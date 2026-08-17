@@ -1,1 +1,14 @@
 .DS_STORE
+node_modules
+bin/
+*.log
+.env
+.env.*
+!.env.*.example
+
+*.bun-build
+.labkit
+.claude/skills
+.omp/skills
+
+.idea
