@@ -158,10 +158,28 @@ AGE in ways worth knowing before writing new Cypher:
 
 ## Testing patterns
 
-Tests spin up `new PGlite({ extensions: { age, vector } })` in memory, call
-`runMigrations(db)` + `bootstrapSession(db)` + `resolveTenantContext(db, "labkit")`
-in `beforeEach` — this is the same bootstrap sequence a real connection goes
-through, not a hand-rolled shortcut. `tests/leader-election.test.ts` races
-three concurrent `connectDb()` calls against a shared `.labkit-test-tmp`
-directory to prove the PGlite backend's election/socket-sharing actually
-works, not just that the code compiles.
+`tests/domain-graph.test.ts` spins up one `new PGlite({ extensions: { age,
+vector } })` in `beforeAll` and reuses it for every test — only the first
+test pays PGlite's WASM start-up cost. Each test still goes through the same
+bootstrap a real connection would (`runMigrations(db)` + `bootstrapSession(db)`
++ `resolveTenantContext(db, "labkit")` in `beforeEach`), it's just no longer
+paying for a fresh instance each time (`runMigrations` is a no-op past the
+first call — the migration journal table already reflects every migration).
+`afterEach` drops the tenant's graph (`graph.dropGraph()`) — which removes
+its whole per-tenant schema, so it never needs to appear in the exclusion
+list below — then truncates every remaining table outside
+`pg_catalog`/`information_schema`/`ag_catalog`/`drizzle` with `RESTART
+IDENTITY CASCADE`. That resets the `tenants.id` sequence every test (so
+`resolveTenantContext(db, "labkit")` deterministically gets tenant id `1`
+again) but deliberately does *not* reset the natural-id sequences from
+`drizzle/0002_natural_ids.sql` — those are standalone `SEQUENCE`s, not tied
+to a truncated table's identity column, so natural ids keep incrementing
+across tests exactly as they would across tenants in production (natural ids
+are scoped globally per entity-type, not per-tenant or per-test — PJ-004
+decision #3). Don't add a test that asserts a specific natural-id value
+across more than one test in the same file for this reason; assert on the
+prefix/shape instead.
+
+`tests/leader-election.test.ts` races three concurrent `connectDb()` calls
+against a shared `.labkit-test-tmp` directory to prove the PGlite backend's
+election/socket-sharing actually works, not just that the code compiles.

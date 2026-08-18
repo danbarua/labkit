@@ -22,8 +22,7 @@
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/pg": "^8.21.0",
-    "drizzle-kit": "^0.31.10"
+    "@types/pg": "^8.21.0"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -38,8 +37,9 @@
     "@electric-sql/pglite-prepopulatedfs": "^0.5.5",
     "@electric-sql/pglite-socket": "^0.2.8",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0",
-    "zod": "^4.4.3",
-    "drizzle-orm": "^0.45.2"
+    "pg-age": "^1.0.0-alpha",
+    "zod": "^4.4.3"
   }
 }
