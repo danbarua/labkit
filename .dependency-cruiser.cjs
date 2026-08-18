@@ -2,6 +2,27 @@
 module.exports = {
   forbidden: [
     {
+      name: 'scenarios-no-persistence',
+      severity: 'error',
+      comment:
+        "A PJ-008 acceptance scenario must be expressible through research verbs alone " +
+        "(src/domain). Reaching into src/db from a scenario means the domain service " +
+        "failed to cover the interaction, which is a finding to record -- not something " +
+        "to route around. tests/helpers/ is exempt: it is harness, not caller.",
+      from: { path: '^tests/scenarios' },
+      to: { path: '^src/db' }
+    },
+    {
+      name: 'persistence-knows-no-domain',
+      severity: 'error',
+      comment:
+        "Layering direction: src/db knows nodes and edges, src/domain knows research " +
+        "actions. Persistence importing the service layer would inverse that and make " +
+        "the graph model depend on today's verbs.",
+      from: { path: '^src/db' },
+      to: { path: '^src/domain' }
+    },
+    {
       name: 'no-circular',
       severity: 'warn',
       comment:
