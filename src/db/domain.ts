@@ -36,6 +36,7 @@ export const EDGE_LABELS = [
   "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
   "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
   "RECORDED_IN", // Evidence -> Artefact
+  "GOVERNS", // Criterion -> Gate (which condition a gate enforces)
   "EVALUATED_AS", // Criterion -> CriterionEvaluation
   "TRIGGERS", // CriterionEvaluation -> Gate
   "GATES", // Gate -> Task/Computation
@@ -95,6 +96,25 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Task", "Artefact"],
   ],
   RECORDED_IN: [["Evidence", "Artefact"]],
+  /**
+   * Which condition a gate enforces, independent of whether it has ever been
+   * evaluated. Earned by S-17.
+   *
+   * PJ-004 #9 made the control chain flow
+   * `Criterion -EVALUATED_AS-> CriterionEvaluation -TRIGGERS-> Gate -GATES-> work`,
+   * which correctly means nothing flows out of a gate that no evaluation
+   * triggered. But it also made the criterion reachable from the gate ONLY
+   * through an evaluation — so for a gate nobody has evaluated, which is
+   * precisely S-17's subject, the governing criterion is unreachable and the
+   * gate is an orphan that gates work while recording no condition at all.
+   *
+   * Demonstrated rather than argued: `criterionGoverning()` returned null for
+   * a declared-but-unevaluated gate, so the reviewer's actual question —
+   * "show me evidence this fails when the artefact is wrong" — could not even
+   * be aimed at a criterion. Direction matches the rest of the chain so the
+   * whole control path reads left to right.
+   */
+  GOVERNS: [["Criterion", "Gate"]],
   EVALUATED_AS: [["Criterion", "CriterionEvaluation"]],
   TRIGGERS: [["CriterionEvaluation", "Gate"]],
   GATES: [["Gate", "Task"], ["Gate", "Computation"]],

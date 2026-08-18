@@ -23,6 +23,10 @@ import type { ArtefactProps, ClaimProps, ComputationProps, EvidenceProps } from 
 import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./events";
 import type {
   AnalysisRef,
+  CriterionRef,
+  GateRef,
+  GateStatus,
+  WorkRef,
   ChangedConclusion,
   Conclusion,
   EnquiryRef,
@@ -158,6 +162,144 @@ export class ResearchSession {
     await this.graph.createEdge(review.natural_id, "EVALUATES", await this.unitOf(input.of));
     this.emit("recordReview", review.natural_id, { of: input.of.id, verdict: input.verdict });
     return { kind: "review", id: review.natural_id };
+  }
+
+  // -------------------------------------------------------------------------
+  // Gating
+  // -------------------------------------------------------------------------
+
+  /** Records a piece of work whose start a gate may protect. */
+  async planWork(input: { objective: string; acceptance: string }): Promise<WorkRef> {
+    const task = await this.graph.createNode("Task", {
+      objective: input.objective,
+      inputs: "",
+      outputs: "",
+      acceptance: input.acceptance,
+      is_open: true,
+    });
+    this.emit("planWork", task.natural_id, { objective: input.objective });
+    return { kind: "work", id: task.natural_id };
+  }
+
+  /** States a condition that must hold. Stating it is not evaluating it. */
+  async stateCriterion(proposition: string): Promise<CriterionRef> {
+    const criterion = await this.graph.createNode("Criterion", { proposition });
+    this.emit("stateCriterion", criterion.natural_id, { proposition });
+    return { kind: "criterion", id: criterion.natural_id };
+  }
+
+  /**
+   * Declares a gate: a consequence attached to a criterion, protecting some
+   * work. Declaring a gate must not make it satisfied — that is the entire
+   * subject of S-17.
+   */
+  async declareGate(input: { criterion: CriterionRef; consequence: string; protecting: WorkRef[] }): Promise<GateRef> {
+    const gate = await this.graph.createNode("Gate", { consequence: input.consequence });
+    await this.graph.createEdge(input.criterion.id, "GOVERNS", gate.natural_id);
+    for (const work of input.protecting) {
+      await this.graph.createEdge(gate.natural_id, "GATES", work.id);
+    }
+    this.emit("declareGate", gate.natural_id, {
+      criterion: input.criterion.id,
+      protecting: input.protecting.map((w) => w.id),
+    });
+    return { kind: "gate", id: gate.natural_id };
+  }
+
+  /** Records that a criterion was actually evaluated, and what came back. */
+  async evaluateCriterion(input: {
+    criterion: CriterionRef;
+    gate: GateRef;
+    value: string;
+    outcome: "pass" | "fail";
+  }): Promise<void> {
+    const at = this.clock.now();
+    const evaluation = await this.graph.createNode("CriterionEvaluation", {
+      value: input.value,
+      outcome: input.outcome,
+      evaluated_at: at,
+    });
+    await this.graph.createEdge(input.criterion.id, "EVALUATED_AS", evaluation.natural_id);
+    await this.graph.createEdge(evaluation.natural_id, "TRIGGERS", input.gate.id);
+    this.emit("evaluateCriterion", evaluation.natural_id, {
+      criterion: input.criterion.id,
+      gate: input.gate.id,
+      outcome: input.outcome,
+    });
+  }
+
+  /**
+   * Which criterion governs this gate?
+   *
+   * The reviewer in S-17 asks for evidence that the guard fails when the
+   * protected artefact is wrong. That is a question about the criterion, and
+   * answering it requires knowing which criterion a gate enforces.
+   *
+   * Answered via `GOVERNS`, which exists from the moment the gate is
+   * declared. Before that edge, the only route ran through a
+   * CriterionEvaluation and so returned null for exactly the gates S-17 is
+   * about — see EDGE_SCHEMA.GOVERNS.
+   */
+  async criterionGoverning(gate: GateRef): Promise<CriterionRef | null> {
+    const rows = await this.graph.query(
+      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { id: gate.id },
+    );
+    const found = rows[0];
+    return found ? { kind: "criterion", id: found.c.natural_id } : null;
+  }
+
+  /** S-17: may this gate be relied on, and on what evidence? */
+  async gateStatus(gate: GateRef): Promise<GateStatus> {
+    const declared = await this.graph.query(
+      `MATCH (g:Gate {natural_id: $id}) RETURN g`,
+      { g: vertexProps<{ consequence: string }>() },
+      { id: gate.id },
+    );
+    const found = declared[0];
+    if (!found) throw new Error(`no gate ${gate.id}`);
+
+    const evaluations = await this.graph.query(
+      `MATCH (c:Criterion)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(:Gate {natural_id: $id})
+       RETURN ev`,
+      { ev: vertexProps<{ value: string; outcome: "pass" | "fail"; evaluated_at: string }>() },
+      { id: gate.id },
+    );
+
+    const gating = await this.graph.query(
+      `MATCH (:Gate {natural_id: $id})-[:GATES]->(w) RETURN w`,
+      { w: vertexProps<{ objective?: string; kind?: string }>() },
+      { id: gate.id },
+    );
+
+    // "Has this guard ever been shown to fail?" is a question about the
+    // criterion's power to discriminate, not about this gate's own history --
+    // the reviewer asks for evidence the check *can* fail. Reached through
+    // GOVERNS, so it counts every evaluation of the governing criterion, not
+    // only those that happened to trigger this gate.
+    const criterionOutcomes = await this.graph.query(
+      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
+       MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
+       RETURN ev`,
+      { ev: vertexProps<{ outcome: "pass" | "fail" }>() },
+      { id: gate.id },
+    );
+
+    const outcomes = evaluations.map((e) => ({ value: e.ev.value, outcome: e.ev.outcome, at: e.ev.evaluated_at }));
+    // Three states, and the ordering matters: absence of evaluation is
+    // checked FIRST, so it can never fall through to "satisfied".
+    const state: GateStatus["state"] =
+      outcomes.length === 0 ? "never-evaluated" : outcomes.some((o) => o.outcome === "pass") ? "satisfied" : "blocked";
+
+    return {
+      gate: gate.id,
+      consequence: found.g.consequence,
+      state,
+      evaluations: outcomes,
+      gating: gating.map((g) => g.w.objective ?? g.w.kind ?? "unknown"),
+      everFailed: criterionOutcomes.some((e) => e.ev.outcome === "fail"),
+    };
   }
 
   // -------------------------------------------------------------------------

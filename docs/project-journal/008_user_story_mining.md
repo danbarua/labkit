@@ -685,6 +685,7 @@ this document's original analysis are marked as such.
 | R | Standing is a birth property, not a transition | `Claim.kind` is hardcoded `"confirmatory"` by the only writer; `exploratory` unreachable through research verbs | S-8, S-7, story 18 | **NEW, from cold review (3 of 4).** Ties to rows **G** and **K**: exploratory→confirmatory is plausibly conferred by an event (preregistration, lock, promotion) rather than set at creation. If so G/K/R are one question about how standing changes, not three |
 | S | No agent, person or role exists in the model | no node label, no property, anywhere | S-8 | **NEW, from cold review.** S-8's Afterward asks "who approved the scale-up, and on what projected cost?" — unanswerable. May legitimately be external metadata rather than domain; S-8 decides |
 | T | Edges cannot carry properties | `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)` | S-7, row O | **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed |
+| U | A gate records no condition until it is evaluated | only path `Criterion`→`Gate` ran via `CriterionEvaluation`; `GateProps` is `{consequence}` | S-17 | **CONFIRMED — resolved.** Added `GOVERNS: Criterion → Gate`. PJ-004 #9's chain correctly stops anything flowing out of an untriggered gate, but it also made the governing criterion reachable *only* through an evaluation — so a declared-but-unevaluated gate, which is exactly S-17's subject, recorded no condition at all. Demonstrated: `criterionGoverning()` returned null, so the reviewer's demand ("show me it fails when the artefact is wrong") could not be aimed at anything |
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from
@@ -698,6 +699,15 @@ independent reviewers, unprimed). They are *not* scenario outcomes — nothing
 has tested them — but three of the five were noticed independently by three
 of four reviewers, which is why they are logged rather than left to be
 re-derived (differently) by whichever scenario hits them first.
+
+**Status after S-17.** Row **U** added and resolved; row **A** (binary
+`pass`/`fail`) took no pressure — S-17's outcomes are genuinely binary, and
+it is S-3 that needs a third. Rows **I** and **S** were predicted to feel
+S-17 and did not: "never evaluated" turned out to be answerable structurally
+(zero evaluations is a distinct state, not a synthetic failure), and nothing
+in S-17 asked who evaluated. The prediction that S-17 would pass unchanged
+was **wrong** — PJ-008 called it "predicted to pass", and it needed a new
+edge.
 
 **Status after S-11** (the control scenario; see `src/domain/`,
 `tests/scenarios/s11_invalidate_analysis.test.ts`). The entity inventory did

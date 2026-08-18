@@ -14,6 +14,9 @@ export interface Ref<K extends string> {
 }
 
 export type ObservationsRef = Ref<"observations">;
+export type CriterionRef = Ref<"criterion">;
+export type GateRef = Ref<"gate">;
+export type WorkRef = Ref<"work">;
 export type AnalysisRef = Ref<"analysis">;
 export type ReviewRef = Ref<"review">;
 export type EnquiryRef = Ref<"enquiry">;
@@ -59,6 +62,32 @@ export interface ReplacementReport {
 export interface UnaffectedRecord {
   what: string;
   why: string;
+}
+
+/**
+ * Whether a gate may be relied on — S-17's four Afterward questions.
+ *
+ * `state` deliberately has three values, not two. "Never evaluated" is not a
+ * kind of failure and must never read as a pass: a gate nobody has evaluated
+ * and a gate that evaluated and failed are different situations, and PJ-001's
+ * doctrine is that a missing evaluation must not be confused with a pass.
+ */
+export interface GateStatus {
+  gate: string;
+  consequence: string;
+  state: "never-evaluated" | "blocked" | "satisfied";
+  /** Evaluations of this gate's criterion. Empty is an answer, not an absence. */
+  evaluations: Array<{ value: string; outcome: "pass" | "fail"; at: string }>;
+  /** What is currently relying on this gate — the blast radius of a fake guard. */
+  gating: string[];
+  /**
+   * Whether any evaluation of this criterion has ever come back `fail`.
+   *
+   * A guard nobody has seen fail is a guard nobody has shown to work. Note
+   * this cannot distinguish "the criterion cannot fail" from "it was never
+   * given anything that should fail" — see this build's findings.
+   */
+  everFailed: boolean;
 }
 
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */
