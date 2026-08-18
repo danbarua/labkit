@@ -1,0 +1,45 @@
+{
+  "name": "labkit",
+  "description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
+  "license": "MIT",
+  "version": "0.0.1",
+  "main": "src/index.ts",
+  "type": "module",
+  "bin": {
+    "labkit": "src/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun build --compile --outfile bin/labkit src/cli.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check:migrations": "bun scripts/check-migrations.ts",
+    "check:no-tracked-symlinks": "bash scripts/check-no-tracked-simlinks.sh",
+    "check:progress": "bash scripts/check-progress-to-stdout.sh",
+    "db:generate": "drizzle-kit generate",
+    "db:generate:custom": "drizzle-kit generate --custom"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.21.0",
+    "drizzle-kit": "^0.31.10"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "engines": {
+    "bun": ">=1.3.10"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.5",
+    "@electric-sql/pglite-age": "^0.0.6",
+    "@electric-sql/pglite-pgvector": "^0.0.6",
+    "@electric-sql/pglite-prepopulatedfs": "^0.5.5",
+    "@electric-sql/pglite-socket": "^0.2.8",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "pg": "^8.23.0",
+    "zod": "^4.4.3",
+    "drizzle-orm": "^0.45.2"
+  }
+}
