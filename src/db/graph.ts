@@ -12,6 +12,22 @@ export interface LabKitDB {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
+/**
+ * Bump whenever `NODE_LABELS`, `EDGE_LABELS`, `NODE_VIEW_COLUMNS`, or
+ * `EDGE_SCHEMA` changes structurally. `src/db/tenant.ts`'s
+ * `provisionTenantGraph()` compares this against each tenant's stored
+ * `schema_version` (src/db/schema.ts) and only re-runs the full
+ * reconciliation pass when they differ — otherwise every `resolveTenantContext`
+ * call would redundantly re-check ~50 idempotent DDL statements. This is
+ * NOT a migration system — it's groundwork for one. How an actual
+ * incompatible graph-schema change (renaming a label, reshaping a property)
+ * gets carried out for tenants that already have data is deliberately
+ * undecided; this version marker just makes "has this tenant seen the
+ * current schema" answerable, which any real migration mechanism will need
+ * anyway. See docs/project-journal/005_provisioning_reconciliation.md.
+ */
+export const GRAPH_SCHEMA_VERSION = 1;
+
 export const NODE_LABELS = [
   "Question",
   "LineOfEnquiry",
@@ -373,17 +389,24 @@ export class TenantGraph {
    * `(fromId, edge, toId)` is a unique key for a relationship — calling
    * this twice with the same three values is a no-op, not a duplicate
    * parallel edge, so agent retries are safe by construction. This is
-   * implemented as an explicit existence check before `CREATE`, NOT Cypher
-   * `MERGE` — `MERGE` for a relationship between two already-matched nodes
-   * was spiked and found broken under pglite-age (the created edge's
-   * `start_id`/`end_id` are both `0`, so it never actually connects the
-   * nodes — see .claude/skills/postgres-age/SKILL.md's gotchas). This
-   * leaves a narrow check-then-create race under concurrent callers, which
-   * PGlite's single-writer architecture makes moot for that backend; a
-   * future direct-Postgres backend would need this revisited (a real
-   * UNIQUE constraint on the edge label's `(start_id, end_id)` table would
-   * be the DB-enforced fix, mirroring how natural-id uniqueness is
-   * enforced — not built yet, no concrete need for it has shown up).
+   * implemented as an explicit existence check before `CREATE` (the fast
+   * path), NOT Cypher `MERGE` — `MERGE` for a relationship between two
+   * already-matched nodes was spiked and found broken under pglite-age (the
+   * created edge's `start_id`/`end_id` are both `0`, so it never actually
+   * connects the nodes — see .claude/skills/postgres-age/SKILL.md's
+   * gotchas).
+   *
+   * The check-then-create fast path alone would leave a race under
+   * concurrent callers on the direct-Postgres backend (already shipped, not
+   * hypothetical — two processes can both pass the existence check before
+   * either `CREATE`s). Closed at the DB layer instead: every edge label's
+   * table has a `UNIQUE (start_id, end_id)` index (provisioned in
+   * `src/db/tenant.ts`, confirmed to actually enforce uniqueness — a
+   * duplicate `CREATE` raises a real Postgres `23505` error), and this
+   * method catches exactly that error code and treats it as the same
+   * successful no-op the fast-path check would have produced. The
+   * uniqueness guarantee is real regardless of backend; the pre-check is
+   * purely an optimization to avoid a wasted round trip in the common case.
    */
   async createEdge(fromId: string, edge: EdgeLabel, toId: string): Promise<void> {
     const fromLabel = resolveLabelFromNaturalId(fromId);
@@ -407,11 +430,16 @@ export class TenantGraph {
     );
     if (existing.length > 0) return;
 
-    await this.cypher(
-      `MATCH (a:${fromLabel} {natural_id: $from}), (b:${toLabel} {natural_id: $to}) CREATE (a)-[:${edge}]->(b)`,
-      "(x agtype)",
-      { from: fromId, to: toId },
-    );
+    try {
+      await this.cypher(
+        `MATCH (a:${fromLabel} {natural_id: $from}), (b:${toLabel} {natural_id: $to}) CREATE (a)-[:${edge}]->(b)`,
+        "(x agtype)",
+        { from: fromId, to: toId },
+      );
+    } catch (err) {
+      if ((err as { code?: string }).code === "23505") return; // lost the race to a concurrent caller — same edge now exists, which is the desired end state
+      throw err;
+    }
   }
 
   /**

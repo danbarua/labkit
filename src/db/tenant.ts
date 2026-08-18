@@ -1,5 +1,5 @@
 import type { LabKitDB } from "./graph";
-import { NODE_LABELS, EDGE_LABELS, NODE_VIEW_COLUMNS } from "./graph";
+import { NODE_LABELS, EDGE_LABELS, NODE_VIEW_COLUMNS, GRAPH_SCHEMA_VERSION, type NodeLabel, type EdgeLabel } from "./graph";
 
 export interface TenantContext {
   tenantId: number;
@@ -7,10 +7,11 @@ export interface TenantContext {
 }
 
 /**
- * Resolves (creating if needed) a tenant by slug, provisions its AGE graph,
- * and returns the `TenantContext` every `TenantGraph` operation requires.
- * This is the CLI/MCP/bootstrap-boundary resolution point PJ-003 §5
- * describes — below this, there is no "tenant omitted" mode.
+ * Resolves (creating if needed) a tenant by slug, reconciles its AGE graph
+ * against the current schema, and returns the `TenantContext` every
+ * `TenantGraph` operation requires. This is the CLI/MCP/bootstrap-boundary
+ * resolution point PJ-003 §5 describes — below this, there is no "tenant
+ * omitted" mode.
  */
 export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promise<TenantContext> {
   const inserted = await db.query<{ id: number; graph_name: string }>(
@@ -27,17 +28,17 @@ export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promi
 }
 
 /**
- * Provisions a tenant's AGE graph: the graph itself, every vertex/edge
- * label, a UNIQUE natural-id index per label, and a CQRS read view per
- * label — all inside one transaction guarded by a transaction-scoped
- * advisory lock keyed by `tenantId`.
+ * Ensures a tenant's AGE graph is fully reconciled against the current
+ * schema (`GRAPH_SCHEMA_VERSION`) — cheap no-op if it already is, a full
+ * `reconcileTenantGraph()` pass otherwise. All inside one transaction
+ * guarded by a transaction-scoped advisory lock keyed by `tenantId`.
  *
  * Contract: serialized per tenant and idempotent AS A WHOLE — not "each
- * individual DDL statement happens to survive a race." Tenant creation is
+ * individual DDL statement happens to survive a race." Tenant resolution is
  * runtime code (unlike the one-time migrations in ./drizzle/), so two
- * processes can call this concurrently for a brand new tenant; the loser
- * blocks on the advisory lock until the winner commits, then sees the graph
- * already exists and does nothing further.
+ * processes can call this concurrently; the loser blocks on the advisory
+ * lock until the winner commits, then re-reads `schema_version` (inside the
+ * lock, not before it) and finds it already current.
  *
  * On PGlite this lock is uncontended in practice (PGlite is already
  * single-writer), but the code path is identical across backends —
@@ -48,32 +49,12 @@ export async function provisionTenantGraph(db: LabKitDB, tenantId: number, graph
   try {
     await db.query("SELECT pg_advisory_xact_lock($1)", [tenantId]);
 
-    const existing = await db.query(`SELECT 1 FROM ag_catalog.ag_graph WHERE name = $1`, [graphName]);
-    if (existing.rows.length === 0) {
-      await db.query(`SELECT create_graph($1)`, [graphName]);
+    const row = await db.query<{ schema_version: number }>(`SELECT schema_version FROM tenants WHERE id = $1`, [tenantId]);
+    const currentVersion = row.rows[0]?.schema_version ?? 0;
 
-      for (const label of NODE_LABELS) {
-        await db.query(`SELECT create_vlabel($1, $2)`, [graphName, label]);
-      }
-      for (const edge of EDGE_LABELS) {
-        await db.query(`SELECT create_elabel($1, $2)`, [graphName, edge]);
-      }
-      for (const label of NODE_LABELS) {
-        await db.query(
-          `CREATE UNIQUE INDEX ON "${graphName}"."${label}" ((ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)))`,
-        );
-      }
-      for (const label of NODE_LABELS) {
-        const columns = NODE_VIEW_COLUMNS[label]
-          .map((col) => `labkit_prop(properties, '${col}') AS ${col}`)
-          .join(",\n           ");
-        await db.query(
-          `CREATE VIEW "${graphName}".${label.toLowerCase()} AS
-           SELECT labkit_prop(properties, 'natural_id') AS natural_id,
-           ${columns}
-           FROM "${graphName}"."${label}"`,
-        );
-      }
+    if (currentVersion < GRAPH_SCHEMA_VERSION) {
+      await reconcileTenantGraph(db, graphName);
+      await db.query(`UPDATE tenants SET schema_version = $1 WHERE id = $2`, [GRAPH_SCHEMA_VERSION, tenantId]);
     }
 
     await db.query("COMMIT");
@@ -81,4 +62,102 @@ export async function provisionTenantGraph(db: LabKitDB, tenantId: number, graph
     await db.query("ROLLBACK");
     throw err;
   }
+}
+
+/**
+ * The actual reconciliation: ensures the graph, every vertex/edge label,
+ * every natural-id uniqueness index, every edge-relationship uniqueness
+ * index, and every CQRS view exist and match the current schema — each
+ * independently, not gated behind a single "does the graph exist at all"
+ * check. This is what makes a *new* label/edge/view added to the codebase
+ * actually reach a tenant whose graph was provisioned before that change
+ * shipped, not just brand-new tenants.
+ *
+ * Exported separately from `provisionTenantGraph` (rather than only
+ * reachable through the version-gate) so reconciliation/self-healing
+ * behavior — e.g. "a view got dropped somehow, does the next reconcile
+ * pass restore it" — is directly testable without needing to manipulate
+ * `schema_version` to force the gate open.
+ */
+export async function reconcileTenantGraph(db: LabKitDB, graphName: string): Promise<void> {
+  await ensureGraph(db, graphName);
+  for (const label of NODE_LABELS) await ensureVertexLabel(db, graphName, label);
+  for (const edge of EDGE_LABELS) await ensureEdgeLabel(db, graphName, edge);
+  for (const label of NODE_LABELS) await ensureNaturalIdIndex(db, graphName, label);
+  for (const edge of EDGE_LABELS) await ensureEdgeUniqueIndex(db, graphName, edge);
+  for (const label of NODE_LABELS) await ensureView(db, graphName, label);
+}
+
+async function ensureGraph(db: LabKitDB, graphName: string): Promise<void> {
+  const existing = await db.query(`SELECT 1 FROM ag_catalog.ag_graph WHERE name = $1`, [graphName]);
+  if (existing.rows.length === 0) {
+    await db.query(`SELECT create_graph($1)`, [graphName]);
+  }
+}
+
+async function labelExists(db: LabKitDB, graphName: string, label: string): Promise<boolean> {
+  const rows = await db.query(
+    `SELECT 1 FROM ag_catalog.ag_label WHERE name = $2 AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
+    [graphName, label],
+  );
+  return rows.rows.length > 0;
+}
+
+async function ensureVertexLabel(db: LabKitDB, graphName: string, label: NodeLabel): Promise<void> {
+  if (!(await labelExists(db, graphName, label))) {
+    await db.query(`SELECT create_vlabel($1, $2)`, [graphName, label]);
+  }
+}
+
+async function ensureEdgeLabel(db: LabKitDB, graphName: string, edge: EdgeLabel): Promise<void> {
+  if (!(await labelExists(db, graphName, edge))) {
+    await db.query(`SELECT create_elabel($1, $2)`, [graphName, edge]);
+  }
+}
+
+/**
+ * DB-enforced natural-id uniqueness per label (see `.claude/skills/postgres-age/SKILL.md`
+ * for why `agtype_access_operator` is the right expression here). Named
+ * explicitly (rather than left to Postgres's auto-naming) so `IF NOT EXISTS`
+ * has something to key its idempotency check on.
+ */
+async function ensureNaturalIdIndex(db: LabKitDB, graphName: string, label: NodeLabel): Promise<void> {
+  const indexName = `${label.toLowerCase()}_natural_id_idx`;
+  await db.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${graphName}"."${label}" ((ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)))`,
+  );
+}
+
+/**
+ * DB-enforced edge-relationship uniqueness: every edge label's underlying
+ * table has exactly `id`/`start_id`/`end_id`/`properties` columns (AGE
+ * materializes edges as real tables just like vertices — confirmed via
+ * `information_schema.columns`), so `UNIQUE (start_id, end_id)` encodes
+ * "at most one edge of this type between these two nodes" directly, closing
+ * the concurrent-create race `TenantGraph.createEdge()`'s check-then-create
+ * fast path alone can't (see that method's docstring).
+ */
+async function ensureEdgeUniqueIndex(db: LabKitDB, graphName: string, edge: EdgeLabel): Promise<void> {
+  const indexName = `${edge.toLowerCase()}_start_end_idx`;
+  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${graphName}"."${edge}" (start_id, end_id)`);
+}
+
+/**
+ * Per-tenant CQRS read view, schema-qualified to this tenant so there's
+ * never a naming collision between tenants. `CREATE OR REPLACE VIEW` is
+ * itself idempotent and picks up column additions — it can NOT remove or
+ * reorder existing columns (a real Postgres restriction), so a
+ * `NODE_VIEW_COLUMNS` change that does either needs an actual migration
+ * story once one exists, not just a reconcile pass. Acceptable for now per
+ * the "lay the groundwork, figure out real graph migrations later" decision
+ * (docs/project-journal/005_provisioning_reconciliation.md).
+ */
+async function ensureView(db: LabKitDB, graphName: string, label: NodeLabel): Promise<void> {
+  const columns = NODE_VIEW_COLUMNS[label].map((col) => `labkit_prop(properties, '${col}') AS ${col}`).join(",\n           ");
+  await db.query(
+    `CREATE OR REPLACE VIEW "${graphName}".${label.toLowerCase()} AS
+     SELECT labkit_prop(properties, 'natural_id') AS natural_id,
+     ${columns}
+     FROM "${graphName}"."${label}"`,
+  );
 }

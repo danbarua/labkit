@@ -104,34 +104,58 @@ and is exactly what `TenantGraph.createNode()` does.
 named `labkit_t1`, containing parent tables `_ag_label_vertex`/
 `_ag_label_edge`. Every vertex/edge label — `create_vlabel`/`create_elabel`
 (LabKit always pre-creates these at tenant-provisioning time, see
-`src/db/tenant.ts`'s `provisionTenantGraph()`) — becomes its own real
+`src/db/tenant.ts`'s `reconcileTenantGraph()`) — becomes its own real
 Postgres table inheriting from those parents, visible in
-`ag_catalog.ag_label`. Confirmed by inspecting
-`information_schema.columns` for `labkit_t1."Question"`: exactly two
-columns, `id` (the internal graphid) and `properties` (agtype).
+`ag_catalog.ag_label`. `ag_catalog.drop_label(graph_name, label, false)`
+drops one (the third argument is documented as a `cascade`/force flag but
+pglite-age rejects `true` with "force option is not supported yet" — pass
+`false`).
+
+Confirmed via `information_schema.columns`:
+
+- A **vertex** label's table (e.g. `labkit_t1."Question"`) has exactly two
+  columns: `id` (the internal graphid) and `properties` (agtype).
+- An **edge** label's table (e.g. `labkit_t1."USES"`) has exactly four:
+  `id`, `start_id`, `end_id` (all `graphid`), and `properties` (agtype).
 
 This means **plain SQL DDL can target a label's table directly** — no need
 to go through `cypher()` for indexes, constraints, or bulk reads:
 
 ```sql
--- Functional unique index — Postgres actually enforces this (confirmed: a
--- duplicate natural_id via Cypher SET raises a real
--- "duplicate key value violates unique constraint" error).
+-- Vertex: functional unique index on a property — Postgres actually
+-- enforces this (confirmed: a duplicate natural_id via Cypher SET raises a
+-- real "duplicate key value violates unique constraint" error).
 CREATE UNIQUE INDEX ON "labkit_t1"."Question"
   ((ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)));
 
--- Reading straight off the table, no cypher() call needed. The
+-- Edge: plain UNIQUE(start_id, end_id) — encodes "at most one edge of this
+-- type between these two nodes" directly, confirmed to block a duplicate
+-- CREATE with a real 23505 error. This is what TenantGraph.createEdge()'s
+-- concurrency safety actually rests on, not its app-level pre-check alone.
+CREATE UNIQUE INDEX ON "labkit_t1"."USES" (start_id, end_id);
+
+-- Reading straight off a vertex table, no cypher() call needed. The
 -- `(properties::text)::jsonb` round-trip is cleaner than agtype's own
 -- operators for this — see labkit_prop() in drizzle/0002_natural_ids.sql.
 SELECT (properties::text)::jsonb ->> 'natural_id' AS natural_id
 FROM "labkit_t1"."Question";
 ```
 
-Each tenant's CQRS read-side views (`src/db/tenant.ts`'s
-`provisionTenantGraph()`, one view per label, e.g. `"labkit_t1".question`)
-use exactly this pattern — no `cypher()` call, no `::vertex`-suffix parsing,
-just ordinary schema-qualified SQL, scoped per tenant so there's never a
-naming collision between tenants' views.
+Each tenant's CQRS read-side views (`src/db/tenant.ts`'s `ensureView()`, one
+per label, e.g. `"labkit_t1".question`) use exactly this pattern — no
+`cypher()` call, no `::vertex`-suffix parsing, just ordinary
+schema-qualified SQL, scoped per tenant so there's never a naming collision
+between tenants' views.
+
+**Provisioning is reconciliation, not a one-time gate.** `create_graph`/
+`create_vlabel`/`create_elabel`/index/view creation all happen via
+`src/db/tenant.ts`'s `reconcileTenantGraph()`, which independently ensures
+each resource exists — not gated behind a single "does the graph already
+exist" check. That distinction matters because there's no `ALTER GRAPH` DDL
+the way there's `ALTER TABLE`: evolving an already-provisioned tenant's
+graph structure is the application's job, and an all-or-nothing gate would
+mean a tenant provisioned before a new label/edge/view shipped never sees
+it. See docs/project-journal/005_provisioning_reconciliation.md.
 
 ## LabKit-specific gotchas
 
@@ -147,9 +171,14 @@ none of these are documented AGE limitations, they're specific to
   `b` (confirmed: `id(a)`/`id(b)` resolve correctly, but the edge is
   unreachable from either node afterward). `TenantGraph.createEdge()`
   therefore does NOT use `MERGE` — it does an explicit `MATCH` for an
-  existing `(from, edge, to)` edge first and only `CREATE`s if absent. If a
-  future AGE/pglite-age upgrade fixes this, `MERGE` would be the more
-  idiomatic (and atomic) choice — re-spike before switching.
+  existing `(from, edge, to)` edge first and only `CREATE`s if absent, with
+  a `UNIQUE (start_id, end_id)` index per edge label (see "How graphs are
+  stored" above) as the actual concurrency-safety backstop: a losing
+  concurrent `CREATE` hits a `23505` error that `createEdge()` catches and
+  treats as success, rather than relying on the pre-check alone. If a future
+  AGE/pglite-age upgrade fixes `MERGE`, it would be the more idiomatic (and
+  marginally cheaper) choice — re-spike before switching; the `UNIQUE`
+  index stays regardless, it's the real correctness guarantee either way.
 - **No whole-map `CREATE` property parameter.** `CREATE (n:Label $props)`
   fails with `properties in a CREATE clause as a parameter is not
   supported`. Expand each key individually:
@@ -172,11 +201,13 @@ none of these are documented AGE limitations, they're specific to
   caller has to. This does **not** apply to a bare `properties` column read
   directly off a label's table (see "How graphs are stored" above) — that
   round-trips through `(properties::text)::jsonb` with no suffix to strip.
-- **`create_graph()` has no `IF NOT EXISTS`.** It errors if the graph
-  already exists — `provisionTenantGraph()` checks `ag_catalog.ag_graph`
-  for existence first, inside a transaction guarded by
-  `pg_advisory_xact_lock(tenantId)` so two processes provisioning the same
-  new tenant concurrently can't interleave partial provisioning.
+- **`create_graph()`/`create_vlabel()`/`create_elabel()` have no `IF NOT EXISTS`.**
+  Each errors if already present — `ensureGraph`/`ensureVertexLabel`/
+  `ensureEdgeLabel` (`src/db/tenant.ts`) each check `ag_catalog.ag_graph`/
+  `ag_catalog.ag_label` for existence first. The whole reconcile pass runs
+  inside a transaction guarded by `pg_advisory_xact_lock(tenantId)` so two
+  processes provisioning the same tenant concurrently can't interleave
+  partial provisioning.
 - **`LOAD`/`SET search_path` are session-scoped**, not schema state — every
   connecting process must call them itself (`bootstrapSession()` in
   `src/db/graph.ts`), they can't be migrated or provisioned away.

@@ -4,7 +4,7 @@ import { age } from "@electric-sql/pglite-age";
 import { vector } from "@electric-sql/pglite-pgvector";
 import { TenantGraph, bootstrapSession, parseAgtype, NODE_LABELS, NATURAL_ID_PREFIX, type NodeLabel, type DecisionProps } from "../src/db/graph";
 import { runMigrations } from "../src/db/migrate";
-import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
+import { resolveTenantContext, reconcileTenantGraph, type TenantContext } from "../src/db/tenant";
 
 /**
  * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
@@ -365,6 +365,91 @@ describe("tenant isolation", () => {
     const loeB = await graphB.createNode("LineOfEnquiry", { name: "loe-in-b" });
 
     await expect(graphA.createEdge(questionA.natural_id, "MOTIVATES", loeB.natural_id)).rejects.toThrow(/not found/);
+  });
+});
+
+describe("provisioning reconciliation", () => {
+  test("re-running reconcileTenantGraph restores a dropped view", async () => {
+    await db.query(`DROP VIEW "${ctx.graphName}".question`);
+    const before = await db.query(`SELECT 1 FROM information_schema.views WHERE table_schema = $1 AND table_name = 'question'`, [ctx.graphName]);
+    expect(before.rows).toHaveLength(0);
+
+    await reconcileTenantGraph(db, ctx.graphName);
+
+    const after = await db.query(`SELECT 1 FROM information_schema.views WHERE table_schema = $1 AND table_name = 'question'`, [ctx.graphName]);
+    expect(after.rows).toHaveLength(1);
+  });
+
+  test("re-running reconcileTenantGraph restores a dropped natural-id index", async () => {
+    await db.query(`DROP INDEX "${ctx.graphName}".claim_natural_id_idx`);
+    const before = await db.query(`SELECT 1 FROM pg_indexes WHERE schemaname = $1 AND indexname = 'claim_natural_id_idx'`, [ctx.graphName]);
+    expect(before.rows).toHaveLength(0);
+
+    await reconcileTenantGraph(db, ctx.graphName);
+
+    const after = await db.query(`SELECT 1 FROM pg_indexes WHERE schemaname = $1 AND indexname = 'claim_natural_id_idx'`, [ctx.graphName]);
+    expect(after.rows).toHaveLength(1);
+  });
+
+  test("a new NODE_LABELS entry reaches an already-provisioned tenant on the next reconcile pass", async () => {
+    // Simulates "the codebase gained a label after this tenant was already
+    // provisioned" without actually changing NODE_LABELS: drop one label's
+    // vertex table entirely (as if it never existed for this tenant), then
+    // confirm reconcileTenantGraph notices and recreates it — this is
+    // exactly the schema-evolution gap PJ-004's original all-or-nothing
+    // "provision only if the graph itself is absent" check couldn't close.
+    await db.query(`DROP VIEW "${ctx.graphName}".task`);
+    await db.query(`SELECT ag_catalog.drop_label($1, 'Task', false)`, [ctx.graphName]);
+    const before = await db.query(
+      `SELECT 1 FROM ag_catalog.ag_label WHERE name = 'Task' AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
+      [ctx.graphName],
+    );
+    expect(before.rows).toHaveLength(0);
+
+    await reconcileTenantGraph(db, ctx.graphName);
+
+    const task = await graph.createNode("Task", { objective: "o", inputs: "i", outputs: "o", acceptance: "a" });
+    expect(task.natural_id).toMatch(/^TASK_\d+$/);
+  });
+});
+
+describe("edge uniqueness is DB-enforced, not just app-checked", () => {
+  test("a duplicate CREATE that bypasses the app-level check is still blocked at the database", async () => {
+    const question = await graph.createNode("Question", { name: "q" });
+    const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+    await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
+
+    // Bypass TenantGraph.createEdge()'s own existence check to prove the
+    // constraint — not the app-level check — is what's actually stopping
+    // a second edge.
+    await expect(
+      graph.cypher(
+        `MATCH (a:Question {natural_id: $from}), (b:LineOfEnquiry {natural_id: $to}) CREATE (a)-[:MOTIVATES]->(b)`,
+        "(x agtype)",
+        { from: question.natural_id, to: loe.natural_id },
+      ),
+    ).rejects.toThrow(/duplicate key value violates unique constraint/);
+  });
+
+  test("createEdge survives losing a race to a concurrent caller", async () => {
+    const question = await graph.createNode("Question", { name: "q" });
+    const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+
+    // Two concurrent createEdge() calls for the same (from, edge, to):
+    // both can pass the existence pre-check before either CREATEs, so one
+    // of them must hit the UNIQUE (start_id, end_id) constraint and recover
+    // via the 23505 catch rather than throwing.
+    await Promise.all([
+      graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
+      graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
+    ]);
+
+    const rows = await graph.cypher<{ r: string }>(
+      `MATCH (:Question {natural_id: $qId})-[r:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN r`,
+      "(r agtype)",
+      { qId: question.natural_id, loeId: loe.natural_id },
+    );
+    expect(rows).toHaveLength(1);
   });
 });
 

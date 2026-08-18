@@ -56,6 +56,20 @@ assumptions:
   instead (see the postgres-age skill's gotchas section). Left unchecked
   here deliberately — it's the one item on this list that did NOT resolve
   the way it was expected to.
+- [x] **Edge label tables have `id`/`start_id`/`end_id`/`properties`
+  columns** (2026-08-18): confirmed via `information_schema.columns` for
+  `"labkit_t1"."USES"` — the same "labels are real Postgres tables" fact
+  PJ-002 already established for vertices, extended to edges. This is what
+  made a real `UNIQUE (start_id, end_id)` index possible, closing the
+  concurrent-`createEdge` race the check-then-`CREATE` fallback above
+  couldn't on its own — see
+  `docs/project-journal/005_provisioning_reconciliation.md`.
+- [x] **`ag_catalog.drop_label(graph, label, false)`** (2026-08-18): drops a
+  vertex or edge label. The documented third `cascade`/force argument
+  rejects `true` under pglite-age ("force option is not supported yet") —
+  pass `false`. Used to test provisioning reconciliation
+  (`reconcileTenantGraph()` restoring a label that was dropped out from
+  under a tenant).
 
 ## Scenarios another agent should try next
 

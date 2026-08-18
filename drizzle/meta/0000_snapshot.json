@@ -1,5 +1,5 @@
 {
-  "id": "c8653c57-1b6a-4de8-a3cf-b12e14d9a045",
+  "id": "6009db0f-a8ec-43a7-86c9-1e60894d3eef",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -35,6 +35,13 @@
             "as": "'labkit_t' || id",
             "type": "stored"
           }
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
