@@ -14,7 +14,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "check:migrations": "bun scripts/check-migrations.ts",
-    "check:no-tracked-symlinks": "bash scripts/check-no-tracked-simlinks.sh",
+    "check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
     "check:progress": "bash scripts/check-progress-to-stdout.sh",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom"
