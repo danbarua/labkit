@@ -125,7 +125,7 @@ and is exactly what `TenantGraph.createNode()` does.
 **namespace** (schema) named `labkit_t1`, containing parent tables
 `_ag_label_vertex`/`_ag_label_edge`. Every vertex/edge label —
 `ag_catalog.create_vlabel`/`create_elabel` (LabKit always pre-creates these
-at tenant-provisioning time, see `src/db/tenant.ts`'s
+at tenant-provisioning time, see `src/db/provisioning.ts`'s
 `provisionTenantGraph()`) — becomes its own real Postgres table inheriting
 from those parents, visible in `ag_catalog.ag_label`.
 `ag_catalog.drop_label(graph_name, label, false)` drops one (the third
@@ -166,7 +166,7 @@ SELECT (properties::text)::jsonb ->> 'natural_id' AS natural_id
 FROM "labkit_t1"."Question";
 ```
 
-Each tenant's CQRS read-side views (`src/db/tenant.ts`'s `ensureView()`, one
+Each tenant's CQRS read-side views (`src/db/provisioning.ts`'s `ensureView()`, one
 per label, e.g. `"labkit_t1".question`) use exactly this pattern — no
 `cypher()` call, no `::vertex`-suffix parsing, just ordinary
 schema-qualified SQL, scoped per tenant so there's never a naming collision
@@ -174,7 +174,7 @@ between tenants' views.
 
 **Provisioning is reconciliation, not a one-time gate.** `create_graph`/
 `create_vlabel`/`create_elabel`/index/view creation all happen via
-`src/db/tenant.ts`'s `provisionTenantGraph()` (called from every
+`src/db/provisioning.ts`'s `provisionTenantGraph()` (called from every
 `resolveTenantContext()`, unconditionally — no version check, see PJ-005),
 which independently ensures each resource exists — not gated behind a
 single "does the graph already exist" check. That distinction matters
@@ -242,18 +242,18 @@ it in a throwaway script first — see PJ-006 for how these were found.
   round-trips through `(properties::text)::jsonb` with no suffix to strip.
 - **`create_graph()`/`create_vlabel()`/`create_elabel()` have no `IF NOT EXISTS`.**
   Each errors if already present — `ensureGraph`/`ensureVertexLabel`/
-  `ensureEdgeLabel` (`src/db/tenant.ts`) each check `ag_catalog.ag_graph`/
+  `ensureEdgeLabel` (`src/db/provisioning.ts`) each check `ag_catalog.ag_graph`/
   `ag_catalog.ag_label` for existence first. The whole reconcile pass runs
   inside a transaction guarded by `pg_advisory_xact_lock(tenantId)` so two
   processes provisioning the same tenant concurrently can't interleave
   partial provisioning.
 - **`LOAD`/`SET search_path` are session-scoped**, not schema state — every
   connecting process must call them itself (`bootstrapSession()` in
-  `src/db/graph.ts`), they can't be migrated or provisioned away.
+  `src/db/client.ts`), they can't be migrated or provisioned away.
 - **Never rely on `search_path` ordering to resolve an unqualified name —
   qualify explicitly.** `ag_catalog.` on every AGE catalog function
   (`ag_catalog.cypher(...)`, `ag_catalog.create_graph(...)`, etc. —
-  `src/db/graph.ts`, `src/db/tenant.ts`), and `src/db/schema.ts`'s
+  `src/db/graph.ts`, `src/db/provisioning.ts`), and `src/db/schema.ts`'s
   `LABKIT_SCHEMA` constant (`"public"`, the single place that would change
   if LabKit ever moved to schema-per-tenancy for its own relational tables)
   on every LabKit-owned object: `${LABKIT_SCHEMA}.tenants`,
@@ -318,7 +318,29 @@ not yet submitted anywhere:
 Straight from `tests/domain-graph.test.ts` — each answers one of the
 journal's MVP acceptance-criteria questions. All addressed by natural id,
 never AGE's internal graphid, and all implicitly scoped to one tenant's
-graph (`graph.cypher(...)` closes over `ctx.graphName`).
+graph (`graph.query(...)` closes over `ctx.graphName`).
+
+From TypeScript these run through `TenantGraph.query(cypher, columns, params)`,
+where `columns` declares each `RETURN`ed name and its decoder — that single
+declaration produces both the SQL `AS` clause AGE requires and the result
+type, so none of the below needs a hand-written `"(e agtype, comp agtype)"`
+or a `parseAgtype()` call:
+
+```ts
+const rows = await graph.query(
+  `MATCH (:Claim {natural_id: $claimId})<-[:SUPPORTS]-(e:Evidence)
+   MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
+   MATCH (u)-[:USES]->(comp:Computation)
+   RETURN e, comp`,
+  { e: vertexProps<EvidenceProps>(), comp: vertexProps<ComputationProps>() },
+  { claimId },
+);
+rows[0]!.e.statement; // typed; no kind-narrowing at the call site
+```
+
+Wrap a column in `optional(...)` when an `OPTIONAL MATCH` can leave it
+unset — that puts the nullability in the type instead of a `!`. Decoders
+live in `src/db/cypher.ts`.
 
 **"What evidence and computation support this claim?"**
 ```cypher
@@ -368,7 +390,7 @@ RETURN x
 
 **"What does this criterion evaluation gate?"** — the corrected chain
 (`Gate`, not `Criterion`, is what gates the downstream object — see
-`EDGE_SCHEMA` in `src/db/graph.ts` for the full rationale):
+`EDGE_SCHEMA` in `src/db/domain.ts` for the full rationale):
 ```cypher
 MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(comp:Computation)
 RETURN comp
@@ -388,3 +410,4 @@ RETURN comp
 - `docs/project-journal/004_tenancy_implementation_plan.md` — this implementation's plan
 - `docs/project-journal/005_provisioning_reconciliation.md` — provisioning reconciliation, why there's no version gate
 - `docs/project-journal/006_agtype_client_and_concurrency_hardening.md` — AGE provenance, the in-house `agtype.ts` parser, schema-qualification, and the pglite-socket concurrency bug
+- `docs/project-journal/007_db_layering_and_typed_cypher.md` — layering `src/db/`, the column-decoder query API, and the `NODE_TYPES` domain registry

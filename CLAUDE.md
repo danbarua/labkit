@@ -14,7 +14,7 @@ domain rationale and boundary tests.
 The domain model lives across a chain of project-journal entries
 (`docs/project-journal/00N_*.md`) that read newest-first for "what's true
 now" — each records *why* a decision was made, not just what changed. Before
-touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-006
+touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 (current persistence design) rather than inferring intent from code alone.
 
 ## Commands
@@ -50,13 +50,43 @@ traversal and dependency propagation are the actual point of this domain —
 forcing them into FK tables would just reimplement graph traversal as
 recursive CTEs.
 
+`src/db/` is layered, not a hub — each module has one job, and the
+dependency direction is enforced by `bun run dev:dependency-cruiser`
+(renders `dependency-graph.svg`; `npx depcruise src tests --output-type err`
+for violations only):
+
+| module | job |
+| --- | --- |
+| `client.ts` | `LabKitDB` (the connection seam) + `bootstrapSession` |
+| `agtype.ts` | agtype parsing, identifier validation, Cypher clause/quoting helpers |
+| `cypher.ts` | `CypherRunner` + column decoders — typed Cypher execution |
+| `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA` |
+| `graph.ts` | `TenantGraph` — the domain-typed verbs |
+| `provisioning.ts` | per-tenant graph schema reconciliation |
+| `tenant.ts` | resolving a slug to a `TenantContext` |
+
+`domain.ts` imports nothing from `src/db/`; it's pure types and data, read by
+both `graph.ts` (to type and validate writes) and `provisioning.ts` (to decide
+what to create). `NODE_TYPES` is one entry per node label carrying its
+natural-id `prefix`, its CQRS `viewColumns`, and its optional `validate` — the
+four parallel per-label tables it replaced are not coming back. Its
+`viewColumns` are constrained to `keyof NodePropsByLabel[L]`, so a view column
+that drifts from its `*Props` interface is a typecheck failure.
+
 All graph access goes through `TenantGraph` (`src/db/graph.ts`), constructed
 per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
 
-- `createNode(label, props)` — stamps a short natural ID (`COMP_123`, prefix
-  from `NATURAL_ID_PREFIX`) in the same round trip; strips AGE's internal
-  graphid before returning. That graphid must never reach a caller outside
-  this file.
+- `query(cypher, columns, params)` — the read surface. `columns` is
+  `{ returnedName: decoder }` (`vertexProps`, `edgeProps`, `vertex`, `edge`,
+  `path`, `scalar`, `agtypeValue`, `optional` — all from `src/db/cypher.ts`).
+  That one declaration produces both the SQL `AS` clause AGE requires and the
+  row type, so callers never hand-write `"(n agtype)"` or call `parseAgtype`
+  themselves. Params are bound as agtype, never interpolated.
+- `createNode(label, props)` — `label` selects the property shape via
+  `NodePropsByLabel`, so passing another label's props is a compile error.
+  Stamps a short natural ID (`COMP_123`, prefix from `NODE_TYPES[label].prefix`)
+  in the same round trip; strips AGE's internal graphid before returning. That
+  graphid must never reach a caller outside this file.
 - `createEdge(fromId, edge, toId)` — resolves both endpoints' labels from
   their natural-id prefix, validates the `(fromLabel, edge, toLabel)`
   combination against the authoritative `EDGE_SCHEMA` table, and is
@@ -64,11 +94,12 @@ per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
   duplicate edge (enforced by a real `UNIQUE (start_id, end_id)` Postgres
   index per edge label — see "AGE-specific gotchas" below).
 - `closeDecision(id)` — the only sanctioned way to set `Decision.is_open`/
-  `closed_at`; a `NODE_VALIDATORS` check also enforces the same invariant at
+  `closed_at`; `NODE_TYPES.Decision.validate` enforces the same invariant at
   creation.
-- `cypher(query, asClause, params)` — the low-level escape hatch when you
-  need a raw traversal; still scoped to `ctx.graphName`, still takes params
-  as a bound object, never string-interpolated.
+
+There is deliberately no raw-string escape hatch on `TenantGraph`. If a query
+needs a shape the decoders don't cover, add a decoder to `src/db/cypher.ts`
+rather than reintroducing one.
 
 `TenantContext` (`{ tenantId, graphName }`) comes from
 `resolveTenantContext(db, slug)` (`src/db/tenant.ts`) — the CLI/MCP/bootstrap
@@ -90,10 +121,12 @@ a performance optimization and it was reverted (PJ-005) because it silently
 stopped tenant resolution from self-healing drift. Don't reintroduce that
 kind of gate without a measured cost driving it.
 
-The internal `reconcileTenantGraph()` is **not exported** — it holds no lock
-itself, so `provisionTenantGraph()` is the only entry point. Tests exercise
-reconciliation through `resolveTenantContext()`, the same path production
-uses, never by calling internals directly.
+`provisionTenantGraph()` and `dropTenantGraph()` (`src/db/provisioning.ts`)
+are the only exports there. The class that does the work,
+`TenantGraphProvisioner`, is **module-private** on purpose — it takes no lock
+and opens no transaction itself, so `provisionTenantGraph()` is the only
+entry point. Tests exercise reconciliation through `resolveTenantContext()`,
+the same path production uses, never by calling internals directly.
 
 "Ensures ... exists" means additive structure only: indexes are checked by
 name (`IF NOT EXISTS`), views by `CREATE OR REPLACE` (can add columns, can't

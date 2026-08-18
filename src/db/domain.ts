@@ -1,0 +1,306 @@
+/**
+ * The LabKit domain model as data and types (docs/project-journal/001_git_init.md,
+ * revised per docs/project-journal/003_review_domain_tenancy.md and
+ * docs/project-journal/004_tenancy_implementation_plan.md).
+ *
+ * Deliberately free of any database import: this is what LabKit's entities
+ * *are*, not how they're stored. `src/db/graph.ts` reads it to type and
+ * validate writes; `src/db/provisioning.ts` reads it to decide what to
+ * create in each tenant's graph. Neither owns it.
+ */
+
+export const NODE_LABELS = [
+  "Question",
+  "LineOfEnquiry",
+  "EvidenceUnit",
+  "Evidence",
+  "Claim",
+  "Decision",
+  "Criterion",
+  "CriterionEvaluation",
+  "Gate",
+  "Review",
+  "Artefact",
+  "Computation",
+  "Task",
+] as const;
+export type NodeLabel = (typeof NODE_LABELS)[number];
+
+export const EDGE_LABELS = [
+  "MOTIVATES", // Question -> LineOfEnquiry
+  "REQUIRES", // LineOfEnquiry -> Evidence
+  "ADDRESSES", // EvidenceUnit -> LineOfEnquiry
+  "SUPPORTS", // Evidence -> Claim
+  "CHALLENGES", // Evidence -> Claim
+  "USES", // EvidenceUnit -> Computation
+  "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
+  "RECORDED_IN", // Evidence -> Artefact
+  "EVALUATED_AS", // Criterion -> CriterionEvaluation
+  "TRIGGERS", // CriterionEvaluation -> Gate
+  "GATES", // Gate -> Task/Computation
+  "CHANGES", // Decision -> Criterion
+  "BASED_ON", // Decision -> Evidence | CriterionEvaluation -> Evidence
+  "RESOLVES", // Decision -> Question
+  "NARROWS", // Decision -> Question
+  "DEFERS", // Decision -> Question
+  "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
+  "EVALUATES", // Review -> Claim | Decision | Evidence
+  "IMPLEMENTS", // Task -> EvidenceUnit
+] as const;
+export type EdgeLabel = (typeof EDGE_LABELS)[number];
+
+/**
+ * Single authoritative source of truth for legal edge shapes (PJ-003 §8).
+ * `createEdge` validates the resolved `(fromLabel, toLabel)` pair against
+ * this table and throws before issuing any Cypher if the pair isn't listed.
+ *
+ * `GATES`'s source is `Gate`, not `Criterion` (PJ-004 decision #9): the
+ * shipped shape had `CriterionEvaluation -[:TRIGGERS]-> Gate` and
+ * *separately* `Criterion -[:GATES]-> Task/Computation`, meaning nothing
+ * ever flowed out of `Gate` — `Criterion` did the gating, contradicting
+ * PJ-001's own definition of `Gate` as "the policy consequence attached to
+ * an evaluation." The chain now actually chains:
+ * `Criterion -[:EVALUATED_AS]-> CriterionEvaluation -[:TRIGGERS]-> Gate -[:GATES]-> Task/Computation`.
+ */
+export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, NodeLabel]>> = {
+  MOTIVATES: [["Question", "LineOfEnquiry"]],
+  REQUIRES: [["LineOfEnquiry", "Evidence"]],
+  ADDRESSES: [["EvidenceUnit", "LineOfEnquiry"]],
+  SUPPORTS: [["Evidence", "Claim"]],
+  CHALLENGES: [["Evidence", "Claim"]],
+  USES: [["EvidenceUnit", "Computation"]],
+  PRODUCES: [
+    ["EvidenceUnit", "Evidence"],
+    ["EvidenceUnit", "Artefact"],
+    ["Computation", "Artefact"],
+    ["Task", "Computation"],
+    ["Task", "Artefact"],
+  ],
+  RECORDED_IN: [["Evidence", "Artefact"]],
+  EVALUATED_AS: [["Criterion", "CriterionEvaluation"]],
+  TRIGGERS: [["CriterionEvaluation", "Gate"]],
+  GATES: [["Gate", "Task"], ["Gate", "Computation"]],
+  CHANGES: [["Decision", "Criterion"]],
+  BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
+  RESOLVES: [["Decision", "Question"]],
+  NARROWS: [["Decision", "Question"]],
+  DEFERS: [["Decision", "Question"]],
+  SUPERSEDES: [["Decision", "Decision"]],
+  EVALUATES: [["Review", "Claim"], ["Review", "Decision"], ["Review", "Evidence"]],
+  IMPLEMENTS: [["Task", "EvidenceUnit"]],
+};
+
+export type EvidenceUnitRole =
+  | "experiment"
+  | "feasibility"
+  | "verification"
+  | "robustness"
+  | "ablation"
+  | "mechanistic"
+  | "analysis"
+  | "infrastructure"
+  | "confirmatory";
+
+// `project_id` removed from every *Props interface below (PJ-003 §4): the
+// graph itself is the tenant partition now, not a repeated node property.
+
+export interface QuestionProps {
+  name: string;
+}
+
+export interface LineOfEnquiryProps {
+  name: string;
+}
+
+export interface EvidenceUnitProps {
+  role: EvidenceUnitRole;
+}
+
+export interface EvidenceProps {
+  statement: string;
+}
+
+export interface ClaimProps {
+  name: string;
+  kind?: "exploratory" | "confirmatory";
+}
+
+/**
+ * `is_open`/`closed_at` are kept as explicit operational state (PJ-004
+ * decision #2) — narrowly scoped to "is this decision record still active
+ * in the control process?", never "is the proposition scientifically
+ * valid?" (that flows from evidence/supersession/review, never from these
+ * fields). `evidence` (a string shadow of `Decision -[:BASED_ON]-> Evidence`)
+ * is removed (PJ-003 §10).
+ */
+export interface DecisionProps {
+  reason: string;
+  invalidation_check: string;
+  is_open?: boolean;
+  closed_at?: string;
+}
+
+export interface CriterionProps {
+  proposition: string;
+}
+
+// `evidence_ref` removed (PJ-004 decision #5) — represented in-graph now as
+// `CriterionEvaluation -[:BASED_ON]-> Evidence` instead of a string shadow.
+export interface CriterionEvaluationProps {
+  value: string;
+  outcome: "pass" | "fail";
+  evaluated_at: string;
+}
+
+export interface GateProps {
+  consequence: string;
+}
+
+export interface ReviewProps {
+  verdict: string;
+}
+
+// verbatim property list from the journal's Artefact section
+export interface ArtefactProps {
+  kind: string;
+  logical_name: string;
+  content_hash?: string;
+  uri?: string;
+  external_ref?: string;
+  invalidated?: boolean;
+}
+
+// verbatim property list from the journal's Computation section
+export interface ComputationProps {
+  kind: string;
+  status: string;
+  backend?: string;
+  external_run_id?: string;
+  started_at?: string;
+  finished_at?: string;
+  code_revision?: string;
+  environment_ref?: string;
+}
+
+export interface TaskProps {
+  objective: string;
+  inputs: string;
+  outputs: string;
+  acceptance: string;
+  is_open?: boolean;
+}
+
+/**
+ * Binds each node label to the property shape it accepts. This is what makes
+ * `createNode("Question", …)` reject `Computation` props at compile time —
+ * before this map existed, `createNode` took `T extends Record<string, unknown>`
+ * and the *Props interfaces above were documentation only.
+ */
+export interface NodePropsByLabel {
+  Question: QuestionProps;
+  LineOfEnquiry: LineOfEnquiryProps;
+  EvidenceUnit: EvidenceUnitProps;
+  Evidence: EvidenceProps;
+  Claim: ClaimProps;
+  Decision: DecisionProps;
+  Criterion: CriterionProps;
+  CriterionEvaluation: CriterionEvaluationProps;
+  Gate: GateProps;
+  Review: ReviewProps;
+  Artefact: ArtefactProps;
+  Computation: ComputationProps;
+  Task: TaskProps;
+}
+
+/** Everything the persistence layer needs to know about one node label, in one place. */
+interface NodeType<L extends NodeLabel> {
+  /**
+   * Short display prefix for natural IDs (e.g. `Computation` -> `"COMP_123"`,
+   * underscore per PJ-004 decision #4). Scoped globally per entity-type, not
+   * per-tenant. Must stay in sync with the per-label `CREATE SEQUENCE`
+   * statements in drizzle/0002_natural_ids.sql — nothing here enforces that,
+   * it's a cross-file obligation to a migration.
+   */
+  readonly prefix: string;
+
+  /**
+   * Columns for this label's per-tenant CQRS view (src/db/provisioning.ts).
+   * The `keyof NodePropsByLabel[L]` constraint is doing real work: a column
+   * that drifts from its *Props interface is a typecheck failure, which is
+   * what replaced the "keep these in sync" comment this table used to carry.
+   */
+  readonly viewColumns: readonly (keyof NodePropsByLabel[L] & string)[];
+
+  /**
+   * Creation-time enforcement of per-label property invariants (PJ-004
+   * decision #8) — `TenantGraph.closeDecision()` alone can't be the whole
+   * story, since a generic create would otherwise happily accept a
+   * pre-contradicted Decision. Returns the props to actually write, so a
+   * validator can normalize (default `is_open`) as well as reject.
+   */
+  readonly validate?: (props: NodePropsByLabel[L]) => NodePropsByLabel[L];
+}
+
+/**
+ * One entry per node label, replacing what used to be four parallel records
+ * (`NODE_LABELS` / `NATURAL_ID_PREFIX` / `NODE_VIEW_COLUMNS` /
+ * `NODE_VALIDATORS`) indexed by the same key and kept aligned by comment.
+ */
+export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
+  Question: { prefix: "Q", viewColumns: ["name"] },
+  LineOfEnquiry: { prefix: "LOE", viewColumns: ["name"] },
+  EvidenceUnit: { prefix: "EU", viewColumns: ["role"] },
+  Evidence: { prefix: "EV", viewColumns: ["statement"] },
+  Claim: { prefix: "CLM", viewColumns: ["name", "kind"] },
+  Decision: {
+    prefix: "DEC",
+    viewColumns: ["reason", "invalidation_check", "is_open", "closed_at"],
+    // Strict biconditional, tightened from PJ-004 decision #2's original
+    // "may have closed_at" now that there's no legacy data to accommodate.
+    validate: (props) => {
+      const is_open = props.is_open ?? true;
+      const closed_at = props.closed_at;
+      if (is_open && closed_at) throw new Error("Decision.is_open=true cannot have closed_at set");
+      if (!is_open && !closed_at) throw new Error("Decision.is_open=false requires closed_at");
+      return { ...props, is_open };
+    },
+  },
+  Criterion: { prefix: "CRIT", viewColumns: ["proposition"] },
+  CriterionEvaluation: { prefix: "CEVAL", viewColumns: ["value", "outcome", "evaluated_at"] },
+  Gate: { prefix: "GATE", viewColumns: ["consequence"] },
+  Review: { prefix: "REV", viewColumns: ["verdict"] },
+  Artefact: {
+    prefix: "ART",
+    viewColumns: ["kind", "logical_name", "content_hash", "uri", "external_ref", "invalidated"],
+  },
+  Computation: {
+    prefix: "COMP",
+    viewColumns: ["kind", "status", "backend", "external_run_id", "started_at", "finished_at", "code_revision", "environment_ref"],
+  },
+  Task: { prefix: "TASK", viewColumns: ["objective", "inputs", "outputs", "acceptance", "is_open"] },
+};
+
+/** Reverse of `NODE_TYPES[label].prefix` — resolves a node's label from its natural id's prefix, e.g. "EU_17" -> "EvidenceUnit". */
+const LABEL_BY_PREFIX: Record<string, NodeLabel> = Object.fromEntries(
+  NODE_LABELS.map((label) => [NODE_TYPES[label].prefix, label]),
+) as Record<string, NodeLabel>;
+
+export function labelForNaturalId(naturalId: string): NodeLabel {
+  const sep = naturalId.indexOf("_");
+  const prefix = sep === -1 ? naturalId : naturalId.slice(0, sep);
+  const label = LABEL_BY_PREFIX[prefix];
+  if (!label) throw new Error(`unrecognized natural id prefix in "${naturalId}"`);
+  return label;
+}
+
+/**
+ * A node as returned to callers outside the persistence layer: AGE's
+ * internal graphid (`AgtypeVertex.id`, a large opaque number/bigint — see
+ * src/db/agtype.ts) is stripped and replaced with the short, incrementing
+ * `natural_id` that's safe to show a user or an AI-agent caller.
+ */
+export interface PublicNode<L extends NodeLabel> {
+  natural_id: string;
+  label: L;
+  properties: NodePropsByLabel[L];
+}

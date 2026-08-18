@@ -1,22 +1,20 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { TenantGraph } from "../src/db/graph";
+import { edgeProps, optional, vertexProps } from "../src/db/cypher";
 import {
-  TenantGraph,
-  parseAgtype,
   NODE_LABELS,
-  NATURAL_ID_PREFIX,
-  type LabKitDB,
+  NODE_TYPES,
   type NodeLabel,
+  type NodePropsByLabel,
+  type ClaimProps,
+  type ComputationProps,
   type DecisionProps,
-  type AgtypeValue,
-} from "../src/db/graph";
+  type EvidenceProps,
+  type LineOfEnquiryProps,
+} from "../src/db/domain";
+import type { LabKitDB } from "../src/db/client";
 import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
 import { setupTestDb, type TestDb } from "./helpers/db";
-
-/** Every parseAgtype() call in this file is on a node or edge RETURN result (never a path/scalar), by construction of the Cypher queries themselves. */
-function props<T>(v: AgtypeValue<T>): T {
-  if (v.kind !== "vertex" && v.kind !== "edge") throw new Error(`expected a vertex or edge, got ${v.kind}`);
-  return v.properties;
-}
 
 /**
  * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
@@ -86,18 +84,18 @@ describe("evidence and computations supporting a claim", () => {
   test("shows evidence, the evidence unit, and the computation that generated it", async () => {
     const { claim } = await seedResearchThread();
 
-    const rows = await graph.cypher<{ e: string; comp: string }>(
+    const rows = await graph.query(
       `MATCH (:Claim {natural_id: $claimId})<-[:SUPPORTS]-(e:Evidence)
        MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
        MATCH (u)-[:USES]->(comp:Computation)
        RETURN e, comp`,
-      "(e agtype, comp agtype)",
+      { e: vertexProps<EvidenceProps>(), comp: vertexProps<ComputationProps>() },
       { claimId: claim.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    const evidence = props(parseAgtype(rows[0]!.e));
-    const computation = props(parseAgtype(rows[0]!.comp));
+    const evidence = rows[0]!.e;
+    const computation = rows[0]!.comp;
     expect(evidence).toMatchObject({ statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" });
     expect(computation).toMatchObject({ external_run_id: "run-42", status: "completed" });
   });
@@ -119,21 +117,25 @@ describe("invalidation propagation", () => {
     // "Affected" is not the same as "unsupported" (PJ-003 §11) — this
     // traversal answers "what needs reconsideration", not "what is now
     // false"; nothing here marks the claim unsupported.
-    const rows = await graph.cypher<{ claim: string | null; decision: string | null; loe: string | null }>(
+    const rows = await graph.query(
       `MATCH (a:Artefact {natural_id: $artefactId})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(claim:Claim)
        OPTIONAL MATCH (decision:Decision)-[:BASED_ON]->(e)
        OPTIONAL MATCH (loe:LineOfEnquiry)-[:REQUIRES]->(e)
        RETURN claim, decision, loe`,
-      "(claim agtype, decision agtype, loe agtype)",
+      {
+        claim: optional(vertexProps<ClaimProps>()),
+        decision: optional(vertexProps<DecisionProps>()),
+        loe: optional(vertexProps<LineOfEnquiryProps>()),
+      },
       { artefactId: artefact.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(props(parseAgtype(rows[0]!.claim!))).toMatchObject({ name: claim.properties.name });
-    expect(props(parseAgtype(rows[0]!.decision!))).toMatchObject({ reason: decision.properties.reason });
-    expect(props(parseAgtype(rows[0]!.loe!))).toMatchObject({ name: lineOfEnquiry.properties.name });
+    expect(rows[0]!.claim).toMatchObject({ name: claim.properties.name });
+    expect(rows[0]!.decision).toMatchObject({ reason: decision.properties.reason });
+    expect(rows[0]!.loe).toMatchObject({ name: lineOfEnquiry.properties.name });
   });
 });
 
@@ -141,11 +143,11 @@ describe("open lines of enquiry", () => {
   test("a line of enquiry is open when its motivating question has no resolving decision", async () => {
     const { lineOfEnquiry } = await seedResearchThread();
 
-    const rows = await graph.cypher<{ q: string; d: string | null }>(
+    const rows = await graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId})
        OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(q)
        RETURN q, d`,
-      "(q agtype, d agtype)",
+      { q: vertexProps(), d: optional(vertexProps<DecisionProps>()) },
       { loeId: lineOfEnquiry.natural_id },
     );
 
@@ -161,16 +163,16 @@ describe("open lines of enquiry", () => {
     });
     await graph.createEdge(decision.natural_id, "RESOLVES", question.natural_id);
 
-    const rows = await graph.cypher<{ d: string }>(
+    const rows = await graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId})
        MATCH (d:Decision)-[:RESOLVES]->(q)
        RETURN d`,
-      "(d agtype)",
+      { d: vertexProps<DecisionProps>() },
       { loeId: lineOfEnquiry.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(props(parseAgtype(rows[0]!.d))).toMatchObject({ reason: "accelerated ridge confirmed equivalent" });
+    expect(rows[0]!.d).toMatchObject({ reason: "accelerated ridge confirmed equivalent" });
   });
 });
 
@@ -184,15 +186,15 @@ describe("failed/planned inquiry provenance", () => {
     await graph.createEdge(evidenceUnit.natural_id, "USES", computation.natural_id);
     // deliberately no Evidence/PRODUCES edge — the computation failed
 
-    const rows = await graph.cypher<{ loe: string }>(
+    const rows = await graph.query(
       `MATCH (:Computation {natural_id: $compId})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry)
        RETURN loe`,
-      "(loe agtype)",
+      { loe: vertexProps<LineOfEnquiryProps>() },
       { compId: computation.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(props(parseAgtype(rows[0]!.loe))).toMatchObject({ name: "does approach X scale" });
+    expect(rows[0]!.loe).toMatchObject({ name: "does approach X scale" });
   });
 });
 
@@ -202,15 +204,15 @@ describe("decision amendments", () => {
     const d2 = await graph.createNode("Decision", { reason: "switch to float64 for stability", invalidation_check: "n/a" });
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
-    const rows = await graph.cypher<{ old: string }>(
+    const rows = await graph.query(
       `MATCH (:Decision {natural_id: $id})-[:SUPERSEDES]->(old:Decision)
        RETURN old`,
-      "(old agtype)",
+      { old: vertexProps<DecisionProps>() },
       { id: d2.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(props(parseAgtype(rows[0]!.old))).toMatchObject({ reason: "use float32 batching" });
+    expect(rows[0]!.old).toMatchObject({ reason: "use float32 batching" });
   });
 
   test("walks the full amendment chain back to the original decision", async () => {
@@ -220,14 +222,14 @@ describe("decision amendments", () => {
     await graph.createEdge(d3.natural_id, "SUPERSEDES", d2.natural_id);
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
-    const rows = await graph.cypher<{ x: string }>(
+    const rows = await graph.query(
       `MATCH (:Decision {natural_id: $id})-[:SUPERSEDES*1..5]->(x:Decision)
        RETURN x`,
-      "(x agtype)",
+      { x: vertexProps<DecisionProps>() },
       { id: d3.natural_id },
     );
 
-    const chain = rows.map((r) => (props(parseAgtype(r.x)) as { reason: string }).reason);
+    const chain = rows.map((r) => r.x.reason);
     expect(chain).toEqual(["d2-amendment", "d1-original"]);
   });
 });
@@ -254,8 +256,8 @@ describe("decision lifecycle integrity", () => {
     const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x" });
     await graph.closeDecision(d.natural_id, "2026-08-18T12:00:00Z");
 
-    const rows = await graph.cypher<{ n: string }>(`MATCH (n:Decision {natural_id: $id}) RETURN n`, "(n agtype)", { id: d.natural_id });
-    expect(props(parseAgtype(rows[0]!.n))).toMatchObject({ is_open: false, closed_at: "2026-08-18T12:00:00Z" });
+    const rows = await graph.query(`MATCH (n:Decision {natural_id: $id}) RETURN n`, { n: vertexProps<DecisionProps>() }, { id: d.natural_id });
+    expect(rows[0]!.n).toMatchObject({ is_open: false, closed_at: "2026-08-18T12:00:00Z" });
   });
 
   test("closeDecision throws for a nonexistent decision", async () => {
@@ -288,9 +290,9 @@ describe("edge integrity", () => {
     await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
     await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
 
-    const rows = await graph.cypher<{ r: string }>(
+    const rows = await graph.query(
       `MATCH (:Question {natural_id: $qId})-[r:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN r`,
-      "(r agtype)",
+      { r: edgeProps() },
       { qId: question.natural_id, loeId: loe.natural_id },
     );
     expect(rows).toHaveLength(1);
@@ -311,25 +313,29 @@ describe("Gate is reconnected to what it actually gates", () => {
     // decision #5: evidence_ref replaced with a real edge
     await graph.createEdge(evaluation.natural_id, "BASED_ON", evidence.natural_id);
 
-    const rows = await graph.cypher<{ comp: string }>(
+    const rows = await graph.query(
       `MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(comp:Computation)
        RETURN comp`,
-      "(comp agtype)",
+      { comp: vertexProps<ComputationProps>() },
       { critId: criterion.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(props(parseAgtype(rows[0]!.comp))).toMatchObject({ kind: "promotion_run" });
+    expect(rows[0]!.comp).toMatchObject({ kind: "promotion_run" });
   });
 });
 
 describe("all node labels", () => {
-  // Minimal valid props per label's *Props interface in src/db/graph.ts.
+  // Minimal valid props per label's *Props interface in src/db/domain.ts.
   // Exists so every label (not just the ones exercised by the acceptance
   // queries above) actually round-trips through createNode(), which is the
-  // only thing that would catch a NATURAL_ID_PREFIX entry drifting out of
-  // sync with the sequence names in drizzle/0002_natural_ids.sql.
-  const fixtures: Record<NodeLabel, Record<string, unknown>> = {
+  // only thing that would catch a NODE_TYPES[label].prefix entry drifting
+  // out of sync with the sequence names in drizzle/0002_natural_ids.sql.
+  //
+  // Typed per-label rather than as Record<string, unknown>: a fixture that
+  // doesn't satisfy its label's *Props interface is now a compile error
+  // here, not a runtime surprise inside AGE.
+  const fixtures: { [L in NodeLabel]: NodePropsByLabel[L] } = {
     Question: { name: "q" },
     LineOfEnquiry: { name: "loe" },
     EvidenceUnit: { role: "experiment" },
@@ -345,10 +351,15 @@ describe("all node labels", () => {
     Task: { objective: "o", inputs: "i", outputs: "o", acceptance: "a" },
   };
 
+  // Generic helper rather than an inline call: inside it `L` is a single
+  // label, so `fixtures[L]` resolves to that label's props type. At the loop
+  // itself `label` is the whole NodeLabel union and would not narrow.
+  const createFixture = <L extends NodeLabel>(label: L) => graph.createNode(label, fixtures[label]);
+
   for (const label of NODE_LABELS) {
     test(`${label} creates with a well-formed natural id`, async () => {
-      const node = await graph.createNode(label, fixtures[label]);
-      expect(node.natural_id).toMatch(new RegExp(`^${NATURAL_ID_PREFIX[label]}_\\d+$`));
+      const node = await createFixture(label);
+      expect(node.natural_id).toMatch(new RegExp(`^${NODE_TYPES[label].prefix}_\\d+$`));
       expect(node).not.toHaveProperty("id");
     });
   }
@@ -379,9 +390,9 @@ describe("tenant isolation", () => {
     const claimB = await graphB.createNode("Claim", { name: "x" });
     expect(claimA.natural_id).not.toBe(claimB.natural_id); // natural ids are global, but the nodes are still in disjoint graphs
 
-    const rowsA = await graphA.cypher<{ c: string }>(`MATCH (c:Claim) RETURN c`, "(c agtype)");
+    const rowsA = await graphA.query(`MATCH (c:Claim) RETURN c`, { c: vertexProps<ClaimProps>() });
     expect(rowsA).toHaveLength(1);
-    expect(props(parseAgtype(rowsA[0]!.c))).toMatchObject({ name: "x" });
+    expect(rowsA[0]!.c).toMatchObject({ name: "x" });
   });
 
   test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {
@@ -461,9 +472,9 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     // constraint — not the app-level check — is what's actually stopping
     // a second edge.
     await expect(
-      graph.cypher(
+      graph.query(
         `MATCH (a:Question {natural_id: $from}), (b:LineOfEnquiry {natural_id: $to}) CREATE (a)-[:MOTIVATES]->(b)`,
-        "(x agtype)",
+        { x: vertexProps() },
         { from: question.natural_id, to: loe.natural_id },
       ),
     ).rejects.toThrow(/duplicate key value violates unique constraint/);
@@ -507,9 +518,9 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     await expect(flakyGraph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id)).resolves.toBeUndefined();
     expect(createAttempts).toBe(1); // confirms the CREATE step actually ran, not that it was skipped some other way
 
-    const rows = await graph.cypher<{ r: string }>(
+    const rows = await graph.query(
       `MATCH (:Question {natural_id: $qId})-[r:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN r`,
-      "(r agtype)",
+      { r: edgeProps() },
       { qId: question.natural_id, loeId: loe.natural_id },
     );
     // The mock never actually created the edge (every CREATE attempt threw)

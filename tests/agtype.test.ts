@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { parseAgtype, type AgtypeNumeric, type AgtypeUnknown } from "../src/db/agtype";
-import { TenantGraph, type LabKitDB } from "../src/db/graph";
+import { TenantGraph } from "../src/db/graph";
+import { agtypeValue } from "../src/db/cypher";
+import type { LabKitDB } from "../src/db/client";
 import { resolveTenantContext } from "../src/db/tenant";
 import { setupTestDb, type TestDb } from "./helpers/db";
 
@@ -180,33 +182,33 @@ describe("parseAgtype — against live pglite-age", () => {
     const b = await graph.createNode("LineOfEnquiry", { name: "loe" });
     await graph.createEdge(a.natural_id, "MOTIVATES", b.natural_id);
 
-    const vertexRows = await graph.cypher<{ n: string }>(`MATCH (n:Question {natural_id: $id}) RETURN n`, "(n agtype)", {
+    const vertexRows = await graph.query(`MATCH (n:Question {natural_id: $id}) RETURN n`, { n: agtypeValue() }, {
       id: a.natural_id,
     });
-    const parsedVertex = parseAgtype(vertexRows[0]!.n);
+    const parsedVertex = vertexRows[0]!.n;
     expect(parsedVertex.kind).toBe("vertex");
 
-    const edgeRows = await graph.cypher<{ e: string }>(
+    const edgeRows = await graph.query(
       `MATCH (:Question {natural_id: $id})-[e:MOTIVATES]->(:LineOfEnquiry) RETURN e`,
-      "(e agtype)",
+      { e: agtypeValue() },
       { id: a.natural_id },
     );
-    const parsedEdge = parseAgtype(edgeRows[0]!.e);
+    const parsedEdge = edgeRows[0]!.e;
     expect(parsedEdge.kind).toBe("edge");
 
-    const pathRows = await graph.cypher<{ p: string }>(
+    const pathRows = await graph.query(
       `MATCH p = (:Question {natural_id: $id})-[:MOTIVATES]->(:LineOfEnquiry) RETURN p`,
-      "(p agtype)",
+      { p: agtypeValue() },
       { id: a.natural_id },
     );
-    const parsedPath = parseAgtype(pathRows[0]!.p);
+    const parsedPath = pathRows[0]!.p;
     expect(parsedPath.kind).toBe("path");
     if (parsedPath.kind !== "path") throw new Error("unreachable");
     expect(parsedPath.elements.map((el) => el.kind)).toEqual(["vertex", "edge", "vertex"]);
   });
 
   // The headline case this rewrite exists for: LabKit provisions 13 node +
-  // 19 edge labels per tenant (src/db/graph.ts's NODE_LABELS/EDGE_LABELS),
+  // 19 edge labels per tenant (src/db/domain.ts's NODE_LABELS/EDGE_LABELS),
   // and graphid = label_id * 2^48 + entry_id — confirmed empirically that
   // SUPERSEDES (a late edge label in provisioning order) already produces
   // a graphid past Number.MAX_SAFE_INTEGER on its very first edge, in
@@ -223,12 +225,12 @@ describe("parseAgtype — against live pglite-age", () => {
     const rawId = rawIdRows.rows[0]!.id;
     expect(Number.isSafeInteger(Number(rawId))).toBe(false); // confirms this test is actually exercising the unsafe case
 
-    const edgeRows = await graph.cypher<{ e: string }>(
+    const edgeRows = await graph.query(
       `MATCH (:Decision {natural_id: $id})-[e:SUPERSEDES]->(:Decision) RETURN e`,
-      "(e agtype)",
+      { e: agtypeValue() },
       { id: d2.natural_id },
     );
-    const parsed = parseAgtype(edgeRows[0]!.e);
+    const parsed = edgeRows[0]!.e;
     expect(parsed.kind).toBe("edge");
     if (parsed.kind !== "edge") throw new Error("unreachable");
     expect(typeof parsed.id).toBe("bigint");

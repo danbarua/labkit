@@ -4,7 +4,8 @@ import { vector } from "@electric-sql/pglite-pgvector";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { Client } from "pg";
 import { runMigrations } from "../../src/db/migrate";
-import { bootstrapSession, type LabKitDB } from "../../src/db/graph";
+import { bootstrapSession, type LabKitDB } from "../../src/db/client";
+import { dropTenantGraph } from "../../src/db/provisioning";
 
 /**
  * Application-code tests should exercise `LabKitDB` the same way production
@@ -77,7 +78,7 @@ export async function setupTestDb(): Promise<TestDb> {
     async reset() {
       const graphs = await admin.query<{ name: string }>(`SELECT name FROM ag_catalog.ag_graph`);
       for (const { name } of graphs.rows) {
-        await admin.query(`SELECT * FROM ag_catalog.drop_graph($1, true)`, [name]);
+        await dropTenantGraph(admin, name);
       }
 
       const tables = await admin.query<{ table_schema: string; table_name: string }>(`

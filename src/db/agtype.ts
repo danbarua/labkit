@@ -415,3 +415,23 @@ export function buildPropertyClause(props: Record<string, unknown>): string {
     })
     .join(", ");
 }
+
+/**
+ * Wraps a Cypher query in a dollar-quoted string literal for embedding in
+ * the SQL `cypher(graph, $$ … $$, params)` call, choosing a delimiter that
+ * can't collide with the query text.
+ *
+ * Ported from the Apache AGE driver's `cypherDollarQuote` (index.ts), with
+ * one gap closed: upstream uses bare `$$` whenever the query doesn't
+ * *contain* `$$`, but a query *ending* in `$` also breaks it —
+ * `$$` + `RETURN n.a$` + `$$` lexes as body `RETURN n.a` followed by a
+ * stray `$`. Both cases fall through to a tagged delimiter here.
+ */
+export function cypherDollarQuote(cypher: string): string {
+  if (!cypher.includes("$$") && !cypher.endsWith("$")) return `$$${cypher}$$`;
+
+  let tag = "cypher";
+  let counter = 0;
+  while (cypher.includes(`$${tag}$`)) tag = `cypher${counter++}`;
+  return `$${tag}$${cypher}$${tag}$`;
+}

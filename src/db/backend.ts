@@ -5,7 +5,7 @@ import { vector } from "@electric-sql/pglite-pgvector";
 import { age } from "@electric-sql/pglite-age";
 import { Client } from "pg";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
-import { bootstrapSession, type LabKitDB } from "./graph";
+import { bootstrapSession, type LabKitDB } from "./client";
 import { runMigrations } from "./migrate";
 
 export interface LabKitDBConnection {
