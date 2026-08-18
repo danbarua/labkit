@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 import { age } from "@electric-sql/pglite-age";
 import { vector } from "@electric-sql/pglite-pgvector";
@@ -21,8 +21,18 @@ let db: PGlite;
 let ctx: TenantContext;
 let graph: TenantGraph;
 
-beforeEach(async () => {
+beforeAll(async () => {
+  // creates single PgLite instance for all tests
   db = new PGlite({ extensions: { age, vector } });
+});
+
+afterAll(async () => {
+  // closes PgLite instance after all tests
+  await db.close();
+});
+
+beforeEach(async () => {
+  // migrates the database and provisions a tenant graph for each test
   await runMigrations(db);
   await bootstrapSession(db);
   ctx = await resolveTenantContext(db, "labkit");
@@ -30,7 +40,29 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await db.close();
+  // tenant graph needs to be dropped before truncating tables
+  // any other tenant graphs (multi-tenancy tests) need to clean up after themselves too
+  if (graph){
+      await graph.dropGraph();
+  }
+
+  const tables = await db.query<{ table_schema: string; table_name: string }>(`
+    select table_schema, table_name 
+    from information_schema.tables
+    where table_schema not in ('pg_catalog', 'information_schema', 'ag_catalog', 'drizzle')
+    order by table_schema, table_name;
+  `);
+
+  const tableNames = tables.rows.map((r) => `"${r.table_schema}"."${r.table_name}"`);
+
+  if (tableNames.length > 0) {
+    // Disable foreign key checks, truncate all tables, re-enable foreign key checks.
+    await db.exec(`
+      set session_replication_role = replica; 
+      truncate ${tableNames.join(", ")} restart identity cascade; 
+      set session_replication_role = DEFAULT;
+    `);
+  }
 });
 
 async function seedResearchThread() {
@@ -353,6 +385,9 @@ describe("tenant isolation", () => {
     const rowsA = await graphA.cypher<{ c: string }>(`MATCH (c:Claim) RETURN c`, "(c agtype)");
     expect(rowsA).toHaveLength(1);
     expect(parseAgtype(rowsA[0]!.c).properties).toMatchObject({ name: "x" });
+
+    await graphA.dropGraph();
+    await graphB.dropGraph();
   });
 
   test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {
@@ -365,6 +400,9 @@ describe("tenant isolation", () => {
     const loeB = await graphB.createNode("LineOfEnquiry", { name: "loe-in-b" });
 
     await expect(graphA.createEdge(questionA.natural_id, "MOTIVATES", loeB.natural_id)).rejects.toThrow(/not found/);
+
+    await graphA.dropGraph();
+    await graphB.dropGraph();
   });
 });
 

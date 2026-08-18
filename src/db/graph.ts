@@ -442,4 +442,8 @@ export class TenantGraph {
       { id: naturalId, closedAt },
     );
   }
+
+  async dropGraph(): Promise<void> {
+    await this.db.query(`SELECT * FROM ag_catalog.drop_graph('${this.ctx.graphName}', true);`);
+  }
 }
