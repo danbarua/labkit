@@ -23,6 +23,7 @@ import type { ArtefactProps, ClaimProps, ComputationProps, EvidenceProps } from 
 import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./events";
 import type {
   AnalysisRef,
+  CheckStatus,
   CriterionRef,
   GateRef,
   GateStatus,
@@ -193,14 +194,17 @@ export class ResearchSession {
    * work. Declaring a gate must not make it satisfied — that is the entire
    * subject of S-17.
    */
-  async declareGate(input: { criterion: CriterionRef; consequence: string; protecting: WorkRef[] }): Promise<GateRef> {
+  async declareGate(input: { governedBy: CriterionRef[]; consequence: string; protecting: WorkRef[] }): Promise<GateRef> {
+    if (input.governedBy.length === 0) throw new Error("a gate governed by no condition is not a gate");
     const gate = await this.graph.createNode("Gate", { consequence: input.consequence });
-    await this.graph.createEdge(input.criterion.id, "GOVERNS", gate.natural_id);
+    for (const criterion of input.governedBy) {
+      await this.graph.createEdge(criterion.id, "GOVERNS", gate.natural_id);
+    }
     for (const work of input.protecting) {
       await this.graph.createEdge(gate.natural_id, "GATES", work.id);
     }
     this.emit("declareGate", gate.natural_id, {
-      criterion: input.criterion.id,
+      governedBy: input.governedBy.map((c) => c.id),
       protecting: input.protecting.map((w) => w.id),
     });
     return { kind: "gate", id: gate.natural_id };
@@ -240,17 +244,23 @@ export class ResearchSession {
    * CriterionEvaluation and so returned null for exactly the gates S-17 is
    * about — see EDGE_SCHEMA.GOVERNS.
    */
-  async criterionGoverning(gate: GateRef): Promise<CriterionRef | null> {
+  async criteriaGoverning(gate: GateRef): Promise<CriterionRef[]> {
     const rows = await this.graph.query(
       `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
       { id: gate.id },
     );
-    const found = rows[0];
-    return found ? { kind: "criterion", id: found.c.natural_id } : null;
+    return rows.map((r) => ({ kind: "criterion" as const, id: r.c.natural_id }));
   }
 
-  /** S-17: may this gate be relied on, and on what evidence? */
+  /**
+   * S-17/S-3: may this gate be relied on, and on what evidence?
+   *
+   * Every governing condition is itemised, including the ones nobody has
+   * evaluated. That is the point: S-3 requires a failed check to be
+   * distinguishable from a check never run, and an absent list entry cannot
+   * carry that difference.
+   */
   async gateStatus(gate: GateRef): Promise<GateStatus> {
     const declared = await this.graph.query(
       `MATCH (g:Gate {natural_id: $id}) RETURN g`,
@@ -260,10 +270,69 @@ export class ResearchSession {
     const found = declared[0];
     if (!found) throw new Error(`no gate ${gate.id}`);
 
-    const evaluations = await this.graph.query(
-      `MATCH (c:Criterion)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(:Gate {natural_id: $id})
+    // Every governing criterion with the evaluations that pertain to THIS
+    // gate. Two scopes are deliberately kept apart, and S-17 plus S-3
+    // together are what force the distinction:
+    //
+    //   gate-scoped  (here) -- has this condition been checked FOR this gate?
+    //   criterion-scoped    -- has this check ever been shown able to fail?
+    //
+    // One criterion can govern several gates and be evaluated separately
+    // against each (the same hash check, run against staging and against
+    // release). Collapsing the two scopes made a gate nobody had evaluated
+    // report as blocked because its criterion had failed somewhere else.
+    //
+    // OPTIONAL MATCH is load-bearing twice over: a criterion nobody evaluated
+    // must still appear as a check, and `g` is bound from the first MATCH so
+    // only evaluations triggering this gate count.
+    const rows = await this.graph.query(
+      `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})
+       OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)
+       RETURN c, ev`,
+      {
+        c: vertexProps<{ proposition: string }>(),
+        ev: optional(vertexProps<{ value: string; outcome: "pass" | "fail"; evaluated_at: string }>()),
+      },
+      { id: gate.id },
+    );
+
+    const byCriterion = new Map<string, CheckStatus>();
+    const evaluations: GateStatus["evaluations"] = [];
+    for (const row of rows) {
+      const name = row.c.proposition;
+      const existing = byCriterion.get(name) ?? { criterion: name, state: "never-run" as const };
+      if (row.ev) {
+        evaluations.push({ value: row.ev.value, outcome: row.ev.outcome, at: row.ev.evaluated_at });
+        // A failure sticks: one failing evaluation is decisive for that check
+        // even if a later run passed. Re-running until green is not evidence.
+        const state = existing.state === "failed" || row.ev.outcome === "fail" ? "failed" : "passed";
+        byCriterion.set(name, { criterion: name, state, value: row.ev.value, at: row.ev.evaluated_at });
+      } else {
+        byCriterion.set(name, existing);
+      }
+    }
+
+    const checks = [...byCriterion.values()];
+    const unmet = checks.filter((c) => c.state !== "passed").map((c) => c.criterion);
+
+    // Order matters. Absence is checked before satisfaction so a gate nobody
+    // evaluated can never fall through to "satisfied" (S-17); failure is
+    // checked before incompleteness because a failure is decisive (S-3).
+    const state: GateStatus["state"] = checks.every((c) => c.state === "never-run")
+      ? "never-evaluated"
+      : checks.some((c) => c.state === "failed")
+        ? "blocked"
+        : checks.some((c) => c.state === "never-run")
+          ? "incomplete"
+          : "satisfied";
+
+    // Criterion-scoped, deliberately unfiltered by gate: "has this check ever
+    // been shown able to fail" is a question about the check itself.
+    const criterionOutcomes = await this.graph.query(
+      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
+       MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
        RETURN ev`,
-      { ev: vertexProps<{ value: string; outcome: "pass" | "fail"; evaluated_at: string }>() },
+      { ev: vertexProps<{ outcome: "pass" | "fail" }>() },
       { id: gate.id },
     );
 
@@ -273,32 +342,15 @@ export class ResearchSession {
       { id: gate.id },
     );
 
-    // "Has this guard ever been shown to fail?" is a question about the
-    // criterion's power to discriminate, not about this gate's own history --
-    // the reviewer asks for evidence the check *can* fail. Reached through
-    // GOVERNS, so it counts every evaluation of the governing criterion, not
-    // only those that happened to trigger this gate.
-    const criterionOutcomes = await this.graph.query(
-      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
-       MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
-       RETURN ev`,
-      { ev: vertexProps<{ outcome: "pass" | "fail" }>() },
-      { id: gate.id },
-    );
-
-    const outcomes = evaluations.map((e) => ({ value: e.ev.value, outcome: e.ev.outcome, at: e.ev.evaluated_at }));
-    // Three states, and the ordering matters: absence of evaluation is
-    // checked FIRST, so it can never fall through to "satisfied".
-    const state: GateStatus["state"] =
-      outcomes.length === 0 ? "never-evaluated" : outcomes.some((o) => o.outcome === "pass") ? "satisfied" : "blocked";
-
     return {
       gate: gate.id,
       consequence: found.g.consequence,
       state,
-      evaluations: outcomes,
+      checks,
+      unmet,
+      evaluations,
       gating: gating.map((g) => g.w.objective ?? g.w.kind ?? "unknown"),
-      everFailed: criterionOutcomes.some((e) => e.ev.outcome === "fail"),
+      everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
   }
 

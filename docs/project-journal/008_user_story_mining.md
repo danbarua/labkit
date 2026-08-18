@@ -686,6 +686,7 @@ this document's original analysis are marked as such.
 | S | No agent, person or role exists in the model | no node label, no property, anywhere | S-8 | **NEW, from cold review.** S-8's Afterward asks "who approved the scale-up, and on what projected cost?" — unanswerable. May legitimately be external metadata rather than domain; S-8 decides |
 | T | Edges cannot carry properties | `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)` | S-7, row O | **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed |
 | U | A gate records no condition until it is evaluated | only path `Criterion`→`Gate` ran via `CriterionEvaluation`; `GateProps` is `{consequence}` | S-17 | **CONFIRMED — resolved.** Added `GOVERNS: Criterion → Gate`. PJ-004 #9's chain correctly stops anything flowing out of an untriggered gate, but it also made the governing criterion reachable *only* through an evaluation — so a declared-but-unevaluated gate, which is exactly S-17's subject, recorded no condition at all. Demonstrated: `criterionGoverning()` returned null, so the reviewer's demand ("show me it fails when the artefact is wrong") could not be aimed at anything |
+| V | Criteria gate work but do not qualify findings | `Criterion -GOVERNS-> Gate -GATES-> Task\|Computation`; nothing connects a criterion to the analysis it qualifies | S-3 | **NEW, CONFIRMED, deliberately unresolved.** Demonstrated wrong answer: with two prespecified robustness checks failed, `whySupported()` still reports the finding `supported: true` — "some evidence exists" rather than "the evidence holds up by its own prespecified standard". Two plausible models and S-3 does **not** discriminate, because its criteria do both jobs at once: (a) `Criterion -QUALIFIES-> EvidenceUnit`, or (b) extend `GATES` so a gate can gate a `Claim`'s standing. A scenario where criteria qualify a finding but gate nothing — or the reverse — would decide it |
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from
@@ -699,6 +700,23 @@ independent reviewers, unprimed). They are *not* scenario outcomes — nothing
 has tested them — but three of the five were noticed independently by three
 of four reviewers, which is why they are logged rather than left to be
 re-derived (differently) by whichever scenario hits them first.
+
+**Status after S-3.** Row **A** — "the strongest single prediction in this
+document" — is **refuted**. No third `outcome` value was needed: each
+prespecified check really is binary, and inconclusiveness lives one layer up,
+exactly as the row's own no-change route proposed. It is carried by a
+four-state gate (`never-evaluated` / `incomplete` / `blocked` / `satisfied`)
+plus per-criterion itemisation where `never-run` is a first-class value, and
+all of it is derived rather than stored. Row **I** held for the same reason:
+absence is a distinct state, not a synthetic failure. Row **V** added — the
+one thing S-3 could not express. Row **J** was brushed (deferred vs accepted
+-as-unresolved) but not settled; S-14 owns it.
+
+S-3 and S-17 together also forced a distinction neither forces alone:
+criterion-scoped state ("has this check ever been shown able to fail?") is
+not gate-scoped state ("has this condition been checked *for this gate*?").
+Collapsing them made a gate nobody had evaluated report as blocked because
+its criterion had failed elsewhere.
 
 **Status after S-17.** Row **U** added and resolved; row **A** (binary
 `pass`/`fail`) took no pressure — S-17's outcomes are genuinely binary, and

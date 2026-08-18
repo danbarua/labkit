@@ -75,8 +75,22 @@ export interface UnaffectedRecord {
 export interface GateStatus {
   gate: string;
   consequence: string;
-  state: "never-evaluated" | "blocked" | "satisfied";
-  /** Evaluations of this gate's criterion. Empty is an answer, not an absence. */
+  /**
+   * Four states, because a gate can be governed by several conditions and
+   * "some checked, none failing" is a real situation distinct from all three
+   * others. `blocked` takes precedence over `incomplete`: a failure is
+   * decisive regardless of what else remains unrun.
+   */
+  state: "never-evaluated" | "incomplete" | "blocked" | "satisfied";
+  /**
+   * Every governing condition, itemised. `never-run` is a first-class value,
+   * not the absence of an entry — S-3 requires failing checks to be
+   * distinguishable from checks nobody performed.
+   */
+  checks: CheckStatus[];
+  /** Conditions not currently passing — what would have to change. Named before anyone spends the compute. */
+  unmet: string[];
+  /** Evaluations of this gate's criteria. Empty is an answer, not an absence. */
   evaluations: Array<{ value: string; outcome: "pass" | "fail"; at: string }>;
   /** What is currently relying on this gate — the blast radius of a fake guard. */
   gating: string[];
@@ -88,6 +102,13 @@ export interface GateStatus {
    * given anything that should fail" — see this build's findings.
    */
   everFailed: boolean;
+}
+
+export interface CheckStatus {
+  criterion: string;
+  state: "passed" | "failed" | "never-run";
+  value?: string;
+  at?: string;
 }
 
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */

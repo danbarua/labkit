@@ -13,4 +13,9 @@ export type {
   ReplacementReport,
   UnaffectedRecord,
   SupportExplanation,
+  GateStatus,
+  CheckStatus,
+  CriterionRef,
+  GateRef,
+  WorkRef,
 } from "./report";

@@ -39,7 +39,7 @@ async function aDeclaredButUnevaluatedGate() {
   });
   const criterion = await session.stateCriterion("the protected artefact matches its recorded hash");
   const gate = await session.declareGate({
-    criterion,
+    governedBy: [criterion],
     consequence: "block promotion unless the artefact verifies",
     protecting: [promotion],
   });
@@ -104,12 +104,12 @@ describe("S-17: does the guard actually guard?", () => {
     const releaseWork = await session.planWork({ objective: "publish to release", acceptance: "verified" });
 
     const stagingGate = await session.declareGate({
-      criterion,
+      governedBy: [criterion],
       consequence: "block staging unless the artefact verifies",
       protecting: [stagingWork],
     });
     const releaseGate = await session.declareGate({
-      criterion,
+      governedBy: [criterion],
       consequence: "block release unless the artefact verifies",
       protecting: [releaseWork],
     });
@@ -134,8 +134,7 @@ describe("S-17: does the guard actually guard?", () => {
   test("Afterward 2, restated: which criterion governs this gate?", async () => {
     const { gate, criterion } = await aDeclaredButUnevaluatedGate();
 
-    const governing = await session.criterionGoverning(gate);
-    expect(governing).not.toBeNull();
-    expect(governing!.id).toBe(criterion.id);
+    const governing = await session.criteriaGoverning(gate);
+    expect(governing.map((c) => c.id)).toEqual([criterion.id]);
   });
 });
