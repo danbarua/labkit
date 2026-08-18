@@ -680,6 +680,11 @@ this document's original analysis are marked as such.
 | M | A review has no analysis to point at | `EVALUATES: Review→Claim\|Decision\|Evidence` | S-11 | **CONFIRMED — resolved.** Added `Review → EvidenceUnit`. Endpoint is the inferential activity, not the `Computation` that executed it: what S-11's reviewer criticises is the method, and nothing ran incorrectly. `Review → Computation` may be earned later by a scenario reviewing an *execution*; S-11 did not earn it |
 | N | Claim identity is undefined | one `Claim` created per analysis conclusion; queried by `name` | S-5, S-12 | **NEW OPEN QUESTION.** Two analyses concluding the same proposition currently create two claims. Correct if a claim is an assertion *occurrence*; wrong if it is a proposition, in which case one claim should accumulate evidence. Deliberately not fixed — S-5 and S-12 are what should decide it |
 | O | Withdrawal reason is under-determined | `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation | S-3, S-7 | **NEW, DEFERRED.** Two shapes of the same gap: with no review the reason is manufactured (row **I** again — probably should be null); with several reviews of one unit the causal one is ambiguous. May want no relationship at all, since it describes *why state changed* rather than *what current state is* — which is what the event history is for. Deferred until the event model is under real pressure |
+| P | `Evidence` carries two senses | one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position | S-9, S-10, S-12 | **NEW, from cold review (3 of 4 reviewers, independently).** May be correct minimalism — S-11's premise ("observations fine, inference wrong") is expressed structurally and works. But `recordObservations` makes Evidence with no producing `EvidenceUnit`, which PJ-001 defines as impossible, and `whySupported` structurally cannot count an observation as support |
+| Q | Question and LineOfEnquiry are collapsed by the service layer | `openEnquiry(question)` creates a `LineOfEnquiry` named with the question text; no `Question`, no `MOTIVATES`, anywhere in `src/domain/` | S-1, S-2, S-13 | **NEW, from cold review (3 of 4, independently).** Two readings: the graph's split is real and the service layer simply hasn't reached it, or the split is the redundancy and S-1 collapses it in the graph too. Consequence either way: PJ-001's "why is this line of enquiry still open?" is unanswerable for anything the service layer creates, since closure derives via `Question` |
+| R | Standing is a birth property, not a transition | `Claim.kind` is hardcoded `"confirmatory"` by the only writer; `exploratory` unreachable through research verbs | S-8, S-7, story 18 | **NEW, from cold review (3 of 4).** Ties to rows **G** and **K**: exploratory→confirmatory is plausibly conferred by an event (preregistration, lock, promotion) rather than set at creation. If so G/K/R are one question about how standing changes, not three |
+| S | No agent, person or role exists in the model | no node label, no property, anywhere | S-8 | **NEW, from cold review.** S-8's Afterward asks "who approved the scale-up, and on what projected cost?" — unanswerable. May legitimately be external metadata rather than domain; S-8 decides |
+| T | Edges cannot carry properties | `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)` | S-7, row O | **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed |
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from
@@ -687,6 +692,12 @@ PJ-001 is about right and the edge schema is where the work is. And row **I**
 underlies three scenarios without being a schema question at all: it is a
 query-semantics requirement, and the likeliest place for the service layer
 to silently get it wrong.
+
+Rows **P**–**T** were added by a cold-context review after S-11 (four
+independent reviewers, unprimed). They are *not* scenario outcomes — nothing
+has tested them — but three of the five were noticed independently by three
+of four reviewers, which is why they are logged rather than left to be
+re-derived (differently) by whichever scenario hits them first.
 
 **Status after S-11** (the control scenario; see `src/domain/`,
 `tests/scenarios/s11_invalidate_analysis.test.ts`). The entity inventory did

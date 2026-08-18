@@ -299,10 +299,17 @@ export class ResearchSession {
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(comp:Computation)
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
        MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL
+       WHERE out.invalidated IS NULL OR out.invalidated = false
        RETURN a`,
-      // NB: "never invalidated" and "no output artefact" would look alike
-      // here. Safe only because recordAnalysis always draws RECORDED_IN.
+      // `invalidated` is optional, so "not invalidated" has two spellings:
+      // absent, and explicitly false. Both are accepted here because the
+      // sibling branch above partitions on JS truthiness, which treats them
+      // alike. A bare `IS NULL` did not, and the mismatch made a claim whose
+      // output artefact was explicitly `false` report supported-but-resting-
+      // on-nothing.
+      //
+      // NB: "never invalidated" and "no output artefact" still look alike.
+      // Safe only because recordAnalysis always draws RECORDED_IN.
       { a: vertexProps<ArtefactProps>() },
       { name: proposition },
     );
