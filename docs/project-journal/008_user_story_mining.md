@@ -655,14 +655,18 @@ doctrine on trial.
 ## §3 — Consolidated design pressure
 
 Where the corpus is predicted to strain the current model
-(`src/db/domain.ts`). **Every row is a prediction to confirm or refute
-during the build, not a decision already taken.** Some will dissolve without
-a schema change; where a plausible no-change route exists it is named.
+(`src/db/domain.ts`). **Every row started as a prediction to confirm or
+refute during the build, not a decision already taken.** Some dissolve
+without a schema change; where a plausible no-change route exists it is
+named. Rows gain an outcome as scenarios run, and a prediction that fails to
+materialise (row **B**) is as much a result as one that is confirmed — rows
+are not deleted when that happens. Rows added *by* a scenario rather than by
+this document's original analysis are marked as such.
 
-| # | Pressure point | Current state (verified) | Scenarios | Plausible no-change route |
+| # | Pressure point | Current state (verified) | Scenarios | Plausible no-change route / outcome |
 | --- | --- | --- | --- | --- |
 | A | A criterion evaluation has no inconclusive outcome | `outcome: "pass" \| "fail"` | S-3, S-17 | The checks genuinely did pass/fail individually; inconclusiveness belongs to the decision, not the evaluation |
-| B | Supersession is decision-only | `SUPERSEDES: [["Decision","Decision"]]` | S-11, S-12 | Challenge the old claim, assert a narrower one, record a decision linking them |
+| B | Supersession is decision-only | `SUPERSEDES: [["Decision","Decision"]]` | ~~S-11~~, S-12 | **S-11: not established as a gap.** Invalidating the replaced analysis's output plus the replacement's own support answered every question; an attempt to mint decisions purely to have something supersedable drew zero edges with all assertions passing. That is *not* a finding that invalidation represents supersession — `invalidated = true` means "no longer valid as a source of current inference", and the two merely coincide here. **Open; S-12 discriminates**, since there the numbers stay valid and only the interpretation changes |
 | C | A claim has no endpoint or scope | `ClaimProps = { name, kind? }` | S-5, S-13 | Scope is carried by the line of enquiry the claim answers, reached by traversal |
 | D | No question-to-question lineage | no `Question`→`Question` edge | S-1, S-13 | A decision narrows the original; new questions motivate new work |
 | E | No evidence-to-evidence lineage | no `Evidence`→`Evidence` edge | S-10 | Both support the same claim; execution differences live on the computation |
@@ -671,6 +675,9 @@ a schema change; where a plausible no-change route exists it is named.
 | H | Closure carries no polarity | `RESOLVES` edge, no outcome field | S-4 | The decision's `reason` prose plus challenging evidence |
 | I | Absence of evidence vs inconclusive evidence | no explicit representation | S-1, S-2, S-3 | Derivable: no evidence unit addressing the question vs one whose evaluations disagree |
 | J | Deferred vs accepted-as-unresolved | `DEFERS` edge covers both | S-14 | Distinguish by whether an open task exists |
+| L | No execution input lineage | no `Computation`→`Artefact` "read" edge | S-11 | **CONFIRMED — resolved.** Added `CONSUMES: Computation → Artefact`. The old route (`ADDRESSES` to the enquiry, then `REQUIRES`) answered "what observations is this enquiry associated with", not "what did this computation consume". Verified false in practice, not in principle: with two analyses on one enquiry over different inputs, "what does this claim rest on" returned both observation sets |
+| M | A review has no analysis to point at | `EVALUATES: Review→Claim\|Decision\|Evidence` | S-11 | **CONFIRMED — resolved.** Added `Review → EvidenceUnit`. Endpoint is the inferential activity, not the `Computation` that executed it: what S-11's reviewer criticises is the method, and nothing ran incorrectly. `Review → Computation` may be earned later by a scenario reviewing an *execution*; S-11 did not earn it |
+| N | Claim identity is undefined | one `Claim` created per analysis conclusion; queried by `name` | S-5, S-12 | **NEW OPEN QUESTION.** Two analyses concluding the same proposition currently create two claims. Correct if a claim is an assertion *occurrence*; wrong if it is a proposition, in which case one claim should accumulate evidence. Deliberately not fixed — S-5 and S-12 are what should decide it |
 | K | No provisional/scratch standing | `Claim.kind: exploratory \| confirmatory` | S-8, story 18 | `exploratory` already is this distinction |
 
 Two observations across the table. Most rows are *missing relationships*
@@ -679,6 +686,15 @@ PJ-001 is about right and the edge schema is where the work is. And row **I**
 underlies three scenarios without being a schema question at all: it is a
 query-semantics requirement, and the likeliest place for the service layer
 to silently get it wrong.
+
+**Status after S-11** (the control scenario; see `src/domain/`,
+`tests/scenarios/s11_invalidate_analysis.test.ts`). The entity inventory did
+not move: no row resolved by adding a node label, and rows **L** and **M**
+were both found by a service-layer traversal failing to answer a real
+question, not by ontology design. Row **B** is the more interesting result —
+the predicted gap did *not* materialise, and saying so is as much a finding
+as confirming one. Row **I** held: "which conclusions changed" proved cleanly
+derivable from before/after findings, with no strength field on `Claim`.
 
 ---
 

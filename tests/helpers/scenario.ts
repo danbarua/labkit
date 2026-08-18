@@ -17,6 +17,8 @@ import { setupTestDb, type TestDb } from "./db";
 export interface Scenario {
   /** A fresh, empty tenant graph for one test. */
   begin(): Promise<TenantGraph>;
+  /** The same graph again, for asserting that state is durable rather than held in a session's memory. */
+  current(): Promise<TenantGraph>;
   end(): Promise<void>;
   close(): Promise<void>;
 }
@@ -30,6 +32,11 @@ export async function openScenario(): Promise<Scenario> {
       // A fresh connection per test -- see tests/helpers/db.ts on why that is
       // load-bearing rather than tidiness.
       db = await testDb.openClient();
+      const ctx = await resolveTenantContext(db, "labkit");
+      return new TenantGraph(ctx, db);
+    },
+    async current() {
+      if (!db) throw new Error("scenario not begun");
       const ctx = await resolveTenantContext(db, "labkit");
       return new TenantGraph(ctx, db);
     },

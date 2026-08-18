@@ -95,14 +95,11 @@ export class ResearchSession {
    * conclusions. Creates the computation, the unit of work that ran it, the
    * artefact holding its output, and one finding + proposition per conclusion.
    *
-   * `from` names the observations consumed — but there is no edge meaning
-   * "this computation read that artefact". The only route back to them is
-   * ADDRESSES to the enquiry, then REQUIRES to whatever observations the
-   * enquiry needs (see recordObservations). That is archaeology: it answers
-   * "what observations does this enquiry rest on", not "what did THIS
-   * analysis read", and it cannot distinguish two analyses on one enquiry
-   * that consumed different inputs. Recorded as a finding, not worked around
-   * by stuffing the ids into a property that means something else.
+   * `from` names the observations consumed, recorded as real execution
+   * lineage (`CONSUMES`). Until S-11 forced the question there was no such
+   * edge, and the only route back to inputs went out to the enquiry and
+   * back — which answered a different question and produced a genuine false
+   * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
    */
   async recordAnalysis(input: {
     enquiry: EnquiryRef;
@@ -123,6 +120,9 @@ export class ResearchSession {
     await this.graph.createEdge(unit.natural_id, "USES", computation.natural_id);
     await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry.id);
     await this.graph.createEdge(unit.natural_id, "PRODUCES", output.natural_id);
+    for (const observations of input.from) {
+      await this.graph.createEdge(computation.natural_id, "CONSUMES", observations.id);
+    }
 
     for (const conclusion of input.concludes) {
       const evidence = await this.graph.createNode("Evidence", { statement: conclusion.finding });
@@ -134,18 +134,22 @@ export class ResearchSession {
 
     this.emit("recordAnalysis", computation.natural_id, {
       method: input.method,
-      // Kept in the event log because the graph has nowhere to put it.
       read: input.from.map((o) => o.id),
       concluded: input.concludes.map((c) => c.proposition),
     });
     return { kind: "analysis", id: computation.natural_id };
   }
 
-  /** Records a reviewer's finding about an analysis. */
+  /**
+   * Records a reviewer's finding about an analysis.
+   *
+   * The review attaches to the inferential activity (the evidence unit), not
+   * to the execution that ran it — what gets criticized in S-11 is the
+   * method, and nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
+   */
   async recordReview(input: { of: AnalysisRef; verdict: string }): Promise<ReviewRef> {
     const review = await this.graph.createNode("Review", { verdict: input.verdict });
-    // A Review can EVALUATE a Claim, Decision or Evidence -- not an analysis.
-    // The review's subject is therefore only in the event log, not the graph.
+    await this.graph.createEdge(review.natural_id, "EVALUATES", await this.unitOf(input.of));
     this.emit("recordReview", review.natural_id, { of: input.of.id, verdict: input.verdict });
     return { kind: "review", id: review.natural_id };
   }
@@ -182,21 +186,24 @@ export class ResearchSession {
       { id: output },
     );
 
-    // "Mark the prior inference superseded" has no direct expression:
-    // supersession runs between decisions only, and an analysis is not one.
-    // The decision below is a genuine record ("we replaced X because of
-    // review Y"), but the SUPERSEDES edge it wants to draw usually cannot be
-    // drawn -- the analysis being replaced has no decision of its own unless
-    // someone minted one purely to have something supersedable. Confirmed
-    // empirically for S-11: one decision created, zero SUPERSEDES edges, and
-    // every scenario assertion still passes. What actually carries
-    // "superseded" here is the invalidated output artefact above.
+    // The record of the replacement decision itself. Note what is NOT here:
+    // no SUPERSEDES edge between the two analyses.
+    //
+    // S-11 does not establish inference supersession as a gap. Invalidating
+    // the replaced analysis's output, plus the replacement's own support, is
+    // sufficient for every question this scenario asks -- an earlier draft
+    // minted decisions purely to have something supersedable and drew zero
+    // edges, with all assertions still passing.
+    //
+    // That is not the same as concluding invalidation *is* supersession.
+    // `invalidated = true` means "no longer valid as a source of current
+    // inference"; the two only coincide here. S-12 is the discriminator: the
+    // numbers stay valid and only the interpretation changes, which
+    // invalidation cannot honestly carry. Deliberately unresolved until then.
     const supersededBy = await this.graph.createNode("Decision", {
       reason: `replaced ${input.supersedes.id}: ${await this.verdictOf(input.because)}`,
       invalidation_check: "re-review of the inferential method",
     });
-    const original = await this.decisionFor(input.supersedes);
-    if (original) await this.graph.createEdge(supersededBy.natural_id, "SUPERSEDES", original);
 
     const replacement = await this.recordAnalysis({
       enquiry: input.enquiry,
@@ -247,8 +254,14 @@ export class ResearchSession {
        MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
        MATCH (u)-[:USES]->(comp:Computation)
        OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
-       RETURN e, comp, a`,
-      { e: vertexProps<EvidenceProps>(), comp: vertexProps<ComputationProps>(), a: optional(vertexProps<ArtefactProps>()) },
+       OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
+       RETURN e, comp, a, r`,
+      {
+        e: vertexProps<EvidenceProps>(),
+        comp: vertexProps<ComputationProps>(),
+        a: optional(vertexProps<ArtefactProps>()),
+        r: optional(vertexProps<{ verdict: string }>()),
+      },
       { name: proposition },
     );
 
@@ -256,19 +269,25 @@ export class ResearchSession {
     const superseded: SupportExplanation["superseded"] = [];
     for (const row of rows) {
       const entry = { finding: row.e.statement, via: row.comp.kind };
-      if (row.a?.invalidated) superseded.push({ ...entry, reason: "its analysis was replaced" });
+      // Why support was withdrawn comes from the review of the inferential
+      // unit -- the edge S-11 earned. Before it existed this was a hardcoded
+      // string, because the review's subject lived only in the event stream.
+      if (row.a?.invalidated) superseded.push({ ...entry, reason: row.r?.verdict ?? "its analysis was replaced" });
       else support.push(entry);
     }
 
-    // The observations reachable from the enquiry this claim's work addresses.
-    // Note the shape of this traversal: it goes claim -> evidence -> unit ->
-    // enquiry -> observations, because no edge connects an analysis directly
-    // to what it read.
+    // What the analyses actually consumed -- one hop from the computation,
+    // not a detour through the enquiry. Only currently-supporting evidence
+    // counts: a superseded analysis's inputs are not what the claim rests on
+    // now.
     const resting = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       MATCH (u)-[:ADDRESSES]->(loe:LineOfEnquiry)-[:REQUIRES]->(obs:Evidence)
-       MATCH (obs)-[:RECORDED_IN]->(a:Artefact)
+      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(comp:Computation)
+       MATCH (comp)-[:CONSUMES]->(a:Artefact)
+       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
+       WHERE out.invalidated IS NULL
        RETURN a`,
+      // NB: "never invalidated" and "no output artefact" would look alike
+      // here. Safe only because recordAnalysis always draws RECORDED_IN.
       { a: vertexProps<ArtefactProps>() },
       { name: proposition },
     );
@@ -282,7 +301,16 @@ export class ResearchSession {
     };
   }
 
-  /** "What is affected if this record is invalidated, and what is not?" -- PJ-001's MVP propagation query. */
+  /**
+   * "What is affected if this record is invalidated?" -- PJ-001's MVP
+   * propagation query. Deliberately the affected side only; what is *not*
+   * affected is reported by replaceAnalysis, because it depends on what the
+   * replacement rests on rather than on the invalidated record alone.
+   *
+   * Unrelated to whySupported()'s `restingOn`, which moved to CONSUMES: this
+   * asks which enquiries REQUIRE the evidence held here, not what any
+   * computation read.
+   */
   async whatDependsOn(artefactName: string): Promise<{ claims: string[]; enquiries: string[] }> {
     const rows = await this.graph.query(
       `MATCH (a:Artefact {logical_name: $name})
@@ -339,16 +367,25 @@ export class ResearchSession {
     return rows[0]?.r.verdict ?? "";
   }
 
-  /** A Decision cannot point at a Computation, so "we use this analysis" is carried by BASED_ON to its evidence. */
-  private async decisionFor(analysis: AnalysisRef): Promise<string | undefined> {
+  /**
+   * The inferential activity behind an analysis.
+   *
+   * An `AnalysisRef` currently carries the computation's id, so reaching the
+   * unit is a hop. Worth watching: "analysis" keeps behaving like the
+   * EvidenceUnit (the bounded inferential activity) rather than the
+   * Computation (its execution) -- the review endpoint went that way too. Not
+   * changed now, because S-11 passes and renaming nouns is not a reason to
+   * refactor; flagged so a later scenario can settle it.
+   */
+  private async unitOf(analysis: AnalysisRef): Promise<string> {
     const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-       MATCH (d:Decision)-[:BASED_ON]->(e)
-       RETURN d`,
-      { d: vertexProps<{ natural_id: string }>() },
+      `MATCH (:Computation {natural_id: $id})<-[:USES]-(u:EvidenceUnit) RETURN u`,
+      { u: vertexProps<{ natural_id: string }>() },
       { id: analysis.id },
     );
-    return rows[0]?.d.natural_id;
+    const found = rows[0];
+    if (!found) throw new Error(`analysis ${analysis.id} has no inferential unit`);
+    return found.u.natural_id;
   }
 
   private async linkDecision(decisionId: string, analysis: AnalysisRef): Promise<void> {

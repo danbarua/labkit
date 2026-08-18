@@ -33,6 +33,7 @@ export const EDGE_LABELS = [
   "SUPPORTS", // Evidence -> Claim
   "CHALLENGES", // Evidence -> Claim
   "USES", // EvidenceUnit -> Computation
+  "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
   "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
   "RECORDED_IN", // Evidence -> Artefact
   "EVALUATED_AS", // Criterion -> CriterionEvaluation
@@ -44,7 +45,7 @@ export const EDGE_LABELS = [
   "NARROWS", // Decision -> Question
   "DEFERS", // Decision -> Question
   "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
-  "EVALUATES", // Review -> Claim | Decision | Evidence
+  "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
   "IMPLEMENTS", // Task -> EvidenceUnit
 ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
@@ -69,6 +70,23 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   SUPPORTS: [["Evidence", "Claim"]],
   CHALLENGES: [["Evidence", "Claim"]],
   USES: [["EvidenceUnit", "Computation"]],
+  /**
+   * Execution lineage: what a computation read. Earned by S-11
+   * (docs/project-journal/008_user_story_mining.md), which asks what an
+   * analysis rests on and could previously only answer it by going out to the
+   * enquiry and back — `ADDRESSES` to a LineOfEnquiry, then `REQUIRES` to
+   * whatever observations that enquiry needs. That answers "what observations
+   * is this enquiry associated with", not "what did this computation
+   * consume", and the two stop being the same answer the moment one enquiry
+   * carries two analyses over different inputs. It produced a real false
+   * inference in the service layer's `whySupported()`, not a hypothetical one.
+   *
+   * Paired with `PRODUCES: Computation -> Artefact`, execution lineage reads
+   * directly in both directions, and it is the seam an external run tracker
+   * (W&B/MLflow knowing that run R42 read artefact D3) would eventually
+   * attach to, while LabKit keeps the scientific identity and the reason.
+   */
+  CONSUMES: [["Computation", "Artefact"]],
   PRODUCES: [
     ["EvidenceUnit", "Evidence"],
     ["EvidenceUnit", "Artefact"],
@@ -86,7 +104,21 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   NARROWS: [["Decision", "Question"]],
   DEFERS: [["Decision", "Question"]],
   SUPERSEDES: [["Decision", "Decision"]],
-  EVALUATES: [["Review", "Claim"], ["Review", "Decision"], ["Review", "Evidence"]],
+  /**
+   * `Review -> EvidenceUnit` is the second relationship S-11 earned: a review
+   * of an *analysis* previously had nowhere to point, so its subject survived
+   * only in the ephemeral event stream and "why was this replaced?" was
+   * unanswerable from the graph.
+   *
+   * The endpoint is the EvidenceUnit rather than the Computation
+   * deliberately. What the S-11 reviewer criticized — "your bootstrap is
+   * centred on the observed effect; it isn't a null test" — is the
+   * inferential procedure, not the execution: nothing ran incorrectly. The
+   * EvidenceUnit is the bounded inferential activity; the Computation is how
+   * it was executed. `Review -> Computation` may well be earned later by a
+   * scenario reviewing an execution, but S-11 did not earn it.
+   */
+  EVALUATES: [["Review", "Claim"], ["Review", "Decision"], ["Review", "Evidence"], ["Review", "EvidenceUnit"]],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
 };
 

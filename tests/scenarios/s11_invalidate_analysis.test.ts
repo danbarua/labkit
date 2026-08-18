@@ -205,6 +205,71 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
   });
 
+  /**
+   * The regression test for the relationship S-11 earned.
+   *
+   * Before `Computation -[:CONSUMES]-> Artefact` existed, "what does this
+   * claim rest on?" was answered by going out to the enquiry and back, which
+   * returns every observation the ENQUIRY is associated with. One enquiry
+   * carrying two analyses over different inputs is where that stops being the
+   * same question -- and it returned both observation sets for both claims.
+   */
+  test("a claim rests only on what its own analysis consumed, not on everything in the enquiry", async () => {
+    const enquiry = await session.openEnquiry("which construction classifies best?");
+    const mnist = await session.recordObservations({
+      enquiry,
+      name: "mnist per-image results",
+      finding: "per-image accuracy on MNIST",
+    });
+    const fashion = await session.recordObservations({
+      enquiry,
+      name: "fashion-mnist per-image results",
+      finding: "per-image accuracy on Fashion-MNIST",
+    });
+
+    await session.recordAnalysis({
+      enquiry,
+      method: "permutation-mnist",
+      from: [mnist],
+      concludes: [{ proposition: "T beats lattice on MNIST", finding: "p = 0.001" }],
+    });
+    await session.recordAnalysis({
+      enquiry,
+      method: "permutation-fashion",
+      from: [fashion],
+      concludes: [{ proposition: "T beats lattice on Fashion", finding: "p = 0.02" }],
+    });
+
+    const onMnist = await session.whySupported("T beats lattice on MNIST");
+    expect(onMnist.restingOn).toEqual(["mnist per-image results"]);
+
+    const onFashion = await session.whySupported("T beats lattice on Fashion");
+    expect(onFashion.restingOn).toEqual(["fashion-mnist per-image results"]);
+  });
+
+  test("why support was withdrawn is answerable from the graph, not just the event log", async () => {
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
+    const review = await session.recordReview({
+      of: analysis,
+      verdict: "bootstrap is centred on the observed effect; it does not implement the intended null",
+    });
+    await session.replaceAnalysis({
+      supersedes: analysis,
+      because: review,
+      enquiry,
+      method: "sign-flip-permutation",
+      from: [observations],
+      concludes: SIGN_FLIP_CONCLUSIONS,
+    });
+
+    // A fresh session over the same graph -- nothing carried in memory.
+    const reader = new ResearchSession(await scenario.current(), { clock });
+    const why = await reader.whySupported("T beats rewired");
+    expect(why.superseded[0]!.reason).toBe(
+      "bootstrap is centred on the observed effect; it does not implement the intended null",
+    );
+  });
+
   test("the temporal seam records the invalidation, with its time and what it moved", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({ of: analysis, verdict: "not a null test" });
