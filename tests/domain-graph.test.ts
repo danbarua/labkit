@@ -1,68 +1,65 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { PGlite } from "@electric-sql/pglite";
-import { age } from "@electric-sql/pglite-age";
-import { vector } from "@electric-sql/pglite-pgvector";
-import { TenantGraph, bootstrapSession, parseAgtype, NODE_LABELS, NATURAL_ID_PREFIX, type NodeLabel, type DecisionProps } from "../src/db/graph";
-import { runMigrations } from "../src/db/migrate";
+import {
+  TenantGraph,
+  parseAgtype,
+  NODE_LABELS,
+  NATURAL_ID_PREFIX,
+  type LabKitDB,
+  type NodeLabel,
+  type DecisionProps,
+  type AgtypeValue,
+} from "../src/db/graph";
 import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
+import { setupTestDb, type TestDb } from "./helpers/db";
+
+/** Every parseAgtype() call in this file is on a node or edge RETURN result (never a path/scalar), by construction of the Cypher queries themselves. */
+function props<T>(v: AgtypeValue<T>): T {
+  if (v.kind !== "vertex" && v.kind !== "edge") throw new Error(`expected a vertex or edge, got ${v.kind}`);
+  return v.properties;
+}
 
 /**
  * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
  * revised by docs/project-journal/003_review_domain_tenancy.md and
  * docs/project-journal/004_tenancy_implementation_plan.md) against Apache
- * AGE running inside an in-memory PGlite instance, migrated and provisioned
- * the same way a real connection would be (runMigrations() +
- * resolveTenantContext(), not hand-rolled setup). Each test corresponds to
- * one of the journal's MVP acceptance-criteria questions, or one of PJ-003
- * §15 / PJ-004's acceptance tests.
+ * AGE, migrated and provisioned the same way a real connection would be
+ * (runMigrations() + resolveTenantContext(), not hand-rolled setup) and
+ * queried through the same `pg.Client`-over-`pglite-socket` path production
+ * uses — never a raw `PGlite` instance directly (see tests/helpers/db.ts).
+ * Each test corresponds to one of the journal's MVP acceptance-criteria
+ * questions, or one of PJ-003 §15 / PJ-004's acceptance tests.
  */
 
-let db: PGlite;
+let testDb: TestDb;
+let db: LabKitDB & { close(): Promise<void> };
 let ctx: TenantContext;
 let graph: TenantGraph;
 
 beforeAll(async () => {
-  // creates single PgLite instance for all tests
-  db = new PGlite({ extensions: { age, vector } });
+  testDb = await setupTestDb();
 });
 
 afterAll(async () => {
-  // closes PgLite instance after all tests
-  await db.close();
+  await testDb.close();
 });
 
 beforeEach(async () => {
-  // migrates the database and provisions a tenant graph for each test
-  await runMigrations(db);
-  await bootstrapSession(db);
+  // A fresh connection every test, not one shared for the whole file — see
+  // tests/helpers/db.ts's file-level comment on why that's load-bearing,
+  // not a style preference (a confirmed pglite-socket bug can permanently
+  // corrupt a connection that sees enough error/concurrency exposure, and
+  // several tests in this file deliberately provoke DB-level errors).
+  db = await testDb.openClient();
   ctx = await resolveTenantContext(db, "labkit");
   graph = new TenantGraph(ctx, db);
 });
 
 afterEach(async () => {
-  // tenant graph needs to be dropped before truncating tables
-  // any other tenant graphs (multi-tenancy tests) need to clean up after themselves too
-  if (graph){
-      await graph.dropGraph();
-  }
-
-  const tables = await db.query<{ table_schema: string; table_name: string }>(`
-    select table_schema, table_name 
-    from information_schema.tables
-    where table_schema not in ('pg_catalog', 'information_schema', 'ag_catalog', 'drizzle')
-    order by table_schema, table_name;
-  `);
-
-  const tableNames = tables.rows.map((r) => `"${r.table_schema}"."${r.table_name}"`);
-
-  if (tableNames.length > 0) {
-    // Disable foreign key checks, truncate all tables, re-enable foreign key checks.
-    await db.exec(`
-      set session_replication_role = replica; 
-      truncate ${tableNames.join(", ")} restart identity cascade; 
-      set session_replication_role = DEFAULT;
-    `);
-  }
+  // Drops every AGE graph (this test's tenant plus any others a
+  // multi-tenancy test created) and truncates every table — see
+  // tests/helpers/db.ts, no per-test cleanup discipline required.
+  await testDb.reset();
+  await db.close();
 });
 
 async function seedResearchThread() {
@@ -99,10 +96,10 @@ describe("evidence and computations supporting a claim", () => {
     );
 
     expect(rows).toHaveLength(1);
-    const evidence = parseAgtype(rows[0]!.e);
-    const computation = parseAgtype(rows[0]!.comp);
-    expect(evidence.properties).toMatchObject({ statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" });
-    expect(computation.properties).toMatchObject({ external_run_id: "run-42", status: "completed" });
+    const evidence = props(parseAgtype(rows[0]!.e));
+    const computation = props(parseAgtype(rows[0]!.comp));
+    expect(evidence).toMatchObject({ statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" });
+    expect(computation).toMatchObject({ external_run_id: "run-42", status: "completed" });
   });
 });
 
@@ -134,9 +131,9 @@ describe("invalidation propagation", () => {
     );
 
     expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.claim!).properties).toMatchObject({ name: claim.properties.name });
-    expect(parseAgtype(rows[0]!.decision!).properties).toMatchObject({ reason: decision.properties.reason });
-    expect(parseAgtype(rows[0]!.loe!).properties).toMatchObject({ name: lineOfEnquiry.properties.name });
+    expect(props(parseAgtype(rows[0]!.claim!))).toMatchObject({ name: claim.properties.name });
+    expect(props(parseAgtype(rows[0]!.decision!))).toMatchObject({ reason: decision.properties.reason });
+    expect(props(parseAgtype(rows[0]!.loe!))).toMatchObject({ name: lineOfEnquiry.properties.name });
   });
 });
 
@@ -173,7 +170,7 @@ describe("open lines of enquiry", () => {
     );
 
     expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.d).properties).toMatchObject({ reason: "accelerated ridge confirmed equivalent" });
+    expect(props(parseAgtype(rows[0]!.d))).toMatchObject({ reason: "accelerated ridge confirmed equivalent" });
   });
 });
 
@@ -195,7 +192,7 @@ describe("failed/planned inquiry provenance", () => {
     );
 
     expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.loe).properties).toMatchObject({ name: "does approach X scale" });
+    expect(props(parseAgtype(rows[0]!.loe))).toMatchObject({ name: "does approach X scale" });
   });
 });
 
@@ -213,7 +210,7 @@ describe("decision amendments", () => {
     );
 
     expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.old).properties).toMatchObject({ reason: "use float32 batching" });
+    expect(props(parseAgtype(rows[0]!.old))).toMatchObject({ reason: "use float32 batching" });
   });
 
   test("walks the full amendment chain back to the original decision", async () => {
@@ -230,7 +227,7 @@ describe("decision amendments", () => {
       { id: d3.natural_id },
     );
 
-    const chain = rows.map((r) => (parseAgtype(r.x).properties as { reason: string }).reason);
+    const chain = rows.map((r) => (props(parseAgtype(r.x)) as { reason: string }).reason);
     expect(chain).toEqual(["d2-amendment", "d1-original"]);
   });
 });
@@ -258,7 +255,7 @@ describe("decision lifecycle integrity", () => {
     await graph.closeDecision(d.natural_id, "2026-08-18T12:00:00Z");
 
     const rows = await graph.cypher<{ n: string }>(`MATCH (n:Decision {natural_id: $id}) RETURN n`, "(n agtype)", { id: d.natural_id });
-    expect(parseAgtype(rows[0]!.n).properties).toMatchObject({ is_open: false, closed_at: "2026-08-18T12:00:00Z" });
+    expect(props(parseAgtype(rows[0]!.n))).toMatchObject({ is_open: false, closed_at: "2026-08-18T12:00:00Z" });
   });
 
   test("closeDecision throws for a nonexistent decision", async () => {
@@ -322,7 +319,7 @@ describe("Gate is reconnected to what it actually gates", () => {
     );
 
     expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.comp).properties).toMatchObject({ kind: "promotion_run" });
+    expect(props(parseAgtype(rows[0]!.comp))).toMatchObject({ kind: "promotion_run" });
   });
 });
 
@@ -384,10 +381,7 @@ describe("tenant isolation", () => {
 
     const rowsA = await graphA.cypher<{ c: string }>(`MATCH (c:Claim) RETURN c`, "(c agtype)");
     expect(rowsA).toHaveLength(1);
-    expect(parseAgtype(rowsA[0]!.c).properties).toMatchObject({ name: "x" });
-
-    await graphA.dropGraph();
-    await graphB.dropGraph();
+    expect(props(parseAgtype(rowsA[0]!.c))).toMatchObject({ name: "x" });
   });
 
   test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {
@@ -400,9 +394,6 @@ describe("tenant isolation", () => {
     const loeB = await graphB.createNode("LineOfEnquiry", { name: "loe-in-b" });
 
     await expect(graphA.createEdge(questionA.natural_id, "MOTIVATES", loeB.natural_id)).rejects.toThrow(/not found/);
-
-    await graphA.dropGraph();
-    await graphB.dropGraph();
   });
 });
 
@@ -478,27 +469,54 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     ).rejects.toThrow(/duplicate key value violates unique constraint/);
   });
 
-  test("createEdge survives losing a race to a concurrent caller", async () => {
+  // NOT a real Promise.all() race against two live connections — genuine
+  // concurrent queries against pglite-socket are not reliable enough for a
+  // deterministic suite to depend on (confirmed 2026-08-18: two SEPARATE
+  // pg.Client connections issuing overlapping queries where one errors,
+  // e.g. this exact 23505, corrupt the connection after a handful of
+  // iterations — reproducible with plain SQL, nothing AGE-specific about
+  // it; see the postgres-age skill's "Upstream filing"). That's a real bug
+  // in @electric-sql/pglite-socket, not something to work around by wanting
+  // harder — and it matters beyond this test, since pgliteLeaderElectionBackend's
+  // whole design is every secondary process hitting the primary's socket
+  // concurrently. What's actually testable deterministically: the DB
+  // constraint itself (the "duplicate CREATE... blocked at the database"
+  // test above, one connection, no race needed) and createEdge()'s own
+  // handling of losing that race — proven here by making the CREATE step
+  // specifically throw a synthetic 23505, the same shape Postgres would
+  // raise from a real conflict, without needing two connections to
+  // actually collide to get there.
+  test("createEdge treats a 23505 from the CREATE step as success, not a race failure", async () => {
     const question = await graph.createNode("Question", { name: "q" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
-    // Two concurrent createEdge() calls for the same (from, edge, to): both
-    // resolve without throwing and exactly one edge results. This doesn't
-    // instrument which call actually hit the UNIQUE (start_id, end_id)
-    // constraint's 23505 vs. which won the pre-check — either is a
-    // legitimate outcome of the race — only that the end state is correct
-    // regardless of interleaving, which is the actual guarantee that matters.
-    await Promise.all([
-      graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
-      graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
-    ]);
+    let createAttempts = 0;
+    const flakyDb: LabKitDB = {
+      async query(sql: string, params?: unknown[]) {
+        if (sql.includes("CREATE (a)-[:")) {
+          createAttempts++;
+          const err = new Error("duplicate key value violates unique constraint") as Error & { code?: string };
+          err.code = "23505";
+          throw err;
+        }
+        return db.query(sql, params);
+      },
+    };
+    const flakyGraph = new TenantGraph(ctx, flakyDb);
+
+    await expect(flakyGraph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id)).resolves.toBeUndefined();
+    expect(createAttempts).toBe(1); // confirms the CREATE step actually ran, not that it was skipped some other way
 
     const rows = await graph.cypher<{ r: string }>(
       `MATCH (:Question {natural_id: $qId})-[r:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN r`,
       "(r agtype)",
       { qId: question.natural_id, loeId: loe.natural_id },
     );
-    expect(rows).toHaveLength(1);
+    // The mock never actually created the edge (every CREATE attempt threw)
+    // — this confirms createEdge() didn't fabricate success, it correctly
+    // treated "someone else already created it" as the end state, which
+    // for this test means zero, since nothing real ever ran the CREATE.
+    expect(rows).toHaveLength(0);
   });
 });
 

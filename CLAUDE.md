@@ -139,47 +139,93 @@ database exists, that stops being true and this note should be updated.
 
 ## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
 
-`pglite-age` (the WASM AGE build this project runs on) diverges from stock
-AGE in ways worth knowing before writing new Cypher:
+`pglite-age` is a genuine compile of Apache AGE's own C source (currently
+pinned at branch `PG18`, tag `v1.7.0-rc0` — confirmed by inspecting
+`electric-sql/postgres-pglite`'s AGE submodule), not a reduced WASM-only
+subset. Most of what looked like WASM quirks turned out to be stock AGE
+1.7.0-rc0 behavior on any platform — confirmed both from source and by
+running the same queries against `docker-compose.yml`'s real Postgres 18 +
+AGE 1.7.0 container (`apache/age:release_PG18_1.7.0`, no WASM involved).
+See the skill doc's "Overview" and "LabKit-specific gotchas" for detail:
 
 - **`MERGE` for relationships is broken** — creates an edge with
   `start_id`/`end_id` both `0`, never actually connecting the two nodes.
-  `createEdge()` uses explicit `MATCH`-then-`CREATE` instead, backed by a
-  real `UNIQUE (start_id, end_id)` index as the actual concurrency
-  guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
-  which `createEdge()` catches and treats as success).
+  **Confirmed WASM/pglite-age-specific** — the identical query connects the
+  nodes correctly on the real Postgres+AGE container (see the skill doc).
+  `createEdge()` uses explicit
+  `MATCH`-then-`CREATE` instead, backed by a real `UNIQUE (start_id,
+  end_id)` index as the actual concurrency guarantee (a losing concurrent
+  `CREATE` hits Postgres error `23505`, which `createEdge()` catches and
+  treats as success).
 - No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
+  Confirmed stock AGE 1.7.0-rc0 behavior, not WASM-specific.
 - No multi-type variable-length edges `[:A|B*1..3]` — chain explicit
-  `MATCH`/`OPTIONAL MATCH`, or use a single-type `[:TYPE*1..5]`.
+  `MATCH`/`OPTIONAL MATCH`, or use a single-type `[:TYPE*1..5]`. Also
+  confirmed stock AGE 1.7.0-rc0 (a grammar-level restriction, not a parser
+  bug specific to this build).
 - Every AGE label (vertex or edge) is a real Postgres table
   (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
   it directly — this is how natural-id uniqueness, edge uniqueness, and the
   per-tenant CQRS views all work, with no `cypher()` call involved.
+- **Never rely on `search_path` ordering** — qualify explicitly instead
+  (`ag_catalog.` for AGE catalog functions, `src/db/schema.ts`'s
+  `LABKIT_SCHEMA` constant for LabKit's own `tenants` table and natural-id
+  functions). This isn't stylistic: migration 0001's `SET search_path`
+  staying active into migration 0002 was silently landing LabKit's own
+  functions in `ag_catalog` instead of `public` until this was fixed.
 
 ## Testing patterns
 
-`tests/domain-graph.test.ts` spins up one `new PGlite({ extensions: { age,
-vector } })` in `beforeAll` and reuses it for every test — only the first
-test pays PGlite's WASM start-up cost. Each test still goes through the same
-bootstrap a real connection would (`runMigrations(db)` + `bootstrapSession(db)`
-+ `resolveTenantContext(db, "labkit")` in `beforeEach`), it's just no longer
-paying for a fresh instance each time (`runMigrations` is a no-op past the
-first call — the migration journal table already reflects every migration).
-`afterEach` drops the tenant's graph (`graph.dropGraph()`) — which removes
-its whole per-tenant schema, so it never needs to appear in the exclusion
-list below — then truncates every remaining table outside
-`pg_catalog`/`information_schema`/`ag_catalog`/`drizzle` with `RESTART
-IDENTITY CASCADE`. That resets the `tenants.id` sequence every test (so
-`resolveTenantContext(db, "labkit")` deterministically gets tenant id `1`
-again) but deliberately does *not* reset the natural-id sequences from
-`drizzle/0002_natural_ids.sql` — those are standalone `SEQUENCE`s, not tied
-to a truncated table's identity column, so natural ids keep incrementing
-across tests exactly as they would across tenants in production (natural ids
-are scoped globally per entity-type, not per-tenant or per-test — PJ-004
-decision #3). Don't add a test that asserts a specific natural-id value
-across more than one test in the same file for this reason; assert on the
-prefix/shape instead.
+`tests/helpers/db.ts`'s `setupTestDb()` spins up one `PGlite` instance +
+runs migrations + starts a `PGLiteSocketServer` once per file, in
+`beforeAll` — only that first step pays PGlite's WASM start-up cost.
+Application-code test files (`tests/domain-graph.test.ts`,
+`tests/agtype.test.ts`) never import `@electric-sql/pglite`/`pglite-age`/
+`pglite-pgvector` themselves; they only ever see a `LabKitDB`-shaped
+`pg.Client`, the same production talks through.
+
+**Each test opens its own fresh connection in `beforeEach`
+(`testDb.openClient()`), not one shared for the whole file — this is
+load-bearing, not a style choice.** `@electric-sql/pglite-socket` has a
+confirmed, open upstream bug
+([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046)):
+two connections issuing concurrent queries, where at least one errors, can
+permanently corrupt the connection(s) involved. We hit this independently
+before finding the issue already filed — see the postgres-age skill's
+"Upstream filing" for the full writeup and `scripts/check-pglite-concurrency.sh`
+for a standing regression check (inverted exit code: 0 means the bug still
+reproduces, i.e. nothing to do; 1 means it didn't, worth checking whether
+pglite-socket picked up a fix). Corruption is confirmed to stay contained
+to the connection that hit it, so a fresh connection per test contains the
+blast radius even though the underlying bug isn't fixed. A test that
+deliberately needs to exercise "what happens when a query loses a race and
+gets a constraint violation" should do it deterministically (see
+`domain-graph.test.ts`'s `createEdge treats a 23505 from the CREATE step as
+success` test, which mocks the DB layer to inject exactly that error rather
+than racing two real connections) — not via `Promise.all()` against two
+live connections, which is unreliable against this backend regardless of
+how many connections are used.
+
+`afterEach` drops every AGE graph and truncates every remaining table
+outside `pg_catalog`/`information_schema`/`ag_catalog`/`drizzle` with
+`RESTART IDENTITY CASCADE` (via a separate, dedicated admin connection kept
+open for the whole file — see `tests/helpers/db.ts`). That resets the
+`tenants.id` sequence every test (so `resolveTenantContext(db, "labkit")`
+deterministically gets tenant id `1` again) but deliberately does *not*
+reset the natural-id sequences from `drizzle/0002_natural_ids.sql` — those
+are standalone `SEQUENCE`s, not tied to a truncated table's identity
+column, so natural ids keep incrementing across tests exactly as they would
+across tenants in production (natural ids are scoped globally per
+entity-type, not per-tenant or per-test — PJ-004 decision #3). Don't add a
+test that asserts a specific natural-id value across more than one test in
+the same file for this reason; assert on the prefix/shape instead.
 
 `tests/leader-election.test.ts` races three concurrent `connectDb()` calls
 against a shared `.labkit-test-tmp` directory to prove the PGlite backend's
-election/socket-sharing actually works, not just that the code compiles.
+election/socket-sharing actually works, not just that the code compiles —
+and is a real, not-yet-resolved instance of the pglite-socket bug above:
+those three processes deliberately share one connection each to the
+primary's socket the way the real backend does, so it can't be fixed the
+same way the `TenantGraph` tests were (opening more connections). Flaky as
+of 2026-08-18; see the postgres-age skill entry for the production-exposure
+angle before attempting a fix.

@@ -16,13 +16,16 @@
     "check:migrations": "bun scripts/check-migrations.ts",
     "check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
     "check:progress": "bash scripts/check-progress-to-stdout.sh",
+    "check:pglite-concurrency": "bash scripts/check-pglite-concurrency.sh",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom"
   },
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/pg": "^8.21.0"
+    "@types/pg": "^8.21.0",
+    "dependency-cruiser": "^18.2.0",
+    "drizzle-kit": "^0.30.6"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -39,7 +42,11 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0",
-    "pg-age": "^1.0.0-alpha",
     "zod": "^4.4.3"
+  },
+  "allowScripts": {
+    "es5-ext@0.10.64": true,
+    "esbuild@0.18.20": true,
+    "esbuild@0.19.12": true
   }
 }

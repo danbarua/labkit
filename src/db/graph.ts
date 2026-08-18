@@ -8,6 +8,11 @@
  * past this file's boundary.
  */
 
+import { LABKIT_SCHEMA } from "./schema";
+import { parseAgtype, validateGraphName, buildPropertyClause, type AgtypeValue } from "./agtype";
+
+export { parseAgtype, type AgtypeValue } from "./agtype";
+
 export interface LabKitDB {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
@@ -262,27 +267,16 @@ const NODE_VALIDATORS: Partial<{ [L in NodeLabel]: (props: Record<string, unknow
   },
 };
 
-export interface AgtypeValue<T = Record<string, unknown>> {
-  id: number;
-  label: string;
-  properties: T;
-}
-
 /**
  * A node as returned to callers outside the persistence layer: AGE's
- * internal graphid (`AgtypeValue.id`, a large opaque bigint) is stripped
- * and replaced with the short, incrementing `natural_id` that's safe to
- * show a user or an AI-agent caller.
+ * internal graphid (`AgtypeVertex.id`, a large opaque number/bigint — see
+ * src/db/agtype.ts) is stripped and replaced with the short, incrementing
+ * `natural_id` that's safe to show a user or an AI-agent caller.
  */
 export interface PublicNode<T> {
   natural_id: string;
   label: NodeLabel;
   properties: T;
-}
-
-/** Strips AGE's `::vertex` / `::edge` suffix and parses the remaining agtype JSON. */
-export function parseAgtype<T = Record<string, unknown>>(raw: string): AgtypeValue<T> {
-  return JSON.parse(raw.replace(/::(vertex|edge)$/, ""));
 }
 
 /**
@@ -295,13 +289,6 @@ export function parseAgtype<T = Record<string, unknown>>(raw: string): AgtypeVal
 export async function bootstrapSession(db: LabKitDB): Promise<void> {
   await db.query(`LOAD 'age';`);
   await db.query(`SET search_path = ag_catalog, "$user", public;`);
-}
-
-/** `{k: $k, ...}` clause plus the matching flat param object; AGE rejects passing a whole map as `$props`. */
-function propPattern(props: Record<string, unknown>): string {
-  return Object.keys(props)
-    .map((k) => `${k}: $${k}`)
-    .join(", ");
 }
 
 /**
@@ -317,7 +304,15 @@ export class TenantGraph {
   constructor(
     private readonly ctx: { tenantId: number; graphName: string },
     private readonly db: LabKitDB,
-  ) {}
+  ) {
+    // Validated once here, not per-call — graphName is immutable for this
+    // instance's lifetime. Always server-derived (tenants.graph_name is a
+    // generated column, PJ-003 §5) so this should never actually fail in
+    // practice; still worth checking before it's string-interpolated into
+    // every query this instance issues, rather than trusting that upstream
+    // invariant silently.
+    validateGraphName(ctx.graphName);
+  }
 
   /**
    * Runs a cypher query against this tenant's graph. `asClause` must match
@@ -329,8 +324,8 @@ export class TenantGraph {
    */
   async cypher<T = Record<string, unknown>>(query: string, asClause: string, params?: Record<string, unknown>): Promise<T[]> {
     const sql = params
-      ? `SELECT * FROM cypher('${this.ctx.graphName}', $$ ${query} $$, $1) AS ${asClause};`
-      : `SELECT * FROM cypher('${this.ctx.graphName}', $$ ${query} $$) AS ${asClause};`;
+      ? `SELECT * FROM ag_catalog.cypher('${this.ctx.graphName}', $$ ${query} $$, $1) AS ${asClause};`
+      : `SELECT * FROM ag_catalog.cypher('${this.ctx.graphName}', $$ ${query} $$) AS ${asClause};`;
     const res = await this.db.query<T>(sql, params ? [JSON.stringify(params)] : undefined);
     return res.rows;
   }
@@ -350,12 +345,13 @@ export class TenantGraph {
   async createNode<T extends Record<string, unknown>>(label: NodeLabel, props: T): Promise<PublicNode<T>> {
     const validated = (NODE_VALIDATORS[label]?.(props) ?? props) as T;
     const prefix = NATURAL_ID_PREFIX[label];
-    const naturalIdClause = `natural_id: labkit_next_natural_id('${label.toLowerCase()}'::text, '${prefix}'::text)`;
-    const propsClause = propPattern(validated);
+    const naturalIdClause = `natural_id: ${LABKIT_SCHEMA}.labkit_next_natural_id('${label.toLowerCase()}'::text, '${prefix}'::text)`;
+    const propsClause = buildPropertyClause(validated);
     const clause = propsClause ? `${propsClause}, ${naturalIdClause}` : naturalIdClause;
 
     const rows = await this.cypher<{ n: string }>(`CREATE (n:${label} {${clause}}) RETURN n`, "(n agtype)", validated);
     const parsed = parseAgtype<T & { natural_id: string }>(rows[0]!.n);
+    if (parsed.kind !== "vertex") throw new Error(`expected CREATE to return a vertex, got ${parsed.kind}`);
     const { natural_id, ...properties } = parsed.properties;
     return { natural_id, label, properties: properties as unknown as T };
   }

@@ -102,42 +102,41 @@ Beyond what `full-lifecycle.ts` already exercises:
   covers with a controlled 3-way race; trying it with real staggered
   process starts is a stronger real-world check than a `Promise.all` in
   one test file).
-- **Real Postgres backend, via Docker (not a local AGE build).** Compiling
-  Apache AGE from source against macOS's system Postgres has not been
-  workable here — Docker is installed but not yet set up as the path around
-  that. Apache AGE publishes an official image
-  ([`apache/age`](https://hub.docker.com/r/apache/age) on Docker Hub,
-  confirmed via the project's own README) that ships a compatible Postgres
-  with the extension pre-built:
+- ~~**Real Postgres backend, via Docker.**~~ **Done (2026-08-18).**
+  `docker-compose.yml` (repo root) runs `apache/age:release_PG18_1.7.0` —
+  the exact AGE version/branch `pglite-age` itself is built from (see the
+  postgres-age skill's "Overview"), not an arbitrary AGE release:
 
   ```sh
-  docker pull apache/age
-  docker run --name labkit-age \
-    -p 5455:5432 \
-    -e POSTGRES_USER=labkit \
-    -e POSTGRES_PASSWORD=labkit \
-    -e POSTGRES_DB=labkit \
-    -d apache/age
+  docker compose up -d
   ```
 
-  That image doesn't obviously bundle `pgvector` (unconfirmed either way —
-  check before assuming) — since nothing in this codebase queries vector
-  features yet, that's not blocking for this scenario, but note it if it
-  comes up. Once the container is up:
-
-  ```sh
-  export LABKIT_DB_URL="postgres://labkit:labkit@localhost:5455/labkit"
-  bunx drizzle-kit migrate   # out-of-band, per the 2026-08-17 decision to
-                              # defer in-process migration locking for this backend
-  bun examples/full-lifecycle.ts
-  ```
-
-  Confirm `directPostgresBackend` (`src/db/backend.ts`) round-trips
-  correctly against a real (if containerized) Postgres, not PGlite. This is
-  unverified — `pglite-age` and stock AGE have already been found to
-  diverge on more than one syntax point now (including the `MERGE` bug
-  above) — so don't assume the migrations or the tenancy/natural-id/CQRS
-  machinery work against real AGE until this has actually been run once.
-  If `MERGE` turns out to work correctly against real AGE, that's a signal
-  `TenantGraph.createEdge()`'s check-then-create fallback is a
-  `pglite-age`-only workaround, not a permanent design choice.
+  Confirmed against that container:
+  - **`pgvector` is NOT bundled** in this image (`CREATE EXTENSION vector`
+    fails: `extension "vector" is not available`) — no longer "unconfirmed
+    either way." Not blocking today (nothing queries vector features yet),
+    but a real gap to close before this image can stand in for a full
+    direct-Postgres deployment.
+  - **The full stack round-trips correctly**: migrations (0000/0002, with
+    0001's `CREATE EXTENSION vector` statement skipped for the reason
+    above), `resolveTenantContext`/`provisionTenantGraph`, `createNode`
+    natural-id generation, `createEdge` idempotency (calling it twice still
+    produces exactly one edge), the CQRS view read-side, and the
+    schema-qualification fix (`labkit_next_natural_id`/`labkit_prop` land in
+    `public`, confirmed via `pg_proc`/`pg_namespace`) — all verified via a
+    one-off script using `drizzle-orm/node-postgres`'s migrator (not
+    `runMigrations()`, which is PGlite-specific — see `src/db/migrate.ts`).
+    There is still no real `db:migrate`-equivalent script wired up for
+    `directPostgresBackend`; that remains the documented out-of-band-step
+    gap (PJ-004), unaffected by this verification.
+  - **`MERGE` for relationships works correctly here** — `start_id`/`end_id`
+    come back properly populated, unlike under `pglite-age`. This confirms
+    the `MERGE` bug is a genuine WASM/pglite-age-specific regression, not a
+    stock-AGE limitation like the other three known gotchas (which *do*
+    reproduce identically on this real container — see the postgres-age
+    skill's "Upstream filing" section for the full breakdown and what's
+    worth reporting where). `TenantGraph.createEdge()`'s check-then-`CREATE`
+    fallback is confirmed to be a `pglite-age`-only workaround, not a
+    permanent design choice — worth revisiting if a future `pglite-age`
+    upgrade picks up a MERGE fix, though the `UNIQUE (start_id, end_id)`
+    index stays regardless as the real concurrency guarantee.

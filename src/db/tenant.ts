@@ -1,5 +1,6 @@
 import type { LabKitDB } from "./graph";
 import { NODE_LABELS, EDGE_LABELS, NODE_VIEW_COLUMNS, type NodeLabel, type EdgeLabel } from "./graph";
+import { LABKIT_SCHEMA } from "./schema";
 
 export interface TenantContext {
   tenantId: number;
@@ -14,12 +15,13 @@ export interface TenantContext {
  */
 export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promise<TenantContext> {
   const inserted = await db.query<{ id: number; graph_name: string }>(
-    `insert into tenants (slug, display_name) values ($1, $2) on conflict (slug) do nothing returning id, graph_name`,
+    `insert into ${LABKIT_SCHEMA}.tenants (slug, display_name) values ($1, $2) on conflict (slug) do nothing returning id, graph_name`,
     [slug, slug],
   );
   const row =
     inserted.rows[0] ??
-    (await db.query<{ id: number; graph_name: string }>(`select id, graph_name from tenants where slug = $1`, [slug])).rows[0];
+    (await db.query<{ id: number; graph_name: string }>(`select id, graph_name from ${LABKIT_SCHEMA}.tenants where slug = $1`, [slug]))
+      .rows[0];
   if (!row) throw new Error(`tenant "${slug}" not found after insert-or-fetch race`);
 
   await provisionTenantGraph(db, row.id, row.graph_name);
@@ -103,7 +105,7 @@ async function reconcileTenantGraph(db: LabKitDB, graphName: string): Promise<vo
 async function ensureGraph(db: LabKitDB, graphName: string): Promise<void> {
   const existing = await db.query(`SELECT 1 FROM ag_catalog.ag_graph WHERE name = $1`, [graphName]);
   if (existing.rows.length === 0) {
-    await db.query(`SELECT create_graph($1)`, [graphName]);
+    await db.query(`SELECT ag_catalog.create_graph($1)`, [graphName]);
   }
 }
 
@@ -117,13 +119,13 @@ async function labelExists(db: LabKitDB, graphName: string, label: string): Prom
 
 async function ensureVertexLabel(db: LabKitDB, graphName: string, label: NodeLabel): Promise<void> {
   if (!(await labelExists(db, graphName, label))) {
-    await db.query(`SELECT create_vlabel($1, $2)`, [graphName, label]);
+    await db.query(`SELECT ag_catalog.create_vlabel($1, $2)`, [graphName, label]);
   }
 }
 
 async function ensureEdgeLabel(db: LabKitDB, graphName: string, edge: EdgeLabel): Promise<void> {
   if (!(await labelExists(db, graphName, edge))) {
-    await db.query(`SELECT create_elabel($1, $2)`, [graphName, edge]);
+    await db.query(`SELECT ag_catalog.create_elabel($1, $2)`, [graphName, edge]);
   }
 }
 
@@ -165,10 +167,12 @@ async function ensureEdgeUniqueIndex(db: LabKitDB, graphName: string, edge: Edge
  * (docs/project-journal/005_provisioning_reconciliation.md).
  */
 async function ensureView(db: LabKitDB, graphName: string, label: NodeLabel): Promise<void> {
-  const columns = NODE_VIEW_COLUMNS[label].map((col) => `labkit_prop(properties, '${col}') AS ${col}`).join(",\n           ");
+  const columns = NODE_VIEW_COLUMNS[label]
+    .map((col) => `${LABKIT_SCHEMA}.labkit_prop(properties, '${col}') AS ${col}`)
+    .join(",\n           ");
   await db.query(
     `CREATE OR REPLACE VIEW "${graphName}".${label.toLowerCase()} AS
-     SELECT labkit_prop(properties, 'natural_id') AS natural_id,
+     SELECT ${LABKIT_SCHEMA}.labkit_prop(properties, 'natural_id') AS natural_id,
      ${columns}
      FROM "${graphName}"."${label}"`,
   );
