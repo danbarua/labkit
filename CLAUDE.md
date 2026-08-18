@@ -16,6 +16,8 @@ The domain model lives across a chain of project-journal entries
 now" — each records *why* a decision was made, not just what changed. Before
 touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 (current persistence design) rather than inferring intent from code alone.
+Before touching `src/domain/`, skim 008 (the interaction corpus the service
+layer is built against) and 009 (the first scenario built from it).
 
 ## Commands
 
@@ -23,6 +25,9 @@ touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 bun install                    # install dependencies
 bun test                       # run all tests
 bun test tests/domain-graph.test.ts   # run one test file
+bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
+npx depcruise src tests --output-type err   # layering rules (errors) + cycles
+bun run dev:dependency-cruiser  # regenerate dependency-graph.svg
 bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
@@ -105,6 +110,66 @@ rather than reintroducing one.
 `resolveTenantContext(db, slug)` (`src/db/tenant.ts`) — the CLI/MCP/bootstrap
 boundary resolves a tenant once; below that boundary, every function takes a
 resolved context, there is no "tenant omitted" mode.
+
+## The domain service layer (`src/domain/`)
+
+Two different things are called "domain", deliberately. `src/db/domain.ts` is
+the domain *as expressed in graph structure* — labels, edge schema, property
+shapes. `src/domain/` is the domain *as it matters to a researcher*:
+
+```
+src/db/        knows nodes and edges
+src/domain/    knows research actions
+(MCP, later)   knows researcher/agent language
+```
+
+`ResearchSession` (`src/domain/session.ts`) is **verb-first**. There is
+deliberately no `createClaim()`/`createEvidence()` — those are persistence
+operations wearing domain names, and exposing them pushes ontology knowledge
+back up to the caller. One verb may write many nodes and edges:
+`recordAnalysis()` writes a computation, an evidence unit, an output artefact,
+and one evidence plus one claim per conclusion.
+
+**Verbs are added when a scenario needs them, not in anticipation.** The
+current set is what PJ-008's S-11 required. Return types are derived
+one-per-bullet from a scenario's "Afterward" questions rather than designed —
+if a bullet has no natural home in the types, the API is wrong, not the
+bullet.
+
+`src/domain/events.ts` is the temporal seam: every state-changing verb flows
+through one choke point that stamps it from an injected `Clock`. The durable
+sink is deliberately still an interface (PJ-009 §3). The rule that keeps it
+honest:
+
+> Events explain *how state changed*. The graph explains *what the current
+> research state is*.
+
+Don't answer a "what is true now" question from the event log.
+
+Two layering rules are enforced as `dependency-cruiser` **errors**, not
+conventions — `npx depcruise src tests --output-type err`:
+
+- `tests/scenarios/` may not import `src/db`. A scenario asserts a
+  researcher's intent can be carried out through research verbs alone; if it
+  needs the persistence layer, that's a finding to record, not something to
+  route around. `tests/helpers/` is exempt (harness, not caller).
+- `src/db` may not import `src/domain`, so the graph model can't come to
+  depend on today's verbs.
+
+### Changing the graph model
+
+New labels and edges are earned by a scenario, not designed up front. The bar
+PJ-009 set, and the reason `CONSUMES` cleared it while inference supersession
+did not:
+
+1. A service query must return a **wrong answer** without the relationship —
+   demonstrated by running the test against the old traversal, not argued
+   from an ugly query path.
+2. The new edge needs a **reader, not just a writer**. An edge that is
+   written and never queried is the dead-code shape PJ-007 found in
+   `buildAsClause`.
+3. A predicted gap that fails to materialise is a **result**. PJ-008's §3
+   ledger keeps such rows (see row B) rather than deleting them.
 
 ## Tenant provisioning is reconciliation, run every time
 
@@ -198,6 +263,29 @@ mattered. Working gotchas:
   ordering to resolve an unqualified name.
 
 ## Testing patterns
+
+Two kinds of test, with different rules.
+
+**Acceptance scenarios** (`tests/scenarios/`) are PJ-008 corpus entries built
+as executable conversations. They may import only `src/domain` — never
+`src/db` (enforced; see "The domain service layer"). `tests/helpers/scenario.ts`
+is the harness that hands them a ready session target.
+
+Every "Afterward" answer is asserted **twice**: once from the value the
+operation returned, once from a query issued afterwards. "Afterward" means
+reconstructible from durable state, not present in a return value the caller
+happened to keep — `scenario.current()` exists to open a second reader over
+the same graph for exactly this.
+
+Scenario conversations must not name a node or edge label in a Researcher or
+Agent line. Needing one means the vocabulary leaked and the scenario is
+failing its own premise (PJ-008 §2).
+
+**Everything else** (`tests/*.test.ts`) tests the persistence layer directly
+and may import `src/db` freely. `tests/reconciliation.test.ts` covers
+additive provisioning of a *new* edge label against an already-provisioned
+tenant, through `resolveTenantContext()` — the production path — never
+provisioning internals.
 
 `tests/helpers/db.ts`'s `setupTestDb()` spins up one `PGlite` instance,
 runs migrations, and starts a `PGLiteSocketServer` once per file, in

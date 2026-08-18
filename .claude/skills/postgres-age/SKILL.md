@@ -29,6 +29,12 @@ graph access should go through `new TenantGraph(ctx, db)`
 (`src/db/graph.ts`) — this document is what that class, and the migrations
 in `./drizzle/`, were written against.
 
+Application code above the persistence layer talks to `src/domain/` (research
+actions) rather than to `TenantGraph` directly; this document stays relevant
+there only for understanding what those actions compile down to. New labels
+and edges are earned by an acceptance scenario returning a wrong answer
+without them — see PJ-009.
+
 `pglite-age` is a genuine compile of Apache AGE's own C source under
 Emscripten/WASM, not a reduced/reimplemented subset — `electric-sql/postgres-pglite`
 (a Postgres core fork) pins AGE as a real git submodule at
@@ -396,6 +402,28 @@ MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation 
 RETURN comp
 ```
 
+**"What did this computation read, and what did it produce?"** — execution
+lineage reads in both directions, `CONSUMES` in and `PRODUCES` out. Note the
+two provenance levels: the `EvidenceUnit` produced the *scientific* output,
+the `Computation` produced the *execution* output, and both edges exist:
+```cypher
+MATCH (c:Computation {natural_id: $compId})
+OPTIONAL MATCH (c)-[:CONSUMES]->(input:Artefact)
+OPTIONAL MATCH (c)-[:PRODUCES]->(output:Artefact)
+RETURN input, output
+```
+
+**"What does this claim actually rest on?"** — via what the supporting
+computation consumed, *not* via the enquiry. Going out through
+`ADDRESSES`/`REQUIRES` instead answers "what observations is this enquiry
+associated with", which returns the wrong answer once one enquiry carries two
+analyses over different inputs (PJ-009 §4):
+```cypher
+MATCH (:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(comp:Computation)
+MATCH (comp)-[:CONSUMES]->(a:Artefact)
+RETURN a
+```
+
 ## References
 
 - [Overview](https://age.apache.org/age-manual/master/intro/overview.html)
@@ -411,3 +439,5 @@ RETURN comp
 - `docs/project-journal/005_provisioning_reconciliation.md` — provisioning reconciliation, why there's no version gate
 - `docs/project-journal/006_agtype_client_and_concurrency_hardening.md` — AGE provenance, the in-house `agtype.ts` parser, schema-qualification, and the pglite-socket concurrency bug
 - `docs/project-journal/007_db_layering_and_typed_cypher.md` — layering `src/db/`, the column-decoder query API, and the `NODE_TYPES` domain registry
+- `docs/project-journal/008_user_story_mining.md` — the interaction corpus the graph model is now tested against, and its running ledger of design pressure
+- `docs/project-journal/009_domain_service_layer_s11.md` — the domain service layer, and the bar a new label/edge has to clear to be added
