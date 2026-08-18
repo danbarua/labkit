@@ -5,8 +5,6 @@
 -- src/db/tenant.ts's provisionTenantGraph(). This migration only sets up
 -- what every tenant graph needs regardless: the extension itself.
 
-CREATE EXTENSION IF NOT EXISTS vector;
---> statement-breakpoint
 CREATE EXTENSION IF NOT EXISTS age;
 --> statement-breakpoint
 LOAD 'age';
