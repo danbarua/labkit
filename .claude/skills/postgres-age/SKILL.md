@@ -19,11 +19,15 @@ triggers:
 
 LabKit's provenance graph (Question, LineOfEnquiry, EvidenceUnit, Evidence,
 Claim, Decision, Criterion, CriterionEvaluation, Gate, Review, Artefact,
-Computation, Task — see `docs/project-journal/001_git_init.md`) lives in one
-Apache AGE graph named `labkit`, running inside PGlite via `pglite-age`. All
-of it should be reached through `src/db/graph.ts`'s helpers
-(`cypher`, `createNode`, `createEdge`, `bootstrapSession`) — this document is
-what those helpers, and the migrations in `./drizzle/`, were written against.
+Computation, Task — see `docs/project-journal/001_git_init.md`) lives in
+**one Apache AGE graph per tenant** (`docs/project-journal/003_review_domain_tenancy.md`,
+`docs/project-journal/004_tenancy_implementation_plan.md`), running inside
+PGlite via `pglite-age`. There is no fixed graph name — every tenant's graph
+is named `labkit_t${tenantId}` (e.g. `labkit_t1`), resolved via
+`resolveTenantContext()` (`src/db/tenant.ts`) into a `TenantContext`. All
+graph access should go through `new TenantGraph(ctx, db)`
+(`src/db/graph.ts`) — this document is what that class, and the migrations
+in `./drizzle/`, were written against.
 
 `pglite-age` is a WASM build of AGE, not the stock C extension. It has
 already been found to diverge from the upstream manual in a few places (see
@@ -40,9 +44,10 @@ next:
 | `MATCH (n:Label {k: v})` | Find nodes/paths by label and exact property match |
 | `OPTIONAL MATCH` | Left-join semantics — binds to `NULL` instead of dropping the row when nothing matches |
 | `CREATE (n:Label {k: v})` | Create a node; `CREATE (a)-[:EDGE]->(b)` creates an edge between already-matched nodes |
+| `MERGE` | Match-or-create — **avoid for relationships** in this codebase, see gotchas below |
 | `SET n.prop = value` | Mutate a property on an already-matched node |
 | `WHERE` | Filter after a `MATCH`, e.g. `WHERE n.name = $name` |
-| `RETURN` | Required — a bare `MATCH`/`CREATE` returns nothing to SQL |
+| `RETURN` | Required to get rows back to SQL — a bare `MATCH`/`CREATE`/`SET` with no `RETURN` still executes, just returns zero rows |
 | `WITH` | Chain query stages, e.g. aggregate then filter |
 | `[:TYPE*1..5]` | Single-type variable-length path, N to M hops |
 
@@ -52,8 +57,7 @@ From the manual's "AGE Beyond Cypher" section — confirmed against the live
 docs, not assumed:
 
 - **Cypher in a CTE has no restrictions.** `WITH x AS (SELECT * FROM
-  cypher('labkit', $$ ... $$) AS (n agtype)) SELECT * FROM x`. This is the
-  basis for turning a Cypher read into a plain SQL `VIEW`.
+  cypher('labkit_t1', $$ ... $$) AS (n agtype)) SELECT * FROM x`.
 - **Cypher in a `JOIN` works for reads.** `CREATE`/`SET`/`REMOVE` Cypher
   clauses inside a `JOIN` are explicitly documented as unsafe — they
   interact badly with Postgres's transaction system. Wrap a write in a CTE
@@ -64,10 +68,9 @@ docs, not assumed:
   possibly many rows, use `IN (...)`; for multiple columns/rows, use
   `EXISTS (...)`.
 - **Multiple graphs can be joined in one statement**: `FROM cypher('g1', $$
-  ... $$) AS g1(...) JOIN cypher('g2', $$ ... $$) AS g2(...) ON ...`.
-
-LabKit doesn't currently need any of these beyond the CTE/view pattern — the
-CQRS read-side views in `drizzle/0002_natural_ids.sql` use it, see below.
+  ... $$) AS g1(...) JOIN cypher('g2', $$ ... $$) AS g2(...) ON ...` — this
+  is how a cross-tenant admin query *could* work if one were ever needed,
+  though nothing in LabKit does this today (tenant isolation is the point).
 
 ## SQL In Cypher
 
@@ -78,7 +81,7 @@ LabKit's natural-id generator is exactly this pattern:
 ```sql
 CREATE OR REPLACE FUNCTION labkit_next_natural_id(label text, prefix text)
 RETURNS text LANGUAGE sql AS $$
-  SELECT prefix || '-' || nextval('labkit_' || lower(label) || '_natural_id_seq')::text;
+  SELECT prefix || '_' || nextval('labkit_' || lower(label) || '_natural_id_seq')::text;
 $$;
 ```
 
@@ -90,20 +93,22 @@ CREATE (n:Computation {
 RETURN n
 ```
 
-**The `::text` casts on the literal arguments are required, not decorative**
-— see the gotcha below. This exact composition (function call inside a
-Cypher `CREATE` property map) was spiked and confirmed working against
-`pglite-age` before being written into `src/db/graph.ts`'s `createNode()`.
+**The `::text` casts on the literal arguments are required, not
+decorative** — see the gotcha below. This composition (function call inside
+a Cypher `CREATE` property map) is confirmed working against `pglite-age`
+and is exactly what `TenantGraph.createNode()` does.
 
 ## How graphs are stored
 
-`SELECT create_graph('labkit')` creates a Postgres **namespace** (schema)
-named `labkit`, containing parent tables `_ag_label_vertex`/`_ag_label_edge`.
-Every vertex/edge label — `create_vlabel`/`create_elabel`, or implicitly the
-first `CREATE (n:Label)` — becomes its own real Postgres table inheriting
-from those parents, visible in `ag_catalog.ag_label`. Confirmed by inspecting
-`information_schema.columns` for `labkit."Question"` after creating one:
-exactly two columns, `id` (the internal graphid) and `properties` (agtype).
+`SELECT create_graph('labkit_t1')` creates a Postgres **namespace** (schema)
+named `labkit_t1`, containing parent tables `_ag_label_vertex`/
+`_ag_label_edge`. Every vertex/edge label — `create_vlabel`/`create_elabel`
+(LabKit always pre-creates these at tenant-provisioning time, see
+`src/db/tenant.ts`'s `provisionTenantGraph()`) — becomes its own real
+Postgres table inheriting from those parents, visible in
+`ag_catalog.ag_label`. Confirmed by inspecting
+`information_schema.columns` for `labkit_t1."Question"`: exactly two
+columns, `id` (the internal graphid) and `properties` (agtype).
 
 This means **plain SQL DDL can target a label's table directly** — no need
 to go through `cypher()` for indexes, constraints, or bulk reads:
@@ -112,21 +117,21 @@ to go through `cypher()` for indexes, constraints, or bulk reads:
 -- Functional unique index — Postgres actually enforces this (confirmed: a
 -- duplicate natural_id via Cypher SET raises a real
 -- "duplicate key value violates unique constraint" error).
-CREATE UNIQUE INDEX ON labkit."Question"
+CREATE UNIQUE INDEX ON "labkit_t1"."Question"
   ((ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)));
 
 -- Reading straight off the table, no cypher() call needed. The
 -- `(properties::text)::jsonb` round-trip is cleaner than agtype's own
 -- operators for this — see labkit_prop() in drizzle/0002_natural_ids.sql.
 SELECT (properties::text)::jsonb ->> 'natural_id' AS natural_id
-FROM labkit."Question";
+FROM "labkit_t1"."Question";
 ```
 
-Note this is a different (simpler) pattern than "wrap `cypher()` in a
-VIEW" — LabKit's CQRS views (`labkit_questions`, `labkit_computations`, ...
-in `drizzle/0002_natural_ids.sql`) select directly off the label tables for
-exactly this reason: no `cypher()` call, no `::vertex`-suffix parsing, just
-ordinary SQL.
+Each tenant's CQRS read-side views (`src/db/tenant.ts`'s
+`provisionTenantGraph()`, one view per label, e.g. `"labkit_t1".question`)
+use exactly this pattern — no `cypher()` call, no `::vertex`-suffix parsing,
+just ordinary schema-qualified SQL, scoped per tenant so there's never a
+naming collision between tenants' views.
 
 ## LabKit-specific gotchas
 
@@ -135,6 +140,16 @@ Hard-won, found by writing throwaway probe scripts against
 none of these are documented AGE limitations, they're specific to
 `pglite-age`'s WASM build:
 
+- **`MERGE` for a relationship between two already-matched nodes is broken.**
+  `MATCH (a...), (b...) MERGE (a)-[:EDGE]->(b)` runs without error and
+  returns what looks like a valid edge, but the created edge's
+  `start_id`/`end_id` are both `0` — it never actually connects `a` and
+  `b` (confirmed: `id(a)`/`id(b)` resolve correctly, but the edge is
+  unreachable from either node afterward). `TenantGraph.createEdge()`
+  therefore does NOT use `MERGE` — it does an explicit `MATCH` for an
+  existing `(from, edge, to)` edge first and only `CREATE`s if absent. If a
+  future AGE/pglite-age upgrade fixes this, `MERGE` would be the more
+  idiomatic (and atomic) choice — re-spike before switching.
 - **No whole-map `CREATE` property parameter.** `CREATE (n:Label $props)`
   fails with `properties in a CREATE clause as a parameter is not
   supported`. Expand each key individually:
@@ -144,8 +159,7 @@ none of these are documented AGE limitations, they're specific to
   parser error (`syntax error at or near "|"`). A single-type
   variable-length edge (`[:SUPERSEDES*1..5]`) works fine, as does an
   unrestricted-type undirected path (`-[*1..3]-`) — it's specifically the
-  type-alternation syntax inside `[...]` that's unsupported. See the
-  decision-amendment-chain test in `tests/domain-graph.test.ts`.
+  type-alternation syntax inside `[...]` that's unsupported.
 - **Cypher string literals are typed `agtype`, not `text`.** Calling a
   `LANGUAGE sql` function with `(text, text)` parameters from inside Cypher
   fails with `function ... does not exist` unless the literal arguments are
@@ -159,22 +173,24 @@ none of these are documented AGE limitations, they're specific to
   directly off a label's table (see "How graphs are stored" above) — that
   round-trips through `(properties::text)::jsonb` with no suffix to strip.
 - **`create_graph()` has no `IF NOT EXISTS`.** It errors if the graph
-  already exists — check `ag_catalog.ag_graph` for existence first, or rely
-  on the migration ledger to guarantee it only runs once (LabKit does the
-  latter — see `drizzle/0001_age_bootstrap.sql`).
+  already exists — `provisionTenantGraph()` checks `ag_catalog.ag_graph`
+  for existence first, inside a transaction guarded by
+  `pg_advisory_xact_lock(tenantId)` so two processes provisioning the same
+  new tenant concurrently can't interleave partial provisioning.
 - **`LOAD`/`SET search_path` are session-scoped**, not schema state — every
   connecting process must call them itself (`bootstrapSession()` in
-  `src/db/graph.ts`), they can't be migrated away like the one-time
-  `CREATE EXTENSION`/`create_graph`/`create_vlabel`/`create_elabel` calls can.
+  `src/db/graph.ts`), they can't be migrated or provisioned away.
 
 ## LabKit query cookbook
 
 Straight from `tests/domain-graph.test.ts` — each answers one of the
-journal's MVP acceptance-criteria questions.
+journal's MVP acceptance-criteria questions. All addressed by natural id,
+never AGE's internal graphid, and all implicitly scoped to one tenant's
+graph (`graph.cypher(...)` closes over `ctx.graphName`).
 
 **"What evidence and computation support this claim?"**
 ```cypher
-MATCH (:Claim {name: $claimName})<-[:SUPPORTS]-(e:Evidence)
+MATCH (:Claim {natural_id: $claimId})<-[:SUPPORTS]-(e:Evidence)
 MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
 MATCH (u)-[:USES]->(comp:Computation)
 RETURN e, comp
@@ -182,10 +198,12 @@ RETURN e, comp
 
 **"If this artefact is invalidated, what breaks?"** — follows only the
 edges meaning "depends on this evidence" (`RECORDED_IN`/`SUPPORTS`/
-`BASED_ON`/`REQUIRES`), deliberately not `PRODUCES`/`USES` (provenance of
-how the evidence came to exist, not something invalidated retroactively):
+`BASED_ON`/`REQUIRES`), deliberately not `PRODUCES`/`USES`/`ADDRESSES`
+(provenance of how the evidence came to exist, not something invalidated
+retroactively). "Affected" is not the same as "unsupported" — this
+traversal answers "what needs reconsideration," not "what is now false":
 ```cypher
-MATCH (a:Artefact {logical_name: $name})
+MATCH (a:Artefact {natural_id: $artefactId})
 OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
 OPTIONAL MATCH (e)-[:SUPPORTS]->(claim:Claim)
 OPTIONAL MATCH (decision:Decision)-[:BASED_ON]->(e)
@@ -194,32 +212,45 @@ RETURN claim, decision, loe
 ```
 
 **"Is this line of enquiry still open?"** — no resolving `Decision` means
-still open:
+still open. Note there is no `Question.is_open` property to contradict this
+— openness is fully derived from the absence of a `RESOLVES` edge:
 ```cypher
-MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {name: $name})
+MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId})
 OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(q)
 RETURN q, d
 ```
 
+**"Why was this computation run, even though it produced no Evidence?"** —
+the failed/planned-inquiry case: `EvidenceUnit -[:ADDRESSES]-> LineOfEnquiry`
+survives even when the computation never produces evidence:
+```cypher
+MATCH (:Computation {natural_id: $compId})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry)
+RETURN loe
+```
+
 **"What's the full amendment history of this decision?"**
 ```cypher
-MATCH (:Decision {reason: $reason})-[:SUPERSEDES*1..5]->(x:Decision)
+MATCH (:Decision {natural_id: $id})-[:SUPERSEDES*1..5]->(x:Decision)
 RETURN x
 ```
 
-**"What gate did this criterion evaluation trigger?"**
+**"What does this criterion evaluation gate?"** — the corrected chain
+(`Gate`, not `Criterion`, is what gates the downstream object — see
+`EDGE_SCHEMA` in `src/db/graph.ts` for the full rationale):
 ```cypher
-MATCH (:Criterion {proposition: $prop})-[:EVALUATED_AS]->(ce:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(g:Gate)
-RETURN g
+MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(comp:Computation)
+RETURN comp
 ```
 
 ## References
 
 - [Overview](https://age.apache.org/age-manual/master/intro/overview.html)
 - [Graphs — create_graph, create_vlabel/elabel, how graphs are stored](https://age.apache.org/age-manual/master/intro/graphs.html)
-- [Clauses](https://age.apache.org/age-manual/master/clauses/match.html) (MATCH, CREATE, SET, RETURN, ...)
+- [Clauses](https://age.apache.org/age-manual/master/clauses/match.html) (MATCH, CREATE, MERGE, SET, RETURN, ...)
 - [AGE Beyond Cypher — Overview](https://age.apache.org/age-manual/master/advanced/advanced_overview.html)
 - [AGE Beyond Cypher — CTE/JOIN/expression composition](https://age.apache.org/age-manual/master/advanced/advanced.html)
 - [SQL In Cypher](https://age.apache.org/age-manual/master/advanced/sql_in_cypher.html)
 - `docs/project-journal/001_git_init.md` — the domain model this graph implements
-- `docs/project-journal/002_schema_dot_ts.md` — write-up of the gotchas above as they were found
+- `docs/project-journal/002_schema_dot_ts.md` — the first implementation's write-up
+- `docs/project-journal/003_review_domain_tenancy.md` — the tenancy/domain review
+- `docs/project-journal/004_tenancy_implementation_plan.md` — this implementation's plan

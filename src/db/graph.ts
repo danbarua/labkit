@@ -1,16 +1,16 @@
 /**
- * Graph-shaped half of the LabKit domain model (docs/project-journal/001_git_init.md).
- * Everything here is provenance/dependency structure — "why does this claim
- * hold", "what does invalidating this artefact break" — which is what Apache
- * AGE's graph queries are for, not what FK tables are for. `projects`
- * (src/db/schema.ts) is the one core entity that stays relational.
+ * Graph-shaped half of the LabKit domain model (docs/project-journal/001_git_init.md),
+ * revised per docs/project-journal/003_review_domain_tenancy.md and
+ * docs/project-journal/004_tenancy_implementation_plan.md: one Apache AGE
+ * graph per tenant (src/db/tenant.ts), addressed and mutated exclusively
+ * through the `TenantGraph` class below — never a hardcoded graph name,
+ * never an arbitrary property-map edge match, never AGE's internal graphid
+ * past this file's boundary.
  */
 
 export interface LabKitDB {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
-
-export const GRAPH_NAME = "labkit";
 
 export const NODE_LABELS = [
   "Question",
@@ -32,6 +32,7 @@ export type NodeLabel = (typeof NODE_LABELS)[number];
 export const EDGE_LABELS = [
   "MOTIVATES", // Question -> LineOfEnquiry
   "REQUIRES", // LineOfEnquiry -> Evidence
+  "ADDRESSES", // EvidenceUnit -> LineOfEnquiry
   "SUPPORTS", // Evidence -> Claim
   "CHALLENGES", // Evidence -> Claim
   "USES", // EvidenceUnit -> Computation
@@ -39,9 +40,9 @@ export const EDGE_LABELS = [
   "RECORDED_IN", // Evidence -> Artefact
   "EVALUATED_AS", // Criterion -> CriterionEvaluation
   "TRIGGERS", // CriterionEvaluation -> Gate
-  "GATES", // Criterion -> Task/Computation
+  "GATES", // Gate -> Task/Computation
   "CHANGES", // Decision -> Criterion
-  "BASED_ON", // Decision -> Evidence
+  "BASED_ON", // Decision -> Evidence | CriterionEvaluation -> Evidence
   "RESOLVES", // Decision -> Question
   "NARROWS", // Decision -> Question
   "DEFERS", // Decision -> Question
@@ -50,6 +51,47 @@ export const EDGE_LABELS = [
   "IMPLEMENTS", // Task -> EvidenceUnit
 ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
+
+/**
+ * Single authoritative source of truth for legal edge shapes (PJ-003 §8).
+ * `createEdge` validates the resolved `(fromLabel, toLabel)` pair against
+ * this table and throws before issuing any Cypher if the pair isn't listed.
+ *
+ * `GATES`'s source is `Gate`, not `Criterion` (PJ-004 decision #9): the
+ * shipped shape had `CriterionEvaluation -[:TRIGGERS]-> Gate` and
+ * *separately* `Criterion -[:GATES]-> Task/Computation`, meaning nothing
+ * ever flowed out of `Gate` — `Criterion` did the gating, contradicting
+ * PJ-001's own definition of `Gate` as "the policy consequence attached to
+ * an evaluation." The chain now actually chains:
+ * `Criterion -[:EVALUATED_AS]-> CriterionEvaluation -[:TRIGGERS]-> Gate -[:GATES]-> Task/Computation`.
+ */
+export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, NodeLabel]>> = {
+  MOTIVATES: [["Question", "LineOfEnquiry"]],
+  REQUIRES: [["LineOfEnquiry", "Evidence"]],
+  ADDRESSES: [["EvidenceUnit", "LineOfEnquiry"]],
+  SUPPORTS: [["Evidence", "Claim"]],
+  CHALLENGES: [["Evidence", "Claim"]],
+  USES: [["EvidenceUnit", "Computation"]],
+  PRODUCES: [
+    ["EvidenceUnit", "Evidence"],
+    ["EvidenceUnit", "Artefact"],
+    ["Computation", "Artefact"],
+    ["Task", "Computation"],
+    ["Task", "Artefact"],
+  ],
+  RECORDED_IN: [["Evidence", "Artefact"]],
+  EVALUATED_AS: [["Criterion", "CriterionEvaluation"]],
+  TRIGGERS: [["CriterionEvaluation", "Gate"]],
+  GATES: [["Gate", "Task"], ["Gate", "Computation"]],
+  CHANGES: [["Decision", "Criterion"]],
+  BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
+  RESOLVES: [["Decision", "Question"]],
+  NARROWS: [["Decision", "Question"]],
+  DEFERS: [["Decision", "Question"]],
+  SUPERSEDES: [["Decision", "Decision"]],
+  EVALUATES: [["Review", "Claim"], ["Review", "Decision"], ["Review", "Evidence"]],
+  IMPLEMENTS: [["Task", "EvidenceUnit"]],
+};
 
 export type EvidenceUnitRole =
   | "experiment"
@@ -62,61 +104,62 @@ export type EvidenceUnitRole =
   | "infrastructure"
   | "confirmatory";
 
+// `project_id` removed from every *Props interface below (PJ-003 §4): the
+// graph itself is the tenant partition now, not a repeated node property.
+
 export interface QuestionProps {
-  project_id: string;
   name: string;
-  is_open?: boolean;
 }
 
 export interface LineOfEnquiryProps {
-  project_id: string;
   name: string;
 }
 
 export interface EvidenceUnitProps {
-  project_id: string;
   role: EvidenceUnitRole;
 }
 
 export interface EvidenceProps {
-  project_id: string;
   statement: string;
 }
 
 export interface ClaimProps {
-  project_id: string;
   name: string;
   kind?: "exploratory" | "confirmatory";
 }
 
+/**
+ * `is_open`/`closed_at` are kept as explicit operational state (PJ-004
+ * decision #2) — narrowly scoped to "is this decision record still active
+ * in the control process?", never "is the proposition scientifically
+ * valid?" (that flows from evidence/supersession/review, never from these
+ * fields). `evidence` (a string shadow of `Decision -[:BASED_ON]-> Evidence`)
+ * is removed (PJ-003 §10).
+ */
 export interface DecisionProps {
-  project_id: string;
   reason: string;
-  evidence: string;
   invalidation_check: string;
   is_open?: boolean;
   closed_at?: string;
 }
 
 export interface CriterionProps {
-  project_id: string;
   proposition: string;
 }
 
+// `evidence_ref` removed (PJ-004 decision #5) — represented in-graph now as
+// `CriterionEvaluation -[:BASED_ON]-> Evidence` instead of a string shadow.
 export interface CriterionEvaluationProps {
   value: string;
   outcome: "pass" | "fail";
   evaluated_at: string;
-  evidence_ref?: string;
 }
 
 export interface GateProps {
-  project_id: string;
   consequence: string;
 }
 
 export interface ReviewProps {
-  project_id: string;
   verdict: string;
 }
 
@@ -150,31 +193,28 @@ export interface TaskProps {
   is_open?: boolean;
 }
 
-export interface AgtypeValue<T = Record<string, unknown>> {
-  id: number;
-  label: string;
-  properties: T;
-}
-
-/**
- * A node as returned to callers outside the persistence layer: AGE's
- * internal graphid (`AgtypeValue.id`, a large opaque bigint — see
- * docs/project-journal/002_schema_dot_ts.md) is stripped and replaced with
- * the short, incrementing `natural_id` (e.g. `"COMP-123"`) that's safe to
- * show a user or an AI-agent caller.
- */
-export interface PublicNode<T> {
-  natural_id: string;
-  label: NodeLabel;
-  properties: T;
-}
+/** Property-name lists per label, used only to build each tenant's CQRS view columns (src/db/tenant.ts). Keep in sync with the *Props interfaces above. */
+export const NODE_VIEW_COLUMNS: Record<NodeLabel, readonly string[]> = {
+  Question: ["name"],
+  LineOfEnquiry: ["name"],
+  EvidenceUnit: ["role"],
+  Evidence: ["statement"],
+  Claim: ["name", "kind"],
+  Decision: ["reason", "invalidation_check", "is_open", "closed_at"],
+  Criterion: ["proposition"],
+  CriterionEvaluation: ["value", "outcome", "evaluated_at"],
+  Gate: ["consequence"],
+  Review: ["verdict"],
+  Artefact: ["kind", "logical_name", "content_hash", "uri", "external_ref", "invalidated"],
+  Computation: ["kind", "status", "backend", "external_run_id", "started_at", "finished_at", "code_revision", "environment_ref"],
+  Task: ["objective", "inputs", "outputs", "acceptance", "is_open"],
+};
 
 /**
  * Short display prefix per label for natural IDs (e.g. `Computation` ->
- * `"COMP-123"`). Scoped globally per entity-type, not per-project — decided
- * 2026-08-17. Must stay in sync with the per-label `CREATE SEQUENCE`
- * statements in drizzle/0002_natural_ids.sql; a mismatch here is a
- * code-review-visible diff in this one file, not a silent drift.
+ * `"COMP_123"`, underscore per PJ-004 decision #4). Scoped globally per
+ * entity-type, not per-tenant. Must stay in sync with the per-label
+ * `CREATE SEQUENCE` statements in drizzle/0002_natural_ids.sql.
  */
 export const NATURAL_ID_PREFIX: Record<NodeLabel, string> = {
   Question: "Q",
@@ -192,6 +232,54 @@ export const NATURAL_ID_PREFIX: Record<NodeLabel, string> = {
   Task: "TASK",
 };
 
+/** Reverse of NATURAL_ID_PREFIX — resolves a node's label from its natural id's prefix, e.g. "EU_17" -> "EvidenceUnit". */
+export const LABEL_BY_PREFIX: Record<string, NodeLabel> = Object.fromEntries(
+  NODE_LABELS.map((label) => [NATURAL_ID_PREFIX[label], label]),
+) as Record<string, NodeLabel>;
+
+function resolveLabelFromNaturalId(naturalId: string): NodeLabel {
+  const sep = naturalId.indexOf("_");
+  const prefix = sep === -1 ? naturalId : naturalId.slice(0, sep);
+  const label = LABEL_BY_PREFIX[prefix];
+  if (!label) throw new Error(`unrecognized natural id prefix in "${naturalId}"`);
+  return label;
+}
+
+/**
+ * Creation-time enforcement of per-label property invariants (PJ-004
+ * decision #8) — `closeDecision()` alone can't be the whole story, since
+ * generic `createNode()` would otherwise happily accept a pre-contradicted
+ * Decision. Strict biconditional, tightened from decision #2's original
+ * "may have closed_at" now that there's no legacy data to accommodate.
+ */
+const NODE_VALIDATORS: Partial<{ [L in NodeLabel]: (props: Record<string, unknown>) => Record<string, unknown> }> = {
+  Decision: (props) => {
+    const is_open = props.is_open ?? true;
+    const closed_at = props.closed_at;
+    if (is_open && closed_at) throw new Error("Decision.is_open=true cannot have closed_at set");
+    if (!is_open && !closed_at) throw new Error("Decision.is_open=false requires closed_at");
+    return { ...props, is_open };
+  },
+};
+
+export interface AgtypeValue<T = Record<string, unknown>> {
+  id: number;
+  label: string;
+  properties: T;
+}
+
+/**
+ * A node as returned to callers outside the persistence layer: AGE's
+ * internal graphid (`AgtypeValue.id`, a large opaque bigint) is stripped
+ * and replaced with the short, incrementing `natural_id` that's safe to
+ * show a user or an AI-agent caller.
+ */
+export interface PublicNode<T> {
+  natural_id: string;
+  label: NodeLabel;
+  properties: T;
+}
+
 /** Strips AGE's `::vertex` / `::edge` suffix and parses the remaining agtype JSON. */
 export function parseAgtype<T = Record<string, unknown>>(raw: string): AgtypeValue<T> {
   return JSON.parse(raw.replace(/::(vertex|edge)$/, ""));
@@ -200,33 +288,13 @@ export function parseAgtype<T = Record<string, unknown>>(raw: string): AgtypeVal
 /**
  * Per-session setup: `LOAD`/`search_path` are session-scoped in Postgres, so
  * every connecting process must call this itself — it can't be migrated
- * away like the one-time bootstrap (`CREATE EXTENSION`, `create_graph`,
- * `create_vlabel`/`create_elabel`) can. That one-time work now lives in
- * drizzle/0001_age_bootstrap.sql, applied once via src/db/migrate.ts.
+ * away like the one-time bootstrap (`CREATE EXTENSION`) can. Graph/label
+ * provisioning is per-tenant runtime work now, not migrated at all — see
+ * src/db/tenant.ts's provisionTenantGraph().
  */
 export async function bootstrapSession(db: LabKitDB): Promise<void> {
   await db.query(`LOAD 'age';`);
   await db.query(`SET search_path = ag_catalog, "$user", public;`);
-}
-
-/**
- * Runs a cypher query against the labkit graph. `asClause` must match the
- * RETURN arity, e.g. `"(n agtype)"` or `"(a agtype, b agtype)"` — AGE needs
- * the column list declared at the SQL level since it can't infer it.
- * `params` are passed as agtype and referenced with `$name` inside the query,
- * so caller-supplied values never get string-interpolated into the query text.
- */
-export async function cypher<T = Record<string, unknown>>(
-  db: LabKitDB,
-  query: string,
-  asClause: string,
-  params?: Record<string, unknown>,
-): Promise<T[]> {
-  const sql = params
-    ? `SELECT * FROM cypher('${GRAPH_NAME}', $$ ${query} $$, $1) AS ${asClause};`
-    : `SELECT * FROM cypher('${GRAPH_NAME}', $$ ${query} $$) AS ${asClause};`;
-  const res = await db.query<T>(sql, params ? [JSON.stringify(params)] : undefined);
-  return res.rows;
 }
 
 /** `{k: $k, ...}` clause plus the matching flat param object; AGE rejects passing a whole map as `$props`. */
@@ -237,60 +305,129 @@ function propPattern(props: Record<string, unknown>): string {
 }
 
 /**
- * Creates a single node and stamps it with a fresh natural id, in one round
- * trip. `label` is one of NODE_LABELS, never caller-controlled input — the
- * generator call's `label`/`prefix` arguments are template-interpolated
- * literals for that reason (`labkit_next_natural_id` in
- * drizzle/0002_natural_ids.sql), never passed through `props`/`$`-params.
- *
- * The `::text` casts on those two literals are required, not decorative:
- * AGE types bare Cypher string literals as `agtype`, and Postgres won't
- * resolve a `(text, text)` function overload against `agtype` arguments —
- * confirmed empirically against pglite-age before this was written this way.
+ * The query/mutation surface for one tenant's graph. Bundles `ctx`/`db` once
+ * instead of threading them through every call — every call site was going
+ * to gain a `ctx: TenantContext` first parameter regardless (PJ-003 §5), so
+ * this centralizes it, and gives `EDGE_SCHEMA` validation, natural-id ->
+ * label resolution, and the `Decision` lifecycle invariant (`closeDecision`
+ * + `NODE_VALIDATORS`) one non-arbitrary home instead of scattering them
+ * across free functions.
  */
-export async function createNode<T extends Record<string, unknown>>(
-  db: LabKitDB,
-  label: NodeLabel,
-  props: T,
-): Promise<PublicNode<T>> {
-  const prefix = NATURAL_ID_PREFIX[label];
-  const naturalIdClause = `natural_id: labkit_next_natural_id('${label.toLowerCase()}'::text, '${prefix}'::text)`;
-  const propsClause = propPattern(props);
-  const clause = propsClause ? `${propsClause}, ${naturalIdClause}` : naturalIdClause;
+export class TenantGraph {
+  constructor(
+    private readonly ctx: { tenantId: number; graphName: string },
+    private readonly db: LabKitDB,
+  ) {}
 
-  const rows = await cypher<{ n: string }>(db, `CREATE (n:${label} {${clause}}) RETURN n`, "(n agtype)", props);
-  const parsed = parseAgtype<T & { natural_id: string }>(rows[0]!.n);
-  const { natural_id, ...properties } = parsed.properties;
-  return { natural_id, label, properties: properties as unknown as T };
-}
+  /**
+   * Runs a cypher query against this tenant's graph. `asClause` must match
+   * the RETURN arity, e.g. `"(n agtype)"` or `"(a agtype, b agtype)"` — AGE
+   * needs the column list declared at the SQL level since it can't infer
+   * it. `params` are passed as agtype and referenced with `$name` inside
+   * the query, so caller-supplied values never get string-interpolated
+   * into the query text.
+   */
+  async cypher<T = Record<string, unknown>>(query: string, asClause: string, params?: Record<string, unknown>): Promise<T[]> {
+    const sql = params
+      ? `SELECT * FROM cypher('${this.ctx.graphName}', $$ ${query} $$, $1) AS ${asClause};`
+      : `SELECT * FROM cypher('${this.ctx.graphName}', $$ ${query} $$) AS ${asClause};`;
+    const res = await this.db.query<T>(sql, params ? [JSON.stringify(params)] : undefined);
+    return res.rows;
+  }
 
-/**
- * Creates a directed edge between two existing nodes, matched by label and an
- * exact-match property (e.g. `{ name: "..." }`), analogous to a natural key
- * lookup. `fromLabel`/`edge`/`toLabel` are NodeLabel/EdgeLabel constants, never
- * caller-controlled input; only the match property *values* go through params.
- */
-export async function createEdge(
-  db: LabKitDB,
-  fromLabel: NodeLabel,
-  fromMatch: Record<string, unknown>,
-  edge: EdgeLabel,
-  toLabel: NodeLabel,
-  toMatch: Record<string, unknown>,
-): Promise<void> {
-  const from = Object.fromEntries(Object.entries(fromMatch).map(([k, v]) => [`from_${k}`, v]));
-  const to = Object.fromEntries(Object.entries(toMatch).map(([k, v]) => [`to_${k}`, v]));
-  const fromPattern = Object.keys(fromMatch)
-    .map((k) => `${k}: $from_${k}`)
-    .join(", ");
-  const toPattern = Object.keys(toMatch)
-    .map((k) => `${k}: $to_${k}`)
-    .join(", ");
-  await cypher(
-    db,
-    `MATCH (a:${fromLabel} {${fromPattern}}), (b:${toLabel} {${toPattern}})
-     CREATE (a)-[:${edge}]->(b)`,
-    "(x agtype)",
-    { ...from, ...to },
-  );
+  /**
+   * Creates a single node and stamps it with a fresh natural id, in one
+   * round trip. `label` is one of NODE_LABELS, never caller-controlled
+   * input — the generator call's `label`/`prefix` arguments are
+   * template-interpolated literals for that reason (`labkit_next_natural_id`
+   * in drizzle/0002_natural_ids.sql), never passed through `props`/`$`-params.
+   *
+   * The `::text` casts on those two literals are required, not decorative:
+   * AGE types bare Cypher string literals as `agtype`, and Postgres won't
+   * resolve a `(text, text)` function overload against `agtype` arguments —
+   * confirmed empirically against pglite-age before this was written this way.
+   */
+  async createNode<T extends Record<string, unknown>>(label: NodeLabel, props: T): Promise<PublicNode<T>> {
+    const validated = (NODE_VALIDATORS[label]?.(props) ?? props) as T;
+    const prefix = NATURAL_ID_PREFIX[label];
+    const naturalIdClause = `natural_id: labkit_next_natural_id('${label.toLowerCase()}'::text, '${prefix}'::text)`;
+    const propsClause = propPattern(validated);
+    const clause = propsClause ? `${propsClause}, ${naturalIdClause}` : naturalIdClause;
+
+    const rows = await this.cypher<{ n: string }>(`CREATE (n:${label} {${clause}}) RETURN n`, "(n agtype)", validated);
+    const parsed = parseAgtype<T & { natural_id: string }>(rows[0]!.n);
+    const { natural_id, ...properties } = parsed.properties;
+    return { natural_id, label, properties: properties as unknown as T };
+  }
+
+  /**
+   * Creates a directed edge identified by natural IDs — never AGE's
+   * internal graphid, never an arbitrary property-map match that could
+   * silently address more than one node (PJ-003 §7). The label of each
+   * endpoint is inferred from its natural-id prefix
+   * (`resolveLabelFromNaturalId`), then validated as a legal `(fromLabel,
+   * edge, toLabel)` combination against `EDGE_SCHEMA` before anything is
+   * matched in the database. A missing source/target throws explicitly
+   * rather than silently creating zero edges.
+   *
+   * `(fromId, edge, toId)` is a unique key for a relationship — calling
+   * this twice with the same three values is a no-op, not a duplicate
+   * parallel edge, so agent retries are safe by construction. This is
+   * implemented as an explicit existence check before `CREATE`, NOT Cypher
+   * `MERGE` — `MERGE` for a relationship between two already-matched nodes
+   * was spiked and found broken under pglite-age (the created edge's
+   * `start_id`/`end_id` are both `0`, so it never actually connects the
+   * nodes — see .claude/skills/postgres-age/SKILL.md's gotchas). This
+   * leaves a narrow check-then-create race under concurrent callers, which
+   * PGlite's single-writer architecture makes moot for that backend; a
+   * future direct-Postgres backend would need this revisited (a real
+   * UNIQUE constraint on the edge label's `(start_id, end_id)` table would
+   * be the DB-enforced fix, mirroring how natural-id uniqueness is
+   * enforced — not built yet, no concrete need for it has shown up).
+   */
+  async createEdge(fromId: string, edge: EdgeLabel, toId: string): Promise<void> {
+    const fromLabel = resolveLabelFromNaturalId(fromId);
+    const toLabel = resolveLabelFromNaturalId(toId);
+
+    const allowed = EDGE_SCHEMA[edge].some(([f, t]) => f === fromLabel && t === toLabel);
+    if (!allowed) {
+      throw new Error(`${edge} does not allow ${fromLabel} -> ${toLabel} (natural ids ${fromId} -> ${toId})`);
+    }
+
+    const fromRows = await this.cypher(`MATCH (n:${fromLabel} {natural_id: $id}) RETURN n`, "(n agtype)", { id: fromId });
+    if (fromRows.length === 0) throw new Error(`source ${fromId} not found in tenant ${this.ctx.graphName}`);
+
+    const toRows = await this.cypher(`MATCH (n:${toLabel} {natural_id: $id}) RETURN n`, "(n agtype)", { id: toId });
+    if (toRows.length === 0) throw new Error(`target ${toId} not found in tenant ${this.ctx.graphName}`);
+
+    const existing = await this.cypher(
+      `MATCH (:${fromLabel} {natural_id: $from})-[e:${edge}]->(:${toLabel} {natural_id: $to}) RETURN e`,
+      "(e agtype)",
+      { from: fromId, to: toId },
+    );
+    if (existing.length > 0) return;
+
+    await this.cypher(
+      `MATCH (a:${fromLabel} {natural_id: $from}), (b:${toLabel} {natural_id: $to}) CREATE (a)-[:${edge}]->(b)`,
+      "(x agtype)",
+      { from: fromId, to: toId },
+    );
+  }
+
+  /**
+   * The only sanctioned way to close a Decision — sets `is_open = false`
+   * and `closed_at` together, in one Cypher `SET`, so the biconditional
+   * invariant (`NODE_VALIDATORS.Decision`) can never be observed broken
+   * between the two writes.
+   */
+  async closeDecision(naturalId: string, closedAt: string = new Date().toISOString()): Promise<void> {
+    const rows = await this.cypher(`MATCH (n:Decision {natural_id: $id}) RETURN n`, "(n agtype)", { id: naturalId });
+    if (rows.length === 0) throw new Error(`decision ${naturalId} not found in tenant ${this.ctx.graphName}`);
+
+    await this.cypher(
+      `MATCH (n:Decision {natural_id: $id}) SET n.is_open = false, n.closed_at = $closedAt`,
+      "(n agtype)",
+      { id: naturalId, closedAt },
+    );
+  }
 }

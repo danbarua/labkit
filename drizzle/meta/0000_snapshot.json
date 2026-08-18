@@ -1,25 +1,40 @@
 {
-  "id": "42366788-6aa3-443f-afc2-e8eee62a965e",
+  "id": "c8653c57-1b6a-4de8-a3cf-b12e14d9a045",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.projects": {
-      "name": "projects",
+    "public.tenants": {
+      "name": "tenants",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "serial",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
-        "name": {
-          "name": "name",
+        "slug": {
+          "name": "slug",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "graph_name": {
+          "name": "graph_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "generated": {
+            "as": "'labkit_t' || id",
+            "type": "stored"
+          }
         },
         "created_at": {
           "name": "created_at",
@@ -33,11 +48,11 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "projects_name_unique": {
-          "name": "projects_name_unique",
+        "tenants_slug_unique": {
+          "name": "tenants_slug_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "name"
+            "slug"
           ]
         }
       },

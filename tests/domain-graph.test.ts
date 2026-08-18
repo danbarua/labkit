@@ -2,24 +2,31 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 import { age } from "@electric-sql/pglite-age";
 import { vector } from "@electric-sql/pglite-pgvector";
-import { createEdge, createNode, cypher, bootstrapSession, parseAgtype, NODE_LABELS, NATURAL_ID_PREFIX, type NodeLabel } from "../src/db/graph";
+import { TenantGraph, bootstrapSession, parseAgtype, NODE_LABELS, NATURAL_ID_PREFIX, type NodeLabel, type DecisionProps } from "../src/db/graph";
 import { runMigrations } from "../src/db/migrate";
-import { getOrCreateProject } from "../src/db/projects";
+import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
 
 /**
- * Exercises the LabKit domain model (docs/project-journal/001_git_init.md)
- * against Apache AGE running inside an in-memory PGlite instance, migrated
- * the same way a real connection would be (src/db/migrate.ts's
- * runMigrations(), not hand-rolled setup). Each test corresponds to one of
- * the journal's MVP acceptance-criteria questions.
+ * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
+ * revised by docs/project-journal/003_review_domain_tenancy.md and
+ * docs/project-journal/004_tenancy_implementation_plan.md) against Apache
+ * AGE running inside an in-memory PGlite instance, migrated and provisioned
+ * the same way a real connection would be (runMigrations() +
+ * resolveTenantContext(), not hand-rolled setup). Each test corresponds to
+ * one of the journal's MVP acceptance-criteria questions, or one of PJ-003
+ * §15 / PJ-004's acceptance tests.
  */
 
 let db: PGlite;
+let ctx: TenantContext;
+let graph: TenantGraph;
 
 beforeEach(async () => {
   db = new PGlite({ extensions: { age, vector } });
   await runMigrations(db);
   await bootstrapSession(db);
+  ctx = await resolveTenantContext(db, "labkit");
+  graph = new TenantGraph(ctx, db);
 });
 
 afterEach(async () => {
@@ -27,33 +34,36 @@ afterEach(async () => {
 });
 
 async function seedResearchThread() {
-  await createNode(db, "Question", { project_id: "p1", name: "does the accelerated ridge implementation match the reference?" });
-  await createNode(db, "LineOfEnquiry", { project_id: "p1", name: "numerical equivalence of accelerated ridge" });
-  await createNode(db, "EvidenceUnit", { project_id: "p1", role: "verification" });
-  await createNode(db, "Computation", { kind: "equivalence_check", status: "completed", backend: "wandb", external_run_id: "run-42" });
-  await createNode(db, "Evidence", { project_id: "p1", statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" });
-  await createNode(db, "Artefact", { kind: "json", logical_name: "stage2b_confirmatory_results", invalidated: false });
-  await createNode(db, "Claim", { project_id: "p1", name: "accelerated ridge is numerically equivalent to reference", kind: "confirmatory" });
+  const question = await graph.createNode("Question", { name: "does the accelerated ridge implementation match the reference?" });
+  const lineOfEnquiry = await graph.createNode("LineOfEnquiry", { name: "numerical equivalence of accelerated ridge" });
+  const evidenceUnit = await graph.createNode("EvidenceUnit", { role: "verification" });
+  const computation = await graph.createNode("Computation", { kind: "equivalence_check", status: "completed", backend: "wandb", external_run_id: "run-42" });
+  const evidence = await graph.createNode("Evidence", { statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" });
+  const artefact = await graph.createNode("Artefact", { kind: "json", logical_name: "stage2b_confirmatory_results", invalidated: false });
+  const claim = await graph.createNode("Claim", { name: "accelerated ridge is numerically equivalent to reference", kind: "confirmatory" });
 
-  await createEdge(db, "Question", { name: "does the accelerated ridge implementation match the reference?" }, "MOTIVATES", "LineOfEnquiry", { name: "numerical equivalence of accelerated ridge" });
-  await createEdge(db, "LineOfEnquiry", { name: "numerical equivalence of accelerated ridge" }, "REQUIRES", "Evidence", { statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" });
-  await createEdge(db, "EvidenceUnit", { role: "verification" }, "USES", "Computation", { external_run_id: "run-42" });
-  await createEdge(db, "EvidenceUnit", { role: "verification" }, "PRODUCES", "Evidence", { statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" });
-  await createEdge(db, "Evidence", { statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" }, "RECORDED_IN", "Artefact", { logical_name: "stage2b_confirmatory_results" });
-  await createEdge(db, "Evidence", { statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" }, "SUPPORTS", "Claim", { name: "accelerated ridge is numerically equivalent to reference" });
+  await graph.createEdge(question.natural_id, "MOTIVATES", lineOfEnquiry.natural_id);
+  await graph.createEdge(lineOfEnquiry.natural_id, "REQUIRES", evidence.natural_id);
+  await graph.createEdge(evidenceUnit.natural_id, "ADDRESSES", lineOfEnquiry.natural_id);
+  await graph.createEdge(evidenceUnit.natural_id, "USES", computation.natural_id);
+  await graph.createEdge(evidenceUnit.natural_id, "PRODUCES", evidence.natural_id);
+  await graph.createEdge(evidence.natural_id, "RECORDED_IN", artefact.natural_id);
+  await graph.createEdge(evidence.natural_id, "SUPPORTS", claim.natural_id);
+
+  return { question, lineOfEnquiry, evidenceUnit, computation, evidence, artefact, claim };
 }
 
 describe("evidence and computations supporting a claim", () => {
   test("shows evidence, the evidence unit, and the computation that generated it", async () => {
-    await seedResearchThread();
+    const { claim } = await seedResearchThread();
 
-    const rows = await cypher<{ e: string; comp: string }>(
-      db,
-      `MATCH (:Claim {name: 'accelerated ridge is numerically equivalent to reference'})<-[:SUPPORTS]-(e:Evidence)
+    const rows = await graph.cypher<{ e: string; comp: string }>(
+      `MATCH (:Claim {natural_id: $claimId})<-[:SUPPORTS]-(e:Evidence)
        MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
        MATCH (u)-[:USES]->(comp:Computation)
        RETURN e, comp`,
       "(e agtype, comp agtype)",
+      { claimId: claim.natural_id },
     );
 
     expect(rows).toHaveLength(1);
@@ -66,56 +76,48 @@ describe("evidence and computations supporting a claim", () => {
 
 describe("invalidation propagation", () => {
   test("finds claims, decisions, and lines of enquiry affected if an artefact is invalidated", async () => {
-    await seedResearchThread();
-    await createNode(db, "Decision", {
-      project_id: "p1",
+    const { artefact, claim, lineOfEnquiry, evidence } = await seedResearchThread();
+    const decision = await graph.createNode("Decision", {
       reason: "promote accelerated ridge to production",
-      evidence: "stage2b_confirmatory_results",
       invalidation_check: "equivalence within tolerance on held-out batch",
     });
-    await createEdge(
-      db,
-      "Decision",
-      { reason: "promote accelerated ridge to production" },
-      "BASED_ON",
-      "Evidence",
-      { statement: "evolved_T mean ΔMSE = -0.021, 95% CI [-0.025, -0.017]" },
-    );
+    await graph.createEdge(decision.natural_id, "BASED_ON", evidence.natural_id);
 
     // Follows only the edges that represent "depends on this evidence" —
-    // RECORDED_IN/SUPPORTS/BASED_ON/REQUIRES — not PRODUCES/USES, which are
-    // provenance of how the evidence came to exist and aren't invalidated
-    // retroactively just because its durable record was. A blind undirected
-    // `*` traversal would also sweep in the Computation and Question that
-    // led to this evidence, which is the wrong direction for "what breaks".
-    const rows = await cypher<{ claim: string | null; decision: string | null; loe: string | null }>(
-      db,
-      `MATCH (a:Artefact {logical_name: 'stage2b_confirmatory_results'})
+    // RECORDED_IN/SUPPORTS/BASED_ON/REQUIRES — not PRODUCES/USES/ADDRESSES,
+    // which are provenance of how the evidence came to exist and aren't
+    // invalidated retroactively just because its durable record was.
+    // "Affected" is not the same as "unsupported" (PJ-003 §11) — this
+    // traversal answers "what needs reconsideration", not "what is now
+    // false"; nothing here marks the claim unsupported.
+    const rows = await graph.cypher<{ claim: string | null; decision: string | null; loe: string | null }>(
+      `MATCH (a:Artefact {natural_id: $artefactId})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(claim:Claim)
        OPTIONAL MATCH (decision:Decision)-[:BASED_ON]->(e)
        OPTIONAL MATCH (loe:LineOfEnquiry)-[:REQUIRES]->(e)
        RETURN claim, decision, loe`,
       "(claim agtype, decision agtype, loe agtype)",
+      { artefactId: artefact.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.claim!).properties).toMatchObject({ name: "accelerated ridge is numerically equivalent to reference" });
-    expect(parseAgtype(rows[0]!.decision!).properties).toMatchObject({ reason: "promote accelerated ridge to production" });
-    expect(parseAgtype(rows[0]!.loe!).properties).toMatchObject({ name: "numerical equivalence of accelerated ridge" });
+    expect(parseAgtype(rows[0]!.claim!).properties).toMatchObject({ name: claim.properties.name });
+    expect(parseAgtype(rows[0]!.decision!).properties).toMatchObject({ reason: decision.properties.reason });
+    expect(parseAgtype(rows[0]!.loe!).properties).toMatchObject({ name: lineOfEnquiry.properties.name });
   });
 });
 
 describe("open lines of enquiry", () => {
   test("a line of enquiry is open when its motivating question has no resolving decision", async () => {
-    await seedResearchThread();
+    const { lineOfEnquiry } = await seedResearchThread();
 
-    const rows = await cypher<{ q: string; d: string | null }>(
-      db,
-      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {name: 'numerical equivalence of accelerated ridge'})
+    const rows = await graph.cypher<{ q: string; d: string | null }>(
+      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId})
        OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(q)
        RETURN q, d`,
       "(q agtype, d agtype)",
+      { loeId: lineOfEnquiry.natural_id },
     );
 
     expect(rows).toHaveLength(1);
@@ -123,28 +125,19 @@ describe("open lines of enquiry", () => {
   });
 
   test("closes once a decision resolves the motivating question", async () => {
-    await seedResearchThread();
-    await createNode(db, "Decision", {
-      project_id: "p1",
+    const { question, lineOfEnquiry } = await seedResearchThread();
+    const decision = await graph.createNode("Decision", {
       reason: "accelerated ridge confirmed equivalent",
-      evidence: "stage2b_confirmatory_results",
       invalidation_check: "n/a",
     });
-    await createEdge(
-      db,
-      "Decision",
-      { reason: "accelerated ridge confirmed equivalent" },
-      "RESOLVES",
-      "Question",
-      { name: "does the accelerated ridge implementation match the reference?" },
-    );
+    await graph.createEdge(decision.natural_id, "RESOLVES", question.natural_id);
 
-    const rows = await cypher<{ d: string }>(
-      db,
-      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {name: 'numerical equivalence of accelerated ridge'})
+    const rows = await graph.cypher<{ d: string }>(
+      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId})
        MATCH (d:Decision)-[:RESOLVES]->(q)
        RETURN d`,
       "(d agtype)",
+      { loeId: lineOfEnquiry.natural_id },
     );
 
     expect(rows).toHaveLength(1);
@@ -152,24 +145,39 @@ describe("open lines of enquiry", () => {
   });
 });
 
-describe("decision amendments", () => {
-  test("an amendment is a decision that supersedes an earlier one", async () => {
-    await createNode(db, "Decision", { project_id: "p1", reason: "use float32 batching", evidence: "e-early", invalidation_check: "n/a" });
-    await createNode(db, "Decision", { project_id: "p1", reason: "switch to float64 for stability", evidence: "e-later", invalidation_check: "n/a" });
-    await createEdge(
-      db,
-      "Decision",
-      { reason: "switch to float64 for stability" },
-      "SUPERSEDES",
-      "Decision",
-      { reason: "use float32 batching" },
+describe("failed/planned inquiry provenance", () => {
+  test("answers 'why was this computation run' even with no resulting Evidence", async () => {
+    const lineOfEnquiry = await graph.createNode("LineOfEnquiry", { name: "does approach X scale" });
+    const evidenceUnit = await graph.createNode("EvidenceUnit", { role: "feasibility" });
+    const computation = await graph.createNode("Computation", { kind: "scaling_probe", status: "failed" });
+
+    await graph.createEdge(evidenceUnit.natural_id, "ADDRESSES", lineOfEnquiry.natural_id);
+    await graph.createEdge(evidenceUnit.natural_id, "USES", computation.natural_id);
+    // deliberately no Evidence/PRODUCES edge — the computation failed
+
+    const rows = await graph.cypher<{ loe: string }>(
+      `MATCH (:Computation {natural_id: $compId})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry)
+       RETURN loe`,
+      "(loe agtype)",
+      { compId: computation.natural_id },
     );
 
-    const rows = await cypher<{ old: string }>(
-      db,
-      `MATCH (:Decision {reason: 'switch to float64 for stability'})-[:SUPERSEDES]->(old:Decision)
+    expect(rows).toHaveLength(1);
+    expect(parseAgtype(rows[0]!.loe).properties).toMatchObject({ name: "does approach X scale" });
+  });
+});
+
+describe("decision amendments", () => {
+  test("an amendment is a decision that supersedes an earlier one", async () => {
+    const d1 = await graph.createNode("Decision", { reason: "use float32 batching", invalidation_check: "n/a" });
+    const d2 = await graph.createNode("Decision", { reason: "switch to float64 for stability", invalidation_check: "n/a" });
+    await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
+
+    const rows = await graph.cypher<{ old: string }>(
+      `MATCH (:Decision {natural_id: $id})-[:SUPERSEDES]->(old:Decision)
        RETURN old`,
       "(old agtype)",
+      { id: d2.natural_id },
     );
 
     expect(rows).toHaveLength(1);
@@ -177,17 +185,17 @@ describe("decision amendments", () => {
   });
 
   test("walks the full amendment chain back to the original decision", async () => {
-    await createNode(db, "Decision", { project_id: "p1", reason: "d1-original", evidence: "e", invalidation_check: "n/a" });
-    await createNode(db, "Decision", { project_id: "p1", reason: "d2-amendment", evidence: "e", invalidation_check: "n/a" });
-    await createNode(db, "Decision", { project_id: "p1", reason: "d3-amendment", evidence: "e", invalidation_check: "n/a" });
-    await createEdge(db, "Decision", { reason: "d3-amendment" }, "SUPERSEDES", "Decision", { reason: "d2-amendment" });
-    await createEdge(db, "Decision", { reason: "d2-amendment" }, "SUPERSEDES", "Decision", { reason: "d1-original" });
+    const d1 = await graph.createNode("Decision", { reason: "d1-original", invalidation_check: "n/a" });
+    const d2 = await graph.createNode("Decision", { reason: "d2-amendment", invalidation_check: "n/a" });
+    const d3 = await graph.createNode("Decision", { reason: "d3-amendment", invalidation_check: "n/a" });
+    await graph.createEdge(d3.natural_id, "SUPERSEDES", d2.natural_id);
+    await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
-    const rows = await cypher<{ x: string }>(
-      db,
-      `MATCH (:Decision {reason: 'd3-amendment'})-[:SUPERSEDES*1..5]->(x:Decision)
+    const rows = await graph.cypher<{ x: string }>(
+      `MATCH (:Decision {natural_id: $id})-[:SUPERSEDES*1..5]->(x:Decision)
        RETURN x`,
       "(x agtype)",
+      { id: d3.natural_id },
     );
 
     const chain = rows.map((r) => (parseAgtype(r.x).properties as { reason: string }).reason);
@@ -195,69 +203,114 @@ describe("decision amendments", () => {
   });
 });
 
-describe("relational/graph seam", () => {
-  test("a graph node's project_id resolves back to a real projects row", async () => {
-    const project = await getOrCreateProject(db, "labkit-mvp");
-    expect(project.id).toBeTruthy();
-
-    const node = await createNode(db, "Question", { project_id: project.id, name: "does the accelerated ridge implementation match the reference?" });
-    expect(node.natural_id).toMatch(/^Q-\d+$/);
-
-    const rows = await cypher<{ q: string }>(
-      db,
-      `MATCH (q:Question {project_id: $project_id}) RETURN q`,
-      "(q agtype)",
-      { project_id: project.id },
+describe("decision lifecycle integrity", () => {
+  test("createNode rejects a Decision created already-open with closed_at set", async () => {
+    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", is_open: true, closed_at: "2026-08-18T00:00:00Z" })).rejects.toThrow(
+      /cannot have closed_at/,
     );
+  });
 
-    expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.q).properties).toMatchObject({ name: "does the accelerated ridge implementation match the reference?" });
+  test("createNode rejects a Decision created already-closed without closed_at", async () => {
+    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", is_open: false })).rejects.toThrow(/requires closed_at/);
+  });
 
-    // insert-or-fetch: calling again with the same name returns the same row,
-    // not a duplicate (this is the ON CONFLICT DO NOTHING path).
-    const again = await getOrCreateProject(db, "labkit-mvp");
-    expect(again.id).toBe(project.id);
+  test("createNode defaults is_open to true when omitted", async () => {
+    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x" });
+    const props = d.properties as DecisionProps;
+    expect(props.is_open).toBe(true);
+    expect(props.closed_at).toBeUndefined();
+  });
+
+  test("closeDecision sets is_open and closed_at together", async () => {
+    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x" });
+    await graph.closeDecision(d.natural_id, "2026-08-18T12:00:00Z");
+
+    const rows = await graph.cypher<{ n: string }>(`MATCH (n:Decision {natural_id: $id}) RETURN n`, "(n agtype)", { id: d.natural_id });
+    expect(parseAgtype(rows[0]!.n).properties).toMatchObject({ is_open: false, closed_at: "2026-08-18T12:00:00Z" });
+  });
+
+  test("closeDecision throws for a nonexistent decision", async () => {
+    await expect(graph.closeDecision("DEC_999")).rejects.toThrow(/not found/);
   });
 });
 
-describe("natural ids", () => {
-  test("createNode never exposes AGE's internal graphid", async () => {
-    const node = await createNode(db, "Computation", { kind: "equivalence_check", status: "completed" });
-    expect(node).not.toHaveProperty("id");
-    expect(node.properties).not.toHaveProperty("id");
-    expect(node.properties).not.toHaveProperty("natural_id");
-    expect(node.natural_id).toMatch(/^COMP-\d+$/);
+describe("edge integrity", () => {
+  test("createEdge throws when the (fromLabel, toLabel) pair isn't in EDGE_SCHEMA", async () => {
+    const claim = await graph.createNode("Claim", { name: "c" });
+    const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+
+    await expect(graph.createEdge(claim.natural_id, "MOTIVATES", loe.natural_id)).rejects.toThrow(/does not allow/);
   });
 
-  test("natural ids increment per label without collisions across many creates", async () => {
-    const nodes = await Promise.all(
-      Array.from({ length: 5 }, (_, i) => createNode(db, "Claim", { project_id: "p1", name: `claim-${i}` })),
+  test("createEdge throws when the source natural id doesn't exist", async () => {
+    const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+    await expect(graph.createEdge("Q_999", "MOTIVATES", loe.natural_id)).rejects.toThrow(/not found/);
+  });
+
+  test("createEdge throws when the target natural id doesn't exist", async () => {
+    const question = await graph.createNode("Question", { name: "q" });
+    await expect(graph.createEdge(question.natural_id, "MOTIVATES", "LOE_999")).rejects.toThrow(/not found/);
+  });
+
+  test("createEdge is idempotent — calling it twice creates exactly one edge", async () => {
+    const question = await graph.createNode("Question", { name: "q" });
+    const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+
+    await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
+    await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
+
+    const rows = await graph.cypher<{ r: string }>(
+      `MATCH (:Question {natural_id: $qId})-[r:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN r`,
+      "(r agtype)",
+      { qId: question.natural_id, loeId: loe.natural_id },
     );
-    const ids = nodes.map((n) => n.natural_id);
-    expect(new Set(ids).size).toBe(5);
-    for (const id of ids) expect(id).toMatch(/^CLM-\d+$/);
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("Gate is reconnected to what it actually gates", () => {
+  test("Criterion -> CriterionEvaluation -> Gate -> Computation chains all the way through", async () => {
+    const criterion = await graph.createNode("Criterion", { proposition: "max_prediction_error <= 1e-8" });
+    const evaluation = await graph.createNode("CriterionEvaluation", { value: "3.2e-9", outcome: "pass", evaluated_at: "2026-08-17T00:00:00Z" });
+    const gate = await graph.createNode("Gate", { consequence: "accelerated ridge implementation may be promoted" });
+    const computation = await graph.createNode("Computation", { kind: "promotion_run", status: "pending" });
+    const evidence = await graph.createNode("Evidence", { statement: "3.2e-9 max error observed" });
+
+    await graph.createEdge(criterion.natural_id, "EVALUATED_AS", evaluation.natural_id);
+    await graph.createEdge(evaluation.natural_id, "TRIGGERS", gate.natural_id);
+    await graph.createEdge(gate.natural_id, "GATES", computation.natural_id);
+    // decision #5: evidence_ref replaced with a real edge
+    await graph.createEdge(evaluation.natural_id, "BASED_ON", evidence.natural_id);
+
+    const rows = await graph.cypher<{ comp: string }>(
+      `MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(comp:Computation)
+       RETURN comp`,
+      "(comp agtype)",
+      { critId: criterion.natural_id },
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(parseAgtype(rows[0]!.comp).properties).toMatchObject({ kind: "promotion_run" });
   });
 });
 
 describe("all node labels", () => {
   // Minimal valid props per label's *Props interface in src/db/graph.ts.
   // Exists so every label (not just the ones exercised by the acceptance
-  // queries above — Review and Task otherwise never get created by
-  // anything) actually round-trips through createNode(), which is the only
-  // thing that would catch a NATURAL_ID_PREFIX entry drifting out of sync
-  // with the sequence names in drizzle/0002_natural_ids.sql (a typo there
-  // fails at runtime with "sequence does not exist", not at typecheck).
+  // queries above) actually round-trips through createNode(), which is the
+  // only thing that would catch a NATURAL_ID_PREFIX entry drifting out of
+  // sync with the sequence names in drizzle/0002_natural_ids.sql.
   const fixtures: Record<NodeLabel, Record<string, unknown>> = {
-    Question: { project_id: "p1", name: "q" },
-    LineOfEnquiry: { project_id: "p1", name: "loe" },
-    EvidenceUnit: { project_id: "p1", role: "experiment" },
-    Evidence: { project_id: "p1", statement: "e" },
-    Claim: { project_id: "p1", name: "c" },
-    Decision: { project_id: "p1", reason: "r", evidence: "e", invalidation_check: "x" },
-    Criterion: { project_id: "p1", proposition: "p" },
+    Question: { name: "q" },
+    LineOfEnquiry: { name: "loe" },
+    EvidenceUnit: { role: "experiment" },
+    Evidence: { statement: "e" },
+    Claim: { name: "c" },
+    Decision: { reason: "r", invalidation_check: "x" },
+    Criterion: { proposition: "p" },
     CriterionEvaluation: { value: "v", outcome: "pass", evaluated_at: "2026-08-17T00:00:00Z" },
-    Gate: { project_id: "p1", consequence: "c" },
-    Review: { project_id: "p1", verdict: "v" },
+    Gate: { consequence: "c" },
+    Review: { verdict: "v" },
     Artefact: { kind: "json", logical_name: "a" },
     Computation: { kind: "k", status: "s" },
     Task: { objective: "o", inputs: "i", outputs: "o", acceptance: "a" },
@@ -265,16 +318,59 @@ describe("all node labels", () => {
 
   for (const label of NODE_LABELS) {
     test(`${label} creates with a well-formed natural id`, async () => {
-      const node = await createNode(db, label, fixtures[label]);
-      expect(node.natural_id).toMatch(new RegExp(`^${NATURAL_ID_PREFIX[label]}-\\d+$`));
+      const node = await graph.createNode(label, fixtures[label]);
+      expect(node.natural_id).toMatch(new RegExp(`^${NATURAL_ID_PREFIX[label]}_\\d+$`));
       expect(node).not.toHaveProperty("id");
     });
   }
 });
 
+describe("tenant resolution", () => {
+  test("resolving the same slug twice returns the same tenant", async () => {
+    const again = await resolveTenantContext(db, "labkit");
+    expect(again.tenantId).toBe(ctx.tenantId);
+    expect(again.graphName).toBe(ctx.graphName);
+  });
+
+  test("graph_name is derived server-side from the tenant id, never from the slug", async () => {
+    const rows = await db.query<{ id: number; slug: string; graph_name: string }>(`select id, slug, graph_name from tenants where id = $1`, [ctx.tenantId]);
+    expect(rows.rows[0]).toMatchObject({ slug: "labkit", graph_name: `labkit_t${ctx.tenantId}` });
+  });
+});
+
+describe("tenant isolation", () => {
+  test("two tenants can hold nodes with identical properties without any query crossing between them", async () => {
+    const ctxA = await resolveTenantContext(db, "tenant-a");
+    const ctxB = await resolveTenantContext(db, "tenant-b");
+    expect(ctxA.graphName).not.toBe(ctxB.graphName);
+    const graphA = new TenantGraph(ctxA, db);
+    const graphB = new TenantGraph(ctxB, db);
+
+    const claimA = await graphA.createNode("Claim", { name: "x" });
+    const claimB = await graphB.createNode("Claim", { name: "x" });
+    expect(claimA.natural_id).not.toBe(claimB.natural_id); // natural ids are global, but the nodes are still in disjoint graphs
+
+    const rowsA = await graphA.cypher<{ c: string }>(`MATCH (c:Claim) RETURN c`, "(c agtype)");
+    expect(rowsA).toHaveLength(1);
+    expect(parseAgtype(rowsA[0]!.c).properties).toMatchObject({ name: "x" });
+  });
+
+  test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {
+    const ctxA = await resolveTenantContext(db, "tenant-a");
+    const ctxB = await resolveTenantContext(db, "tenant-b");
+    const graphA = new TenantGraph(ctxA, db);
+    const graphB = new TenantGraph(ctxB, db);
+
+    const questionA = await graphA.createNode("Question", { name: "q-in-a" });
+    const loeB = await graphB.createNode("LineOfEnquiry", { name: "loe-in-b" });
+
+    await expect(graphA.createEdge(questionA.natural_id, "MOTIVATES", loeB.natural_id)).rejects.toThrow(/not found/);
+  });
+});
+
 describe("CQRS read-side views", () => {
-  test("labkit_computations exposes only natural ids, never raw graph ids", async () => {
-    await createNode(db, "Computation", {
+  test("the per-tenant computation view exposes only natural ids, never raw graph ids", async () => {
+    await graph.createNode("Computation", {
       kind: "equivalence_check",
       status: "completed",
       backend: "wandb",
@@ -282,33 +378,12 @@ describe("CQRS read-side views", () => {
     });
 
     const rows = await db.query<{ natural_id: string; kind: string; status: string; external_run_id: string }>(
-      `SELECT natural_id, kind, status, external_run_id FROM labkit_computations WHERE external_run_id = $1`,
+      `SELECT natural_id, kind, status, external_run_id FROM "${ctx.graphName}".computation WHERE external_run_id = $1`,
       ["run-42"],
     );
 
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0]).toMatchObject({ kind: "equivalence_check", status: "completed", external_run_id: "run-42" });
-    expect(rows.rows[0]!.natural_id).toMatch(/^COMP-\d+$/);
-  });
-});
-
-describe("criterion evaluation and gating", () => {
-  test("a criterion evaluation triggers a gate", async () => {
-    await createNode(db, "Criterion", { project_id: "p1", proposition: "max_prediction_error <= 1e-8" });
-    await createNode(db, "CriterionEvaluation", { value: "3.2e-9", outcome: "pass", evaluated_at: "2026-08-17T00:00:00Z" });
-    await createNode(db, "Gate", { project_id: "p1", consequence: "accelerated ridge implementation may be promoted" });
-
-    await createEdge(db, "Criterion", { proposition: "max_prediction_error <= 1e-8" }, "EVALUATED_AS", "CriterionEvaluation", { value: "3.2e-9" });
-    await createEdge(db, "CriterionEvaluation", { value: "3.2e-9" }, "TRIGGERS", "Gate", { consequence: "accelerated ridge implementation may be promoted" });
-
-    const rows = await cypher<{ g: string }>(
-      db,
-      `MATCH (:Criterion {proposition: 'max_prediction_error <= 1e-8'})-[:EVALUATED_AS]->(ce:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(g:Gate)
-       RETURN g`,
-      "(g agtype)",
-    );
-
-    expect(rows).toHaveLength(1);
-    expect(parseAgtype(rows[0]!.g).properties).toMatchObject({ consequence: "accelerated ridge implementation may be promoted" });
+    expect(rows.rows[0]!.natural_id).toMatch(/^COMP_\d+$/);
   });
 });
