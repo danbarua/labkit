@@ -12,22 +12,6 @@ export interface LabKitDB {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-/**
- * Bump whenever `NODE_LABELS`, `EDGE_LABELS`, `NODE_VIEW_COLUMNS`, or
- * `EDGE_SCHEMA` changes structurally. `src/db/tenant.ts`'s
- * `provisionTenantGraph()` compares this against each tenant's stored
- * `schema_version` (src/db/schema.ts) and only re-runs the full
- * reconciliation pass when they differ — otherwise every `resolveTenantContext`
- * call would redundantly re-check ~50 idempotent DDL statements. This is
- * NOT a migration system — it's groundwork for one. How an actual
- * incompatible graph-schema change (renaming a label, reshaping a property)
- * gets carried out for tenants that already have data is deliberately
- * undecided; this version marker just makes "has this tenant seen the
- * current schema" answerable, which any real migration mechanism will need
- * anyway. See docs/project-journal/005_provisioning_reconciliation.md.
- */
-export const GRAPH_SCHEMA_VERSION = 1;
-
 export const NODE_LABELS = [
   "Question",
   "LineOfEnquiry",

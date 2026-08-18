@@ -1,6 +1,6 @@
 {
-  "id": "ae575823-3100-40fe-8b34-f98b0c3b6228",
-  "prevId": "e3fcfb3e-ff3e-4eb7-a50c-37bf54a7fe83",
+  "id": "d379b50a-807f-4661-84cb-0de0b185e27f",
+  "prevId": "7f6ddb1f-3863-48c0-8bbe-0baf6ca292c1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -35,13 +35,6 @@
             "type": "stored",
             "as": "'labkit_t' || id"
           }
-        },
-        "schema_version": {
-          "name": "schema_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "created_at": {
           "name": "created_at",

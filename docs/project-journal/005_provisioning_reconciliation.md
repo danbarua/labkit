@@ -1,8 +1,12 @@
 # PJ-005: Provisioning reconciliation and edge-uniqueness review response
 
-**Status: implemented (2026-08-18).** Response to a review of `main@3faeade`
-(PJ-004's implementation), which found one blocking and one medium-severity
-gap in that round's per-tenant graph provisioning.
+**Status: implemented (2026-08-18), revised same day after a follow-up
+review.** Response to a review of `main@3faeade` (PJ-004's implementation),
+which found one blocking and one medium-severity gap in that round's
+per-tenant graph provisioning. A second review of the fix (`main@408afd4`)
+then caught that the first fix's own performance optimization
+(`tenants.schema_version`) undermined the guarantee it had just built — see
+"No version gate" below. That optimization was removed, not patched.
 
 ## Context
 
@@ -40,9 +44,9 @@ already-real the gap was.
 
 ### 1. Reconciliation, not a single existence gate
 
-`src/db/tenant.ts`'s `provisionTenantGraph()` is now a thin, version-gated
-wrapper around `reconcileTenantGraph()`, which independently ensures each
-resource exists and matches the current schema:
+`src/db/tenant.ts`'s `provisionTenantGraph()` (the only exported entry
+point — see below) now unconditionally runs `reconcileTenantGraph()`, which
+independently ensures each resource exists and is current:
 
 ```text
 ensure graph exists
@@ -61,38 +65,67 @@ ensure every label's CQRS view exists and is current
 Each step is its own idempotent function (`ensureGraph`, `ensureVertexLabel`,
 `ensureEdgeLabel`, `ensureNaturalIdIndex`, `ensureEdgeUniqueIndex`,
 `ensureView`) — a codebase change that adds a new label or edge now reaches
-every existing tenant on their next reconcile pass, not just brand-new
-tenants.
+every existing tenant the next time `resolveTenantContext()` is called for
+it, not just brand-new tenants.
 
-`reconcileTenantGraph()` is exported and callable directly (not only
-reachable through the version gate below), specifically so reconciliation
-behavior is testable on its own terms:
-`tests/domain-graph.test.ts`'s "provisioning reconciliation" block drops a
-view, an index, and an entire label (simulating "this tenant predates a
-schema change"), then confirms a bare `reconcileTenantGraph()` call restores
-each one.
+"Ensures ... exists" deliberately does not mean "matches the current schema
+exactly" — indexes are checked by name (`IF NOT EXISTS`), not compared by
+definition, and labels are checked for existence, not arbitrary structural
+equivalence. This is groundwork for evolving *additive* graph structure, not
+full structural reconciliation. A change that isn't purely additive —
+removing/reordering a view column (`CREATE OR REPLACE VIEW` can't do
+either), renaming a label, reshaping a property that already has data — has
+no story here and isn't claimed to.
 
-### 2. `tenants.schema_version` — groundwork, not a migration system
+### 2. No version gate — reconciliation runs every time, unconditionally
 
-Running all ~50 idempotent `ensure*` checks on every single
-`resolveTenantContext()` call is correct but wasteful once a tenant is
-already current. `tenants` gained a `schema_version` column (default `0`);
-`graph.ts` gained `GRAPH_SCHEMA_VERSION` (currently `1`), bumped by hand
-whenever `NODE_LABELS`/`EDGE_LABELS`/`NODE_VIEW_COLUMNS`/`EDGE_SCHEMA`
-changes structurally. `provisionTenantGraph()` compares the two (read inside
-the advisory-lock transaction, not before it) and only runs
-`reconcileTenantGraph()` when the tenant is behind, then stamps the new
-version.
+**Revised after a follow-up review of the first version of this change.**
+The first cut added a `tenants.schema_version` column and a
+`GRAPH_SCHEMA_VERSION` constant, skipping the `reconcileTenantGraph()` pass
+entirely when a tenant's stored version already matched — intended purely as
+a performance optimization (avoid ~50 idempotent checks on every connection
+once a tenant is current).
 
-**This is explicitly not a migration system.** It answers "has this tenant
-seen the current schema," which is necessary groundwork for a real migration
-mechanism but not one itself — `ensureView`'s `CREATE OR REPLACE VIEW`, for
-instance, can add columns but can't remove or reorder them (a real Postgres
-restriction); a schema change that needs to do either has no story yet.
-How LabKit actually migrates a tenant's graph through an incompatible
-structural change (renaming a label, reshaping a property that already has
-data) is deliberately left undecided, per the direction that this round lay
-groundwork rather than solve that problem now.
+The review caught that this quietly broke the property the whole change was
+for: `resolveTenantContext()` — the actual production path — would stop
+self-healing drift the moment the stored version matched, even though the
+tests demonstrating repair called the internal reconciliation function
+directly, bypassing that gate entirely. So the shipped code proved
+"reconciliation logic can repair drift" without actually proving "tenant
+resolution repairs drift," which is the property that matters. The version
+field also introduced obligations nobody had asked for yet: every
+structural change has to remember to bump the constant, nothing catches a
+forgotten bump, and an older process encountering a *newer* stored version
+had no defined behavior at all.
+
+None of that was justified by a measured cost — there was no evidence the
+~50-check pass was actually expensive. Removed entirely rather than
+patched: `tenants.schema_version` and `GRAPH_SCHEMA_VERSION` are both gone.
+`provisionTenantGraph()` now just runs `reconcileTenantGraph()` unconditionally,
+every time, inside the same transaction + advisory-lock it already had:
+
+```text
+resolve tenant row
+    ↓
+acquire per-tenant advisory lock (transaction-scoped)
+    ↓
+reconcile expected additive structure, unconditionally
+    ↓
+return TenantContext
+```
+
+`reconcileTenantGraph()` itself is no longer exported — it acquires no lock
+and starts no transaction of its own, so a second, untestable-vs-production
+route into it would have been exactly the kind of "tests exercise something
+production doesn't" gap that caused this revision. `provisionTenantGraph()`
+is the only way to reach it, and tests reconcile the same way production
+does: by calling `resolveTenantContext()` again after breaking something.
+
+If the reconciliation pass ever shows up as a measured cost (startup
+latency, connection-pool pressure), the fix at that point should be
+evaluated against the actual observed problem — a structural fingerprint,
+a real migration/versioning mechanism, or something else — not reintroduced
+as a manually-maintained integer with no defined behavior at rest.
 
 ### 3. Edge-relationship uniqueness is now DB-enforced
 
@@ -115,19 +148,21 @@ pre-check alone couldn't. `tests/domain-graph.test.ts`'s "edge uniqueness is
 DB-enforced, not just app-checked" block proves this two ways: a duplicate
 `CREATE` that bypasses `createEdge()`'s own pre-check entirely still fails
 at the database, and two concurrent `createEdge()` calls for the same
-`(from, edge, to)` both succeed without producing two edges (one of them
-provably takes the `23505`-catch path, not the pre-check's early-return).
+`(from, edge, to)` both succeed without producing two edges. That second
+test doesn't instrument which call actually hit the `23505` path versus
+which won the pre-check — either is a legitimate outcome of the race — only
+that the end state (exactly one edge) is correct regardless of interleaving,
+which is the guarantee that actually matters.
 
 ## Judgment calls
 
-- **Reconciliation runs every `ensure*` check unconditionally when a tenant
-  is behind, rather than diffing to run only what's missing.** Each
-  individual `ensure*` call is already cheap and idempotent (an existence
-  check plus, at most, one DDL statement), so the "diff first" optimization
-  wasn't worth the added complexity — the real cost `schema_version` exists
-  to avoid is re-running this whole pass on *every connection*, not
-  shaving statements off a pass that's already only happening on a version
-  bump.
+- **Reconciliation runs every `ensure*` check unconditionally, on every
+  `resolveTenantContext()` call, with no version gate or diff-first
+  optimization.** See "No version gate" above — this was tried the other
+  way first and reverted after review. Each individual `ensure*` call is
+  already cheap and idempotent (an existence check plus, at most, one DDL
+  statement); optimize this only in response to a measured cost, not a
+  hypothetical one.
 - **`ensureView`'s `CREATE OR REPLACE VIEW` limitation (can't remove/reorder
   columns) is accepted, not worked around.** Forcing a real solution here
   (drop-and-recreate, with whatever downstream consequences that has for

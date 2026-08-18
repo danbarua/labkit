@@ -1,5 +1,5 @@
 import type { LabKitDB } from "./graph";
-import { NODE_LABELS, EDGE_LABELS, NODE_VIEW_COLUMNS, GRAPH_SCHEMA_VERSION, type NodeLabel, type EdgeLabel } from "./graph";
+import { NODE_LABELS, EDGE_LABELS, NODE_VIEW_COLUMNS, type NodeLabel, type EdgeLabel } from "./graph";
 
 export interface TenantContext {
   tenantId: number;
@@ -7,11 +7,10 @@ export interface TenantContext {
 }
 
 /**
- * Resolves (creating if needed) a tenant by slug, reconciles its AGE graph
- * against the current schema, and returns the `TenantContext` every
- * `TenantGraph` operation requires. This is the CLI/MCP/bootstrap-boundary
- * resolution point PJ-003 §5 describes — below this, there is no "tenant
- * omitted" mode.
+ * Resolves (creating if needed) a tenant by slug, reconciles its AGE graph,
+ * and returns the `TenantContext` every `TenantGraph` operation requires.
+ * This is the CLI/MCP/bootstrap-boundary resolution point PJ-003 §5
+ * describes — below this, there is no "tenant omitted" mode.
  */
 export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promise<TenantContext> {
   const inserted = await db.query<{ id: number; graph_name: string }>(
@@ -28,17 +27,29 @@ export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promi
 }
 
 /**
- * Ensures a tenant's AGE graph is fully reconciled against the current
- * schema (`GRAPH_SCHEMA_VERSION`) — cheap no-op if it already is, a full
- * `reconcileTenantGraph()` pass otherwise. All inside one transaction
- * guarded by a transaction-scoped advisory lock keyed by `tenantId`.
+ * Reconciles a tenant's AGE graph, unconditionally, every time it's called
+ * — inside one transaction guarded by a transaction-scoped advisory lock
+ * keyed by `tenantId`. No version gate: an earlier version tried skipping
+ * reconciliation when a stored `schema_version` already matched the
+ * current code, but that meant `resolveTenantContext()` — the actual
+ * production path — would stop self-healing the moment the version
+ * matched, even though the whole point of moving to per-resource
+ * reconciliation (PJ-005) was to make drift repairable through normal
+ * tenant resolution, not just through a test calling the reconciliation
+ * internals directly. Removed per review (2026-08-18) rather than kept as
+ * an unmeasured optimization: each `ensure*` call is already a cheap
+ * existence check, there's no evidence the full pass is a material cost,
+ * and the version field created real correctness questions of its own
+ * (what happens when an older process sees a newer tenant?) for a problem
+ * that was never confirmed to exist. Measure first if this ever needs
+ * revisiting.
  *
- * Contract: serialized per tenant and idempotent AS A WHOLE — not "each
- * individual DDL statement happens to survive a race." Tenant resolution is
- * runtime code (unlike the one-time migrations in ./drizzle/), so two
- * processes can call this concurrently; the loser blocks on the advisory
- * lock until the winner commits, then re-reads `schema_version` (inside the
- * lock, not before it) and finds it already current.
+ * Contract: serialized per tenant — not "each individual DDL statement
+ * happens to survive a race." Tenant resolution is runtime code (unlike
+ * the one-time migrations in ./drizzle/), so two processes can call this
+ * concurrently; the loser blocks on the advisory lock until the winner
+ * commits, then runs the same reconciliation itself — redundant but
+ * idempotent, not incorrect.
  *
  * On PGlite this lock is uncontended in practice (PGlite is already
  * single-writer), but the code path is identical across backends —
@@ -48,15 +59,7 @@ export async function provisionTenantGraph(db: LabKitDB, tenantId: number, graph
   await db.query("BEGIN");
   try {
     await db.query("SELECT pg_advisory_xact_lock($1)", [tenantId]);
-
-    const row = await db.query<{ schema_version: number }>(`SELECT schema_version FROM tenants WHERE id = $1`, [tenantId]);
-    const currentVersion = row.rows[0]?.schema_version ?? 0;
-
-    if (currentVersion < GRAPH_SCHEMA_VERSION) {
-      await reconcileTenantGraph(db, graphName);
-      await db.query(`UPDATE tenants SET schema_version = $1 WHERE id = $2`, [GRAPH_SCHEMA_VERSION, tenantId]);
-    }
-
+    await reconcileTenantGraph(db, graphName);
     await db.query("COMMIT");
   } catch (err) {
     await db.query("ROLLBACK");
@@ -65,21 +68,30 @@ export async function provisionTenantGraph(db: LabKitDB, tenantId: number, graph
 }
 
 /**
- * The actual reconciliation: ensures the graph, every vertex/edge label,
- * every natural-id uniqueness index, every edge-relationship uniqueness
- * index, and every CQRS view exist and match the current schema — each
+ * Ensures the currently supported ADDITIVE graph structure exists: the
+ * graph, every vertex/edge label, every natural-id uniqueness index, every
+ * edge-relationship uniqueness index, and every CQRS view — each
  * independently, not gated behind a single "does the graph exist at all"
  * check. This is what makes a *new* label/edge/view added to the codebase
  * actually reach a tenant whose graph was provisioned before that change
  * shipped, not just brand-new tenants.
  *
- * Exported separately from `provisionTenantGraph` (rather than only
- * reachable through the version-gate) so reconciliation/self-healing
- * behavior — e.g. "a view got dropped somehow, does the next reconcile
- * pass restore it" — is directly testable without needing to manipulate
- * `schema_version` to force the gate open.
+ * Deliberately not a claim of full structural reconciliation: indexes are
+ * checked by name (`IF NOT EXISTS`), not compared by definition, and
+ * labels are checked for existence, not arbitrary structural equivalence.
+ * A change that isn't purely additive — removing/reordering a view column,
+ * renaming a label, reshaping a property that already has data — has no
+ * story here; see docs/project-journal/005_provisioning_reconciliation.md.
+ *
+ * NOT exported — only reachable through `provisionTenantGraph()`'s
+ * transaction + advisory lock above. This function does neither itself, so
+ * two callers invoking it directly and concurrently could race the
+ * check-then-create `ensure*` calls below; tests exercise reconciliation
+ * through `resolveTenantContext()`/`provisionTenantGraph()`, the same
+ * locked path production uses, not a second unlocked route that only
+ * exists for testing.
  */
-export async function reconcileTenantGraph(db: LabKitDB, graphName: string): Promise<void> {
+async function reconcileTenantGraph(db: LabKitDB, graphName: string): Promise<void> {
   await ensureGraph(db, graphName);
   for (const label of NODE_LABELS) await ensureVertexLabel(db, graphName, label);
   for (const edge of EDGE_LABELS) await ensureEdgeLabel(db, graphName, edge);

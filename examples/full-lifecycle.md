@@ -67,9 +67,10 @@ assumptions:
 - [x] **`ag_catalog.drop_label(graph, label, false)`** (2026-08-18): drops a
   vertex or edge label. The documented third `cascade`/force argument
   rejects `true` under pglite-age ("force option is not supported yet") —
-  pass `false`. Used to test provisioning reconciliation
-  (`reconcileTenantGraph()` restoring a label that was dropped out from
-  under a tenant).
+  pass `false`. Used to test provisioning reconciliation — re-resolving a
+  tenant (`resolveTenantContext()`, the real production path, not an
+  internal function called directly) restores a label that was dropped out
+  from under it.
 
 ## Scenarios another agent should try next
 

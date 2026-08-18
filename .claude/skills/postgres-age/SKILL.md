@@ -104,7 +104,7 @@ and is exactly what `TenantGraph.createNode()` does.
 named `labkit_t1`, containing parent tables `_ag_label_vertex`/
 `_ag_label_edge`. Every vertex/edge label — `create_vlabel`/`create_elabel`
 (LabKit always pre-creates these at tenant-provisioning time, see
-`src/db/tenant.ts`'s `reconcileTenantGraph()`) — becomes its own real
+`src/db/tenant.ts`'s `provisionTenantGraph()`) — becomes its own real
 Postgres table inheriting from those parents, visible in
 `ag_catalog.ag_label`. `ag_catalog.drop_label(graph_name, label, false)`
 drops one (the third argument is documented as a `cascade`/force flag but
@@ -149,12 +149,14 @@ between tenants' views.
 
 **Provisioning is reconciliation, not a one-time gate.** `create_graph`/
 `create_vlabel`/`create_elabel`/index/view creation all happen via
-`src/db/tenant.ts`'s `reconcileTenantGraph()`, which independently ensures
-each resource exists — not gated behind a single "does the graph already
-exist" check. That distinction matters because there's no `ALTER GRAPH` DDL
-the way there's `ALTER TABLE`: evolving an already-provisioned tenant's
-graph structure is the application's job, and an all-or-nothing gate would
-mean a tenant provisioned before a new label/edge/view shipped never sees
+`src/db/tenant.ts`'s `provisionTenantGraph()` (called from every
+`resolveTenantContext()`, unconditionally — no version check, see PJ-005),
+which independently ensures each resource exists — not gated behind a
+single "does the graph already exist" check. That distinction matters
+because there's no `ALTER GRAPH` DDL the way there's `ALTER TABLE`: evolving
+an already-provisioned tenant's graph structure is the application's job,
+and an all-or-nothing gate would mean a tenant provisioned before a new
+label/edge/view shipped never sees
 it. See docs/project-journal/005_provisioning_reconciliation.md.
 
 ## LabKit-specific gotchas

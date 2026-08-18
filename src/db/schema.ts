@@ -34,15 +34,6 @@ export const tenants = p.pgTable("tenants", {
     // second value an application could accidentally desync from it.
     // "labkit_t1", not "labkit_t<uuid>" — boring, hyphen-free, debuggable.
     graph_name: p.text().notNull().generatedAlwaysAs(sql`'labkit_t' || id`),
-    // Tracks the last `GRAPH_SCHEMA_VERSION` (src/db/graph.ts) this tenant's
-    // graph was reconciled against — NOT a migration history, just a marker
-    // so `provisionTenantGraph` can skip re-checking ~50 idempotent DDL
-    // statements on every connection once a tenant is already current.
-    // How an actual incompatible graph-schema migration (e.g. renaming a
-    // label, reshaping a property) gets carried out is deliberately left
-    // for later — this column is the groundwork for that, not the answer
-    // to it (docs/project-journal/005_provisioning_reconciliation.md).
-    schema_version: p.integer().notNull().default(0),
     created_at: p.timestamp().defaultNow().notNull(),
 });
 

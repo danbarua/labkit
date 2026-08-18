@@ -4,7 +4,7 @@ import { age } from "@electric-sql/pglite-age";
 import { vector } from "@electric-sql/pglite-pgvector";
 import { TenantGraph, bootstrapSession, parseAgtype, NODE_LABELS, NATURAL_ID_PREFIX, type NodeLabel, type DecisionProps } from "../src/db/graph";
 import { runMigrations } from "../src/db/migrate";
-import { resolveTenantContext, reconcileTenantGraph, type TenantContext } from "../src/db/tenant";
+import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
 
 /**
  * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
@@ -369,35 +369,44 @@ describe("tenant isolation", () => {
 });
 
 describe("provisioning reconciliation", () => {
-  test("re-running reconcileTenantGraph restores a dropped view", async () => {
+  // Every test here re-resolves the SAME production path
+  // (resolveTenantContext -> provisionTenantGraph, transaction + advisory
+  // lock) that every real connection uses — not an internal reconciliation
+  // function called directly. Reconciliation that only a test can reach
+  // isn't the thing being claimed; it has to hold for actual tenant
+  // resolution, unconditionally, every time.
+
+  test("re-resolving the tenant restores a dropped view", async () => {
     await db.query(`DROP VIEW "${ctx.graphName}".question`);
     const before = await db.query(`SELECT 1 FROM information_schema.views WHERE table_schema = $1 AND table_name = 'question'`, [ctx.graphName]);
     expect(before.rows).toHaveLength(0);
 
-    await reconcileTenantGraph(db, ctx.graphName);
+    await resolveTenantContext(db, "labkit");
 
     const after = await db.query(`SELECT 1 FROM information_schema.views WHERE table_schema = $1 AND table_name = 'question'`, [ctx.graphName]);
     expect(after.rows).toHaveLength(1);
   });
 
-  test("re-running reconcileTenantGraph restores a dropped natural-id index", async () => {
+  test("re-resolving the tenant restores a dropped natural-id index", async () => {
     await db.query(`DROP INDEX "${ctx.graphName}".claim_natural_id_idx`);
     const before = await db.query(`SELECT 1 FROM pg_indexes WHERE schemaname = $1 AND indexname = 'claim_natural_id_idx'`, [ctx.graphName]);
     expect(before.rows).toHaveLength(0);
 
-    await reconcileTenantGraph(db, ctx.graphName);
+    await resolveTenantContext(db, "labkit");
 
     const after = await db.query(`SELECT 1 FROM pg_indexes WHERE schemaname = $1 AND indexname = 'claim_natural_id_idx'`, [ctx.graphName]);
     expect(after.rows).toHaveLength(1);
   });
 
-  test("a new NODE_LABELS entry reaches an already-provisioned tenant on the next reconcile pass", async () => {
+  test("a new NODE_LABELS entry reaches an already-provisioned tenant on the next resolution", async () => {
     // Simulates "the codebase gained a label after this tenant was already
     // provisioned" without actually changing NODE_LABELS: drop one label's
     // vertex table entirely (as if it never existed for this tenant), then
-    // confirm reconcileTenantGraph notices and recreates it — this is
-    // exactly the schema-evolution gap PJ-004's original all-or-nothing
-    // "provision only if the graph itself is absent" check couldn't close.
+    // confirm the next ordinary resolveTenantContext() call notices and
+    // recreates it — this is exactly the schema-evolution gap PJ-004's
+    // original all-or-nothing "provision only if the graph itself is
+    // absent" check couldn't close, now proven closed through the real
+    // path rather than a test-only shortcut.
     await db.query(`DROP VIEW "${ctx.graphName}".task`);
     await db.query(`SELECT ag_catalog.drop_label($1, 'Task', false)`, [ctx.graphName]);
     const before = await db.query(
@@ -406,7 +415,7 @@ describe("provisioning reconciliation", () => {
     );
     expect(before.rows).toHaveLength(0);
 
-    await reconcileTenantGraph(db, ctx.graphName);
+    await resolveTenantContext(db, "labkit");
 
     const task = await graph.createNode("Task", { objective: "o", inputs: "i", outputs: "o", acceptance: "a" });
     expect(task.natural_id).toMatch(/^TASK_\d+$/);
@@ -435,10 +444,12 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     const question = await graph.createNode("Question", { name: "q" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
-    // Two concurrent createEdge() calls for the same (from, edge, to):
-    // both can pass the existence pre-check before either CREATEs, so one
-    // of them must hit the UNIQUE (start_id, end_id) constraint and recover
-    // via the 23505 catch rather than throwing.
+    // Two concurrent createEdge() calls for the same (from, edge, to): both
+    // resolve without throwing and exactly one edge results. This doesn't
+    // instrument which call actually hit the UNIQUE (start_id, end_id)
+    // constraint's 23505 vs. which won the pre-check — either is a
+    // legitimate outcome of the race — only that the end state is correct
+    // regardless of interleaving, which is the actual guarantee that matters.
     await Promise.all([
       graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
       graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
