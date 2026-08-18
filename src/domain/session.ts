@@ -80,10 +80,10 @@ export class ResearchSession {
     });
     const evidence = await this.graph.createNode("Evidence", { statement: input.finding });
     await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", artefact.natural_id);
-    // The enquiry requires these observations. This is also, currently, the
-    // ONLY way a later analysis can be traced back to what it read — see
-    // recordAnalysis(). It says "the enquiry needs this", not "that analysis
-    // consumed this", which is weaker than S-11 asks for.
+    // The enquiry requires these observations -- a statement about the
+    // enquiry, not about any analysis. What a given analysis actually read is
+    // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
+    // it.
     await this.graph.createEdge(input.enquiry.id, "REQUIRES", evidence.natural_id);
 
     this.emit("recordObservations", artefact.natural_id, { name: input.name });
@@ -119,7 +119,13 @@ export class ResearchSession {
 
     await this.graph.createEdge(unit.natural_id, "USES", computation.natural_id);
     await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry.id);
+    // Both levels of provenance, deliberately: the evidence unit produced
+    // this scientific output; the computation produced this concrete
+    // execution output. Without the second, CONSUMES would be half a pair --
+    // "what did this computation read" answerable in one hop while "what did
+    // it produce" still needed a detour through the unit.
     await this.graph.createEdge(unit.natural_id, "PRODUCES", output.natural_id);
+    await this.graph.createEdge(computation.natural_id, "PRODUCES", output.natural_id);
     for (const observations of input.from) {
       await this.graph.createEdge(computation.natural_id, "CONSUMES", observations.id);
     }
@@ -177,6 +183,7 @@ export class ResearchSession {
     concludes: Conclusion[];
   }): Promise<ReplacementReport> {
     const at = this.clock.now();
+    await this.assertReviewOf(input.because, input.supersedes);
     const before = await this.conclusionsOf(input.supersedes);
 
     const output = await this.outputArtefactOf(input.supersedes);
@@ -186,32 +193,30 @@ export class ResearchSession {
       { id: output },
     );
 
-    // The record of the replacement decision itself. Note what is NOT here:
-    // no SUPERSEDES edge between the two analyses.
+    // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
     //
-    // S-11 does not establish inference supersession as a gap. Invalidating
-    // the replaced analysis's output, plus the replacement's own support, is
-    // sufficient for every question this scenario asks -- an earlier draft
-    // minted decisions purely to have something supersedable and drew zero
-    // edges, with all assertions still passing.
+    // Not a Decision. An earlier draft minted one ("we replaced X because of
+    // review Y") and linked it BASED_ON to the REPLACEMENT's evidence, which
+    // points causality backwards -- the decision to replace preceded that
+    // evidence and cannot rest on it. No assertion used it. S-11 contains an
+    // invalidated analysis and a replacement, both of which the graph
+    // represents directly; it does not contain a researcher decision. S-7,
+    // which turns on an explicit decision to amend a locked procedure, is
+    // where a Decision should be earned.
     //
-    // That is not the same as concluding invalidation *is* supersession.
+    // Nor supersession. Invalidating the replaced analysis's output plus the
+    // replacement's own support answers every question this scenario asks.
+    // That is not the same as concluding invalidation *is* supersession:
     // `invalidated = true` means "no longer valid as a source of current
-    // inference"; the two only coincide here. S-12 is the discriminator: the
-    // numbers stay valid and only the interpretation changes, which
-    // invalidation cannot honestly carry. Deliberately unresolved until then.
-    const supersededBy = await this.graph.createNode("Decision", {
-      reason: `replaced ${input.supersedes.id}: ${await this.verdictOf(input.because)}`,
-      invalidation_check: "re-review of the inferential method",
-    });
-
+    // inference", and the two merely coincide here. S-12 is the
+    // discriminator -- there the numbers stay valid and only the
+    // interpretation changes, which invalidation cannot honestly carry.
     const replacement = await this.recordAnalysis({
       enquiry: input.enquiry,
       method: input.method,
       from: input.from,
       concludes: input.concludes,
     });
-    await this.linkDecision(supersededBy.natural_id, replacement);
 
     const changed: ChangedConclusion[] = [];
     const unchanged: string[] = [];
@@ -272,6 +277,16 @@ export class ResearchSession {
       // Why support was withdrawn comes from the review of the inferential
       // unit -- the edge S-11 earned. Before it existed this was a hardcoded
       // string, because the review's subject lived only in the event stream.
+      //
+      // Two related gaps, recorded rather than solved. With NO review the
+      // reason is manufactured, which is the absence-vs-inconclusive shape
+      // (PJ-008 row I) and should probably be null. With SEVERAL reviews of
+      // one unit the row multiplies and the reason is ambiguous: EVALUATES
+      // says who reviewed the analysis, never which review caused a later
+      // invalidation. That second one may not want a relationship at all --
+      // it describes why state changed, which is what the event history is
+      // for. S-3/S-7 should put enough pressure on the event model to settle
+      // both.
       if (row.a?.invalidated) superseded.push({ ...entry, reason: row.r?.verdict ?? "its analysis was replaced" });
       else support.push(entry);
     }
@@ -347,8 +362,10 @@ export class ResearchSession {
   }
 
   private async outputArtefactOf(analysis: AnalysisRef): Promise<string> {
+    // One hop, via the computation's own PRODUCES -- the direct counterpart
+    // to CONSUMES. This previously had to go out through the evidence unit.
     const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(a:Artefact)
+      `MATCH (:Computation {natural_id: $id})-[:PRODUCES]->(a:Artefact)
        RETURN a`,
       { a: vertexProps<ArtefactProps & { natural_id: string }>() },
       { id: analysis.id },
@@ -358,13 +375,25 @@ export class ResearchSession {
     return found.a.natural_id;
   }
 
-  private async verdictOf(review: ReviewRef): Promise<string> {
+  /**
+   * A replacement must be justified by a review OF the analysis being
+   * replaced -- otherwise any review's verdict could retire any analysis,
+   * and `whySupported()` would report a withdrawal reason that never
+   * referred to the withdrawn work.
+   *
+   * This is why `Review -[:EVALUATES]-> EvidenceUnit` is not decorative: it
+   * constrains a research action, not just an explanatory query.
+   */
+  private async assertReviewOf(review: ReviewRef, analysis: AnalysisRef): Promise<void> {
     const rows = await this.graph.query(
-      `MATCH (r:Review {natural_id: $id}) RETURN r`,
-      { r: vertexProps<{ verdict: string }>() },
-      { id: review.id },
+      `MATCH (:Review {natural_id: $review})-[:EVALUATES]->(:EvidenceUnit)-[:USES]->(:Computation {natural_id: $analysis})
+       RETURN 1`,
+      { ok: scalar<number>() },
+      { review: review.id, analysis: analysis.id },
     );
-    return rows[0]?.r.verdict ?? "";
+    if (rows.length === 0) {
+      throw new Error(`review ${review.id} does not review analysis ${analysis.id}; it cannot justify replacing it`);
+    }
   }
 
   /**
@@ -388,13 +417,4 @@ export class ResearchSession {
     return found.u.natural_id;
   }
 
-  private async linkDecision(decisionId: string, analysis: AnalysisRef): Promise<void> {
-    const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-       RETURN e`,
-      { e: vertexProps<{ natural_id: string }>() },
-      { id: analysis.id },
-    );
-    for (const row of rows) await this.graph.createEdge(decisionId, "BASED_ON", row.e.natural_id);
-  }
 }

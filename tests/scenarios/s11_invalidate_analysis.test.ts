@@ -270,6 +270,48 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     );
   });
 
+  /**
+   * The review relationship constrains a research action, not just an
+   * explanatory query: a replacement has to be justified by a review OF the
+   * analysis being replaced. Without this, any verdict could retire any
+   * analysis and whySupported() would report a withdrawal reason that never
+   * referred to the withdrawn work.
+   */
+  test("a replacement cannot cite a review of some other analysis", async () => {
+    const enquiry = await session.openEnquiry("which construction classifies best?");
+    const observations = await session.recordObservations({ enquiry, name: "obs", finding: "raw" });
+
+    const target = await session.recordAnalysis({
+      enquiry,
+      method: "bootstrap-pairwise",
+      from: [observations],
+      concludes: [{ proposition: "T beats rewired", finding: "p = 0.002 (bootstrap)" }],
+    });
+    const unrelated = await session.recordAnalysis({
+      enquiry,
+      method: "unrelated-analysis",
+      from: [observations],
+      concludes: [{ proposition: "something else entirely", finding: "n/a" }],
+    });
+    const reviewOfUnrelated = await session.recordReview({ of: unrelated, verdict: "a verdict about other work" });
+
+    await expect(
+      session.replaceAnalysis({
+        supersedes: target,
+        because: reviewOfUnrelated,
+        enquiry,
+        method: "sign-flip-permutation",
+        from: [observations],
+        concludes: [{ proposition: "T beats rewired", finding: "p = 0.049" }],
+      }),
+    ).rejects.toThrow(/does not review analysis/);
+
+    // ...and nothing was invalidated on the way to failing.
+    const why = await session.whySupported("T beats rewired");
+    expect(why.supported).toBe(true);
+    expect(why.superseded).toHaveLength(0);
+  });
+
   test("the temporal seam records the invalidation, with its time and what it moved", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({ of: analysis, verdict: "not a null test" });
