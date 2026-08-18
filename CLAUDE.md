@@ -17,7 +17,8 @@ now" — each records *why* a decision was made, not just what changed. Before
 touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 (current persistence design) rather than inferring intent from code alone.
 Before touching `src/domain/`, skim 008 (the interaction corpus the service
-layer is built against) and 009 (the first scenario built from it).
+layer is built against), 009 (the first scenario built from it), and 010 (a
+cold-context review of both).
 
 ## Commands
 

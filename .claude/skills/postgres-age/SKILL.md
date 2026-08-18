@@ -441,3 +441,4 @@ RETURN a
 - `docs/project-journal/007_db_layering_and_typed_cypher.md` — layering `src/db/`, the column-decoder query API, and the `NODE_TYPES` domain registry
 - `docs/project-journal/008_user_story_mining.md` — the interaction corpus the graph model is now tested against, and its running ledger of design pressure
 - `docs/project-journal/009_domain_service_layer_s11.md` — the domain service layer, and the bar a new label/edge has to clear to be added
+- `docs/project-journal/010_cold_context_review.md` — cold-context review after the first scenario: what four unprimed reviewers could and couldn't reconstruct
