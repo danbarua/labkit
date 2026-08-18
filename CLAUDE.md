@@ -14,7 +14,7 @@ domain rationale and boundary tests.
 The domain model lives across a chain of project-journal entries
 (`docs/project-journal/00N_*.md`) that read newest-first for "what's true
 now" — each records *why* a decision was made, not just what changed. Before
-touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004/005
+touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-006
 (current persistence design) rather than inferring intent from code alone.
 
 ## Commands
@@ -25,6 +25,7 @@ bun test                       # run all tests
 bun test tests/domain-graph.test.ts   # run one test file
 bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
+bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun examples/full-lifecycle.ts # runnable end-to-end smoke test of the persistence layer
@@ -139,93 +140,71 @@ database exists, that stops being true and this note should be updated.
 
 ## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
 
-`pglite-age` is a genuine compile of Apache AGE's own C source (currently
-pinned at branch `PG18`, tag `v1.7.0-rc0` — confirmed by inspecting
-`electric-sql/postgres-pglite`'s AGE submodule), not a reduced WASM-only
-subset. Most of what looked like WASM quirks turned out to be stock AGE
-1.7.0-rc0 behavior on any platform — confirmed both from source and by
-running the same queries against `docker-compose.yml`'s real Postgres 18 +
-AGE 1.7.0 container (`apache/age:release_PG18_1.7.0`, no WASM involved).
-See the skill doc's "Overview" and "LabKit-specific gotchas" for detail:
+`pglite-age` is a genuine compile of Apache AGE's own C source (pinned at
+branch `PG18`, tag `v1.7.0-rc0`), not a reduced WASM-only subset — see the
+skill doc's "Overview" for how that's established and PJ-006 for why it
+mattered. Working gotchas:
 
 - **`MERGE` for relationships is broken** — creates an edge with
-  `start_id`/`end_id` both `0`, never actually connecting the two nodes.
-  **Confirmed WASM/pglite-age-specific** — the identical query connects the
-  nodes correctly on the real Postgres+AGE container (see the skill doc).
-  `createEdge()` uses explicit
-  `MATCH`-then-`CREATE` instead, backed by a real `UNIQUE (start_id,
-  end_id)` index as the actual concurrency guarantee (a losing concurrent
-  `CREATE` hits Postgres error `23505`, which `createEdge()` catches and
-  treats as success).
+  `start_id`/`end_id` both `0`, never actually connecting the two nodes
+  (WASM/pglite-age-specific, not stock AGE — see the skill doc).
+  `createEdge()` uses explicit `MATCH`-then-`CREATE` instead, backed by a
+  real `UNIQUE (start_id, end_id)` index as the actual concurrency
+  guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
+  which `createEdge()` catches and treats as success).
 - No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
-  Confirmed stock AGE 1.7.0-rc0 behavior, not WASM-specific.
 - No multi-type variable-length edges `[:A|B*1..3]` — chain explicit
-  `MATCH`/`OPTIONAL MATCH`, or use a single-type `[:TYPE*1..5]`. Also
-  confirmed stock AGE 1.7.0-rc0 (a grammar-level restriction, not a parser
-  bug specific to this build).
+  `MATCH`/`OPTIONAL MATCH`, or use a single-type `[:TYPE*1..5]`.
 - Every AGE label (vertex or edge) is a real Postgres table
   (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
   it directly — this is how natural-id uniqueness, edge uniqueness, and the
   per-tenant CQRS views all work, with no `cypher()` call involved.
-- **Never rely on `search_path` ordering** — qualify explicitly instead
-  (`ag_catalog.` for AGE catalog functions, `src/db/schema.ts`'s
-  `LABKIT_SCHEMA` constant for LabKit's own `tenants` table and natural-id
-  functions). This isn't stylistic: migration 0001's `SET search_path`
-  staying active into migration 0002 was silently landing LabKit's own
-  functions in `ag_catalog` instead of `public` until this was fixed.
+- **Always schema-qualify explicitly** — `ag_catalog.` for AGE catalog
+  functions, `src/db/schema.ts`'s `LABKIT_SCHEMA` constant for LabKit's own
+  `tenants` table and natural-id functions. Don't rely on `search_path`
+  ordering to resolve an unqualified name.
 
 ## Testing patterns
 
-`tests/helpers/db.ts`'s `setupTestDb()` spins up one `PGlite` instance +
-runs migrations + starts a `PGLiteSocketServer` once per file, in
-`beforeAll` — only that first step pays PGlite's WASM start-up cost.
-Application-code test files (`tests/domain-graph.test.ts`,
+`tests/helpers/db.ts`'s `setupTestDb()` spins up one `PGlite` instance,
+runs migrations, and starts a `PGLiteSocketServer` once per file, in
+`beforeAll`. Application-code test files (`tests/domain-graph.test.ts`,
 `tests/agtype.test.ts`) never import `@electric-sql/pglite`/`pglite-age`/
-`pglite-pgvector` themselves; they only ever see a `LabKitDB`-shaped
+`pglite-pgvector` themselves — they only ever see a `LabKitDB`-shaped
 `pg.Client`, the same production talks through.
 
-**Each test opens its own fresh connection in `beforeEach`
-(`testDb.openClient()`), not one shared for the whole file — this is
-load-bearing, not a style choice.** `@electric-sql/pglite-socket` has a
-confirmed, open upstream bug
-([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046)):
-two connections issuing concurrent queries, where at least one errors, can
-permanently corrupt the connection(s) involved. We hit this independently
-before finding the issue already filed — see the postgres-age skill's
-"Upstream filing" for the full writeup and `scripts/check-pglite-concurrency.sh`
-for a standing regression check (inverted exit code: 0 means the bug still
-reproduces, i.e. nothing to do; 1 means it didn't, worth checking whether
-pglite-socket picked up a fix). Corruption is confirmed to stay contained
-to the connection that hit it, so a fresh connection per test contains the
-blast radius even though the underlying bug isn't fixed. A test that
-deliberately needs to exercise "what happens when a query loses a race and
-gets a constraint violation" should do it deterministically (see
-`domain-graph.test.ts`'s `createEdge treats a 23505 from the CREATE step as
-success` test, which mocks the DB layer to inject exactly that error rather
-than racing two real connections) — not via `Promise.all()` against two
-live connections, which is unreliable against this backend regardless of
-how many connections are used.
+**Each test opens its own fresh connection** (`testDb.openClient()` in
+`beforeEach`, closed in `afterEach`) — never share one connection across a
+whole file. `@electric-sql/pglite-socket` has a confirmed, open upstream
+concurrency bug
+([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046) —
+see the postgres-age skill's "Upstream filing" and PJ-006): two connections
+racing, where one errors, can permanently corrupt the connection(s)
+involved. Corruption stays contained to the connection that hit it, so a
+fresh connection per test contains the blast radius even though the
+underlying bug isn't fixed. `scripts/check-pglite-concurrency.sh`
+(`bun run check:pglite-concurrency`) regression-checks this — see the
+script's header for its (inverted) exit-code meaning.
+
+A test that needs to exercise "a query loses a race and hits a constraint
+violation" should do it deterministically — mock the DB layer to inject the
+error at the right point (see `domain-graph.test.ts`'s `createEdge treats a
+23505 from the CREATE step as success` test) — not via `Promise.all()`
+against two live connections, which this backend can't reliably support.
 
 `afterEach` drops every AGE graph and truncates every remaining table
 outside `pg_catalog`/`information_schema`/`ag_catalog`/`drizzle` with
-`RESTART IDENTITY CASCADE` (via a separate, dedicated admin connection kept
-open for the whole file — see `tests/helpers/db.ts`). That resets the
-`tenants.id` sequence every test (so `resolveTenantContext(db, "labkit")`
-deterministically gets tenant id `1` again) but deliberately does *not*
-reset the natural-id sequences from `drizzle/0002_natural_ids.sql` — those
-are standalone `SEQUENCE`s, not tied to a truncated table's identity
-column, so natural ids keep incrementing across tests exactly as they would
-across tenants in production (natural ids are scoped globally per
-entity-type, not per-tenant or per-test — PJ-004 decision #3). Don't add a
-test that asserts a specific natural-id value across more than one test in
-the same file for this reason; assert on the prefix/shape instead.
+`RESTART IDENTITY CASCADE`, via a dedicated admin connection kept open for
+the whole file. This resets `tenants.id` every test but deliberately does
+*not* reset the natural-id sequences (`drizzle/0002_natural_ids.sql`) —
+those are standalone `SEQUENCE`s, and natural ids are scoped globally per
+entity-type (PJ-004 decision #3), not per-tenant or per-test. Don't assert
+a specific natural-id value across more than one test in the same file for
+this reason — assert on the prefix/shape instead.
 
 `tests/leader-election.test.ts` races three concurrent `connectDb()` calls
 against a shared `.labkit-test-tmp` directory to prove the PGlite backend's
-election/socket-sharing actually works, not just that the code compiles —
-and is a real, not-yet-resolved instance of the pglite-socket bug above:
-those three processes deliberately share one connection each to the
-primary's socket the way the real backend does, so it can't be fixed the
-same way the `TenantGraph` tests were (opening more connections). Flaky as
-of 2026-08-18; see the postgres-age skill entry for the production-exposure
-angle before attempting a fix.
+election/socket-sharing actually works. It's a live, unresolved instance of
+the pglite-socket bug above (see PJ-006) — flaky, and not fixable the way
+the other tests were, since it deliberately needs genuine concurrent
+connections to prove what it proves.

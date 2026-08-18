@@ -30,35 +30,26 @@ graph access should go through `new TenantGraph(ctx, db)`
 in `./drizzle/`, were written against.
 
 `pglite-age` is a genuine compile of Apache AGE's own C source under
-Emscripten/WASM — confirmed by inspecting the actual build (`electric-sql/postgres-pglite`,
-a Postgres core fork, `.gitmodules` pins AGE at `github.com/apache/age`
-branch `PG18`, commit `806fa2ebdb300b3e76ef30cdba61803babbf2683`, tag
-`PG18/v1.7.0-rc0` — `age.control`'s `default_version = '1.7.0'` and the
-`RELEASE` file confirm it). It is **not a reduced/reimplemented subset** —
-`cypher_gram.y`, `cypher_clause.c`, `agtype.c`, `ag_catalog.c` etc. all match
-stock AGE's source tree. `grep`ing the whole AGE submodule for
-`__PGLITE__`/`EMSCRIPTEN`/`WASM` finds zero hits — AGE's own C/SQL source is
-byte-for-byte unpatched; the only WASM-specific lever is a build flag
-(`SIZEOF_DATUM=4`, `pglite/other_extensions/Makefile`) that AGE's own
-Makefile already supports (an upstream 1.7.0 feature, PR #2286, "32-bit
-platform support for graphid") — it switches `graphid` from pass-by-value to
-pass-by-reference, the same accommodation Postgres core makes for its own
-8-byte types on 4-byte-`Datum` platforms.
+Emscripten/WASM, not a reduced/reimplemented subset — `electric-sql/postgres-pglite`
+(a Postgres core fork) pins AGE as a real git submodule at
+`github.com/apache/age` branch `PG18`, commit
+`806fa2ebdb300b3e76ef30cdba61803babbf2683`, tag `PG18/v1.7.0-rc0`, and its
+`cypher_gram.y`/`cypher_clause.c`/`agtype.c`/`ag_catalog.c` etc. all match
+stock AGE's source tree byte-for-byte (no `__PGLITE__`/`EMSCRIPTEN`/`WASM`
+conditionals anywhere in it). The only WASM-specific lever is a build flag
+(`SIZEOF_DATUM=4`) that AGE's own 1.7.0 Makefile already supports (its own
+32-bit-`graphid` feature, PR #2286) — it switches `graphid` from
+pass-by-value to pass-by-reference, the same accommodation Postgres core
+makes for its own 8-byte types on 4-byte-`Datum` platforms. `docker-compose.yml`
+runs a real Postgres 18 + AGE 1.7.0 container
+(`apache/age:release_PG18_1.7.0`, no WASM) for comparing behavior directly
+against this pinned version when a gotcha's platform-specificity is in
+question — see "LabKit-specific gotchas" below, and PJ-006 for how this was
+established.
 
-**Important correction, worth internalizing:** three of the four gotchas
-below were originally written up as "pglite-age WASM quirks." They are not.
-They reproduce from literal, unconditional source lines in stock AGE
-1.7.0-rc0 itself (see each item) — this is simply what AGE's current PG18
-port does, release-candidate maturity and all, on *any* platform, WASM or
-not. Confirmed directly, not just from source: `docker-compose.yml` runs
-`apache/age:release_PG18_1.7.0` (real native Postgres 18, no WASM), and all
-three reproduce there with the identical error text. The fourth, `MERGE`,
-is the opposite case — it works correctly on that same real container, so
-it genuinely is a WASM/pglite-age-specific bug, not a stock-AGE one (see its
-entry). Treat anything not already proven working in this repo's own tests
-as worth a throwaway spike before trusting it, same as before — and now
-that a real Postgres+AGE container is available locally, a spike that wants
-to rule out "is this WASM-specific" can just run against both.
+Treat anything not already proven working in this repo's own tests as worth
+a throwaway spike before trusting it — `pglite-age`/AGE 1.7.0-rc0 diverge
+from the manual in known ways (below) and there could be more.
 
 ## Core Cypher clauses
 
@@ -120,8 +111,8 @@ RETURN n
 ```
 
 (`public` here is `src/db/schema.ts`'s `LABKIT_SCHEMA` constant, spelled out
-literally in these examples for readability — see "Explicit
-schema-qualification" below for why it's qualified at all.)
+literally in these examples for readability — see "LabKit-specific
+gotchas" below for why it's qualified at all.)
 
 **The `::text` casts on the literal arguments are required, not
 decorative** — see the gotcha below. This composition (function call inside
@@ -139,14 +130,13 @@ at tenant-provisioning time, see `src/db/tenant.ts`'s
 from those parents, visible in `ag_catalog.ag_label`.
 `ag_catalog.drop_label(graph_name, label, false)` drops one (the third
 argument is documented as a `cascade`/force flag but rejects `true` with
-"force option is not supported yet" — pass `false`; **confirmed stock AGE
-1.7.0-rc0 behavior**, not pglite-age-specific — the literal error string is
-unconditional source at `age/src/backend/commands/label_commands.c:875`).
-Always schema-qualify AGE catalog functions explicitly
-(`ag_catalog.create_graph(...)`, not bare `create_graph(...)`) rather than
-relying on `search_path` — see "Explicit schema-qualification" below.
+"force option is not supported yet" — pass `false`; unconditional stock AGE
+behavior, `age/src/backend/commands/label_commands.c:875`, not
+pglite-age-specific). Always schema-qualify AGE catalog functions
+explicitly (`ag_catalog.create_graph(...)`, not bare `create_graph(...)`)
+rather than relying on `search_path` — see "LabKit-specific gotchas" below.
 
-Confirmed via `information_schema.columns`:
+Via `information_schema.columns`:
 
 - A **vertex** label's table (e.g. `labkit_t1."Question"`) has exactly two
   columns: `id` (the internal graphid) and `properties` (agtype).
@@ -196,28 +186,24 @@ it. See docs/project-journal/005_provisioning_reconciliation.md.
 
 ## LabKit-specific gotchas
 
-Hard-won, found by writing throwaway probe scripts against
-`new PGlite({ extensions: { age } })` before committing to any real code.
-Root causes below are from reading the actual AGE 1.7.0-rc0/PG18 source
-(`electric-sql/postgres-pglite`'s `age` submodule — see "Overview" above):
+Root causes below are cited against the actual AGE 1.7.0-rc0/PG18 source
+(`electric-sql/postgres-pglite`'s `age` submodule — see "Overview" above).
+When something's not already proven working in this repo's own tests, spike
+it in a throwaway script first — see PJ-006 for how these were found.
 
 - **`MERGE` for a relationship between two already-matched nodes is broken.**
   `MATCH (a...), (b...) MERGE (a)-[:EDGE]->(b)` runs without error and
   returns what looks like a valid edge, but the created edge's
-  `start_id`/`end_id` are both `0` — it never actually connects `a` and
-  `b` (confirmed: `id(a)`/`id(b)` resolve correctly, but the edge is
-  unreachable from either node afterward). **Confirmed WASM/pglite-age-specific,
-  not a stock-AGE bug** (2026-08-18): the identical `MATCH ... MERGE
-  (a)-[:REL]->(b)` ran correctly against a real Postgres 18 + AGE 1.7.0
-  container (`apache/age:release_PG18_1.7.0`, `docker-compose.yml`) —
-  `start_id`/`end_id` came back correctly populated, not zero. So this
-  really is the WASM build's fault, most likely AGE's `SIZEOF_DATUM=4`
-  build (see "Overview") making `graphid` pass-by-reference instead of
-  pass-by-value: `cypher_merge.c`/`cypher_create.c`/`cypher_utils.c` show no
-  use of the `DatumGetInt64`/`Int64GetDatum` accessors that pattern
-  requires on a 4-byte-`Datum` platform. `TenantGraph.createEdge()` therefore does NOT use
-  `MERGE` — it does an explicit `MATCH` for an existing `(from, edge, to)`
-  edge first and only `CREATE`s if absent, with a `UNIQUE (start_id,
+  `start_id`/`end_id` are both `0` — it never actually connects `a` and `b`.
+  **WASM/pglite-age-specific**, not a stock-AGE bug — the identical query
+  connects the nodes correctly against a real Postgres 18 + AGE 1.7.0
+  container (`docker-compose.yml`). Most likely cause: AGE's
+  `SIZEOF_DATUM=4` build (see "Overview") makes `graphid` pass-by-reference,
+  and `cypher_merge.c`/`cypher_create.c`/`cypher_utils.c` show no use of the
+  `DatumGetInt64`/`Int64GetDatum` accessors that requires on a
+  4-byte-`Datum` platform. `TenantGraph.createEdge()` therefore does NOT
+  use `MERGE` — it does an explicit `MATCH` for an existing `(from, edge,
+  to)` edge first and only `CREATE`s if absent, with a `UNIQUE (start_id,
   end_id)` index per edge label (see "How graphs are stored" above) as the
   actual concurrency-safety backstop: a losing concurrent `CREATE` hits a
   `23505` error that `createEdge()` catches and treats as success, rather
@@ -226,20 +212,18 @@ Root causes below are from reading the actual AGE 1.7.0-rc0/PG18 source
   real correctness guarantee either way.
 - **No whole-map `CREATE` property parameter.** `CREATE (n:Label $props)`
   fails with `properties in a CREATE clause as a parameter is not
-  supported`. **Confirmed stock AGE 1.7.0-rc0 behavior, not a WASM
-  quirk** — the literal error string is unconditional source at
-  `age/src/backend/parser/cypher_clause.c:6407`. Expand each key
-  individually: `CREATE (n:Label {k1: $k1, k2: $k2, ...})` — see
-  `propPattern()` in `src/db/graph.ts`.
+  supported` — unconditional stock AGE behavior
+  (`age/src/backend/parser/cypher_clause.c:6407`), not a WASM quirk. Expand
+  each key individually: `CREATE (n:Label {k1: $k1, k2: $k2, ...})` — see
+  `buildPropertyClause()` in `src/db/agtype.ts`.
 - **No multi-type variable-length edges.** `[:A|B*1..3]` raises a hard
-  parser error (`syntax error at or near "|"`). **Confirmed stock AGE
-  1.7.0-rc0 behavior** — the relationship-pattern grammar production
-  (`age/src/backend/parser/cypher_gram.y:1369`) only accepts a single
-  `label_opt` (`: label_name`); there is no `|`-alternation production in
-  the grammar at all, on any platform. A single-type variable-length edge
-  (`[:SUPERSEDES*1..5]`) works fine, as does an unrestricted-type undirected
-  path (`-[*1..3]-`) — it's specifically the type-alternation syntax inside
-  `[...]` that doesn't exist.
+  parser error (`syntax error at or near "|"`) — the relationship-pattern
+  grammar production (`age/src/backend/parser/cypher_gram.y:1369`) only
+  accepts a single `label_opt` (`: label_name`); there is no `|`-alternation
+  production in the grammar at all, on any platform. A single-type
+  variable-length edge (`[:SUPERSEDES*1..5]`) works fine, as does an
+  unrestricted-type undirected path (`-[*1..3]-`) — it's specifically the
+  type-alternation syntax inside `[...]` that doesn't exist.
 - **Cypher string literals are typed `agtype`, not `text`.** Calling a
   `LANGUAGE sql` function with `(text, text)` parameters from inside Cypher
   fails with `function ... does not exist` unless the literal arguments are
@@ -247,9 +231,13 @@ Root causes below are from reading the actual AGE 1.7.0-rc0/PG18 source
   no `(agtype, agtype)` overload to resolve to.
 - **Raw agtype from `cypher()` isn't directly JSON.** A `RETURN n` for a
   vertex comes back as a string like `{"id": ..., "label": ..., "properties":
-  {...}}::vertex` — strip the `::vertex`/`::edge` suffix before
-  `JSON.parse`. `parseAgtype()` in `src/db/graph.ts` does this once so no
-  caller has to. This does **not** apply to a bare `properties` column read
+  {...}}::vertex`, and a `::tag` can appear nested at any depth (e.g. a
+  numeric property value gets its own `::numeric` tag). `parseAgtype()`
+  (`src/db/agtype.ts`) is a real recursive-descent parser for this, not a
+  strip-the-trailing-suffix regex — it also returns `bigint` for an
+  internal graphid past `Number.MAX_SAFE_INTEGER` (LabKit's own tenant
+  graphs hit this once a label's id reaches 32; see the file's own header
+  comment). This does **not** apply to a bare `properties` column read
   directly off a label's table (see "How graphs are stored" above) — that
   round-trips through `(properties::text)::jsonb` with no suffix to strip.
 - **`create_graph()`/`create_vlabel()`/`create_elabel()` have no `IF NOT EXISTS`.**
@@ -263,15 +251,9 @@ Root causes below are from reading the actual AGE 1.7.0-rc0/PG18 source
   connecting process must call them itself (`bootstrapSession()` in
   `src/db/graph.ts`), they can't be migrated or provisioned away.
 - **Never rely on `search_path` ordering to resolve an unqualified name —
-  qualify explicitly.** This bit LabKit for real: migration 0001 leaves
-  `search_path = ag_catalog, "$user", public` active for the rest of the
-  migration session, so migration 0002's originally-unqualified
-  `CREATE FUNCTION labkit_next_natural_id(...)`/`labkit_prop(...)` were
-  silently landing in `ag_catalog` — AGE's namespace, not LabKit's —
-  confirmed via `pg_proc`/`pg_namespace`. Fixed by qualifying explicitly
-  everywhere, not by reordering `search_path`: `ag_catalog.` on every AGE
-  catalog function (`ag_catalog.cypher(...)`, `ag_catalog.create_graph(...)`,
-  etc. — `src/db/graph.ts`, `src/db/tenant.ts`), and `src/db/schema.ts`'s
+  qualify explicitly.** `ag_catalog.` on every AGE catalog function
+  (`ag_catalog.cypher(...)`, `ag_catalog.create_graph(...)`, etc. —
+  `src/db/graph.ts`, `src/db/tenant.ts`), and `src/db/schema.ts`'s
   `LABKIT_SCHEMA` constant (`"public"`, the single place that would change
   if LabKit ever moved to schema-per-tenancy for its own relational tables)
   on every LabKit-owned object: `${LABKIT_SCHEMA}.tenants`,
@@ -302,47 +284,34 @@ not yet submitted anywhere:
     if it were a bound query parameter; that argument position is actually
     `columns: CypherColumn[]` (result-column naming) — the example would
     fail at runtime as written.
-- **`electric-sql/pglite`:** three of LabKit's four empirically-found
-  gotchas are not pglite-specific after all (see "Overview" above) — they
-  reproduce from stock AGE 1.7.0-rc0 regardless of platform (confirmed
-  directly against `apache/age:release_PG18_1.7.0`, not just from source),
-  so there's nothing to file against pglite for those. The `MERGE`
-  `start_id`/`end_id`-both-zero bug is different: **confirmed
-  WASM/pglite-age-specific** (2026-08-18) — the same query correctly
-  connects the two nodes on the real Postgres+AGE container. Worth filing
-  against pglite (the AGE WASM build), with the `SIZEOF_DATUM=4`
-  pass-by-reference `graphid` build as the strongest lead (see the gotcha
-  entry above) though the exact faulty code path in `cypher_merge.c`/
-  `cypher_create.c`/`cypher_utils.c` hasn't been pinned down yet — that's
-  the concrete next step before actually filing, not another
-  platform-comparison experiment (that question is now answered).
-- **`@electric-sql/pglite-socket` — already filed, still open:**
+- **`electric-sql/pglite`:** three of LabKit's four gotchas above reproduce
+  from stock AGE 1.7.0-rc0 regardless of platform (confirmed directly
+  against `apache/age:release_PG18_1.7.0`) — nothing to file against pglite
+  for those. `MERGE`'s `start_id`/`end_id`-both-zero bug is different and
+  is worth filing, with `SIZEOF_DATUM=4`'s pass-by-reference `graphid`
+  build as the strongest lead (see that gotcha) — the exact faulty code
+  path in `cypher_merge.c`/`cypher_create.c`/`cypher_utils.c` hasn't been
+  pinned down yet, which is the concrete next step before filing.
+- **`@electric-sql/pglite-socket` — already filed upstream, still open:**
   [electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046).
-  Nothing AGE-specific about this one — plain SQL reproduces it. We hit it
-  independently (2026-08-18, chasing a flaky `bun test` run) before finding
-  the issue already open, and it precisely matches what we saw: two
-  connections issuing concurrent queries, where at least one errors (e.g. a
-  `23505` unique violation), can permanently corrupt the connection(s)
-  involved — a wire-protocol desync ("unexpected parseComplete message from
-  backend") or, per the issue's own root-cause analysis of
-  `QueryQueueManager.processQueue()`, silently wrong rows from one
+  Nothing AGE-specific — plain SQL reproduces it. Two connections issuing
+  concurrent queries, where at least one errors (e.g. a `23505` unique
+  violation), can permanently corrupt the connection(s) involved — a
+  wire-protocol desync ("unexpected parseComplete message from backend"),
+  or (per the issue's own root-cause analysis of
+  `QueryQueueManager.processQueue()`) silently wrong rows, from one
   connection's extended-protocol batch clobbering another's unnamed
-  prepared statement mid-flight ("Defect A" — no transaction needed to
-  trigger it). Confirmed empirically (not just from the issue) that
-  corruption stays contained to the connection that hit it — a fresh
-  connection against the same underlying PGlite instance is immediately
-  clean, which is why `tests/helpers/db.ts` opens one per test rather than
-  sharing one for a whole file. `scripts/check-pglite-concurrency.sh`
-  regression-checks this — exit 0 means it still reproduces (expected,
-  workaround still needed), exit 1 means it didn't (worth re-checking
-  whether pglite-socket has picked up a fix). Real production exposure, not
-  just a test artifact: `pgliteLeaderElectionBackend`'s whole design is
-  every secondary process hitting the primary's socket concurrently, which
-  is exactly this trigger condition — `tests/leader-election.test.ts`
-  itself intermittently hits this (unresolved as of 2026-08-18; that test
-  still shares connections the way the real backend does, deliberately, so
-  fixing it isn't as simple as opening more connections the way the
-  `TenantGraph` tests were).
+  prepared statement mid-flight — no transaction needed to trigger it.
+  Corruption stays contained to the connection that hit it, which is why
+  `tests/helpers/db.ts` opens a fresh connection per test rather than
+  sharing one for a whole file; `scripts/check-pglite-concurrency.sh`
+  regression-checks it (inverted exit code — see the script's header).
+  Real production exposure, not just a test artifact:
+  `pgliteLeaderElectionBackend`'s whole design is every secondary process
+  hitting the primary's socket concurrently, which is exactly this trigger
+  condition — `tests/leader-election.test.ts` is a live, unresolved
+  instance of it, not fixable the same way the `TenantGraph` tests were
+  (see PJ-006).
 
 ## LabKit query cookbook
 
@@ -417,3 +386,5 @@ RETURN comp
 - `docs/project-journal/002_schema_dot_ts.md` — the first implementation's write-up
 - `docs/project-journal/003_review_domain_tenancy.md` — the tenancy/domain review
 - `docs/project-journal/004_tenancy_implementation_plan.md` — this implementation's plan
+- `docs/project-journal/005_provisioning_reconciliation.md` — provisioning reconciliation, why there's no version gate
+- `docs/project-journal/006_agtype_client_and_concurrency_hardening.md` — AGE provenance, the in-house `agtype.ts` parser, schema-qualification, and the pglite-socket concurrency bug
