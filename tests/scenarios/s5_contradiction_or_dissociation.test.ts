@@ -214,6 +214,103 @@ describe("S-5 — contradiction or dissociation?", () => {
   });
 
   /**
+   * Nothing about another line of enquiry's closure rests on this reading.
+   *
+   * The sharpest remaining leak, because it is invisible when only one scope
+   * ever closes anything: a question closed elsewhere on an identically worded
+   * claim would be reported as depending on a reading nobody there held.
+   */
+  test("a question closed in another line of enquiry is not reported as resting on this reading", async () => {
+    const programme = await twoStages();
+
+    // A third line of work asserting the same sentence, and settling on it.
+    const alsoInternal = await session.pose("does the graph construction matter for reconstruction error?");
+    const work = await session.pursue({ question: alsoInternal, approach: "reconstruction-error comparison" });
+    const readings = await session.recordObservations({
+      enquiry: work,
+      name: "reconstruction-error readings",
+      finding: "reconstruction error measured for the same five constructions",
+    });
+    const settled = await session.recordAnalysis({
+      enquiry: work,
+      method: "reconstruction-error-comparison",
+      from: [readings],
+      concludes: [{ proposition: IMMATERIAL, finding: "reconstruction error within 0.01 across constructions" }],
+    });
+    await session.closeEnquiry({ enquiry: work, answeredBy: { analysis: settled, proposition: IMMATERIAL } });
+
+    const report = await session.reinterpret({
+      of: { analysis: programme.earlier, proposition: IMMATERIAL },
+      as: "graph construction does not affect mapping strength within 0.02",
+      because: "immaterial overstates it",
+    });
+
+    // The reconstruction-error question was settled on its own reading, not
+    // on this one.
+    expect(report.restingOnTheOldReading).toEqual([]);
+
+    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const settledStill = await later.whySupported({ analysis: settled, proposition: IMMATERIAL });
+    expect(settledStill.withdrawn).toBe(false);
+    expect(settledStill.supported).toBe(true);
+  });
+
+  /**
+   * A sentence withdrawn in one line of enquiry does not block work in
+   * another.
+   *
+   * S-12 added a guard refusing to re-assert a withdrawn proposition. Unscoped,
+   * that guard had the defect this scenario is about, in the opposite
+   * direction: it would have blocked legitimate work.
+   */
+  test("withdrawing a sentence here does not block concluding it elsewhere", async () => {
+    const programme = await twoStages();
+    await session.reinterpret({
+      of: { analysis: programme.earlier, proposition: IMMATERIAL },
+      as: "graph construction does not affect mapping strength within 0.02",
+      because: "immaterial overstates it",
+    });
+
+    const elsewhere = await session.pose("does the graph construction matter for reconstruction error?");
+    const work = await session.pursue({ question: elsewhere, approach: "reconstruction-error comparison" });
+    const readings = await session.recordObservations({
+      enquiry: work,
+      name: "reconstruction-error readings",
+      finding: "reconstruction error measured across constructions",
+    });
+    const fresh = await session.recordAnalysis({
+      enquiry: work,
+      method: "reconstruction-error-comparison",
+      from: [readings],
+      concludes: [{ proposition: IMMATERIAL, finding: "reconstruction error within 0.01 across constructions" }],
+    });
+
+    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const here = await later.whySupported({ analysis: programme.earlier, proposition: IMMATERIAL });
+    const there = await later.whySupported({ analysis: fresh, proposition: IMMATERIAL });
+    expect(here.withdrawn).toBe(true);
+    expect(there.withdrawn).toBe(false);
+    expect(there.supported).toBe(true);
+  });
+
+  /** A citation must be one the cited analysis actually made. */
+  test("naming a conclusion an analysis never reached is refused", async () => {
+    const programme = await twoStages();
+
+    await expect(
+      session.whySupported({ analysis: programme.earlier, proposition: "a conclusion nobody drew" }),
+    ).rejects.toThrow(/concluded nothing about "a conclusion nobody drew"/);
+
+    await expect(
+      session.reinterpret({
+        of: { analysis: programme.later, proposition: "a conclusion nobody drew" },
+        as: "narrower still",
+        because: "it should not get this far",
+      }),
+    ).rejects.toThrow(/concluded nothing about "a conclusion nobody drew"/);
+  });
+
+  /**
    * A bare proposition is refused when it names more than one claim.
    *
    * Text remains the right handle when a sentence is asserted once, which is

@@ -1276,7 +1276,7 @@ export class ResearchSession {
       }
     }
 
-    const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope.proposition);
+    const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
     this.emit("reinterpret", narrower.natural_id, { previously: scope.proposition, because: input.because });
 
@@ -1338,7 +1338,7 @@ export class ResearchSession {
         previously: step.was.name,
         nowClaims: current,
         reason: step.d.reason,
-        restingOnTheOldReading: await this.decidedOnTheStrengthOf(step.was.name),
+        restingOnTheOldReading: await this.decidedOnTheStrengthOf({ proposition: step.was.name }),
       });
       current = step.was.name;
     }
@@ -1378,15 +1378,24 @@ export class ResearchSession {
   }
 
   /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
-  private async decidedOnTheStrengthOf(proposition: string): Promise<string[]> {
-    const rows = await this.graph.query(
-      `MATCH (d:Decision)-[:BASED_ON]->(:Evidence)-[:SUPPORTS]->(:Claim {name: $name})
-       MATCH (d)-[:RESOLVES]->(q:Question)
-       RETURN q`,
-      { q: vertexProps<{ name: string }>() },
-      { name: proposition },
-    );
-    return [...new Set(rows.map((r) => r.q.name))].sort();
+  private async decidedOnTheStrengthOf(scope: { proposition: string; enquiry?: string }): Promise<string[]> {
+    const asked = new Set<string>();
+    // Both bearings: a question can be settled "no" on a finding that
+    // challenges the proposition, and that closure rests on this reading just
+    // as much as a supporting one does.
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (d:Decision)-[:BASED_ON]->(e:Evidence)-[:${bearing}]->(:Claim {name: $name})
+         MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
+         ${this.withinScope(scope)}
+         MATCH (d)-[:RESOLVES]->(q:Question)
+         RETURN q`,
+        { q: vertexProps<{ name: string }>() },
+        { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+      );
+      for (const row of rows) asked.add(row.q.name);
+    }
+    return [...asked].sort();
   }
 
   /**
@@ -1406,6 +1415,16 @@ export class ResearchSession {
    */
   private async scopeFor(subject: ClaimSubject): Promise<{ proposition: string; enquiry?: string }> {
     if (typeof subject !== "string") {
+      // A citation has to be one the cited analysis actually made. Without
+      // this, naming a proposition it never concluded still resolves to its
+      // line of enquiry, and the answer comes back about whatever *other*
+      // analysis in that scope said -- so `reinterpret()` would withdraw a
+      // claim the cited analysis never asserted. Same check `closeEnquiry()`
+      // and `amendDesign()` already make of their citations.
+      const concluded = await this.findingFor(subject.analysis, subject.proposition);
+      if (!concluded) {
+        throw new Error(`analysis ${subject.analysis.id} concluded nothing about "${subject.proposition}"`);
+      }
       const enquiry = await this.enquiryAddressedBy(subject.analysis);
       if (!enquiry) throw new Error(`analysis ${subject.analysis.id} addresses no line of enquiry`);
       return { proposition: subject.proposition, enquiry };
@@ -1479,8 +1498,8 @@ export class ResearchSession {
   }
 
   private async sideOf(conclusion: ConclusionRef): Promise<ConflictSide & { enquiry: string }> {
-    const enquiry = await this.enquiryAddressedBy(conclusion.analysis);
-    if (!enquiry) throw new Error(`analysis ${conclusion.analysis.id} addresses no line of enquiry`);
+    const resolved = await this.scopeFor(conclusion);
+    const enquiry = resolved.enquiry!;
 
     const asked = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
@@ -1488,7 +1507,7 @@ export class ResearchSession {
       { id: enquiry },
     );
 
-    const scope = { proposition: conclusion.proposition, enquiry };
+    const scope = resolved;
     const supportedBy = (await this.findingsBearing(scope, "SUPPORTS")).map((r) => r.e.statement);
     const challengedBy = (await this.findingsBearing(scope, "CHALLENGES")).map((r) => r.e.statement);
 
