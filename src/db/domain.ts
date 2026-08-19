@@ -32,6 +32,7 @@ export const EDGE_LABELS = [
   "ADDRESSES", // EvidenceUnit -> LineOfEnquiry
   "SUPPORTS", // Evidence -> Claim
   "CHALLENGES", // Evidence -> Claim
+  "REVERIFIES", // Evidence -> Evidence
   "USES", // EvidenceUnit -> Computation
   "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
   "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
@@ -186,6 +187,30 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * confirm, and telling the two apart from a free-text verdict would be
    * text-matching.
    */
+  /**
+   * "Re-checked that finding, without reproducing the run behind it." Earned
+   * by S-10.
+   *
+   * Demonstrated rather than argued: the only way to record a re-run was as
+   * another analysis concluding the same proposition, which S-5's scope rules
+   * then resolve to the same claim — so `whySupported()` reported the
+   * proposition resting on *two independent findings*. It rests on one, checked
+   * twice, and the second check specified initial conditions the first never
+   * recorded. A historical claim reporting itself independently corroborated by
+   * an execution nobody reproduced is confidently wrong, not merely thin.
+   *
+   * What a shared claim cannot carry is **direction** and **caveat**: which run
+   * re-checked which, and that their executions are not the same. Two genuinely
+   * independent analyses in one enquiry are indistinguishable from a
+   * re-verification without it, and those are different scientific situations.
+   *
+   * `Evidence -> Evidence` rather than `EvidenceUnit -> EvidenceUnit` because a
+   * re-run checks a *finding*: one analysis may re-verify one of several
+   * conclusions and say nothing about the others. The unit-level relationship
+   * is the one to reach for if a scenario ever re-runs a whole analysis as an
+   * indivisible thing; nothing has.
+   */
+  REVERIFIES: [["Evidence", "Evidence"]],
   CHANGES: [["Decision", "Criterion"], ["Decision", "Claim"]],
   BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
   RESOLVES: [["Decision", "Question"]],

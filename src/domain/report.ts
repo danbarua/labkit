@@ -219,6 +219,65 @@ export interface EvaluationRecord {
   basis: string[];
 }
 
+/**
+ * What a re-run did and did not establish about a historical result (S-10).
+ *
+ * Two verdicts, deliberately not one: a conclusion can be re-reached by an
+ * execution that was never reproduced, and collapsing those into a single
+ * boolean is the mistake the scenario is named after.
+ */
+export interface ReproductionReport {
+  /** The re-verifying analysis, by method. */
+  verification: string;
+  /** The historical analysis it re-checked, by method. */
+  of: string;
+  /** Whether the re-run reached the same conclusion. Says nothing about how. */
+  conclusion: "agrees" | "disagrees";
+  /**
+   * Whether the same execution was reproduced — the same recorded inputs, not
+   * merely the same protocol. `not-reproduced` covers "the original never
+   * recorded what it consumed", which is absence rather than difference; see
+   * `differs`.
+   */
+  execution: "reproduced" | "not-reproduced";
+  /**
+   * What the two runs did not share. `unrecorded-in-the-original` is the case
+   * S-10 exists for and is **not** the same as `changed`: nobody wrote the
+   * original's conditions down, so the two are not known to differ and are not
+   * known to agree. Row I's distinction, asked of execution instead of evidence.
+   */
+  differs: Array<{ what: string; standing: "unrecorded-in-the-original" | "changed" }>;
+  /** Which way the re-run cuts for the historical claim. */
+  bearing: "raises" | "lowers";
+  /**
+   * Whether this amounts to confirmation. False whenever the execution was not
+   * reproduced, however well the conclusions agree — a reader who takes
+   * `bearing: "raises"` for confirmation is making exactly the inference this
+   * report exists to prevent.
+   */
+  confirms: boolean;
+  /**
+   * Whether the two runs' numbers may be put side by side.
+   *
+   * Carried here rather than enforced by a refusing verb: LabKit has nothing
+   * that plots or compares numbers, so a command existing only to reject its
+   * arguments would be a feature invented to manufacture a wrong answer. The
+   * caveat instead travels with the report a reader already asks for.
+   */
+  comparable: boolean;
+  /** Why not, when `comparable` is false. Absent when it is true. */
+  incomparableBecause?: string;
+}
+
+/** What `reverify()` recorded. */
+export interface VerificationReport {
+  at: string;
+  /** The analysis this act created — row AB, asked of a return type. */
+  verification: AnalysisRef;
+  /** The historical analysis it re-checked. */
+  of: AnalysisRef;
+}
+
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */
 export interface SupportExplanation {
   proposition: string;
@@ -232,6 +291,15 @@ export interface SupportExplanation {
   supported: boolean;
   /** Findings currently supporting the proposition, each with the analysis that produced it. */
   support: Array<{ finding: string; via: string }>;
+  /**
+   * Analyses that re-checked a supporting finding without reproducing its
+   * execution, by method (S-10).
+   *
+   * Kept out of `support` deliberately. A re-verification is not a second
+   * independent finding, and listing it as one made a claim established once
+   * report itself as corroborated twice — see `EDGE_SCHEMA.REVERIFIES`.
+   */
+  reverifiedBy: string[];
   /**
    * The prespecified conditions the supporting analyses were held to,
    * itemised the same way a gate's are — `recordAnalysis({ heldTo })`.

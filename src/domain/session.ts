@@ -25,6 +25,8 @@ import { optional, scalar, vertexProps } from "../db/cypher";
 import type { ArtefactProps, ClaimProps, ComputationProps, EvidenceProps } from "../db/domain";
 import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./events";
 import type {
+  ReproductionReport,
+  VerificationReport,
   AmendmentRecord,
   TaskContract,
   ClaimSubject,
@@ -602,7 +604,7 @@ export class ResearchSession {
        OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
        RETURN e, comp, a, r`,
       {
-        e: vertexProps<EvidenceProps>(),
+        e: vertexProps<EvidenceProps & { natural_id: string }>(),
         comp: vertexProps<ComputationProps>(),
         a: optional(vertexProps<ArtefactProps>()),
         r: optional(vertexProps<{ verdict: string }>()),
@@ -796,6 +798,133 @@ export class ResearchSession {
       { id: gate.id },
     );
     return rows.map((r) => ({ kind: "criterion" as const, id: r.c.natural_id }));
+  }
+
+
+  /**
+   * Records that a historical result was re-checked, without claiming its run
+   * was reproduced (S-10).
+   *
+   * `recordAnalysis` plus one edge, and the edge is the whole point: recorded
+   * as an ordinary analysis the re-run becomes a second finding behind the same
+   * claim, and the record then says a proposition established once rests on two
+   * independent results. See `EDGE_SCHEMA.REVERIFIES`.
+   *
+   * `under` is what the *new* run consumed. It is normally non-empty precisely
+   * because the historical run's inputs were never recorded — that asymmetry is
+   * the situation, not an error, and `reproductionOf()` reads it back as
+   * `unrecorded-in-the-original` rather than as a difference.
+   *
+   * One event, not two: a researcher who re-verified a result did one thing.
+   */
+  async reverify(input: {
+    historical: AnalysisRef;
+    enquiry: EnquiryRef;
+    method: string;
+    under: ObservationsRef[];
+    concludes: Conclusion;
+  }): Promise<VerificationReport> {
+    const at = this.clock.now();
+    const original = await this.findingFor(input.historical, input.concludes.proposition);
+    if (!original) {
+      throw new Error(
+        `analysis ${input.historical.id} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
+      );
+    }
+
+    const verification = await this.recordAnalysis({
+      enquiry: input.enquiry,
+      method: input.method,
+      from: input.under,
+      concludes: [input.concludes],
+    });
+    const restated = await this.findingFor(verification, input.concludes.proposition);
+    if (!restated) throw new Error("unreachable: the analysis just recorded this conclusion");
+    await this.graph.createEdge(restated, "REVERIFIES", original);
+
+    this.emit("reverify", verification.id, { of: input.historical.id, proposition: input.concludes.proposition });
+    return { at, verification, of: input.historical };
+  }
+
+  /**
+   * What a re-run did and did not establish (S-10).
+   *
+   * The execution verdict is derived from what each run recorded consuming, not
+   * from a stored flag: two runs are a reproduction when they read the same
+   * recorded inputs. Structure in the query rather than in the stored model, so
+   * there is no value anyone can set to "reproduced".
+   */
+  async reproductionOf(verification: AnalysisRef): Promise<ReproductionReport> {
+    const link = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(new:Evidence)
+       MATCH (new)-[:REVERIFIES]->(old:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(oldcomp:Computation)
+       RETURN new, old, oldcomp`,
+      {
+        new: vertexProps<{ natural_id: string }>(),
+        old: vertexProps<{ natural_id: string }>(),
+        oldcomp: vertexProps<{ natural_id: string; kind: string }>(),
+      },
+      { id: verification.id },
+    );
+    const found = link[0];
+    if (!found) throw new Error(`analysis ${verification.id} re-verifies nothing`);
+
+    const method = await this.graph.query(
+      `MATCH (c:Computation {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ kind: string }>() },
+      { id: verification.id },
+    );
+
+    const inputs = async (computation: string): Promise<string[]> => {
+      const rows = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
+        { a: vertexProps<{ logical_name: string }>() },
+        { id: computation },
+      );
+      return rows.map((r) => r.a.logical_name).sort();
+    };
+    const mine = await inputs(verification.id);
+    const theirs = await inputs(found.oldcomp.natural_id);
+
+    // Absence and difference are not the same answer. The original recording
+    // nothing means the two are neither known to agree nor known to differ,
+    // which is why this is not simply a set difference.
+    const differs: ReproductionReport["differs"] =
+      theirs.length === 0
+        ? mine.map((what) => ({ what, standing: "unrecorded-in-the-original" as const }))
+        : mine.filter((what) => !theirs.includes(what)).map((what) => ({ what, standing: "changed" as const }));
+
+    const reproduced = differs.length === 0 && mine.length === theirs.length;
+
+    // Which way the re-run cuts, read from the bearing the restated finding was
+    // recorded with -- never from comparing the two findings' wording.
+    const bearing = await this.graph.query(
+      `MATCH (:Evidence {natural_id: $id})-[:CHALLENGES]->(:Claim) RETURN 1`,
+      { ok: scalar<number>() },
+      { id: found.new.natural_id },
+    );
+    const agrees = bearing.length === 0;
+
+    return {
+      verification: method[0]?.c.kind ?? "unknown",
+      of: found.oldcomp.kind,
+      conclusion: agrees ? "agrees" : "disagrees",
+      execution: reproduced ? "reproduced" : "not-reproduced",
+      differs,
+      bearing: agrees ? "raises" : "lowers",
+      // Agreement between two different executions is not confirmation of
+      // either, however well the numbers line up.
+      confirms: reproduced && agrees,
+      comparable: reproduced,
+      ...(reproduced
+        ? {}
+        : {
+            incomparableBecause:
+              theirs.length === 0
+                ? "the original run's initial conditions were never recorded, so the two runs' numbers describe different executions"
+                : "the two runs consumed different inputs",
+          }),
+    };
   }
 
   /**
@@ -1697,7 +1826,20 @@ export class ResearchSession {
     const forRows = await this.findingsBearing(scope, "SUPPORTS");
     const againstRows = await this.findingsBearing(scope, "CHALLENGES");
 
+    // Findings that re-checked another finding rather than establishing the
+    // proposition themselves. Keyed by identity, never by wording -- two runs
+    // reaching the same conclusion say the same sentence by construction.
+    const reverifying = new Set(
+      (
+        await this.graph.query(
+          `MATCH (e:Evidence)-[:REVERIFIES]->(:Evidence) RETURN e`,
+          { e: vertexProps<{ natural_id: string }>() },
+        )
+      ).map((r) => r.e.natural_id),
+    );
+
     const support: SupportExplanation["support"] = [];
+    const reverifiedBy: string[] = [];
     const against: SupportExplanation["against"] = [];
     const superseded: SupportExplanation["superseded"] = [];
     for (const { rows, bearing, live } of [
@@ -1708,6 +1850,11 @@ export class ResearchSession {
         const entry = { finding: row.e.statement, via: row.comp.kind };
         if (row.a?.invalidated) {
           superseded.push({ ...entry, bearing, reason: row.r?.verdict ?? "its analysis was replaced" });
+        } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
+          // A re-verification is not a second independent finding. Counting it
+          // as one reported a proposition established once as corroborated
+          // twice -- S-10, and the reason `REVERIFIES` exists.
+          if (!reverifiedBy.includes(row.comp.kind)) reverifiedBy.push(row.comp.kind);
         } else {
           live.push(entry);
         }
@@ -1788,6 +1935,7 @@ export class ResearchSession {
       // second: the numbers are fine, and blanking them would say otherwise.
       supported: support.length > 0 && !withdrawn && unmet.length === 0,
       support,
+      reverifiedBy,
       standard,
       unmet,
       restingOn: [...new Set(resting.map((r) => r.a.logical_name))],
