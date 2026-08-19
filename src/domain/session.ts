@@ -1122,12 +1122,12 @@ export class ResearchSession {
         ev: optional(
           vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
         ),
-        basis: optional(vertexProps<{ statement: string }>()),
+        basis: optional(vertexProps<{ natural_id: string; statement: string }>()),
       },
       { id: gate.id },
     );
 
-    const checks = this.checksFrom(rows);
+    const checks = this.checksFrom(rows, await this.withdrawnFindings());
     // Flattened in the same order the checks were assembled in.
     const evaluations = checks.flatMap((c) => c.evaluations);
     const unmet = checks.filter((c) => c.state !== "passed").map((c) => c.proposition);
@@ -1180,17 +1180,46 @@ export class ResearchSession {
    * check is reported must not, or the same condition would read one way
    * through a gate and another through the finding it qualifies.
    */
+  /**
+   * Findings whose analysis was replaced, by identity.
+   *
+   * A separate query rather than a hop hung off the evaluation, because AGE
+   * will not bind a two-relationship `OPTIONAL MATCH`: written as
+   * `OPTIONAL MATCH (ev)-[:BASED_ON]->(b:Evidence)-[:RECORDED_IN]->(a:Artefact)`
+   * the artefact comes back null for every row, including the ones that do
+   * have it — silently, with no error. That is the kind of empty answer that
+   * reads as "nothing was withdrawn", so the shape is deliberate and not a
+   * stylistic choice. See the AGE notes in CLAUDE.md.
+   *
+   * Unscoped on purpose: an invalidated output means the finding is no longer
+   * a source of current inference, wherever it is cited from.
+   */
+  private async withdrawnFindings(): Promise<ReadonlySet<string>> {
+    const rows = await this.graph.query(
+      `MATCH (e:Evidence)-[:RECORDED_IN]->(a:Artefact)
+       WHERE a.invalidated = true
+       RETURN e`,
+      { e: vertexProps<{ natural_id: string }>() },
+    );
+    return new Set(rows.map((r) => r.e.natural_id));
+  }
+
   private checksFrom(
     rows: Array<{
       c: { natural_id: string; proposition: string };
       ev: { natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string } | null;
-      basis: { statement: string } | null;
+      basis: { natural_id: string; statement: string } | null;
     }>,
+    /** Findings whose analysis was replaced — see `withdrawnFindings()`. */
+    withdrawn: ReadonlySet<string>,
   ): CheckStatus[] {
       // Keyed by natural id, not by proposition text. Two criteria worded
       // identically are two criteria; whether they SHOULD be one is an identity
       // question, and a read-side query must not settle it by string equality.
-      type TimedEvaluation = EvaluationRecord & { id: string };
+      // `standing` counts the cited findings that have NOT been withdrawn. It
+      // is kept alongside `basis` rather than derived from it because `basis`
+      // is display text, and two withdrawn findings can share a sentence.
+      type TimedEvaluation = EvaluationRecord & { id: string; cited: number; standing: number };
       const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
       for (const row of rows) {
         const id = row.c.natural_id;
@@ -1205,18 +1234,35 @@ export class ResearchSession {
             outcome: row.ev.outcome,
             at: row.ev.evaluated_at,
             basis: [] as string[],
+            cited: 0,
+            standing: 0,
           };
-          if (row.basis && !record.basis.includes(row.basis.statement)) record.basis.push(row.basis.statement);
+          if (row.basis) {
+            if (!record.basis.includes(row.basis.statement)) record.basis.push(row.basis.statement);
+            record.cited += 1;
+            if (!withdrawn.has(row.basis.natural_id)) record.standing += 1;
+          }
           if (!seen) entry.evaluations.push(record);
         }
         byCriterion.set(id, entry);
       }
 
-      const strip = ({ value, outcome, at, basis }: TimedEvaluation): EvaluationRecord => ({
-        value,
-        outcome,
-        at,
-        basis: [...basis].sort(),
+      /**
+       * A verdict is withdrawn when everything it was reached against has
+       * been. A verdict that cited nothing cannot be withdrawn at all — there
+       * is nothing to retract — which is what keeps S-8's asserted-versus-
+       * measured distinction (row W) from becoming a loophole.
+       */
+      const isWithdrawn = (e: TimedEvaluation): boolean => e.cited > 0 && e.standing === 0;
+
+      const strip = (e: TimedEvaluation): EvaluationRecord => ({
+        value: e.value,
+        outcome: e.outcome,
+        at: e.at,
+        basis: [...e.basis].sort(),
+        // Present only when true, so a record that stands is byte-identical to
+        // what it was before this field existed.
+        ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
       });
 
       const checks: CheckStatus[] = [];
@@ -1226,12 +1272,24 @@ export class ResearchSession {
         // of a check is not a stable contract between runs.
         const ordered = entry.evaluations.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
 
-        // A failure sticks: one failing evaluation is decisive for this check
-        // even if a later run passed, so re-running until green is not
-        // evidence. NOTE this is an S-3 policy that currently applies to every
-        // gate -- see ledger row X, which asks whether a repaired artefact
-        // should stay blocked forever.
-        const decisive = ordered.find((e) => e.outcome === "fail") ?? ordered[0];
+        // A failure sticks -- among verdicts that still stand. One failing
+        // evaluation is decisive even if a later run passed, so re-running
+        // until green is not evidence (S-3, and the case that earned this).
+        //
+        // S-3c narrowed it, and only here: a verdict whose entire basis has
+        // been reviewed and withdrawn is not a failure that stands, it is a
+        // failure that was retracted. Before this the two were the same state,
+        // so a check found to be defective, corrected and re-run went on
+        // disqualifying the finding and blocking the work for ever -- the same
+        // answer as re-rolling the dice, which is the one thing S-3 set out to
+        // prevent. Ledger row X.
+        //
+        // What did NOT change: the withdrawn verdict stays in `evaluations`,
+        // marked. Erasing it would leave no record of why the finding was ever
+        // in doubt, and re-running a check that nobody faulted still cannot
+        // clear it, because nothing withdraws it.
+        const standing = ordered.filter((e) => !isWithdrawn(e));
+        const decisive = standing.find((e) => e.outcome === "fail") ?? standing[0];
         checks.push({
           criterion: id,
           proposition: entry.proposition,
@@ -1318,6 +1376,7 @@ export class ResearchSession {
 
     const report: ReplacementReport = {
       at,
+      replacement,
       affected: before.map((b) => b.proposition),
       unaffected,
       changed,
@@ -1712,11 +1771,11 @@ export class ResearchSession {
         ev: optional(
           vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
         ),
-        basis: optional(vertexProps<{ statement: string }>()),
+        basis: optional(vertexProps<{ natural_id: string; statement: string }>()),
       },
       { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
-    const standard = this.checksFrom(standardRows);
+    const standard = this.checksFrom(standardRows, await this.withdrawnFindings());
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
     // and the two must agree, since in S-3 they are the same checks.

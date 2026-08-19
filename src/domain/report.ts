@@ -104,6 +104,18 @@ export interface ChangedConclusion {
  */
 export interface ReplacementReport {
   at: string;
+  /**
+   * The analysis this act brought into existence.
+   *
+   * The act recorded what it replaced and what that cost, and not what it
+   * produced — so the replacement was unreachable to the caller that had just
+   * created it. Row AB's shape for the fourth time, and the first where the
+   * omission blocks a scenario outright rather than degrading an answer: S-3c
+   * has to cite the corrected check to evaluate a criterion against it, and
+   * could not name it. The remedy is the smallest of the four, which is the
+   * point of the heuristic — it says look, not what to do.
+   */
+  replacement: AnalysisRef;
   /** Propositions whose support ran through the replaced analysis — enumerable, not "everything downstream". */
   affected: string[];
   /** Still valid, and still cited by the replacement. */
@@ -186,6 +198,16 @@ export interface EvaluationRecord {
   value: string;
   outcome: "pass" | "fail";
   at: string;
+  /**
+   * Present, and `true`, when everything this verdict was reached against has
+   * since been withdrawn — the check was found to be faulty and replaced, not
+   * merely re-run. Such a verdict stays readable but no longer decides the
+   * check's state; see `CheckStatus.decidedBy` and ledger row X.
+   *
+   * Absent rather than `false` when the verdict stands, so a standing record
+   * reads exactly as it did before this distinction existed.
+   */
+  withdrawn?: true;
   /**
    * The findings this evaluation was carried out against.
    *
