@@ -348,6 +348,16 @@ export class ResearchSession {
      * for this and had never been written.
      */
     implementing?: WorkRef;
+    /**
+     * The prespecified conditions this analysis's conclusions are held to.
+     *
+     * Earned by S-3b: criteria that qualify a finding and gate nothing. The
+     * checks are agreed before the run, so they are stated separately and
+     * named here; recording them at evaluation time cannot work, because a
+     * check nobody ran must still count against the finding. See
+     * EDGE_SCHEMA.QUALIFIES.
+     */
+    heldTo?: CriterionRef[];
   }): Promise<AnalysisRef> {
     // Checked before anything is written. A proposition the record has
     // withdrawn cannot be re-asserted as a side effect of recording an
@@ -383,6 +393,9 @@ export class ResearchSession {
     await this.graph.createEdge(unit.natural_id, "USES", computation.natural_id);
     await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry.id);
     if (input.implementing) await this.graph.createEdge(input.implementing.id, "IMPLEMENTS", unit.natural_id);
+    for (const criterion of input.heldTo ?? []) {
+      await this.graph.createEdge(criterion.id, "QUALIFIES", unit.natural_id);
+    }
     // Both levels of provenance, deliberately: the evidence unit produced
     // this scientific output; the computation produced this concrete
     // execution output. Without the second, CONSUMES would be half a pair --
@@ -676,6 +689,13 @@ export class ResearchSession {
    */
   async declareGate(input: { governedBy: CriterionRef[]; consequence: string; protecting: WorkRef[] }): Promise<GateRef> {
     if (input.governedBy.length === 0) throw new Error("a gate governed by no condition is not a gate");
+    // And a gate protecting nothing is not a gate either. Before S-3b there
+    // was no way to record a check that qualifies a finding without minting
+    // one: `gateStatus()` then answered "what is blocked?" with `blocked` and
+    // an empty `gating` list -- a control-plane object asserting a consequence
+    // for work that does not exist. `recordAnalysis({ heldTo })` is how a
+    // standard with nothing downstream is recorded now.
+    if (input.protecting.length === 0) throw new Error("a gate protecting nothing is not a gate");
     const gate = await this.graph.createNode("Gate", { consequence: input.consequence });
     for (const criterion of input.governedBy) {
       await this.graph.createEdge(criterion.id, "GOVERNS", gate.natural_id);
@@ -703,13 +723,23 @@ export class ResearchSession {
    */
   async evaluateCriterion(input: {
     criterion: CriterionRef;
-    gate: GateRef;
+    /**
+     * The gate this verdict is being reached for, if it is being reached for
+     * one. Omitted when the condition qualifies a finding and gates no work —
+     * S-3b, where requiring a gate forced the caller to mint one that
+     * protected nothing.
+     */
+    gate?: GateRef;
     value: string;
     outcome: "pass" | "fail";
     /** The finding this verdict was reached against, if it was reached against one. */
     citing?: ConclusionRef;
   }): Promise<void> {
-    await this.assertCriterionGovernsGate(input.criterion, input.gate);
+    if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
+    // Same invariant class as `assertCriterionGovernsGate`, for the other job
+    // a criterion can do: an evaluation that neither triggers a gate nor bears
+    // on a finding held to it is durable nonsense no reader would ever surface.
+    else await this.assertCriterionQualifiesSomething(input.criterion);
     let basis: string | undefined;
     if (input.citing) {
       basis = await this.findingFor(input.citing.analysis, input.citing.proposition);
@@ -724,7 +754,7 @@ export class ResearchSession {
       evaluated_at: at,
     });
     await this.graph.createEdge(input.criterion.id, "EVALUATED_AS", evaluation.natural_id);
-    await this.graph.createEdge(evaluation.natural_id, "TRIGGERS", input.gate.id);
+    if (input.gate) await this.graph.createEdge(evaluation.natural_id, "TRIGGERS", input.gate.id);
     // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
     // Evidence` was declared in PJ-004 and never written until S-8; without
     // it, a condition established by measurement and one asserted by an agent
@@ -732,7 +762,7 @@ export class ResearchSession {
     if (basis) await this.graph.createEdge(evaluation.natural_id, "BASED_ON", basis);
     this.emit("evaluateCriterion", evaluation.natural_id, {
       criterion: input.criterion.id,
-      gate: input.gate.id,
+      ...(input.gate ? { gate: input.gate.id } : {}),
       outcome: input.outcome,
     });
   }
@@ -1092,62 +1122,9 @@ export class ResearchSession {
       { id: gate.id },
     );
 
-    // Keyed by natural id, not by proposition text. Two criteria worded
-    // identically are two criteria; whether they SHOULD be one is an identity
-    // question, and a read-side query must not settle it by string equality.
-    type TimedEvaluation = EvaluationRecord & { id: string };
-    const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
-    for (const row of rows) {
-      const id = row.c.natural_id;
-      const entry = byCriterion.get(id) ?? { proposition: row.c.proposition, evaluations: [] };
-      if (row.ev) {
-        // One row per (evaluation, basis) pair, so an evaluation citing several
-        // findings arrives more than once. Accumulate rather than push.
-        const seen = entry.evaluations.find((e) => e.id === row.ev!.natural_id);
-        const record = seen ?? {
-          id: row.ev.natural_id,
-          value: row.ev.value,
-          outcome: row.ev.outcome,
-          at: row.ev.evaluated_at,
-          basis: [] as string[],
-        };
-        if (row.basis && !record.basis.includes(row.basis.statement)) record.basis.push(row.basis.statement);
-        if (!seen) entry.evaluations.push(record);
-      }
-      byCriterion.set(id, entry);
-    }
-
-    const strip = ({ value, outcome, at, basis }: TimedEvaluation): EvaluationRecord => ({
-      value,
-      outcome,
-      at,
-      basis: [...basis].sort(),
-    });
-
-    const checks: CheckStatus[] = [];
-    const evaluations: GateStatus["evaluations"] = [];
-    for (const [id, entry] of byCriterion) {
-      // Cypher imposes no ordering, so sort explicitly: by time, then by
-      // identity. Without this, which evaluation gets reported as "the" value
-      // of a check is not a stable contract between runs.
-      const ordered = entry.evaluations.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
-      evaluations.push(...ordered.map(strip));
-
-      // A failure sticks: one failing evaluation is decisive for this check
-      // even if a later run passed, so re-running until green is not
-      // evidence. NOTE this is an S-3 policy that currently applies to every
-      // gate -- see ledger row X, which asks whether a repaired artefact
-      // should stay blocked forever.
-      const decisive = ordered.find((e) => e.outcome === "fail") ?? ordered[0];
-      checks.push({
-        criterion: id,
-        proposition: entry.proposition,
-        state: decisive === undefined ? "never-run" : decisive.outcome === "fail" ? "failed" : "passed",
-        evaluations: ordered.map(strip),
-        ...(decisive ? { decidedBy: strip(decisive) } : {}),
-      });
-    }
-
+    const checks = this.checksFrom(rows);
+    // Flattened in the same order the checks were assembled in.
+    const evaluations = checks.flatMap((c) => c.evaluations);
     const unmet = checks.filter((c) => c.state !== "passed").map((c) => c.proposition);
 
     // Order matters. Absence is checked before satisfaction so a gate nobody
@@ -1187,6 +1164,79 @@ export class ResearchSession {
       gating: gating.map((g) => g.w.objective ?? g.w.kind ?? "unknown"),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
+  }
+
+  /**
+   * Groups (criterion, evaluation, basis) rows into itemised checks.
+   *
+   * Shared by the two jobs a criterion does, which S-3 fused and S-3b took
+   * apart: gating work (`gateStatus`) and qualifying a finding
+   * (`whySupported`). The traversals that reach the criteria differ; how a
+   * check is reported must not, or the same condition would read one way
+   * through a gate and another through the finding it qualifies.
+   */
+  private checksFrom(
+    rows: Array<{
+      c: { natural_id: string; proposition: string };
+      ev: { natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string } | null;
+      basis: { statement: string } | null;
+    }>,
+  ): CheckStatus[] {
+      // Keyed by natural id, not by proposition text. Two criteria worded
+      // identically are two criteria; whether they SHOULD be one is an identity
+      // question, and a read-side query must not settle it by string equality.
+      type TimedEvaluation = EvaluationRecord & { id: string };
+      const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
+      for (const row of rows) {
+        const id = row.c.natural_id;
+        const entry = byCriterion.get(id) ?? { proposition: row.c.proposition, evaluations: [] };
+        if (row.ev) {
+          // One row per (evaluation, basis) pair, so an evaluation citing several
+          // findings arrives more than once. Accumulate rather than push.
+          const seen = entry.evaluations.find((e) => e.id === row.ev!.natural_id);
+          const record = seen ?? {
+            id: row.ev.natural_id,
+            value: row.ev.value,
+            outcome: row.ev.outcome,
+            at: row.ev.evaluated_at,
+            basis: [] as string[],
+          };
+          if (row.basis && !record.basis.includes(row.basis.statement)) record.basis.push(row.basis.statement);
+          if (!seen) entry.evaluations.push(record);
+        }
+        byCriterion.set(id, entry);
+      }
+
+      const strip = ({ value, outcome, at, basis }: TimedEvaluation): EvaluationRecord => ({
+        value,
+        outcome,
+        at,
+        basis: [...basis].sort(),
+      });
+
+      const checks: CheckStatus[] = [];
+      for (const [id, entry] of byCriterion) {
+        // Cypher imposes no ordering, so sort explicitly: by time, then by
+        // identity. Without this, which evaluation gets reported as "the" value
+        // of a check is not a stable contract between runs.
+        const ordered = entry.evaluations.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+
+        // A failure sticks: one failing evaluation is decisive for this check
+        // even if a later run passed, so re-running until green is not
+        // evidence. NOTE this is an S-3 policy that currently applies to every
+        // gate -- see ledger row X, which asks whether a repaired artefact
+        // should stay blocked forever.
+        const decisive = ordered.find((e) => e.outcome === "fail") ?? ordered[0];
+        checks.push({
+          criterion: id,
+          proposition: entry.proposition,
+          state: decisive === undefined ? "never-run" : decisive.outcome === "fail" ? "failed" : "passed",
+          evaluations: ordered.map(strip),
+          ...(decisive ? { decidedBy: strip(decisive) } : {}),
+        });
+      }
+
+    return checks;
   }
 
   // -------------------------------------------------------------------------
@@ -1626,6 +1676,39 @@ export class ResearchSession {
       { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
 
+    // The standard the finding was held to, if it was held to one. S-3b: the
+    // criteria a researcher agreed before the run are what "does this stand?"
+    // is answered against, and before `QUALIFIES` there was no path from a
+    // claim to them at all -- so a finding whose own prespecified checks had
+    // failed reported `supported: true`. See ledger row V.
+    //
+    // Same invalidation filter as `restingOn` above: a replaced analysis's
+    // checks are as historical as its findings, and applying one filter and
+    // not the other would make two fields of one answer disagree.
+    const standardRows = await this.graph.query(
+      `MATCH (:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       ${this.withinScope(scope)}
+       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
+       WHERE out.invalidated IS NULL OR out.invalidated = false
+       MATCH (crit:Criterion)-[:QUALIFIES]->(u)
+       OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
+       OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
+       RETURN crit AS c, ev, basis`,
+      {
+        c: vertexProps<{ natural_id: string; proposition: string }>(),
+        ev: optional(
+          vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
+        ),
+        basis: optional(vertexProps<{ statement: string }>()),
+      },
+      { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+    );
+    const standard = this.checksFrom(standardRows);
+    // Never-run counts against, exactly as it does for a gate: a check nobody
+    // performed has not been met. `gateStatus()` computes `unmet` the same way
+    // and the two must agree, since in S-3 they are the same checks.
+    const unmet = standard.filter((c) => c.state !== "passed").map((c) => c.proposition);
+
     // A withdrawn interpretation is not supported, however much evidence once
     // carried it. `support` stays populated deliberately: the findings are
     // fine and always were, and blanking them would say the numbers had gone
@@ -1634,8 +1717,15 @@ export class ResearchSession {
 
     return {
       proposition,
-      supported: support.length > 0 && !withdrawn,
+      // Three ways to not be supported, and they are different states: no
+      // evidence at all, the interpretation withdrawn, and -- since S-3b --
+      // evidence that exists and fails the standard set for it. `support`
+      // stays populated in the third case for the same reason it does in the
+      // second: the numbers are fine, and blanking them would say otherwise.
+      supported: support.length > 0 && !withdrawn && unmet.length === 0,
       support,
+      standard,
+      unmet,
       restingOn: [...new Set(resting.map((r) => r.a.logical_name))],
       superseded,
       challenged: against.length > 0,
@@ -1738,6 +1828,19 @@ export class ResearchSession {
     );
     if (rows.length === 0) {
       throw new Error(`criterion ${criterion.id} does not govern gate ${gate.id}; it cannot be evaluated for it`);
+    }
+  }
+
+  private async assertCriterionQualifiesSomething(criterion: CriterionRef): Promise<void> {
+    const rows = await this.graph.query(
+      `MATCH (:Criterion {natural_id: $criterion})-[:QUALIFIES]->(:EvidenceUnit) RETURN 1`,
+      { ok: scalar<number>() },
+      { criterion: criterion.id },
+    );
+    if (rows.length === 0) {
+      throw new Error(
+        `criterion ${criterion.id} gates no work and qualifies no finding; name the gate it is being evaluated for`,
+      );
     }
   }
 

@@ -200,9 +200,32 @@ export interface EvaluationRecord {
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */
 export interface SupportExplanation {
   proposition: string;
+  /**
+   * Whether the record currently stands behind this proposition: evidence
+   * supports it, nothing has withdrawn it, and it meets whatever standard it
+   * was held to. `support`, `withdrawn` and `unmet` say which of the three is
+   * missing when it is false — reporting them identically is the confusion
+   * this field has been fixed for twice (S-12, S-3b).
+   */
   supported: boolean;
   /** Findings currently supporting the proposition, each with the analysis that produced it. */
   support: Array<{ finding: string; via: string }>;
+  /**
+   * The prespecified conditions the supporting analyses were held to,
+   * itemised the same way a gate's are — `recordAnalysis({ heldTo })`.
+   *
+   * Empty means the finding was held to no agreed standard, which is a
+   * different state from meeting one and from failing one. S-3b: without this,
+   * `supported` meant "some evidence exists" and a finding whose own
+   * robustness checks had failed read as plainly supported.
+   */
+  standard: CheckStatus[];
+  /**
+   * The conditions in `standard` not currently passing — what would have to
+   * change for the finding to stand. A check nobody ran counts, exactly as it
+   * does for a gate.
+   */
+  unmet: string[];
   /**
    * Observations the supporting findings ultimately rest on, by the **name**
    * they were recorded under — `recordObservations({ name })`, not the

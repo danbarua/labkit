@@ -162,6 +162,9 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    */
   test("is the primary finding trustworthy? — the criteria that qualify it", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
+    // Both jobs, named explicitly: the same three checks gate the tertiary
+    // model and are the standard this analysis is held to. Before S-3b only
+    // the first was expressible.
     const enquiry = await session.openEnquiry("does T differ from rewired?");
     const observations = await session.recordObservations({
       enquiry,
@@ -173,6 +176,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       method: "holm-pairwise",
       from: [observations],
       concludes: [{ proposition: "T differs from rewired", finding: "p = 0.002, Holm-corrected" }],
+      heldTo: [primary, median, seed],
     });
 
     await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
@@ -184,16 +188,19 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("blocked");
 
-    // But the finding itself is reported as plainly supported. Nothing
-    // connects the prespecified criteria to the analysis they qualify, so
-    // "supported" here means "some evidence exists", not "the evidence holds
-    // up by its own prespecified standard".
-    //
-    // Asserted as it currently behaves, deliberately -- this is the wrong
-    // answer, tracked as ledger row V, and if someone fixes it this test
-    // should fail and be updated on purpose rather than silently drift.
+    // And so does the finding. This assertion read `true` from the day it was
+    // written until S-3b: nothing connected the prespecified criteria to the
+    // analysis they qualified, so "supported" meant "some evidence exists"
+    // rather than "the evidence holds up by its own prespecified standard".
+    // It was left asserting the wrong answer on purpose, as ledger row V, to
+    // be updated by whoever fixed it rather than drifting silently. Fixed by
+    // `QUALIFIES`; see tests/scenarios/s3b_criteria_qualify_only.test.ts.
     const why = await session.whySupported("T differs from rewired");
-    expect(why.supported).toBe(true); // WRONG: two prespecified checks failed
+    expect(await (await afterwards()).whySupported("T differs from rewired")).toEqual(why);
+    expect(why.supported).toBe(false);
+    expect([...why.unmet].sort()).toEqual([MEDIAN, SEED].sort());
+    // Disqualified, not withdrawn: the numbers are exactly as they were.
+    expect(why.support).toEqual([{ finding: "p = 0.002, Holm-corrected", via: "holm-pairwise" }]);
     expect(analysis.kind).toBe("analysis");
   });
 

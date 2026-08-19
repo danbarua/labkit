@@ -37,6 +37,7 @@ export const EDGE_LABELS = [
   "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
   "RECORDED_IN", // Evidence -> Artefact
   "GOVERNS", // Criterion -> Gate (which condition a gate enforces)
+  "QUALIFIES", // Criterion -> EvidenceUnit (which standard a finding is held to)
   "EVALUATED_AS", // Criterion -> CriterionEvaluation
   "TRIGGERS", // CriterionEvaluation -> Gate
   "GATES", // Gate -> Task/Computation
@@ -146,6 +147,30 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * whole control path reads left to right.
    */
   GOVERNS: [["Criterion", "Gate"]],
+  /**
+   * The standard a finding is held to, as distinct from the work a condition
+   * gates. Earned by S-3b (PJ-016), which is S-3's conversation with the
+   * downstream work removed.
+   *
+   * Demonstrated rather than argued: with prespecified robustness checks
+   * failing against the very analysis they were agreed about, `whySupported()`
+   * reported `supported: true` — "some evidence exists" rather than "the
+   * evidence holds up by the standard set for it". Criteria reached only
+   * `Gate`, so there was no path from a claim to the conditions it was
+   * supposed to satisfy, and the answer was confidently wrong rather than
+   * empty. Ledger row V.
+   *
+   * The endpoint is the `EvidenceUnit` rather than the `Claim` because a
+   * prespecified check is agreed about a *run* — "the checks we agreed before
+   * running it" — and applies to what that run concluded. One analysis whose
+   * conclusions are held to different standards would discriminate the two and
+   * is the scenario that would move this; nothing in the corpus does yet.
+   *
+   * Written when the analysis is recorded, not when a check is evaluated: a
+   * check that was never run must still count against the finding, and an edge
+   * minted by evaluation could not express one.
+   */
+  QUALIFIES: [["Criterion", "EvidenceUnit"]],
   EVALUATED_AS: [["Criterion", "CriterionEvaluation"]],
   TRIGGERS: [["CriterionEvaluation", "Gate"]],
   GATES: [["Gate", "Task"], ["Gate", "Computation"]],
