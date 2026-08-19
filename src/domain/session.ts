@@ -13,8 +13,9 @@
  * `recordAnalysis()` writes a computation, an evidence unit, an output
  * artefact, and one piece of evidence and one claim per conclusion.
  *
- * Scope: S-11 only (docs/project-journal/008_user_story_mining.md). Verbs are
- * added when a scenario needs them, not in anticipation.
+ * Scope: the scenarios built so far — S-11 (analysis replacement), S-17 and
+ * S-3 (the criterion/gate chain). See docs/project-journal/008_user_story_mining.md.
+ * Verbs are added when a scenario needs them, not in anticipation.
  */
 
 import type { TenantGraph } from "../db/graph";
@@ -24,6 +25,7 @@ import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./eve
 import type {
   AnalysisRef,
   CheckStatus,
+  EvaluationRecord,
   CriterionRef,
   GateRef,
   GateStatus,
@@ -210,13 +212,24 @@ export class ResearchSession {
     return { kind: "gate", id: gate.natural_id };
   }
 
-  /** Records that a criterion was actually evaluated, and what came back. */
+  /**
+   * Records that a criterion was actually evaluated, and what came back.
+   *
+   * The criterion must already govern the gate. Without that check an
+   * evaluation could be attached to an unrelated gate, and `gateStatus()`
+   * would mostly *hide* the result — its traversal starts from `GOVERNS`, so
+   * the malformed evaluation sits in the graph as durable nonsense without
+   * producing a visibly wrong report. Same invariant class as
+   * `assertReviewOf`, and checked before anything is written so a rejected
+   * command leaves no partial state.
+   */
   async evaluateCriterion(input: {
     criterion: CriterionRef;
     gate: GateRef;
     value: string;
     outcome: "pass" | "fail";
   }): Promise<void> {
+    await this.assertCriterionGovernsGate(input.criterion, input.gate);
     const at = this.clock.now();
     const evaluation = await this.graph.createNode("CriterionEvaluation", {
       value: input.value,
@@ -290,30 +303,60 @@ export class ResearchSession {
        OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)
        RETURN c, ev`,
       {
-        c: vertexProps<{ proposition: string }>(),
-        ev: optional(vertexProps<{ value: string; outcome: "pass" | "fail"; evaluated_at: string }>()),
+        c: vertexProps<{ natural_id: string; proposition: string }>(),
+        ev: optional(
+          vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
+        ),
       },
       { id: gate.id },
     );
 
-    const byCriterion = new Map<string, CheckStatus>();
-    const evaluations: GateStatus["evaluations"] = [];
+    // Keyed by natural id, not by proposition text. Two criteria worded
+    // identically are two criteria; whether they SHOULD be one is an identity
+    // question, and a read-side query must not settle it by string equality.
+    type TimedEvaluation = EvaluationRecord & { id: string };
+    const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
     for (const row of rows) {
-      const name = row.c.proposition;
-      const existing = byCriterion.get(name) ?? { criterion: name, state: "never-run" as const };
+      const id = row.c.natural_id;
+      const entry = byCriterion.get(id) ?? { proposition: row.c.proposition, evaluations: [] };
       if (row.ev) {
-        evaluations.push({ value: row.ev.value, outcome: row.ev.outcome, at: row.ev.evaluated_at });
-        // A failure sticks: one failing evaluation is decisive for that check
-        // even if a later run passed. Re-running until green is not evidence.
-        const state = existing.state === "failed" || row.ev.outcome === "fail" ? "failed" : "passed";
-        byCriterion.set(name, { criterion: name, state, value: row.ev.value, at: row.ev.evaluated_at });
-      } else {
-        byCriterion.set(name, existing);
+        entry.evaluations.push({
+          id: row.ev.natural_id,
+          value: row.ev.value,
+          outcome: row.ev.outcome,
+          at: row.ev.evaluated_at,
+        });
       }
+      byCriterion.set(id, entry);
     }
 
-    const checks = [...byCriterion.values()];
-    const unmet = checks.filter((c) => c.state !== "passed").map((c) => c.criterion);
+    const strip = ({ value, outcome, at }: TimedEvaluation): EvaluationRecord => ({ value, outcome, at });
+
+    const checks: CheckStatus[] = [];
+    const evaluations: GateStatus["evaluations"] = [];
+    for (const [id, entry] of byCriterion) {
+      // Cypher imposes no ordering, so sort explicitly: by time, then by
+      // identity. Without this, which evaluation gets reported as "the" value
+      // of a check is not a stable contract between runs.
+      const ordered = entry.evaluations.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+      evaluations.push(...ordered.map(strip));
+
+      // A failure sticks: one failing evaluation is decisive for this check
+      // even if a later run passed, so re-running until green is not
+      // evidence. NOTE this is an S-3 policy that currently applies to every
+      // gate -- see ledger row X, which asks whether a repaired artefact
+      // should stay blocked forever.
+      const decisive = ordered.find((e) => e.outcome === "fail") ?? ordered[0];
+      checks.push({
+        criterion: id,
+        proposition: entry.proposition,
+        state: decisive === undefined ? "never-run" : decisive.outcome === "fail" ? "failed" : "passed",
+        evaluations: ordered.map(strip),
+        ...(decisive ? { decidedBy: strip(decisive) } : {}),
+      });
+    }
+
+    const unmet = checks.filter((c) => c.state !== "passed").map((c) => c.proposition);
 
     // Order matters. Absence is checked before satisfaction so a gate nobody
     // evaluated can never fall through to "satisfied" (S-17); failure is
@@ -585,6 +628,17 @@ export class ResearchSession {
    * This is why `Review -[:EVALUATES]-> EvidenceUnit` is not decorative: it
    * constrains a research action, not just an explanatory query.
    */
+  private async assertCriterionGovernsGate(criterion: CriterionRef, gate: GateRef): Promise<void> {
+    const rows = await this.graph.query(
+      `MATCH (:Criterion {natural_id: $criterion})-[:GOVERNS]->(:Gate {natural_id: $gate}) RETURN 1`,
+      { ok: scalar<number>() },
+      { criterion: criterion.id, gate: gate.id },
+    );
+    if (rows.length === 0) {
+      throw new Error(`criterion ${criterion.id} does not govern gate ${gate.id}; it cannot be evaluated for it`);
+    }
+  }
+
   private async assertReviewOf(review: ReviewRef, analysis: AnalysisRef): Promise<void> {
     const rows = await this.graph.query(
       `MATCH (:Review {natural_id: $review})-[:EVALUATES]->(:EvidenceUnit)-[:USES]->(:Computation {natural_id: $analysis})

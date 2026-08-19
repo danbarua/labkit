@@ -57,7 +57,31 @@ This is the second prediction to dissolve rather than confirm — row B was the
 first — and like row B it stays in the ledger, because a prediction that
 fails to materialise is a result.
 
-What carries it is entirely **derived**, nothing stored:
+**What was actually established needs stating in three parts, because the
+first draft of this entry collapsed them:**
+
+```
+Row A                 REFUTED. Individual criterion evaluations remain
+                      genuinely binary; pass, fail, and structurally absent
+                      are enough to describe the individual checks.
+
+Control state         EXPRESSIBLE. Whether the tertiary analysis may run is
+                      never-evaluated / incomplete / blocked / satisfied,
+                      derived rather than stored.
+
+Epistemic standing    UNRESOLVED. The primary finding still reports as
+                      supported despite failing its own prespecified
+                      robustness standard. Row V owns this.
+```
+
+The four gate states carry the *gating consequence*. They do not carry the
+scientific conclusion "inconclusive" — the scenario's own test asserts
+`whySupported()` still returns `supported: true`. Saying "what carries it is
+entirely derived" overclaims by one layer, and the more interesting result is
+the layer that is still missing.
+
+The gating consequence, then, is what is entirely **derived**, nothing
+stored:
 
 - **Four gate states** — `never-evaluated` / `incomplete` / `blocked` /
   `satisfied`. The ordering is the substance: absence is checked before
@@ -175,5 +199,14 @@ different operation with a different bar.
   "passed". Structure went into the query and the stored model stayed thin —
   which is the pattern this project appears to be converging on rather than
   a rule anyone imposed.
+- **`incomplete` is the one state no test forced.** It was reasoned into
+  existence rather than demonstrated, which by this project's own bar is a
+  weaker warrant than everything around it.
+- **The control chain is splitting into three concepts that looked like
+  one**: criterion truth (was it evaluated, and what came back), gate policy
+  state (may the protected work proceed), and epistemic standing of a finding
+  (does the result hold up). S-17 separated the first two; S-3 exposed the
+  missing connection to the third. That is the shape of the region, and it
+  was not visible before either scenario ran.
 - **S-17's tests were kept running rather than retired**, which is what
   caught the scope collapse in §3.

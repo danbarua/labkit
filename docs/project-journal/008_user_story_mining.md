@@ -687,6 +687,8 @@ this document's original analysis are marked as such.
 | T | Edges cannot carry properties | `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)` | S-7, row O | **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed |
 | U | A gate records no condition until it is evaluated | only path `Criterion`→`Gate` ran via `CriterionEvaluation`; `GateProps` is `{consequence}` | S-17 | **CONFIRMED — resolved.** Added `GOVERNS: Criterion → Gate`. PJ-004 #9's chain correctly stops anything flowing out of an untriggered gate, but it also made the governing criterion reachable *only* through an evaluation — so a declared-but-unevaluated gate, which is exactly S-17's subject, recorded no condition at all. Demonstrated: `criterionGoverning()` returned null, so the reviewer's demand ("show me it fails when the artefact is wrong") could not be aimed at anything |
 | V | Criteria gate work but do not qualify findings | `Criterion -GOVERNS-> Gate -GATES-> Task\|Computation`; nothing connects a criterion to the analysis it qualifies | S-3 | **NEW, CONFIRMED, deliberately unresolved.** Demonstrated wrong answer: with two prespecified robustness checks failed, `whySupported()` still reports the finding `supported: true` — "some evidence exists" rather than "the evidence holds up by its own prespecified standard". Two plausible models and S-3 does **not** discriminate, because its criteria do both jobs at once: (a) `Criterion -QUALIFIES-> EvidenceUnit`, or (b) extend `GATES` so a gate can gate a `Claim`'s standing. A scenario where criteria qualify a finding but gate nothing — or the reverse — would decide it |
+| W | An evaluation record is not evidence of evaluation | `CriterionEvaluation {value, outcome}` can be minted directly; `BASED_ON: CriterionEvaluation → Evidence` exists and is never written | S-17, S-3 | **NEW, DEFERRED.** S-17's motivating failure was a guard that *looked* implemented but had never demonstrated the required behaviour. Recording `outcome: "fail"` with no provenance for how that was reached risks recreating exactly that gap one level up. Two propositions hide here: "the criterion was recorded as failing" and "the criterion was exercised against evidence and failed." A later scenario should say whether an evaluation is itself sufficient durable evidence, or needs provenance through Evidence/EvidenceUnit/Computation |
+| X | "Failure sticks" is S-3 policy applied to every gate | `gateStatus()` treats any failing evaluation as permanently decisive | S-3, S-17 | **NEW, DEFERRED.** S-3 earns "re-running a robustness test until green must not erase the earlier failure". It does not earn "any failure blocks every gate forever", which is what is implemented. For S-17's hash check — artefact corrupted, criterion fails, artefact repaired, criterion passes — a permanent block is plausibly wrong. There may eventually be four distinct things here: historical failure evidence, current gate satisfaction, admissible re-evaluation, and superseded evaluation |
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from
@@ -718,9 +720,10 @@ not gate-scoped state ("has this condition been checked *for this gate*?").
 Collapsing them made a gate nobody had evaluated report as blocked because
 its criterion had failed elsewhere.
 
-**Status after S-17.** Row **U** added and resolved; row **A** (binary
-`pass`/`fail`) took no pressure — S-17's outcomes are genuinely binary, and
-it is S-3 that needs a third. Rows **I** and **S** were predicted to feel
+**Status after S-17.** Row **U** added and resolved; row **A** took no
+pressure here — S-17's outcomes are genuinely binary. (Written before S-3
+ran, this originally predicted S-3 would need a third value. It did not; see
+the S-3 status above.) Rows **I** and **S** were predicted to feel
 S-17 and did not: "never evaluated" turned out to be answerable structurally
 (zero evaluations is a distinct state, not a synthetic failure), and nothing
 in S-17 asked who evaluated. The prediction that S-17 would pass unchanged

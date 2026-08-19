@@ -97,7 +97,9 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     // Seed stability is never evaluated at all.
 
     const status = await session.gateStatus(gate);
-    const byName = Object.fromEntries(status.checks.map((c) => [c.criterion, c.state]));
+    // Keyed by proposition for readability here; `criterion` is the stable
+    // identity and two criteria worded alike are two criteria.
+    const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c.state]));
     expect(byName[PRIMARY]).toBe("passed");
     expect(byName[MEDIAN]).toBe("failed");
     expect(byName[SEED]).toBe("never-run");
@@ -177,6 +179,52 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const why = await session.whySupported("T differs from rewired");
     expect(why.supported).toBe(true); // WRONG: two prespecified checks failed
     expect(analysis.kind).toBe("analysis");
+  });
+
+  /**
+   * Two criteria worded identically are two criteria. Aggregating by
+   * proposition text collapsed them into one check — which is the "two things
+   * treated as one" shape that has caused every expensive mistake in this
+   * project so far (PJ-012 §1).
+   */
+  test("two criteria worded identically are two separate checks", async () => {
+    const work = await session.planWork({ objective: "downstream work", acceptance: "both hold" });
+    const first = await session.stateCriterion("seed stability is adequate");
+    const second = await session.stateCriterion("seed stability is adequate");
+    const gate = await session.declareGate({
+      governedBy: [first, second],
+      consequence: "block unless both hold",
+      protecting: [work],
+    });
+
+    await session.evaluateCriterion({ criterion: first, gate, value: "within tolerance", outcome: "pass" });
+
+    const status = await session.gateStatus(gate);
+    expect(status.checks).toHaveLength(2);
+    expect(new Set(status.checks.map((c) => c.criterion)).size).toBe(2);
+    // One checked, one not -- which the collapsed version could not express.
+    expect(status.checks.filter((c) => c.state === "passed")).toHaveLength(1);
+    expect(status.checks.filter((c) => c.state === "never-run")).toHaveLength(1);
+    expect(status.state).toBe("incomplete");
+  });
+
+  /**
+   * Which evaluation is reported as deciding a check must not depend on the
+   * order Cypher happens to return rows.
+   */
+  test("the evaluation that decided a failed check is the failing one, deterministically", async () => {
+    const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
+    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
+    await session.evaluateCriterion({ criterion: seed, gate, value: "within tolerance", outcome: "pass" });
+    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.21", outcome: "fail" });
+    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.04 on a second run", outcome: "pass" });
+
+    const check = (await session.gateStatus(gate)).checks.find((c) => c.proposition === MEDIAN)!;
+    expect(check.state).toBe("failed");
+    // The decisive record is the failure, not whichever row came back last.
+    expect(check.decidedBy).toMatchObject({ value: "median p = 0.21", outcome: "fail" });
+    // ...and the history is retained rather than overwritten.
+    expect(check.evaluations).toHaveLength(2);
   });
 
   test("re-running a failed check until it passes does not clear it", async () => {

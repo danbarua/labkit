@@ -67,10 +67,12 @@ export interface UnaffectedRecord {
 /**
  * Whether a gate may be relied on — S-17's four Afterward questions.
  *
- * `state` deliberately has three values, not two. "Never evaluated" is not a
- * kind of failure and must never read as a pass: a gate nobody has evaluated
- * and a gate that evaluated and failed are different situations, and PJ-001's
+ * `state` deliberately has four values. "Never evaluated" is not a kind of
+ * failure and must never read as a pass: a gate nobody has evaluated and a
+ * gate that evaluated and failed are different situations, and PJ-001's
  * doctrine is that a missing evaluation must not be confused with a pass.
+ * `incomplete` covers the fourth case a multi-criterion gate creates — some
+ * conditions checked, none failing, others never run.
  */
 export interface GateStatus {
   gate: string;
@@ -80,6 +82,10 @@ export interface GateStatus {
    * "some checked, none failing" is a real situation distinct from all three
    * others. `blocked` takes precedence over `incomplete`: a failure is
    * decisive regardless of what else remains unrun.
+   *
+   * Note that these describe **control state** — whether the protected work
+   * may proceed. They deliberately say nothing about the epistemic standing
+   * of any finding; see ledger row V.
    */
   state: "never-evaluated" | "incomplete" | "blocked" | "satisfied";
   /**
@@ -105,10 +111,28 @@ export interface GateStatus {
 }
 
 export interface CheckStatus {
+  /** Stable identity. Two criteria worded identically are two criteria. */
   criterion: string;
+  /** Display text. Not an identity — see `criterion`. */
+  proposition: string;
   state: "passed" | "failed" | "never-run";
-  value?: string;
-  at?: string;
+  /**
+   * Every evaluation of this criterion for this gate, oldest first, ties
+   * broken by identity. Cypher imposes no ordering, so without an explicit
+   * sort "the value of this check" is not a stable contract.
+   */
+  evaluations: EvaluationRecord[];
+  /**
+   * The evaluation that decided `state` — the failing one where a check
+   * failed, since failure is decisive. Absent for a check never run.
+   */
+  decidedBy?: EvaluationRecord;
+}
+
+export interface EvaluationRecord {
+  value: string;
+  outcome: "pass" | "fail";
+  at: string;
 }
 
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */

@@ -126,6 +126,34 @@ describe("S-17: does the guard actually guard?", () => {
   });
 
   /**
+   * An evaluation must be attached to a gate the criterion actually governs.
+   * Without the guard, gateStatus() would mostly HIDE the malformed
+   * evaluation — its traversal starts from GOVERNS — so the graph would carry
+   * durable nonsense without producing a visibly wrong report.
+   */
+  test("a criterion cannot be evaluated against a gate it does not govern", async () => {
+    const { gate } = await aDeclaredButUnevaluatedGate();
+    const unrelated = await session.stateCriterion("an unrelated condition");
+    const otherWork = await session.planWork({ objective: "other work", acceptance: "n/a" });
+    await session.declareGate({
+      governedBy: [unrelated],
+      consequence: "block other work",
+      protecting: [otherWork],
+    });
+
+    await expect(
+      session.evaluateCriterion({ criterion: unrelated, gate, value: "irrelevant", outcome: "fail" }),
+    ).rejects.toThrow(/does not govern gate/);
+
+    // Rejected before anything was written: the gate is untouched, and no
+    // stray evaluation is sitting in the graph.
+    const status = await session.gateStatus(gate);
+    expect(status.state).toBe("never-evaluated");
+    expect(status.evaluations).toEqual([]);
+    expect(status.everFailed).toBe(false);
+  });
+
+  /**
    * The reviewer's actual demand: "show me evidence that it fails when the
    * protected artefact is wrong." That is a question about the CRITERION, not
    * about this gate's history -- it should be answerable without knowing

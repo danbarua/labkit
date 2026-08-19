@@ -15,6 +15,7 @@ export type {
   SupportExplanation,
   GateStatus,
   CheckStatus,
+  EvaluationRecord,
   CriterionRef,
   GateRef,
   WorkRef,
