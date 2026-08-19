@@ -1492,6 +1492,43 @@ commit.* The check-itemisation logic is now shared between the two readers, so
 a condition cannot report one state through the gate it governs and another
 through the finding it qualifies.
 
+### S-3c predictions, recorded before the build
+
+Recorded 2026-08-19, against `d9e1180`, before a line of test or source was
+written. S-3c is row X's discriminator (specified under Row X above). The
+headline prediction is again **no schema change**: the state that tells the two
+cases apart is already in the graph and simply never consulted.
+
+The rule under test is one line, `checksFrom()` in `src/domain/session.ts`:
+
+```ts
+const decisive = ordered.find((e) => e.outcome === "fail") ?? ordered[0];
+```
+
+| Question | Prediction |
+| --- | --- |
+| Is the wrong answer *demonstrated* or merely empty? | **Demonstrated, and confidently so.** Case 2 will report `state: "failed"`, `gateStatus.state: "blocked"` and `whySupported.supported: false` — populated, plausible and wrong — not an empty result. This is the bar row X has never yet cleared |
+| What distinguishes the two cases? | **The standing of the failing evaluation's own basis.** Since S-8, `CriterionEvaluation -BASED_ON-> Evidence`. In case 1 that basis still stands; in case 2 the analysis that produced it was reviewed and replaced, so its output artefact carries `invalidated = true`. `checksFrom()` reads `ev.outcome` and never asks. The path is `CriterionEvaluation -BASED_ON-> Evidence <-PRODUCES- EvidenceUnit -USES-> Computation -PRODUCES-> Artefact` and every hop already exists |
+| New node or edge? | **Neither.** Predicting zero additions to `NODE_TYPES` and `EDGE_SCHEMA`, and zero migrations — the same result S-5 produced against a louder prediction |
+| New verb? | **None.** The scenario should be expressible with `recordReview` + `replaceAnalysis` (S-11) to retire the defective check, and `evaluateCriterion({ citing })` (S-8) to record the corrected verdict. If a new verb turns out to be needed, the interesting finding is *which* act had no home |
+| Where does the fix land? | **The read side**, per "prefer structure in the query over structure in the stored model". `checksFrom()` is pure and shared, so the basis-standing must arrive through *both* feeding queries — `gateStatus()` and `whySupported()`. One rule, two readers: exactly row X's stated blast radius |
+| Does case 1 stay failed? | **Yes, untouched.** Re-running a check unchanged leaves the original failing evaluation's basis standing, so nothing about S-3's earned policy changes. If this prediction breaks, the fix is too broad and has eaten the rule it was meant to narrow |
+| Row X's status afterward | `resolved` if the wrong answer is demonstrated and cleared; **`refuted` is a live possibility** and would be a real result — it would mean "failure sticks" is correct as shipped and the sympathetic case was an illusion |
+
+**Two things deliberately not predicted.** Whether the corrected evaluation
+should *supersede* the earlier one or merely outrank it while both stay
+readable — the Afterward bullet "which historical evaluations remain readable"
+is there to decide that, not preference. And whether an invalidated basis
+should make the check `passed` or return it to `never-run`; both are defensible
+and the scenario should pick the one it can justify.
+
+**The known hazard.** This makes "the check was defective" a lever anyone can
+pull to clear an inconvenient failure. That the lever requires a recorded
+`Review` with a verdict, and a replacement analysis, is the audit trail — but
+whether that is *enough* is a question about authority, and LabKit has no actor
+model by decision. Expect to record this rather than solve it; if it wants an
+actor it belongs with the deferred identity work, not here.
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
