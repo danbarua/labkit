@@ -24,8 +24,13 @@ support machinery S-3c had just changed. Both good; neither forced.
 
 ## Changed
 
-Thirteen commits: two scenarios built, two ledger rows cleared, one AGE bug
-found, two journal entries written. +1,846 / −117 across 14 files.
+Two scenarios built, two ledger rows cleared, one AGE bug found, two journal
+entries written.
+
+*No commit count or total diffstat here, deliberately.* Both go stale the moment
+this file is committed, and the Stop hook then re-fires on the commit that fixed
+them. `git log b3d6f33..` is authoritative and never wrong. The commits below are
+listed because **which** commit did what is durable; how many there were is not.
 
 - `d6a34c8` — another session's rewrite of `docs/session-log/002`. Input, not
   authored here.
@@ -37,10 +42,13 @@ found, two journal entries written. +1,846 / −117 across 14 files.
   AGE fix, then PJ-018 and the ledger.
 - `e1665bf`, `dd5c683`, `3b12e61` — **S-10**: predictions, build, the ledger.
 - `29a58ab` — PJ-019, and CLAUDE.md brought up to date.
+- `0740eea`, `21dc34d`, and this file's own commit — wrap bookkeeping, plus the
+  correction recorded under Goal.
 
-Source: `src/domain/session.ts` (+237), `src/domain/report.ts` (+90),
-`src/db/domain.ts` (+25, the `REVERIFIES` edge), `src/db/agtype.ts` (+14, the
-column-name guard). Two scenario files, ~594 lines.
+Source, stable because no later commit touches it: `src/domain/session.ts`
+(+237), `src/domain/report.ts` (+90), `src/db/domain.ts` (+25, the `REVERIFIES`
+edge), `src/db/agtype.ts` (+14, the column-name guard). Two scenario files, 594
+lines.
 
 Tree is clean.
 
@@ -77,7 +85,9 @@ when there are four.
 
 ## Open
 
-**Three mistakes made this session, all fixed, all worth knowing:**
+**Three self-inflicted errors, all fixed, all worth knowing.** Note these are
+distinct from the four *wrong predictions*, which are the method working and are
+recorded in PJ-008 as results.
 
 1. *A wrong diagnosis committed as fact.* `ced0388` shipped a docstring
    asserting AGE cannot bind a two-hop `OPTIONAL MATCH`, with a query
@@ -90,10 +100,15 @@ when there are four.
    making rows O, T, Z and AA all claim S-3c owned them. Restored in `a20b9a1`
    and diffed against the pre-edit file. Several PJ-008 rows share verbatim
    text — scope any replace to the row's own section.
-3. *Two predictions in each scenario were wrong*, which is the method working
-   rather than a defect, but the S-10 pair are worth carrying: row P was
-   predicted to fire and did not, and the "compare numerically" bullet was
-   predicted as a refusing verb and landed as report fields.
+3. *An unchecked "only" claim*, corrected in `21dc34d` — see Goal. S-10 was
+   justified as the sole candidate when there were two. Written into a
+   predictions commit, repeated aloud, and carried into this entry without ever
+   being checked against the table it described. The most instructive of the
+   three: the other two were wrong about the world, this one presented a
+   judgment as forced, which is what makes a choice unauditable afterwards.
+
+All three share a shape — a claim asserted with the evidence one command away.
+The AGE probe took two minutes; the ledger check took one.
 
 **Genuinely open, not fixed:**
 
