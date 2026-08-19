@@ -1290,6 +1290,68 @@ guarantee the system cannot give.
 
 *One bullet was declined rather than answered* — see row S.
 
+---
+
+### S-3b — the same design with nothing downstream
+
+Authored 2026-08-19, from **story 3**, and deliberately not from §2. Ledger row
+**V** names the probe that would settle it: *a scenario where criteria qualify
+a finding and gate nothing*. S-8 supplied the reverse case and, exactly as
+predicted, could only narrow the row. §1 and §2 are held at their original
+wording, so this scenario lives here in §3's living part, with its provenance
+stated plainly: it is S-3's conversation with the tertiary model taken away.
+Nothing else changes — the same prespecified checks, the same significant
+primary result, the same robustness check that disagrees. Removing the second
+of the two jobs S-3's criteria do at once is the whole experiment.
+
+**Conversation.**
+
+> **Agent:** T vs rewired is Holm-significant under the primary test.
+> **Researcher:** And the checks we agreed before running it?
+> **Agent:** Median aggregation is non-significant. Seed stability was never
+> run.
+> **Researcher:** Nothing is waiting on this — there's no further model to
+> fit. I only want to know whether the finding stands.
+> **LabKit:** Not by the standard you set for it. One agreed check disagrees,
+> one was never performed, and the significant result is what they were agreed
+> about.
+
+**Afterward — LabKit must answer:**
+
+- *Does the finding stand?* → no — and specifically not because evidence is
+  missing. The evidence exists, says what it always said, and fails the
+  standard it was held to.
+- *By what standard?* → the prespecified checks, itemised, with the
+  disagreeing one distinguishable from the one never run. S-3's third
+  Afterward bullet, asked of the finding instead of the work.
+- *What is waiting on those checks?* → nothing. The answer must say nothing
+  rather than name work that does not exist.
+- *Are the numbers still good?* → yes. Disqualified is not withdrawn, which is
+  S-12's distinction: the primary result is still evidence, still supports what
+  it supports, and nothing about it has been retracted.
+
+**Expressibility.** The agreed checks cannot be recorded at all without first
+declaring a gate, because a gate is the only thing `evaluateCriterion()` will
+attach a verdict to. Whether that is a defect or the model correctly insisting
+that a standard is a control object is what this scenario exists to decide.
+
+### S-3b predictions, recorded before the build
+
+Recorded 2026-08-19. Row V has been the one confirmed wrong answer shipping
+green since S-3, and CLAUDE.md's deferral rule makes clearing it the next thing
+built. Unlike S-8, this scenario is expected to **settle the row or refute the
+attempt** — there is no half available, because the qualification job is now
+the only job left in the scenario.
+
+| Row / question | Prediction |
+| --- | --- |
+| V — criteria gate work but do not qualify findings | **Settled, model (a).** The demonstration is a *pair* of wrong answers, both measured against today's code before this was written, using a gate declared with nothing to protect: `gateStatus()` returns `state: "blocked"` with `gating: []` — blocked, naming nothing blocked — and `whySupported()` returns `supported: true` for a finding one of whose own prespecified checks failed against it. Expect the fix to be (a)-shaped: a relationship from the criterion to the thing it qualifies |
+| what this scenario does *not* do | **It does not mechanically refute model (b)**, and the write-up must say so. Under (b) the fix is a gate on a claim's standing, which is exactly what the phantom gate above would become. What closes (b) is this scenario *plus* S-8: `GATES` is already fully occupied with control semantics, and giving one edge two readings is the "two things treated as one" shape PJ-012 §1 names as the source of every expensive mistake in this project. That is the ledger deciding, not the demonstration |
+| the endpoint of the new relationship | **Deliberately not predicted.** Row V wrote model (a) as `Criterion -QUALIFIES-> EvidenceUnit`, which was recorded before S-5 derived claim scope by traversal. `EvidenceUnit`, `Evidence` and `Claim` are all live candidates; the Afterward bullets should pick, and whichever endpoint answers "does the finding stand?" without introducing a second identity rule is the right one. Naming it here would be the self-fulfilling refactor §3's judgment calls warn about |
+| the API shape | **Also deliberately not predicted.** Recording a qualification-only check either makes `gate` optional on `evaluateCriterion()` or earns its own verb. Expect the choice to be forced by whether `gateStatus()` stays coherent for a gate that gates nothing — if it does not, that is itself the argument that the gate should never have been there |
+| X — "failure sticks" is S-3 policy applied to every gate | **Bites harder, and still not settled.** In S-3 a stuck failure blocks work someone can re-run; qualification makes it mark a finding as not standing permanently, and "the median check was re-run after a coding error in the check itself" is a far more sympathetic case than re-running until green. Expect to record that and leave it, since clearing V is what licenses shipping anything at all here |
+| the rest of the chain | No new node label and no migration, consistent with every scenario since S-11. One edge in `EDGE_SCHEMA`, provisioned by reconciliation, with its reader written in the same commit — row W's lesson, applied in the right order this time |
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
