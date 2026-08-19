@@ -813,6 +813,21 @@ evidence — a diagnosis carries `SUPPORTS` like any finding — but is derivabl
 from what the amendment *changes*: it is scientific exactly when a confirmatory
 result stands in its blast radius. Nobody can set it.
 
+### S-12 predictions, recorded before the build
+
+Recorded 2026-08-19, before the scenario existed. S-12 is the first probe of
+what a `Claim` actually *is*, which is the least settled part of the noun
+inventory after six scenarios in which the rest of it has held.
+
+| Row / question | Prediction |
+| --- | --- |
+| B — supersession is decision-only | **Resolves as "claim-level supersession is not real."** S-7 built the machinery: a decision that `CHANGES` the thing it replaces, chained to the previous decision by `SUPERSEDES`, with the current version derived as the one nothing changed. Expect that shape to transfer from a design condition to an interpretation, needing one endpoint pair (`CHANGES: Decision → Claim`) and no `Claim → Claim` edge |
+| N — claim identity undefined | **The demonstrated wrong answer, and the point of the scenario.** Two analyses concluding one proposition mint two `Claim` nodes today, while `whySupported()` matches by `name` and so silently treats them as one. Withdraw one and the other still stands: "what does the record claim now" returns the retracted interpretation. Expect a service-layer fix — reuse the existing node for a proposition already asserted — and expect it to sit uneasily against row **C**, since two enquiries asserting the same sentence about different scopes would then share a claim |
+| O — withdrawal reason under-determined | Does not bite. The reinterpretation names the review that caused it. Still deferred |
+| act→product (row AB) | **No new edge.** Predicting S-7's remedy transfers: the narrower interpretation is recoverable as the claim no decision has changed, exactly as the current design condition is. If that fails, row AB gets a third instance and starts to look like a relationship after all |
+| does this require recomputation? | **No, and demonstrably.** Nothing invalidated, no artefact touched, and the observations still reachable underneath the narrower claim. This is the assertion that keeps reinterpretation from quietly becoming `replaceAnalysis` |
+| what downstream depends on the old interpretation? | **Answerable, not empty.** `Decision -BASED_ON-> Evidence -SUPPORTS-> Claim` already exists, so a question closed on the old reading is reachable. Expect that to be the enumerable answer, and expect it to be a genuinely different answer from S-11's, which was about invalidated inputs |
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
