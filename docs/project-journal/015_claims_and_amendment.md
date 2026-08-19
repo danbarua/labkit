@@ -5,7 +5,8 @@
 S-5 (`0aaa3e4`, `8aaa17c`, `51b70d6`), plus `d8134d2` and `af5a1d2`. Rows B, C,
 N and R resolved; rows AA, AB, AC added; rows V, W, X still open. Verification
 at the time of writing: 130 pass / 0 fail, typecheck clean, `npx depcruise src
-tests --output-type err` 0 errors.**
+tests --output-type err` 0 errors. One judgment call below was subsequently
+cleared by S-8; the entry is otherwise as written.**
 
 ## Context
 

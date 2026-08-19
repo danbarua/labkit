@@ -26,8 +26,10 @@ export interface Scenario {
    * assertion made through it cannot be reading a value the test kept in a
    * local variable, and it would catch a `ResearchSession` or `TenantGraph`
    * that started memoising. Today neither holds any query state, so against a
-   * plain re-query on the same session the marginal proof is small — this is
-   * cheap insurance against a future cache, not a strong proof in itself.
+   * plain re-query on the same session the marginal proof is **nil** — checked,
+   * not assumed: pointing every durable read in S-3 back at the writing session
+   * leaves all nine tests passing. This is cheap insurance against a future
+   * cache, not a proof in itself, and it should not be described as one.
    *
    * It deliberately does **not** open a new connection: `@electric-sql/pglite-socket`
    * has a confirmed concurrency bug (see tests/helpers/db.ts and PJ-006), so

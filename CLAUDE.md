@@ -50,6 +50,11 @@ binary — `src/cli.ts`/`src/index.ts` are currently stubs, not a working CLI.
 `bun test` exits with a non-zero code even when every test passes — this is
 a known `bun test` + PGlite WASM teardown interaction, not a failure signal.
 Read the actual pass/fail counts in the output, don't trust the exit code.
+`bun examples/full-lifecycle.ts` does the same: it exits **99** on a completely
+successful run, and has since long before anyone noticed. Judge it by whether
+the output ends with `closed connection cleanly` and contains no raw graphids.
+Note also that `$?` after a pipeline reports the *last* command's status, so
+`bun ... | tail` will happily report success that isn't there.
 
 ## Architecture: two persistence halves, deliberately not one
 
