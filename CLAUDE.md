@@ -21,9 +21,10 @@ layer is built against), 009 (the first scenario built from it), 010 (a
 cold-context review of both), 011 (the control chain under scenario pressure),
 then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
 S-12, S-5), 016 (the standard a finding is held to: S-3b), 018 (when a failed
-check stops counting: S-3c) and **019 (re-verification is not reproduction:
-S-10)** — those are the current state of the domain model, and 019 is the newest
-decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
+check stops counting: S-3c), 019 (re-verification is not reproduction: S-10) and
+**020 (a third external review: atomicity, and identity by wording again)** —
+those are the current state of the domain model, and 020 is the newest decision
+in the chain. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
@@ -124,6 +125,18 @@ per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
 - `closeDecision(id)` — the only sanctioned way to set `Decision.is_open`/
   `closed_at`; `NODE_TYPES.Decision.validate` enforces the same invariant at
   creation.
+
+A compound domain verb must run inside `graph.inTransaction(fn)` — everything
+it writes commits together or none of it does. Earned by external review of
+S-3c (PJ-020), by negative test: `replaceAnalysis()` invalidates the superseded
+output *before* recording the replacement, and since S-3c invalidating an output
+withdraws the criterion evaluations that cited it, so a failure between the
+halves left an earlier failure no longer deciding its check and no corrected
+check in existence. `reverify()`, `replaceAnalysis()` and `recordAnalysis()` use
+it; `reinterpret()` and `amendDesign()` should when a scenario next touches
+them. It is re-entrant by depth, so a composed verb does not nest `BEGIN`. Note
+this is a transaction boundary, not an escape hatch: no caller gains the ability
+to issue Cypher this class would not otherwise run.
 
 There is deliberately no raw-string escape hatch on `TenantGraph`. If a query
 needs a shape the decoders don't cover, add a decoder to `src/db/cypher.ts`
@@ -247,6 +260,14 @@ prespecified check nobody ran must still count against the finding it
 qualifies, so `QUALIFIES` is written when the analysis is recorded and not when
 the check is evaluated — the same edge minted at the later moment cannot
 express the case the scenario exists for (S-3b, PJ-016).
+
+**Identity is never wording.** Five unrelated regions have now had to decide
+this — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
+(S-3c), and execution inputs (S-10, caught by review after shipping wrong).
+Three of the five got it right first time because someone asked at the time, so
+the rule is not "we keep failing at this" but **every new comparison is a fresh
+chance to fail at it**: when you write an equality test between two records, say
+out loud which field carries identity.
 
 A claim is identified by its **proposition within a line of enquiry**, never by
 its wording alone. Two stages of one programme can assert the same sentence
@@ -418,6 +439,12 @@ mattered. Working gotchas:
   `OPTIONAL MATCH` bound — both verified directly against this backend when
   the case-folding bug above was mistaken for an AGE limitation. Don't
   restructure a query around a limit that isn't there.
+- **No `NOT (pattern)` predicate in `WHERE`** — `WHERE NOT (e)-[:R]->(:X)` is a
+  syntax error (`cypher_yyerror`), not merely unsupported. Fetch the candidate
+  and filter in TypeScript, as `whySupported()`'s `restingOn` does. Watch the
+  precedence trap next door too: `WHERE a IS NULL OR a = false AND NOT ...`
+  binds the `AND` tighter than the `OR`, so parenthesise before assuming a
+  filter means what it reads like.
 - **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
   `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
   form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a
