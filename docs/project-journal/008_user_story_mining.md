@@ -692,11 +692,11 @@ this document's original analysis are marked as such.
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
-| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b, S-3c° | open |
+| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b, **S-3c** | resolved |
 | Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14° | boundary |
 | Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
-| AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7** | resolved |
+| AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
@@ -717,7 +717,7 @@ to be that well informed:
 
 | Kind | Means | Rows today |
 | --- | --- | --- |
-| `open` + owned | an unbuilt discriminator is named (`°` present) | E, F, J, K, P, X |
+| `open` + owned | an unbuilt discriminator is named (`°` present) | E, F, J, K, P |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | O, S, T, Z |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
@@ -882,11 +882,10 @@ its only unbuilt owner.
 
 **Current state (verified):** `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation
 
-> **Now owned, as of the S-3c brief below.** This row spent its whole life
-> unowned — every named scenario built, nothing that would settle it. That is
-> no longer true: a discriminator is specified below and unbuilt. The note is
-> kept rather than deleted because "unowned for four scenarios" is itself a
-> fact about how long the model went without a probe for this.
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
 
 **NEW, DEFERRED.** Two shapes of the same gap: with no review the reason is manufactured (row **I** again — probably should be null); with several reviews of one unit the causal one is ambiguous. May want no relationship at all, since it describes *why state changed* rather than *what current state is* — which is what the event history is for. Deferred until the event model is under real pressure
 
@@ -944,11 +943,10 @@ any other. This row therefore has no owner again until identity work begins.
 
 **Current state (verified):** `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)`
 
-> **Now owned, as of the S-3c brief below.** This row spent its whole life
-> unowned — every named scenario built, nothing that would settle it. That is
-> no longer true: a discriminator is specified below and unbuilt. The note is
-> kept rather than deleted because "unowned for four scenarios" is itself a
-> fact about how long the model went without a probe for this.
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
 
 **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed
 
@@ -1031,15 +1029,16 @@ checked by inspection — the point is that the record says which happened.
 
 ### Row X — "Failure sticks" is S-3 policy applied to every gate
 
-**Scenarios:** S-3, S-17, S-3b, S-3c° · **Status:** open
+**Scenarios:** S-3, S-17, S-3b, **S-3c** · **Status:** resolved
 
 **Current state (verified):** `gateStatus()` treats any failing evaluation as permanently decisive
 
-> **Now owned, as of the S-3c brief below.** This row spent its whole life
-> unowned — every named scenario built, nothing that would settle it. That is
-> no longer true: a discriminator is specified below and unbuilt. The note is
-> kept rather than deleted because "unowned for four scenarios" is itself a
-> fact about how long the model went without a probe for this.
+> **Owned, then cleared, in one sitting.** This row spent four scenarios
+> unowned — every named scenario built, nothing that would settle it — then
+> gained S-3c as a discriminator and was closed by it the same day. The history
+> is kept because "unowned for four scenarios" is a fact about how long the
+> model went without a probe for this, and the speed of the close once one
+> existed is a fact about what was actually missing: a scenario, not a model.
 
 **NEW, DEFERRED.** S-3 earns "re-running a robustness test until green must not erase the earlier failure". It does not earn "any failure blocks every gate forever", which is what is implemented. For S-17's hash check — artefact corrupted, criterion fails, artefact repaired, criterion passes — a permanent block is plausibly wrong. There may eventually be four distinct things here: historical failure evidence, current gate satisfaction, admissible re-evaluation, and superseded evaluation
 
@@ -1087,6 +1086,33 @@ mined**, and PJ-016's precedent for that is the most contested decision in the
 arc — whoever builds this has to face that question rather than inherit it.
 And a specified discriminator is not a built one; X is owned, not resolved
 
+**S-3c: built, demonstrated, resolved.** The wrong answer was confidently
+wrong, which is what this row had never managed to show: with a robustness
+check reviewed, replaced and re-run correctly, `whySupported()` returned
+`supported: false` and `gateStatus()` returned `blocked` — populated, plausible,
+and about a finding nothing was wrong with. Indistinguishable from re-rolling
+the dice, which is the one case S-3 existed to prevent.
+
+The narrowing is one clause: a verdict decides its check only if it still
+stands, and a verdict whose entire basis has been withdrawn does not. It stays
+in `evaluations`, marked `withdrawn`, because erasing it would leave no record
+of why the finding was ever in doubt.
+
+**Verified in both directions, which is what makes it a narrowing rather than a
+removal.** Delete the filter and exactly the three defective-check assertions
+fail. Widen it to "the last verdict wins" and S-3's own two tests fail with it.
+The rule is as narrow as it has to be, and the second check is the one that
+matters — a fix that cleared this case while also clearing S-3's would have
+looked green on this scenario alone.
+
+*What it did not need:* no new node label, no new edge, no migration, no new
+verb. Three consecutive scenarios have now moved nothing in `NODE_TYPES`.
+
+*The authored-versus-mined question is still open.* S-3c is the second authored
+scenario and nothing here settles PJ-016's precedent; it is now a pattern rather
+than an exception, which raises the stakes on that question rather than
+answering it
+
 ### Row Y — Closure without a cited result is classified by whether anyone worked on it
 
 **Scenarios:** **S-1**, S-14 · **Status:** boundary
@@ -1101,11 +1127,10 @@ And a specified discriminator is not a built one; X is owned, not resolved
 
 **Current state (verified):** `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only
 
-> **Now owned, as of the S-3c brief below.** This row spent its whole life
-> unowned — every named scenario built, nothing that would settle it. That is
-> no longer true: a discriminator is specified below and unbuilt. The note is
-> kept rather than deleted because "unowned for four scenarios" is itself a
-> fact about how long the model went without a probe for this.
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
 
 **NEW, CHARACTERISED, no change earned.** S-1's hardest Afterward question — what was known when this question was sharpened, asked after later evidence arrived — is answered from durable state, with an empty event log open beside it, because `sharpen()` freezes the standing findings onto the decision when the act is recorded. What that cannot reconstruct is the *survey*: whether a given question was established at that moment needs an ordering between two `Decision`s, and there is none. Natural ids happen to be allocated in order, which is an accident of the sequence and not a modelled fact — CLAUDE.md already forbids reading meaning into their values. So the temporal seam took real pressure and held at the level S-1 asked about; the level above it is a real gap that S-7 (post-lock amendment) is better placed to price, and neither a durable event sink nor a `decided_at` property is earned by a question nobody has yet been unable to answer
 
@@ -1117,11 +1142,10 @@ And a specified discriminator is not a built one; X is owned, not resolved
 
 **Current state (verified):** `closeEnquiry()` writes the one cited finding; `sharpen()` writes every standing finding
 
-> **Now owned, as of the S-3c brief below.** This row spent its whole life
-> unowned — every named scenario built, nothing that would settle it. That is
-> no longer true: a discriminator is specified below and unbuilt. The note is
-> kept rather than deleted because "unowned for four scenarios" is itself a
-> fact about how long the model went without a probe for this.
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
 
 **NEW, BOUNDARY LOGGED, deliberately not changed.** "This evidence informed this decision" and "this is what was known when the decision was taken" are different claims, and the same edge now expresses both. S-1 cannot separate them, because the sharpening genuinely was taken in light of everything known — the two sets coincide, which is exactly why the overload is invisible here. What would discriminate: a decision taken on a *specific* subset while other findings stood unconsidered. If that shows the snapshot reading manufacturing a rationale the researcher never had, the contemporaneous set needs its own edge and `BASED_ON` goes back to meaning what it says
 
@@ -1129,13 +1153,28 @@ And a specified discriminator is not a built one; X is owned, not resolved
 
 ### Row AB — A consequential act records what it acted **on**, not what it brought into existence
 
-**Scenarios:** **S-1**, **S-7** · **Status:** resolved
+**Scenarios:** **S-1**, **S-7**, S-12, **S-3c** · **Status:** resolved
 
 **Current state (verified):** `sharpen()` wrote `NARROWS` to the original question; `amendDesign()` wrote `CHANGES` to the replaced condition
 
 **NEW, CROSS-SCENARIO, established as a failure shape rather than a relationship.** Two unrelated scenarios exposed the same structural omission, in regions that share no labels. S-1 found it in question sharpening, S-7 in design amendment. **The remedies differed**, which is the interesting part: S-1 needed `Decision -MOTIVATES-> Question`, because the reason and the frozen evidence live on the decision and nothing else could reach them; S-7 needed nothing, because the amended product is recoverable from the `SUPERSEDES` chain and the criteria governing the gate. That argues *against* a generic act-produces-thing relationship for decisions. Treat act→product as a **review heuristic** — a question to ask of every new verb that mints something — not as a domain relationship
 
 **S-12: third instance, and the prediction that S-7's remedy transfers was REFUTED.** S-7 needed no act→product edge because a gate contains its design conditions, so the current one is derivable as the unchanged member. An interpretation has no container, so from a narrowed claim there was no route back to the act that narrowed it, and `MOTIVATES: Decision → Claim` was earned. Three instances, three different resolutions — one new edge, one derivation, one new edge again. The shape recurs; the remedy does not generalise, which is still the argument against a blanket rule
+
+**S-3c: fourth instance, first one that blocks a scenario outright.** The three
+before it degraded an answer — a query returned something wrong or something
+less than it could have. This one stopped the conversation: `replaceAnalysis()`
+recorded what it replaced and what that cost, and returned no handle on the
+analysis it had just created, so a researcher who corrects a defective check
+cannot then cite the correction. The scenario could not be written without
+fixing it.
+
+The remedy is the smallest of the four — a field on the return type, no edge,
+no derivation — which is the heuristic behaving exactly as row AB says it
+should. Four instances, four different remedies, still no relationship. What
+the fourth adds is a sharper trigger for the review question: **ask it of a
+verb's return type, not only of its writes.** `replaceAnalysis()` wrote the
+replacement into the graph correctly; what it withheld was the reference
 
 ### Row AC — A withdrawn interpretation has no way back
 
@@ -1528,6 +1567,49 @@ pull to clear an inconvenient failure. That the lever requires a recorded
 whether that is *enough* is a question about authority, and LabKit has no actor
 model by decision. Expect to record this rather than solve it; if it wants an
 actor it belongs with the deferred identity work, not here.
+
+**Outcomes.** The headline prediction held — **no schema change, no new verb,
+no migration** — and so did the one that mattered most: the wrong answer was
+*demonstrated* and confidently wrong, which is the bar row X had never cleared
+in four scenarios of being open. Case 1 stayed failed, confirmed by deliberately
+over-broadening the rule and watching S-3's own tests break.
+
+Two predictions were wrong in detail, and both were wrong in the same
+direction — I predicted a harder mechanism than the one that existed:
+
+- **The path was one hop, not three.** I predicted reaching the basis's standing
+  via `Evidence <-PRODUCES- EvidenceUnit -USES-> Computation -PRODUCES->
+  Artefact`. `whySupported()` already had the idiom for this —
+  `Evidence -RECORDED_IN-> Artefact` — and had been using it since S-11 to
+  filter superseded findings. Predicting a traversal the code was already
+  performing next door is a reading failure, not a modelling one.
+- **"Through both feeding queries" was right; the route between them was not.**
+  Both readers did change, as predicted. But the implementation detoured through
+  a separate helper query for a while on a **wrong diagnosis** — see below.
+
+*One prediction was under-specified rather than wrong.* "No new verb" held, but
+`replaceAnalysis()` had to start **returning** the analysis it created, without
+which the scenario cannot cite the corrected check at all. See row AB.
+
+**The two deliberately-unpredicted questions, decided by the scenario.** The
+corrected case reports `passed`, not `never-run`: a check *was* run, twice, and
+one of those verdicts stands. And both evaluations stay readable, the withdrawn
+one marked — asked directly by the brief's "which historical evaluations remain
+readable", and the answer is all of them.
+
+*Found in passing, and the most portable thing here.* A camelCase `RETURN` name
+decodes as `null` for every row, silently, because the AS clause AGE requires is
+unquoted SQL and Postgres folds it. It cost a wrong diagnosis — I blamed AGE's
+`OPTIONAL MATCH`, restructured the query around a limitation that does not
+exist, and only found the real cause after probing six `OPTIONAL MATCH` shapes
+directly and watching all six bind. `buildAsClause()` now refuses such a name,
+and on its first run the guard found a live instance that predated this work:
+`enquiryStatus()` returned a `forClaim` column that had been decoding as null
+since it was written, harmless only because nothing read it. Removed as dead —
+PJ-007's shape, exactly.
+
+**The hazard was recorded, not solved, as expected.** Nothing here decides who
+may declare a check defective.
 
 ## §4 — Held back as stories, not scenarios
 

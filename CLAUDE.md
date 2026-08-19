@@ -20,9 +20,9 @@ Before touching `src/domain/`, skim 008 (the interaction corpus the service
 layer is built against), 009 (the first scenario built from it), 010 (a
 cold-context review of both), 011 (the control chain under scenario pressure),
 then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
-S-12, S-5) and **016 (the standard a finding is held to: S-3b)** — those three
-are the current state of the domain model, and 016 is the newest decision in
-the chain. 012 is the implementing agent's own perspective after S-3, opinion
+S-12, S-5), 016 (the standard a finding is held to: S-3b) and **018 (when a
+failed check stops counting: S-3c)** — those are the current state of the domain
+model, and 018 is the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
@@ -206,7 +206,11 @@ did not:
    `buildAsClause`.
 4. A predicted gap that fails to materialise is a **result**. PJ-008's §3
    ledger keeps such rows — see row B, and row A, which PJ-008 called its
-   strongest single prediction and which S-3 refuted.
+   strongest single prediction and which S-3 refuted. The ledger distinguishes
+   three kinds of unfinished row — `open` + owned (an unbuilt discriminator is
+   named, marked `°`), `open` + unowned (every named probe built, a new one
+   needed), and `boundary`; only the middle kind is a gap in the method. See
+   its §3 legend.
 5. When two models both fit, **record both and pick neither** (row V). Do not
    ship API for an undecided model either: a speculative verb written to
    probe row V was removed rather than left in place.
@@ -275,10 +279,12 @@ Two rules, so this is checkable rather than remembered:
    cleared another row is nominated too, demonstrated or not** — otherwise
    clearing one row can quietly make a second worse while the rule that would
    have caught it stops applying, which is exactly what happened to row X when
-   S-3b cleared row V (PJ-017 §3). **No row is currently that one** — row V was the last, and
-   S-3b cleared it (PJ-016). Row X is the likeliest next: a decisive failure now
-   disqualifies a finding as well as blocking work, permanently. Nothing has
-   demonstrated it, and it does not become a live defect until something does.
+   S-3b cleared row V (PJ-017 §3). **No row is currently that one.** Row V was
+   cleared by S-3b (PJ-016) and row X — nominated under exactly that widening
+   rule, then demonstrated and cleared by S-3c (PJ-018) — was the last. The
+   nomination rule worked end to end: a row made worse by another row's fix was
+   named, built and closed, and the four scenarios X spent unowned are the
+   measure of what the rule is for.
 2. **Every deferred row names the scenario that would settle it.** A row that
    cannot name one is not deferred, it is unresolved and unowned, and it should
    say so in its own cell. "Record both and pick neither" is a decision about
