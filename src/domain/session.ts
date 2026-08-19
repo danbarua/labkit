@@ -26,6 +26,7 @@ import type { ArtefactProps, ClaimProps, ComputationProps, EvidenceProps } from 
 import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./events";
 import type {
   AmendmentRecord,
+  TaskContract,
   ClaimSubject,
   ConflictSide,
   ConflictVerdict,
@@ -615,16 +616,50 @@ export class ResearchSession {
   // -------------------------------------------------------------------------
 
   /** Records a piece of work whose start a gate may protect. */
-  async planWork(input: { objective: string; acceptance: string }): Promise<WorkRef> {
+  async planWork(input: {
+    objective: string;
+    acceptance: string;
+    /**
+     * What this work is permitted to read. Closed-world — see `TaskContract`.
+     *
+     * Earned by S-8, and the first walk of `TaskProps.inputs`, which
+     * `planWork()` had hardcoded to `""` since it was written. Stored as JSON
+     * rather than a delimited string so an entry containing punctuation cannot
+     * silently split; if a scenario ever needs to query *by element*, that is
+     * when it becomes a real list property rather than a serialised one.
+     */
+    mayRead?: string[];
+  }): Promise<WorkRef> {
     const task = await this.graph.createNode("Task", {
       objective: input.objective,
-      inputs: "",
+      inputs: JSON.stringify(input.mayRead ?? []),
       outputs: "",
       acceptance: input.acceptance,
       is_open: true,
     });
     this.emit("planWork", task.natural_id, { objective: input.objective });
     return { kind: "work", id: task.natural_id };
+  }
+
+  /** What a planned task is permitted to touch, and whether anyone is enforcing it. */
+  async contractFor(work: WorkRef): Promise<TaskContract> {
+    const rows = await this.graph.query(
+      `MATCH (t:Task {natural_id: $id}) RETURN t`,
+      { t: vertexProps<{ objective: string; acceptance: string; inputs: string }>() },
+      { id: work.id },
+    );
+    const task = rows[0]?.t;
+    if (!task) throw new Error(`no planned work ${work.id}`);
+
+    let mayRead: string[] = [];
+    try {
+      const parsed: unknown = JSON.parse(task.inputs || "[]");
+      if (Array.isArray(parsed)) mayRead = parsed.filter((x): x is string => typeof x === "string");
+    } catch {
+      // Work planned before contracts existed carries free text here. An
+      // unparseable contract is an empty one, not a crash.
+    }
+    return { objective: task.objective, acceptance: task.acceptance, mayRead, enforced: false };
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
@@ -671,8 +706,17 @@ export class ResearchSession {
     gate: GateRef;
     value: string;
     outcome: "pass" | "fail";
+    /** The finding this verdict was reached against, if it was reached against one. */
+    citing?: ConclusionRef;
   }): Promise<void> {
     await this.assertCriterionGovernsGate(input.criterion, input.gate);
+    let basis: string | undefined;
+    if (input.citing) {
+      basis = await this.findingFor(input.citing.analysis, input.citing.proposition);
+      if (!basis) {
+        throw new Error(`analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`);
+      }
+    }
     const at = this.clock.now();
     const evaluation = await this.graph.createNode("CriterionEvaluation", {
       value: input.value,
@@ -681,6 +725,11 @@ export class ResearchSession {
     });
     await this.graph.createEdge(input.criterion.id, "EVALUATED_AS", evaluation.natural_id);
     await this.graph.createEdge(evaluation.natural_id, "TRIGGERS", input.gate.id);
+    // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
+    // Evidence` was declared in PJ-004 and never written until S-8; without
+    // it, a condition established by measurement and one asserted by an agent
+    // returned identical records. See PJ-008 row W.
+    if (basis) await this.graph.createEdge(evaluation.natural_id, "BASED_ON", basis);
     this.emit("evaluateCriterion", evaluation.natural_id, {
       criterion: input.criterion.id,
       gate: input.gate.id,
@@ -1031,12 +1080,14 @@ export class ResearchSession {
     const rows = await this.graph.query(
       `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})
        OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)
-       RETURN c, ev`,
+       OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
+       RETURN c, ev, basis`,
       {
         c: vertexProps<{ natural_id: string; proposition: string }>(),
         ev: optional(
           vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
         ),
+        basis: optional(vertexProps<{ statement: string }>()),
       },
       { id: gate.id },
     );
@@ -1050,17 +1101,28 @@ export class ResearchSession {
       const id = row.c.natural_id;
       const entry = byCriterion.get(id) ?? { proposition: row.c.proposition, evaluations: [] };
       if (row.ev) {
-        entry.evaluations.push({
+        // One row per (evaluation, basis) pair, so an evaluation citing several
+        // findings arrives more than once. Accumulate rather than push.
+        const seen = entry.evaluations.find((e) => e.id === row.ev!.natural_id);
+        const record = seen ?? {
           id: row.ev.natural_id,
           value: row.ev.value,
           outcome: row.ev.outcome,
           at: row.ev.evaluated_at,
-        });
+          basis: [] as string[],
+        };
+        if (row.basis && !record.basis.includes(row.basis.statement)) record.basis.push(row.basis.statement);
+        if (!seen) entry.evaluations.push(record);
       }
       byCriterion.set(id, entry);
     }
 
-    const strip = ({ value, outcome, at }: TimedEvaluation): EvaluationRecord => ({ value, outcome, at });
+    const strip = ({ value, outcome, at, basis }: TimedEvaluation): EvaluationRecord => ({
+      value,
+      outcome,
+      at,
+      basis: [...basis].sort(),
+    });
 
     const checks: CheckStatus[] = [];
     const evaluations: GateStatus["evaluations"] = [];

@@ -21,6 +21,7 @@ export type {
   ClaimSubject,
   ConflictSide,
   ConflictVerdict,
+  TaskContract,
   Conclusion,
   ConclusionRef,
   ChangedConclusion,

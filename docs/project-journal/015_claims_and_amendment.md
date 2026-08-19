@@ -193,8 +193,11 @@ pays.
   prespecified robustness checks failed. Two models fit and S-3 cannot
   discriminate. This is now governed by a stated trigger rather than by
   everyone remembering — see CLAUDE.md, "Changing the graph model".
-- **`incomplete` is still the one gate state no test forced.** PJ-012 flagged
-  it against itself; PJ-013 kept it flagged; it is still true.
+- ~~**`incomplete` is still the one gate state no test forced.**~~ **Cleared by
+  S-8.** PJ-012 flagged it against itself, PJ-013 kept it flagged, and this
+  entry repeated it. S-8's advancement gate — throughput established, solver
+  health never run — forces the state from a scenario rather than from an
+  argument.
 - **`interpretationHistory()` keeps its wording key.** It refuses on ambiguity
   rather than guessing, and no scenario has produced a wrong answer through it.
   Scoping it speculatively would be building for a model nobody has tested.

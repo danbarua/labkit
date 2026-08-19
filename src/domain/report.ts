@@ -186,6 +186,15 @@ export interface EvaluationRecord {
   value: string;
   outcome: "pass" | "fail";
   at: string;
+  /**
+   * The findings this evaluation was carried out against.
+   *
+   * Empty means the verdict was asserted, not measured — a real and different
+   * thing from a verdict backed by a result, and S-8's reason for existing:
+   * work is promoted "by explicit evidence rather than agent enthusiasm", and
+   * the two must not read alike. See PJ-008 row W.
+   */
+  basis: string[];
 }
 
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */
@@ -410,4 +419,24 @@ export interface ConflictVerdict {
    */
   differsBy: "scope" | null;
   sides: ConflictSide[];
+}
+
+/**
+ * What a planned task is permitted to touch.
+ *
+ * Closed-world: `mayRead` is the whole contract, and anything absent is
+ * outside it. A second "may not read" list would be unbounded and impossible
+ * to keep complete, and answering "is the held-out set in scope?" from an
+ * absence is both simpler and harder to get wrong.
+ *
+ * `enforced` is `false` and says so out loud. LabKit records the contract; it
+ * does not police it. Nothing here prevents a process reading whatever it
+ * likes, and a scenario that implied otherwise would be describing a guarantee
+ * the system cannot give — S-8's own expressibility note concedes this.
+ */
+export interface TaskContract {
+  objective: string;
+  acceptance: string;
+  mayRead: string[];
+  enforced: false;
 }

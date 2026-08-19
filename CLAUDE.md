@@ -138,7 +138,7 @@ back up to the caller. One verb may write many nodes and edges:
 and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
-current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12 and S-5 required. Return
+current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5 and S-8 required. Return
 types are derived one-per-bullet from a scenario's "Afterward" questions
 rather than designed — if a bullet has no natural home in the types, the API
 is wrong, not the bullet.

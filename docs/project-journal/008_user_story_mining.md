@@ -689,7 +689,7 @@ this document's original analysis are marked as such.
 | T | Edges cannot carry properties | S-7, row O | open |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8 | open |
-| W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | deferred |
+| W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
 | X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17 | open |
 | Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14 | boundary |
 | Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
@@ -886,6 +886,18 @@ Distinguish by whether an open task exists
 
 **NEW, from cold review.** S-8's Afterward asks "who approved the scale-up, and on what projected cost?" — unanswerable. May legitimately be external metadata rather than domain; S-8 decides
 
+**S-8: deliberately not probed, which is a decision rather than an
+oversight.** S-8 was this row's only named scenario and its Afterward list
+includes "who approved the scale-up?". LabKit has no concept of user identity,
+and that is a standing decision: it is a cross-cutting infrastructure,
+persistence and API concern rather than a domain one, and every "who" waits
+until the domain model is complete and consolidated. The scenario records the
+bullet as out of scope with its reason instead of asserting an empty answer,
+because an Afterward question quietly left untested is the S-17 shape applied
+to our own corpus. The *other* half of the same bullet — "on what projected
+cost" — needed nothing new: a cost projection is a finding with provenance like
+any other. This row therefore has no owner again until identity work begins.
+
 ### Row T — Edges cannot carry properties
 
 **Scenarios:** S-7, row O · **Status:** open
@@ -917,13 +929,39 @@ Distinguish by whether an open task exists
 
 **NEW, CONFIRMED, deliberately unresolved.** Demonstrated wrong answer: with two prespecified robustness checks failed, `whySupported()` still reports the finding `supported: true` — "some evidence exists" rather than "the evidence holds up by its own prespecified standard". Two plausible models and S-3 does **not** discriminate, because its criteria do both jobs at once: (a) `Criterion -QUALIFIES-> EvidenceUnit`, or (b) extend `GATES` so a gate can gate a `Claim`'s standing. A scenario where criteria qualify a finding but gate nothing — or the reverse — would decide it
 
+**S-8: half-discriminated, exactly as predicted, and still open.** S-8's
+criteria gate expensive work and qualify no finding — the reverse case row V
+asked for. It establishes that the two jobs are **separable**: promoting work
+through a gate leaves the standing of every finding involved untouched
+(asserted directly), and `GATES` is fully occupied with control semantics,
+which is an argument against extending it to `Claim` (model b). But an argument
+is not this project's bar. S-8 produces no wrong answer on the qualification
+side, so it cannot select model (a) either. **What remains named:** a scenario
+where criteria qualify a finding and gate nothing. Until one exists row V stays
+the one confirmed wrong answer shipping green, and under CLAUDE.md's deferral
+rule that makes clearing it the next thing built.
+
 ### Row W — An evaluation record is not evidence of evaluation
 
-**Scenarios:** S-17, S-3, S-8 · **Status:** deferred
+**Scenarios:** S-17, S-3, S-8 · **Status:** resolved
 
 **Current state (verified):** `CriterionEvaluation {value, outcome}` can be minted directly; `BASED_ON: CriterionEvaluation → Evidence` exists and is never written
 
 **NEW, DEFERRED.** S-17's motivating failure was a guard that *looked* implemented but had never demonstrated the required behaviour. Recording `outcome: "fail"` with no provenance for how that was reached risks recreating exactly that gap one level up. Two propositions hide here: "the criterion was recorded as failing" and "the criterion was exercised against evidence and failed." A later scenario should say whether an evaluation is itself sufficient durable evidence, or needs provenance through Evidence/EvidenceUnit/Computation
+
+**S-8: RESOLVED, and the declared edge finally walked.** `BASED_ON:
+CriterionEvaluation → Evidence` had been declared since PJ-004 and never
+written. Demonstrated wrong answer, captured before the fix: with one condition
+established by a real throughput measurement and another asserted as "looked
+fine", `gateStatus()` returned **identical** evaluation records for both — the
+same identical-objects-for-distinct-states shape rows I and R were fixed for,
+and precisely the "promoted by explicit evidence rather than agent enthusiasm"
+distinction S-8 exists to make. `evaluateCriterion()` now takes an optional
+`citing: ConclusionRef`, validated the same way `closeEnquiry()` and
+`amendDesign()` validate theirs, and `EvaluationRecord.basis` reads it back.
+Verified load-bearing by deleting the write. Note what is *not* claimed: an
+uncited evaluation is still permitted, because a condition can legitimately be
+checked by inspection — the point is that the record says which happened.
 
 ### Row X — "Failure sticks" is S-3 policy applied to every gate
 
@@ -1222,6 +1260,35 @@ rather than settling it**.
 | "what is this task allowed to touch?" | **Recordable, not enforceable.** `TaskProps.inputs`/`outputs` exist and are hardcoded `""` by `planWork()` — another declared-but-unwalked structure. Recording the contract is a service-layer parameter on existing fields, zero schema change. *Enforcing* it is the advisory boundary the story's own expressibility note concedes, and S-8 should record that rather than pretend otherwise |
 | "who approved the scale-up?" | **Out of scope by policy, not skipped.** LabKit has no user identity, deliberately: it is a cross-cutting infrastructure, persistence and API concern, and every "who" waits until the domain model is consolidated. S-8 does not probe it and does not assert an empty answer; it records the bullet as a standing decision with its reason. The *"on what projected cost"* half is different — a cost projection is a finding, and a decision resting on it is `BASED_ON`. Probe that half |
 | the rest of the chain | The evaluation→gate→computation chain is expected sufficient. No new node label, no migration |
+
+**Outcomes.** Every prediction held, including the deliberately unglamorous
+headline: **S-8 narrows row V and does not settle it.** The two jobs are shown
+separable — gating work leaves every finding's standing untouched — and that is
+an argument against model (b), not a demonstration. Row V stays open with its
+remaining probe named.
+
+The catch was where it was predicted: **row W**, resolved. See that row.
+
+*`incomplete` is earned.* PJ-012 flagged it against itself — "the one gate
+state no test forced. I reasoned it should exist. By this project's own bar
+that is a weaker warrant than everything around it" — and PJ-013 and PJ-015
+kept the flag. S-8's advancement gate is governed by throughput *and* solver
+health; the feasibility step establishes the first and nothing has run the
+second, so "why can't the full run start?" is answered by a state that now has
+a scenario behind it rather than an argument. The flag is cleared.
+
+*Two more declared-but-unwalked structures got their first walk.*
+`TaskProps.inputs` had been hardcoded `""` by `planWork()` since it was
+written; it now carries the task contract. The contract is deliberately
+**closed-world** — `mayRead` is the whole of it, and "the official test data is
+not accessible to this task" is answered from an absence rather than from a
+second list nobody could keep complete. It is also explicitly **advisory**:
+`TaskContract.enforced` is `false` and says so, because nothing in LabKit stops
+a process reading whatever it likes, and the story's own expressibility note
+conceded exactly this. A scenario that implied otherwise would be describing a
+guarantee the system cannot give.
+
+*One bullet was declined rather than answered* — see row S.
 
 ## §4 — Held back as stories, not scenarios
 
