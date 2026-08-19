@@ -45,6 +45,21 @@ export interface Conclusion {
    * specificity claim. That is what `challenges` is for.
    */
   bearing?: "supports" | "challenges";
+  /**
+   * Whether this proposition is being asserted as a confirmatory result.
+   *
+   * Defaults to `exploratory`, and that default is the point. Until S-7 every
+   * claim was written `confirmatory` by the only writer, so a solver diagnosis
+   * and a prespecified comparison were indistinguishable — and an amendment
+   * that touched only feasibility work reported itself as compromising a
+   * confirmatory result, which is a false p-hacking alarm rather than an empty
+   * answer. Confirmatory standing is claimed deliberately or not at all.
+   *
+   * Whether standing should instead be *conferred* by an act — preregistration,
+   * promotion, passing a confirmatory gate — rather than declared at creation
+   * is still open; see PJ-008 rows G, K and R.
+   */
+  standing?: "exploratory" | "confirmatory";
 }
 
 /**
@@ -246,4 +261,56 @@ export interface QuestionOrigin {
   /** Why it was sharpened. */
   reason: string;
   knownAtTheTime: string[];
+}
+
+/**
+ * What an amendment to a locked design did.
+ *
+ * `nature` is the field that matters. Mechanical and scientific amendments are
+ * the difference between a legitimate repair and p-hacking, and the record has
+ * to carry it — S-7's own words. It is derived, not declared: an amendment is
+ * scientific exactly when something the confirmatory boundary rests on is in
+ * its blast radius. Nobody can set it to "mechanical".
+ */
+export interface AmendmentReport {
+  at: string;
+  amendment: string;
+  /** The setting as it stood, in its own words. Still readable afterwards — amending is not editing. */
+  replaced: string;
+  nowRequires: string;
+  /** Work the amended condition protected, and which therefore has to be run again. Enumerated, not "everything downstream". */
+  rerun: string[];
+  /** Confirmatory results in the blast radius. Empty is the claim "none", and it is computed rather than assumed. */
+  confirmatoryAffected: string[];
+  nature: "mechanical" | "scientific";
+}
+
+/** One amendment in a design's history, as read back long afterwards. */
+export interface AmendmentRecord {
+  amendment: string;
+  replaced: string;
+  nowRequires: string;
+  reason: string;
+  /** The findings the amendment was actually taken on — cited specifically, not a snapshot of everything known. */
+  citing: string[];
+  rerun: string[];
+  nature: "mechanical" | "scientific";
+}
+
+/**
+ * A locked design and everything that has happened to it.
+ *
+ * `amendments` is ordered oldest-first, and that order is reconstructed from
+ * the supersession chain alone — no timestamp on any decision, and nothing
+ * read from the event log. See PJ-008 row Z for what this does and does not
+ * settle about chronology.
+ */
+export interface DesignHistory {
+  gate: string;
+  /** What the design said before anyone amended it. */
+  originally: string;
+  nowRequires: string;
+  /** The condition currently in force, for amending again. */
+  criterion: CriterionRef;
+  amendments: AmendmentRecord[];
 }

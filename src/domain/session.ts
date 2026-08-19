@@ -15,7 +15,7 @@
  *
  * Scope: the scenarios built so far — S-11 (analysis replacement), S-17 and
  * S-3 (the criterion/gate chain), S-4 (negative closure), S-1 (posing,
- * pursuing and sharpening questions). See
+ * pursuing and sharpening questions), S-7 (amending a locked design). See
  * docs/project-journal/008_user_story_mining.md. Verbs are added when a
  * scenario needs them, not in anticipation.
  */
@@ -25,6 +25,8 @@ import { optional, scalar, vertexProps } from "../db/cypher";
 import type { ArtefactProps, ClaimProps, ComputationProps, EvidenceProps } from "../db/domain";
 import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./events";
 import type {
+  AmendmentRecord,
+  AmendmentReport,
   AnalysisRef,
   CheckStatus,
   EnquiryStatus,
@@ -36,6 +38,7 @@ import type {
   ChangedConclusion,
   Conclusion,
   ConclusionRef,
+  DesignHistory,
   EnquiryRef,
   KnowledgeSurvey,
   ObservationsRef,
@@ -328,6 +331,16 @@ export class ResearchSession {
     method: string;
     from: ObservationsRef[];
     concludes: Conclusion[];
+    /**
+     * The planned work this analysis carries out, if it carries out any.
+     *
+     * Earned by S-7: a gate protects work, and until an analysis said which
+     * work it was, the blast radius of amending a gated condition reached the
+     * *work* and stopped there — so "was any confirmatory result affected?"
+     * could only be answered by asserting it. `IMPLEMENTS` already existed
+     * for this and had never been written.
+     */
+    implementing?: WorkRef;
   }): Promise<AnalysisRef> {
     const computation = await this.graph.createNode("Computation", {
       kind: input.method,
@@ -341,6 +354,7 @@ export class ResearchSession {
 
     await this.graph.createEdge(unit.natural_id, "USES", computation.natural_id);
     await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry.id);
+    if (input.implementing) await this.graph.createEdge(input.implementing.id, "IMPLEMENTS", unit.natural_id);
     // Both levels of provenance, deliberately: the evidence unit produced
     // this scientific output; the computation produced this concrete
     // execution output. Without the second, CONSUMES would be half a pair --
@@ -354,7 +368,10 @@ export class ResearchSession {
 
     for (const conclusion of input.concludes) {
       const evidence = await this.graph.createNode("Evidence", { statement: conclusion.finding });
-      const claim = await this.graph.createNode("Claim", { name: conclusion.proposition, kind: "confirmatory" });
+      const claim = await this.graph.createNode("Claim", {
+        name: conclusion.proposition,
+        kind: conclusion.standing ?? "exploratory",
+      });
       await this.graph.createEdge(unit.natural_id, "PRODUCES", evidence.natural_id);
       await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", output.natural_id);
       // A null result is a finding, not an absence of one -- it bears
@@ -663,6 +680,269 @@ export class ResearchSession {
    * distinguishable from a check never run, and an absent list entry cannot
    * carry that difference.
    */
+  /**
+   * Amends a locked design: replaces one condition with another, recording the
+   * act rather than editing the setting.
+   *
+   * This is the `Decision` S-11 declined to mint. There, "we replaced X
+   * because of review Y" pointed causality backwards and no assertion used it.
+   * Here the decision is the whole point: the original setting has to stay
+   * readable, the reason and its evidence have to survive, and one amendment
+   * has to be orderable against another.
+   *
+   * The diagnosis is cited **specifically**, not snapshotted. `sharpen()`
+   * freezes everything standing because a sharpening genuinely is taken in
+   * light of everything known; an amendment is taken on one diagnosis, and
+   * recording every finding on the record as its basis would manufacture a
+   * rationale the researcher never had. See PJ-008 row AA — the same edge now
+   * carries both senses, deliberately and with the boundary written down.
+   *
+   * `SUPERSEDES` chains this amendment to the previous one on the same design,
+   * found rather than supplied: an ordering that depends on the caller
+   * remembering to pass the right handle is not an ordering.
+   */
+  async amendDesign(input: {
+    criterion: CriterionRef;
+    nowRequires: string;
+    because: string;
+    citing: ConclusionRef;
+  }): Promise<AmendmentReport> {
+    const at = this.clock.now();
+
+    // Everything validated before anything is written -- a rejected amendment
+    // must not leave a decision recording a change that never happened.
+    const existing = await this.graph.query(
+      `MATCH (c:Criterion {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ proposition: string }>() },
+      { id: input.criterion.id },
+    );
+    const replaced = existing[0]?.c.proposition;
+    if (!replaced) throw new Error(`no condition ${input.criterion.id} to amend`);
+
+    const diagnosis = await this.findingFor(input.citing.analysis, input.citing.proposition);
+    if (!diagnosis) {
+      throw new Error(`analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`);
+    }
+
+    const gates = await this.gatesGovernedBy(input.criterion.id);
+    if (gates.length === 0) {
+      throw new Error(`condition ${input.criterion.id} governs nothing; there is no locked design to amend`);
+    }
+
+    const prior = await this.latestAmendmentOn(gates);
+
+    const replacement = await this.graph.createNode("Criterion", { proposition: input.nowRequires });
+    for (const gate of gates) await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
+
+    const decision = await this.graph.createNode("Decision", {
+      reason: input.because,
+      invalidation_check: "evidence that the amended setting was not the constraint after all",
+    });
+    await this.graph.createEdge(decision.natural_id, "CHANGES", input.criterion.id);
+    await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
+    if (prior) await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
+
+    const rerun = await this.workGatedBy(gates);
+    const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
+
+    this.emit("amendDesign", decision.natural_id, {
+      criterion: input.criterion.id,
+      replaced,
+      nowRequires: input.nowRequires,
+      supersedes: prior ?? null,
+    });
+
+    return {
+      at,
+      amendment: decision.natural_id,
+      replaced,
+      nowRequires: input.nowRequires,
+      rerun,
+      confirmatoryAffected,
+      // Derived, never declared. An amendment is scientific exactly when
+      // something the confirmatory boundary rests on is in its blast radius --
+      // which is the difference between repairing a solver and moving the
+      // goalposts, and is not a thing the person amending gets to assert.
+      nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
+    };
+  }
+
+  /**
+   * A locked design and everything that has happened to it, oldest first.
+   *
+   * The order comes from the supersession chain alone — no decision carries a
+   * timestamp, nothing is read from the event log, and natural-id allocation
+   * order is never consulted. What that does *not* order is two amendments to
+   * different designs; see PJ-008 row Z.
+   */
+  async designHistory(gate: GateRef): Promise<DesignHistory> {
+    const conditions = await this.graph.query(
+      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
+       OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)
+       RETURN c, d`,
+      {
+        c: vertexProps<{ natural_id: string; proposition: string }>(),
+        d: optional(vertexProps<{ natural_id: string }>()),
+      },
+      { id: gate.id },
+    );
+    if (conditions.length === 0) throw new Error(`gate ${gate.id} is governed by no condition`);
+
+    const changedBy = new Map<string, string>(); // decision -> criterion it replaced
+    const propositionOf = new Map<string, string>();
+    const current: string[] = [];
+    for (const row of conditions) {
+      propositionOf.set(row.c.natural_id, row.c.proposition);
+      if (row.d) changedBy.set(row.d.natural_id, row.c.natural_id);
+      else current.push(row.c.natural_id);
+    }
+
+    // A design history needs one condition in force. A gate governed by
+    // several unamended conditions is a different shape -- see S-3 -- and
+    // guessing which one is "the design" would be a confidently wrong answer.
+    const inForce = [...new Set(current)];
+    if (inForce.length !== 1) {
+      throw new Error(`gate ${gate.id} has ${inForce.length} conditions in force; a design history needs exactly one`);
+    }
+
+    const chain = await this.amendmentChain(gate.id);
+    const rerun = await this.workGatedBy([gate.id]);
+    const confirmatory = await this.confirmatoryResultsBehind([gate.id]);
+    const nature = confirmatory.length > 0 ? ("scientific" as const) : ("mechanical" as const);
+
+    const amendments: AmendmentRecord[] = chain.map((step, i) => {
+      const wasCriterion = changedBy.get(step.decision);
+      const nextCriterion = i + 1 < chain.length ? changedBy.get(chain[i + 1]!.decision) : inForce[0];
+      return {
+        amendment: step.decision,
+        replaced: (wasCriterion && propositionOf.get(wasCriterion)) ?? "",
+        nowRequires: (nextCriterion && propositionOf.get(nextCriterion)) ?? "",
+        reason: step.reason,
+        citing: step.citing,
+        rerun,
+        nature,
+      };
+    });
+
+    const firstReplaced = amendments[0]?.replaced;
+    return {
+      gate: gate.id,
+      originally: firstReplaced ?? propositionOf.get(inForce[0]!)!,
+      nowRequires: propositionOf.get(inForce[0]!)!,
+      criterion: { kind: "criterion", id: inForce[0]! },
+      amendments,
+    };
+  }
+
+  /** Amendments to one design, ordered oldest-first by following supersession back to its root. */
+  private async amendmentChain(gateId: string): Promise<Array<{ decision: string; reason: string; citing: string[] }>> {
+    const rows = await this.graph.query(
+      `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
+       OPTIONAL MATCH (d)-[:SUPERSEDES]->(older:Decision)
+       OPTIONAL MATCH (d)-[:BASED_ON]->(e:Evidence)
+       RETURN d, older, e`,
+      {
+        d: vertexProps<{ natural_id: string; reason: string }>(),
+        older: optional(vertexProps<{ natural_id: string }>()),
+        e: optional(vertexProps<{ statement: string }>()),
+      },
+      { id: gateId },
+    );
+
+    const nodes = new Map<string, { reason: string; older: string | null; citing: Set<string> }>();
+    for (const row of rows) {
+      const node = nodes.get(row.d.natural_id) ?? { reason: row.d.reason, older: null, citing: new Set<string>() };
+      if (row.older) node.older = row.older.natural_id;
+      if (row.e) node.citing.add(row.e.statement);
+      nodes.set(row.d.natural_id, node);
+    }
+
+    const followedBy = new Map<string, string>();
+    let root: string | undefined;
+    for (const [id, node] of nodes) {
+      if (node.older === null) root = id;
+      else followedBy.set(node.older, id);
+    }
+
+    const ordered: Array<{ decision: string; reason: string; citing: string[] }> = [];
+    let cursor = root;
+    while (cursor) {
+      const node = nodes.get(cursor)!;
+      ordered.push({ decision: cursor, reason: node.reason, citing: [...node.citing].sort() });
+      cursor = followedBy.get(cursor);
+    }
+    return ordered;
+  }
+
+  private async gatesGovernedBy(criterionId: string): Promise<string[]> {
+    const rows = await this.graph.query(
+      `MATCH (:Criterion {natural_id: $id})-[:GOVERNS]->(g:Gate) RETURN g`,
+      { g: vertexProps<{ natural_id: string }>() },
+      { id: criterionId },
+    );
+    return [...new Set(rows.map((r) => r.g.natural_id))];
+  }
+
+  /** The most recent amendment to this design — the one nothing has superseded yet. */
+  private async latestAmendmentOn(gates: string[]): Promise<string | undefined> {
+    for (const gate of gates) {
+      const rows = await this.graph.query(
+        `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
+         OPTIONAL MATCH (newer:Decision)-[:SUPERSEDES]->(d)
+         RETURN d, newer`,
+        {
+          d: vertexProps<{ natural_id: string }>(),
+          newer: optional(vertexProps<{ natural_id: string }>()),
+        },
+        { id: gate },
+      );
+      const superseded = new Set(rows.filter((r) => r.newer).map((r) => r.d.natural_id));
+      const latest = rows.map((r) => r.d.natural_id).find((d) => !superseded.has(d));
+      if (latest) return latest;
+    }
+    return undefined;
+  }
+
+  /** Work these gates protect, and which therefore has to be run again when their condition changes. */
+  private async workGatedBy(gates: string[]): Promise<string[]> {
+    const objectives = new Set<string>();
+    for (const gate of gates) {
+      const rows = await this.graph.query(
+        `MATCH (:Gate {natural_id: $id})-[:GATES]->(t:Task) RETURN t`,
+        { t: vertexProps<{ objective: string }>() },
+        { id: gate },
+      );
+      for (const row of rows) objectives.add(row.t.objective);
+    }
+    return [...objectives].sort();
+  }
+
+  /**
+   * Confirmatory results standing behind these gates.
+   *
+   * Reaches the *results*, not just the work: gate -> work -> the unit that
+   * carried it out -> what that unit concluded. Without the last two hops this
+   * could only report "no confirmatory result affected" by virtue of seeing no
+   * results at all, which is the same answer a genuinely clean amendment
+   * gives — see S-4 on absence of evidence reading as a negative.
+   */
+  private async confirmatoryResultsBehind(gates: string[]): Promise<string[]> {
+    const affected = new Set<string>();
+    for (const gate of gates) {
+      for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+        const rows = await this.graph.query(
+          `MATCH (:Gate {natural_id: $id})-[:GATES]->(:Task)-[:IMPLEMENTS]->(u:EvidenceUnit)
+           MATCH (u)-[:PRODUCES]->(e:Evidence)-[:${bearing}]->(c:Claim)
+           RETURN c`,
+          { c: vertexProps<{ name: string; kind?: string }>() },
+          { id: gate },
+        );
+        for (const row of rows) if (row.c.kind === "confirmatory") affected.add(row.c.name);
+      }
+    }
+    return [...affected].sort();
+  }
+
   async gateStatus(gate: GateRef): Promise<GateStatus> {
     const declared = await this.graph.query(
       `MATCH (g:Gate {natural_id: $id}) RETURN g`,
