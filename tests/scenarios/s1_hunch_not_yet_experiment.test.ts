@@ -19,7 +19,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink, type QuestionRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
 let scenario: Scenario;
@@ -143,12 +143,14 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(ids(known.established)).not.toContain(prior.smear.id);
     expect(ids(known.untested)).not.toContain(prior.smear.id);
 
-    // Untested is not failure and not a negative result. The question nobody
-    // pursued has nothing standing against it, and neither does the one still
-    // being worked on.
+    // Untested is not failure and not a negative result. The disjointness
+    // above is what carries that; this pins the weaker companion claim -- that
+    // posing a question mints nothing that could later be read as a finding
+    // against it. It would hold for any string, and is here to stay holding.
     const untestedProposition = await session.whySupported("does the learned topology help on an external task?");
     expect(untestedProposition.challenged).toBe(false);
     expect(untestedProposition.against).toEqual([]);
+    expect(untestedProposition.supported).toBe(false);
 
     // Afterward, from a second reader over the same graph.
     const later = new ResearchSession(await scenario.current(), { clock });
@@ -267,6 +269,42 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(later.events.all()).toHaveLength(0);
     expect((await later.originOf(first))?.knownAtTheTime).not.toContain(LATE);
     expect((await later.originOf(second))?.knownAtTheTime).toContain(LATE);
+  });
+
+  /**
+   * Sharpening validates before it writes anything.
+   *
+   * The act writes a decision, two edges per standing finding, and a question.
+   * A rejection partway through would leave a decision recording a narrowing
+   * that produced nothing — which is precisely the unreadable state row D was
+   * about. Same shape as S-4's closure guards.
+   */
+  test("sharpening a question that is not on the record writes nothing", async () => {
+    await priorState();
+    const before = await session.whatIsKnown();
+
+    const absent: QuestionRef = { kind: "question", id: "Q_404" };
+
+    // The message is the assertion. Sharpening a missing question would fail
+    // either way -- but failing on the *second* write, when the narrowing edge
+    // finds no endpoint, means a decision was already on the record. Only the
+    // up-front guard produces this wording, so a rejection that stops saying
+    // it is a rejection that started writing first.
+    await expect(
+      session.sharpen({ from: absent, into: "a sharper form of nothing", because: "it should not get this far" }),
+    ).rejects.toThrow(/no question Q_404 to sharpen/);
+
+    const later = new ResearchSession(await scenario.current(), { clock });
+    const after = await later.whatIsKnown();
+    const census = (k: Awaited<ReturnType<typeof later.whatIsKnown>>) =>
+      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question).sort();
+    expect(census(after)).toEqual(census(before));
+
+    // Nothing on the record cites the sharpening that never happened.
+    for (const question of census(after)) {
+      const origin = await later.originOf({ kind: "question", id: question });
+      expect(origin?.reason).not.toBe("it should not get this far");
+    }
   });
 
   /**

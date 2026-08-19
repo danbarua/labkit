@@ -285,6 +285,10 @@ mattered. Working gotchas:
   guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
   which `createEdge()` catches and treats as success).
 - No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
+- **A `RETURN` name that is a SQL reserved word breaks the AS clause** —
+  `RETURN d, from` becomes `AS (d agtype, from agtype)` and fails in the SQL
+  parser (`42601`, `scanner_yyerror`, not `cypher_yyerror`). Alias it:
+  `RETURN d, from AS origin`.
 - **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
   `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
   form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a

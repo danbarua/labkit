@@ -234,6 +234,16 @@ it in a throwaway script first — see PJ-006 for how these were found.
   variable-length edge (`[:SUPERSEDES*1..5]`) works fine, as does an
   unrestricted-type undirected path (`-[*1..3]-`) — it's specifically the
   type-alternation syntax inside `[...]` that doesn't exist.
+- **A `RETURN` name that is a SQL reserved word breaks the AS clause.** AGE
+  requires every returned column to be declared in the SQL `AS (...)` list, so
+  each Cypher `RETURN` name becomes a bare SQL identifier there. `RETURN d,
+  from` — a perfectly legal Cypher variable named `from` — produces
+  `AS (d agtype, from agtype)` and dies at the *SQL* parser with `42601`,
+  `syntax error at or near "from"`, `routine: scanner_yyerror`. Note the
+  routine: this is `scan.l`, not `cypher_yyerror`, which is how you tell it
+  from a Cypher-grammar error. Verified on pglite-age 2026-08-19. Alias it —
+  `RETURN d, from AS origin` — rather than quoting, so the decoder key and the
+  column name stay the same string.
 - **Cypher string literals are typed `agtype`, not `text`.** Calling a
   `LANGUAGE sql` function with `(text, text)` parameters from inside Cypher
   fails with `function ... does not exist` unless the literal arguments are
