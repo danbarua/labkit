@@ -192,6 +192,20 @@ did not:
    ship API for an undecided model either: a speculative verb written to
    probe row V was removed rather than left in place.
 
+A relationship can still be **earned after being implemented prematurely** —
+but the evidential sequence has to be reconstructed explicitly, by deleting the
+edge and demonstrating the wrong answer that returns. S-7 wired `IMPLEMENTS`
+before showing what it prevented, then showed it afterwards: with the edge
+gone, an amendment that moves a prespecified comparison reports itself
+*mechanical*. Implementing first is the wrong order; leaving the evidence
+unreconstructed is the actual defect.
+
+Ask of every verb that mints something: **does the act record what it
+produced, or only what it acted on?** Two scenarios in unrelated regions (S-1
+sharpening a question, S-7 amending a design) hit the same omission. It is a
+review heuristic, not a relationship — the two needed different remedies, and
+one needed none. See PJ-008 row AB.
+
 Prefer structure in the **query** over structure in the **stored model**.
 S-3's four gate states and per-criterion itemisation are computed, not
 stored, so there is no `Gate.status` field to maintain and no value anyone
