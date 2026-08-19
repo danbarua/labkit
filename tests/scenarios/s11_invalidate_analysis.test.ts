@@ -341,13 +341,20 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       changed: ["T beats rewired"],
     });
 
-    // Every mutation left a trace, in order.
+    // Every research action left a trace, in order — one per action, not one
+    // per write. This list used to carry a second `recordAnalysis` between the
+    // review and the replacement, because `replaceAnalysis()` called the
+    // public analysis verb and so emitted its event too. That is the same
+    // defect `openEnquiry` was fixed for (PJ-014), and this assertion had
+    // quietly encoded it; external review of S-10 found it in `reverify()` and
+    // it was here as well. A researcher who replaced an analysis did one
+    // thing, and a log that also records the analysis underneath describes the
+    // implementation.
     expect(events.all().map((e) => e.operation)).toEqual([
       "openEnquiry",
       "recordObservations",
       "recordAnalysis",
       "recordReview",
-      "recordAnalysis",
       "replaceAnalysis",
     ]);
   });

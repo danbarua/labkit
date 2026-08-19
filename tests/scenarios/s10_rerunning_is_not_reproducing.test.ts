@@ -180,7 +180,12 @@ describe("S-10: rerunning is not reproducing", () => {
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
     expect(report.bearing).toBe("raises");
-    expect(report.confirms).toBe(false);
+    // `confirms` was removed after external review: S-10 established that
+    // "raises confidence" and "reproduced the execution" are different, not
+    // that an independent re-check can never confirm a claim. Those two fields
+    // already say everything demonstrated, without settling what the overloaded
+    // word means.
+    expect(report.execution).toBe("not-reproduced");
 
     // And the claim itself now reads as re-verified rather than as twice
     // independently established.
@@ -250,5 +255,166 @@ describe("S-10: rerunning is not reproducing", () => {
     expect(report.differs).toEqual([]);
     expect(report.comparable).toBe(true);
     expect(report.incomparableBecause).toBeUndefined();
+  });
+
+  /**
+   * External review, finding 3a. Execution equality was compared by artefact
+   * *name*, which is the identity-versus-wording mistake this project has now
+   * found in four unrelated places (S-5, S-12, S-3b, and here).
+   *
+   * Two runs can each record "initial conditions" and mean different data.
+   */
+  test("two inputs sharing a name are not the same input", async () => {
+    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+    const theirs = await session.recordObservations({
+      enquiry,
+      name: "initial conditions",
+      finding: "seed 4, tolerance 1e-6, 512 steps",
+    });
+    const mine = await session.recordObservations({
+      enquiry,
+      name: "initial conditions",
+      finding: "seed 91, tolerance 1e-3, 64 steps",
+    });
+    const historical = await session.recordAnalysis({
+      enquiry,
+      method: "annealing-v1",
+      from: [theirs],
+      concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
+    });
+    const rerun = await session.reverify({
+      historical,
+      enquiry,
+      method: "annealing-v1, re-run",
+      under: [mine],
+      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+    });
+
+    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    expect(report.execution).toBe("not-reproduced");
+    // Both directions, and both are true: the re-run read an "initial
+    // conditions" the original did not, and the original read one the re-run
+    // did not. Identical names, two artefacts, two differences.
+    expect(report.differs).toEqual([
+      { what: "initial conditions", standing: "changed" },
+      { what: "initial conditions", standing: "not-used-by-the-re-run" },
+    ]);
+  });
+
+  /**
+   * External review, finding 3b, and the sharpest of them: two runs that each
+   * recorded *nothing* compared equal, so the report said the execution was
+   * reproduced. S-10's entire premise is that an empty input record means
+   * provenance was never captured, not that the run consumed nothing.
+   */
+  test("two runs that both recorded no inputs have not reproduced anything", async () => {
+    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
+    const rerun = await session.reverify({
+      historical,
+      enquiry,
+      method: "annealing-v1, re-run",
+      under: [],
+      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+    });
+
+    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    expect(report.execution).toBe("not-reproduced");
+    expect(report.comparable).toBe(false);
+    expect(report.incomparableBecause).toMatch(/never recorded/);
+  });
+
+  /**
+   * External review, finding 3c. The difference calculation only looked for
+   * new-run inputs absent from the original, so dropping an input reported
+   * `not-reproduced` with nothing named as differing.
+   */
+  test("an input the original used and the re-run did not is named", async () => {
+    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+    const a = await session.recordObservations({ enquiry, name: "conditions A", finding: "seed 4" });
+    const b = await session.recordObservations({ enquiry, name: "conditions B", finding: "warm start" });
+    const historical = await session.recordAnalysis({
+      enquiry,
+      method: "annealing-v1",
+      from: [a, b],
+      concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
+    });
+    const rerun = await session.reverify({
+      historical,
+      enquiry,
+      method: "annealing-v1, re-run",
+      under: [a],
+      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+    });
+
+    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    expect(report.execution).toBe("not-reproduced");
+    expect(report.differs).toEqual([{ what: "conditions B", standing: "not-used-by-the-re-run" }]);
+  });
+
+  /**
+   * External review, finding 4. Agreement was read from the re-run's bearing
+   * alone, never compared with the original's — so two runs that both found
+   * *against* the proposition were reported as disagreeing with each other.
+   */
+  test("two runs that both find against the proposition agree with each other", async () => {
+    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+    const historical = await session.recordAnalysis({
+      enquiry,
+      method: "annealing-v1",
+      from: [],
+      concludes: [{ proposition: PROPOSITION, finding: "did not converge", bearing: "challenges" }],
+    });
+    const conditions = await session.recordObservations({
+      enquiry,
+      name: "initial conditions, newly specified",
+      finding: "seed 4, tolerance 1e-6, 512 steps",
+    });
+    const rerun = await session.reverify({
+      historical,
+      enquiry,
+      method: "annealing-v1, re-run",
+      under: [conditions],
+      concludes: { proposition: PROPOSITION, finding: "did not converge either", bearing: "challenges" },
+    });
+
+    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    expect(report.conclusion).toBe("agrees");
+    // Agreeing with a negative finding does not raise confidence in the
+    // proposition -- bearing is about the claim, not about the two runs.
+    expect(report.bearing).toBe("lowers");
+  });
+
+  /**
+   * External review, finding 5. `whySupported()` removed the re-verifying
+   * finding from `support`, but `restingOn` still walked it — so the claim was
+   * reported as resting directly on inputs belonging to something the same
+   * report had just said was not an independent supporting finding.
+   */
+  test("the claim does not rest on the re-run's inputs", async () => {
+    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+    const original = await session.recordObservations({ enquiry, name: "original conditions", finding: "seed 1" });
+    const historical = await session.recordAnalysis({
+      enquiry,
+      method: "annealing-v1",
+      from: [original],
+      concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
+    });
+    const fresh = await session.recordObservations({
+      enquiry,
+      name: "initial conditions, newly specified",
+      finding: "seed 4, tolerance 1e-6, 512 steps",
+    });
+    await session.reverify({
+      historical,
+      enquiry,
+      method: "annealing-v1, re-run",
+      under: [fresh],
+      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+    });
+
+    const why = await (await afterwards()).whySupported({ analysis: historical, proposition: PROPOSITION });
+    expect(why.support.map((s) => s.via)).toEqual(["annealing-v1"]);
+    expect(why.reverifiedBy).toEqual(["annealing-v1, re-run"]);
+    expect(why.restingOn).toEqual(["original conditions"]);
   });
 });

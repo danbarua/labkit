@@ -335,7 +335,26 @@ export class ResearchSession {
    * back — which answered a different question and produced a genuine false
    * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
    */
-  async recordAnalysis(input: {
+  async recordAnalysis(input: Parameters<ResearchSession["recorded"]>[0]): Promise<AnalysisRef> {
+    const analysis = await this.graph.inTransaction(() => this.recorded(input));
+    this.emit("recordAnalysis", analysis.id, {
+      enquiry: input.enquiry.id,
+      method: input.method,
+      concludes: input.concludes.map((c) => c.proposition),
+    });
+    return analysis;
+  }
+
+  /**
+   * The write half of `recordAnalysis`, without the event.
+   *
+   * Composed verbs call this. A researcher who re-verified a result did one
+   * thing, and a log that also records the analysis underneath it describes the
+   * implementation — the rule `openEnquiry` established (PJ-014), applied where
+   * external review found it had lapsed: `reverify()` and `replaceAnalysis()`
+   * were each emitting two events while their journals claimed one.
+   */
+  private async recorded(input: {
     enquiry: EnquiryRef;
     method: string;
     from: ObservationsRef[];
@@ -423,11 +442,6 @@ export class ResearchSession {
       await this.graph.createEdge(evidence.natural_id, bearing, claim.natural_id);
     }
 
-    this.emit("recordAnalysis", computation.natural_id, {
-      method: input.method,
-      read: input.from.map((o) => o.id),
-      concluded: input.concludes.map((c) => c.proposition),
-    });
     return { kind: "analysis", id: computation.natural_id };
   }
 
@@ -825,22 +839,27 @@ export class ResearchSession {
     concludes: Conclusion;
   }): Promise<VerificationReport> {
     const at = this.clock.now();
-    const original = await this.findingFor(input.historical, input.concludes.proposition);
-    if (!original) {
-      throw new Error(
-        `analysis ${input.historical.id} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
-      );
-    }
-
-    const verification = await this.recordAnalysis({
-      enquiry: input.enquiry,
-      method: input.method,
-      from: input.under,
-      concludes: [input.concludes],
+    // Atomic: without the second write the durable state is precisely S-10's
+    // demonstrated wrong answer -- a second independent support standing where
+    // a re-verification was meant. See TenantGraph.inTransaction.
+    const verification = await this.graph.inTransaction(async () => {
+      const original = await this.findingFor(input.historical, input.concludes.proposition);
+      if (!original) {
+        throw new Error(
+          `analysis ${input.historical.id} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
+        );
+      }
+      const recorded = await this.recorded({
+        enquiry: input.enquiry,
+        method: input.method,
+        from: input.under,
+        concludes: [input.concludes],
+      });
+      const restated = await this.findingFor(recorded, input.concludes.proposition);
+      if (!restated) throw new Error("unreachable: the analysis just recorded this conclusion");
+      await this.graph.createEdge(restated, "REVERIFIES", original);
+      return recorded;
     });
-    const restated = await this.findingFor(verification, input.concludes.proposition);
-    if (!restated) throw new Error("unreachable: the analysis just recorded this conclusion");
-    await this.graph.createEdge(restated, "REVERIFIES", original);
 
     this.emit("reverify", verification.id, { of: input.historical.id, proposition: input.concludes.proposition });
     return { at, verification, of: input.historical };
@@ -875,35 +894,57 @@ export class ResearchSession {
       { id: verification.id },
     );
 
-    const inputs = async (computation: string): Promise<string[]> => {
+    // Keyed by natural id, never by `logical_name`. Two runs can each record
+    // something called "initial conditions" and mean different data; comparing
+    // the names made those the same execution input. That is the identity-
+    // versus-wording mistake this project has now found in four unrelated
+    // places (S-5, S-12, S-3b, and here, by external review).
+    const inputs = async (computation: string): Promise<Map<string, string>> => {
       const rows = await this.graph.query(
         `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
-        { a: vertexProps<{ logical_name: string }>() },
+        { a: vertexProps<{ natural_id: string; logical_name: string }>() },
         { id: computation },
       );
-      return rows.map((r) => r.a.logical_name).sort();
+      return new Map(rows.map((r) => [r.a.natural_id, r.a.logical_name]));
     };
     const mine = await inputs(verification.id);
     const theirs = await inputs(found.oldcomp.natural_id);
 
-    // Absence and difference are not the same answer. The original recording
-    // nothing means the two are neither known to agree nor known to differ,
-    // which is why this is not simply a set difference.
-    const differs: ReproductionReport["differs"] =
-      theirs.length === 0
-        ? mine.map((what) => ({ what, standing: "unrecorded-in-the-original" as const }))
-        : mine.filter((what) => !theirs.includes(what)).map((what) => ({ what, standing: "changed" as const }));
+    // Absence and difference are not the same answer, and absence on BOTH sides
+    // is still absence: two runs that each recorded nothing have not reproduced
+    // anything, they have simply both failed to say what they read. Comparing
+    // the two empty sets reported `reproduced`, contradicting the premise the
+    // scenario exists for.
+    const provenanceMissing = theirs.size === 0;
+    const differs: ReproductionReport["differs"] = provenanceMissing
+      ? [...mine.values()].sort().map((what) => ({ what, standing: "unrecorded-in-the-original" as const }))
+      : [
+          ...[...mine].filter(([id]) => !theirs.has(id)).map(([, what]) => ({ what, standing: "changed" as const })),
+          // The other direction, which was not computed at all: an input the
+          // original read and the re-run did not is a difference too, and
+          // reporting `not-reproduced` with an empty `differs` named nothing.
+          ...[...theirs]
+            .filter(([id]) => !mine.has(id))
+            .map(([, what]) => ({ what, standing: "not-used-by-the-re-run" as const })),
+        ].sort((a, b) => a.what.localeCompare(b.what));
 
-    const reproduced = differs.length === 0 && mine.length === theirs.length;
+    const reproduced = !provenanceMissing && differs.length === 0;
 
-    // Which way the re-run cuts, read from the bearing the restated finding was
-    // recorded with -- never from comparing the two findings' wording.
-    const bearing = await this.graph.query(
-      `MATCH (:Evidence {natural_id: $id})-[:CHALLENGES]->(:Claim) RETURN 1`,
-      { ok: scalar<number>() },
-      { id: found.new.natural_id },
-    );
-    const agrees = bearing.length === 0;
+    // Which way each run cut, read from the bearing each finding was recorded
+    // with -- never from comparing the two findings' wording. Both are needed:
+    // reading only the re-run's made two runs that each found *against* the
+    // proposition report as disagreeing with each other.
+    const challenges = async (evidence: string): Promise<boolean> =>
+      (
+        await this.graph.query(
+          `MATCH (:Evidence {natural_id: $id})-[:CHALLENGES]->(:Claim) RETURN 1`,
+          { ok: scalar<number>() },
+          { id: evidence },
+        )
+      ).length > 0;
+    const newChallenges = await challenges(found.new.natural_id);
+    const oldChallenges = await challenges(found.old.natural_id);
+    const agrees = newChallenges === oldChallenges;
 
     return {
       verification: method[0]?.c.kind ?? "unknown",
@@ -911,18 +952,18 @@ export class ResearchSession {
       conclusion: agrees ? "agrees" : "disagrees",
       execution: reproduced ? "reproduced" : "not-reproduced",
       differs,
-      bearing: agrees ? "raises" : "lowers",
-      // Agreement between two different executions is not confirmation of
-      // either, however well the numbers line up.
-      confirms: reproduced && agrees,
+      // Which way the RE-RUN cuts for the claim -- a question about the
+      // proposition, not about whether the two runs concur. Two runs that agree
+      // on a negative finding agree with each other and lower confidence in the
+      // proposition, and those are different sentences.
+      bearing: newChallenges ? "lowers" : "raises",
       comparable: reproduced,
       ...(reproduced
         ? {}
         : {
-            incomparableBecause:
-              theirs.length === 0
-                ? "the original run's initial conditions were never recorded, so the two runs' numbers describe different executions"
-                : "the two runs consumed different inputs",
+            incomparableBecause: provenanceMissing
+              ? "the original run's initial conditions were never recorded, so the two runs' numbers describe different executions"
+              : "the two runs consumed different inputs",
           }),
     };
   }
@@ -1409,10 +1450,22 @@ export class ResearchSession {
         // clear it, because nothing withdraws it.
         const standing = ordered.filter((e) => !isWithdrawn(e));
         const decisive = standing.find((e) => e.outcome === "fail") ?? standing[0];
+        // Three ways to have no decisive verdict, and only one of them is
+        // "nobody ran this". A check every one of whose verdicts has been
+        // withdrawn *ran*, and saying `never-run` contradicted the evaluations
+        // listed beside it -- external review of S-3c.
+        const state: CheckStatus["state"] =
+          decisive !== undefined
+            ? decisive.outcome === "fail"
+              ? "failed"
+              : "passed"
+            : ordered.length > 0
+              ? "no-standing-verdict"
+              : "never-run";
         checks.push({
           criterion: id,
           proposition: entry.proposition,
-          state: decisive === undefined ? "never-run" : decisive.outcome === "fail" ? "failed" : "passed",
+          state,
           evaluations: ordered.map(strip),
           ...(decisive ? { decidedBy: strip(decisive) } : {}),
         });
@@ -1444,15 +1497,23 @@ export class ResearchSession {
     concludes: Conclusion[];
   }): Promise<ReplacementReport> {
     const at = this.clock.now();
-    await this.assertReviewOf(input.because, input.supersedes);
-    const before = await this.conclusionsOf(input.supersedes);
+    // Atomic, and this is the one that made transactions necessary rather than
+    // tidy. Invalidating the superseded output is not an isolated write: since
+    // S-3c it withdraws the criterion evaluations that cited it, so a failure
+    // between the halves leaves an earlier failure no longer deciding its check
+    // and no corrected check in existence. External review named it the
+    // blocking finding; S-3c carries the negative test. See
+    // TenantGraph.inTransaction.
+    const { before, replacement } = await this.graph.inTransaction(async () => {
+      await this.assertReviewOf(input.because, input.supersedes);
+      const before = await this.conclusionsOf(input.supersedes);
 
-    const output = await this.outputArtefactOf(input.supersedes);
-    await this.graph.query(
-      `MATCH (a:Artefact {natural_id: $id}) SET a.invalidated = true RETURN a`,
-      { a: vertexProps<ArtefactProps>() },
-      { id: output },
-    );
+      const output = await this.outputArtefactOf(input.supersedes);
+      await this.graph.query(
+        `MATCH (a:Artefact {natural_id: $id}) SET a.invalidated = true RETURN a`,
+        { a: vertexProps<ArtefactProps>() },
+        { id: output },
+      );
 
     // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
     //
@@ -1472,11 +1533,13 @@ export class ResearchSession {
     // inference", and the two merely coincide here. S-12 is the
     // discriminator -- there the numbers stay valid and only the
     // interpretation changes, which invalidation cannot honestly carry.
-    const replacement = await this.recordAnalysis({
-      enquiry: input.enquiry,
-      method: input.method,
-      from: input.from,
-      concludes: input.concludes,
+      const replacement = await this.recorded({
+        enquiry: input.enquiry,
+        method: input.method,
+        from: input.from,
+        concludes: input.concludes,
+      });
+      return { before, replacement };
     });
 
     const changed: ChangedConclusion[] = [];
@@ -1872,8 +1935,8 @@ export class ResearchSession {
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
        MATCH (e)-[:RECORDED_IN]->(out:Artefact)
        WHERE out.invalidated IS NULL OR out.invalidated = false
-       RETURN a`,
-      { a: vertexProps<ArtefactProps>() },
+       RETURN a, e`,
+      { a: vertexProps<ArtefactProps>(), e: vertexProps<{ natural_id: string }>() },
       { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
 
@@ -1938,7 +2001,15 @@ export class ResearchSession {
       reverifiedBy,
       standard,
       unmet,
-      restingOn: [...new Set(resting.map((r) => r.a.logical_name))],
+      // Re-verifying findings are excluded here for the same reason they are
+      // kept out of `support`: the claim does not rest on inputs belonging to
+      // something this very report says is not an independent supporting
+      // finding (external review of S-10). Filtered in TypeScript rather than
+      // in the query because AGE rejects a `NOT (pattern)` predicate outright
+      // -- `cypher_yyerror`, not a decode problem.
+      restingOn: [
+        ...new Set(resting.filter((r) => !reverifying.has(r.e.natural_id)).map((r) => r.a.logical_name)),
+      ],
       superseded,
       challenged: against.length > 0,
       against,

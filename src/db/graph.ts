@@ -37,17 +37,61 @@ import type { TenantContext } from "./tenant";
  */
 export class TenantGraph {
   private readonly runner: CypherRunner;
+  private readonly db: LabKitDB;
+  /** Depth counter, so a compound verb calling another one does not nest BEGIN. */
+  private depth = 0;
 
   constructor(
     private readonly ctx: TenantContext,
     db: LabKitDB,
   ) {
+    this.db = db;
     // CypherRunner validates ctx.graphName once, in its own constructor —
     // graphName is immutable for this instance's lifetime, and always
     // server-derived (tenants.graph_name is a generated column, PJ-003 §5),
     // so it should never fail in practice. Still worth checking before it's
     // interpolated into every query this instance issues.
     this.runner = new CypherRunner(db, ctx.graphName);
+  }
+
+  /**
+   * Runs `work` inside one database transaction: everything it writes commits
+   * together, or none of it does.
+   *
+   * Earned by external review of S-3c, as a negative test rather than as
+   * infrastructure hygiene. A compound research action was not atomic and had
+   * become *consequential*: `replaceAnalysis()` invalidates the superseded
+   * output first, and since S-3c invalidating an output withdraws the criterion
+   * evaluations that cited it. So a failure between the two halves left a
+   * record where the earlier failure had stopped deciding its check and no
+   * corrected check existed — a partially committed scientific state, which is
+   * the thing this system exists to prevent. `reverify()` had the same shape
+   * with a worse landing: without its second write, the durable state is
+   * exactly S-10's demonstrated wrong answer.
+   *
+   * Re-entrant by depth count rather than by savepoint. A verb that composes
+   * another (`reverify` calls the analysis writer) must not issue a nested
+   * `BEGIN`, and partial rollback to a savepoint is not something any caller
+   * has needed — the whole point is that these actions are indivisible.
+   *
+   * Note this is a *transaction* boundary, not a raw-string escape hatch: no
+   * caller gains the ability to issue Cypher this class would not otherwise
+   * run. See the file header.
+   */
+  async inTransaction<T>(work: () => Promise<T>): Promise<T> {
+    if (this.depth > 0) return work();
+    await this.db.query("BEGIN");
+    this.depth += 1;
+    try {
+      const result = await work();
+      this.depth -= 1;
+      await this.db.query("COMMIT");
+      return result;
+    } catch (err) {
+      this.depth -= 1;
+      await this.db.query("ROLLBACK");
+      throw err;
+    }
   }
 
   /**

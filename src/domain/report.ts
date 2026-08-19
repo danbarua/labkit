@@ -180,7 +180,14 @@ export interface CheckStatus {
   criterion: string;
   /** Display text. Not an identity — see `criterion`. */
   proposition: string;
-  state: "passed" | "failed" | "never-run";
+  /**
+   * `no-standing-verdict` is the state between a check being found defective
+   * and its correction being run: evaluations exist, and none of them still
+   * stands. It is emphatically not `never-run` — the check ran, and reporting
+   * otherwise contradicted the `evaluations` list in the same object (external
+   * review of S-3c). It counts as unmet, exactly as `never-run` does.
+   */
+  state: "passed" | "failed" | "never-run" | "no-standing-verdict";
   /**
    * Every evaluation of this criterion for this gate, oldest first, ties
    * broken by identity. Cypher imposes no ordering, so without an explicit
@@ -246,16 +253,12 @@ export interface ReproductionReport {
    * original's conditions down, so the two are not known to differ and are not
    * known to agree. Row I's distinction, asked of execution instead of evidence.
    */
-  differs: Array<{ what: string; standing: "unrecorded-in-the-original" | "changed" }>;
+  differs: Array<{
+    what: string;
+    standing: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run";
+  }>;
   /** Which way the re-run cuts for the historical claim. */
   bearing: "raises" | "lowers";
-  /**
-   * Whether this amounts to confirmation. False whenever the execution was not
-   * reproduced, however well the conclusions agree — a reader who takes
-   * `bearing: "raises"` for confirmation is making exactly the inference this
-   * report exists to prevent.
-   */
-  confirms: boolean;
   /**
    * Whether the two runs' numbers may be put side by side.
    *

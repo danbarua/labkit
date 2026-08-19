@@ -337,4 +337,103 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(why.supported).toBe(false);
     expect(why.unmet).toEqual([ROBUSTNESS]);
   });
+
+  /**
+   * External review, finding 2. The state between "the check was found
+   * defective" and "the corrected check has been re-run".
+   *
+   * S-3c's own tests never reach it: the corrected case records a replacement
+   * pass immediately, and the narrowing test has an older pass available. With
+   * neither, every verdict on the check is withdrawn and `checksFrom()` falls
+   * through to `never-run` — while `evaluations` still lists the withdrawn
+   * failure. The check certainly ran; what it has is no verdict that stands.
+   */
+  test("a check whose every verdict has been withdrawn has no standing verdict, and did not never-run", async () => {
+    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
+    const defective = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+      proposition: DISAGREES,
+      finding: "median p = 0.21",
+    });
+    await session.evaluateCriterion({
+      criterion: robustness,
+      value: "median p = 0.21",
+      outcome: "fail",
+      citing: { analysis: defective, proposition: DISAGREES },
+    });
+
+    // The check is found faulty and retired. Nobody has re-run it yet.
+    const review = await session.recordReview({ of: defective, verdict: "the aggregation dropped the last fold" });
+    await session.replaceAnalysis({
+      supersedes: defective,
+      because: review,
+      enquiry,
+      method: "median-aggregation, all folds",
+      from: [observations],
+      concludes: [{ proposition: AGREES, finding: "median p = 0.04" }],
+    });
+
+    const why = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
+    const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
+    expect(check?.state).toBe("no-standing-verdict");
+    expect(check?.decidedBy).toBeUndefined();
+    // The history is intact, which is what makes `never-run` a contradiction
+    // rather than merely a poor label.
+    expect(check?.evaluations.map((e) => e.outcome)).toEqual(["fail"]);
+    expect(check?.evaluations[0]?.withdrawn).toBe(true);
+    // And the finding does not stand: nothing has met the agreed standard.
+    expect(why.supported).toBe(false);
+    expect(why.unmet).toEqual([ROBUSTNESS]);
+  });
+
+  /**
+   * External review, finding 1 — the blocking one, as a negative test.
+   *
+   * `replaceAnalysis()` invalidates the superseded output *before* recording
+   * the replacement. Since S-3c, invalidating an output withdraws the criterion
+   * evaluations that cited it, so a failure can stop counting. If the
+   * replacement write then fails, the record is left with a failure that no
+   * longer decides its check and no corrected check in existence — a partially
+   * committed scientific state, which is the thing LabKit exists to prevent.
+   *
+   * The failure is provoked through a real guard rather than a mock:
+   * `recordAnalysis()` refuses to re-assert a withdrawn proposition.
+   */
+  test("a replacement that cannot be completed leaves the earlier failure standing", async () => {
+    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
+    const defective = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+      proposition: DISAGREES,
+      finding: "median p = 0.21",
+    });
+    await session.evaluateCriterion({
+      criterion: robustness,
+      value: "median p = 0.21",
+      outcome: "fail",
+      citing: { analysis: defective, proposition: DISAGREES },
+    });
+
+    // Retire the proposition the replacement is going to try to re-assert, so
+    // the second half of the compound action is guaranteed to be refused.
+    await session.reinterpret({
+      of: { analysis: defective, proposition: DISAGREES },
+      as: "the median aggregation was never computed correctly",
+      because: "the fold handling was wrong throughout",
+    });
+
+    const before = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
+    const review = await session.recordReview({ of: defective, verdict: "the aggregation dropped the last fold" });
+    await expect(
+      session.replaceAnalysis({
+        supersedes: defective,
+        because: review,
+        enquiry,
+        method: "median-aggregation, all folds",
+        from: [observations],
+        concludes: [{ proposition: DISAGREES, finding: "median p = 0.04" }],
+      }),
+    ).rejects.toThrow();
+
+    // Nothing moved. The command failed whole.
+    const after = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
+    expect(after).toEqual(before);
+  });
 });
