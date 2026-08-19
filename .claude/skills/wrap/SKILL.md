@@ -1,7 +1,7 @@
 ---
 name: wrap
 description: |
-  Writes the session's wrap-up entry to docs/project-journal/<NNN>_<slug>.md —
+  Writes the session's wrap-up entry to docs/session-log/<NNN>_<slug>.md —
   the goal in one line, what actually changed (from git diff --stat), the
   commands that verified it with their key output, what is still open, and the
   exact next step. Invoked by hand as /wrap, and automatically by the Stop hook
@@ -15,12 +15,19 @@ triggers:
   - "write up what we did"
 ---
 
-# wrap — the session's own entry in the journal
+# wrap — the session log
 
 A wrap entry is a **handover to whoever opens this repo cold**, which is
 usually a future session with none of this context. It records what was done
-and how it was checked, not why the design is right — the reasoning entries
-(PJ-001…) do that, and this must not pretend to be one.
+and how it was checked, not why the design is right.
+
+It lives in `docs/session-log/`, deliberately apart from
+`docs/project-journal/`. The journal is a curated argument — each entry is a
+decision and its reasoning, and CLAUDE.md sends readers to the newest few for
+"what's true now". A session log is mechanical and disposable by comparison,
+and interleaving the two would dilute the sequence that is doing the work. A
+wrap that turns out to contain a real decision has found something the journal
+should say; put it there too, in the journal's own terms.
 
 Optional argument: the path to a `.claude/.wrap-state/<session>` file. The Stop
 hook passes it. Without it the skill still works; the baseline is just the last
@@ -65,11 +72,11 @@ Three traps in this repo, all of which have caught someone already
 
 ## 3. Write the entry
 
-Filename: `docs/project-journal/<NNN>_<slug>.md`, `NNN` zero-padded, slug in
+Filename: `docs/session-log/<NNN>_<slug>.md`, `NNN` zero-padded, slug in
 `snake_case` naming the work rather than the session ("wrap_skill_and_stop_hook",
 not "session_2026_08_19").
 
-**Re-check the number immediately before writing** — `ls docs/project-journal/`.
+**Re-check the number immediately before writing** — `ls docs/session-log/`.
 `collect.sh` computed it when it ran, and other sessions work in this repo. If
 the file now exists and is not this session's, take the next free number.
 
@@ -85,7 +92,7 @@ The five parts, in this order, and nothing else:
 # <NNN>: <what this session did, as a title>
 
 **Session wrap, <YYYY-MM-DD>, on `<branch>`.** Not a decision record — see
-PJ-0NN for the reasoning behind <whatever this touched>.
+`docs/project-journal/` for the reasoning behind <whatever this touched>.
 
 ## Goal
 
@@ -122,7 +129,7 @@ If a state file path was passed, point it at the entry just written, so a later
 fire in this session updates that file instead of starting another:
 
 ```sh
-.claude/skills/wrap/record-entry.sh <state-file> docs/project-journal/<NNN>_<slug>.md
+.claude/skills/wrap/record-entry.sh <state-file> docs/session-log/<NNN>_<slug>.md
 ```
 
 Use the script rather than writing the file by hand — it preserves `baseline`
@@ -144,6 +151,7 @@ commit` line. If the user asks for it to be committed, do it then.
 - The number is taken at write time, not reserved. Two sessions wrapping in the
   same second can still collide; the re-check in step 3 narrows it, and the
   loser renames. Not worth a lock.
-- These entries are mechanical, and the numbered journal is otherwise a
-  curated argument. If they start crowding it, move them to `docs/session-log/`
-  — one path change here and in `collect.sh`.
+- The path lives in three places if it ever moves again: this file,
+  `collect.sh` (`log_dir`), and `record-entry.sh`'s guard.
+- Numbering restarts at `001` in `docs/session-log/` and is independent of the
+  project journal's. Two sequences, two purposes.

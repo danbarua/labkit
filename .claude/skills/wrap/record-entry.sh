@@ -11,7 +11,7 @@ state_file="${1:?state file}"
 entry="${2:?entry path}"
 # Personal tooling, but a mangled invocation should not point state at an
 # arbitrary path.
-case "$entry" in docs/*) ;; *) echo "entry must be under docs/: $entry" >&2; exit 1;; esac
+case "$entry" in docs/session-log/*) ;; *) echo "entry must be under docs/session-log/: $entry" >&2; exit 1;; esac
 get() { [ -f "$state_file" ] && sed -n "s/^$1=//p" "$state_file" | tail -1 || true; }
 mkdir -p "$(dirname "$state_file")"
 printf 'baseline=%s\nasked=%s\nentry=%s\n' "$(get baseline)" "$(get asked)" "$entry" > "$state_file"
