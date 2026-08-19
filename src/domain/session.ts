@@ -26,6 +26,9 @@ import type { ArtefactProps, ClaimProps, ComputationProps, EvidenceProps } from 
 import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./events";
 import type {
   AmendmentRecord,
+  ClaimSubject,
+  ConflictSide,
+  ConflictVerdict,
   AmendmentReport,
   AnalysisRef,
   CheckStatus,
@@ -352,7 +355,13 @@ export class ResearchSession {
     // PJ-008 row AC -- re-opening a withdrawn reading is a deliberate act, and
     // there is no verb for it yet.
     for (const conclusion of input.concludes) {
-      const { withdrawn, replacedBy } = await this.withdrawalOf(conclusion.proposition);
+      // Scoped to the line of enquiry being recorded. Unscoped, this guard had
+      // the very defect S-5 is about: a sentence withdrawn in one enquiry
+      // would block legitimate work concluding the same words in another.
+      const { withdrawn, replacedBy } = await this.withdrawalOf({
+        proposition: conclusion.proposition,
+        enquiry: input.enquiry.id,
+      });
       if (withdrawn) {
         throw new Error(
           `"${conclusion.proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy}"` : ""}; it cannot be re-asserted by recording another analysis`,
@@ -564,10 +573,11 @@ export class ResearchSession {
    * merely unsupported for variable-length patterns. The value comes from a
    * closed set of literals here, never from a caller.
    */
-  private async findingsBearing(proposition: string, bearing: "SUPPORTS" | "CHALLENGES") {
+  private async findingsBearing(scope: { proposition: string; enquiry?: string }, bearing: "SUPPORTS" | "CHALLENGES") {
     return this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)
        MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
+       ${this.withinScope(scope)}
        MATCH (u)-[:USES]->(comp:Computation)
        OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
        OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
@@ -578,8 +588,17 @@ export class ResearchSession {
         a: optional(vertexProps<ArtefactProps>()),
         r: optional(vertexProps<{ verdict: string }>()),
       },
-      { name: proposition },
+      { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
+  }
+
+  /**
+   * Restricts a claim traversal to one line of enquiry, when the caller named
+   * one. Empty when they did not — a sentence asserted in a single scope needs
+   * no qualifier, and every scenario before S-5 relies on that.
+   */
+  private withinScope(scope: { enquiry?: string }): string {
+    return scope.enquiry ? `MATCH (u)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})` : "";
   }
 
   private async questionBehind(enquiry: EnquiryRef): Promise<string | undefined> {
@@ -1209,18 +1228,26 @@ export class ResearchSession {
    * the numbers were right and only the sentence about them was wrong.
    */
   async reinterpret(input: {
-    proposition: string;
+    /**
+     * Which claim. A bare proposition while the sentence is asserted once;
+     * naming the analysis that concluded it when it is not — S-5, where
+     * withdrawing by wording alone retracted an unrelated line of work.
+     */
+    of: ClaimSubject;
     as: string;
     because: string;
   }): Promise<ReinterpretationReport> {
     const at = this.clock.now();
 
+    const scope = await this.scopeFor(input.of);
     const claims = await this.graph.query(
-      `MATCH (c:Claim {name: $name}) RETURN c`,
+      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       ${this.withinScope(scope)}
+       RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
-      { name: input.proposition },
+      { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
-    if (claims.length === 0) throw new Error(`nothing on the record claims "${input.proposition}"`);
+    if (claims.length === 0) throw new Error(`nothing on the record claims "${scope.proposition}"`);
 
     const review = await this.graph.createNode("Review", { verdict: input.because });
     const narrower = await this.graph.createNode("Claim", { name: input.as, kind: "exploratory" });
@@ -1234,7 +1261,8 @@ export class ResearchSession {
     await this.graph.createEdge(decision.natural_id, "MOTIVATES", narrower.natural_id);
 
     const carried = new Set<string>();
-    for (const claim of claims) {
+    for (const id of new Set(claims.map((c) => c.c.natural_id))) {
+      const claim = { c: { natural_id: id } };
       await this.graph.createEdge(review.natural_id, "EVALUATES", claim.c.natural_id);
       await this.graph.createEdge(decision.natural_id, "CHANGES", claim.c.natural_id);
       const evidence = await this.graph.query(
@@ -1248,13 +1276,13 @@ export class ResearchSession {
       }
     }
 
-    const restingOnTheOldReading = await this.decidedOnTheStrengthOf(input.proposition);
+    const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope.proposition);
 
-    this.emit("reinterpret", narrower.natural_id, { previously: input.proposition, because: input.because });
+    this.emit("reinterpret", narrower.natural_id, { previously: scope.proposition, because: input.because });
 
     return {
       at,
-      previously: input.proposition,
+      previously: scope.proposition,
       nowClaims: input.as,
       evidenceStanding: [...carried].sort(),
       restingOnTheOldReading,
@@ -1323,9 +1351,10 @@ export class ResearchSession {
   }
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */
-  private async withdrawalOf(proposition: string): Promise<{ withdrawn: boolean; replacedBy?: string }> {
+  private async withdrawalOf(scope: { proposition: string; enquiry?: string }): Promise<{ withdrawn: boolean; replacedBy?: string }> {
     const rows = await this.graph.query(
-      `MATCH (c:Claim {name: $name})
+      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       ${this.withinScope(scope)}
        OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)
        OPTIONAL MATCH (d)-[:MOTIVATES]->(now:Claim)
        RETURN c, d, now`,
@@ -1334,7 +1363,7 @@ export class ResearchSession {
         d: optional(vertexProps<{ natural_id: string }>()),
         now: optional(vertexProps<{ name: string }>()),
       },
-      { name: proposition },
+      { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
     if (rows.length === 0) return { withdrawn: false };
 
@@ -1360,14 +1389,128 @@ export class ResearchSession {
     return [...new Set(rows.map((r) => r.q.name))].sort();
   }
 
+  /**
+   * Works out which claim a caller meant.
+   *
+   * Proposition text identifies a claim only while a sentence is asserted in
+   * one line of enquiry. S-5 is the case where it is asserted in two — the
+   * same words about different endpoints — and there text identifies nothing.
+   * Rather than picking one, this refuses and says how many there are. The
+   * wrong answer available here is not "no result": before this existed,
+   * `whySupported()` merged both into a single claim that was simultaneously
+   * supported and challenged, and `reinterpret()` withdrew an unrelated line
+   * of work's claim with no decision saying so.
+   *
+   * Scope is the line of enquiry, reached by traversal. Nothing is stored on
+   * the claim — see PJ-008 row C.
+   */
+  private async scopeFor(subject: ClaimSubject): Promise<{ proposition: string; enquiry?: string }> {
+    if (typeof subject !== "string") {
+      const enquiry = await this.enquiryAddressedBy(subject.analysis);
+      if (!enquiry) throw new Error(`analysis ${subject.analysis.id} addresses no line of enquiry`);
+      return { proposition: subject.proposition, enquiry };
+    }
+
+    const scopes = await this.enquiriesClaiming(subject);
+    if (scopes.length > 1) {
+      throw new Error(`"${subject}" is claimed in ${scopes.length} lines of enquiry; name which, by the analysis that concluded it`);
+    }
+    return { proposition: subject };
+  }
+
+  /** Lines of enquiry in which some claim of this wording is asserted. */
+  private async enquiriesClaiming(proposition: string): Promise<string[]> {
+    const found = new Set<string>();
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+         MATCH (u)-[:ADDRESSES]->(loe:LineOfEnquiry)
+         RETURN loe`,
+        { loe: vertexProps<{ natural_id: string }>() },
+        { name: proposition },
+      );
+      for (const row of rows) found.add(row.loe.natural_id);
+    }
+    return [...found];
+  }
+
+  private async enquiryAddressedBy(analysis: AnalysisRef): Promise<string | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry) RETURN loe`,
+      { loe: vertexProps<{ natural_id: string }>() },
+      { id: analysis.id },
+    );
+    return rows[0]?.loe.natural_id;
+  }
+
+  /**
+   * Whether two findings actually conflict.
+   *
+   * Answered from what each claim is attached to — the question it answers and
+   * the way its evidence bears — never from comparing the two sentences. In
+   * S-5 the sentences are identical and the answer is "no".
+   */
+  async doTheseConflict(a: ConclusionRef, b: ConclusionRef): Promise<ConflictVerdict> {
+    const sides = [await this.sideOf(a), await this.sideOf(b)];
+    const [left, right] = sides;
+
+    const sameScope = left!.enquiry === right!.enquiry;
+    if (!sameScope) {
+      // Support for equivalence on one endpoint says nothing about another.
+      // Identical wording does not make them one claim.
+      return {
+        conflict: false,
+        relation: "dissociation",
+        differsBy: "scope",
+        sides: sides.map(({ enquiry: _enquiry, ...side }) => side),
+      };
+    }
+
+    const opposed =
+      (left!.supportedBy.length > 0 && right!.challengedBy.length > 0) ||
+      (left!.challengedBy.length > 0 && right!.supportedBy.length > 0);
+
+    return {
+      conflict: opposed,
+      relation: opposed ? "contradiction" : "corroboration",
+      differsBy: null,
+      sides: sides.map(({ enquiry: _enquiry, ...side }) => side),
+    };
+  }
+
+  private async sideOf(conclusion: ConclusionRef): Promise<ConflictSide & { enquiry: string }> {
+    const enquiry = await this.enquiryAddressedBy(conclusion.analysis);
+    if (!enquiry) throw new Error(`analysis ${conclusion.analysis.id} addresses no line of enquiry`);
+
+    const asked = await this.graph.query(
+      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
+      { q: vertexProps<{ name: string }>() },
+      { id: enquiry },
+    );
+
+    const scope = { proposition: conclusion.proposition, enquiry };
+    const supportedBy = (await this.findingsBearing(scope, "SUPPORTS")).map((r) => r.e.statement);
+    const challengedBy = (await this.findingsBearing(scope, "CHALLENGES")).map((r) => r.e.statement);
+
+    return {
+      proposition: conclusion.proposition,
+      asks: asked[0]?.q.name ?? "",
+      supportedBy: [...new Set(supportedBy)].sort(),
+      challengedBy: [...new Set(challengedBy)].sort(),
+      enquiry,
+    };
+  }
+
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */
-  async whySupported(proposition: string): Promise<SupportExplanation> {
+  async whySupported(subject: ClaimSubject): Promise<SupportExplanation> {
+    const scope = await this.scopeFor(subject);
+    const proposition = scope.proposition;
     // Both bearings, each partitioned by whether its analysis output was
     // later invalidated. A withdrawn challenge is as historical as a
     // withdrawn support -- before this, challenging findings counted as
     // current forever.
-    const forRows = await this.findingsBearing(proposition, "SUPPORTS");
-    const againstRows = await this.findingsBearing(proposition, "CHALLENGES");
+    const forRows = await this.findingsBearing(scope, "SUPPORTS");
+    const againstRows = await this.findingsBearing(scope, "CHALLENGES");
 
     const support: SupportExplanation["support"] = [];
     const against: SupportExplanation["against"] = [];
@@ -1391,20 +1534,22 @@ export class ResearchSession {
     // findings count: a superseded analysis's inputs are not what the claim
     // rests on now.
     const resting = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(comp:Computation)
+      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       ${this.withinScope(scope)}
+       MATCH (u)-[:USES]->(comp:Computation)
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
        MATCH (e)-[:RECORDED_IN]->(out:Artefact)
        WHERE out.invalidated IS NULL OR out.invalidated = false
        RETURN a`,
       { a: vertexProps<ArtefactProps>() },
-      { name: proposition },
+      { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
 
     // A withdrawn interpretation is not supported, however much evidence once
     // carried it. `support` stays populated deliberately: the findings are
     // fine and always were, and blanking them would say the numbers had gone
     // wrong -- which is the one thing S-12 exists to deny.
-    const { withdrawn, replacedBy } = await this.withdrawalOf(proposition);
+    const { withdrawn, replacedBy } = await this.withdrawalOf(scope);
 
     return {
       proposition,

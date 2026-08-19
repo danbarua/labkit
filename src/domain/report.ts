@@ -372,3 +372,42 @@ export interface InterpretationHistory {
   nowClaims: string;
   revisions: Revision[];
 }
+
+/**
+ * How a caller names one claim rather than another.
+ *
+ * A bare proposition is fine while a sentence is asserted in one line of
+ * enquiry, which is the ordinary case. When the same words are asserted in
+ * two, it stops identifying anything and a `ConclusionRef` — this analysis,
+ * this proposition — is what picks one out. See S-5.
+ */
+export type ClaimSubject = string | ConclusionRef;
+
+/** One side of a comparison between two findings. */
+export interface ConflictSide {
+  proposition: string;
+  /** The question this claim answers. Where its scope lives — derived, not stored on the claim. */
+  asks: string;
+  supportedBy: string[];
+  challengedBy: string[];
+}
+
+/**
+ * Whether two findings actually conflict.
+ *
+ * The verdict comes from scope and bearing, never from comparing the two
+ * sentences — S-5's two claims are worded identically on purpose. Two claims
+ * of the same scope with opposing support contradict each other; two claims of
+ * different scope do not, however alike they read.
+ */
+export interface ConflictVerdict {
+  conflict: boolean;
+  relation: "contradiction" | "dissociation" | "corroboration";
+  /**
+   * Why this is not a contradiction, when it is not. `"scope"` means the two
+   * answer different questions — which is also the answer to "what would make
+   * this a genuine contradiction": the same scope.
+   */
+  differsBy: "scope" | null;
+  sides: ConflictSide[];
+}

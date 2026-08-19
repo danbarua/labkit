@@ -134,7 +134,7 @@ back up to the caller. One verb may write many nodes and edges:
 and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
-current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7 and S-12 required. Return
+current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12 and S-5 required. Return
 types are derived one-per-bullet from a scenario's "Afterward" questions
 rather than designed — if a bullet has no natural home in the types, the API
 is wrong, not the bullet.
@@ -205,6 +205,14 @@ produced, or only what it acted on?** Two scenarios in unrelated regions (S-1
 sharpening a question, S-7 amending a design) hit the same omission. It is a
 review heuristic, not a relationship — the two needed different remedies, and
 one needed none. See PJ-008 row AB.
+
+A claim is identified by its **proposition within a line of enquiry**, never by
+its wording alone. Two stages of one programme can assert the same sentence
+about different endpoints, and merging them reports a claim that is
+simultaneously supported and challenged when each separately has a clean
+answer (S-5). Verbs take a `ClaimSubject` — bare text while a sentence is
+asserted once, a `ConclusionRef` naming the analysis when it is not — and
+**refuse** rather than guess when text is ambiguous.
 
 Prefer structure in the **query** over structure in the **stored model**.
 S-3's four gate states and per-criterion itemisation are computed, not

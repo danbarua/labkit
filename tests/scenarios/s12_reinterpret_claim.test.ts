@@ -84,7 +84,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // Reviewer:   no. The interpretation is backwards -- both signal types
     //             attenuate, and the discriminative one attenuates more.
     const report = await session.reinterpret({
-      proposition: PREFERENTIAL,
+      of: PREFERENTIAL,
       as: NARROWER,
       because: "both types attenuate; the ratio is a difference in degree, not preservation",
     });
@@ -116,7 +116,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     expect(beforehand.support).toHaveLength(2);
 
     await session.reinterpret({
-      proposition: PREFERENTIAL,
+      of: PREFERENTIAL,
       as: NARROWER,
       because: "both types attenuate",
     });
@@ -153,7 +153,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   test("every finding survives, and nothing was invalidated", async () => {
     const programme = await assertedTwice();
     await session.reinterpret({
-      proposition: PREFERENTIAL,
+      of: PREFERENTIAL,
       as: NARROWER,
       because: "both types attenuate",
     });
@@ -198,7 +198,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     });
 
     const report = await session.reinterpret({
-      proposition: PREFERENTIAL,
+      of: PREFERENTIAL,
       as: NARROWER,
       because: "both types attenuate",
     });
@@ -224,8 +224,8 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     await assertedTwice();
     const EVEN_NARROWER = "discriminative signal attenuates less in cohort A only";
 
-    await session.reinterpret({ proposition: PREFERENTIAL, as: NARROWER, because: "both types attenuate" });
-    await session.reinterpret({ proposition: NARROWER, as: EVEN_NARROWER, because: "the cohort B ratio does not separate" });
+    await session.reinterpret({ of: PREFERENTIAL, as: NARROWER, because: "both types attenuate" });
+    await session.reinterpret({ of: NARROWER, as: EVEN_NARROWER, because: "the cohort B ratio does not separate" });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     expect(later.events.all()).toHaveLength(0);
@@ -288,7 +288,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    */
   test("recording the withdrawn sentence again does not quietly restore it", async () => {
     const programme = await assertedTwice();
-    await session.reinterpret({ proposition: PREFERENTIAL, as: NARROWER, because: "both types attenuate" });
+    await session.reinterpret({ of: PREFERENTIAL, as: NARROWER, because: "both types attenuate" });
 
     const moreReadings = await session.recordObservations({
       enquiry: programme.enquiry,
@@ -318,7 +318,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
     await expect(
       session.reinterpret({
-        proposition: "a sentence nobody wrote",
+        of: "a sentence nobody wrote",
         as: "some narrower version of it",
         because: "it should not get this far",
       }),
