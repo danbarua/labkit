@@ -21,10 +21,36 @@ export type AnalysisRef = Ref<"analysis">;
 export type ReviewRef = Ref<"review">;
 export type EnquiryRef = Ref<"enquiry">;
 
-/** One proposition an analysis concluded, and the finding that supports it. */
+/** One proposition an analysis concluded, and the finding that bears on it. */
 export interface Conclusion {
   proposition: string;
   finding: string;
+  /**
+   * Which way the finding cuts. Defaults to `supports`.
+   *
+   * A null result is not an absence of evidence — "all five constructions
+   * within 0.02 of each other" is a finding, and it bears against a
+   * specificity claim. That is what `challenges` is for.
+   */
+  bearing?: "supports" | "challenges";
+}
+
+/**
+ * Whether an enquiry is still open, and if not, how it closed.
+ *
+ * `closure` distinguishes three things that must not collapse into one:
+ * a question that was **answered** on evidence, one **abandoned** without
+ * any, and one **deferred**. `answer` carries polarity — a question can be
+ * answered "no" and that is a substantive result, not a failure.
+ */
+export interface EnquiryStatus {
+  enquiry: string;
+  question: string;
+  open: boolean;
+  closure: "answered" | "abandoned" | "deferred" | null;
+  answer: "yes" | "no" | null;
+  /** The findings the closing decision rests on. Empty means nothing was cited. */
+  evidence: string[];
 }
 
 /**
@@ -145,4 +171,14 @@ export interface SupportExplanation {
   restingOn: string[];
   /** Support that was withdrawn, and why — bullet 5. */
   superseded: Array<{ finding: string; via: string; reason: string }>;
+  /**
+   * Whether any finding bears *against* this proposition.
+   *
+   * Distinct from `supported: false`, which is also true of a proposition
+   * nobody has ever examined. A claim refuted by a null result and a claim
+   * never investigated are different scientific states, and reporting them
+   * identically confuses absence of evidence with failure — see S-4.
+   */
+  challenged: boolean;
+  against: Array<{ finding: string; via: string }>;
 }

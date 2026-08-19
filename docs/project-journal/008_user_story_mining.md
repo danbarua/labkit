@@ -672,8 +672,8 @@ this document's original analysis are marked as such.
 | E | No evidence-to-evidence lineage | no `Evidence`→`Evidence` edge | S-10 | Both support the same claim; execution differences live on the computation |
 | F | No artefact-to-artefact lineage | no `Artefact`→`Artefact` edge | S-9 | Content-hash comparison plus an open question about the generator |
 | G | "Locked" is not distinct from "decision record still active" | `Decision.is_open` (PJ-004 #2) | S-7, S-13 | A gate expresses the confirmatory boundary; `is_open` was always meant to carry this |
-| H | Closure carries no polarity | `RESOLVES` edge, no outcome field | S-4 | The decision's `reason` prose plus challenging evidence |
-| I | Absence of evidence vs inconclusive evidence | no explicit representation | S-1, S-2, S-3 | Derivable: no evidence unit addressing the question vs one whose evaluations disagree |
+| H | Closure carries no polarity | `RESOLVES` edge, no outcome field | S-4 | **REFUTED by S-4 — no polarity field needed.** Answered/abandoned/deferred and yes/no are all derived: `RESOLVES` + cited evidence is *answered*, `RESOLVES` with nothing cited is *abandoned*, `DEFERS` is *deferred*; and the answer is "no" when the cited findings `CHALLENGES` the proposition rather than `SUPPORTS` it. Third prediction to dissolve rather than confirm |
+| I | Absence of evidence vs inconclusive evidence | no explicit representation | S-1, S-2, S-3, **S-4** | **HELD, and now tested outside the gate machinery.** S-4 found a genuine instance: a claim refuted by a null result and a claim nobody had examined returned *identical* objects from `whySupported()` — both `supported: false` with empty support. That is not an empty result but an assertion of equivalence between two different scientific states. Fixed at the service layer by reading the `CHALLENGES` edges S-4 made live; no schema change. `challenged`/`against` now distinguish them |
 | J | Deferred vs accepted-as-unresolved | `DEFERS` edge covers both | S-14 | Distinguish by whether an open task exists |
 | K | No provisional/scratch standing | `Claim.kind: exploratory \| confirmatory` | S-8, story 18 | `exploratory` already is this distinction |
 | L | No execution input lineage | no `Computation`→`Artefact` "read" edge | S-11 | **CONFIRMED — resolved.** Added `CONSUMES: Computation → Artefact`. The old route (`ADDRESSES` to the enquiry, then `REQUIRES`) answered "what observations is this enquiry associated with", not "what did this computation consume". Verified false in practice, not in principle: with two analyses on one enquiry over different inputs, "what does this claim rest on" returned both observation sets |
@@ -681,7 +681,7 @@ this document's original analysis are marked as such.
 | N | Claim identity is undefined | one `Claim` created per analysis conclusion; queried by `name` | S-5, S-12 | **NEW OPEN QUESTION.** Two analyses concluding the same proposition currently create two claims. Correct if a claim is an assertion *occurrence*; wrong if it is a proposition, in which case one claim should accumulate evidence. Deliberately not fixed — S-5 and S-12 are what should decide it |
 | O | Withdrawal reason is under-determined | `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation | S-3, S-7 | **NEW, DEFERRED.** Two shapes of the same gap: with no review the reason is manufactured (row **I** again — probably should be null); with several reviews of one unit the causal one is ambiguous. May want no relationship at all, since it describes *why state changed* rather than *what current state is* — which is what the event history is for. Deferred until the event model is under real pressure |
 | P | `Evidence` carries two senses | one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position | S-9, S-10, S-12 | **NEW, from cold review (3 of 4 reviewers, independently).** May be correct minimalism — S-11's premise ("observations fine, inference wrong") is expressed structurally and works. But `recordObservations` makes Evidence with no producing `EvidenceUnit`, which PJ-001 defines as impossible, and `whySupported` structurally cannot count an observation as support |
-| Q | Question and LineOfEnquiry are collapsed by the service layer | `openEnquiry(question)` creates a `LineOfEnquiry` named with the question text; no `Question`, no `MOTIVATES`, anywhere in `src/domain/` | S-1, S-2, S-13 | **NEW, from cold review (3 of 4, independently).** Two readings: the graph's split is real and the service layer simply hasn't reached it, or the split is the redundancy and S-1 collapses it in the graph too. Consequence either way: PJ-001's "why is this line of enquiry still open?" is unanswerable for anything the service layer creates, since closure derives via `Question` |
+| Q | Question and LineOfEnquiry are collapsed by the service layer | `openEnquiry(question)` created only a `LineOfEnquiry`; no `Question`, no `MOTIVATES`, anywhere in `src/domain/` | S-1, S-2, S-13, **S-4** | **RESOLVED by S-4, with no schema change.** The split is real and load-bearing: closure attaches to the question, so a closed enquiry went on reporting itself open — state was written and the query contradicted it. `MOTIVATES` and `RESOLVES` already existed and were already tested in the db layer, so this was a service-layer collapse, not a gap in the model (ladder step 1). `openEnquiry` now creates both. They still share a name; a scenario that sharpens one question into several, or pursues one question two ways, is what would force them apart |
 | R | Standing is a birth property, not a transition | `Claim.kind` is hardcoded `"confirmatory"` by the only writer; `exploratory` unreachable through research verbs | S-8, S-7, story 18 | **NEW, from cold review (3 of 4).** Ties to rows **G** and **K**: exploratory→confirmatory is plausibly conferred by an event (preregistration, lock, promotion) rather than set at creation. If so G/K/R are one question about how standing changes, not three |
 | S | No agent, person or role exists in the model | no node label, no property, anywhere | S-8 | **NEW, from cold review.** S-8's Afterward asks "who approved the scale-up, and on what projected cost?" — unanswerable. May legitimately be external metadata rather than domain; S-8 decides |
 | T | Edges cannot carry properties | `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)` | S-7, row O | **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed |
@@ -702,6 +702,22 @@ independent reviewers, unprimed). They are *not* scenario outcomes — nothing
 has tested them — but three of the five were noticed independently by three
 of four reviewers, which is why they are logged rather than left to be
 re-derived (differently) by whichever scenario hits them first.
+
+**Status after S-4.** The first scenario outside the control chain, and it
+resolved three open rows **without a single schema change** — every fix was
+ladder step 1 or 2 (a missing service operation, or an answer derivable from
+structure that already existed). Row **Q** resolved: the Question/
+LineOfEnquiry split is real, and the service layer was wrong to collapse it.
+Row **H** refuted: closure polarity is derived, not stored — the third
+prediction to dissolve. Row **I** held and was tested outside gates for the
+first time. `CHALLENGES` moved from declared-but-never-walked to live, which
+is one fewer empty label on the frontier.
+
+Two bugs S-4 caught that were nothing to do with S-4: a closed enquiry
+reporting itself open, and a cross-product in a `whySupported` traversal
+where two anonymous `(:EvidenceUnit)` patterns did not have to match the same
+unit. The second only surfaced because the scenario had two analyses in
+scope — with one it would have passed spuriously.
 
 **Status after S-3.** Row **A** — "the strongest single prediction in this
 document" — is **refuted**. No third `outcome` value was needed: each

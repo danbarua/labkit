@@ -25,6 +25,7 @@ import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./eve
 import type {
   AnalysisRef,
   CheckStatus,
+  EnquiryStatus,
   EvaluationRecord,
   CriterionRef,
   GateRef,
@@ -61,10 +62,25 @@ export class ResearchSession {
   // Recording
   // -------------------------------------------------------------------------
 
-  /** Opens a line of enquiry. S-11 needs one only as somewhere for its analyses to hang. */
+  /**
+   * Opens a line of enquiry pursuing a question.
+   *
+   * Both nodes are created, because they are different things: the question
+   * is what is unknown, the enquiry is how it is being pursued. Until S-4
+   * this created only the enquiry — and closure attaches to the question, so
+   * a closed enquiry went on reporting itself open. That was a service-layer
+   * collapse, not a gap in the model: `MOTIVATES` and `RESOLVES` both already
+   * existed. See PJ-008 row Q.
+   *
+   * The two currently share a name because the caller supplies one string.
+   * A scenario that sharpens one question into several, or pursues one
+   * question two ways, would be the thing that forces them apart.
+   */
   async openEnquiry(question: string): Promise<EnquiryRef> {
+    const asked = await this.graph.createNode("Question", { name: question });
     const enquiry = await this.graph.createNode("LineOfEnquiry", { name: question });
-    this.emit("openEnquiry", enquiry.natural_id, { question });
+    await this.graph.createEdge(asked.natural_id, "MOTIVATES", enquiry.natural_id);
+    this.emit("openEnquiry", enquiry.natural_id, { question, asked: asked.natural_id });
     return { kind: "enquiry", id: enquiry.natural_id };
   }
 
@@ -142,7 +158,10 @@ export class ResearchSession {
       const claim = await this.graph.createNode("Claim", { name: conclusion.proposition, kind: "confirmatory" });
       await this.graph.createEdge(unit.natural_id, "PRODUCES", evidence.natural_id);
       await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", output.natural_id);
-      await this.graph.createEdge(evidence.natural_id, "SUPPORTS", claim.natural_id);
+      // A null result is a finding, not an absence of one -- it bears
+      // against the proposition rather than failing to bear on it.
+      const bearing = conclusion.bearing === "challenges" ? "CHALLENGES" : "SUPPORTS";
+      await this.graph.createEdge(evidence.natural_id, bearing, claim.natural_id);
     }
 
     this.emit("recordAnalysis", computation.natural_id, {
@@ -165,6 +184,118 @@ export class ResearchSession {
     await this.graph.createEdge(review.natural_id, "EVALUATES", await this.unitOf(input.of));
     this.emit("recordReview", review.natural_id, { of: input.of.id, verdict: input.verdict });
     return { kind: "review", id: review.natural_id };
+  }
+
+  // -------------------------------------------------------------------------
+  // Question lifecycle
+  // -------------------------------------------------------------------------
+
+  /**
+   * Closes an enquiry by resolving the question that motivates it.
+   *
+   * `answeredBy` is what makes this an answer rather than an abandonment:
+   * closing with nothing cited is a real and different act, and the two must
+   * not read alike.
+   */
+  async closeEnquiry(input: { enquiry: EnquiryRef; answeredBy?: AnalysisRef }): Promise<void> {
+    const question = await this.questionBehind(input.enquiry);
+    const decision = await this.graph.createNode("Decision", {
+      reason: input.answeredBy ? `answered by ${input.answeredBy.id}` : "closed without a cited result",
+      invalidation_check: "new evidence bearing on the question",
+    });
+    if (question) await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
+
+    if (input.answeredBy) {
+      const findings = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence) RETURN e`,
+        { e: vertexProps<{ natural_id: string }>() },
+        { id: input.answeredBy.id },
+      );
+      for (const row of findings) {
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", row.e.natural_id);
+      }
+    }
+
+    this.emit("closeEnquiry", input.enquiry.id, { answeredBy: input.answeredBy?.id ?? null });
+  }
+
+  /** Is this enquiry open, and if not, how did it close? */
+  async enquiryStatus(enquiry: EnquiryRef): Promise<EnquiryStatus> {
+    const named = await this.graph.query(
+      `MATCH (loe:LineOfEnquiry {natural_id: $id}) RETURN loe`,
+      { loe: vertexProps<{ name: string }>() },
+      { id: enquiry.id },
+    );
+    const loe = named[0];
+    if (!loe) throw new Error(`no enquiry ${enquiry.id}`);
+
+    // Closure attaches to the question the enquiry pursues, not to the
+    // enquiry itself -- an enquiry is a way of pursuing a question, and it is
+    // the question that gets answered.
+    const rows = await this.graph.query(
+      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id})
+       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
+       OPTIONAL MATCH (deferring:Decision)-[:DEFERS]->(q)
+       RETURN q, resolving, deferring`,
+      {
+        q: vertexProps<{ name: string }>(),
+        resolving: optional(vertexProps<{ natural_id: string }>()),
+        deferring: optional(vertexProps<{ natural_id: string }>()),
+      },
+      { id: enquiry.id },
+    );
+
+    const question = rows[0]?.q.name ?? loe.loe.name;
+    const resolving = rows.find((r) => r.resolving)?.resolving ?? null;
+    const deferred = rows.some((r) => r.deferring);
+
+    if (!resolving && !deferred) {
+      return { enquiry: enquiry.id, question, open: true, closure: null, answer: null, evidence: [] };
+    }
+    if (deferred && !resolving) {
+      return { enquiry: enquiry.id, question, open: false, closure: "deferred", answer: null, evidence: [] };
+    }
+
+    // What the closing decision rests on. Nothing cited means the question was
+    // abandoned, not answered -- absence of evidence is not a negative result.
+    const cited = await this.graph.query(
+      `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(against:Claim)
+       OPTIONAL MATCH (e)-[:SUPPORTS]->(forClaim:Claim)
+       RETURN e, against, forClaim`,
+      {
+        e: vertexProps<{ statement: string }>(),
+        against: optional(vertexProps<{ name: string }>()),
+        forClaim: optional(vertexProps<{ name: string }>()),
+      },
+      { id: resolving!.natural_id },
+    );
+
+    if (cited.length === 0) {
+      return { enquiry: enquiry.id, question, open: false, closure: "abandoned", answer: null, evidence: [] };
+    }
+
+    // Polarity is derived from which way the cited findings cut, not stored on
+    // the decision: a question answered by evidence that challenges its
+    // proposition was answered "no".
+    const challenges = cited.some((r) => r.against !== null);
+    return {
+      enquiry: enquiry.id,
+      question,
+      open: false,
+      closure: "answered",
+      answer: challenges ? "no" : "yes",
+      evidence: [...new Set(cited.map((r) => r.e.statement))],
+    };
+  }
+
+  private async questionBehind(enquiry: EnquiryRef): Promise<string | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
+      { q: vertexProps<{ natural_id: string }>() },
+      { id: enquiry.id },
+    );
+    return rows[0]?.q.natural_id;
   }
 
   // -------------------------------------------------------------------------
@@ -551,12 +682,31 @@ export class ResearchSession {
       { name: proposition },
     );
 
+    // Findings that bear against the proposition. Without this, a refuted
+    // claim and one nobody has examined return identical objects -- both
+    // `supported: false` with empty support -- which asserts an equivalence
+    // between two different scientific states.
+    const againstRows = await this.graph.query(
+      // `u` is bound and reused deliberately. Two anonymous (:EvidenceUnit)
+       // patterns do not have to match the same unit, so the computation came
+       // back as a cross product with every other analysis in the tenant.
+      `MATCH (c:Claim {name: $name})<-[:CHALLENGES]-(e:Evidence)
+       MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
+       MATCH (u)-[:USES]->(comp:Computation)
+       RETURN e, comp`,
+      { e: vertexProps<EvidenceProps>(), comp: vertexProps<ComputationProps>() },
+      { name: proposition },
+    );
+    const against = againstRows.map((r) => ({ finding: r.e.statement, via: r.comp.kind }));
+
     return {
       proposition,
       supported: support.length > 0,
       support,
       restingOn: [...new Set(resting.map((r) => r.a.logical_name))],
       superseded,
+      challenged: against.length > 0,
+      against,
     };
   }
 

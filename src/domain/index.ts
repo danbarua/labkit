@@ -15,6 +15,7 @@ export type {
   SupportExplanation,
   GateStatus,
   CheckStatus,
+  EnquiryStatus,
   EvaluationRecord,
   CriterionRef,
   GateRef,
