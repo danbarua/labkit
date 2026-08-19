@@ -861,6 +861,21 @@ withdrawn reading: the findings were always fine, and blanking them would say
 the numbers had gone wrong, which is the one thing this scenario exists to
 deny.
 
+### S-5 predictions, recorded before the build
+
+Recorded 2026-08-19. PJ-008 called S-5 "the one most likely to force a real
+model change". The prediction is the opposite: **no schema change at all**,
+and the damage is in the service layer's addressing scheme rather than the
+graph.
+
+| Row / question | Prediction |
+| --- | --- |
+| C — a claim has no endpoint or scope | **No-change route holds.** Scope is already reachable: `Claim <-SUPPORTS- Evidence <-PRODUCES- EvidenceUnit -ADDRESSES-> LineOfEnquiry <-MOTIVATES- Question`. Every edge on that path exists and is already walked by something. Expect scope to be *derived* and no property added to `Claim` |
+| N — proposition identity vs assertion occurrence | **Resolves.** Identity for reading is proposition **within a scope**, not proposition alone and not the node. Duplicate nodes inside one scope stay harmless, exactly as S-12 found; duplicates *across* scopes are two different claims that happen to share wording. The node remains an assertion occurrence |
+| the S-12 revision path | **The demonstrated wrong answer, and the serious one.** `reinterpret()`, `withdrawalOf()`, `whySupported()` and `interpretationHistory()` are all keyed by proposition **text**. Two enquiries asserting the same sentence about different endpoints means withdrawing one interpretation silently retracts the other, in an unrelated line of work, with no decision saying so. That is worse than the S-12 bug it descends from |
+| what the fix looks like | Not a new signature everywhere. Text is the right handle when a sentence is asserted in one scope, which is the common case and every prior scenario. Expect: accept a `ConclusionRef` where the caller can name one, and **refuse** — not guess — when a bare proposition is ambiguous across scopes. Same principle as S-7's fork guard: a command that declines beats state that reads back wrong |
+| do these findings conflict? | Derived from scope plus bearing, never from wording. Same scope + opposing bearings = contradiction; different scope = dissociation whatever the sentences say |
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
