@@ -319,14 +319,6 @@ interface NodeType<L extends NodeLabel> {
   readonly prefix: string;
 
   /**
-   * Columns for this label's per-tenant CQRS view (src/db/provisioning.ts).
-   * The `keyof NodePropsByLabel[L]` constraint is doing real work: a column
-   * that drifts from its *Props interface is a typecheck failure, which is
-   * what replaced the "keep these in sync" comment this table used to carry.
-   */
-  readonly viewColumns: readonly (keyof NodePropsByLabel[L] & string)[];
-
-  /**
    * Creation-time enforcement of per-label property invariants (PJ-004
    * decision #8) — `TenantGraph.closeDecision()` alone can't be the whole
    * story, since a generic create would otherwise happily accept a
@@ -342,14 +334,13 @@ interface NodeType<L extends NodeLabel> {
  * `NODE_VALIDATORS`) indexed by the same key and kept aligned by comment.
  */
 export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
-  Question: { prefix: "Q", viewColumns: ["name"] },
-  LineOfEnquiry: { prefix: "LOE", viewColumns: ["name"] },
-  EvidenceUnit: { prefix: "EU", viewColumns: ["role"] },
-  Evidence: { prefix: "EV", viewColumns: ["statement"] },
-  Claim: { prefix: "CLM", viewColumns: ["name", "kind"] },
+  Question: { prefix: "Q" },
+  LineOfEnquiry: { prefix: "LOE" },
+  EvidenceUnit: { prefix: "EU" },
+  Evidence: { prefix: "EV" },
+  Claim: { prefix: "CLM" },
   Decision: {
     prefix: "DEC",
-    viewColumns: ["reason", "invalidation_check", "is_open", "closed_at"],
     // Strict biconditional, tightened from PJ-004 decision #2's original
     // "may have closed_at" now that there's no legacy data to accommodate.
     validate: (props) => {
@@ -360,19 +351,17 @@ export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
       return { ...props, is_open };
     },
   },
-  Criterion: { prefix: "CRIT", viewColumns: ["proposition"] },
-  CriterionEvaluation: { prefix: "CEVAL", viewColumns: ["value", "outcome", "evaluated_at"] },
-  Gate: { prefix: "GATE", viewColumns: ["consequence"] },
-  Review: { prefix: "REV", viewColumns: ["verdict"] },
+  Criterion: { prefix: "CRIT" },
+  CriterionEvaluation: { prefix: "CEVAL" },
+  Gate: { prefix: "GATE" },
+  Review: { prefix: "REV" },
   Artefact: {
     prefix: "ART",
-    viewColumns: ["kind", "logical_name", "content_hash", "uri", "external_ref", "invalidated"],
   },
   Computation: {
     prefix: "COMP",
-    viewColumns: ["kind", "status", "backend", "external_run_id", "started_at", "finished_at", "code_revision", "environment_ref"],
   },
-  Task: { prefix: "TASK", viewColumns: ["objective", "inputs", "outputs", "acceptance", "is_open"] },
+  Task: { prefix: "TASK" },
 };
 
 /** Reverse of `NODE_TYPES[label].prefix` — resolves a node's label from its natural id's prefix, e.g. "EU_17" -> "EvidenceUnit". */

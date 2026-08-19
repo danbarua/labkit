@@ -416,17 +416,6 @@ describe("provisioning reconciliation", () => {
   // isn't the thing being claimed; it has to hold for actual tenant
   // resolution, unconditionally, every time.
 
-  test("re-resolving the tenant restores a dropped view", async () => {
-    await db.query(`DROP VIEW "${ctx.graphName}".question`);
-    const before = await db.query(`SELECT 1 FROM information_schema.views WHERE table_schema = $1 AND table_name = 'question'`, [ctx.graphName]);
-    expect(before.rows).toHaveLength(0);
-
-    await resolveTenantContext(db, "labkit");
-
-    const after = await db.query(`SELECT 1 FROM information_schema.views WHERE table_schema = $1 AND table_name = 'question'`, [ctx.graphName]);
-    expect(after.rows).toHaveLength(1);
-  });
-
   test("re-resolving the tenant restores a dropped natural-id index", async () => {
     await db.query(`DROP INDEX "${ctx.graphName}".claim_natural_id_idx`);
     const before = await db.query(`SELECT 1 FROM pg_indexes WHERE schemaname = $1 AND indexname = 'claim_natural_id_idx'`, [ctx.graphName]);
@@ -447,7 +436,6 @@ describe("provisioning reconciliation", () => {
     // original all-or-nothing "provision only if the graph itself is
     // absent" check couldn't close, now proven closed through the real
     // path rather than a test-only shortcut.
-    await db.query(`DROP VIEW "${ctx.graphName}".task`);
     await db.query(`SELECT ag_catalog.drop_label($1, 'Task', false)`, [ctx.graphName]);
     const before = await db.query(
       `SELECT 1 FROM ag_catalog.ag_label WHERE name = 'Task' AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
@@ -531,22 +519,3 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
   });
 });
 
-describe("CQRS read-side views", () => {
-  test("the per-tenant computation view exposes only natural ids, never raw graph ids", async () => {
-    await graph.createNode("Computation", {
-      kind: "equivalence_check",
-      status: "completed",
-      backend: "wandb",
-      external_run_id: "run-42",
-    });
-
-    const rows = await db.query<{ natural_id: string; kind: string; status: string; external_run_id: string }>(
-      `SELECT natural_id, kind, status, external_run_id FROM "${ctx.graphName}".computation WHERE external_run_id = $1`,
-      ["run-42"],
-    );
-
-    expect(rows.rows).toHaveLength(1);
-    expect(rows.rows[0]).toMatchObject({ kind: "equivalence_check", status: "completed", external_run_id: "run-42" });
-    expect(rows.rows[0]!.natural_id).toMatch(/^COMP_\d+$/);
-  });
-});

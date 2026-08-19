@@ -2,7 +2,7 @@
  * Additive reconciliation of a tenant graph (PJ-005).
  *
  * `provisionTenantGraph()` re-runs on every `resolveTenantContext()` call
- * specifically so a label, index or view added to the codebase reaches
+ * specifically so a label or index added to the codebase reaches
  * tenants whose graphs were provisioned before that change shipped. This test
  * exercises that for the case it was built for — the S-11 edge additions
  * (`CONSUMES`, `EVALUATES: Review->EvidenceUnit`) were the first new edge

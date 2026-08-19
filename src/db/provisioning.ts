@@ -2,7 +2,7 @@
  * Per-tenant AGE graph schema management (docs/project-journal/005_provisioning_reconciliation.md).
  *
  * There's no `ALTER GRAPH` DDL the way there's `ALTER TABLE`, so evolving a
- * tenant's graph structure — a new label, edge, index, or view — is the
+ * tenant's graph structure — a new label, edge or index — is the
  * application's job, and it runs as reconciliation on every tenant
  * resolution rather than as a migration.
  *
@@ -79,19 +79,19 @@ class TenantGraphProvisioner {
 
   /**
    * Ensures the currently supported ADDITIVE graph structure exists: the
-   * graph, every vertex/edge label, every natural-id uniqueness index, every
-   * edge-relationship uniqueness index, and every CQRS view — each
-   * independently, not gated behind a single "does the graph exist at all"
-   * check. This is what makes a *new* label/edge/view added to the codebase
-   * actually reach a tenant whose graph was provisioned before that change
-   * shipped, not just brand-new tenants.
+   * graph, every vertex/edge label, every natural-id uniqueness index and
+   * every edge-relationship uniqueness index — each independently, not gated
+   * behind a single "does the graph exist at all" check. This is what makes a
+   * *new* label, edge or index added to the codebase actually reach a tenant
+   * whose graph was provisioned before that change shipped, not just
+   * brand-new tenants.
    *
    * Deliberately not a claim of full structural reconciliation: indexes are
    * checked by name (`IF NOT EXISTS`), not compared by definition, and
    * labels are checked for existence, not arbitrary structural equivalence.
-   * A change that isn't purely additive — removing/reordering a view column,
-   * renaming a label, reshaping a property that already has data — has no
-   * story here; see docs/project-journal/005_provisioning_reconciliation.md.
+   * A change that isn't purely additive — renaming a label, reshaping a
+   * property that already has data — has no story here; see
+   * docs/project-journal/005_provisioning_reconciliation.md.
    */
   async reconcile(): Promise<void> {
     await this.ensureGraph();
@@ -99,7 +99,6 @@ class TenantGraphProvisioner {
     for (const edge of EDGE_LABELS) await this.ensureEdgeLabel(edge);
     for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label);
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge);
-    for (const label of NODE_LABELS) await this.ensureView(label);
   }
 
   private async ensureGraph(): Promise<void> {
@@ -156,25 +155,4 @@ class TenantGraphProvisioner {
     await this.db.query(`CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${edge}" (start_id, end_id)`);
   }
 
-  /**
-   * Per-tenant CQRS read view, schema-qualified to this tenant so there's
-   * never a naming collision between tenants. `CREATE OR REPLACE VIEW` is
-   * itself idempotent and picks up column additions — it can NOT remove or
-   * reorder existing columns (a real Postgres restriction), so a
-   * `NODE_TYPES[label].viewColumns` change that does either needs an actual
-   * migration story once one exists, not just a reconcile pass. Acceptable
-   * for now per the "lay the groundwork, figure out real graph migrations
-   * later" decision (docs/project-journal/005_provisioning_reconciliation.md).
-   */
-  private async ensureView(label: NodeLabel): Promise<void> {
-    const columns = NODE_TYPES[label].viewColumns
-      .map((col) => `${LABKIT_SCHEMA}.labkit_prop(properties, '${col}') AS ${col}`)
-      .join(",\n           ");
-    await this.db.query(
-      `CREATE OR REPLACE VIEW "${this.graphName}".${label.toLowerCase()} AS
-     SELECT ${LABKIT_SCHEMA}.labkit_prop(properties, 'natural_id') AS natural_id,
-     ${columns}
-     FROM "${this.graphName}"."${label}"`,
-    );
-  }
 }

@@ -76,10 +76,9 @@ for violations only):
 `domain.ts` imports nothing from `src/db/`; it's pure types and data, read by
 both `graph.ts` (to type and validate writes) and `provisioning.ts` (to decide
 what to create). `NODE_TYPES` is one entry per node label carrying its
-natural-id `prefix`, its CQRS `viewColumns`, and its optional `validate` — the
-four parallel per-label tables it replaced are not coming back. Its
-`viewColumns` are constrained to `keyof NodePropsByLabel[L]`, so a view column
-that drifts from its `*Props` interface is a typecheck failure.
+natural-id `prefix` and its optional `validate` — the four parallel per-label
+tables it replaced are not coming back. It also carried `viewColumns` until the
+per-tenant CQRS views were removed; see "No relational read side" below.
 
 All graph access goes through `TenantGraph` (`src/db/graph.ts`), constructed
 per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
@@ -230,17 +229,30 @@ distinguish *ruled out by the corpus* from *not yet reached by it*.
 ## Tenant provisioning is reconciliation, run every time
 
 There's no `ALTER GRAPH` DDL the way there's `ALTER TABLE` — evolving a
-tenant's AGE graph structure (new label, new edge, new index, new view) is
+tenant's AGE graph structure (new label, new edge, new index) is
 the application's job. `resolveTenantContext()` calls
 `provisionTenantGraph()`, which — inside one transaction guarded by a
 transaction-scoped `pg_advisory_xact_lock(tenantId)` — unconditionally
 ensures the graph, every `NODE_LABELS`/`EDGE_LABELS` entry, every natural-id
-index, every edge-uniqueness index, and every per-tenant CQRS view exist.
+index and every edge-uniqueness index exist.
 This runs on *every* `resolveTenantContext()` call, deliberately, not gated
 behind a version check — an earlier version added a `schema_version` gate as
 a performance optimization and it was reverted (PJ-005) because it silently
 stopped tenant resolution from self-healing drift. Don't reintroduce that
 kind of gate without a measured cost driving it.
+
+**No relational read side.** Every tenant used to get one SQL view per node
+label, reconciled on each `resolveTenantContext()`. Nothing ever read them, and
+nothing could: `TenantGraph` has no raw-SQL escape hatch, so every domain and
+scenario read goes through `cypher()`. They were removed after eight scenarios
+without a reader — 13 `CREATE OR REPLACE VIEW` statements per tenant per
+resolution, plus a standing non-additive migration problem (a view's columns
+can't be removed or reordered in place) held open for no consumer. This is not
+a reversal of the no-cull policy: that policy protects unused *labels and
+edges*, because a declared-but-unwalked edge is a claim about the domain. A view
+claims nothing. What would bring them back is the MCP/CLI read layer, where a
+relational projection actually pays;
+`git show 51b70d6:src/db/provisioning.ts` has the implementation.
 
 `provisionTenantGraph()` and `dropTenantGraph()` (`src/db/provisioning.ts`)
 are the only exports there. The class that does the work,
@@ -250,8 +262,7 @@ entry point. Tests exercise reconciliation through `resolveTenantContext()`,
 the same path production uses, never by calling internals directly.
 
 "Ensures ... exists" means additive structure only: indexes are checked by
-name (`IF NOT EXISTS`), views by `CREATE OR REPLACE` (can add columns, can't
-remove/reorder them), labels by existence. There is deliberately no story
+name (`IF NOT EXISTS`), labels by existence. There is deliberately no story
 yet for a non-additive schema change (renaming a label, reshaping a
 property that already has data) — see PJ-005's "Judgment calls."
 
@@ -317,8 +328,8 @@ mattered. Working gotchas:
   single-type `[:TYPE*1..5]` for variable length.
 - Every AGE label (vertex or edge) is a real Postgres table
   (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
-  it directly — this is how natural-id uniqueness, edge uniqueness, and the
-  per-tenant CQRS views all work, with no `cypher()` call involved.
+  it directly — this is how natural-id uniqueness and edge uniqueness both
+  work, with no `cypher()` call involved.
 - **Always schema-qualify explicitly** — `ag_catalog.` for AGE catalog
   functions, `src/db/schema.ts`'s `LABKIT_SCHEMA` constant for LabKit's own
   `tenants` table and natural-id functions. Don't rely on `search_path`
