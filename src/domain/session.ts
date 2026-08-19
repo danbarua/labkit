@@ -45,7 +45,10 @@ import type {
   QuestionOrigin,
   QuestionRef,
   QuestionStanding,
+  InterpretationHistory,
+  ReinterpretationReport,
   ReplacementReport,
+  Revision,
   ReviewRef,
   SupportExplanation,
   UnaffectedRecord,
@@ -1182,6 +1185,156 @@ export class ResearchSession {
   // Explanation -- must stay answerable long after the report was returned
   // -------------------------------------------------------------------------
 
+  /**
+   * Narrows an interpretation without touching anything it was inferred from.
+   *
+   * The computations, artefacts, observations and findings all stay exactly as
+   * they were — this verb exists precisely because `replaceAnalysis` cannot
+   * express that, its whole mechanism being invalidation of the output. Here
+   * the numbers were right and only the sentence about them was wrong.
+   */
+  async reinterpret(input: {
+    proposition: string;
+    as: string;
+    because: string;
+  }): Promise<ReinterpretationReport> {
+    const at = this.clock.now();
+
+    const claims = await this.graph.query(
+      `MATCH (c:Claim {name: $name}) RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { name: input.proposition },
+    );
+    if (claims.length === 0) throw new Error(`nothing on the record claims "${input.proposition}"`);
+
+    const review = await this.graph.createNode("Review", { verdict: input.because });
+    const narrower = await this.graph.createNode("Claim", { name: input.as, kind: "exploratory" });
+    // The review records that someone objected; the decision records that the
+    // objection was acted on. Reviews also confirm, so a review alone cannot
+    // mean "withdrawn" without reading its prose.
+    const decision = await this.graph.createNode("Decision", {
+      reason: input.because,
+      invalidation_check: "evidence that the original reading was right after all",
+    });
+    await this.graph.createEdge(decision.natural_id, "MOTIVATES", narrower.natural_id);
+
+    const carried = new Set<string>();
+    for (const claim of claims) {
+      await this.graph.createEdge(review.natural_id, "EVALUATES", claim.c.natural_id);
+      await this.graph.createEdge(decision.natural_id, "CHANGES", claim.c.natural_id);
+      const evidence = await this.graph.query(
+        `MATCH (e:Evidence)-[:SUPPORTS]->(:Claim {natural_id: $id}) RETURN e`,
+        { e: vertexProps<{ natural_id: string; statement: string }>() },
+        { id: claim.c.natural_id },
+      );
+      for (const row of evidence) {
+        await this.graph.createEdge(row.e.natural_id, "SUPPORTS", narrower.natural_id);
+        carried.add(row.e.statement);
+      }
+    }
+
+    const restingOnTheOldReading = await this.decidedOnTheStrengthOf(input.proposition);
+
+    this.emit("reinterpret", narrower.natural_id, { previously: input.proposition, because: input.because });
+
+    return {
+      at,
+      previously: input.proposition,
+      nowClaims: input.as,
+      evidenceStanding: [...carried].sort(),
+      restingOnTheOldReading,
+      requiresRecomputation: false,
+    };
+  }
+
+  /**
+   * An interpretation and every narrowing behind it, oldest first.
+   *
+   * The chain walks claim-to-claim through the decisions that made it: each
+   * revision `CHANGES` the reading it withdrew and `MOTIVATES` the one that
+   * replaced it. No timestamps, nothing from the event log, and — unlike
+   * `designHistory` — no `SUPERSEDES` edge, because with both halves of each
+   * step recorded the order is already implied and a supersession edge would
+   * be a writer with no reader.
+   */
+  async interpretationHistory(proposition: string): Promise<InterpretationHistory> {
+    const steps: Revision[] = [];
+    let current = proposition;
+
+    // Walk backwards from the current reading. Bounded by the number of
+    // revisions actually recorded, so a cycle cannot spin.
+    const seen = new Set<string>([current]);
+    for (;;) {
+      const rows = await this.graph.query(
+        `MATCH (d:Decision)-[:MOTIVATES]->(:Claim {name: $name})
+         MATCH (d)-[:CHANGES]->(was:Claim)
+         RETURN d, was`,
+        {
+          d: vertexProps<{ natural_id: string; reason: string }>(),
+          was: vertexProps<{ name: string }>(),
+        },
+        { name: current },
+      );
+      const step = rows[0];
+      if (!step) break;
+      if (seen.has(step.was.name)) throw new Error(`interpretation history for "${proposition}" loops at "${step.was.name}"`);
+      seen.add(step.was.name);
+
+      steps.unshift({
+        revision: step.d.natural_id,
+        previously: step.was.name,
+        nowClaims: current,
+        reason: step.d.reason,
+        restingOnTheOldReading: await this.decidedOnTheStrengthOf(step.was.name),
+      });
+      current = step.was.name;
+    }
+
+    return {
+      originally: steps[0]?.previously ?? proposition,
+      nowClaims: proposition,
+      revisions: steps,
+    };
+  }
+
+  /** Whether the record has stopped asserting a proposition, and what replaced it. */
+  private async withdrawalOf(proposition: string): Promise<{ withdrawn: boolean; replacedBy?: string }> {
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {name: $name})
+       OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (d)-[:MOTIVATES]->(now:Claim)
+       RETURN c, d, now`,
+      {
+        c: vertexProps<{ natural_id: string }>(),
+        d: optional(vertexProps<{ natural_id: string }>()),
+        now: optional(vertexProps<{ name: string }>()),
+      },
+      { name: proposition },
+    );
+    if (rows.length === 0) return { withdrawn: false };
+
+    // Every node asserting this proposition must have been withdrawn. One left
+    // standing means the record still claims it -- which is exactly the
+    // duplicate-claim case S-12 was built to catch.
+    const standing = new Set(rows.filter((r) => !r.d).map((r) => r.c.natural_id));
+    if (standing.size > 0) return { withdrawn: false };
+
+    const replacedBy = rows.find((r) => r.now)?.now?.name;
+    return { withdrawn: true, ...(replacedBy ? { replacedBy } : {}) };
+  }
+
+  /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
+  private async decidedOnTheStrengthOf(proposition: string): Promise<string[]> {
+    const rows = await this.graph.query(
+      `MATCH (d:Decision)-[:BASED_ON]->(:Evidence)-[:SUPPORTS]->(:Claim {name: $name})
+       MATCH (d)-[:RESOLVES]->(q:Question)
+       RETURN q`,
+      { q: vertexProps<{ name: string }>() },
+      { name: proposition },
+    );
+    return [...new Set(rows.map((r) => r.q.name))].sort();
+  }
+
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */
   async whySupported(proposition: string): Promise<SupportExplanation> {
     // Both bearings, each partitioned by whether its analysis output was
@@ -1222,14 +1375,22 @@ export class ResearchSession {
       { name: proposition },
     );
 
+    // A withdrawn interpretation is not supported, however much evidence once
+    // carried it. `support` stays populated deliberately: the findings are
+    // fine and always were, and blanking them would say the numbers had gone
+    // wrong -- which is the one thing S-12 exists to deny.
+    const { withdrawn, replacedBy } = await this.withdrawalOf(proposition);
+
     return {
       proposition,
-      supported: support.length > 0,
+      supported: support.length > 0 && !withdrawn,
       support,
       restingOn: [...new Set(resting.map((r) => r.a.logical_name))],
       superseded,
       challenged: against.length > 0,
       against,
+      withdrawn,
+      ...(replacedBy ? { replacedBy } : {}),
     };
   }
 

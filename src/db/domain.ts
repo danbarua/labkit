@@ -79,13 +79,24 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * arrived. That is a confidently wrong answer, not an empty one — the reply
    * was populated and plausible, and belonged to a different event.
    *
+   * The `Decision -> Claim` pair is S-12, and it is the third instance of the
+   * same shape (PJ-008 row AB): `CHANGES` records which interpretation was
+   * withdrawn, and nothing recorded which one replaced it. S-7 got away
+   * without such an edge because a gate contains its design conditions and the
+   * current one is derivable as the unchanged member. An interpretation has no
+   * container, so from a narrowed claim there was no route back to the act
+   * that narrowed it — the prediction that S-7's remedy would transfer was
+   * wrong. Note what this makes redundant: with `CHANGES` and `MOTIVATES` both
+   * present the revision chain walks claim-to-claim through its decisions, so
+   * no `SUPERSEDES` edge is written between them. An edge needs a reader.
+   *
    * A direct `Question -> Question` lineage edge was the other candidate and
    * was not chosen: it answers "where did this come from" but not "what did we
    * know when we asked it", because the reason and the frozen evidence set
    * live on the decision. The two models are not equally capable here, so
    * PJ-011's record-both-pick-neither rule does not apply — see PJ-008 row D.
    */
-  MOTIVATES: [["Question", "LineOfEnquiry"], ["Decision", "Question"]],
+  MOTIVATES: [["Question", "LineOfEnquiry"], ["Decision", "Question"], ["Decision", "Claim"]],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
   ADDRESSES: [["EvidenceUnit", "LineOfEnquiry"]],
   SUPPORTS: [["Evidence", "Claim"]],
@@ -138,7 +149,19 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   EVALUATED_AS: [["Criterion", "CriterionEvaluation"]],
   TRIGGERS: [["CriterionEvaluation", "Gate"]],
   GATES: [["Gate", "Task"], ["Gate", "Computation"]],
-  CHANGES: [["Decision", "Criterion"]],
+  /**
+   * What a decision withdrew or replaced. A design condition (S-7), an
+   * interpretation (S-12).
+   *
+   * The `Claim` pair is earned by S-12. With only a `Review` recording that an
+   * interpretation had been criticised, `whySupported()` went on reporting the
+   * retracted sentence as supported — the record confidently asserting
+   * something the reviewer had just withdrawn, which is the worst thing a
+   * provenance system can do. A review is not a retraction: reviews also
+   * confirm, and telling the two apart from a free-text verdict would be
+   * text-matching.
+   */
+  CHANGES: [["Decision", "Criterion"], ["Decision", "Claim"]],
   BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
   RESOLVES: [["Decision", "Question"]],
   NARROWS: [["Decision", "Question"]],

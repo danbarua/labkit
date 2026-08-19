@@ -214,6 +214,18 @@ export interface SupportExplanation {
    */
   challenged: boolean;
   against: Array<{ finding: string; via: string }>;
+  /**
+   * Whether the record has stopped claiming this at all.
+   *
+   * A third state, and it is not `challenged`. Challenged means evidence bears
+   * against the sentence; withdrawn means nobody is asserting the sentence any
+   * more, usually because a narrower one replaced it. The findings underneath a
+   * withdrawn interpretation are untouched — that is the whole point of S-12 —
+   * so `support` stays populated while `supported` is false.
+   */
+  withdrawn: boolean;
+  /** The interpretation that replaced it, if one did. */
+  replacedBy?: string;
 }
 
 /**
@@ -319,4 +331,44 @@ export interface DesignHistory {
   /** The condition currently in force, for amending again. */
   criterion: CriterionRef;
   amendments: AmendmentRecord[];
+}
+
+/**
+ * What a reinterpretation did.
+ *
+ * `requiresRecomputation` is the field that keeps this verb honest. A
+ * reinterpretation touches no computation, no artefact and no observation —
+ * if it ever needs one rerun, it was a replacement wearing the wrong name, and
+ * `replaceAnalysis` already exists for that.
+ */
+export interface ReinterpretationReport {
+  at: string;
+  previously: string;
+  nowClaims: string;
+  /** Findings that carried the old reading and carry the new one. Unchanged, and demonstrably so. */
+  evidenceStanding: string[];
+  /** Things decided on the strength of the old sentence — not things computed from the numbers. */
+  restingOnTheOldReading: string[];
+  requiresRecomputation: boolean;
+}
+
+/** One revision of an interpretation, read back long afterwards. */
+export interface Revision {
+  revision: string;
+  previously: string;
+  nowClaims: string;
+  reason: string;
+  restingOnTheOldReading: string[];
+}
+
+/**
+ * An interpretation and everything it has been through, oldest first.
+ *
+ * Ordered from the supersession chain alone, exactly as `DesignHistory` is —
+ * no timestamps, nothing read from the event log.
+ */
+export interface InterpretationHistory {
+  originally: string;
+  nowClaims: string;
+  revisions: Revision[];
 }
