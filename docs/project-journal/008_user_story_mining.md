@@ -681,7 +681,7 @@ this document's original analysis are marked as such.
 | L | No execution input lineage | S-11 | resolved |
 | M | A review has no analysis to point at | S-11 | resolved |
 | N | Claim identity is undefined | S-5, S-12 | resolved |
-| O | Withdrawal reason is under-determined | S-3, S-7 | deferred |
+| O | Withdrawal reason is under-determined | S-3, S-7 | open |
 | P | `Evidence` carries two senses | S-9, S-10, S-12 | open |
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2, S-13, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, story 18 | resolved |
@@ -689,8 +689,8 @@ this document's original analysis are marked as such.
 | T | Edges cannot carry properties | S-7, row O | open |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8 | open |
-| W | An evaluation record is not evidence of evaluation | S-17, S-3 | deferred |
-| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17 | deferred |
+| W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | deferred |
+| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17 | open |
 | Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14 | boundary |
 | Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
@@ -699,8 +699,13 @@ this document's original analysis are marked as such.
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
-be one. `deferred` — real, deliberately not acted on. `boundary` — a known
-limit of the current model, recorded rather than fixed.
+be one. `deferred` — real, deliberately not acted on, **and with a scenario named that
+would settle it**. `boundary` — a known limit of the current model, recorded
+rather than fixed.
+
+A row whose named scenarios have all been built has nothing that would settle
+it, and is therefore `open` and unowned rather than `deferred` — CLAUDE.md's
+deferral rule. Those rows say so in their own section.
 
 Each row's narrative is below, oldest verdict first. A row's `Status` is taken
 from its **latest** dated verdict; earlier verdicts are kept verbatim, because
@@ -834,7 +839,7 @@ Distinguish by whether an open task exists
 
 ### Row O — Withdrawal reason is under-determined
 
-**Scenarios:** S-3, S-7 · **Status:** deferred
+**Scenarios:** S-3, S-7 · **Status:** open
 
 **Current state (verified):** `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation
 
@@ -914,20 +919,15 @@ Distinguish by whether an open task exists
 
 ### Row W — An evaluation record is not evidence of evaluation
 
-**Scenarios:** S-17, S-3 · **Status:** deferred
+**Scenarios:** S-17, S-3, S-8 · **Status:** deferred
 
 **Current state (verified):** `CriterionEvaluation {value, outcome}` can be minted directly; `BASED_ON: CriterionEvaluation → Evidence` exists and is never written
-
-> **No scenario currently named would settle this.** Every scenario in
-> its row has been built. Under CLAUDE.md's deferral rule that makes it
-> unresolved and unowned rather than deferred — recorded here rather than
-> left to look like a decision.
 
 **NEW, DEFERRED.** S-17's motivating failure was a guard that *looked* implemented but had never demonstrated the required behaviour. Recording `outcome: "fail"` with no provenance for how that was reached risks recreating exactly that gap one level up. Two propositions hide here: "the criterion was recorded as failing" and "the criterion was exercised against evidence and failed." A later scenario should say whether an evaluation is itself sufficient durable evidence, or needs provenance through Evidence/EvidenceUnit/Computation
 
 ### Row X — "Failure sticks" is S-3 policy applied to every gate
 
-**Scenarios:** S-3, S-17 · **Status:** deferred
+**Scenarios:** S-3, S-17 · **Status:** open
 
 **Current state (verified):** `gateStatus()` treats any failing evaluation as permanently decisive
 
@@ -1207,6 +1207,21 @@ withdrawal guard had no covering test at all, so scoping it could have been
 reverted silently; and a `ConclusionRef` was accepted without checking the
 cited analysis had concluded that proposition, which resolved to the right
 scope and then answered about a different analysis's claim.
+
+### S-8 predictions, recorded before the build
+
+Recorded 2026-08-19. S-8 is the *reverse* of row V: criteria that gate work
+and qualify no finding. The honest expectation is that it **narrows row V
+rather than settling it**.
+
+| Row / question | Prediction |
+| --- | --- |
+| V — criteria gate work but do not qualify findings | **Half-discriminated, not settled.** S-8's criteria gate expensive work and qualify nothing, which shows the two jobs are *separable* and that `GATES` is fully occupied with control semantics — an argument against extending it to `Claim` (model b). It produces no wrong answer on the qualification side, so by this project's own bar it cannot select model (a) either. Expect row V to keep status `open` with what remains named: a scenario where criteria qualify a finding and gate nothing |
+| W — an evaluation record is not evidence of evaluation | **S-8 owns this, and it is the likeliest thing to be earned.** `BASED_ON: CriterionEvaluation → Evidence` is declared in `EDGE_SCHEMA` and has never been written — the same shape `SUPERSEDES` and `IMPLEMENTS` were in before S-7. S-8's story is explicitly *"promoted by explicit evidence rather than agent enthusiasm"*, so the feasibility step should produce a real analysis and the throughput evaluation should cite its conclusion. Predicted wrong answer: without it, an evidence-backed promotion and a bare assertion return **identical** records — the same identical-objects-for-distinct-states shape rows I and R were fixed for. Wire the reader in the same commit, and demonstrate by deletion in the right order this time |
+| `incomplete` — the gate state no test forced | **Earned at last, or the flag stands.** PJ-012 flagged it against itself, PJ-013 kept it flagged, PJ-015 repeated it. S-8 creates it naturally: an advancement gate governed by throughput *and* solver-health, one evaluated pass, the other never run. That is "why can't the full run start?" answered by machinery that already exists. If it lands, clear the flag in PJ-015's judgment calls rather than leaving it flagged out of habit |
+| "what is this task allowed to touch?" | **Recordable, not enforceable.** `TaskProps.inputs`/`outputs` exist and are hardcoded `""` by `planWork()` — another declared-but-unwalked structure. Recording the contract is a service-layer parameter on existing fields, zero schema change. *Enforcing* it is the advisory boundary the story's own expressibility note concedes, and S-8 should record that rather than pretend otherwise |
+| "who approved the scale-up?" | **Out of scope by policy, not skipped.** LabKit has no user identity, deliberately: it is a cross-cutting infrastructure, persistence and API concern, and every "who" waits until the domain model is consolidated. S-8 does not probe it and does not assert an empty answer; it records the bullet as a standing decision with its reason. The *"on what projected cost"* half is different — a cost projection is a finding, and a decision resting on it is `BASED_ON`. Probe that half |
+| the rest of the chain | The evaluation→gate→computation chain is expected sufficient. No new node label, no migration |
 
 ## §4 — Held back as stories, not scenarios
 
