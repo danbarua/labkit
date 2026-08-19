@@ -1611,6 +1611,37 @@ PJ-007's shape, exactly.
 **The hazard was recorded, not solved, as expected.** Nothing here decides who
 may declare a check defective.
 
+### S-10 predictions, recorded before the build
+
+Recorded 2026-08-19, against `7e36b31`, before a line of test or source. S-10 is
+**mined**, not authored — chosen over S-13 because it is the only unbuilt corpus
+scenario that solely owns an open row (E), and because after S-3b and S-3c the
+corpus is due a turn as the independent check rather than the ledger.
+
+**The trap this scenario has to avoid, stated first.** Row E's natural failure
+is an **empty** answer: "what re-verifies this claim?" has no edge to walk and
+returns nothing. Under PJ-011 §5 that earns no edge — unanswerable is what every
+question the model has never been asked looks like. If every probe comes back
+empty rather than wrong, the honest outcome is **row E stays open with no edge
+added**, and this section says so before the build rather than after.
+
+| Question | Prediction |
+| --- | --- |
+| Where the *wrong* answer lives, if it exists | **Both runs supporting the same proposition in the same line of enquiry.** Under S-5's scope rules they resolve to one claim, so the re-run joins the original as ordinary support and `whySupported()` reports two independent findings behind a proposition that has been established once and re-checked under *different* initial conditions. That is a historical claim reporting itself strengthened by an execution nobody reproduced — populated, plausible, and wrong in the direction that matters |
+| Row E — evidence-to-evidence lineage | **Genuinely uncertain, and I am not predicting resolution.** It turns entirely on whether the above materialises as a wrong answer or merely a thin one. Direction and caveat are the two things a shared-claim encoding loses; if losing them cannot be made to produce a confidently wrong report, no edge is earned |
+| Row P — `Evidence` carries two senses | **Likely to fire, and it is a finding rather than an obstacle.** Verified still true at `7e36b31`: `recordObservations()` mints `Evidence` with `RECORDED_IN` and `REQUIRES` but **no** producing `EvidenceUnit`, which PJ-001 defines as impossible, and `whySupported()` traverses `Claim <-SUPPORTS- Evidence <-PRODUCES- EvidenceUnit`, so an observation structurally cannot count as support. A re-verification whose initial conditions were *newly specified* is exactly the case that might need an observation to stand as evidence |
+| "Can the two be compared numerically?" | **A refusal, not a field** — S-5's refuse-rather-than-guess shape, which is now the established answer to "the caller asked something the record cannot honestly answer". Predicting the one-bullet-one-return-type rule puts it on the verb, because the bullet says LabKit should say so *before* someone plots them together, and a field on a report only speaks when asked |
+| "Does the new run raise or lower confidence?" | **Answerable without new structure**, from bearing plus the caveat. The prediction that would falsify this is needing a third bearing beyond `SUPPORTS`/`CHALLENGES` |
+| Schema change overall | **No new node label.** Four scenarios running (S-5, S-8, S-3b, S-3c) have added none, and the noun inventory has not moved in eleven. Predicting an edge is a coin-flip; predicting a *node* is not |
+| Regression pressure | S-3c's narrowing is hours old and S-10's assertions run through the same support/standing machinery. Expect this scenario to exercise it incidentally; a break there would be the most valuable thing it finds |
+
+**What would make this scenario a failure of the corpus rather than of the
+model.** If every Afterward bullet is answerable today, S-10 is a control like
+S-11 and that is a result — but it would be the second consecutive scenario to
+tell us nothing new about the nouns, and the question in PJ-018's closing
+section ("is the entity set well chosen, or is the corpus not pressing?") would
+get sharper rather than answered.
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
