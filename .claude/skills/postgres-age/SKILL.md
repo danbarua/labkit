@@ -457,3 +457,4 @@ fail?"), and a silent bug if you meant the first one. See PJ-011 §3.
 - `docs/project-journal/009_domain_service_layer_s11.md` — the domain service layer, and the bar a new label/edge has to clear to be added
 - `docs/project-journal/010_cold_context_review.md` — cold-context review after the first scenario: what four unprimed reviewers could and couldn't reconstruct
 - `docs/project-journal/011_control_chain_two_wrong_predictions.md` — the Criterion/Gate chain under scenario pressure, and why unused labels are not culled
+- `docs/project-journal/012_implementers_perspective.md` — the implementing agent's read of what has and hasn't held up; opinion, not decision

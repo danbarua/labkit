@@ -19,7 +19,8 @@ touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 Before touching `src/domain/`, skim 008 (the interaction corpus the service
 layer is built against), 009 (the first scenario built from it), 010 (a
 cold-context review of both), and 011 (the control chain under scenario
-pressure).
+pressure). 012 is the implementing agent's own perspective — opinion rather
+than decision, and explicitly arguable.
 
 ## Commands
 
