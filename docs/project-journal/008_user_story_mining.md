@@ -671,29 +671,29 @@ this document's original analysis are marked as such.
 | --- | --- | --- | --- |
 | A | A criterion evaluation has no inconclusive outcome | S-3, S-17 | refuted |
 | B | Supersession is decision-only | ~~S-11~~, S-12 | resolved |
-| C | A claim has no endpoint or scope | S-5, S-13 | resolved |
-| D | No question-to-question lineage | **S-1**, S-13 | resolved |
-| E | No evidence-to-evidence lineage | S-10 | open |
-| F | No artefact-to-artefact lineage | S-9 | open |
-| G | "Locked" is not distinct from "decision record still active" | S-7, S-13 | resolved |
+| C | A claim has no endpoint or scope | S-5, S-13° | resolved |
+| D | No question-to-question lineage | **S-1**, S-13° | resolved |
+| E | No evidence-to-evidence lineage | S-10° | open |
+| F | No artefact-to-artefact lineage | S-9° | open |
+| G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
-| I | Absence of evidence vs inconclusive evidence | S-1, S-2, S-3, **S-4** | resolved |
-| J | Deferred vs accepted-as-unresolved | S-14 | open |
-| K | No provisional/scratch standing | S-8, story 18 | open |
+| I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
+| J | Deferred vs accepted-as-unresolved | S-14° | open |
+| K | No provisional/scratch standing | S-8, story 18° | open |
 | L | No execution input lineage | S-11 | resolved |
 | M | A review has no analysis to point at | S-11 | resolved |
 | N | Claim identity is undefined | S-5, S-12 | resolved |
 | O | Withdrawal reason is under-determined | S-3, S-7 | open |
-| P | `Evidence` carries two senses | S-9, S-10, S-12 | open |
-| Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2, S-13, **S-4** | resolved |
-| R | Standing is a birth property, not a transition | S-8, S-7, story 18 | resolved |
+| P | `Evidence` carries two senses | S-9°, S-10°, S-12 | open |
+| Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
+| R | Standing is a birth property, not a transition | S-8, S-7, story 18° | resolved |
 | S | No agent, person or role exists in the model | S-8 | open |
 | T | Edges cannot carry properties | S-7, row O | open |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
-| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b | open |
-| Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14 | boundary |
+| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b, S-3c° | open |
+| Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14° | boundary |
 | Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7** | resolved |
@@ -707,9 +707,32 @@ than distinguished only in the prose below. `deferred` — real, deliberately no
 acted on, **and with a scenario named that would settle it**. `boundary` — a
 known limit of the current model, recorded rather than fixed.
 
-A row whose named scenarios have all been built has nothing that would settle
-it, and is therefore `open` and unowned rather than `deferred` — CLAUDE.md's
-deferral rule. Those rows say so in their own section.
+**Ownership, and the `°` marker.** A scenario in the Scenarios column marked
+`°` has **not been built**. That one mark is what makes ownership scannable,
+because `open` alone conflates two different situations and reading them apart
+otherwise requires knowing the whole build state by heart. Row K was misread as
+unowned in a review handoff, by an agent that had just read this table; an
+external reviewer caught it. The marker exists so the next reader does not have
+to be that well informed:
+
+| Kind | Means | Rows today |
+| --- | --- | --- |
+| `open` + owned | an unbuilt discriminator is named (`°` present) | E, F, J, K, P, X |
+| `open` + unowned | every named probe is built; a **new** discriminator is needed | O, S, T, Z |
+| `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
+
+Only the middle kind is a gap in the *method* — CLAUDE.md's deferral rule says
+a row that cannot name a scenario is unresolved and unowned rather than
+`deferred`, and those rows say so in their own section. The first kind is
+ordinary backlog. Keeping the three apart is what stops "we haven't decided"
+collapsing into one undifferentiated pile.
+
+`°` is a fact about build state, not about the row: when a scenario is built,
+clear its `°` everywhere in this table **and update the Rows-today column above**
+in the same change — both are derived, and both go stale silently. An owner need not be
+a corpus scenario — row K's is **story 18** and row T's is **row O**. And an owner being built is not the same as it returning a verdict —
+row K's owner S-8 *was* built and gave none, which is recorded as a verdict in
+its own right rather than left as an omission.
 
 Each row's narrative is below, oldest verdict first. A row's `Status` is taken
 from its **latest** dated verdict; earlier verdicts are kept verbatim, because
@@ -859,10 +882,11 @@ its only unbuilt owner.
 
 **Current state (verified):** `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation
 
-> **No scenario currently named would settle this.** Every scenario in
-> its row has been built. Under CLAUDE.md's deferral rule that makes it
-> unresolved and unowned rather than deferred — recorded here rather than
-> left to look like a decision.
+> **Now owned, as of the S-3c brief below.** This row spent its whole life
+> unowned — every named scenario built, nothing that would settle it. That is
+> no longer true: a discriminator is specified below and unbuilt. The note is
+> kept rather than deleted because "unowned for four scenarios" is itself a
+> fact about how long the model went without a probe for this.
 
 **NEW, DEFERRED.** Two shapes of the same gap: with no review the reason is manufactured (row **I** again — probably should be null); with several reviews of one unit the causal one is ambiguous. May want no relationship at all, since it describes *why state changed* rather than *what current state is* — which is what the event history is for. Deferred until the event model is under real pressure
 
@@ -920,10 +944,11 @@ any other. This row therefore has no owner again until identity work begins.
 
 **Current state (verified):** `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)`
 
-> **No scenario currently named would settle this.** Every scenario in
-> its row has been built. Under CLAUDE.md's deferral rule that makes it
-> unresolved and unowned rather than deferred — recorded here rather than
-> left to look like a decision.
+> **Now owned, as of the S-3c brief below.** This row spent its whole life
+> unowned — every named scenario built, nothing that would settle it. That is
+> no longer true: a discriminator is specified below and unbuilt. The note is
+> kept rather than deleted because "unowned for four scenarios" is itself a
+> fact about how long the model went without a probe for this.
 
 **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed
 
@@ -1006,14 +1031,15 @@ checked by inspection — the point is that the record says which happened.
 
 ### Row X — "Failure sticks" is S-3 policy applied to every gate
 
-**Scenarios:** S-3, S-17, S-3b · **Status:** open
+**Scenarios:** S-3, S-17, S-3b, S-3c° · **Status:** open
 
 **Current state (verified):** `gateStatus()` treats any failing evaluation as permanently decisive
 
-> **No scenario currently named would settle this.** Every scenario in
-> its row has been built. Under CLAUDE.md's deferral rule that makes it
-> unresolved and unowned rather than deferred — recorded here rather than
-> left to look like a decision.
+> **Now owned, as of the S-3c brief below.** This row spent its whole life
+> unowned — every named scenario built, nothing that would settle it. That is
+> no longer true: a discriminator is specified below and unbuilt. The note is
+> kept rather than deleted because "unowned for four scenarios" is itself a
+> fact about how long the model went without a probe for this.
 
 **NEW, DEFERRED.** S-3 earns "re-running a robustness test until green must not erase the earlier failure". It does not earn "any failure blocks every gate forever", which is what is implemented. For S-17's hash check — artefact corrupted, criterion fails, artefact repaired, criterion passes — a permanent block is plausibly wrong. There may eventually be four distinct things here: historical failure evidence, current gate satisfaction, admissible re-evaluation, and superseded evaluation
 
@@ -1025,6 +1051,41 @@ the finding not standing forever. That is a more sympathetic case than
 re-running until green, and it is the same rule. Still not demonstrated, and
 still nothing in the corpus names the scenario that would settle it — so it
 stays unresolved and unowned, exactly as its own note above says
+
+**S-3c — the discriminator, specified and not yet built.** Proposed by external
+review, and taken over S-13 as the next build: S-13 revisits productive ground
+(question lineage, closure stability, act->product), whereas X attacks a live
+global policy already known to have spread from gate *control* into epistemic
+*standing*. The shipped rule is
+
+```text
+any historical failure -> criterion stays failed -> gate stays blocked
+                       -> qualified finding stays disqualified
+```
+
+while S-3 earned only *do not let someone re-run the same robustness check until
+they happen to obtain green*.
+
+Construct two cases **indistinguishable to the current gate logic**:
+
+1. an honestly failed robustness check, re-run unchanged until it passes;
+2. a failed evaluation later shown to come from a defect **in the check
+   itself**, followed by a corrected evaluation.
+
+(1) must remain failed. (2) may legitimately supersede the earlier evaluation.
+**Do not pre-add** evaluation supersession, timestamps, status fields or a new
+node. Afterward: what is the criterion's current standing; which historical
+evaluations remain readable; why is one later pass admissible and the other not;
+does correcting the evaluation restore only the affected gate and finding; can
+LabKit reconstruct that distinction from existing state? The target is row X,
+**not a generic retry mechanism** — if the two cases stay indistinguishable,
+demonstrate the wrong answer first.
+
+Two things this brief does not settle. The name `S-3c` is a provisional handle,
+not a claim of corpus membership: like S-3b it would be **authored rather than
+mined**, and PJ-016's precedent for that is the most contested decision in the
+arc — whoever builds this has to face that question rather than inherit it.
+And a specified discriminator is not a built one; X is owned, not resolved
 
 ### Row Y — Closure without a cited result is classified by whether anyone worked on it
 
@@ -1040,10 +1101,11 @@ stays unresolved and unowned, exactly as its own note above says
 
 **Current state (verified):** `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only
 
-> **No scenario currently named would settle this.** Every scenario in
-> its row has been built. Under CLAUDE.md's deferral rule that makes it
-> unresolved and unowned rather than deferred — recorded here rather than
-> left to look like a decision.
+> **Now owned, as of the S-3c brief below.** This row spent its whole life
+> unowned — every named scenario built, nothing that would settle it. That is
+> no longer true: a discriminator is specified below and unbuilt. The note is
+> kept rather than deleted because "unowned for four scenarios" is itself a
+> fact about how long the model went without a probe for this.
 
 **NEW, CHARACTERISED, no change earned.** S-1's hardest Afterward question — what was known when this question was sharpened, asked after later evidence arrived — is answered from durable state, with an empty event log open beside it, because `sharpen()` freezes the standing findings onto the decision when the act is recorded. What that cannot reconstruct is the *survey*: whether a given question was established at that moment needs an ordering between two `Decision`s, and there is none. Natural ids happen to be allocated in order, which is an accident of the sequence and not a modelled fact — CLAUDE.md already forbids reading meaning into their values. So the temporal seam took real pressure and held at the level S-1 asked about; the level above it is a real gap that S-7 (post-lock amendment) is better placed to price, and neither a durable event sink nor a `decided_at` property is earned by a question nobody has yet been unable to answer
 
@@ -1055,10 +1117,11 @@ stays unresolved and unowned, exactly as its own note above says
 
 **Current state (verified):** `closeEnquiry()` writes the one cited finding; `sharpen()` writes every standing finding
 
-> **No scenario currently named would settle this.** Every scenario in
-> its row has been built. Under CLAUDE.md's deferral rule that makes it
-> unresolved and unowned rather than deferred — recorded here rather than
-> left to look like a decision.
+> **Now owned, as of the S-3c brief below.** This row spent its whole life
+> unowned — every named scenario built, nothing that would settle it. That is
+> no longer true: a discriminator is specified below and unbuilt. The note is
+> kept rather than deleted because "unowned for four scenarios" is itself a
+> fact about how long the model went without a probe for this.
 
 **NEW, BOUNDARY LOGGED, deliberately not changed.** "This evidence informed this decision" and "this is what was known when the decision was taken" are different claims, and the same edge now expresses both. S-1 cannot separate them, because the sharpening genuinely was taken in light of everything known — the two sets coincide, which is exactly why the overload is invisible here. What would discriminate: a decision taken on a *specific* subset while other findings stood unconsidered. If that shows the snapshot reading manufacturing a rationale the researcher never had, the contemporaneous set needs its own edge and `BASED_ON` goes back to meaning what it says
 

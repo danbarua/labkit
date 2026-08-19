@@ -12,20 +12,35 @@ numbers from earlier in the arc.
 
 ## Changed
 
-**Nothing in the repo.** The tree is clean and HEAD is unmoved by this session's
-work. The deliverable is `/tmp/claude-501/chatgpt-handoff.md` (121 lines),
-written and handed to the user, outside version control by intent — it is a
-message to a reviewer, not a project record.
+**No `src/` or `tests/` change this session** — docs only. The deliverable is
+`/tmp/claude-501/chatgpt-handoff.md` (141 lines), written and handed to the
+user, outside version control by intent: a message to a reviewer, not a project
+record.
 
-The one commit in this wrap's window is another session's:
+`docs/project-journal/008_user_story_mining.md` — §3 ledger edits, on the
+user's instruction that 008 is the work tracker and explicitly not append-only.
+Unbuilt owners are now marked `°` in the Scenarios column; the legend states the
+three-way `open + owned` / `open + unowned` / `boundary` split with the rows in
+each; and row X gains **S-3c**, the discriminator brief supplied by external
+review, which moves X from unowned to owned.
+
+Commits in the window:
 
 - `d6a34c8` — *docs: update cold-context review of S-3b to reflect open items
-  and policy changes*, rewriting `docs/session-log/002`. Read here as input, not
-  authored here.
+  and policy changes*, rewriting `docs/session-log/002`. Another session's work,
+  read here as input, not authored here.
+- `45ec5fa` — *docs: add ChatGPT review handoff session log for S-5
+  verification*, committing this entry at its first draft (+71).
+
+**The tree is dirty**, and deliberately so: this file has ~54 further lines of
+correction on top of `45ec5fa`, made after the reviewer caught a stale
+conclusion about row K (see Open). Nothing else is modified.
 
 ## Verified
 
-All three run at `d6a34c8`, this turn, not carried forward:
+All three run against `d6a34c8` during this session, not carried forward from
+an earlier commit. `git diff --name-only d6a34c8..HEAD -- src tests` returns
+zero files, so they still hold at `45ec5fa`:
 
 - `bun test` — **145 pass, 0 fail**, 471 expect() calls, 15 files, 50.4s.
   (Exit code ignored, per CLAUDE.md.)
@@ -49,23 +64,54 @@ assumed:
 
 ## Open
 
-**Row K is open by omission, and this session did not fix it.** Reconciling the
-ledger for the handoff showed **six** rows — K, O, S, T, X, Z — are `open` with
-every named scenario already built, not the five previously counted. K's owner
-is S-8, which was built and never returned a verdict on it. PJ-017 already
-flagged this; it is now also stated in the handoff as the sharpest of the six,
-but the row itself is untouched. This is a journal-level item, not just a
-session note: the ledger cell for K should record the S-8 verdict or say
-explicitly that S-8 did not settle it.
+**A miscount in the handoff, corrected after review — not a defect in the
+ledger.** Reconciling PJ-008's §3 for the handoff, I counted six rows as `open`
+with every named scenario built: K, O, S, T, X, Z. K does not belong in that
+set. The ledger lists it as `S-8, story 18`, and **story 18 is still named and
+unbuilt**, so K is owned. The correct split:
+
+```text
+open + owned      E, F, J, K, P, X   an unbuilt discriminator is named
+open + unowned    O, S, T, Z         all named probes exhausted
+boundary          Y, AA              characterised, no claim it should be fixed
+```
+
+Keeping those three mechanically distinct is what stops "we haven't decided"
+collapsing into one undifferentiated backlog, and the handoff blurred the first
+two. Corrected in the handoff, and now recorded in PJ-008's legend so the next
+reader does not have to hold the build state in their head to see it.
+
+I also proposed giving row K an S-8 verdict. PJ-008 already has one, and a
+sharper one than I was going to write: *"S-8: no verdict — the row was not
+probed, and saying so is the verdict."* The omission was found and converted
+into an explicit result — materially different from a forgotten row — and the
+entry there explains that S-7 made `exploratory` reachable while S-8 exercised
+no standing *transition*. **K's verdict needed no edit**; what needed one was
+the table's inability to show ownership at all, which is what the `°` marker
+and the legend split now fix.
+
+Checking that split row by row found the miscount was not only about K: **five**
+open rows have an unbuilt owner (E→S-10, F→S-9, J→S-14, K→story 18, P→S-9/S-10),
+not one. The handoff and this entry both said five rows were unowned; four are
+(O, S, T, Z) once S-3c is recorded against X.
 
 The handoff lives only in `/tmp/claude-501/`, which does not survive a reboot.
 If it has not been pasted to the reviewer, it needs re-generating or relocating.
 
 ## Next
 
-Give row K its verdict: open `docs/project-journal/008_user_story_mining.md`,
-find row K (`No provisional/scratch standing | S-8, story 18 | open`) in the §3
-ledger and its prose section below, and record what S-8 actually showed — or
-state that S-8 left it unsettled and name what would. Then the standing
-nomination for the next build is row X's discriminator, per PJ-017; S-13 is the
-alternative from the corpus.
+Build **S-3c**, row X's discriminator. The brief is now in the journal rather
+than here — open `docs/project-journal/008_user_story_mining.md` at *Row X* and
+work from the "S-3c — the discriminator, specified and not yet built" section:
+two cases indistinguishable to the current gate logic (an honest failure re-run
+until green; a failure caused by a defect *in the check*, then corrected), what
+must hold for each, what not to pre-add, and the five Afterward questions.
+
+Read its last paragraph first. `S-3c` is a provisional handle, and the scenario
+would be **authored rather than mined** — PJ-016's precedent for that is the
+most contested decision in the arc, and this build should face that question
+rather than inherit it silently.
+
+S-13 goes after: it revisits already-productive ground (question lineage,
+closure stability, act->product), whereas X attacks a live global policy known
+to have spread from gate control into epistemic standing.
