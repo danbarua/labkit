@@ -17,7 +17,23 @@ import { setupTestDb, type TestDb } from "./db";
 export interface Scenario {
   /** A fresh, empty tenant graph for one test. */
   begin(): Promise<TenantGraph>;
-  /** The same graph again, for asserting that state is durable rather than held in a session's memory. */
+  /**
+   * A second reader over the same graph — what an "Afterward" answer is
+   * re-asserted through.
+   *
+   * Be precise about what this proves, because it is less than it looks.
+   * It re-resolves the tenant and builds a **new** `TenantGraph`, so an
+   * assertion made through it cannot be reading a value the test kept in a
+   * local variable, and it would catch a `ResearchSession` or `TenantGraph`
+   * that started memoising. Today neither holds any query state, so against a
+   * plain re-query on the same session the marginal proof is small — this is
+   * cheap insurance against a future cache, not a strong proof in itself.
+   *
+   * It deliberately does **not** open a new connection: `@electric-sql/pglite-socket`
+   * has a confirmed concurrency bug (see tests/helpers/db.ts and PJ-006), so
+   * one connection per test is the containment strategy. "Durable" here means
+   * *in the graph rather than in memory*, not *survives a reconnect*.
+   */
   current(): Promise<TenantGraph>;
   end(): Promise<void>;
   close(): Promise<void>;

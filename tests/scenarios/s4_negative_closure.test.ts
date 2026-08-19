@@ -31,6 +31,11 @@ beforeEach(async () => {
 });
 afterEach(async () => { await scenario.end(); });
 
+/** A second reader over the same graph — see tests/helpers/scenario.ts on what this proves. */
+async function afterwards(): Promise<ResearchSession> {
+  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+}
+
 const SPECIFICITY = "the learned construction is special on the internal mapping measure";
 const TRANSFORMATION = "the encoding performs structured internal transformation";
 
@@ -83,6 +88,7 @@ describe("S-4: a negative result that closes the question", () => {
     await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.open).toBe(false);
   });
 
@@ -97,6 +103,7 @@ describe("S-4: a negative result that closes the question", () => {
     await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.open).toBe(false);
     expect(status.closure).toBe("answered");
     // The three must not be one state.
@@ -115,6 +122,7 @@ describe("S-4: a negative result that closes the question", () => {
     await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.answer).toBe("no");
   });
 
@@ -155,6 +163,7 @@ describe("S-4: a negative result that closes the question", () => {
     await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.evidence).toHaveLength(1);
     expect(status.evidence[0]).toContain("no separation detectable");
   });
@@ -170,6 +179,7 @@ describe("S-4: a negative result that closes the question", () => {
     await session.closeEnquiry({ enquiry: specificity });
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.open).toBe(false);
     expect(status.closure).toBe("abandoned");
     expect(status.answer).toBeNull();
@@ -229,6 +239,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     // Nothing was written on the way to failing.
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
     expect(observations.kind).toBe("observations");
@@ -248,6 +259,7 @@ describe("S-4: a negative result that closes the question", () => {
     ).rejects.toThrow(/concluded nothing about/);
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.open).toBe(true);
   });
 
@@ -271,6 +283,7 @@ describe("S-4: a negative result that closes the question", () => {
     await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: mixed, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.closure).toBe("answered");
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
@@ -328,6 +341,7 @@ describe("S-4: a negative result that closes the question", () => {
     const { specificity } = await aProgrammeWithOneOpenQuestion();
 
     const status = await session.enquiryStatus(specificity);
+    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
   });

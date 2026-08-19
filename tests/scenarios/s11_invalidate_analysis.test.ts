@@ -48,6 +48,11 @@ afterEach(async () => {
   await scenario.end();
 });
 
+/** A second reader over the same graph — see tests/helpers/scenario.ts on what this proves. */
+async function afterwards(): Promise<ResearchSession> {
+  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+}
+
 /**
  * The state before the reviewer speaks: per-image observations, and a
  * bootstrap analysis drawing six pairwise conclusions from them.
@@ -164,6 +169,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // Durable check: the replacement conclusion still rests on the same
     // observations, and those observations were never invalidated.
     const why = await session.whySupported("T beats rewired");
+    expect(await (await afterwards()).whySupported("T beats rewired")).toEqual(why);
     expect(why.restingOn).toContain("per-image classification results");
   });
 
@@ -180,6 +186,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
 
     const why = await session.whySupported("T beats rewired");
+    expect(await (await afterwards()).whySupported("T beats rewired")).toEqual(why);
     expect(why.supported).toBe(true);
     expect(why.support.map((s) => s.via)).toEqual(["sign-flip-permutation"]);
     expect(why.support[0]!.finding).toBe("p = 0.049 (sign-flip permutation)");
@@ -198,6 +205,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
 
     const why = await session.whySupported("T beats rewired");
+    expect(await (await afterwards()).whySupported("T beats rewired")).toEqual(why);
     expect(why.superseded).toHaveLength(1);
     expect(why.superseded[0]).toMatchObject({
       finding: "p = 0.002 (bootstrap)",
@@ -308,6 +316,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // ...and nothing was invalidated on the way to failing.
     const why = await session.whySupported("T beats rewired");
+    expect(await (await afterwards()).whySupported("T beats rewired")).toEqual(why);
     expect(why.supported).toBe(true);
     expect(why.superseded).toHaveLength(0);
   });

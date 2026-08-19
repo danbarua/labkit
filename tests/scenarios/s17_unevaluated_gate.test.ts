@@ -31,6 +31,19 @@ beforeEach(async () => {
 });
 afterEach(async () => { await scenario.end(); });
 
+/**
+ * A second reader over the same graph, with an event log of its own.
+ *
+ * Every Afterward answer here is re-asserted through one of these. The point
+ * is not repetition: a status read back from the session that wrote it could
+ * be held in that session's memory, and "Afterward" means reconstructible from
+ * durable state. See tests/helpers/scenario.ts on what this does and does not
+ * prove.
+ */
+async function afterwards(): Promise<ResearchSession> {
+  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+}
+
 /** The state the agent describes as "the verification gate is implemented". */
 async function aDeclaredButUnevaluatedGate() {
   const promotion = await session.planWork({
@@ -53,6 +66,8 @@ describe("S-17: does the guard actually guard?", () => {
     const status = await session.gateStatus(gate);
     expect(status.state).toBe("never-evaluated");
     expect(status.state).not.toBe("satisfied");
+
+    expect((await (await afterwards()).gateStatus(gate)).state).toBe("never-evaluated");
   });
 
   test("Afterward 2: the evidence that its criterion was evaluated is stated as none", async () => {
@@ -60,6 +75,8 @@ describe("S-17: does the guard actually guard?", () => {
 
     const status = await session.gateStatus(gate);
     expect(status.evaluations).toEqual([]);
+
+    expect((await (await afterwards()).gateStatus(gate)).evaluations).toEqual([]);
   });
 
   test("Afterward 3: what relies on this gate is enumerable", async () => {
@@ -67,6 +84,10 @@ describe("S-17: does the guard actually guard?", () => {
 
     const status = await session.gateStatus(gate);
     expect(status.gating).toEqual(["promote the accelerated implementation to reference"]);
+
+    expect((await (await afterwards()).gateStatus(gate)).gating).toEqual([
+      "promote the accelerated implementation to reference",
+    ]);
   });
 
   test("Afterward 4: 'has it ever been shown to fail' is separate from 'has it ever passed'", async () => {
@@ -79,6 +100,10 @@ describe("S-17: does the guard actually guard?", () => {
     const status = await session.gateStatus(gate);
     expect(status.state).toBe("satisfied");
     expect(status.everFailed).toBe(false);
+
+    const durable = await (await afterwards()).gateStatus(gate);
+    expect(durable.state).toBe("satisfied");
+    expect(durable.everFailed).toBe(false);
   });
 
   test("a failing evaluation blocks the gate rather than leaving it unevaluated", async () => {
@@ -90,6 +115,10 @@ describe("S-17: does the guard actually guard?", () => {
     expect(status.everFailed).toBe(true);
     // Distinguishable from never-evaluated -- the whole point.
     expect(status.evaluations).toHaveLength(1);
+
+    const durable = await (await afterwards()).gateStatus(gate);
+    expect(durable.state).toBe("blocked");
+    expect(durable.everFailed).toBe(true);
   });
 
   /**
@@ -151,6 +180,10 @@ describe("S-17: does the guard actually guard?", () => {
     expect(status.state).toBe("never-evaluated");
     expect(status.evaluations).toEqual([]);
     expect(status.everFailed).toBe(false);
+
+    const durable = await (await afterwards()).gateStatus(gate);
+    expect(durable.state).toBe("never-evaluated");
+    expect(durable.evaluations).toEqual([]);
   });
 
   /**
@@ -164,5 +197,8 @@ describe("S-17: does the guard actually guard?", () => {
 
     const governing = await session.criteriaGoverning(gate);
     expect(governing.map((c) => c.id)).toEqual([criterion.id]);
+
+    const durable = await (await afterwards()).criteriaGoverning(gate);
+    expect(durable.map((c) => c.id)).toEqual([criterion.id]);
   });
 });
