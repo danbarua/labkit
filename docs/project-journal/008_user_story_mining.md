@@ -665,37 +665,335 @@ materialise (row **B**) is as much a result as one that is confirmed — rows
 are not deleted when that happens. Rows added *by* a scenario rather than by
 this document's original analysis are marked as such.
 
-| # | Pressure point | Current state (verified) | Scenarios | Plausible no-change route / outcome |
-| --- | --- | --- | --- | --- |
-| A | A criterion evaluation has no inconclusive outcome | `outcome: "pass" \| "fail"` | S-3, S-17 | The checks genuinely did pass/fail individually; inconclusiveness belongs to the decision, not the evaluation |
-| B | Supersession is decision-only | `SUPERSEDES: [["Decision","Decision"]]` | ~~S-11~~, S-12 | **S-11: not established as a gap.** Invalidating the replaced analysis's output plus the replacement's own support answered every question; an attempt to mint decisions purely to have something supersedable drew zero edges with all assertions passing. That is *not* a finding that invalidation represents supersession — `invalidated = true` means "no longer valid as a source of current inference", and the two merely coincide here. **Open; S-12 discriminates**, since there the numbers stay valid and only the interpretation changes **S-7: confirmed and walked.** `SUPERSEDES` got its first writer and reader. Amendment-to-amendment is exactly the shape it fits, and removing the edge breaks the ordering test — verified by deleting it, not argued **S-12: RESOLVED — claim-level supersession is not real, and decision-level supersession was not needed either.** An interpretation is withdrawn by a `Decision` that `CHANGES` it and `MOTIVATES` the reading that replaced it. Because both halves of every step are recorded, the revision chain already walks claim-to-claim and a `SUPERSEDES` edge between the decisions would have been a writer with no reader. Note the contrast with S-7, where `SUPERSEDES` *is* load-bearing: there each step records only what it changed, and the container (the gate) supplies the rest |
-| C | A claim has no endpoint or scope | `ClaimProps = { name, kind? }` | S-5, S-13 | Scope is carried by the line of enquiry the claim answers, reached by traversal **S-5: RESOLVED, no-change route held, nothing added to `Claim`.** Scope is reached by traversal — `Claim <-SUPPORTS- Evidence <-PRODUCES- EvidenceUnit -ADDRESSES-> LineOfEnquiry <-MOTIVATES- Question` — and every edge on that path already existed and was already walked. Two claims worded identically now answer different questions traceably, and "do these conflict?" is derived from scope and bearing without either sentence being compared to the other. Note what this cost: **zero schema changes**, against S-5's own §2 note calling it "the one most likely to force a real model change" |
-| D | No question-to-question lineage | ~~no `Question`→`Question` edge~~ → `MOTIVATES: Decision → Question` | **S-1**, S-13 | **RESOLVED by S-1 — one relationship, no new label, and the predicted no-change route was half right.** A decision does narrow the original, exactly as predicted; what the prediction missed is that nothing attached the *product* of the narrowing to the act, so a question born of sharpening had no path back to the decision that produced it. Demonstrated rather than argued: one hunch sharpened twice with a result landing in between, and `originOf(secondQuestion)` returned the knowledge that existed before the *first* sharpening — populated, plausible, and belonging to a different event. Direct `Question`→`Question` lineage was the other candidate and lost on capability, not taste: it says where a question came from but not what was known when it was asked, because the reason and the frozen evidence set live on the decision. PJ-011's record-both-pick-neither rule needs two models that fit *equally*; these did not |
-| E | No evidence-to-evidence lineage | no `Evidence`→`Evidence` edge | S-10 | Both support the same claim; execution differences live on the computation |
-| F | No artefact-to-artefact lineage | no `Artefact`→`Artefact` edge | S-9 | Content-hash comparison plus an open question about the generator |
-| G | "Locked" is not distinct from "decision record still active" | `Decision.is_open` (PJ-004 #2) | S-7, S-13 | A gate expresses the confirmatory boundary; `is_open` was always meant to carry this **S-7: prediction held, no change.** "Locked" is carried by a gate protecting the work, and "the confirmatory boundary is untouched" is assertable as `gateStatus` being identical either side of the amendment. `Decision.is_open` is still unwalked by the domain layer and was not needed |
-| H | Closure carries no polarity | `RESOLVES` edge, no outcome field | S-4 | **REFUTED by S-4 — no polarity field needed.** Answered/abandoned/deferred and yes/no are all derived: `RESOLVES` + cited evidence is *answered*, `RESOLVES` with nothing cited is *abandoned*, `DEFERS` is *deferred*; and the answer is "no" when the cited findings `CHALLENGES` the proposition rather than `SUPPORTS` it. Third prediction to dissolve rather than confirm |
-| I | Absence of evidence vs inconclusive evidence | `whySupported().challenged`/`against`; `whatIsKnown()`'s three lists | S-1, S-2, S-3, **S-4** | **HELD, and now tested at both levels.** S-4 found the claim-level instance: a claim refuted by a null result and a claim nobody had examined returned *identical* objects from `whySupported()`. **S-1 raises it to the question level**: `whatIsKnown()` returns `established`/`unresolved`/`untested` as three disjoint lists, so a question nothing has been run against is not a weak kind of unsettled and renders as neither failure nor inconclusive evidence. Both fixes are service-layer reads of structure that already existed — `CHALLENGES` for the first, `ADDRESSES`/`RESOLVES` for the second. No schema change either time |
-| J | Deferred vs accepted-as-unresolved | `DEFERS` edge covers both | S-14 | Distinguish by whether an open task exists |
-| K | No provisional/scratch standing | `Claim.kind: exploratory \| confirmatory` | S-8, story 18 | `exploratory` already is this distinction |
-| L | No execution input lineage | no `Computation`→`Artefact` "read" edge | S-11 | **CONFIRMED — resolved.** Added `CONSUMES: Computation → Artefact`. The old route (`ADDRESSES` to the enquiry, then `REQUIRES`) answered "what observations is this enquiry associated with", not "what did this computation consume". Verified false in practice, not in principle: with two analyses on one enquiry over different inputs, "what does this claim rest on" returned both observation sets |
-| M | A review has no analysis to point at | `EVALUATES: Review→Claim\|Decision\|Evidence` | S-11 | **CONFIRMED — resolved.** Added `Review → EvidenceUnit`. Endpoint is the inferential activity, not the `Computation` that executed it: what S-11's reviewer criticises is the method, and nothing ran incorrectly. `Review → Computation` may be earned later by a scenario reviewing an *execution*; S-11 did not earn it |
-| N | Claim identity is undefined | one `Claim` created per analysis conclusion; queried by `name` | S-5, S-12 | **NEW OPEN QUESTION.** Two analyses concluding the same proposition currently create two claims. Correct if a claim is an assertion *occurrence*; wrong if it is a proposition, in which case one claim should accumulate evidence. Deliberately not fixed — S-5 and S-12 are what should decide it **S-12: NARROWED, prediction half refuted, still not resolved.** Predicted that duplicate `Claim` nodes would produce the wrong answer and force proposition identity. They did not: every operation keys by proposition, and `withdrawalOf()` requires *every* node asserting a sentence to have been withdrawn before it reports the record as no longer claiming it — so two nodes behave as one. Claim is therefore **operationally a proposition** while being **stored as an occurrence**, and the duplication is redundancy rather than a defect. What would break it is standing (row **R**): two nodes for one sentence, one `exploratory` and one `confirmatory`, gives two answers to "is this confirmatory?". S-12 never creates that, so it is not demonstrated. Row C is the other side — merging by name would conflate two enquiries asserting the same sentence about different scopes **S-5: RESOLVED.** Identity for reading is a proposition **within a scope**. The node stays an assertion occurrence — duplicates inside one line of enquiry remain harmless and merge on read, exactly as S-12 found; duplicates across lines are two different claims that happen to share wording, and must never merge. That is the distinction S-12 could not draw, because it only ever had one scope **Boundary S-5 did not test, named rather than left implicit:** the scoped `withdrawalOf()`/`reinterpret()` lookups reach a claim through `<-[:SUPPORTS]-` only, so a proposition that exists *solely* as something an analysis concluded against cannot be reinterpreted or read as withdrawn — it reports "nothing on the record claims it". Probably right, since nobody is claiming a sentence they concluded against, but it is untested. `interpretationHistory()` is still keyed by wording alone; it does not need scoping because its distinct-decisions guard already refuses when two scopes narrow to the same words, rather than following whichever came first |
-| O | Withdrawal reason is under-determined | `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation | S-3, S-7 | **NEW, DEFERRED.** Two shapes of the same gap: with no review the reason is manufactured (row **I** again — probably should be null); with several reviews of one unit the causal one is ambiguous. May want no relationship at all, since it describes *why state changed* rather than *what current state is* — which is what the event history is for. Deferred until the event model is under real pressure **S-7: prediction held — did not bite.** An amendment names its own cause, so the ambiguity O describes never arose. Still deferred **S-12: still does not bite.** A reinterpretation mints both the review and the decision that acted on it, so which review caused the change is recorded rather than inferred. Note what this establishes in passing: a review is *not* a retraction — reviews also confirm, and distinguishing them from a free-text verdict would be text-matching. That is why the `Decision` exists at all here |
-| P | `Evidence` carries two senses | one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position | S-9, S-10, S-12 | **NEW, from cold review (3 of 4 reviewers, independently).** May be correct minimalism — S-11's premise ("observations fine, inference wrong") is expressed structurally and works. But `recordObservations` makes Evidence with no producing `EvidenceUnit`, which PJ-001 defines as impossible, and `whySupported` structurally cannot count an observation as support |
-| Q | Question and LineOfEnquiry are collapsed by the service layer | `pose`/`pursue`/`openEnquiry`; `MOTIVATES` walked in both directions | S-1, S-2, S-13, **S-4** | **RESOLVED by S-4, and now load-bearing beyond closure after S-1.** S-4 showed the split was real: closure attaches to the question, so a closed enquiry went on reporting itself open. That left the two still sharing a name and a lifetime, and this row predicted that "a scenario that sharpens one question into several, or pursues one question two ways, is what would force them apart" — S-1 is that scenario and it did. `pose()` puts a question on the record with no pursuit at all (which is what makes *untested* a state of the record rather than a reader's invention), and `pursue()` opens further lines against a question already held. Identity is the handle throughout: two pursuits worded alike stay one question, two questions worded identically stay two |
-| R | Standing is a birth property, not a transition | `Claim.kind` is hardcoded `"confirmatory"` by the only writer; `exploratory` unreachable through research verbs | S-8, S-7, story 18 | **NEW, from cold review (3 of 4).** Ties to rows **G** and **K**: exploratory→confirmatory is plausibly conferred by an event (preregistration, lock, promotion) rather than set at creation. If so G/K/R are one question about how standing changes, not three **RESOLVED by S-7 at the service layer, with the successor question still open.** Predicted as the likeliest wrong answer and it was: with `kind` hardcoded `"confirmatory"`, amending a solver iteration limit reported `nature: "scientific"` and named a convergence diagnosis as a compromised confirmatory result — a false p-hacking alarm, populated and confident. `Conclusion.standing` now defaults to **exploratory**, which makes `exploratory` reachable for the first time and requires confirmatory standing to be claimed deliberately. What S-7 does *not* settle is whether standing should be **conferred by an act** rather than declared at creation; it does rule out the naive gate-conferred model, since S-17 established that declaring a gate does not satisfy it, so a claim behind an unevaluated confirmatory gate would read exploratory and the scientific amendment would go undetected |
-| S | No agent, person or role exists in the model | no node label, no property, anywhere | S-8 | **NEW, from cold review.** S-8's Afterward asks "who approved the scale-up, and on what projected cost?" — unanswerable. May legitimately be external metadata rather than domain; S-8 decides |
-| T | Edges cannot carry properties | `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)` | S-7, row O | **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed **S-7: prediction held — no pressure.** The amendment `Decision` is the reification; reason, evidence and order all have a node to live on. Untested still |
-| U | A gate records no condition until it is evaluated | only path `Criterion`→`Gate` ran via `CriterionEvaluation`; `GateProps` is `{consequence}` | S-17 | **CONFIRMED — resolved.** Added `GOVERNS: Criterion → Gate`. PJ-004 #9's chain correctly stops anything flowing out of an untriggered gate, but it also made the governing criterion reachable *only* through an evaluation — so a declared-but-unevaluated gate, which is exactly S-17's subject, recorded no condition at all. Demonstrated: `criterionGoverning()` returned null, so the reviewer's demand ("show me it fails when the artefact is wrong") could not be aimed at anything |
-| V | Criteria gate work but do not qualify findings | `Criterion -GOVERNS-> Gate -GATES-> Task\|Computation`; nothing connects a criterion to the analysis it qualifies | S-3 | **NEW, CONFIRMED, deliberately unresolved.** Demonstrated wrong answer: with two prespecified robustness checks failed, `whySupported()` still reports the finding `supported: true` — "some evidence exists" rather than "the evidence holds up by its own prespecified standard". Two plausible models and S-3 does **not** discriminate, because its criteria do both jobs at once: (a) `Criterion -QUALIFIES-> EvidenceUnit`, or (b) extend `GATES` so a gate can gate a `Claim`'s standing. A scenario where criteria qualify a finding but gate nothing — or the reverse — would decide it |
-| W | An evaluation record is not evidence of evaluation | `CriterionEvaluation {value, outcome}` can be minted directly; `BASED_ON: CriterionEvaluation → Evidence` exists and is never written | S-17, S-3 | **NEW, DEFERRED.** S-17's motivating failure was a guard that *looked* implemented but had never demonstrated the required behaviour. Recording `outcome: "fail"` with no provenance for how that was reached risks recreating exactly that gap one level up. Two propositions hide here: "the criterion was recorded as failing" and "the criterion was exercised against evidence and failed." A later scenario should say whether an evaluation is itself sufficient durable evidence, or needs provenance through Evidence/EvidenceUnit/Computation |
-| X | "Failure sticks" is S-3 policy applied to every gate | `gateStatus()` treats any failing evaluation as permanently decisive | S-3, S-17 | **NEW, DEFERRED.** S-3 earns "re-running a robustness test until green must not erase the earlier failure". It does not earn "any failure blocks every gate forever", which is what is implemented. For S-17's hash check — artefact corrupted, criterion fails, artefact repaired, criterion passes — a permanent block is plausibly wrong. There may eventually be four distinct things here: historical failure evidence, current gate satisfaction, admissible re-evaluation, and superseded evaluation |
-| Y | Closure without a cited result is classified by whether anyone worked on it | `whatIsKnown()` buckets an abandoned question under `unresolved` if anything ever addressed it, and a deferred one under `untested` if nothing did | **S-1**, S-14 | **NEW, KNOWN BOUNDARY, deliberately not fixed.** S-1 needs three states and gets them from structure — resolved-on-cited-evidence, worked-on, never-touched. It never poses a question that was abandoned or deferred, so it has no standing to say where those belong, and inventing a fourth and fifth list to hold cases the scenario never exercised is how the survey stops being derived. Row J already owns the deferred-vs-accepted distinction; S-14 should decide both together |
-| Z | Chronology exists for evidence but not for status | `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only | **S-1**, S-7 | **NEW, CHARACTERISED, no change earned.** S-1's hardest Afterward question — what was known when this question was sharpened, asked after later evidence arrived — is answered from durable state, with an empty event log open beside it, because `sharpen()` freezes the standing findings onto the decision when the act is recorded. What that cannot reconstruct is the *survey*: whether a given question was established at that moment needs an ordering between two `Decision`s, and there is none. Natural ids happen to be allocated in order, which is an accident of the sequence and not a modelled fact — CLAUDE.md already forbids reading meaning into their values. So the temporal seam took real pressure and held at the level S-1 asked about; the level above it is a real gap that S-7 (post-lock amendment) is better placed to price, and neither a durable event sink nor a `decided_at` property is earned by a question nobody has yet been unable to answer **S-7: narrowed, as predicted, and the distinction is the result.** In-chain order is structural — `SUPERSEDES` alone orders two amendments to one design, with no timestamp, an empty event log, and natural-id order never consulted. Two decisions on *different* designs remain unordered, and S-7 includes an unrelated sharpening precisely to show that the answer covers one class of history and not chronology in general. Not a partial fix: a smaller true claim |
-| AA | `BASED_ON` carries two senses | `closeEnquiry()` writes the one cited finding; `sharpen()` writes every standing finding | **S-1**, S-7, S-12 | **NEW, BOUNDARY LOGGED, deliberately not changed.** "This evidence informed this decision" and "this is what was known when the decision was taken" are different claims, and the same edge now expresses both. S-1 cannot separate them, because the sharpening genuinely was taken in light of everything known — the two sets coincide, which is exactly why the overload is invisible here. What would discriminate: a decision taken on a *specific* subset while other findings stood unconsidered. If that shows the snapshot reading manufacturing a rationale the researcher never had, the contemporaneous set needs its own edge and `BASED_ON` goes back to meaning what it says **S-7: live, characterised, not fixed.** Both senses now have real writers — `amendDesign()` cites one diagnosis specifically, `sharpen()` snapshots everything standing. No mechanical collision: the readers pin different edges. The boundary stands as written |
-| AB | A consequential act records what it acted **on**, not what it brought into existence | `sharpen()` wrote `NARROWS` to the original question; `amendDesign()` wrote `CHANGES` to the replaced condition | **S-1**, **S-7** | **NEW, CROSS-SCENARIO, established as a failure shape rather than a relationship.** Two unrelated scenarios exposed the same structural omission, in regions that share no labels. S-1 found it in question sharpening, S-7 in design amendment. **The remedies differed**, which is the interesting part: S-1 needed `Decision -MOTIVATES-> Question`, because the reason and the frozen evidence live on the decision and nothing else could reach them; S-7 needed nothing, because the amended product is recoverable from the `SUPERSEDES` chain and the criteria governing the gate. That argues *against* a generic act-produces-thing relationship for decisions. Treat act→product as a **review heuristic** — a question to ask of every new verb that mints something — not as a domain relationship **S-12: third instance, and the prediction that S-7's remedy transfers was REFUTED.** S-7 needed no act→product edge because a gate contains its design conditions, so the current one is derivable as the unchanged member. An interpretation has no container, so from a narrowed claim there was no route back to the act that narrowed it, and `MOTIVATES: Decision → Claim` was earned. Three instances, three different resolutions — one new edge, one derivation, one new edge again. The shape recurs; the remedy does not generalise, which is still the argument against a blanket rule |
-| AC | A withdrawn interpretation has no way back | `recordAnalysis()` refuses to conclude a proposition the record has withdrawn | **S-12** | **NEW, from review of the finished scenario, and a real wrong answer before it was guarded.** `withdrawalOf()` reports a sentence withdrawn only when *every* node asserting it has been changed, so a colleague who had not read the review could record an analysis concluding it again and the record would silently un-retract itself — objection still standing, `withdrawn` back to `false`, `replacedBy` gone. Demonstrated before fixing. Now refused, on the same principle as S-7's design fork: a command that declines beats state that reads back wrong. What that leaves missing is the legitimate case — new evidence genuinely re-opening a settled reading — which needs a **deliberate** verb rather than a side effect of recording work. Not built, because S-12 does not contain one **S-5 found this guard had the same defect it was fixing.** `recordAnalysis()`'s withdrawal check was unscoped, so a sentence withdrawn in one line of enquiry would have blocked legitimate work concluding the same words in another. Now scoped to the enquiry being recorded |
+| # | Pressure point | Scenarios | Status |
+| --- | --- | --- | --- |
+| A | A criterion evaluation has no inconclusive outcome | S-3, S-17 | refuted |
+| B | Supersession is decision-only | ~~S-11~~, S-12 | resolved |
+| C | A claim has no endpoint or scope | S-5, S-13 | resolved |
+| D | No question-to-question lineage | **S-1**, S-13 | resolved |
+| E | No evidence-to-evidence lineage | S-10 | open |
+| F | No artefact-to-artefact lineage | S-9 | open |
+| G | "Locked" is not distinct from "decision record still active" | S-7, S-13 | resolved |
+| H | Closure carries no polarity | S-4 | refuted |
+| I | Absence of evidence vs inconclusive evidence | S-1, S-2, S-3, **S-4** | resolved |
+| J | Deferred vs accepted-as-unresolved | S-14 | open |
+| K | No provisional/scratch standing | S-8, story 18 | open |
+| L | No execution input lineage | S-11 | resolved |
+| M | A review has no analysis to point at | S-11 | resolved |
+| N | Claim identity is undefined | S-5, S-12 | resolved |
+| O | Withdrawal reason is under-determined | S-3, S-7 | deferred |
+| P | `Evidence` carries two senses | S-9, S-10, S-12 | open |
+| Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2, S-13, **S-4** | resolved |
+| R | Standing is a birth property, not a transition | S-8, S-7, story 18 | resolved |
+| S | No agent, person or role exists in the model | S-8 | open |
+| T | Edges cannot carry properties | S-7, row O | open |
+| U | A gate records no condition until it is evaluated | S-17 | resolved |
+| V | Criteria gate work but do not qualify findings | S-3, S-8 | open |
+| W | An evaluation record is not evidence of evaluation | S-17, S-3 | deferred |
+| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17 | deferred |
+| Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14 | boundary |
+| Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
+| AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
+| AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7** | resolved |
+| AC | A withdrawn interpretation has no way back | **S-12** | resolved |
+
+**Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
+with or without a model change. `refuted` — the predicted gap turned out not to
+be one. `deferred` — real, deliberately not acted on. `boundary` — a known
+limit of the current model, recorded rather than fixed.
+
+Each row's narrative is below, oldest verdict first. A row's `Status` is taken
+from its **latest** dated verdict; earlier verdicts are kept verbatim, because
+a prediction that failed is a result about the model.
+
+---
+
+### Row A — A criterion evaluation has no inconclusive outcome
+
+**Scenarios:** S-3, S-17 · **Status:** refuted
+
+**Current state (verified):** `outcome: "pass" \| "fail"`
+
+The checks genuinely did pass/fail individually; inconclusiveness belongs to the decision, not the evaluation
+
+### Row B — Supersession is decision-only
+
+**Scenarios:** ~~S-11~~, S-12 · **Status:** resolved
+
+**Current state (verified):** `SUPERSEDES: [["Decision","Decision"]]`
+
+**S-11: not established as a gap.** Invalidating the replaced analysis's output plus the replacement's own support answered every question; an attempt to mint decisions purely to have something supersedable drew zero edges with all assertions passing. That is *not* a finding that invalidation represents supersession — `invalidated = true` means "no longer valid as a source of current inference", and the two merely coincide here. **Open; S-12 discriminates**, since there the numbers stay valid and only the interpretation changes
+
+**S-7: confirmed and walked.** `SUPERSEDES` got its first writer and reader. Amendment-to-amendment is exactly the shape it fits, and removing the edge breaks the ordering test — verified by deleting it, not argued
+
+**S-12: RESOLVED — claim-level supersession is not real, and decision-level supersession was not needed either.** An interpretation is withdrawn by a `Decision` that `CHANGES` it and `MOTIVATES` the reading that replaced it. Because both halves of every step are recorded, the revision chain already walks claim-to-claim and a `SUPERSEDES` edge between the decisions would have been a writer with no reader. Note the contrast with S-7, where `SUPERSEDES` *is* load-bearing: there each step records only what it changed, and the container (the gate) supplies the rest
+
+### Row C — A claim has no endpoint or scope
+
+**Scenarios:** S-5, S-13 · **Status:** resolved
+
+**Current state (verified):** `ClaimProps = { name, kind? }`
+
+Scope is carried by the line of enquiry the claim answers, reached by traversal
+
+**S-5: RESOLVED, no-change route held, nothing added to `Claim`.** Scope is reached by traversal — `Claim <-SUPPORTS- Evidence <-PRODUCES- EvidenceUnit -ADDRESSES-> LineOfEnquiry <-MOTIVATES- Question` — and every edge on that path already existed and was already walked. Two claims worded identically now answer different questions traceably, and "do these conflict?" is derived from scope and bearing without either sentence being compared to the other. Note what this cost: **zero schema changes**, against S-5's own §2 note calling it "the one most likely to force a real model change"
+
+### Row D — No question-to-question lineage
+
+**Scenarios:** **S-1**, S-13 · **Status:** resolved
+
+**Current state (verified):** ~~no `Question`→`Question` edge~~ → `MOTIVATES: Decision → Question`
+
+**RESOLVED by S-1 — one relationship, no new label, and the predicted no-change route was half right.** A decision does narrow the original, exactly as predicted; what the prediction missed is that nothing attached the *product* of the narrowing to the act, so a question born of sharpening had no path back to the decision that produced it. Demonstrated rather than argued: one hunch sharpened twice with a result landing in between, and `originOf(secondQuestion)` returned the knowledge that existed before the *first* sharpening — populated, plausible, and belonging to a different event. Direct `Question`→`Question` lineage was the other candidate and lost on capability, not taste: it says where a question came from but not what was known when it was asked, because the reason and the frozen evidence set live on the decision. PJ-011's record-both-pick-neither rule needs two models that fit *equally*; these did not
+
+### Row E — No evidence-to-evidence lineage
+
+**Scenarios:** S-10 · **Status:** open
+
+**Current state (verified):** no `Evidence`→`Evidence` edge
+
+Both support the same claim; execution differences live on the computation
+
+### Row F — No artefact-to-artefact lineage
+
+**Scenarios:** S-9 · **Status:** open
+
+**Current state (verified):** no `Artefact`→`Artefact` edge
+
+Content-hash comparison plus an open question about the generator
+
+### Row G — "Locked" is not distinct from "decision record still active"
+
+**Scenarios:** S-7, S-13 · **Status:** resolved
+
+**Current state (verified):** `Decision.is_open` (PJ-004 #2)
+
+A gate expresses the confirmatory boundary; `is_open` was always meant to carry this
+
+**S-7: prediction held, no change.** "Locked" is carried by a gate protecting the work, and "the confirmatory boundary is untouched" is assertable as `gateStatus` being identical either side of the amendment. `Decision.is_open` is still unwalked by the domain layer and was not needed
+
+### Row H — Closure carries no polarity
+
+**Scenarios:** S-4 · **Status:** refuted
+
+**Current state (verified):** `RESOLVES` edge, no outcome field
+
+**REFUTED by S-4 — no polarity field needed.** Answered/abandoned/deferred and yes/no are all derived: `RESOLVES` + cited evidence is *answered*, `RESOLVES` with nothing cited is *abandoned*, `DEFERS` is *deferred*; and the answer is "no" when the cited findings `CHALLENGES` the proposition rather than `SUPPORTS` it. Third prediction to dissolve rather than confirm
+
+### Row I — Absence of evidence vs inconclusive evidence
+
+**Scenarios:** S-1, S-2, S-3, **S-4** · **Status:** resolved
+
+**Current state (verified):** `whySupported().challenged`/`against`; `whatIsKnown()`'s three lists
+
+**HELD, and now tested at both levels.** S-4 found the claim-level instance: a claim refuted by a null result and a claim nobody had examined returned *identical* objects from `whySupported()`. **S-1 raises it to the question level**: `whatIsKnown()` returns `established`/`unresolved`/`untested` as three disjoint lists, so a question nothing has been run against is not a weak kind of unsettled and renders as neither failure nor inconclusive evidence. Both fixes are service-layer reads of structure that already existed — `CHALLENGES` for the first, `ADDRESSES`/`RESOLVES` for the second. No schema change either time
+
+### Row J — Deferred vs accepted-as-unresolved
+
+**Scenarios:** S-14 · **Status:** open
+
+**Current state (verified):** `DEFERS` edge covers both
+
+Distinguish by whether an open task exists
+
+### Row K — No provisional/scratch standing
+
+**Scenarios:** S-8, story 18 · **Status:** open
+
+**Current state (verified):** `Claim.kind: exploratory \| confirmatory`
+
+`exploratory` already is this distinction
+
+### Row L — No execution input lineage
+
+**Scenarios:** S-11 · **Status:** resolved
+
+**Current state (verified):** no `Computation`→`Artefact` "read" edge
+
+**CONFIRMED — resolved.** Added `CONSUMES: Computation → Artefact`. The old route (`ADDRESSES` to the enquiry, then `REQUIRES`) answered "what observations is this enquiry associated with", not "what did this computation consume". Verified false in practice, not in principle: with two analyses on one enquiry over different inputs, "what does this claim rest on" returned both observation sets
+
+### Row M — A review has no analysis to point at
+
+**Scenarios:** S-11 · **Status:** resolved
+
+**Current state (verified):** `EVALUATES: Review→Claim\|Decision\|Evidence`
+
+**CONFIRMED — resolved.** Added `Review → EvidenceUnit`. Endpoint is the inferential activity, not the `Computation` that executed it: what S-11's reviewer criticises is the method, and nothing ran incorrectly. `Review → Computation` may be earned later by a scenario reviewing an *execution*; S-11 did not earn it
+
+### Row N — Claim identity is undefined
+
+**Scenarios:** S-5, S-12 · **Status:** resolved
+
+**Current state (verified):** one `Claim` created per analysis conclusion; queried by `name`
+
+**NEW OPEN QUESTION.** Two analyses concluding the same proposition currently create two claims. Correct if a claim is an assertion *occurrence*; wrong if it is a proposition, in which case one claim should accumulate evidence. Deliberately not fixed — S-5 and S-12 are what should decide it
+
+**S-12: NARROWED, prediction half refuted, still not resolved.** Predicted that duplicate `Claim` nodes would produce the wrong answer and force proposition identity. They did not: every operation keys by proposition, and `withdrawalOf()` requires *every* node asserting a sentence to have been withdrawn before it reports the record as no longer claiming it — so two nodes behave as one. Claim is therefore **operationally a proposition** while being **stored as an occurrence**, and the duplication is redundancy rather than a defect. What would break it is standing (row **R**): two nodes for one sentence, one `exploratory` and one `confirmatory`, gives two answers to "is this confirmatory?". S-12 never creates that, so it is not demonstrated. Row C is the other side — merging by name would conflate two enquiries asserting the same sentence about different scopes
+
+**S-5: RESOLVED.** Identity for reading is a proposition **within a scope**. The node stays an assertion occurrence — duplicates inside one line of enquiry remain harmless and merge on read, exactly as S-12 found; duplicates across lines are two different claims that happen to share wording, and must never merge. That is the distinction S-12 could not draw, because it only ever had one scope **Boundary S-5 did not test, named rather than left implicit:** the scoped `withdrawalOf()`/`reinterpret()` lookups reach a claim through `<-[:SUPPORTS]-` only, so a proposition that exists *solely* as something an analysis concluded against cannot be reinterpreted or read as withdrawn — it reports "nothing on the record claims it". Probably right, since nobody is claiming a sentence they concluded against, but it is untested. `interpretationHistory()` is still keyed by wording alone; it does not need scoping because its distinct-decisions guard already refuses when two scopes narrow to the same words, rather than following whichever came first
+
+### Row O — Withdrawal reason is under-determined
+
+**Scenarios:** S-3, S-7 · **Status:** deferred
+
+**Current state (verified):** `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation
+
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
+
+**NEW, DEFERRED.** Two shapes of the same gap: with no review the reason is manufactured (row **I** again — probably should be null); with several reviews of one unit the causal one is ambiguous. May want no relationship at all, since it describes *why state changed* rather than *what current state is* — which is what the event history is for. Deferred until the event model is under real pressure
+
+**S-7: prediction held — did not bite.** An amendment names its own cause, so the ambiguity O describes never arose. Still deferred
+
+**S-12: still does not bite.** A reinterpretation mints both the review and the decision that acted on it, so which review caused the change is recorded rather than inferred. Note what this establishes in passing: a review is *not* a retraction — reviews also confirm, and distinguishing them from a free-text verdict would be text-matching. That is why the `Decision` exists at all here
+
+### Row P — `Evidence` carries two senses
+
+**Scenarios:** S-9, S-10, S-12 · **Status:** open
+
+**Current state (verified):** one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position
+
+**NEW, from cold review (3 of 4 reviewers, independently).** May be correct minimalism — S-11's premise ("observations fine, inference wrong") is expressed structurally and works. But `recordObservations` makes Evidence with no producing `EvidenceUnit`, which PJ-001 defines as impossible, and `whySupported` structurally cannot count an observation as support
+
+### Row Q — Question and LineOfEnquiry are collapsed by the service layer
+
+**Scenarios:** S-1, S-2, S-13, **S-4** · **Status:** resolved
+
+**Current state (verified):** `pose`/`pursue`/`openEnquiry`; `MOTIVATES` walked in both directions
+
+**RESOLVED by S-4, and now load-bearing beyond closure after S-1.** S-4 showed the split was real: closure attaches to the question, so a closed enquiry went on reporting itself open. That left the two still sharing a name and a lifetime, and this row predicted that "a scenario that sharpens one question into several, or pursues one question two ways, is what would force them apart" — S-1 is that scenario and it did. `pose()` puts a question on the record with no pursuit at all (which is what makes *untested* a state of the record rather than a reader's invention), and `pursue()` opens further lines against a question already held. Identity is the handle throughout: two pursuits worded alike stay one question, two questions worded identically stay two
+
+### Row R — Standing is a birth property, not a transition
+
+**Scenarios:** S-8, S-7, story 18 · **Status:** resolved
+
+**Current state (verified):** `Claim.kind` is hardcoded `"confirmatory"` by the only writer; `exploratory` unreachable through research verbs
+
+**NEW, from cold review (3 of 4).** Ties to rows **G** and **K**: exploratory→confirmatory is plausibly conferred by an event (preregistration, lock, promotion) rather than set at creation. If so G/K/R are one question about how standing changes, not three **RESOLVED by S-7 at the service layer, with the successor question still open.** Predicted as the likeliest wrong answer and it was: with `kind` hardcoded `"confirmatory"`, amending a solver iteration limit reported `nature: "scientific"` and named a convergence diagnosis as a compromised confirmatory result — a false p-hacking alarm, populated and confident. `Conclusion.standing` now defaults to **exploratory**, which makes `exploratory` reachable for the first time and requires confirmatory standing to be claimed deliberately. What S-7 does *not* settle is whether standing should be **conferred by an act** rather than declared at creation; it does rule out the naive gate-conferred model, since S-17 established that declaring a gate does not satisfy it, so a claim behind an unevaluated confirmatory gate would read exploratory and the scientific amendment would go undetected
+
+### Row S — No agent, person or role exists in the model
+
+**Scenarios:** S-8 · **Status:** open
+
+**Current state (verified):** no node label, no property, anywhere
+
+**NEW, from cold review.** S-8's Afterward asks "who approved the scale-up, and on what projected cost?" — unanswerable. May legitimately be external metadata rather than domain; S-8 decides
+
+### Row T — Edges cannot carry properties
+
+**Scenarios:** S-7, row O · **Status:** open
+
+**Current state (verified):** `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)`
+
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
+
+**NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed
+
+**S-7: prediction held — no pressure.** The amendment `Decision` is the reification; reason, evidence and order all have a node to live on. Untested still
+
+### Row U — A gate records no condition until it is evaluated
+
+**Scenarios:** S-17 · **Status:** resolved
+
+**Current state (verified):** only path `Criterion`→`Gate` ran via `CriterionEvaluation`; `GateProps` is `{consequence}`
+
+**CONFIRMED — resolved.** Added `GOVERNS: Criterion → Gate`. PJ-004 #9's chain correctly stops anything flowing out of an untriggered gate, but it also made the governing criterion reachable *only* through an evaluation — so a declared-but-unevaluated gate, which is exactly S-17's subject, recorded no condition at all. Demonstrated: `criterionGoverning()` returned null, so the reviewer's demand ("show me it fails when the artefact is wrong") could not be aimed at anything
+
+### Row V — Criteria gate work but do not qualify findings
+
+**Scenarios:** S-3, S-8 · **Status:** open
+
+**Current state (verified):** `Criterion -GOVERNS-> Gate -GATES-> Task\|Computation`; nothing connects a criterion to the analysis it qualifies
+
+**NEW, CONFIRMED, deliberately unresolved.** Demonstrated wrong answer: with two prespecified robustness checks failed, `whySupported()` still reports the finding `supported: true` — "some evidence exists" rather than "the evidence holds up by its own prespecified standard". Two plausible models and S-3 does **not** discriminate, because its criteria do both jobs at once: (a) `Criterion -QUALIFIES-> EvidenceUnit`, or (b) extend `GATES` so a gate can gate a `Claim`'s standing. A scenario where criteria qualify a finding but gate nothing — or the reverse — would decide it
+
+### Row W — An evaluation record is not evidence of evaluation
+
+**Scenarios:** S-17, S-3 · **Status:** deferred
+
+**Current state (verified):** `CriterionEvaluation {value, outcome}` can be minted directly; `BASED_ON: CriterionEvaluation → Evidence` exists and is never written
+
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
+
+**NEW, DEFERRED.** S-17's motivating failure was a guard that *looked* implemented but had never demonstrated the required behaviour. Recording `outcome: "fail"` with no provenance for how that was reached risks recreating exactly that gap one level up. Two propositions hide here: "the criterion was recorded as failing" and "the criterion was exercised against evidence and failed." A later scenario should say whether an evaluation is itself sufficient durable evidence, or needs provenance through Evidence/EvidenceUnit/Computation
+
+### Row X — "Failure sticks" is S-3 policy applied to every gate
+
+**Scenarios:** S-3, S-17 · **Status:** deferred
+
+**Current state (verified):** `gateStatus()` treats any failing evaluation as permanently decisive
+
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
+
+**NEW, DEFERRED.** S-3 earns "re-running a robustness test until green must not erase the earlier failure". It does not earn "any failure blocks every gate forever", which is what is implemented. For S-17's hash check — artefact corrupted, criterion fails, artefact repaired, criterion passes — a permanent block is plausibly wrong. There may eventually be four distinct things here: historical failure evidence, current gate satisfaction, admissible re-evaluation, and superseded evaluation
+
+### Row Y — Closure without a cited result is classified by whether anyone worked on it
+
+**Scenarios:** **S-1**, S-14 · **Status:** boundary
+
+**Current state (verified):** `whatIsKnown()` buckets an abandoned question under `unresolved` if anything ever addressed it, and a deferred one under `untested` if nothing did
+
+**NEW, KNOWN BOUNDARY, deliberately not fixed.** S-1 needs three states and gets them from structure — resolved-on-cited-evidence, worked-on, never-touched. It never poses a question that was abandoned or deferred, so it has no standing to say where those belong, and inventing a fourth and fifth list to hold cases the scenario never exercised is how the survey stops being derived. Row J already owns the deferred-vs-accepted distinction; S-14 should decide both together
+
+### Row Z — Chronology exists for evidence but not for status
+
+**Scenarios:** **S-1**, S-7 · **Status:** open
+
+**Current state (verified):** `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only
+
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
+
+**NEW, CHARACTERISED, no change earned.** S-1's hardest Afterward question — what was known when this question was sharpened, asked after later evidence arrived — is answered from durable state, with an empty event log open beside it, because `sharpen()` freezes the standing findings onto the decision when the act is recorded. What that cannot reconstruct is the *survey*: whether a given question was established at that moment needs an ordering between two `Decision`s, and there is none. Natural ids happen to be allocated in order, which is an accident of the sequence and not a modelled fact — CLAUDE.md already forbids reading meaning into their values. So the temporal seam took real pressure and held at the level S-1 asked about; the level above it is a real gap that S-7 (post-lock amendment) is better placed to price, and neither a durable event sink nor a `decided_at` property is earned by a question nobody has yet been unable to answer
+
+**S-7: narrowed, as predicted, and the distinction is the result.** In-chain order is structural — `SUPERSEDES` alone orders two amendments to one design, with no timestamp, an empty event log, and natural-id order never consulted. Two decisions on *different* designs remain unordered, and S-7 includes an unrelated sharpening precisely to show that the answer covers one class of history and not chronology in general. Not a partial fix: a smaller true claim
+
+### Row AA — `BASED_ON` carries two senses
+
+**Scenarios:** **S-1**, S-7, S-12 · **Status:** boundary
+
+**Current state (verified):** `closeEnquiry()` writes the one cited finding; `sharpen()` writes every standing finding
+
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
+
+**NEW, BOUNDARY LOGGED, deliberately not changed.** "This evidence informed this decision" and "this is what was known when the decision was taken" are different claims, and the same edge now expresses both. S-1 cannot separate them, because the sharpening genuinely was taken in light of everything known — the two sets coincide, which is exactly why the overload is invisible here. What would discriminate: a decision taken on a *specific* subset while other findings stood unconsidered. If that shows the snapshot reading manufacturing a rationale the researcher never had, the contemporaneous set needs its own edge and `BASED_ON` goes back to meaning what it says
+
+**S-7: live, characterised, not fixed.** Both senses now have real writers — `amendDesign()` cites one diagnosis specifically, `sharpen()` snapshots everything standing. No mechanical collision: the readers pin different edges. The boundary stands as written
+
+### Row AB — A consequential act records what it acted **on**, not what it brought into existence
+
+**Scenarios:** **S-1**, **S-7** · **Status:** resolved
+
+**Current state (verified):** `sharpen()` wrote `NARROWS` to the original question; `amendDesign()` wrote `CHANGES` to the replaced condition
+
+**NEW, CROSS-SCENARIO, established as a failure shape rather than a relationship.** Two unrelated scenarios exposed the same structural omission, in regions that share no labels. S-1 found it in question sharpening, S-7 in design amendment. **The remedies differed**, which is the interesting part: S-1 needed `Decision -MOTIVATES-> Question`, because the reason and the frozen evidence live on the decision and nothing else could reach them; S-7 needed nothing, because the amended product is recoverable from the `SUPERSEDES` chain and the criteria governing the gate. That argues *against* a generic act-produces-thing relationship for decisions. Treat act→product as a **review heuristic** — a question to ask of every new verb that mints something — not as a domain relationship
+
+**S-12: third instance, and the prediction that S-7's remedy transfers was REFUTED.** S-7 needed no act→product edge because a gate contains its design conditions, so the current one is derivable as the unchanged member. An interpretation has no container, so from a narrowed claim there was no route back to the act that narrowed it, and `MOTIVATES: Decision → Claim` was earned. Three instances, three different resolutions — one new edge, one derivation, one new edge again. The shape recurs; the remedy does not generalise, which is still the argument against a blanket rule
+
+### Row AC — A withdrawn interpretation has no way back
+
+**Scenarios:** **S-12** · **Status:** resolved
+
+**Current state (verified):** `recordAnalysis()` refuses to conclude a proposition the record has withdrawn
+
+**NEW, from review of the finished scenario, and a real wrong answer before it was guarded.** `withdrawalOf()` reports a sentence withdrawn only when *every* node asserting it has been changed, so a colleague who had not read the review could record an analysis concluding it again and the record would silently un-retract itself — objection still standing, `withdrawn` back to `false`, `replacedBy` gone. Demonstrated before fixing. Now refused, on the same principle as S-7's design fork: a command that declines beats state that reads back wrong. What that leaves missing is the legitimate case — new evidence genuinely re-opening a settled reading — which needs a **deliberate** verb rather than a side effect of recording work. Not built, because S-12 does not contain one **S-5 found this guard had the same defect it was fixing.** `recordAnalysis()`'s withdrawal check was unscoped, so a sentence withdrawn in one line of enquiry would have blocked legitimate work concluding the same words in another. Now scoped to the enquiry being recorded
+
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from
