@@ -275,8 +275,10 @@ mattered. Working gotchas:
   guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
   which `createEdge()` catches and treats as success).
 - No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
-- No multi-type variable-length edges `[:A|B*1..3]` — chain explicit
-  `MATCH`/`OPTIONAL MATCH`, or use a single-type `[:TYPE*1..5]`.
+- **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
+  `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
+  form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a
+  single-type `[:TYPE*1..5]` for variable length.
 - Every AGE label (vertex or edge) is a real Postgres table
   (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
   it directly — this is how natural-id uniqueness, edge uniqueness, and the

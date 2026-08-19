@@ -33,6 +33,7 @@ import type {
   WorkRef,
   ChangedConclusion,
   Conclusion,
+  ConclusionRef,
   EnquiryRef,
   ObservationsRef,
   ReplacementReport,
@@ -197,26 +198,59 @@ export class ResearchSession {
    * closing with nothing cited is a real and different act, and the two must
    * not read alike.
    */
-  async closeEnquiry(input: { enquiry: EnquiryRef; answeredBy?: AnalysisRef }): Promise<void> {
+  async closeEnquiry(input: { enquiry: EnquiryRef; answeredBy?: ConclusionRef }): Promise<void> {
+    // Everything is validated before anything is written. A rejected close
+    // must leave no Decision behind, and an analysis from some other enquiry
+    // must not become the stated basis for resolving this question.
     const question = await this.questionBehind(input.enquiry);
-    const decision = await this.graph.createNode("Decision", {
-      reason: input.answeredBy ? `answered by ${input.answeredBy.id}` : "closed without a cited result",
-      invalidation_check: "new evidence bearing on the question",
-    });
-    if (question) await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
+    if (!question) throw new Error(`enquiry ${input.enquiry.id} has no motivating question to resolve`);
 
+    let answerBearing: string | undefined;
     if (input.answeredBy) {
-      const findings = await this.graph.query(
-        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence) RETURN e`,
-        { e: vertexProps<{ natural_id: string }>() },
-        { id: input.answeredBy.id },
+      const { analysis, proposition } = input.answeredBy;
+      const addresses = await this.graph.query(
+        `MATCH (:Computation {natural_id: $analysis})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
+         RETURN 1`,
+        { ok: scalar<number>() },
+        { analysis: analysis.id, enquiry: input.enquiry.id },
       );
-      for (const row of findings) {
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", row.e.natural_id);
+      if (addresses.length === 0) {
+        throw new Error(`analysis ${analysis.id} does not address enquiry ${input.enquiry.id}; it cannot answer its question`);
+      }
+      answerBearing = await this.findingFor(analysis, proposition);
+      if (!answerBearing) {
+        throw new Error(`analysis ${analysis.id} concluded nothing about "${proposition}"`);
       }
     }
 
-    this.emit("closeEnquiry", input.enquiry.id, { answeredBy: input.answeredBy?.id ?? null });
+    const decision = await this.graph.createNode("Decision", {
+      reason: input.answeredBy ? `answered on "${input.answeredBy.proposition}"` : "closed without a cited result",
+      invalidation_check: "new evidence bearing on the question",
+    });
+    await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
+    if (answerBearing) await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
+
+    this.emit("closeEnquiry", input.enquiry.id, {
+      answeredBy: input.answeredBy?.analysis.id ?? null,
+      proposition: input.answeredBy?.proposition ?? null,
+    });
+  }
+
+  /** The single finding by which an analysis concluded something about one proposition. */
+  private async findingFor(analysis: AnalysisRef, proposition: string): Promise<string | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (:Computation {natural_id: $analysis})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
+       OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim {name: $proposition})
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim {name: $proposition})
+       RETURN e, sc, cc`,
+      {
+        e: vertexProps<{ natural_id: string }>(),
+        sc: optional(vertexProps<{ name: string }>()),
+        cc: optional(vertexProps<{ name: string }>()),
+      },
+      { analysis: analysis.id, proposition },
+    );
+    return rows.find((r) => r.sc !== null || r.cc !== null)?.e.natural_id;
   }
 
   /** Is this enquiry open, and if not, how did it close? */
@@ -287,6 +321,32 @@ export class ResearchSession {
       answer: challenges ? "no" : "yes",
       evidence: [...new Set(cited.map((r) => r.e.statement))],
     };
+  }
+
+  /**
+   * Findings bearing on a proposition one way or the other.
+   *
+   * `bearing` is interpolated because pglite-age rejects edge-type
+   * alternation outright — `[:SUPPORTS|CHALLENGES]` is a syntax error, not
+   * merely unsupported for variable-length patterns. The value comes from a
+   * closed set of literals here, never from a caller.
+   */
+  private async findingsBearing(proposition: string, bearing: "SUPPORTS" | "CHALLENGES") {
+    return this.graph.query(
+      `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)
+       MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
+       MATCH (u)-[:USES]->(comp:Computation)
+       OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
+       OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
+       RETURN e, comp, a, r`,
+      {
+        e: vertexProps<EvidenceProps>(),
+        comp: vertexProps<ComputationProps>(),
+        a: optional(vertexProps<ArtefactProps>()),
+        r: optional(vertexProps<{ verdict: string }>()),
+      },
+      { name: proposition },
+    );
   }
 
   private async questionBehind(enquiry: EnquiryRef): Promise<string | undefined> {
@@ -622,82 +682,43 @@ export class ResearchSession {
 
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */
   async whySupported(proposition: string): Promise<SupportExplanation> {
-    const rows = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)
-       MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
-       MATCH (u)-[:USES]->(comp:Computation)
-       OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
-       OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
-       RETURN e, comp, a, r`,
-      {
-        e: vertexProps<EvidenceProps>(),
-        comp: vertexProps<ComputationProps>(),
-        a: optional(vertexProps<ArtefactProps>()),
-        r: optional(vertexProps<{ verdict: string }>()),
-      },
-      { name: proposition },
-    );
+    // Both bearings, each partitioned by whether its analysis output was
+    // later invalidated. A withdrawn challenge is as historical as a
+    // withdrawn support -- before this, challenging findings counted as
+    // current forever.
+    const forRows = await this.findingsBearing(proposition, "SUPPORTS");
+    const againstRows = await this.findingsBearing(proposition, "CHALLENGES");
 
     const support: SupportExplanation["support"] = [];
+    const against: SupportExplanation["against"] = [];
     const superseded: SupportExplanation["superseded"] = [];
-    for (const row of rows) {
-      const entry = { finding: row.e.statement, via: row.comp.kind };
-      // Why support was withdrawn comes from the review of the inferential
-      // unit -- the edge S-11 earned. Before it existed this was a hardcoded
-      // string, because the review's subject lived only in the event stream.
-      //
-      // Two related gaps, recorded rather than solved. With NO review the
-      // reason is manufactured, which is the absence-vs-inconclusive shape
-      // (PJ-008 row I) and should probably be null. With SEVERAL reviews of
-      // one unit the row multiplies and the reason is ambiguous: EVALUATES
-      // says who reviewed the analysis, never which review caused a later
-      // invalidation. That second one may not want a relationship at all --
-      // it describes why state changed, which is what the event history is
-      // for. S-3/S-7 should put enough pressure on the event model to settle
-      // both.
-      if (row.a?.invalidated) superseded.push({ ...entry, reason: row.r?.verdict ?? "its analysis was replaced" });
-      else support.push(entry);
+    for (const { rows, bearing, live } of [
+      { rows: forRows, bearing: "supports" as const, live: support },
+      { rows: againstRows, bearing: "challenges" as const, live: against },
+    ]) {
+      for (const row of rows) {
+        const entry = { finding: row.e.statement, via: row.comp.kind };
+        if (row.a?.invalidated) {
+          superseded.push({ ...entry, bearing, reason: row.r?.verdict ?? "its analysis was replaced" });
+        } else {
+          live.push(entry);
+        }
+      }
     }
 
-    // What the analyses actually consumed -- one hop from the computation,
-    // not a detour through the enquiry. Only currently-supporting evidence
-    // counts: a superseded analysis's inputs are not what the claim rests on
-    // now.
+    // What the still-current analyses actually consumed -- one hop from the
+    // computation, not a detour through the enquiry. Only currently-standing
+    // findings count: a superseded analysis's inputs are not what the claim
+    // rests on now.
     const resting = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(comp:Computation)
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
        MATCH (e)-[:RECORDED_IN]->(out:Artefact)
        WHERE out.invalidated IS NULL OR out.invalidated = false
        RETURN a`,
-      // `invalidated` is optional, so "not invalidated" has two spellings:
-      // absent, and explicitly false. Both are accepted here because the
-      // sibling branch above partitions on JS truthiness, which treats them
-      // alike. A bare `IS NULL` did not, and the mismatch made a claim whose
-      // output artefact was explicitly `false` report supported-but-resting-
-      // on-nothing.
-      //
-      // NB: "never invalidated" and "no output artefact" still look alike.
-      // Safe only because recordAnalysis always draws RECORDED_IN.
       { a: vertexProps<ArtefactProps>() },
       { name: proposition },
     );
-
-    // Findings that bear against the proposition. Without this, a refuted
-    // claim and one nobody has examined return identical objects -- both
-    // `supported: false` with empty support -- which asserts an equivalence
-    // between two different scientific states.
-    const againstRows = await this.graph.query(
-      // `u` is bound and reused deliberately. Two anonymous (:EvidenceUnit)
-       // patterns do not have to match the same unit, so the computation came
-       // back as a cross product with every other analysis in the tenant.
-      `MATCH (c:Claim {name: $name})<-[:CHALLENGES]-(e:Evidence)
-       MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
-       MATCH (u)-[:USES]->(comp:Computation)
-       RETURN e, comp`,
-      { e: vertexProps<EvidenceProps>(), comp: vertexProps<ComputationProps>() },
-      { name: proposition },
-    );
-    const against = againstRows.map((r) => ({ finding: r.e.statement, via: r.comp.kind }));
 
     return {
       proposition,
@@ -725,13 +746,20 @@ export class ResearchSession {
       `MATCH (a:Artefact {logical_name: $name})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(claim:Claim)
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(challenged:Claim)
        OPTIONAL MATCH (loe:LineOfEnquiry)-[:REQUIRES]->(e)
-       RETURN claim, loe`,
-      { claim: optional(vertexProps<ClaimProps>()), loe: optional(vertexProps<{ name: string }>()) },
+       RETURN claim, challenged, loe`,
+      {
+        claim: optional(vertexProps<ClaimProps>()),
+        challenged: optional(vertexProps<ClaimProps>()),
+        loe: optional(vertexProps<{ name: string }>()),
+      },
       { name: artefactName },
     );
     return {
-      claims: [...new Set(rows.flatMap((r) => (r.claim ? [r.claim.name] : [])))],
+      // A claim whose refutation rested on this record is affected by
+      // invalidating it, exactly as a supported one is.
+      claims: [...new Set(rows.flatMap((r) => [r.claim?.name, r.challenged?.name].filter((n): n is string => !!n)))],
       enquiries: [...new Set(rows.flatMap((r) => (r.loe ? [r.loe.name] : [])))],
     };
   }
@@ -746,13 +774,23 @@ export class ResearchSession {
 
   private async conclusionsOf(analysis: AnalysisRef): Promise<Conclusion[]> {
     const rows = await this.graph.query(
+      // Either bearing: an analysis whose findings all CHALLENGE returned no
+      // conclusions at all, so replacing one reported nothing as affected.
       `MATCH (:Computation {natural_id: $id})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-       MATCH (e)-[:SUPPORTS]->(c:Claim)
-       RETURN e, c`,
-      { e: vertexProps<EvidenceProps>(), c: vertexProps<ClaimProps>() },
+       OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
+       RETURN e, sc, cc`,
+      {
+        e: vertexProps<EvidenceProps>(),
+        sc: optional(vertexProps<ClaimProps>()),
+        cc: optional(vertexProps<ClaimProps>()),
+      },
       { id: analysis.id },
     );
-    return rows.map((r) => ({ proposition: r.c.name, finding: r.e.statement }));
+    return rows.flatMap((r) => {
+      const claim = r.sc ?? r.cc;
+      return claim ? [{ proposition: claim.name, finding: r.e.statement }] : [];
+    });
   }
 
   private async outputArtefactOf(analysis: AnalysisRef): Promise<string> {

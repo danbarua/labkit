@@ -9,6 +9,7 @@ export type {
   ReviewRef,
   EnquiryRef,
   Conclusion,
+  ConclusionRef,
   ChangedConclusion,
   ReplacementReport,
   UnaffectedRecord,

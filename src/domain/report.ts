@@ -15,6 +15,17 @@ export interface Ref<K extends string> {
 
 export type ObservationsRef = Ref<"observations">;
 export type CriterionRef = Ref<"criterion">;
+
+/**
+ * One specific conclusion of an analysis. Closing a question cites *this*,
+ * not the whole analysis: an analysis can support the proposition answering
+ * one question while challenging a secondary one, and "any cited finding
+ * challenges anything" is too coarse to derive polarity from.
+ */
+export interface ConclusionRef {
+  analysis: AnalysisRef;
+  proposition: string;
+}
 export type GateRef = Ref<"gate">;
 export type WorkRef = Ref<"work">;
 export type AnalysisRef = Ref<"analysis">;
@@ -169,8 +180,8 @@ export interface SupportExplanation {
   support: Array<{ finding: string; via: string }>;
   /** Observations the supporting findings ultimately rest on. */
   restingOn: string[];
-  /** Support that was withdrawn, and why — bullet 5. */
-  superseded: Array<{ finding: string; via: string; reason: string }>;
+  /** Findings withdrawn because their analysis was replaced — bullet 5. Either bearing. */
+  superseded: Array<{ finding: string; via: string; reason: string; bearing: "supports" | "challenges" }>;
   /**
    * Whether any finding bears *against* this proposition.
    *

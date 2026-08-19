@@ -80,7 +80,7 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // Researcher: then close that question for this endpoint.
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: nullResult });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
     expect(status.open).toBe(false);
@@ -94,7 +94,7 @@ describe("S-4: a negative result that closes the question", () => {
       from: [observations],
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: nullResult });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
     expect(status.open).toBe(false);
@@ -112,7 +112,7 @@ describe("S-4: a negative result that closes the question", () => {
       from: [observations],
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: nullResult });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
     expect(status.answer).toBe("no");
@@ -126,7 +126,7 @@ describe("S-4: a negative result that closes the question", () => {
       from: [observations],
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: nullResult });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     // Reconstructible from a fresh reader, not from a value we kept.
     const reader = new ResearchSession(await scenario.current(), { clock });
@@ -152,7 +152,7 @@ describe("S-4: a negative result that closes the question", () => {
         },
       ],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: nullResult });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
 
     const status = await session.enquiryStatus(specificity);
     expect(status.evidence).toHaveLength(1);
@@ -202,6 +202,126 @@ describe("S-4: a negative result that closes the question", () => {
     expect(refuted.against).toHaveLength(1);
     expect(refuted.against[0]!.finding).toContain("no separation detectable");
     expect(neverExamined.against).toEqual([]);
+  });
+
+  /**
+   * A question can only be answered by work that was actually pursuing it.
+   * Without this, an unrelated analysis's findings become the stated basis
+   * for resolving a question they never addressed.
+   */
+  test("an analysis from a different enquiry cannot answer this question", async () => {
+    const { established, specificity, observations } = await aProgrammeWithOneOpenQuestion();
+    const elsewhere = await session.recordObservations({
+      enquiry: established,
+      name: "unrelated measurements",
+      finding: "unrelated",
+    });
+    const unrelated = await session.recordAnalysis({
+      enquiry: established,
+      method: "unrelated-analysis",
+      from: [elsewhere],
+      concludes: [{ proposition: SPECIFICITY, finding: "irrelevant", bearing: "challenges" }],
+    });
+
+    await expect(
+      session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: unrelated, proposition: SPECIFICITY } }),
+    ).rejects.toThrow(/does not address enquiry/);
+
+    // Nothing was written on the way to failing.
+    const status = await session.enquiryStatus(specificity);
+    expect(status.open).toBe(true);
+    expect(status.closure).toBeNull();
+    expect(observations.kind).toBe("observations");
+  });
+
+  test("a question cannot be answered on a proposition the analysis never concluded", async () => {
+    const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
+    const analysis = await session.recordAnalysis({
+      enquiry: specificity,
+      method: "cluster-comparison",
+      from: [observations],
+      concludes: [{ proposition: SPECIFICITY, finding: "no separation", bearing: "challenges" }],
+    });
+
+    await expect(
+      session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis, proposition: "something else entirely" } }),
+    ).rejects.toThrow(/concluded nothing about/);
+
+    const status = await session.enquiryStatus(specificity);
+    expect(status.open).toBe(true);
+  });
+
+  /**
+   * Polarity must come from the finding that answers THIS question, not from
+   * "any cited finding challenges anything". An analysis can support the
+   * proposition answering one question while challenging a secondary one.
+   */
+  test("polarity comes from the answering finding, not from any finding in the analysis", async () => {
+    const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
+    const mixed = await session.recordAnalysis({
+      enquiry: specificity,
+      method: "mixed-analysis",
+      from: [observations],
+      concludes: [
+        { proposition: SPECIFICITY, finding: "clear separation between constructions" },
+        { proposition: "a secondary side-proposition", finding: "not borne out", bearing: "challenges" },
+      ],
+    });
+
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: mixed, proposition: SPECIFICITY } });
+
+    const status = await session.enquiryStatus(specificity);
+    expect(status.closure).toBe("answered");
+    // "yes" -- the answering finding supports it, despite the analysis also
+    // challenging an unrelated proposition.
+    expect(status.answer).toBe("yes");
+    expect(status.evidence).toEqual(["clear separation between constructions"]);
+  });
+
+  /**
+   * Overlap regression, per review: making CHALLENGES live exposed
+   * SUPPORTS-only assumptions in query paths written before it existed.
+   */
+  test("a withdrawn challenge is historical, and propagates as an affected claim", async () => {
+    const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
+    const refutation = await session.recordAnalysis({
+      enquiry: specificity,
+      method: "cluster-comparison",
+      from: [observations],
+      concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
+    });
+
+    const before = await session.whySupported(SPECIFICITY);
+    expect(before.challenged).toBe(true);
+    expect(before.against).toHaveLength(1);
+
+    const review = await session.recordReview({ of: refutation, verdict: "the clustering metric was misapplied" });
+    const report = await session.replaceAnalysis({
+      supersedes: refutation,
+      because: review,
+      enquiry: specificity,
+      method: "corrected-cluster-comparison",
+      from: [observations],
+      concludes: [{ proposition: SPECIFICITY, finding: "still no separation, corrected metric", bearing: "challenges" }],
+    });
+
+    // conclusionsOf() saw nothing at all when an analysis only challenged.
+    expect(report.affected).toEqual([SPECIFICITY]);
+    expect(report.changed).toHaveLength(1);
+
+    const after = await session.whySupported(SPECIFICITY);
+    // The old challenge is withdrawn, not still standing.
+    expect(after.against.map((a) => a.finding)).toEqual(["still no separation, corrected metric"]);
+    expect(after.superseded).toHaveLength(1);
+    expect(after.superseded[0]).toMatchObject({
+      finding: "no separation detectable",
+      bearing: "challenges",
+      reason: "the clustering metric was misapplied",
+    });
+
+    // ...and invalidating the record enumerates the challenged claim.
+    const downstream = await session.whatDependsOn("cluster-comparison output");
+    expect(downstream.claims).toContain(SPECIFICITY);
   });
 
   test("an enquiry nobody has closed is open, and that is not a kind of closure", async () => {

@@ -222,11 +222,15 @@ it in a throwaway script first — see PJ-006 for how these were found.
   (`age/src/backend/parser/cypher_clause.c:6407`), not a WASM quirk. Expand
   each key individually: `CREATE (n:Label {k1: $k1, k2: $k2, ...})` — see
   `buildPropertyClause()` in `src/db/agtype.ts`.
-- **No multi-type variable-length edges.** `[:A|B*1..3]` raises a hard
-  parser error (`syntax error at or near "|"`) — the relationship-pattern
-  grammar production (`age/src/backend/parser/cypher_gram.y:1369`) only
-  accepts a single `label_opt` (`: label_name`); there is no `|`-alternation
-  production in the grammar at all, on any platform. A single-type
+- **No edge-type alternation, at any length.** `[:A|B*1..3]` raises a hard
+  parser error (`syntax error at or near "|"`), and so does the plain
+  fixed-length `[:A|B]` — verified against pglite-age, Postgres `42601` /
+  `cypher_yyerror`. The grammar production
+  (`age/src/backend/parser/cypher_gram.y:1369`) accepts a single `label_opt`
+  (`: label_name`); there is no `|`-alternation production at all, on any
+  platform, so the variable-length part is incidental. Chain an
+  `OPTIONAL MATCH` per type and coalesce in application code — see
+  `conclusionsOf()`/`findingsBearing()` in `src/domain/session.ts`. A single-type
   variable-length edge (`[:SUPERSEDES*1..5]`) works fine, as does an
   unrestricted-type undirected path (`-[*1..3]-`) — it's specifically the
   type-alternation syntax inside `[...]` that doesn't exist.
