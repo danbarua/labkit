@@ -693,6 +693,7 @@ this document's original analysis are marked as such.
 | X | "Failure sticks" is S-3 policy applied to every gate | `gateStatus()` treats any failing evaluation as permanently decisive | S-3, S-17 | **NEW, DEFERRED.** S-3 earns "re-running a robustness test until green must not erase the earlier failure". It does not earn "any failure blocks every gate forever", which is what is implemented. For S-17's hash check — artefact corrupted, criterion fails, artefact repaired, criterion passes — a permanent block is plausibly wrong. There may eventually be four distinct things here: historical failure evidence, current gate satisfaction, admissible re-evaluation, and superseded evaluation |
 | Y | Closure without a cited result is classified by whether anyone worked on it | `whatIsKnown()` buckets an abandoned question under `unresolved` if anything ever addressed it, and a deferred one under `untested` if nothing did | **S-1**, S-14 | **NEW, KNOWN BOUNDARY, deliberately not fixed.** S-1 needs three states and gets them from structure — resolved-on-cited-evidence, worked-on, never-touched. It never poses a question that was abandoned or deferred, so it has no standing to say where those belong, and inventing a fourth and fifth list to hold cases the scenario never exercised is how the survey stops being derived. Row J already owns the deferred-vs-accepted distinction; S-14 should decide both together |
 | Z | Chronology exists for evidence but not for status | `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only | **S-1**, S-7 | **NEW, CHARACTERISED, no change earned.** S-1's hardest Afterward question — what was known when this question was sharpened, asked after later evidence arrived — is answered from durable state, with an empty event log open beside it, because `sharpen()` freezes the standing findings onto the decision when the act is recorded. What that cannot reconstruct is the *survey*: whether a given question was established at that moment needs an ordering between two `Decision`s, and there is none. Natural ids happen to be allocated in order, which is an accident of the sequence and not a modelled fact — CLAUDE.md already forbids reading meaning into their values. So the temporal seam took real pressure and held at the level S-1 asked about; the level above it is a real gap that S-7 (post-lock amendment) is better placed to price, and neither a durable event sink nor a `decided_at` property is earned by a question nobody has yet been unable to answer |
+| AA | `BASED_ON` carries two senses | `closeEnquiry()` writes the one cited finding; `sharpen()` writes every standing finding | **S-1**, S-7, S-12 | **NEW, BOUNDARY LOGGED, deliberately not changed.** "This evidence informed this decision" and "this is what was known when the decision was taken" are different claims, and the same edge now expresses both. S-1 cannot separate them, because the sharpening genuinely was taken in light of everything known — the two sets coincide, which is exactly why the overload is invisible here. What would discriminate: a decision taken on a *specific* subset while other findings stood unconsidered. If that shows the snapshot reading manufacturing a rationale the researcher never had, the contemporaneous set needs its own edge and `BASED_ON` goes back to meaning what it says |
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from
@@ -760,6 +761,24 @@ as confirming one. Row **I** held: "which conclusions changed" proved cleanly
 derivable from before/after findings, with no strength field on `Claim`.
 
 ---
+
+### S-7 predictions, recorded before the build
+
+S-7 touches more open rows than any scenario so far, and a prediction is
+only worth keeping if it was written down while it could still be wrong.
+Recorded 2026-08-19, before a line of the scenario existed.
+
+| Row | Prediction |
+| --- | --- |
+| B — supersession is decision-only | `SUPERSEDES` gets its first walk and is **enough**. Amendment is decision-to-decision, which is the shape the story's own expressibility note endorses |
+| G — "locked" vs "decision record still active" | The no-change route holds. A gate expresses the confirmatory boundary, and "the confirmatory boundary is untouched" is assertable as `gateStatus` being identical either side of the amendment. `Decision.is_open` is not needed and stays unwalked by the domain layer |
+| O — withdrawal reason under-determined | Does not bite here. An amendment decision names its own cause, so the ambiguity O describes (several reviews, no way to say which caused it) never arises. Stays deferred |
+| R — standing is a birth property | **The likeliest demonstrated wrong answer.** `Claim.kind` is hardcoded `"confirmatory"` by its only writer, so every feasibility claim reads confirmatory and "was any confirmatory result affected?" answers wrongly rather than emptily. Expect a service-layer fix, not a schema one |
+| T — edges cannot carry properties | No pressure. The amendment decision *is* the reification; "when, why, by whom" all have a node to live on. Expect T to stay open and untested |
+| Z — chronology between decisions | **Narrows rather than disappears.** `SUPERSEDES` gives in-chain order structurally, with no timestamps and no event log. Two unrelated decisions remain unordered. That is a distinction, not a partial fix |
+| AA — `BASED_ON` carries two senses | Goes live. The amendment cites one specific diagnosis, so both senses have real writers. No mechanical collision expected — the readers pin different edges — so characterise, do not fix |
+| mechanical vs scientific | **Not derivable from the shape of the cited evidence.** A diagnosis gets a `SUPPORTS` edge like any finding, so structurally it is indistinguishable from a scientific result. If a derivation exists it will be about *what the amendment changes*, not what it rests on. Otherwise: two models, record both |
+| what else was rerun | Honestly **empty**. Nothing connects an amendment to the work it invalidates. An empty answer earns nothing, and manufacturing a second amendment purely to break it would be manufacturing the wrong answer rather than finding one |
 
 ## §4 — Held back as stories, not scenarios
 
