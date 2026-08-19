@@ -5,6 +5,14 @@ vantage point among several. Nothing here was agreed with the reviewer or the
 user; it is recorded so it can be argued with, and superseded when it turns
 out to be wrong.**
 
+> **Read this with a date in mind.** Written after S-3, before S-4, S-1, S-7,
+> S-12 and S-5 existed. Its central open question — "do the nouns survive claim
+> identity?" — has since been answered *yes*, by S-12 and S-5, with no schema
+> change. For what is true now, read **PJ-014** (question lifecycle) and
+> **PJ-015** (claims and amendment). Three of the four things this entry said
+> to watch have outcomes recorded there; the fourth (what a first non-additive
+> change costs) is still untested.
+
 ## Why this entry exists, and what it can't see
 
 The user, the reviewer and the project's originator share context this entry

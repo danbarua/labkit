@@ -2,6 +2,12 @@
 
 **Status: implemented (2026-08-18), on `spike/drizzle-age`.**
 
+> **One claim here has since been tested and did not hold.** §3 says the
+> durable event sink stays an interface until S-1 or S-7 needs it. Both were
+> built; both answer their hardest historical question from durable graph
+> state, asserted with a provably empty event log. The successor trigger is
+> recorded in `src/domain/events.ts` and in PJ-014 §5.
+
 ## Context
 
 PJ-008 turned a real research programme into an interaction corpus. This

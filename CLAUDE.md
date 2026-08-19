@@ -18,9 +18,14 @@ touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 (current persistence design) rather than inferring intent from code alone.
 Before touching `src/domain/`, skim 008 (the interaction corpus the service
 layer is built against), 009 (the first scenario built from it), 010 (a
-cold-context review of both), and 011 (the control chain under scenario
-pressure). 012 is the implementing agent's own perspective — opinion rather
-than decision, and explicitly arguable.
+cold-context review of both), 011 (the control chain under scenario pressure),
+then **014 (the question lifecycle: S-4, S-1)** and **015 (claims and
+amendment: S-7, S-12, S-5)** — those two are the current state of the domain
+model and the newest decisions in the chain. 012 is the implementing agent's
+own perspective after S-3, opinion rather than decision and now largely
+superseded by 014/015. 013 is an external read-only review of the whole arc,
+written by a different reviewer; its improvement list is what 014/015 and the
+surrounding cleanup address.
 
 ## Commands
 
@@ -225,6 +230,33 @@ walked structure is a computable map of where the model has untested claims —
 `CHALLENGES` sitting empty is the only durable record that the model claims
 evidence can challenge a claim and nothing ever has. A cull would need to
 distinguish *ruled out by the corpus* from *not yet reached by it*.
+
+This protects **labels and edges**, which are claims about the domain. It does
+not protect query conveniences with no consumer — the per-tenant CQRS views
+were removed on exactly that distinction (see "No relational read side").
+
+### When a deferral stops being acceptable
+
+Recording two models and picking neither is the right move often enough that
+the stack of deferred rows grows on its own. PJ-012 named the failure mode it
+risks and PJ-013 found it still unaddressed:
+
+> the model stays technically undecided while the code quietly encodes one
+> reading anyway.
+
+Two rules, so this is checkable rather than remembered:
+
+1. **At most one confirmed wrong answer ships green at a time, and clearing it
+   is the next thing built.** A deferred row that records a *demonstrated*
+   wrong answer — not an empty result, not an ugly query — is a live defect
+   with a comment on it. One is a considered trade; two means the trade stopped
+   being considered. **Row V is currently that one**: `whySupported()` reports
+   `supported: true` for a finding whose own prespecified robustness checks
+   failed.
+2. **Every deferred row names the scenario that would settle it.** A row that
+   cannot name one is not deferred, it is unresolved and unowned, and it should
+   say so in its own cell. "Record both and pick neither" is a decision about
+   *models*; it is not a decision to stop looking for the discriminator.
 
 ## Tenant provisioning is reconciliation, run every time
 
