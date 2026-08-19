@@ -798,6 +798,15 @@ prespecified comparison to the full sample reports itself **mechanical**. That
 is the worst available wrong answer here, since "mechanical" is precisely the
 label that says a repair is legitimate rather than p-hacking.
 
+*Follow-ups, from review of the finished scenario:* amending a setting that
+had *already* been amended was accepted and forked the design — two conditions
+in force at once, and a history that threw on read. Refused at the write
+instead, because state that cannot be read back is the one outcome with nothing
+to recommend it. `designHistory()` now also refuses to render a history whose
+amendments do not form one chain, rather than silently dropping the ones it
+cannot reach; an audit trail that quietly omits an entry is worse than one that
+declines. Both verified by removing the guard.
+
 *Held:* mechanical-vs-scientific is not derivable from the shape of the cited
 evidence — a diagnosis carries `SUPPORTS` like any finding — but is derivable
 from what the amendment *changes*: it is scientific exactly when a confirmatory

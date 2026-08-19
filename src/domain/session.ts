@@ -729,6 +729,20 @@ export class ResearchSession {
       throw new Error(`condition ${input.criterion.id} governs nothing; there is no locked design to amend`);
     }
 
+    // Amending a setting that has already been amended forks the design, and
+    // the fork is not readable: two conditions end up in force at once and
+    // `designHistory()` can no longer say what the design requires. Rejected
+    // at the write rather than thrown at the read -- state that cannot be read
+    // back is worse than a command that refuses.
+    const alreadyAmended = await this.graph.query(
+      `MATCH (:Decision)-[:CHANGES]->(c:Criterion {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { id: input.criterion.id },
+    );
+    if (alreadyAmended.length > 0) {
+      throw new Error(`condition ${input.criterion.id} has already been amended; amend the one now in force`);
+    }
+
     const prior = await this.latestAmendmentOn(gates);
 
     const replacement = await this.graph.createNode("Criterion", { proposition: input.nowRequires });
@@ -870,6 +884,16 @@ export class ResearchSession {
       const node = nodes.get(cursor)!;
       ordered.push({ decision: cursor, reason: node.reason, citing: [...node.citing].sort() });
       cursor = followedBy.get(cursor);
+    }
+
+    // Every amendment must appear. A second chain root, or a break partway,
+    // would otherwise drop amendments out of the history with no error at all
+    // -- and an audit trail that quietly omits an entry is worse than one that
+    // refuses to render.
+    if (ordered.length !== nodes.size) {
+      throw new Error(
+        `gate ${gateId} has ${nodes.size} amendments but only ${ordered.length} form a chain; its history is not a single line`,
+      );
     }
     return ordered;
   }

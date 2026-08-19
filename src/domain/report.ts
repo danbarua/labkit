@@ -194,7 +194,13 @@ export interface SupportExplanation {
   supported: boolean;
   /** Findings currently supporting the proposition, each with the analysis that produced it. */
   support: Array<{ finding: string; via: string }>;
-  /** Observations the supporting findings ultimately rest on. */
+  /**
+   * Observations the supporting findings ultimately rest on, by the **name**
+   * they were recorded under — `recordObservations({ name })`, not the
+   * `finding` text. Two different strings describe an observation set, and
+   * asserting on the wrong one is a mistake this project has already made
+   * once.
+   */
   restingOn: string[];
   /** Findings withdrawn because their analysis was replaced — bullet 5. Either bearing. */
   superseded: Array<{ finding: string; via: string; reason: string; bearing: "supports" | "challenges" }>;

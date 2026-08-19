@@ -343,6 +343,40 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     expect(history.amendments[0]!.rerun).toEqual(["feasibility sweep of the evolved condition"]);
   });
 
+  /**
+   * Amending a setting that has already been amended is refused.
+   *
+   * It would fork the design: two conditions in force at once, and no answer
+   * to "what does this design require". Refusing the command is better than
+   * accepting it and having the history throw at read time — writing state
+   * that cannot be read back is the one outcome with nothing to recommend it.
+   */
+  test("a setting that has already been amended cannot be amended again", async () => {
+    const programme = await lockedProgramme();
+    const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
+
+    await session.amendDesign({
+      criterion: programme.iterationLimit,
+      nowRequires: RAISED_LIMIT,
+      because: "the locked limit is unreachable",
+      citing: cites,
+    });
+    const afterFirst = await session.designHistory(programme.feasibilityBoundary);
+
+    await expect(
+      session.amendDesign({
+        criterion: programme.iterationLimit,
+        nowRequires: "the solver converges within 25,000 iterations",
+        because: "amending the superseded setting by mistake",
+        citing: cites,
+      }),
+    ).rejects.toThrow(/has already been amended; amend the one now in force/);
+
+    // The history still reads, and reads exactly as it did before.
+    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    expect(await later.designHistory(programme.feasibilityBoundary)).toEqual(afterFirst);
+  });
+
   /** Amending a condition nobody stated writes nothing. */
   test("amending a criterion that is not on the record writes nothing", async () => {
     const programme = await lockedProgramme();
