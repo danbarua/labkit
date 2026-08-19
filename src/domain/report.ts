@@ -14,6 +14,7 @@ export interface Ref<K extends string> {
 }
 
 export type ObservationsRef = Ref<"observations">;
+export type QuestionRef = Ref<"question">;
 export type CriterionRef = Ref<"criterion">;
 
 /**
@@ -192,4 +193,57 @@ export interface SupportExplanation {
    */
   challenged: boolean;
   against: Array<{ finding: string; via: string }>;
+}
+
+/**
+ * A question on the record. `question` is its identity; `asks` is what it
+ * says. The two are kept apart deliberately: S-1 pursues one question two
+ * ways and poses two identically-worded questions, and neither may be
+ * resolved by comparing text.
+ */
+export interface QuestionStanding {
+  question: string;
+  asks: string;
+}
+
+/**
+ * What the programme knows, in three states rather than two.
+ *
+ * `untested` is not a weak form of `unresolved`: one is a question nothing has
+ * ever been run against, the other is a question something has been run
+ * against without settling it. PJ-001's doctrine that absence of evidence must
+ * not read as a negative result is why they are separate lists rather than a
+ * flag on one.
+ *
+ * Boundaries S-1 does not test, and which are therefore classified by
+ * structure alone: a question closed *without* cited evidence (abandoned)
+ * appears under `unresolved` if anything ever addressed it, and a deferred one
+ * appears under `untested` if nothing did.
+ */
+export interface KnowledgeSurvey {
+  /** Settled on cited evidence. Polarity is not here — an answered "no" is still settled; see `EnquiryStatus.answer`. */
+  established: QuestionStanding[];
+  /** Worked on, not settled. */
+  unresolved: QuestionStanding[];
+  /** On the books, never pursued. Not a failure and not an inconclusive result. */
+  untested: QuestionStanding[];
+}
+
+/**
+ * Where a question came from, when it came from sharpening an earlier one.
+ *
+ * `knownAtTheTime` is the point of this type. It is the findings the
+ * sharpening act was taken in light of, frozen when the act was recorded —
+ * not "everything standing now", which would back-date later results onto an
+ * earlier decision. S-1's hardest Afterward question is asked *after* more
+ * evidence has arrived, precisely to catch that.
+ */
+export interface QuestionOrigin {
+  /** Identity of the question this one was sharpened from. */
+  from: string;
+  /** What that question asked — still in its original words. */
+  fromAsks: string;
+  /** Why it was sharpened. */
+  reason: string;
+  knownAtTheTime: string[];
 }

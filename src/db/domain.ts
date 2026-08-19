@@ -65,7 +65,27 @@ export type EdgeLabel = (typeof EDGE_LABELS)[number];
  * `Criterion -[:EVALUATED_AS]-> CriterionEvaluation -[:TRIGGERS]-> Gate -[:GATES]-> Task/Computation`.
  */
 export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, NodeLabel]>> = {
-  MOTIVATES: [["Question", "LineOfEnquiry"]],
+  /**
+   * "Gave rise to." A question gives rise to a line of enquiry; a decision
+   * gives rise to a question.
+   *
+   * The second pair is earned by S-1. Sharpening a vague hunch into a testable
+   * question records a `Decision` that `NARROWS` the original — but nothing
+   * attached the *product* of that act to the act, so a question created by
+   * sharpening had no path back to it. Demonstrated rather than argued: with
+   * one hunch sharpened twice and a result landing in between,
+   * `originOf(secondQuestion)` reported the knowledge that existed before the
+   * *first* sharpening, back-dating an act onto evidence that had not yet
+   * arrived. That is a confidently wrong answer, not an empty one — the reply
+   * was populated and plausible, and belonged to a different event.
+   *
+   * A direct `Question -> Question` lineage edge was the other candidate and
+   * was not chosen: it answers "where did this come from" but not "what did we
+   * know when we asked it", because the reason and the frozen evidence set
+   * live on the decision. The two models are not equally capable here, so
+   * PJ-011's record-both-pick-neither rule does not apply — see PJ-008 row D.
+   */
+  MOTIVATES: [["Question", "LineOfEnquiry"], ["Decision", "Question"]],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
   ADDRESSES: [["EvidenceUnit", "LineOfEnquiry"]],
   SUPPORTS: [["Evidence", "Claim"]],

@@ -134,10 +134,15 @@ back up to the caller. One verb may write many nodes and edges:
 and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
-current set is what PJ-008's S-11 required. Return types are derived
-one-per-bullet from a scenario's "Afterward" questions rather than designed —
-if a bullet has no natural home in the types, the API is wrong, not the
-bullet.
+current set is what PJ-008's S-11, S-17, S-3, S-4 and S-1 required. Return
+types are derived one-per-bullet from a scenario's "Afterward" questions
+rather than designed — if a bullet has no natural home in the types, the API
+is wrong, not the bullet.
+
+A verb that composes others records **one** event, not one per step
+(`openEnquiry` is `pose` + `pursue` and emits only `openEnquiry`). The event
+stream is a record of research actions; a researcher who opened an enquiry did
+one thing, and a log that decomposes it describes the implementation instead.
 
 `src/domain/events.ts` is the temporal seam: every state-changing verb flows
 through one choke point that stamps it from an injected `Clock`. The durable
@@ -147,7 +152,12 @@ honest:
 > Events explain *how state changed*. The graph explains *what the current
 > research state is*.
 
-Don't answer a "what is true now" question from the event log.
+Don't answer a "what is true now" question from the event log. Nor a "what was
+true then" one: S-1 asks what was known at the moment a question was sharpened,
+*after* later evidence has arrived, and it is answered from durable state — the
+sharpening freezes the findings it was taken in light of onto the decision. The
+scenario asserts it with an empty event log open beside it. See PJ-008 row Z for
+the level above that, which is not answerable and has not been made so.
 
 Two layering rules are enforced as `dependency-cruiser` **errors**, not
 conventions — `npx depcruise src tests --output-type err`:

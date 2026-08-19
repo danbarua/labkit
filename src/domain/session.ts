@@ -14,8 +14,10 @@
  * artefact, and one piece of evidence and one claim per conclusion.
  *
  * Scope: the scenarios built so far — S-11 (analysis replacement), S-17 and
- * S-3 (the criterion/gate chain). See docs/project-journal/008_user_story_mining.md.
- * Verbs are added when a scenario needs them, not in anticipation.
+ * S-3 (the criterion/gate chain), S-4 (negative closure), S-1 (posing,
+ * pursuing and sharpening questions). See
+ * docs/project-journal/008_user_story_mining.md. Verbs are added when a
+ * scenario needs them, not in anticipation.
  */
 
 import type { TenantGraph } from "../db/graph";
@@ -35,7 +37,11 @@ import type {
   Conclusion,
   ConclusionRef,
   EnquiryRef,
+  KnowledgeSurvey,
   ObservationsRef,
+  QuestionOrigin,
+  QuestionRef,
+  QuestionStanding,
   ReplacementReport,
   ReviewRef,
   SupportExplanation,
@@ -64,25 +70,217 @@ export class ResearchSession {
   // -------------------------------------------------------------------------
 
   /**
-   * Opens a line of enquiry pursuing a question.
+   * Puts a question on the record without pursuing it.
    *
-   * Both nodes are created, because they are different things: the question
-   * is what is unknown, the enquiry is how it is being pursued. Until S-4
-   * this created only the enquiry — and closure attaches to the question, so
-   * a closed enquiry went on reporting itself open. That was a service-layer
+   * This is what makes "untested" a state of the record rather than something
+   * a reader invents: S-1 must answer *what has not been tested*, and a
+   * question nobody has written down cannot be reported as untested without
+   * manufacturing it. Posing is deliberately cheap — a hunch is allowed on the
+   * books before anyone knows what the experiment is.
+   *
+   * Identity is the returned handle, never the wording. Posing the same words
+   * twice gives two questions, because two people can ask the same thing for
+   * different reasons and only the asker knows whether they meant one.
+   */
+  async pose(question: string): Promise<QuestionRef> {
+    const asked = await this.posed(question);
+    this.emit("pose", asked.id, { question });
+    return asked;
+  }
+
+  /**
+   * The write, without the event. Verbs that compose this one record the
+   * action the caller actually took, not the steps it decomposed into — the
+   * event stream is a record of research actions, and a researcher who opened
+   * an enquiry did one thing, not three.
+   */
+  private async posed(question: string): Promise<QuestionRef> {
+    const asked = await this.graph.createNode("Question", { name: question });
+    return { kind: "question", id: asked.natural_id };
+  }
+
+  /**
+   * Opens a line of enquiry pursuing a question already on the record.
+   *
+   * One question may be pursued many ways — that is what a `LineOfEnquiry`
+   * *is*, and until S-1 nothing exercised it: every enquiry had exactly one
+   * question and every question exactly one enquiry, so the two were
+   * distinguishable only by S-4's closure argument. `approach` names the
+   * pursuit, not the question, and carrying similar words to another pursuit
+   * of the same question has no effect on identity either way.
+   */
+  async pursue(input: { question: QuestionRef; approach: string }): Promise<EnquiryRef> {
+    const enquiry = await this.pursued(input);
+    this.emit("pursue", enquiry.id, { question: input.question.id, approach: input.approach });
+    return enquiry;
+  }
+
+  /** The write, without the event — see `posed`. */
+  private async pursued(input: { question: QuestionRef; approach: string }): Promise<EnquiryRef> {
+    const enquiry = await this.graph.createNode("LineOfEnquiry", { name: input.approach });
+    await this.graph.createEdge(input.question.id, "MOTIVATES", enquiry.natural_id);
+    return { kind: "enquiry", id: enquiry.natural_id };
+  }
+
+  /**
+   * Poses a question and immediately pursues it — the common case, and the
+   * only shape that existed before S-1.
+   *
+   * Both nodes are created, because they are different things: the question is
+   * what is unknown, the enquiry is how it is being pursued. Until S-4 this
+   * created only the enquiry — and closure attaches to the question, so a
+   * closed enquiry went on reporting itself open. That was a service-layer
    * collapse, not a gap in the model: `MOTIVATES` and `RESOLVES` both already
    * existed. See PJ-008 row Q.
-   *
-   * The two currently share a name because the caller supplies one string.
-   * A scenario that sharpens one question into several, or pursues one
-   * question two ways, would be the thing that forces them apart.
    */
   async openEnquiry(question: string): Promise<EnquiryRef> {
-    const asked = await this.graph.createNode("Question", { name: question });
-    const enquiry = await this.graph.createNode("LineOfEnquiry", { name: question });
-    await this.graph.createEdge(asked.natural_id, "MOTIVATES", enquiry.natural_id);
-    this.emit("openEnquiry", enquiry.natural_id, { question, asked: asked.natural_id });
-    return { kind: "enquiry", id: enquiry.natural_id };
+    const asked = await this.posed(question);
+    const enquiry = await this.pursued({ question: asked, approach: question });
+    this.emit("openEnquiry", enquiry.id, { question, asked: asked.id });
+    return enquiry;
+  }
+
+  /** Every line of enquiry pursuing this question. */
+  async pursuitsOf(question: QuestionRef): Promise<EnquiryRef[]> {
+    const rows = await this.graph.query(
+      `MATCH (:Question {natural_id: $id})-[:MOTIVATES]->(loe:LineOfEnquiry) RETURN loe`,
+      { loe: vertexProps<{ natural_id: string }>() },
+      { id: question.id },
+    );
+    return rows.map((r) => ({ kind: "enquiry", id: r.loe.natural_id }) as EnquiryRef);
+  }
+
+  /**
+   * Sharpens a question into a more precise one, recording the act rather than
+   * editing the original.
+   *
+   * The original keeps its words. A vague hunch that later turns out to have
+   * been the right instinct is worth being able to read back in the form it
+   * was actually held, and rewriting it in place would make every programme
+   * look as though it had known its final question from the start — which is
+   * S-1's whole complaint.
+   *
+   * Sharpening is not answering and not closing: the original stays open
+   * unless something later resolves it on evidence.
+   *
+   * `knowing` freezes what the act was taken in light of. It is captured here,
+   * at the moment of sharpening, because the alternative — reconstructing it
+   * later from what stands *now* — back-dates every subsequent result onto the
+   * decision. S-1 asks this question after more evidence has arrived, for
+   * exactly that reason.
+   */
+  async sharpen(input: { from: QuestionRef; into: string; because: string }): Promise<QuestionRef> {
+    const original = await this.graph.query(
+      `MATCH (q:Question {natural_id: $id}) RETURN q`,
+      { q: vertexProps<{ name: string }>() },
+      { id: input.from.id },
+    );
+    if (original.length === 0) throw new Error(`no question ${input.from.id} to sharpen`);
+
+    const decision = await this.graph.createNode("Decision", {
+      reason: input.because,
+      invalidation_check: "evidence that the sharper question was the wrong one to ask",
+    });
+    await this.graph.createEdge(decision.natural_id, "NARROWS", input.from.id);
+
+    for (const finding of await this.standingFindings()) {
+      await this.graph.createEdge(decision.natural_id, "BASED_ON", finding);
+    }
+
+    const sharper = await this.posed(input.into);
+    await this.graph.createEdge(decision.natural_id, "MOTIVATES", sharper.id);
+    this.emit("sharpen", sharper.id, { from: input.from.id, because: input.because, via: decision.natural_id });
+    return sharper;
+  }
+
+  /** Every finding currently on the record — what "we knew at the time" means when an act is recorded. */
+  private async standingFindings(): Promise<string[]> {
+    const rows = await this.graph.query(
+      `MATCH (:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
+       OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
+       RETURN e, a`,
+      {
+        e: vertexProps<{ natural_id: string }>(),
+        a: optional(vertexProps<{ invalidated?: boolean }>()),
+      },
+    );
+    return rows.filter((r) => !r.a?.invalidated).map((r) => r.e.natural_id);
+  }
+
+  /**
+   * Where a question came from, if it came from sharpening an earlier one.
+   *
+   * `null` for a question somebody simply asked — most questions have no
+   * origin beyond the person who thought of it, and inventing one would be
+   * worse than saying so.
+   */
+  async originOf(question: QuestionRef): Promise<QuestionOrigin | null> {
+    const rows = await this.graph.query(
+      `MATCH (d:Decision)-[:MOTIVATES]->(:Question {natural_id: $id})
+       MATCH (d)-[:NARROWS]->(from:Question)
+       RETURN d, from AS origin`,
+      {
+        d: vertexProps<{ natural_id: string; reason: string }>(),
+        origin: vertexProps<{ natural_id: string; name: string }>(),
+      },
+      { id: question.id },
+    );
+    if (rows.length === 0) return null;
+
+    const row = rows[0]!;
+    const knew = await this.graph.query(
+      `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence) RETURN e`,
+      { e: vertexProps<{ statement: string }>() },
+      { id: row.d.natural_id },
+    );
+
+    return {
+      from: row.origin.natural_id,
+      fromAsks: row.origin.name,
+      reason: row.d.reason,
+      knownAtTheTime: knew.map((r) => r.e.statement).sort(),
+    };
+  }
+
+  /**
+   * What the programme knows: settled, unsettled, and never looked at.
+   *
+   * Three states rather than two, classified structurally — established is a
+   * question resolved on cited evidence, untested is one nothing has ever been
+   * run against, unresolved is the rest. Nothing here compares a question's
+   * words to a claim's; the buckets come from what is attached to each
+   * question, not from what it says.
+   */
+  async whatIsKnown(): Promise<KnowledgeSurvey> {
+    const rows = await this.graph.query(
+      `MATCH (q:Question)
+       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
+       OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
+       OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)
+       RETURN q, cited, work`,
+      {
+        q: vertexProps<{ natural_id: string; name: string }>(),
+        cited: optional(vertexProps<{ natural_id: string }>()),
+        work: optional(vertexProps<{ natural_id: string }>()),
+      },
+    );
+
+    const byQuestion = new Map<string, { asks: string; cited: boolean; worked: boolean }>();
+    for (const row of rows) {
+      const entry = byQuestion.get(row.q.natural_id) ?? { asks: row.q.name, cited: false, worked: false };
+      entry.cited ||= row.cited !== null;
+      entry.worked ||= row.work !== null;
+      byQuestion.set(row.q.natural_id, entry);
+    }
+
+    const survey: KnowledgeSurvey = { established: [], unresolved: [], untested: [] };
+    for (const [question, entry] of byQuestion) {
+      const standing: QuestionStanding = { question, asks: entry.asks };
+      if (entry.cited) survey.established.push(standing);
+      else if (entry.worked) survey.unresolved.push(standing);
+      else survey.untested.push(standing);
+    }
+    return survey;
   }
 
   /**
