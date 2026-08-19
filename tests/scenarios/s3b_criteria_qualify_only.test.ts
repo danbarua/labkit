@@ -225,6 +225,39 @@ describe("S-3b: the same design with nothing downstream", () => {
   });
 
   /**
+   * A replaced analysis's checks are as historical as its findings.
+   *
+   * `whySupported()` already excludes a superseded analysis's inputs from
+   * `restingOn`; the standard is read through the same filter, and this is
+   * what makes that filter load-bearing rather than tidy. Without it the dead
+   * analysis's failed check would disqualify the claim the *replacement*
+   * supports — S-11's separation of the observations from the inference,
+   * undone from a direction S-11 could not see.
+   */
+  test("a superseded analysis's failed checks do not disqualify its replacement", async () => {
+    const { median, analysis, enquiry, observations } = await aFindingHeldToAgreedChecks();
+    await session.evaluateCriterion({ criterion: median, value: "median p = 0.21", outcome: "fail" });
+    expect((await session.whySupported(PROPOSITION)).supported).toBe(false);
+
+    const review = await session.recordReview({ of: analysis, verdict: "the aggregation was the wrong one" });
+    await session.replaceAnalysis({
+      supersedes: analysis,
+      because: review,
+      enquiry,
+      method: "holm-pairwise, mean aggregation",
+      from: [observations],
+      concludes: [{ proposition: PROPOSITION, finding: "p = 0.003, Holm-corrected" }],
+    });
+
+    const why = await (await afterwards()).whySupported(PROPOSITION);
+    // The replacement was held to nothing, so it is held to nothing -- not to
+    // the checks that failed against the analysis it replaced.
+    expect(why.standard).toEqual([]);
+    expect(why.unmet).toEqual([]);
+    expect(why.supported).toBe(true);
+  });
+
+  /**
    * Scope, as S-5 left it: two lines of enquiry can assert the same sentence,
    * and a standard agreed in one must not disqualify the other's finding.
    */

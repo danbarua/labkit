@@ -3,7 +3,7 @@
 **Status: implemented (2026-08-19), on `spike/drizzle-age`. Covers S-3b
 (`de94994`, `1d4a9a0`), a scenario authored from story 3 rather than promoted
 from §2. Row V resolved; row X widened and left open. Verification at the time
-of writing: 144 pass / 0 fail, typecheck clean, `npx depcruise src tests
+of writing: 145 pass / 0 fail, typecheck clean, `npx depcruise src tests
 --output-type err` 0 errors, `bun examples/full-lifecycle.ts` ends `closed
 connection cleanly` with no raw graphids.**
 
@@ -143,9 +143,16 @@ questions nothing has yet asked.
   copies of the itemisation logic diverging quietly, which would let one
   condition report `failed` through the gate it governs and `passed` through
   the finding it qualifies. The traversals differ; the report must not.
-- **The invalidation filter on the standard was included without a test that
-  forces it.** `whySupported()` already excludes replaced analyses from
-  `restingOn`, and applying the filter to one field and not the other would
-  make two halves of one answer disagree. This is the one place here where
-  consistency was preferred to the project's usual "earn it with a failing
-  answer" bar, and it is small enough to say so rather than pretend otherwise.
+- **The invalidation filter on the standard was argued from consistency and
+  then tested anyway.** `whySupported()` already excludes replaced analyses
+  from `restingOn`, which was the reason for writing it; PJ-015's sharpest
+  lesson is that an untested branch *inside* a fix survives the sweep that
+  fixes everything around it, so the filter has a deletion probe of its own —
+  remove it and a superseded analysis's failed check disqualifies the claim its
+  replacement supports.
+- **Only supporting analyses are qualified.** A challenging analysis held to a
+  standard whose checks fail still reads as a live challenge, because
+  `challenged` is computed from bearing alone. Recorded in the query's comment
+  rather than fixed: nothing in the corpus holds a challenging analysis to a
+  prespecified standard, and the scenario that would settle it is a null result
+  whose own robustness checks disagree.

@@ -3,7 +3,9 @@
 **Status: accepted requirements (2026-08-18), on `spike/drizzle-age`. Drives
 the Domain Service Layer build. §1 and §2 are held at their original wording;
 §3's ledger is the living part and gains outcomes as scenarios are built —
-S-11, S-17, S-3, S-4 and S-1 so far.**
+S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8 and S-3b so far. S-3b is the one
+scenario not promoted from §2: it was authored from story 3 to settle row V,
+and it lives in §3 with the rest of the living material.**
 
 ## Context
 

@@ -713,13 +713,18 @@ export class ResearchSession {
   /**
    * Records that a criterion was actually evaluated, and what came back.
    *
-   * The criterion must already govern the gate. Without that check an
-   * evaluation could be attached to an unrelated gate, and `gateStatus()`
-   * would mostly *hide* the result — its traversal starts from `GOVERNS`, so
-   * the malformed evaluation sits in the graph as durable nonsense without
-   * producing a visibly wrong report. Same invariant class as
-   * `assertReviewOf`, and checked before anything is written so a rejected
-   * command leaves no partial state.
+   * A verdict is reached either *for a gate* or *about a finding held to the
+   * criterion*, and one of the two must be true. Named a gate, the criterion
+   * must already govern it: otherwise the evaluation attaches to an unrelated
+   * gate and `gateStatus()` mostly *hides* the result — its traversal starts
+   * from `GOVERNS`, so the malformed evaluation sits in the graph as durable
+   * nonsense without producing a visibly wrong report. Named no gate, the
+   * criterion must already qualify something (`recordAnalysis({ heldTo })`),
+   * for the same reason: an evaluation no reader can reach still looks like a
+   * check that was performed.
+   *
+   * Same invariant class as `assertReviewOf`, and both are checked before
+   * anything is written so a rejected command leaves no partial state.
    */
   async evaluateCriterion(input: {
     criterion: CriterionRef;
@@ -1684,7 +1689,15 @@ export class ResearchSession {
     //
     // Same invalidation filter as `restingOn` above: a replaced analysis's
     // checks are as historical as its findings, and applying one filter and
-    // not the other would make two fields of one answer disagree.
+    // not the other would make two fields of one answer disagree. Load-bearing,
+    // not tidy -- see the superseded-analysis test in S-3b.
+    //
+    // Boundary: only the SUPPORTING analyses' standards are read. An analysis
+    // recorded with `heldTo` whose findings CHALLENGE the proposition still
+    // reads as a live challenge even if its own checks failed, so `challenged`
+    // is not qualified the way `supported` now is. Nothing in the corpus holds
+    // a challenging analysis to a prespecified standard; the scenario that
+    // would settle it is a null result whose robustness checks disagree.
     const standardRows = await this.graph.query(
       `MATCH (:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
