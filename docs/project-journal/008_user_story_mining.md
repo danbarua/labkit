@@ -673,7 +673,7 @@ this document's original analysis are marked as such.
 | B | Supersession is decision-only | ~~S-11~~, S-12 | resolved |
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
-| E | No evidence-to-evidence lineage | S-10° | open |
+| E | No evidence-to-evidence lineage | **S-10** | resolved |
 | F | No artefact-to-artefact lineage | S-9° | open |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
@@ -684,7 +684,7 @@ this document's original analysis are marked as such.
 | M | A review has no analysis to point at | S-11 | resolved |
 | N | Claim identity is undefined | S-5, S-12 | resolved |
 | O | Withdrawal reason is under-determined | S-3, S-7 | open |
-| P | `Evidence` carries two senses | S-9°, S-10°, S-12 | open |
+| P | `Evidence` carries two senses | S-9°, S-10, S-12 | open |
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, story 18° | resolved |
 | S | No agent, person or role exists in the model | S-8 | open |
@@ -717,7 +717,7 @@ to be that well informed:
 
 | Kind | Means | Rows today |
 | --- | --- | --- |
-| `open` + owned | an unbuilt discriminator is named (`°` present) | E, F, J, K, P |
+| `open` + owned | an unbuilt discriminator is named (`°` present) | F, J, K, P |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | O, S, T, Z |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
@@ -780,11 +780,37 @@ Scope is carried by the line of enquiry the claim answers, reached by traversal
 
 ### Row E — No evidence-to-evidence lineage
 
-**Scenarios:** S-10 · **Status:** open
+**Scenarios:** **S-10** · **Status:** resolved
 
-**Current state (verified):** no `Evidence`→`Evidence` edge
+**Current state (verified):** `Evidence -[:REVERIFIES]-> Evidence`, written by `reverify()`, read by `reproductionOf()` and `whySupported()`
 
 Both support the same claim; execution differences live on the computation
+
+**S-10: earned, and the no-change route was the thing that failed.** The
+predicted fallback — both runs supporting the same claim, execution differences
+read off the computations — is exactly what the model already did, and it
+produced a confidently wrong answer rather than a thin one: `whySupported()`
+reported a proposition resting on **two independent findings** when it rested on
+one, checked twice, by a run whose initial conditions the original never
+recorded. A historical claim reporting itself independently corroborated by an
+execution nobody reproduced.
+
+What the shared-claim encoding cannot carry is **direction** and **caveat**:
+which run re-checked which, and that the two executions are not the same. Two
+genuinely independent analyses in one line of enquiry are indistinguishable from
+a re-verification without the edge, and those are different scientific
+situations — which is what makes this a wrong answer rather than a missing
+feature.
+
+*Deletion-verified*: remove the write and all five Afterward assertions fail,
+`whySupported()` among them, reverting to two independent supports.
+
+*What was deliberately not done.* `recordAnalysis()` still accepts the old
+shape. Recording two analyses over one proposition is a claim of two independent
+results, which is real and sometimes true; what was missing was a way to say the
+*other* thing, not a way to stop saying this one. Contrast with S-3b, where
+`declareGate()` was made to refuse — there the shape being refused asserted
+something that could not be true
 
 ### Row F — No artefact-to-artefact lineage
 
@@ -900,6 +926,19 @@ its only unbuilt owner.
 **Current state (verified):** one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position
 
 **NEW, from cold review (3 of 4 reviewers, independently).** May be correct minimalism — S-11's premise ("observations fine, inference wrong") is expressed structurally and works. But `recordObservations` makes Evidence with no producing `EvidenceUnit`, which PJ-001 defines as impossible, and `whySupported` structurally cannot count an observation as support
+
+**S-10: predicted to fire, and it did not.** The prediction was that a re-run
+"under newly specified initial conditions" would force an observation to stand
+as evidence — the conditions are a *result* of the new run in a way the model
+had no place for. It did not: `reproductionOf()` reads what each run consumed as
+**artefacts**, through `CONSUMES`, and never needs the observation's `Evidence`
+node at all. The two senses stayed apart without being told to.
+
+Both cold-review claims are still true of the code, verified at `7e36b31`. What
+S-10 removes is one of the two routes by which they were expected to become a
+wrong answer. The row stays open with S-9 as its only unbuilt owner, and that
+scenario — where an artefact's provenance is partly unrecoverable — is now the
+one that has to produce it or leave the row where it is
 
 ### Row Q — Question and LineOfEnquiry are collapsed by the service layer
 
@@ -1641,6 +1680,35 @@ S-11 and that is a result — but it would be the second consecutive scenario to
 tell us nothing new about the nouns, and the question in PJ-018's closing
 section ("is the entity set well chosen, or is the corpus not pressing?") would
 get sharper rather than answered.
+
+**Outcomes.** The trap was avoided: the failure was **not** empty. The wrong
+answer named in the table is the one that materialised, in the reader predicted
+— `whySupported()` listing a re-run as a second independent finding. Row E
+resolved with `REVERIFIES: Evidence → Evidence`, written and read in the same
+commit, deletion-verified.
+
+**Two predictions wrong, one of them squarely.**
+
+- **Row P was predicted "likely to fire" and did not.** `reproductionOf()` reads
+  each run's inputs as artefacts through `CONSUMES` and never touches the
+  observation's `Evidence` node, so the two senses never collided. The
+  prediction assumed the new run's *conditions* would have to stand as evidence;
+  they are an input, and the model already had a place for inputs. Row P stays
+  open with S-9 as its only unbuilt owner.
+- **The refusal prediction was wrong in kind, not degree.** "Can these be
+  compared numerically?" was predicted to land as a refusing verb, S-5's shape.
+  It landed as two fields on the report, because LabKit has nothing that plots
+  or compares numbers — a `compareNumerically()` existing only to reject its
+  arguments would be a feature invented to manufacture a wrong answer, which is
+  PJ-011 §5 read from the other side. **A refusal needs something real to
+  refuse.** That is the generalisable half of this scenario, and it is a limit
+  on the S-5 pattern that nothing had previously stated.
+
+*Held:* no new node label (twelve scenarios, still none), no migration, and the
+bearing question needed no third bearing beyond `SUPPORTS`/`CHALLENGES`.
+
+*The incidental regression pressure found nothing.* S-3c's narrowing was hours
+old and S-10 runs through the same support machinery; 159 pass, 0 fail.
 
 ## §4 — Held back as stories, not scenarios
 
