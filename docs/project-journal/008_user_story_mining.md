@@ -690,7 +690,7 @@ this document's original analysis are marked as such.
 | S | No agent, person or role exists in the model | S-8 | open |
 | T | Edges cannot carry properties | S-7, row O | open |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
-| V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved |
+| V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
 | X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b | open |
 | Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14 | boundary |
@@ -701,9 +701,11 @@ this document's original analysis are marked as such.
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
-be one. `deferred` — real, deliberately not acted on, **and with a scenario named that
-would settle it**. `boundary` — a known limit of the current model, recorded
-rather than fixed.
+be one. `resolved (argued)` — settled, but the closing move was an argument
+rather than a demonstrated wrong answer; weaker, and scannable as such rather
+than distinguished only in the prose below. `deferred` — real, deliberately not
+acted on, **and with a scenario named that would settle it**. `boundary` — a
+known limit of the current model, recorded rather than fixed.
 
 A row whose named scenarios have all been built has nothing that would settle
 it, and is therefore `open` and unowned rather than `deferred` — CLAUDE.md's
@@ -810,6 +812,18 @@ Distinguish by whether an open task exists
 **Current state (verified):** `Claim.kind: exploratory \| confirmatory`
 
 `exploratory` already is this distinction
+
+**S-8: no verdict — the row was not probed, and saying so is the verdict.**
+S-8 is one of K's two named scenarios and it was built without this row being
+revisited, which is an omission rather than a finding. What S-8 *did* change
+sits next door: S-7 made `Conclusion.standing` default to `exploratory`, so the
+value is reachable through a research verb for the first time and K's original
+line — "`exploratory` already is this distinction" — is now testable rather
+than merely asserted. What S-8 did **not** do is exercise a *transition*:
+nothing in it promotes an exploratory claim to confirmatory, so whether
+standing is conferred by an act (rows G, K, R are one question) is exactly as
+open as it was. Story 18 remains the probe, and K stays `open` with story 18 as
+its only unbuilt owner.
 
 ### Row L — No execution input lineage
 
@@ -925,7 +939,7 @@ any other. This row therefore has no owner again until identity work begins.
 
 ### Row V — Criteria gate work but do not qualify findings
 
-**Scenarios:** S-3, S-8, S-3b · **Status:** resolved
+**Scenarios:** S-3, S-8, S-3b · **Status:** resolved (argued)
 
 **Current state (verified):** `Criterion -GOVERNS-> Gate -GATES-> Task\|Computation`; nothing connects a criterion to the analysis it qualifies
 

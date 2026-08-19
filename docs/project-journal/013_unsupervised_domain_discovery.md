@@ -4,6 +4,15 @@
 `spike/drizzle-age`, working tree clean at time of review. Nothing was
 modified.**
 
+> **Superseded in part — read with a date in mind.** All five improvement items
+> in §3 were acted on: §3.1 by PJ-014 and PJ-015, §3.2 by the ledger
+> restructure, §3.3 by CLAUDE.md's deferral rule, §3.4 by the restated trigger
+> in `src/domain/events.ts`, §3.5 by the `scenario.current()` backfill — whose
+> §3.5 table is therefore stale, and whose premise turned out weaker than
+> stated (a second reader proves nothing a re-query does not while the session
+> holds no query state; see `tests/helpers/scenario.ts`). §3.6's `incomplete`
+> flag was cleared by S-8. The newer external review is **017**.
+
 Verification basis: `bun run typecheck` clean; `npx depcruise src tests
 --output-type err` reports **0 errors** (2 warnings, both orphaned CLI
 stubs — the two layering rules hold). I did **not** run `bun test` — another

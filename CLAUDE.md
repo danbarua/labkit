@@ -25,7 +25,16 @@ are the current state of the domain model, and 016 is the newest decision in
 the chain. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
-improvement list is what 014/015 and the surrounding cleanup address.
+improvement list is what 014/015 and the surrounding cleanup address. **017 is
+a second external review**, of S-3b and the row V close-out, and it has live
+items: a status token for rows cleared by argument, a nomination for row X, and
+row K's missing S-8 verdict.
+
+`docs/session-log/` holds mechanical per-session handovers written by the
+`wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
+independently; see its README. Note that the Stop/SessionStart wiring lives in
+`.claude/settings.json`, which is **gitignored**, so on a fresh clone the skill
+is present but the hook that runs it is not.
 
 ## Commands
 
@@ -262,7 +271,11 @@ Two rules, so this is checkable rather than remembered:
    is the next thing built.** A deferred row that records a *demonstrated*
    wrong answer — not an empty result, not an ugly query — is a live defect
    with a comment on it. One is a considered trade; two means the trade stopped
-   being considered. **No row is currently that one** — row V was the last, and
+   being considered. **A row whose severity is widened by the change that
+   cleared another row is nominated too, demonstrated or not** — otherwise
+   clearing one row can quietly make a second worse while the rule that would
+   have caught it stops applying, which is exactly what happened to row X when
+   S-3b cleared row V (PJ-017 §3). **No row is currently that one** — row V was the last, and
    S-3b cleared it (PJ-016). Row X is the likeliest next: a decisive failure now
    disqualifies a finding as well as blocking work, permanently. Nothing has
    demonstrated it, and it does not become a live defect until something does.
