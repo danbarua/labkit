@@ -1,146 +1,142 @@
-# 003: clearing ledger rows — S-3c (row X) and S-10 (row E)
+# 003: clearing ledger rows — S-3c (row X), S-10 (row E), and a third review
 
-**Session wrap, 2026-08-19, on `spike/drizzle-age`.** Not a decision record —
-see `docs/project-journal/018_when_a_failed_check_stops_counting.md` (S-3c) and
-`019_re_verification_is_not_reproduction.md` (S-10), and PJ-008 §3 rows E, P, X
-and AB for the ledger.
+**Session wrap, 2026-08-20, on `spike/drizzle-age`.** Not a decision record —
+see `docs/project-journal/` 018 (S-3c), 019 (S-10) and 020 (the review), and
+PJ-008 §3 rows E, P, X and AB for the ledger.
 
-Renamed twice — from `003_chatgpt_review_handoff.md` (`45ec5fa`), then from
-`003_row_x_cleared_by_s3c.md`. The session kept outgrowing its title; the slug
-is now generic so a third scenario would not need a third rename.
+Renamed twice as the session outgrew its title; the slug is now generic so a
+further scenario would not need a third rename.
 
 ## Goal
 
 Prepare an external-review handoff, act on the review that came back, then build
 the scenarios that would move the ledger — row X's discriminator first, then a
-corpus scenario owning an open row.
+corpus scenario owning an open row. A second, unplanned review arrived at the
+end and was acted on in full.
 
-*Met.* One correction to how the second choice was justified: S-10 was described
-in `e1665bf` and here as "the **only** unbuilt corpus scenario that solely owns
-an open row". It was not — row F is solely owned by S-9, equally unbuilt, then
-and now. The real grounds were the other two given at the time: S-10 is
-**mined**, following two consecutive authored scenarios, and it exercises the
-support machinery S-3c had just changed. Both good; neither forced.
+*Met.* One correction to how the second build was justified: S-10 was described
+in `e1665bf` and in an earlier draft of this entry as "the **only** unbuilt
+corpus scenario that solely owns an open row". It was not — row F is solely
+owned by S-9, equally unbuilt, then and now. The real grounds were the other two
+given at the time: S-10 is **mined**, following two consecutive authored
+scenarios, and it exercises the support machinery S-3c had just changed.
 
 ## Changed
 
-Two scenarios built, two ledger rows cleared, one AGE bug found, two journal
-entries written.
+Two scenarios built, two ledger rows cleared, one AGE bug found, one review
+acted on in full, three journal entries written. Every compound domain verb is
+now atomic, each earned by its own negative test.
 
 *No commit count or total diffstat here, deliberately.* Both go stale the moment
 this file is committed, and the Stop hook then re-fires on the commit that fixed
-them. `git log b3d6f33..` is authoritative and never wrong. The commits below are
-listed because **which** commit did what is durable; how many there were is not.
+them. `git log b3d6f33..` is authoritative. **Which** commit did what is
+durable; how many there were is not.
 
 - `d6a34c8` — another session's rewrite of `docs/session-log/002`. Input, not
   authored here.
-- `45ec5fa`, `7e36b31`, `f6ca9cc` — this entry's earlier drafts.
 - `d9e1180` — PJ-008 §3 made scannable: unbuilt owners marked `°`, the legend
   states the `open + owned` / `open + unowned` / `boundary` split, row X gains
-  the **S-3c** brief from external review.
+  the **S-3c** brief from the first review.
 - `3023cb1`, `ced0388`, `b0ed208`, `a20b9a1` — **S-3c**: predictions, build, the
-  AGE fix, then PJ-018 and the ledger.
-- `e1665bf`, `dd5c683`, `3b12e61` — **S-10**: predictions, build, the ledger.
-- `29a58ab` — PJ-019, and CLAUDE.md brought up to date.
-- `0740eea`, `21dc34d`, and this file's own commit — wrap bookkeeping, plus the
-  correction recorded under Goal.
+  AGE column-name fix, then PJ-018 and the ledger.
+- `e1665bf`, `dd5c683`, `3b12e61`, `29a58ab` — **S-10**: predictions, build,
+  ledger, PJ-019.
+- `e2fa5ff`, `2b6c80d` — **the third review**: seven fixes, then PJ-020.
+- `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, and this
+  file's own commit — wrap bookkeeping.
 
-Source, stable because no later commit touches it: `src/domain/session.ts`
-(+237), `src/domain/report.ts` (+90), `src/db/domain.ts` (+25, the `REVERIFIES`
-edge), `src/db/agtype.ts` (+14, the column-name guard). Two scenario files, 594
-lines.
+Source: `src/domain/session.ts`, `src/domain/report.ts`, `src/db/domain.ts` (the
+`REVERIFIES` edge), `src/db/graph.ts` (`inTransaction`), `src/db/agtype.ts` (the
+column-name guard). Two new scenario files.
 
-Tree is clean.
+**One file landed that was not this session's work.** `docs/dependency-graph.svg`
+was already modified in the working tree when the session began, and a `git
+add -A` swept it into `e2fa5ff`, whose message does not mention it. Verified
+after the fact by regenerating: it matches current output, so what is committed
+is correct — but it was not reviewed before being committed, and the sweep is
+the same mistake made earlier in this session with another session's journal
+entry.
 
 ## Verified
 
-Run at `29a58ab` (`src/` unchanged since `dd5c683`; the last two commits are
-docs):
+Run at `2b6c80d`:
 
-- `bun test` — **159 pass, 0 fail**, 513 expect() calls, 17 files. Was 145/15 at
+- `bun test` — **166 pass, 0 fail**, 533 expect() calls, 17 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 2 `no-orphans`
-  warnings on the empty CLI stubs. 49 modules, 128 dependencies.
+  warnings on the empty CLI stubs.
 - `bun examples/full-lifecycle.ts` — ends `closed connection cleanly`, no raw
   graphids.
+- `bun run dev:dependency-cruiser` — regenerates to a byte-identical graph.
 
-**Both builds were deletion-verified**, and S-3c in both directions — removing
-the rule fails exactly the three defective-check assertions, while *widening* it
-to "the last verdict wins" fails S-3's own two tests. That second check is what
-distinguishes a narrowing from a removal, and is worth repeating if either is
-revisited.
+**Three deletion verifications**, each removing the thing and watching the wrong
+answer return: S-3c's narrowing, S-10's `REVERIFIES` write, and
+`inTransaction()`. S-3c's was also run in the *opposite* direction — widening
+the rule to "the last verdict wins" fails S-3's own two tests, which is what
+distinguishes a narrowing from a removal. Worth repeating if either is revisited.
 
-**The AGE finding was measured, not reasoned.** Six `OPTIONAL MATCH` shapes
-probed directly against pglite-age; all six bind. The failing shape is a
-camelCase `RETURN` name, which returns the column present and `NULL` for every
-row.
-
-**Two stale CLAUDE.md claims were found by checking rather than assuming**, and
-neither was about this session's scenarios: `CHALLENGES` was cited as the
-never-walked edge (S-4 and S-5 walk it; `DEFERS` is the accurate example, and a
-sharper one — read by `enquiryStatus()`, written by nothing, so `closure:
-"deferred"` is unreachable), and the act→product heuristic said two instances
-when there are four.
+**The AGE findings were measured, not reasoned.** Six `OPTIONAL MATCH` shapes
+probed directly; all six bind. The failing shape is a camelCase `RETURN` name,
+which silently returns the column present and `NULL`.
 
 ## Open
 
-**Three self-inflicted errors, all fixed, all worth knowing.** Note these are
-distinct from the four *wrong predictions*, which are the method working and are
-recorded in PJ-008 as results.
+**Four self-inflicted errors, all found and fixed, all worth knowing:**
 
-1. *A wrong diagnosis committed as fact.* `ced0388` shipped a docstring
-   asserting AGE cannot bind a two-hop `OPTIONAL MATCH`, with a query
-   restructured around it. The real cause was the camelCase column name; the
-   same file's other query disproved the general claim. Corrected in `b0ed208`,
-   which refuses such names at the seam — and on its first run that guard found
-   a live pre-existing instance, `enquiryStatus()`'s `forClaim` column, decoding
-   as null since it was written.
+1. *A wrong diagnosis committed as fact.* `ced0388` shipped a docstring claiming
+   AGE cannot bind a two-hop `OPTIONAL MATCH`, with a query restructured around
+   it. The real cause was a camelCase column name; the same file's other query
+   disproved the general claim. `b0ed208` refuses such names at the seam — and
+   on its first run that guard found a live pre-existing instance,
+   `enquiryStatus()`'s `forClaim`, decoding as null since it was written.
 2. *An unqualified string replace in `d9e1180`* rewrote a **shared** blockquote,
-   making rows O, T, Z and AA all claim S-3c owned them. Restored in `a20b9a1`
-   and diffed against the pre-edit file. Several PJ-008 rows share verbatim
-   text — scope any replace to the row's own section.
-3. *An unchecked "only" claim*, corrected in `21dc34d` — see Goal. S-10 was
-   justified as the sole candidate when there were two. Written into a
-   predictions commit, repeated aloud, and carried into this entry without ever
-   being checked against the table it described. The most instructive of the
-   three: the other two were wrong about the world, this one presented a
-   judgment as forced, which is what makes a choice unauditable afterwards.
+   making rows O, T, Z and AA all claim S-3c owned them. Restored in `a20b9a1`,
+   diffed against the pre-edit file. Several PJ-008 rows share verbatim text —
+   scope any replace to the row's own section.
+3. *An unchecked "only".* See Goal.
+4. *A `git add -A` sweeping a pre-existing working-tree change.* See Changed.
+   This is the second occurrence in this session's lineage; `git add <paths>` is
+   the cheap fix.
 
-All three share a shape — a claim asserted with the evidence one command away.
-The AGE probe took two minutes; the ledger check took one.
+**What the third review exposed about the method**, and the most portable thing
+here: the scenario discipline is structurally poor at states that exist only
+*between* two steps, and at failures occurring *during* a compound action. Both
+of that review's most serious findings were of that kind, and neither was
+reachable from a conversation that runs to completion. PJ-020 §"What this says
+about the method" carries it.
 
 **Genuinely open, not fixed:**
 
 - **Who may declare a check defective** (S-3c). "The check was defective" is now
   a lever that clears a failure. It requires a recorded `Review` and a
-  replacement analysis, so there is an audit trail; whether that suffices is an
-  authority question, and there is no actor model by decision.
+  replacement, so there is a trail; whether that suffices is an authority
+  question, and there is no actor model by decision.
 - **The authored-versus-mined precedent.** S-3c is the second authored scenario.
-  S-10 being mined takes some pressure off, but PJ-016's argument is
-  load-bearing twice.
-- **The noun inventory has not moved in twelve scenarios.** Four consecutive
-  scenarios have pressed only on relationships and query semantics. PJ-018 and
-  PJ-019 both close on this and neither can answer it.
+  S-10 being mined takes pressure off; PJ-016's argument is load-bearing twice.
+- **The noun inventory has not moved in twelve scenarios.** PJ-018, PJ-019 and
+  PJ-020 all close on this and none can answer it.
 - **Ledger:** no row is a live defect shipping green. `open` + unowned: O, S, T,
   Z. `open` with an unbuilt owner: F, J, K, P.
 
 ## Next
 
 **S-9, "the artefact survived; its provenance didn't."** It solely owns rows F
-and P, and P's cell now says explicitly that S-9 is the scenario that has to
-produce that wrong answer or leave the row where it is — S-10 was predicted to
-fire P and did not.
+and P, and P's cell says explicitly that S-9 is the scenario that has to produce
+that wrong answer or leave the row where it is — S-10 was predicted to fire P
+and did not.
 
 Open `docs/project-journal/008_user_story_mining.md` at `### S-9 —`. Its stated
 expressibility route is content-hash equality plus an open question, and it
 deliberately does not ask for a recovered-artefact type: if the general entities
 cannot carry it, that is the finding. Commit predictions before building, as
-`3023cb1` and `e1665bf` did — that discipline is why this session's four wrong
+`3023cb1` and `e1665bf` did — that discipline is why this session's wrong
 predictions are legible rather than invisible.
 
-PJ-019 flags one thing to watch there: nothing yet distinguishes "re-verify a
+Two things to carry in: PJ-019 notes that nothing yet distinguishes "re-verify a
 finding" from "re-run an analysis wholesale", and S-9 regenerating an artefact
-is close to that question.
+is close to that. And per PJ-020, ask of every step **"what does this look like
+halfway through?"** and **"what if the second half fails?"** — the questions the
+happy-path conversation cannot ask.
 
 Remaining corpus after S-9: S-2, S-13, S-14.

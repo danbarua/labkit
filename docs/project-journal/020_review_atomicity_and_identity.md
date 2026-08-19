@@ -51,6 +51,24 @@ re-assert a withdrawn proposition) rather than a mock, asserts the whole
 and is deletion-verified: make `inTransaction` a pass-through and it is the only
 test in the file that fails.
 
+**The other two compound verbs got the boundary too, on their own evidence.**
+The review named `reinterpret()` and `amendDesign()` alongside the two whose
+harm a scenario could reach. Their harm is real but not reachable that way — so
+the tests live in `tests/domain-session.test.ts`, which is the right home for a
+question no researcher asks. That file already exists for states "the
+persistence layer can legitimately produce but the research verbs don't
+create"; an interrupted command is one of those.
+
+Worth recording that **the guess about where each verb hurts was wrong**, and
+probing each write in turn was what corrected it. For `reinterpret()` the
+obvious guess is to fail before the withdrawal, leaving both sentences standing
+— the S-5/S-12 duplicate-claim state. At that point no reader has changed its
+answer. The damage is one write later: with the original withdrawn but its
+evidence not yet carried across, the record **retracts a finding and puts
+nothing in its place**, which is worse than the duplication and was not the
+first hypothesis. Guessing where a compound verb hurts is exactly as reliable
+here as guessing anywhere else in this project.
+
 `TenantGraph.inTransaction()` is a **transaction boundary, not a raw-string
 escape hatch** — no caller gains the ability to issue Cypher the class would not
 otherwise run, so the file header's rule stands. It is re-entrant by depth

@@ -22,8 +22,18 @@
 
 import type { TenantGraph } from "../db/graph";
 import { optional, scalar, vertexProps } from "../db/cypher";
-import type { ArtefactProps, ClaimProps, ComputationProps, EvidenceProps } from "../db/domain";
-import { type Clock, type EventSink, inMemoryEventLog, systemClock } from "./events";
+import type {
+  ArtefactProps,
+  ClaimProps,
+  ComputationProps,
+  EvidenceProps,
+} from "../db/domain";
+import {
+  type Clock,
+  type EventSink,
+  inMemoryEventLog,
+  systemClock,
+} from "./events";
 import type {
   ReproductionReport,
   VerificationReport,
@@ -121,16 +131,31 @@ export class ResearchSession {
    * pursuit, not the question, and carrying similar words to another pursuit
    * of the same question has no effect on identity either way.
    */
-  async pursue(input: { question: QuestionRef; approach: string }): Promise<EnquiryRef> {
+  async pursue(input: {
+    question: QuestionRef;
+    approach: string;
+  }): Promise<EnquiryRef> {
     const enquiry = await this.pursued(input);
-    this.emit("pursue", enquiry.id, { question: input.question.id, approach: input.approach });
+    this.emit("pursue", enquiry.id, {
+      question: input.question.id,
+      approach: input.approach,
+    });
     return enquiry;
   }
 
   /** The write, without the event — see `posed`. */
-  private async pursued(input: { question: QuestionRef; approach: string }): Promise<EnquiryRef> {
-    const enquiry = await this.graph.createNode("LineOfEnquiry", { name: input.approach });
-    await this.graph.createEdge(input.question.id, "MOTIVATES", enquiry.natural_id);
+  private async pursued(input: {
+    question: QuestionRef;
+    approach: string;
+  }): Promise<EnquiryRef> {
+    const enquiry = await this.graph.createNode("LineOfEnquiry", {
+      name: input.approach,
+    });
+    await this.graph.createEdge(
+      input.question.id,
+      "MOTIVATES",
+      enquiry.natural_id,
+    );
     return { kind: "enquiry", id: enquiry.natural_id };
   }
 
@@ -159,7 +184,9 @@ export class ResearchSession {
       { loe: vertexProps<{ natural_id: string }>() },
       { id: question.id },
     );
-    return rows.map((r) => ({ kind: "enquiry", id: r.loe.natural_id }) as EnquiryRef);
+    return rows.map(
+      (r) => ({ kind: "enquiry", id: r.loe.natural_id }) as EnquiryRef,
+    );
   }
 
   /**
@@ -181,17 +208,23 @@ export class ResearchSession {
    * decision. S-1 asks this question after more evidence has arrived, for
    * exactly that reason.
    */
-  async sharpen(input: { from: QuestionRef; into: string; because: string }): Promise<QuestionRef> {
+  async sharpen(input: {
+    from: QuestionRef;
+    into: string;
+    because: string;
+  }): Promise<QuestionRef> {
     const original = await this.graph.query(
       `MATCH (q:Question {natural_id: $id}) RETURN q`,
       { q: vertexProps<{ name: string }>() },
       { id: input.from.id },
     );
-    if (original.length === 0) throw new Error(`no question ${input.from.id} to sharpen`);
+    if (original.length === 0)
+      throw new Error(`no question ${input.from.id} to sharpen`);
 
     const decision = await this.graph.createNode("Decision", {
       reason: input.because,
-      invalidation_check: "evidence that the sharper question was the wrong one to ask",
+      invalidation_check:
+        "evidence that the sharper question was the wrong one to ask",
     });
     await this.graph.createEdge(decision.natural_id, "NARROWS", input.from.id);
 
@@ -201,7 +234,11 @@ export class ResearchSession {
 
     const sharper = await this.posed(input.into);
     await this.graph.createEdge(decision.natural_id, "MOTIVATES", sharper.id);
-    this.emit("sharpen", sharper.id, { from: input.from.id, because: input.because, via: decision.natural_id });
+    this.emit("sharpen", sharper.id, {
+      from: input.from.id,
+      because: input.because,
+      via: decision.natural_id,
+    });
     return sharper;
   }
 
@@ -277,15 +314,26 @@ export class ResearchSession {
       },
     );
 
-    const byQuestion = new Map<string, { asks: string; cited: boolean; worked: boolean }>();
+    const byQuestion = new Map<
+      string,
+      { asks: string; cited: boolean; worked: boolean }
+    >();
     for (const row of rows) {
-      const entry = byQuestion.get(row.q.natural_id) ?? { asks: row.q.name, cited: false, worked: false };
+      const entry = byQuestion.get(row.q.natural_id) ?? {
+        asks: row.q.name,
+        cited: false,
+        worked: false,
+      };
       entry.cited ||= row.cited !== null;
       entry.worked ||= row.work !== null;
       byQuestion.set(row.q.natural_id, entry);
     }
 
-    const survey: KnowledgeSurvey = { established: [], unresolved: [], untested: [] };
+    const survey: KnowledgeSurvey = {
+      established: [],
+      unresolved: [],
+      untested: [],
+    };
     for (const [question, entry] of byQuestion) {
       const standing: QuestionStanding = { question, asks: entry.asks };
       if (entry.cited) survey.established.push(standing);
@@ -312,13 +360,23 @@ export class ResearchSession {
       logical_name: input.name,
       ...(input.contentHash ? { content_hash: input.contentHash } : {}),
     });
-    const evidence = await this.graph.createNode("Evidence", { statement: input.finding });
-    await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", artefact.natural_id);
+    const evidence = await this.graph.createNode("Evidence", {
+      statement: input.finding,
+    });
+    await this.graph.createEdge(
+      evidence.natural_id,
+      "RECORDED_IN",
+      artefact.natural_id,
+    );
     // The enquiry requires these observations -- a statement about the
     // enquiry, not about any analysis. What a given analysis actually read is
     // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
     // it.
-    await this.graph.createEdge(input.enquiry.id, "REQUIRES", evidence.natural_id);
+    await this.graph.createEdge(
+      input.enquiry.id,
+      "REQUIRES",
+      evidence.natural_id,
+    );
 
     this.emit("recordObservations", artefact.natural_id, { name: input.name });
     return { kind: "observations", id: artefact.natural_id };
@@ -335,7 +393,9 @@ export class ResearchSession {
    * back — which answered a different question and produced a genuine false
    * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
    */
-  async recordAnalysis(input: Parameters<ResearchSession["recorded"]>[0]): Promise<AnalysisRef> {
+  async recordAnalysis(
+    input: Parameters<ResearchSession["recorded"]>[0],
+  ): Promise<AnalysisRef> {
     const analysis = await this.graph.inTransaction(() => this.recorded(input));
     this.emit("recordAnalysis", analysis.id, {
       enquiry: input.enquiry.id,
@@ -405,15 +465,26 @@ export class ResearchSession {
       kind: input.method,
       status: "completed",
     });
-    const unit = await this.graph.createNode("EvidenceUnit", { role: "analysis" });
+    const unit = await this.graph.createNode("EvidenceUnit", {
+      role: "analysis",
+    });
     const output = await this.graph.createNode("Artefact", {
       kind: "analysis-output",
       logical_name: `${input.method} output`,
     });
 
-    await this.graph.createEdge(unit.natural_id, "USES", computation.natural_id);
+    await this.graph.createEdge(
+      unit.natural_id,
+      "USES",
+      computation.natural_id,
+    );
     await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry.id);
-    if (input.implementing) await this.graph.createEdge(input.implementing.id, "IMPLEMENTS", unit.natural_id);
+    if (input.implementing)
+      await this.graph.createEdge(
+        input.implementing.id,
+        "IMPLEMENTS",
+        unit.natural_id,
+      );
     for (const criterion of input.heldTo ?? []) {
       await this.graph.createEdge(criterion.id, "QUALIFIES", unit.natural_id);
     }
@@ -423,23 +494,46 @@ export class ResearchSession {
     // "what did this computation read" answerable in one hop while "what did
     // it produce" still needed a detour through the unit.
     await this.graph.createEdge(unit.natural_id, "PRODUCES", output.natural_id);
-    await this.graph.createEdge(computation.natural_id, "PRODUCES", output.natural_id);
+    await this.graph.createEdge(
+      computation.natural_id,
+      "PRODUCES",
+      output.natural_id,
+    );
     for (const observations of input.from) {
-      await this.graph.createEdge(computation.natural_id, "CONSUMES", observations.id);
+      await this.graph.createEdge(
+        computation.natural_id,
+        "CONSUMES",
+        observations.id,
+      );
     }
 
     for (const conclusion of input.concludes) {
-      const evidence = await this.graph.createNode("Evidence", { statement: conclusion.finding });
+      const evidence = await this.graph.createNode("Evidence", {
+        statement: conclusion.finding,
+      });
       const claim = await this.graph.createNode("Claim", {
         name: conclusion.proposition,
         kind: conclusion.standing ?? "exploratory",
       });
-      await this.graph.createEdge(unit.natural_id, "PRODUCES", evidence.natural_id);
-      await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", output.natural_id);
+      await this.graph.createEdge(
+        unit.natural_id,
+        "PRODUCES",
+        evidence.natural_id,
+      );
+      await this.graph.createEdge(
+        evidence.natural_id,
+        "RECORDED_IN",
+        output.natural_id,
+      );
       // A null result is a finding, not an absence of one -- it bears
       // against the proposition rather than failing to bear on it.
-      const bearing = conclusion.bearing === "challenges" ? "CHALLENGES" : "SUPPORTS";
-      await this.graph.createEdge(evidence.natural_id, bearing, claim.natural_id);
+      const bearing =
+        conclusion.bearing === "challenges" ? "CHALLENGES" : "SUPPORTS";
+      await this.graph.createEdge(
+        evidence.natural_id,
+        bearing,
+        claim.natural_id,
+      );
     }
 
     return { kind: "analysis", id: computation.natural_id };
@@ -452,10 +546,22 @@ export class ResearchSession {
    * to the execution that ran it — what gets criticized in S-11 is the
    * method, and nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
-  async recordReview(input: { of: AnalysisRef; verdict: string }): Promise<ReviewRef> {
-    const review = await this.graph.createNode("Review", { verdict: input.verdict });
-    await this.graph.createEdge(review.natural_id, "EVALUATES", await this.unitOf(input.of));
-    this.emit("recordReview", review.natural_id, { of: input.of.id, verdict: input.verdict });
+  async recordReview(input: {
+    of: AnalysisRef;
+    verdict: string;
+  }): Promise<ReviewRef> {
+    const review = await this.graph.createNode("Review", {
+      verdict: input.verdict,
+    });
+    await this.graph.createEdge(
+      review.natural_id,
+      "EVALUATES",
+      await this.unitOf(input.of),
+    );
+    this.emit("recordReview", review.natural_id, {
+      of: input.of.id,
+      verdict: input.verdict,
+    });
     return { kind: "review", id: review.natural_id };
   }
 
@@ -470,12 +576,18 @@ export class ResearchSession {
    * closing with nothing cited is a real and different act, and the two must
    * not read alike.
    */
-  async closeEnquiry(input: { enquiry: EnquiryRef; answeredBy?: ConclusionRef }): Promise<void> {
+  async closeEnquiry(input: {
+    enquiry: EnquiryRef;
+    answeredBy?: ConclusionRef;
+  }): Promise<void> {
     // Everything is validated before anything is written. A rejected close
     // must leave no Decision behind, and an analysis from some other enquiry
     // must not become the stated basis for resolving this question.
     const question = await this.questionBehind(input.enquiry);
-    if (!question) throw new Error(`enquiry ${input.enquiry.id} has no motivating question to resolve`);
+    if (!question)
+      throw new Error(
+        `enquiry ${input.enquiry.id} has no motivating question to resolve`,
+      );
 
     let answerBearing: string | undefined;
     if (input.answeredBy) {
@@ -487,20 +599,31 @@ export class ResearchSession {
         { analysis: analysis.id, enquiry: input.enquiry.id },
       );
       if (addresses.length === 0) {
-        throw new Error(`analysis ${analysis.id} does not address enquiry ${input.enquiry.id}; it cannot answer its question`);
+        throw new Error(
+          `analysis ${analysis.id} does not address enquiry ${input.enquiry.id}; it cannot answer its question`,
+        );
       }
       answerBearing = await this.findingFor(analysis, proposition);
       if (!answerBearing) {
-        throw new Error(`analysis ${analysis.id} concluded nothing about "${proposition}"`);
+        throw new Error(
+          `analysis ${analysis.id} concluded nothing about "${proposition}"`,
+        );
       }
     }
 
     const decision = await this.graph.createNode("Decision", {
-      reason: input.answeredBy ? `answered on "${input.answeredBy.proposition}"` : "closed without a cited result",
+      reason: input.answeredBy
+        ? `answered on "${input.answeredBy.proposition}"`
+        : "closed without a cited result",
       invalidation_check: "new evidence bearing on the question",
     });
     await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
-    if (answerBearing) await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
+    if (answerBearing)
+      await this.graph.createEdge(
+        decision.natural_id,
+        "BASED_ON",
+        answerBearing,
+      );
 
     this.emit("closeEnquiry", input.enquiry.id, {
       answeredBy: input.answeredBy?.analysis.id ?? null,
@@ -509,7 +632,10 @@ export class ResearchSession {
   }
 
   /** The single finding by which an analysis concluded something about one proposition. */
-  private async findingFor(analysis: AnalysisRef, proposition: string): Promise<string | undefined> {
+  private async findingFor(
+    analysis: AnalysisRef,
+    proposition: string,
+  ): Promise<string | undefined> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $analysis})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim {name: $proposition})
@@ -556,10 +682,24 @@ export class ResearchSession {
     const deferred = rows.some((r) => r.deferring);
 
     if (!resolving && !deferred) {
-      return { enquiry: enquiry.id, question, open: true, closure: null, answer: null, evidence: [] };
+      return {
+        enquiry: enquiry.id,
+        question,
+        open: true,
+        closure: null,
+        answer: null,
+        evidence: [],
+      };
     }
     if (deferred && !resolving) {
-      return { enquiry: enquiry.id, question, open: false, closure: "deferred", answer: null, evidence: [] };
+      return {
+        enquiry: enquiry.id,
+        question,
+        open: false,
+        closure: "deferred",
+        answer: null,
+        evidence: [],
+      };
     }
 
     // What the closing decision rests on. Nothing cited means the question was
@@ -583,7 +723,14 @@ export class ResearchSession {
     );
 
     if (cited.length === 0) {
-      return { enquiry: enquiry.id, question, open: false, closure: "abandoned", answer: null, evidence: [] };
+      return {
+        enquiry: enquiry.id,
+        question,
+        open: false,
+        closure: "abandoned",
+        answer: null,
+        evidence: [],
+      };
     }
 
     // Polarity is derived from which way the cited findings cut, not stored on
@@ -608,7 +755,10 @@ export class ResearchSession {
    * merely unsupported for variable-length patterns. The value comes from a
    * closed set of literals here, never from a caller.
    */
-  private async findingsBearing(scope: { proposition: string; enquiry?: string }, bearing: "SUPPORTS" | "CHALLENGES") {
+  private async findingsBearing(
+    scope: { proposition: string; enquiry?: string },
+    bearing: "SUPPORTS" | "CHALLENGES",
+  ) {
     return this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)
        MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
@@ -623,7 +773,10 @@ export class ResearchSession {
         a: optional(vertexProps<ArtefactProps>()),
         r: optional(vertexProps<{ verdict: string }>()),
       },
-      { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+      {
+        name: scope.proposition,
+        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+      },
     );
   }
 
@@ -633,10 +786,14 @@ export class ResearchSession {
    * no qualifier, and every scenario before S-5 relies on that.
    */
   private withinScope(scope: { enquiry?: string }): string {
-    return scope.enquiry ? `MATCH (u)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})` : "";
+    return scope.enquiry
+      ? `MATCH (u)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})`
+      : "";
   }
 
-  private async questionBehind(enquiry: EnquiryRef): Promise<string | undefined> {
+  private async questionBehind(
+    enquiry: EnquiryRef,
+  ): Promise<string | undefined> {
     const rows = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
       { q: vertexProps<{ natural_id: string }>() },
@@ -679,7 +836,13 @@ export class ResearchSession {
   async contractFor(work: WorkRef): Promise<TaskContract> {
     const rows = await this.graph.query(
       `MATCH (t:Task {natural_id: $id}) RETURN t`,
-      { t: vertexProps<{ objective: string; acceptance: string; inputs: string }>() },
+      {
+        t: vertexProps<{
+          objective: string;
+          acceptance: string;
+          inputs: string;
+        }>(),
+      },
       { id: work.id },
     );
     const task = rows[0]?.t;
@@ -688,12 +851,18 @@ export class ResearchSession {
     let mayRead: string[] = [];
     try {
       const parsed: unknown = JSON.parse(task.inputs || "[]");
-      if (Array.isArray(parsed)) mayRead = parsed.filter((x): x is string => typeof x === "string");
+      if (Array.isArray(parsed))
+        mayRead = parsed.filter((x): x is string => typeof x === "string");
     } catch {
       // Work planned before contracts existed carries free text here. An
       // unparseable contract is an empty one, not a crash.
     }
-    return { objective: task.objective, acceptance: task.acceptance, mayRead, enforced: false };
+    return {
+      objective: task.objective,
+      acceptance: task.acceptance,
+      mayRead,
+      enforced: false,
+    };
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
@@ -708,16 +877,24 @@ export class ResearchSession {
    * work. Declaring a gate must not make it satisfied — that is the entire
    * subject of S-17.
    */
-  async declareGate(input: { governedBy: CriterionRef[]; consequence: string; protecting: WorkRef[] }): Promise<GateRef> {
-    if (input.governedBy.length === 0) throw new Error("a gate governed by no condition is not a gate");
+  async declareGate(input: {
+    governedBy: CriterionRef[];
+    consequence: string;
+    protecting: WorkRef[];
+  }): Promise<GateRef> {
+    if (input.governedBy.length === 0)
+      throw new Error("a gate governed by no condition is not a gate");
     // And a gate protecting nothing is not a gate either. Before S-3b there
     // was no way to record a check that qualifies a finding without minting
     // one: `gateStatus()` then answered "what is blocked?" with `blocked` and
     // an empty `gating` list -- a control-plane object asserting a consequence
     // for work that does not exist. `recordAnalysis({ heldTo })` is how a
     // standard with nothing downstream is recorded now.
-    if (input.protecting.length === 0) throw new Error("a gate protecting nothing is not a gate");
-    const gate = await this.graph.createNode("Gate", { consequence: input.consequence });
+    if (input.protecting.length === 0)
+      throw new Error("a gate protecting nothing is not a gate");
+    const gate = await this.graph.createNode("Gate", {
+      consequence: input.consequence,
+    });
     for (const criterion of input.governedBy) {
       await this.graph.createEdge(criterion.id, "GOVERNS", gate.natural_id);
     }
@@ -761,16 +938,22 @@ export class ResearchSession {
     /** The finding this verdict was reached against, if it was reached against one. */
     citing?: ConclusionRef;
   }): Promise<void> {
-    if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
+    if (input.gate)
+      await this.assertCriterionGovernsGate(input.criterion, input.gate);
     // Same invariant class as `assertCriterionGovernsGate`, for the other job
     // a criterion can do: an evaluation that neither triggers a gate nor bears
     // on a finding held to it is durable nonsense no reader would ever surface.
     else await this.assertCriterionQualifiesSomething(input.criterion);
     let basis: string | undefined;
     if (input.citing) {
-      basis = await this.findingFor(input.citing.analysis, input.citing.proposition);
+      basis = await this.findingFor(
+        input.citing.analysis,
+        input.citing.proposition,
+      );
       if (!basis) {
-        throw new Error(`analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`);
+        throw new Error(
+          `analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`,
+        );
       }
     }
     const at = this.clock.now();
@@ -779,13 +962,23 @@ export class ResearchSession {
       outcome: input.outcome,
       evaluated_at: at,
     });
-    await this.graph.createEdge(input.criterion.id, "EVALUATED_AS", evaluation.natural_id);
-    if (input.gate) await this.graph.createEdge(evaluation.natural_id, "TRIGGERS", input.gate.id);
+    await this.graph.createEdge(
+      input.criterion.id,
+      "EVALUATED_AS",
+      evaluation.natural_id,
+    );
+    if (input.gate)
+      await this.graph.createEdge(
+        evaluation.natural_id,
+        "TRIGGERS",
+        input.gate.id,
+      );
     // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
     // Evidence` was declared in PJ-004 and never written until S-8; without
     // it, a condition established by measurement and one asserted by an agent
     // returned identical records. See PJ-008 row W.
-    if (basis) await this.graph.createEdge(evaluation.natural_id, "BASED_ON", basis);
+    if (basis)
+      await this.graph.createEdge(evaluation.natural_id, "BASED_ON", basis);
     this.emit("evaluateCriterion", evaluation.natural_id, {
       criterion: input.criterion.id,
       ...(input.gate ? { gate: input.gate.id } : {}),
@@ -811,9 +1004,11 @@ export class ResearchSession {
       { c: vertexProps<{ natural_id: string }>() },
       { id: gate.id },
     );
-    return rows.map((r) => ({ kind: "criterion" as const, id: r.c.natural_id }));
+    return rows.map((r) => ({
+      kind: "criterion" as const,
+      id: r.c.natural_id,
+    }));
   }
-
 
   /**
    * Records that a historical result was re-checked, without claiming its run
@@ -843,7 +1038,10 @@ export class ResearchSession {
     // demonstrated wrong answer -- a second independent support standing where
     // a re-verification was meant. See TenantGraph.inTransaction.
     const verification = await this.graph.inTransaction(async () => {
-      const original = await this.findingFor(input.historical, input.concludes.proposition);
+      const original = await this.findingFor(
+        input.historical,
+        input.concludes.proposition,
+      );
       if (!original) {
         throw new Error(
           `analysis ${input.historical.id} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
@@ -855,13 +1053,22 @@ export class ResearchSession {
         from: input.under,
         concludes: [input.concludes],
       });
-      const restated = await this.findingFor(recorded, input.concludes.proposition);
-      if (!restated) throw new Error("unreachable: the analysis just recorded this conclusion");
+      const restated = await this.findingFor(
+        recorded,
+        input.concludes.proposition,
+      );
+      if (!restated)
+        throw new Error(
+          "unreachable: the analysis just recorded this conclusion",
+        );
       await this.graph.createEdge(restated, "REVERIFIES", original);
       return recorded;
     });
 
-    this.emit("reverify", verification.id, { of: input.historical.id, proposition: input.concludes.proposition });
+    this.emit("reverify", verification.id, {
+      of: input.historical.id,
+      proposition: input.concludes.proposition,
+    });
     return { at, verification, of: input.historical };
   }
 
@@ -886,7 +1093,8 @@ export class ResearchSession {
       { id: verification.id },
     );
     const found = link[0];
-    if (!found) throw new Error(`analysis ${verification.id} re-verifies nothing`);
+    if (!found)
+      throw new Error(`analysis ${verification.id} re-verifies nothing`);
 
     const method = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
@@ -899,7 +1107,9 @@ export class ResearchSession {
     // the names made those the same execution input. That is the identity-
     // versus-wording mistake this project has now found in four unrelated
     // places (S-5, S-12, S-3b, and here, by external review).
-    const inputs = async (computation: string): Promise<Map<string, string>> => {
+    const inputs = async (
+      computation: string,
+    ): Promise<Map<string, string>> => {
       const rows = await this.graph.query(
         `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
         { a: vertexProps<{ natural_id: string; logical_name: string }>() },
@@ -917,15 +1127,25 @@ export class ResearchSession {
     // scenario exists for.
     const provenanceMissing = theirs.size === 0;
     const differs: ReproductionReport["differs"] = provenanceMissing
-      ? [...mine.values()].sort().map((what) => ({ what, standing: "unrecorded-in-the-original" as const }))
+      ? [...mine.values()]
+          .sort()
+          .map((what) => ({
+            what,
+            standing: "unrecorded-in-the-original" as const,
+          }))
       : [
-          ...[...mine].filter(([id]) => !theirs.has(id)).map(([, what]) => ({ what, standing: "changed" as const })),
+          ...[...mine]
+            .filter(([id]) => !theirs.has(id))
+            .map(([, what]) => ({ what, standing: "changed" as const })),
           // The other direction, which was not computed at all: an input the
           // original read and the re-run did not is a difference too, and
           // reporting `not-reproduced` with an empty `differs` named nothing.
           ...[...theirs]
             .filter(([id]) => !mine.has(id))
-            .map(([, what]) => ({ what, standing: "not-used-by-the-re-run" as const })),
+            .map(([, what]) => ({
+              what,
+              standing: "not-used-by-the-re-run" as const,
+            })),
         ].sort((a, b) => a.what.localeCompare(b.what));
 
     const reproduced = !provenanceMissing && differs.length === 0;
@@ -1013,16 +1233,24 @@ export class ResearchSession {
       { id: input.criterion.id },
     );
     const replaced = existing[0]?.c.proposition;
-    if (!replaced) throw new Error(`no condition ${input.criterion.id} to amend`);
+    if (!replaced)
+      throw new Error(`no condition ${input.criterion.id} to amend`);
 
-    const diagnosis = await this.findingFor(input.citing.analysis, input.citing.proposition);
+    const diagnosis = await this.findingFor(
+      input.citing.analysis,
+      input.citing.proposition,
+    );
     if (!diagnosis) {
-      throw new Error(`analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`);
+      throw new Error(
+        `analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`,
+      );
     }
 
     const gates = await this.gatesGovernedBy(input.criterion.id);
     if (gates.length === 0) {
-      throw new Error(`condition ${input.criterion.id} governs nothing; there is no locked design to amend`);
+      throw new Error(
+        `condition ${input.criterion.id} governs nothing; there is no locked design to amend`,
+      );
     }
 
     // Amending a setting that has already been amended forks the design, and
@@ -1036,21 +1264,42 @@ export class ResearchSession {
       { id: input.criterion.id },
     );
     if (alreadyAmended.length > 0) {
-      throw new Error(`condition ${input.criterion.id} has already been amended; amend the one now in force`);
+      throw new Error(
+        `condition ${input.criterion.id} has already been amended; amend the one now in force`,
+      );
     }
 
     const prior = await this.latestAmendmentOn(gates);
 
-    const replacement = await this.graph.createNode("Criterion", { proposition: input.nowRequires });
-    for (const gate of gates) await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
+    // Atomic, for the same reason: interrupted after the replacement condition
+    // governs the gate but before the original is retired, the gate is governed
+    // by two conditions, one of which nobody agreed to. See
+    // TenantGraph.inTransaction.
+    const { replacement, decision } = await this.graph.inTransaction(
+      async () => {
+        const replacement = await this.graph.createNode("Criterion", {
+          proposition: input.nowRequires,
+        });
+        for (const gate of gates)
+          await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
 
-    const decision = await this.graph.createNode("Decision", {
-      reason: input.because,
-      invalidation_check: "evidence that the amended setting was not the constraint after all",
-    });
-    await this.graph.createEdge(decision.natural_id, "CHANGES", input.criterion.id);
-    await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
-    if (prior) await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
+        const decision = await this.graph.createNode("Decision", {
+          reason: input.because,
+          invalidation_check:
+            "evidence that the amended setting was not the constraint after all",
+        });
+        await this.graph.createEdge(
+          decision.natural_id,
+          "CHANGES",
+          input.criterion.id,
+        );
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
+        if (prior)
+          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
+        return { replacement, decision };
+      },
+    );
+    void replacement;
 
     const rerun = await this.workGatedBy(gates);
     const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
@@ -1096,7 +1345,8 @@ export class ResearchSession {
       },
       { id: gate.id },
     );
-    if (conditions.length === 0) throw new Error(`gate ${gate.id} is governed by no condition`);
+    if (conditions.length === 0)
+      throw new Error(`gate ${gate.id} is governed by no condition`);
 
     const changedBy = new Map<string, string>(); // decision -> criterion it replaced
     const propositionOf = new Map<string, string>();
@@ -1112,17 +1362,25 @@ export class ResearchSession {
     // guessing which one is "the design" would be a confidently wrong answer.
     const inForce = [...new Set(current)];
     if (inForce.length !== 1) {
-      throw new Error(`gate ${gate.id} has ${inForce.length} conditions in force; a design history needs exactly one`);
+      throw new Error(
+        `gate ${gate.id} has ${inForce.length} conditions in force; a design history needs exactly one`,
+      );
     }
 
     const chain = await this.amendmentChain(gate.id);
     const rerun = await this.workGatedBy([gate.id]);
     const confirmatory = await this.confirmatoryResultsBehind([gate.id]);
-    const nature = confirmatory.length > 0 ? ("scientific" as const) : ("mechanical" as const);
+    const nature =
+      confirmatory.length > 0
+        ? ("scientific" as const)
+        : ("mechanical" as const);
 
     const amendments: AmendmentRecord[] = chain.map((step, i) => {
       const wasCriterion = changedBy.get(step.decision);
-      const nextCriterion = i + 1 < chain.length ? changedBy.get(chain[i + 1]!.decision) : inForce[0];
+      const nextCriterion =
+        i + 1 < chain.length
+          ? changedBy.get(chain[i + 1]!.decision)
+          : inForce[0];
       return {
         amendment: step.decision,
         replaced: (wasCriterion && propositionOf.get(wasCriterion)) ?? "",
@@ -1145,7 +1403,9 @@ export class ResearchSession {
   }
 
   /** Amendments to one design, ordered oldest-first by following supersession back to its root. */
-  private async amendmentChain(gateId: string): Promise<Array<{ decision: string; reason: string; citing: string[] }>> {
+  private async amendmentChain(
+    gateId: string,
+  ): Promise<Array<{ decision: string; reason: string; citing: string[] }>> {
     const rows = await this.graph.query(
       `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
        OPTIONAL MATCH (d)-[:SUPERSEDES]->(older:Decision)
@@ -1159,9 +1419,16 @@ export class ResearchSession {
       { id: gateId },
     );
 
-    const nodes = new Map<string, { reason: string; older: string | null; citing: Set<string> }>();
+    const nodes = new Map<
+      string,
+      { reason: string; older: string | null; citing: Set<string> }
+    >();
     for (const row of rows) {
-      const node = nodes.get(row.d.natural_id) ?? { reason: row.d.reason, older: null, citing: new Set<string>() };
+      const node = nodes.get(row.d.natural_id) ?? {
+        reason: row.d.reason,
+        older: null,
+        citing: new Set<string>(),
+      };
       if (row.older) node.older = row.older.natural_id;
       if (row.e) node.citing.add(row.e.statement);
       nodes.set(row.d.natural_id, node);
@@ -1174,11 +1441,19 @@ export class ResearchSession {
       else followedBy.set(node.older, id);
     }
 
-    const ordered: Array<{ decision: string; reason: string; citing: string[] }> = [];
+    const ordered: Array<{
+      decision: string;
+      reason: string;
+      citing: string[];
+    }> = [];
     let cursor = root;
     while (cursor) {
       const node = nodes.get(cursor)!;
-      ordered.push({ decision: cursor, reason: node.reason, citing: [...node.citing].sort() });
+      ordered.push({
+        decision: cursor,
+        reason: node.reason,
+        citing: [...node.citing].sort(),
+      });
       cursor = followedBy.get(cursor);
     }
 
@@ -1204,7 +1479,9 @@ export class ResearchSession {
   }
 
   /** The most recent amendment to this design — the one nothing has superseded yet. */
-  private async latestAmendmentOn(gates: string[]): Promise<string | undefined> {
+  private async latestAmendmentOn(
+    gates: string[],
+  ): Promise<string | undefined> {
     for (const gate of gates) {
       const rows = await this.graph.query(
         `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
@@ -1216,8 +1493,12 @@ export class ResearchSession {
         },
         { id: gate },
       );
-      const superseded = new Set(rows.filter((r) => r.newer).map((r) => r.d.natural_id));
-      const latest = rows.map((r) => r.d.natural_id).find((d) => !superseded.has(d));
+      const superseded = new Set(
+        rows.filter((r) => r.newer).map((r) => r.d.natural_id),
+      );
+      const latest = rows
+        .map((r) => r.d.natural_id)
+        .find((d) => !superseded.has(d));
       if (latest) return latest;
     }
     return undefined;
@@ -1257,7 +1538,8 @@ export class ResearchSession {
           { c: vertexProps<{ name: string; kind?: string }>() },
           { id: gate },
         );
-        for (const row of rows) if (row.c.kind === "confirmatory") affected.add(row.c.name);
+        for (const row of rows)
+          if (row.c.kind === "confirmatory") affected.add(row.c.name);
       }
     }
     return [...affected].sort();
@@ -1296,7 +1578,12 @@ export class ResearchSession {
       {
         c: vertexProps<{ natural_id: string; proposition: string }>(),
         ev: optional(
-          vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
+          vertexProps<{
+            natural_id: string;
+            value: string;
+            outcome: "pass" | "fail";
+            evaluated_at: string;
+          }>(),
         ),
         basis: optional(vertexProps<{ statement: string }>()),
         basisout: optional(vertexProps<{ invalidated?: boolean }>()),
@@ -1307,12 +1594,16 @@ export class ResearchSession {
     const checks = this.checksFrom(rows);
     // Flattened in the same order the checks were assembled in.
     const evaluations = checks.flatMap((c) => c.evaluations);
-    const unmet = checks.filter((c) => c.state !== "passed").map((c) => c.proposition);
+    const unmet = checks
+      .filter((c) => c.state !== "passed")
+      .map((c) => c.proposition);
 
     // Order matters. Absence is checked before satisfaction so a gate nobody
     // evaluated can never fall through to "satisfied" (S-17); failure is
     // checked before incompleteness because a failure is decisive (S-3).
-    const state: GateStatus["state"] = checks.every((c) => c.state === "never-run")
+    const state: GateStatus["state"] = checks.every(
+      (c) => c.state === "never-run",
+    )
       ? "never-evaluated"
       : checks.some((c) => c.state === "failed")
         ? "blocked"
@@ -1360,7 +1651,12 @@ export class ResearchSession {
   private checksFrom(
     rows: Array<{
       c: { natural_id: string; proposition: string };
-      ev: { natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string } | null;
+      ev: {
+        natural_id: string;
+        value: string;
+        outcome: "pass" | "fail";
+        evaluated_at: string;
+      } | null;
       basis: { statement: string } | null;
       /**
        * The artefact the cited finding was recorded in, carrying whether that
@@ -1373,103 +1669,118 @@ export class ResearchSession {
       basisout: { invalidated?: boolean } | null;
     }>,
   ): CheckStatus[] {
-      // Keyed by natural id, not by proposition text. Two criteria worded
-      // identically are two criteria; whether they SHOULD be one is an identity
-      // question, and a read-side query must not settle it by string equality.
-      // `standing` counts the cited findings that have NOT been withdrawn. It
-      // is kept alongside `basis` rather than derived from it because `basis`
-      // is display text, and two withdrawn findings can share a sentence.
-      type TimedEvaluation = EvaluationRecord & { id: string; cited: number; standing: number };
-      const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
-      for (const row of rows) {
-        const id = row.c.natural_id;
-        const entry = byCriterion.get(id) ?? { proposition: row.c.proposition, evaluations: [] };
-        if (row.ev) {
-          // One row per (evaluation, basis) pair, so an evaluation citing several
-          // findings arrives more than once. Accumulate rather than push.
-          const seen = entry.evaluations.find((e) => e.id === row.ev!.natural_id);
-          const record = seen ?? {
-            id: row.ev.natural_id,
-            value: row.ev.value,
-            outcome: row.ev.outcome,
-            at: row.ev.evaluated_at,
-            basis: [] as string[],
-            cited: 0,
-            standing: 0,
-          };
-          if (row.basis) {
-            if (!record.basis.includes(row.basis.statement)) record.basis.push(row.basis.statement);
-            record.cited += 1;
-            if (!row.basisout?.invalidated) record.standing += 1;
-          }
-          if (!seen) entry.evaluations.push(record);
+    // Keyed by natural id, not by proposition text. Two criteria worded
+    // identically are two criteria; whether they SHOULD be one is an identity
+    // question, and a read-side query must not settle it by string equality.
+    // `standing` counts the cited findings that have NOT been withdrawn. It
+    // is kept alongside `basis` rather than derived from it because `basis`
+    // is display text, and two withdrawn findings can share a sentence.
+    type TimedEvaluation = EvaluationRecord & {
+      id: string;
+      cited: number;
+      standing: number;
+    };
+    const byCriterion = new Map<
+      string,
+      { proposition: string; evaluations: TimedEvaluation[] }
+    >();
+    for (const row of rows) {
+      const id = row.c.natural_id;
+      const entry = byCriterion.get(id) ?? {
+        proposition: row.c.proposition,
+        evaluations: [],
+      };
+      if (row.ev) {
+        // One row per (evaluation, basis) pair, so an evaluation citing several
+        // findings arrives more than once. Accumulate rather than push.
+        const seen = entry.evaluations.find((e) => e.id === row.ev!.natural_id);
+        const record = seen ?? {
+          id: row.ev.natural_id,
+          value: row.ev.value,
+          outcome: row.ev.outcome,
+          at: row.ev.evaluated_at,
+          basis: [] as string[],
+          cited: 0,
+          standing: 0,
+        };
+        if (row.basis) {
+          if (!record.basis.includes(row.basis.statement))
+            record.basis.push(row.basis.statement);
+          record.cited += 1;
+          if (!row.basisout?.invalidated) record.standing += 1;
         }
-        byCriterion.set(id, entry);
+        if (!seen) entry.evaluations.push(record);
       }
+      byCriterion.set(id, entry);
+    }
 
-      /**
-       * A verdict is withdrawn when everything it was reached against has
-       * been. A verdict that cited nothing cannot be withdrawn at all — there
-       * is nothing to retract — which is what keeps S-8's asserted-versus-
-       * measured distinction (row W) from becoming a loophole.
-       */
-      const isWithdrawn = (e: TimedEvaluation): boolean => e.cited > 0 && e.standing === 0;
+    /**
+     * A verdict is withdrawn when everything it was reached against has
+     * been. A verdict that cited nothing cannot be withdrawn at all — there
+     * is nothing to retract — which is what keeps S-8's asserted-versus-
+     * measured distinction (row W) from becoming a loophole.
+     */
+    const isWithdrawn = (e: TimedEvaluation): boolean =>
+      e.cited > 0 && e.standing === 0;
 
-      const strip = (e: TimedEvaluation): EvaluationRecord => ({
-        value: e.value,
-        outcome: e.outcome,
-        at: e.at,
-        basis: [...e.basis].sort(),
-        // Present only when true, so a record that stands is byte-identical to
-        // what it was before this field existed.
-        ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
+    const strip = (e: TimedEvaluation): EvaluationRecord => ({
+      value: e.value,
+      outcome: e.outcome,
+      at: e.at,
+      basis: [...e.basis].sort(),
+      // Present only when true, so a record that stands is byte-identical to
+      // what it was before this field existed.
+      ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
+    });
+
+    const checks: CheckStatus[] = [];
+    for (const [id, entry] of byCriterion) {
+      // Cypher imposes no ordering, so sort explicitly: by time, then by
+      // identity. Without this, which evaluation gets reported as "the" value
+      // of a check is not a stable contract between runs.
+      const ordered = entry.evaluations.sort(
+        (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id),
+      );
+
+      // A failure sticks -- among verdicts that still stand. One failing
+      // evaluation is decisive even if a later run passed, so re-running
+      // until green is not evidence (S-3, and the case that earned this).
+      //
+      // S-3c narrowed it, and only here: a verdict whose entire basis has
+      // been reviewed and withdrawn is not a failure that stands, it is a
+      // failure that was retracted. Before this the two were the same state,
+      // so a check found to be defective, corrected and re-run went on
+      // disqualifying the finding and blocking the work for ever -- the same
+      // answer as re-rolling the dice, which is the one thing S-3 set out to
+      // prevent. Ledger row X.
+      //
+      // What did NOT change: the withdrawn verdict stays in `evaluations`,
+      // marked. Erasing it would leave no record of why the finding was ever
+      // in doubt, and re-running a check that nobody faulted still cannot
+      // clear it, because nothing withdraws it.
+      const standing = ordered.filter((e) => !isWithdrawn(e));
+      const decisive =
+        standing.find((e) => e.outcome === "fail") ?? standing[0];
+      // Three ways to have no decisive verdict, and only one of them is
+      // "nobody ran this". A check every one of whose verdicts has been
+      // withdrawn *ran*, and saying `never-run` contradicted the evaluations
+      // listed beside it -- external review of S-3c.
+      const state: CheckStatus["state"] =
+        decisive !== undefined
+          ? decisive.outcome === "fail"
+            ? "failed"
+            : "passed"
+          : ordered.length > 0
+            ? "no-standing-verdict"
+            : "never-run";
+      checks.push({
+        criterion: id,
+        proposition: entry.proposition,
+        state,
+        evaluations: ordered.map(strip),
+        ...(decisive ? { decidedBy: strip(decisive) } : {}),
       });
-
-      const checks: CheckStatus[] = [];
-      for (const [id, entry] of byCriterion) {
-        // Cypher imposes no ordering, so sort explicitly: by time, then by
-        // identity. Without this, which evaluation gets reported as "the" value
-        // of a check is not a stable contract between runs.
-        const ordered = entry.evaluations.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
-
-        // A failure sticks -- among verdicts that still stand. One failing
-        // evaluation is decisive even if a later run passed, so re-running
-        // until green is not evidence (S-3, and the case that earned this).
-        //
-        // S-3c narrowed it, and only here: a verdict whose entire basis has
-        // been reviewed and withdrawn is not a failure that stands, it is a
-        // failure that was retracted. Before this the two were the same state,
-        // so a check found to be defective, corrected and re-run went on
-        // disqualifying the finding and blocking the work for ever -- the same
-        // answer as re-rolling the dice, which is the one thing S-3 set out to
-        // prevent. Ledger row X.
-        //
-        // What did NOT change: the withdrawn verdict stays in `evaluations`,
-        // marked. Erasing it would leave no record of why the finding was ever
-        // in doubt, and re-running a check that nobody faulted still cannot
-        // clear it, because nothing withdraws it.
-        const standing = ordered.filter((e) => !isWithdrawn(e));
-        const decisive = standing.find((e) => e.outcome === "fail") ?? standing[0];
-        // Three ways to have no decisive verdict, and only one of them is
-        // "nobody ran this". A check every one of whose verdicts has been
-        // withdrawn *ran*, and saying `never-run` contradicted the evaluations
-        // listed beside it -- external review of S-3c.
-        const state: CheckStatus["state"] =
-          decisive !== undefined
-            ? decisive.outcome === "fail"
-              ? "failed"
-              : "passed"
-            : ordered.length > 0
-              ? "no-standing-verdict"
-              : "never-run";
-        checks.push({
-          criterion: id,
-          proposition: entry.proposition,
-          state,
-          evaluations: ordered.map(strip),
-          ...(decisive ? { decidedBy: strip(decisive) } : {}),
-        });
-      }
+    }
 
     return checks;
   }
@@ -1515,24 +1826,24 @@ export class ResearchSession {
         { id: output },
       );
 
-    // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
-    //
-    // Not a Decision. An earlier draft minted one ("we replaced X because of
-    // review Y") and linked it BASED_ON to the REPLACEMENT's evidence, which
-    // points causality backwards -- the decision to replace preceded that
-    // evidence and cannot rest on it. No assertion used it. S-11 contains an
-    // invalidated analysis and a replacement, both of which the graph
-    // represents directly; it does not contain a researcher decision. S-7,
-    // which turns on an explicit decision to amend a locked procedure, is
-    // where a Decision should be earned.
-    //
-    // Nor supersession. Invalidating the replaced analysis's output plus the
-    // replacement's own support answers every question this scenario asks.
-    // That is not the same as concluding invalidation *is* supersession:
-    // `invalidated = true` means "no longer valid as a source of current
-    // inference", and the two merely coincide here. S-12 is the
-    // discriminator -- there the numbers stay valid and only the
-    // interpretation changes, which invalidation cannot honestly carry.
+      // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
+      //
+      // Not a Decision. An earlier draft minted one ("we replaced X because of
+      // review Y") and linked it BASED_ON to the REPLACEMENT's evidence, which
+      // points causality backwards -- the decision to replace preceded that
+      // evidence and cannot rest on it. No assertion used it. S-11 contains an
+      // invalidated analysis and a replacement, both of which the graph
+      // represents directly; it does not contain a researcher decision. S-7,
+      // which turns on an explicit decision to amend a locked procedure, is
+      // where a Decision should be earned.
+      //
+      // Nor supersession. Invalidating the replaced analysis's output plus the
+      // replacement's own support answers every question this scenario asks.
+      // That is not the same as concluding invalidation *is* supersession:
+      // `invalidated = true` means "no longer valid as a source of current
+      // inference", and the two merely coincide here. S-12 is the
+      // discriminator -- there the numbers stay valid and only the
+      // interpretation changes, which invalidation cannot honestly carry.
       const replacement = await this.recorded({
         enquiry: input.enquiry,
         method: input.method,
@@ -1548,7 +1859,12 @@ export class ResearchSession {
       const was = before.find((b) => b.proposition === now.proposition);
       if (!was) continue;
       if (was.finding === now.finding) unchanged.push(now.proposition);
-      else changed.push({ proposition: now.proposition, before: was.finding, after: now.finding });
+      else
+        changed.push({
+          proposition: now.proposition,
+          before: was.finding,
+          after: now.finding,
+        });
     }
 
     const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
@@ -1603,40 +1919,78 @@ export class ResearchSession {
        ${this.withinScope(scope)}
        RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
-      { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+      {
+        name: scope.proposition,
+        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+      },
     );
-    if (claims.length === 0) throw new Error(`nothing on the record claims "${scope.proposition}"`);
+    if (claims.length === 0)
+      throw new Error(`nothing on the record claims "${scope.proposition}"`);
 
-    const review = await this.graph.createNode("Review", { verdict: input.because });
-    const narrower = await this.graph.createNode("Claim", { name: input.as, kind: "exploratory" });
-    // The review records that someone objected; the decision records that the
-    // objection was acted on. Reviews also confirm, so a review alone cannot
-    // mean "withdrawn" without reading its prose.
-    const decision = await this.graph.createNode("Decision", {
-      reason: input.because,
-      invalidation_check: "evidence that the original reading was right after all",
-    });
-    await this.graph.createEdge(decision.natural_id, "MOTIVATES", narrower.natural_id);
-
-    const carried = new Set<string>();
-    for (const id of new Set(claims.map((c) => c.c.natural_id))) {
-      const claim = { c: { natural_id: id } };
-      await this.graph.createEdge(review.natural_id, "EVALUATES", claim.c.natural_id);
-      await this.graph.createEdge(decision.natural_id, "CHANGES", claim.c.natural_id);
-      const evidence = await this.graph.query(
-        `MATCH (e:Evidence)-[:SUPPORTS]->(:Claim {natural_id: $id}) RETURN e`,
-        { e: vertexProps<{ natural_id: string; statement: string }>() },
-        { id: claim.c.natural_id },
+    // Atomic. Interrupted between withdrawing the original and carrying its
+    // evidence across, this retracts a finding and puts nothing in its place.
+    // Demonstrated in tests/domain-session.test.ts, which is where the harm is
+    // reachable -- "does this roll back?" is not a researcher's question, so it
+    // is not a scenario. See TenantGraph.inTransaction.
+    const { narrower, carried } = await this.graph.inTransaction(async () => {
+      const review = await this.graph.createNode("Review", {
+        verdict: input.because,
+      });
+      const narrower = await this.graph.createNode("Claim", {
+        name: input.as,
+        kind: "exploratory",
+      });
+      // The review records that someone objected; the decision records that the
+      // objection was acted on. Reviews also confirm, so a review alone cannot
+      // mean "withdrawn" without reading its prose.
+      const decision = await this.graph.createNode("Decision", {
+        reason: input.because,
+        invalidation_check:
+          "evidence that the original reading was right after all",
+      });
+      await this.graph.createEdge(
+        decision.natural_id,
+        "MOTIVATES",
+        narrower.natural_id,
       );
-      for (const row of evidence) {
-        await this.graph.createEdge(row.e.natural_id, "SUPPORTS", narrower.natural_id);
-        carried.add(row.e.statement);
+
+      const carried = new Set<string>();
+      for (const id of new Set(claims.map((c) => c.c.natural_id))) {
+        const claim = { c: { natural_id: id } };
+        await this.graph.createEdge(
+          review.natural_id,
+          "EVALUATES",
+          claim.c.natural_id,
+        );
+        await this.graph.createEdge(
+          decision.natural_id,
+          "CHANGES",
+          claim.c.natural_id,
+        );
+        const evidence = await this.graph.query(
+          `MATCH (e:Evidence)-[:SUPPORTS]->(:Claim {natural_id: $id}) RETURN e`,
+          { e: vertexProps<{ natural_id: string; statement: string }>() },
+          { id: claim.c.natural_id },
+        );
+        for (const row of evidence) {
+          await this.graph.createEdge(
+            row.e.natural_id,
+            "SUPPORTS",
+            narrower.natural_id,
+          );
+          carried.add(row.e.statement);
+        }
       }
-    }
+
+      return { narrower, carried };
+    });
 
     const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
-    this.emit("reinterpret", narrower.natural_id, { previously: scope.proposition, because: input.because });
+    this.emit("reinterpret", narrower.natural_id, {
+      previously: scope.proposition,
+      because: input.because,
+    });
 
     return {
       at,
@@ -1658,7 +2012,9 @@ export class ResearchSession {
    * step recorded the order is already implied and a supersession edge would
    * be a writer with no reader.
    */
-  async interpretationHistory(proposition: string): Promise<InterpretationHistory> {
+  async interpretationHistory(
+    proposition: string,
+  ): Promise<InterpretationHistory> {
     const steps: Revision[] = [];
     let current = proposition;
 
@@ -1684,11 +2040,16 @@ export class ResearchSession {
       const decisions = new Set(rows.map((r) => r.d.natural_id));
       const replaced = new Set(rows.map((r) => r.was.name));
       if (decisions.size > 1 || replaced.size > 1) {
-        throw new Error(`interpretation history for "${proposition}" is not a single line at "${current}"`);
+        throw new Error(
+          `interpretation history for "${proposition}" is not a single line at "${current}"`,
+        );
       }
       const step = rows[0];
       if (!step) break;
-      if (seen.has(step.was.name)) throw new Error(`interpretation history for "${proposition}" loops at "${step.was.name}"`);
+      if (seen.has(step.was.name))
+        throw new Error(
+          `interpretation history for "${proposition}" loops at "${step.was.name}"`,
+        );
       seen.add(step.was.name);
 
       steps.unshift({
@@ -1696,7 +2057,9 @@ export class ResearchSession {
         previously: step.was.name,
         nowClaims: current,
         reason: step.d.reason,
-        restingOnTheOldReading: await this.decidedOnTheStrengthOf({ proposition: step.was.name }),
+        restingOnTheOldReading: await this.decidedOnTheStrengthOf({
+          proposition: step.was.name,
+        }),
       });
       current = step.was.name;
     }
@@ -1709,7 +2072,10 @@ export class ResearchSession {
   }
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */
-  private async withdrawalOf(scope: { proposition: string; enquiry?: string }): Promise<{ withdrawn: boolean; replacedBy?: string }> {
+  private async withdrawalOf(scope: {
+    proposition: string;
+    enquiry?: string;
+  }): Promise<{ withdrawn: boolean; replacedBy?: string }> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
@@ -1721,14 +2087,19 @@ export class ResearchSession {
         d: optional(vertexProps<{ natural_id: string }>()),
         now: optional(vertexProps<{ name: string }>()),
       },
-      { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+      {
+        name: scope.proposition,
+        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+      },
     );
     if (rows.length === 0) return { withdrawn: false };
 
     // Every node asserting this proposition must have been withdrawn. One left
     // standing means the record still claims it -- which is exactly the
     // duplicate-claim case S-12 was built to catch.
-    const standing = new Set(rows.filter((r) => !r.d).map((r) => r.c.natural_id));
+    const standing = new Set(
+      rows.filter((r) => !r.d).map((r) => r.c.natural_id),
+    );
     if (standing.size > 0) return { withdrawn: false };
 
     const replacedBy = rows.find((r) => r.now)?.now?.name;
@@ -1736,7 +2107,10 @@ export class ResearchSession {
   }
 
   /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
-  private async decidedOnTheStrengthOf(scope: { proposition: string; enquiry?: string }): Promise<string[]> {
+  private async decidedOnTheStrengthOf(scope: {
+    proposition: string;
+    enquiry?: string;
+  }): Promise<string[]> {
     const asked = new Set<string>();
     // Both bearings: a question can be settled "no" on a finding that
     // challenges the proposition, and that closure rests on this reading just
@@ -1749,7 +2123,10 @@ export class ResearchSession {
          MATCH (d)-[:RESOLVES]->(q:Question)
          RETURN q`,
         { q: vertexProps<{ name: string }>() },
-        { name: scope.proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+        {
+          name: scope.proposition,
+          ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+        },
       );
       for (const row of rows) asked.add(row.q.name);
     }
@@ -1771,7 +2148,9 @@ export class ResearchSession {
    * Scope is the line of enquiry, reached by traversal. Nothing is stored on
    * the claim — see PJ-008 row C.
    */
-  private async scopeFor(subject: ClaimSubject): Promise<{ proposition: string; enquiry?: string }> {
+  private async scopeFor(
+    subject: ClaimSubject,
+  ): Promise<{ proposition: string; enquiry?: string }> {
     if (typeof subject !== "string") {
       // A citation has to be one the cited analysis actually made. Without
       // this, naming a proposition it never concluded still resolves to its
@@ -1779,18 +2158,28 @@ export class ResearchSession {
       // analysis in that scope said -- so `reinterpret()` would withdraw a
       // claim the cited analysis never asserted. Same check `closeEnquiry()`
       // and `amendDesign()` already make of their citations.
-      const concluded = await this.findingFor(subject.analysis, subject.proposition);
+      const concluded = await this.findingFor(
+        subject.analysis,
+        subject.proposition,
+      );
       if (!concluded) {
-        throw new Error(`analysis ${subject.analysis.id} concluded nothing about "${subject.proposition}"`);
+        throw new Error(
+          `analysis ${subject.analysis.id} concluded nothing about "${subject.proposition}"`,
+        );
       }
       const enquiry = await this.enquiryAddressedBy(subject.analysis);
-      if (!enquiry) throw new Error(`analysis ${subject.analysis.id} addresses no line of enquiry`);
+      if (!enquiry)
+        throw new Error(
+          `analysis ${subject.analysis.id} addresses no line of enquiry`,
+        );
       return { proposition: subject.proposition, enquiry };
     }
 
     const scopes = await this.enquiriesClaiming(subject);
     if (scopes.length > 1) {
-      throw new Error(`"${subject}" is claimed in ${scopes.length} lines of enquiry; name which, by the analysis that concluded it`);
+      throw new Error(
+        `"${subject}" is claimed in ${scopes.length} lines of enquiry; name which, by the analysis that concluded it`,
+      );
     }
     return { proposition: subject };
   }
@@ -1811,7 +2200,9 @@ export class ResearchSession {
     return [...found];
   }
 
-  private async enquiryAddressedBy(analysis: AnalysisRef): Promise<string | undefined> {
+  private async enquiryAddressedBy(
+    analysis: AnalysisRef,
+  ): Promise<string | undefined> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry) RETURN loe`,
       { loe: vertexProps<{ natural_id: string }>() },
@@ -1827,7 +2218,10 @@ export class ResearchSession {
    * the way its evidence bears — never from comparing the two sentences. In
    * S-5 the sentences are identical and the answer is "no".
    */
-  async doTheseConflict(a: ConclusionRef, b: ConclusionRef): Promise<ConflictVerdict> {
+  async doTheseConflict(
+    a: ConclusionRef,
+    b: ConclusionRef,
+  ): Promise<ConflictVerdict> {
     const sides = [await this.sideOf(a), await this.sideOf(b)];
     const [left, right] = sides;
 
@@ -1855,7 +2249,9 @@ export class ResearchSession {
     };
   }
 
-  private async sideOf(conclusion: ConclusionRef): Promise<ConflictSide & { enquiry: string }> {
+  private async sideOf(
+    conclusion: ConclusionRef,
+  ): Promise<ConflictSide & { enquiry: string }> {
     const resolved = await this.scopeFor(conclusion);
     const enquiry = resolved.enquiry!;
 
@@ -1866,8 +2262,12 @@ export class ResearchSession {
     );
 
     const scope = resolved;
-    const supportedBy = (await this.findingsBearing(scope, "SUPPORTS")).map((r) => r.e.statement);
-    const challengedBy = (await this.findingsBearing(scope, "CHALLENGES")).map((r) => r.e.statement);
+    const supportedBy = (await this.findingsBearing(scope, "SUPPORTS")).map(
+      (r) => r.e.statement,
+    );
+    const challengedBy = (await this.findingsBearing(scope, "CHALLENGES")).map(
+      (r) => r.e.statement,
+    );
 
     return {
       proposition: conclusion.proposition,
@@ -1912,12 +2312,20 @@ export class ResearchSession {
       for (const row of rows) {
         const entry = { finding: row.e.statement, via: row.comp.kind };
         if (row.a?.invalidated) {
-          superseded.push({ ...entry, bearing, reason: row.r?.verdict ?? "its analysis was replaced" });
-        } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
+          superseded.push({
+            ...entry,
+            bearing,
+            reason: row.r?.verdict ?? "its analysis was replaced",
+          });
+        } else if (
+          bearing === "supports" &&
+          reverifying.has(row.e.natural_id)
+        ) {
           // A re-verification is not a second independent finding. Counting it
           // as one reported a proposition established once as corroborated
           // twice -- S-10, and the reason `REVERIFIES` exists.
-          if (!reverifiedBy.includes(row.comp.kind)) reverifiedBy.push(row.comp.kind);
+          if (!reverifiedBy.includes(row.comp.kind))
+            reverifiedBy.push(row.comp.kind);
         } else {
           live.push(entry);
         }
@@ -1936,8 +2344,14 @@ export class ResearchSession {
        MATCH (e)-[:RECORDED_IN]->(out:Artefact)
        WHERE out.invalidated IS NULL OR out.invalidated = false
        RETURN a, e`,
-      { a: vertexProps<ArtefactProps>(), e: vertexProps<{ natural_id: string }>() },
-      { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+      {
+        a: vertexProps<ArtefactProps>(),
+        e: vertexProps<{ natural_id: string }>(),
+      },
+      {
+        name: proposition,
+        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+      },
     );
 
     // The standard the finding was held to, if it was held to one. S-3b: the
@@ -1970,18 +2384,28 @@ export class ResearchSession {
       {
         c: vertexProps<{ natural_id: string; proposition: string }>(),
         ev: optional(
-          vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
+          vertexProps<{
+            natural_id: string;
+            value: string;
+            outcome: "pass" | "fail";
+            evaluated_at: string;
+          }>(),
         ),
         basis: optional(vertexProps<{ statement: string }>()),
         basisout: optional(vertexProps<{ invalidated?: boolean }>()),
       },
-      { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+      {
+        name: proposition,
+        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+      },
     );
     const standard = this.checksFrom(standardRows);
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
     // and the two must agree, since in S-3 they are the same checks.
-    const unmet = standard.filter((c) => c.state !== "passed").map((c) => c.proposition);
+    const unmet = standard
+      .filter((c) => c.state !== "passed")
+      .map((c) => c.proposition);
 
     // A withdrawn interpretation is not supported, however much evidence once
     // carried it. `support` stays populated deliberately: the findings are
@@ -2008,7 +2432,11 @@ export class ResearchSession {
       // in the query because AGE rejects a `NOT (pattern)` predicate outright
       // -- `cypher_yyerror`, not a decode problem.
       restingOn: [
-        ...new Set(resting.filter((r) => !reverifying.has(r.e.natural_id)).map((r) => r.a.logical_name)),
+        ...new Set(
+          resting
+            .filter((r) => !reverifying.has(r.e.natural_id))
+            .map((r) => r.a.logical_name),
+        ),
       ],
       superseded,
       challenged: against.length > 0,
@@ -2028,7 +2456,9 @@ export class ResearchSession {
    * asks which enquiries REQUIRE the evidence held here, not what any
    * computation read.
    */
-  async whatDependsOn(artefactName: string): Promise<{ claims: string[]; enquiries: string[] }> {
+  async whatDependsOn(
+    artefactName: string,
+  ): Promise<{ claims: string[]; enquiries: string[] }> {
     const rows = await this.graph.query(
       `MATCH (a:Artefact {logical_name: $name})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
@@ -2046,7 +2476,13 @@ export class ResearchSession {
     return {
       // A claim whose refutation rested on this record is affected by
       // invalidating it, exactly as a supported one is.
-      claims: [...new Set(rows.flatMap((r) => [r.claim?.name, r.challenged?.name].filter((n): n is string => !!n)))],
+      claims: [
+        ...new Set(
+          rows.flatMap((r) =>
+            [r.claim?.name, r.challenged?.name].filter((n): n is string => !!n),
+          ),
+        ),
+      ],
       enquiries: [...new Set(rows.flatMap((r) => (r.loe ? [r.loe.name] : [])))],
     };
   }
@@ -2055,7 +2491,11 @@ export class ResearchSession {
   // Internals -- the archaeology the current edge schema forces
   // -------------------------------------------------------------------------
 
-  private emit(operation: string, subject: string, detail?: Record<string, unknown>): void {
+  private emit(
+    operation: string,
+    subject: string,
+    detail?: Record<string, unknown>,
+  ): void {
     this.events.record({ at: this.clock.now(), operation, subject, detail });
   }
 
@@ -2103,18 +2543,25 @@ export class ResearchSession {
    * This is why `Review -[:EVALUATES]-> EvidenceUnit` is not decorative: it
    * constrains a research action, not just an explanatory query.
    */
-  private async assertCriterionGovernsGate(criterion: CriterionRef, gate: GateRef): Promise<void> {
+  private async assertCriterionGovernsGate(
+    criterion: CriterionRef,
+    gate: GateRef,
+  ): Promise<void> {
     const rows = await this.graph.query(
       `MATCH (:Criterion {natural_id: $criterion})-[:GOVERNS]->(:Gate {natural_id: $gate}) RETURN 1`,
       { ok: scalar<number>() },
       { criterion: criterion.id, gate: gate.id },
     );
     if (rows.length === 0) {
-      throw new Error(`criterion ${criterion.id} does not govern gate ${gate.id}; it cannot be evaluated for it`);
+      throw new Error(
+        `criterion ${criterion.id} does not govern gate ${gate.id}; it cannot be evaluated for it`,
+      );
     }
   }
 
-  private async assertCriterionQualifiesSomething(criterion: CriterionRef): Promise<void> {
+  private async assertCriterionQualifiesSomething(
+    criterion: CriterionRef,
+  ): Promise<void> {
     const rows = await this.graph.query(
       `MATCH (:Criterion {natural_id: $criterion})-[:QUALIFIES]->(:EvidenceUnit) RETURN 1`,
       { ok: scalar<number>() },
@@ -2127,7 +2574,10 @@ export class ResearchSession {
     }
   }
 
-  private async assertReviewOf(review: ReviewRef, analysis: AnalysisRef): Promise<void> {
+  private async assertReviewOf(
+    review: ReviewRef,
+    analysis: AnalysisRef,
+  ): Promise<void> {
     const rows = await this.graph.query(
       `MATCH (:Review {natural_id: $review})-[:EVALUATES]->(:EvidenceUnit)-[:USES]->(:Computation {natural_id: $analysis})
        RETURN 1`,
@@ -2135,7 +2585,9 @@ export class ResearchSession {
       { review: review.id, analysis: analysis.id },
     );
     if (rows.length === 0) {
-      throw new Error(`review ${review.id} does not review analysis ${analysis.id}; it cannot justify replacing it`);
+      throw new Error(
+        `review ${review.id} does not review analysis ${analysis.id}; it cannot justify replacing it`,
+      );
     }
   }
 
@@ -2156,8 +2608,8 @@ export class ResearchSession {
       { id: analysis.id },
     );
     const found = rows[0];
-    if (!found) throw new Error(`analysis ${analysis.id} has no inferential unit`);
+    if (!found)
+      throw new Error(`analysis ${analysis.id} has no inferential unit`);
     return found.u.natural_id;
   }
-
 }

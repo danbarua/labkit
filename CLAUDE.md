@@ -128,13 +128,13 @@ per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
 
 A compound domain verb must run inside `graph.inTransaction(fn)` — everything
 it writes commits together or none of it does. Earned by external review of
-S-3c (PJ-020), by negative test: `replaceAnalysis()` invalidates the superseded
+S-3c (PJ-020), by negative test in each case: `replaceAnalysis()` invalidates the superseded
 output *before* recording the replacement, and since S-3c invalidating an output
 withdraws the criterion evaluations that cited it, so a failure between the
 halves left an earlier failure no longer deciding its check and no corrected
 check in existence. `reverify()`, `replaceAnalysis()` and `recordAnalysis()` use
-it; `reinterpret()` and `amendDesign()` should when a scenario next touches
-them. It is re-entrant by depth, so a composed verb does not nest `BEGIN`. Note
+it, and so do `reinterpret()` and `amendDesign()` — every compound verb now
+does. It is re-entrant by depth, so a composed verb does not nest `BEGIN`. Note
 this is a transaction boundary, not an escape hatch: no caller gains the ability
 to issue Cypher this class would not otherwise run.
 
