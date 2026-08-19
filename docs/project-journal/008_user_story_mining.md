@@ -688,9 +688,9 @@ this document's original analysis are marked as such.
 | S | No agent, person or role exists in the model | S-8 | open |
 | T | Edges cannot carry properties | S-7, row O | open |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
-| V | Criteria gate work but do not qualify findings | S-3, S-8 | open |
+| V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
-| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17 | open |
+| X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b | open |
 | Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14 | boundary |
 | Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
@@ -923,7 +923,7 @@ any other. This row therefore has no owner again until identity work begins.
 
 ### Row V — Criteria gate work but do not qualify findings
 
-**Scenarios:** S-3, S-8 · **Status:** open
+**Scenarios:** S-3, S-8, S-3b · **Status:** resolved
 
 **Current state (verified):** `Criterion -GOVERNS-> Gate -GATES-> Task\|Computation`; nothing connects a criterion to the analysis it qualifies
 
@@ -940,6 +940,31 @@ side, so it cannot select model (a) either. **What remains named:** a scenario
 where criteria qualify a finding and gate nothing. Until one exists row V stays
 the one confirmed wrong answer shipping green, and under CLAUDE.md's deferral
 rule that makes clearing it the next thing built.
+
+**S-3b: RESOLVED, model (a), and the wrong answer flipped in the test that
+recorded it.** S-3b is S-3's conversation with the tertiary model taken away —
+the same agreed checks, the same significant result, nothing downstream — so
+qualification is the only job left. `QUALIFIES: Criterion → EvidenceUnit`,
+written by `recordAnalysis({ heldTo })` and read by `whySupported()`, which now
+itemises the standard and reports `supported: false` when it is unmet.
+
+Two things the scenario decided rather than assumed. The **endpoint** is the
+evidence unit because a prespecified check is agreed about a *run* — "the checks
+we agreed before running it" — and the discriminating case (one analysis whose
+conclusions are held to different standards) does not exist anywhere in the
+corpus; that is named here so the choice can be revisited on evidence. The
+**write moment** is not a choice at all: a check nobody ran must still count
+against the finding, so the edge cannot be minted by evaluation, which is what
+an earlier reading of row V's model (a) would have done.
+
+What the scenario does **not** do is mechanically refute model (b) — predicted,
+and it held. Under (b) the fix is a gate on a claim's standing, which is what
+the phantom gate this scenario had to mint would have become. Model (b) is
+closed by S-8 rather than by S-3b: `GATES` is fully occupied with control
+semantics, and giving one edge two readings is PJ-012 §1's shape. That is the
+ledger deciding, and it is worth saying plainly, because a row cleared by
+argument is weaker than one cleared by demonstration and should not be filed as
+though it were the same thing.
 
 ### Row W — An evaluation record is not evidence of evaluation
 
@@ -965,7 +990,7 @@ checked by inspection — the point is that the record says which happened.
 
 ### Row X — "Failure sticks" is S-3 policy applied to every gate
 
-**Scenarios:** S-3, S-17 · **Status:** open
+**Scenarios:** S-3, S-17, S-3b · **Status:** open
 
 **Current state (verified):** `gateStatus()` treats any failing evaluation as permanently decisive
 
@@ -975,6 +1000,15 @@ checked by inspection — the point is that the record says which happened.
 > left to look like a decision.
 
 **NEW, DEFERRED.** S-3 earns "re-running a robustness test until green must not erase the earlier failure". It does not earn "any failure blocks every gate forever", which is what is implemented. For S-17's hash check — artefact corrupted, criterion fails, artefact repaired, criterion passes — a permanent block is plausibly wrong. There may eventually be four distinct things here: historical failure evidence, current gate satisfaction, admissible re-evaluation, and superseded evaluation
+
+**S-3b: unchanged in kind, larger in blast radius, and now the likeliest next
+row to produce a demonstrated wrong answer.** The same decisive-failure rule
+that blocks work now also disqualifies a finding, permanently: a check that
+failed and was then re-run correctly after a coding error *in the check* leaves
+the finding not standing forever. That is a more sympathetic case than
+re-running until green, and it is the same rule. Still not demonstrated, and
+still nothing in the corpus names the scenario that would settle it — so it
+stays unresolved and unowned, exactly as its own note above says
 
 ### Row Y — Closure without a cited result is classified by whether anyone worked on it
 
@@ -1351,6 +1385,33 @@ the only job left in the scenario.
 | the API shape | **Also deliberately not predicted.** Recording a qualification-only check either makes `gate` optional on `evaluateCriterion()` or earns its own verb. Expect the choice to be forced by whether `gateStatus()` stays coherent for a gate that gates nothing — if it does not, that is itself the argument that the gate should never have been there |
 | X — "failure sticks" is S-3 policy applied to every gate | **Bites harder, and still not settled.** In S-3 a stuck failure blocks work someone can re-run; qualification makes it mark a finding as not standing permanently, and "the median check was re-run after a coding error in the check itself" is a far more sympathetic case than re-running until green. Expect to record that and leave it, since clearing V is what licenses shipping anything at all here |
 | the rest of the chain | No new node label and no migration, consistent with every scenario since S-11. One edge in `EDGE_SCHEMA`, provisioned by reconciliation, with its reader written in the same commit — row W's lesson, applied in the right order this time |
+
+**Outcomes.** Every prediction held. Row **V** is resolved by `QUALIFIES:
+Criterion → EvidenceUnit`, and the write-up says out loud that the
+demonstration selected model (a) while S-8's argument is what closed model (b)
+— see the row. The endpoint and the API shape were both left unpredicted and
+both were decided by an Afterward bullet rather than by preference: a check
+nobody ran must still count against the finding, which rules out minting the
+edge at evaluation time, and "nothing is waiting on this" must be expressible
+without a gate, which made `gate` optional on `evaluateCriterion()`.
+
+*The phantom gate was closed rather than tolerated.* `declareGate()` now
+refuses a gate protecting nothing, next to its existing refusal of a gate
+governed by no condition, so `blocked` with an empty `gating` list is no longer
+reachable. That half of the demonstration therefore survives only in prose and
+in this ledger — which is the right trade, but it is a trade: the durable
+record of the *other* half is S-3's own assertion, flipped from `true` to
+`false` by whoever fixed it, exactly as the comment left on it demanded.
+
+*Row X is where the pressure went.* Nothing about "failure sticks" changed, but
+its blast radius did: a decisive failure now disqualifies a finding as well as
+blocking work. Recorded, not fixed — one confirmed wrong answer at a time, and
+this one is not yet demonstrated.
+
+*No new node label, no migration, and one edge with a reader in the same
+commit.* The check-itemisation logic is now shared between the two readers, so
+a condition cannot report one state through the gate it governs and another
+through the finding it qualifies.
 
 ## §4 — Held back as stories, not scenarios
 

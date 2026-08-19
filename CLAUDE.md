@@ -19,13 +19,13 @@ touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 Before touching `src/domain/`, skim 008 (the interaction corpus the service
 layer is built against), 009 (the first scenario built from it), 010 (a
 cold-context review of both), 011 (the control chain under scenario pressure),
-then **014 (the question lifecycle: S-4, S-1)** and **015 (claims and
-amendment: S-7, S-12, S-5)** — those two are the current state of the domain
-model and the newest decisions in the chain. 012 is the implementing agent's
-own perspective after S-3, opinion rather than decision and now largely
-superseded by 014/015. 013 is an external read-only review of the whole arc,
-written by a different reviewer; its improvement list is what 014/015 and the
-surrounding cleanup address.
+then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
+S-12, S-5) and **016 (the standard a finding is held to: S-3b)** — those three
+are the current state of the domain model, and 016 is the newest decision in
+the chain. 012 is the implementing agent's own perspective after S-3, opinion
+rather than decision and now largely superseded by 014/015. 013 is an external
+read-only review of the whole arc, written by a different reviewer; its
+improvement list is what 014/015 and the surrounding cleanup address.
 
 ## Commands
 
@@ -143,8 +143,9 @@ back up to the caller. One verb may write many nodes and edges:
 and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
-current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5 and S-8 required. Return
-types are derived one-per-bullet from a scenario's "Afterward" questions
+current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8 and
+S-3b required. Return types are derived one-per-bullet from a scenario's
+"Afterward" questions
 rather than designed — if a bullet has no natural home in the types, the API
 is wrong, not the bullet.
 
@@ -215,6 +216,12 @@ sharpening a question, S-7 amending a design) hit the same omission. It is a
 review heuristic, not a relationship — the two needed different remedies, and
 one needed none. See PJ-008 row AB.
 
+Ask also **when** a relationship is written, not only what it connects. A
+prespecified check nobody ran must still count against the finding it
+qualifies, so `QUALIFIES` is written when the analysis is recorded and not when
+the check is evaluated — the same edge minted at the later moment cannot
+express the case the scenario exists for (S-3b, PJ-016).
+
 A claim is identified by its **proposition within a line of enquiry**, never by
 its wording alone. Two stages of one programme can assert the same sentence
 about different endpoints, and merging them reports a claim that is
@@ -255,9 +262,10 @@ Two rules, so this is checkable rather than remembered:
    is the next thing built.** A deferred row that records a *demonstrated*
    wrong answer — not an empty result, not an ugly query — is a live defect
    with a comment on it. One is a considered trade; two means the trade stopped
-   being considered. **Row V is currently that one**: `whySupported()` reports
-   `supported: true` for a finding whose own prespecified robustness checks
-   failed.
+   being considered. **No row is currently that one** — row V was the last, and
+   S-3b cleared it (PJ-016). Row X is the likeliest next: a decisive failure now
+   disqualifies a finding as well as blocking work, permanently. Nothing has
+   demonstrated it, and it does not become a live defect until something does.
 2. **Every deferred row names the scenario that would settle it.** A row that
    cannot name one is not deferred, it is unresolved and unowned, and it should
    say so in its own cell. "Record both and pick neither" is a decision about
