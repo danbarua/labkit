@@ -3,7 +3,7 @@
 # Hook driver for the `wrap` skill -- see SKILL.md in this directory.
 #
 #   wrap-hook.sh start   SessionStart: record the HEAD this session began at.
-#   wrap-hook.sh stop    Stop: ask Claude to write the session's journal entry,
+#   wrap-hook.sh stop    Stop: ask Claude to write the session log entry,
 #                        but only if HEAD has moved since the last time we asked.
 #
 # Wired from .claude/settings.json, which is personal (gitignored) -- the

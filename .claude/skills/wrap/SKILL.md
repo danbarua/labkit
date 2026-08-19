@@ -30,8 +30,11 @@ wrap that turns out to contain a real decision has found something the journal
 should say; put it there too, in the journal's own terms.
 
 Optional argument: the path to a `.claude/.wrap-state/<session>` file. The Stop
-hook passes it. Without it the skill still works; the baseline is just the last
-commit that touched the journal.
+hook passes it, and it is what pins the baseline to the HEAD this session began
+at. Without it the skill still works, on a guessed window: the last commit that
+touched `docs/session-log/`, failing that the commit before today's first
+commit, failing that HEAD. `collect.sh` names which one it used — say so in the
+entry when it is a guess.
 
 ## 1. Collect
 
