@@ -1653,9 +1653,14 @@ may declare a check defective.
 ### S-10 predictions, recorded before the build
 
 Recorded 2026-08-19, against `7e36b31`, before a line of test or source. S-10 is
-**mined**, not authored — chosen over S-13 because it is the only unbuilt corpus
-scenario that solely owns an open row (E), and because after S-3b and S-3c the
-corpus is due a turn as the independent check rather than the ledger.
+**mined**, not authored — chosen over S-13 because after S-3b and S-3c the
+corpus is due a turn as the independent check rather than the ledger, and
+because it solely owns an open row (E).
+
+*Corrected after the build:* this section first said S-10 was the **only**
+unbuilt scenario solely owning an open row. It was not — row F is solely owned
+by S-9, equally unbuilt. The choice was a judgment between two candidates, and
+stating it as forced made it unauditable. S-9 is next.
 
 **The trap this scenario has to avoid, stated first.** Row E's natural failure
 is an **empty** answer: "what re-verifies this claim?" has no edge to walk and

@@ -12,8 +12,15 @@ is now generic so a third scenario would not need a third rename.
 ## Goal
 
 Prepare an external-review handoff, act on the review that came back, then build
-the scenarios that would move the ledger — row X's discriminator first, then the
-only unbuilt corpus scenario that solely owned an open row.
+the scenarios that would move the ledger — row X's discriminator first, then a
+corpus scenario owning an open row.
+
+*Met.* One correction to how the second choice was justified: S-10 was described
+in `e1665bf` and here as "the **only** unbuilt corpus scenario that solely owns
+an open row". It was not — row F is solely owned by S-9, equally unbuilt, then
+and now. The real grounds were the other two given at the time: S-10 is
+**mined**, following two consecutive authored scenarios, and it exercises the
+support machinery S-3c had just changed. Both good; neither forced.
 
 ## Changed
 
