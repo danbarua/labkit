@@ -138,6 +138,9 @@ commit` line. If the user asks for it to be committed, do it then.
 
 - The Stop hook advances the recorded sha at the moment it fires, so a HEAD is
   never asked about twice even if this skill errors. Failing loudly is safe.
+- Commits made *during* the wrap turn itself land with `asked` already
+  advanced, so they fire once more at the next real stop. Benign — the entry is
+  rewritten whole — but that is where an unexplained double-fire comes from.
 - The number is taken at write time, not reserved. Two sessions wrapping in the
   same second can still collide; the re-check in step 3 narrows it, and the
   loser renames. Not worth a lock.
