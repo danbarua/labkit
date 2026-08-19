@@ -424,6 +424,20 @@ MATCH (comp)-[:CONSUMES]->(a:Artefact)
 RETURN a
 ```
 
+**"Which conditions govern this gate, including ones nobody has evaluated?"**
+— the `OPTIONAL MATCH` is load-bearing twice: a criterion with no evaluation
+must still come back as a row (absence is a state, not a missing entry), and
+binding `g` in the first `MATCH` and reusing it in the second restricts
+evaluations to *this* gate rather than every evaluation of that criterion:
+```cypher
+MATCH (c:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})
+OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)
+RETURN c, ev
+```
+Dropping the `-[:TRIGGERS]->(g)` tail widens it to criterion scope — a
+different and also useful question ("has this check ever been shown able to
+fail?"), and a silent bug if you meant the first one. See PJ-011 §3.
+
 ## References
 
 - [Overview](https://age.apache.org/age-manual/master/intro/overview.html)
@@ -442,3 +456,4 @@ RETURN a
 - `docs/project-journal/008_user_story_mining.md` — the interaction corpus the graph model is now tested against, and its running ledger of design pressure
 - `docs/project-journal/009_domain_service_layer_s11.md` — the domain service layer, and the bar a new label/edge has to clear to be added
 - `docs/project-journal/010_cold_context_review.md` — cold-context review after the first scenario: what four unprimed reviewers could and couldn't reconstruct
+- `docs/project-journal/011_control_chain_two_wrong_predictions.md` — the Criterion/Gate chain under scenario pressure, and why unused labels are not culled

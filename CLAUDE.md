@@ -17,8 +17,9 @@ now" — each records *why* a decision was made, not just what changed. Before
 touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
 (current persistence design) rather than inferring intent from code alone.
 Before touching `src/domain/`, skim 008 (the interaction corpus the service
-layer is built against), 009 (the first scenario built from it), and 010 (a
-cold-context review of both).
+layer is built against), 009 (the first scenario built from it), 010 (a
+cold-context review of both), and 011 (the control chain under scenario
+pressure).
 
 ## Commands
 
@@ -166,11 +167,32 @@ did not:
 1. A service query must return a **wrong answer** without the relationship —
    demonstrated by running the test against the old traversal, not argued
    from an ugly query path.
-2. The new edge needs a **reader, not just a writer**. An edge that is
+2. An **empty** result is not a wrong one (PJ-011 §5). It is *unanswerable*,
+   which is true of any question the model has never been asked, and any
+   missing feature manufactures one. Only a confidently incorrect answer
+   shows the model claiming something it cannot support.
+3. The new edge needs a **reader, not just a writer**. An edge that is
    written and never queried is the dead-code shape PJ-007 found in
    `buildAsClause`.
-3. A predicted gap that fails to materialise is a **result**. PJ-008's §3
-   ledger keeps such rows (see row B) rather than deleting them.
+4. A predicted gap that fails to materialise is a **result**. PJ-008's §3
+   ledger keeps such rows — see row B, and row A, which PJ-008 called its
+   strongest single prediction and which S-3 refuted.
+5. When two models both fit, **record both and pick neither** (row V). Do not
+   ship API for an undecided model either: a speculative verb written to
+   probe row V was removed rather than left in place.
+
+Prefer structure in the **query** over structure in the **stored model**.
+S-3's four gate states and per-criterion itemisation are computed, not
+stored, so there is no `Gate.status` field to maintain and no value anyone
+can set to "passed". Stored shape is where change gets expensive; queries are
+free to be wrong and re-run.
+
+**Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
+Every label is provisioned into every tenant up front, so declared-but-never-
+walked structure is a computable map of where the model has untested claims —
+`CHALLENGES` sitting empty is the only durable record that the model claims
+evidence can challenge a claim and nothing ever has. A cull would need to
+distinguish *ruled out by the corpus* from *not yet reached by it*.
 
 ## Tenant provisioning is reconciliation, run every time
 
