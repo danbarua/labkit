@@ -345,6 +345,21 @@ export class ResearchSession {
      */
     implementing?: WorkRef;
   }): Promise<AnalysisRef> {
+    // Checked before anything is written. A proposition the record has
+    // withdrawn cannot be re-asserted as a side effect of recording an
+    // analysis: a fresh claim node would restore it while the objection that
+    // withdrew it still stood, and the record would un-retract itself. See
+    // PJ-008 row AC -- re-opening a withdrawn reading is a deliberate act, and
+    // there is no verb for it yet.
+    for (const conclusion of input.concludes) {
+      const { withdrawn, replacedBy } = await this.withdrawalOf(conclusion.proposition);
+      if (withdrawn) {
+        throw new Error(
+          `"${conclusion.proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy}"` : ""}; it cannot be re-asserted by recording another analysis`,
+        );
+      }
+    }
+
     const computation = await this.graph.createNode("Computation", {
       kind: input.method,
       status: "completed",
@@ -1275,6 +1290,16 @@ export class ResearchSession {
         },
         { name: current },
       );
+      // One line only. Two decisions narrowing different readings to the same
+      // sentence would otherwise send the walk down whichever row came back
+      // first -- the arbitrary-rows[0] shape S-1 turned into a wrong answer.
+      // Several *rows* per decision are normal and not a fork: one decision
+      // withdraws every node asserting the sentence it replaced.
+      const decisions = new Set(rows.map((r) => r.d.natural_id));
+      const replaced = new Set(rows.map((r) => r.was.name));
+      if (decisions.size > 1 || replaced.size > 1) {
+        throw new Error(`interpretation history for "${proposition}" is not a single line at "${current}"`);
+      }
       const step = rows[0];
       if (!step) break;
       if (seen.has(step.was.name)) throw new Error(`interpretation history for "${proposition}" loops at "${step.was.name}"`);

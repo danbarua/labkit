@@ -94,7 +94,10 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     expect(report.nowClaims).toBe(NARROWER);
     expect(report.previously).toBe(PREFERENTIAL);
     expect(report.requiresRecomputation).toBe(false);
-    expect(report.evidenceStanding).toHaveLength(2);
+    expect(report.evidenceStanding.sort()).toEqual([
+      "discriminative amplitude ratio 0.79, non-discriminative 0.41",
+      "discriminative amplitude ratio 0.81, non-discriminative 0.44",
+    ]);
     void programme;
   });
 
@@ -271,6 +274,41 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // still stand, and nothing is superseded.
     expect(standing.support).toHaveLength(2);
     expect(standing.superseded).toEqual([]);
+  });
+
+  /**
+   * A withdrawn interpretation cannot be re-asserted by side effect.
+   *
+   * The ordinary case, not an exotic one: a colleague who has not read the
+   * review records an analysis concluding the sentence again. Nothing about
+   * that reverses the withdrawal, and if a fresh claim node quietly restored
+   * it, the record would un-retract itself while the reviewer's objection
+   * still stood. Re-opening a withdrawn reading is a deliberate act and LabKit
+   * has no verb for it yet, so it refuses rather than doing it accidentally.
+   */
+  test("recording the withdrawn sentence again does not quietly restore it", async () => {
+    const programme = await assertedTwice();
+    await session.reinterpret({ proposition: PREFERENTIAL, as: NARROWER, because: "both types attenuate" });
+
+    const moreReadings = await session.recordObservations({
+      enquiry: programme.enquiry,
+      name: "attenuation readings, cohort D",
+      finding: "signal amplitude before and after encoding, cohort D",
+    });
+    await expect(
+      session.recordAnalysis({
+        enquiry: programme.enquiry,
+        method: "attenuation-ratio",
+        from: [moreReadings],
+        concludes: [{ proposition: PREFERENTIAL, finding: "discriminative amplitude ratio 0.80, non-discriminative 0.43" }],
+      }),
+    ).rejects.toThrow(/"the encoding preferentially preserves discriminative signal" was withdrawn/);
+
+    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const still = await later.whySupported(PREFERENTIAL);
+    expect(still.withdrawn).toBe(true);
+    expect(still.replacedBy).toBe(NARROWER);
+    expect(still.supported).toBe(false);
   });
 
   /** Reinterpreting something nobody claimed writes nothing. */
