@@ -380,6 +380,21 @@ mattered. Working gotchas:
   `RETURN d, from` becomes `AS (d agtype, from agtype)` and fails in the SQL
   parser (`42601`, `scanner_yyerror`, not `cypher_yyerror`). Alias it:
   `RETURN d, from AS origin`.
+- **A camelCase `RETURN` name silently decodes as `null`** — worse than the
+  reserved-word case above, because nothing fails. The AS clause is unquoted
+  SQL, so Postgres folds `basisOut` to `basisout` while AGE keys the row by
+  the name the Cypher `RETURN` used; the column arrives present and `NULL` for
+  every row, and a decoder reads that as "nothing matched". Cost a wrong
+  diagnosis once, blamed on `OPTIONAL MATCH` (S-3c). `buildAsClause()` now
+  **refuses** such a name, so this is a compile-time-ish error rather than a
+  debugging session; alias in the query (`RETURN basisOut AS basisout`) or
+  name the variable lower-case. Labels and property keys are unaffected —
+  they are quoted, and `CriterionEvaluation`/`natural_id` are fine.
+- **`OPTIONAL MATCH` is not the fragile thing it looks like.** Multi-hop
+  patterns bind, and so do patterns extending a variable that an earlier
+  `OPTIONAL MATCH` bound — both verified directly against this backend when
+  the case-folding bug above was mistaken for an AGE limitation. Don't
+  restructure a query around a limit that isn't there.
 - **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
   `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
   form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a

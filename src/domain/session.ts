@@ -549,14 +549,19 @@ export class ResearchSession {
     // What the closing decision rests on. Nothing cited means the question was
     // abandoned, not answered -- absence of evidence is not a negative result.
     const cited = await this.graph.query(
+      // Only the challenging bearing is fetched. An earlier version also
+      // returned the supporting claim as `forClaim` and never read it: polarity
+      // is "no" when something challenges and "yes" otherwise, so the
+      // supporting side is the default rather than an input. Dead the same way
+      // PJ-007's `buildAsClause` branch was -- and silently broken besides,
+      // since a camelCase column decodes as null (see `buildAsClause`, which
+      // now refuses the name that hid this).
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(against:Claim)
-       OPTIONAL MATCH (e)-[:SUPPORTS]->(forClaim:Claim)
-       RETURN e, against, forClaim`,
+       RETURN e, against`,
       {
         e: vertexProps<{ statement: string }>(),
         against: optional(vertexProps<{ name: string }>()),
-        forClaim: optional(vertexProps<{ name: string }>()),
       },
       { id: resolving!.natural_id },
     );
@@ -1116,18 +1121,20 @@ export class ResearchSession {
       `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})
        OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)
        OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
-       RETURN c, ev, basis`,
+       OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)
+       RETURN c, ev, basis, basisout`,
       {
         c: vertexProps<{ natural_id: string; proposition: string }>(),
         ev: optional(
           vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
         ),
-        basis: optional(vertexProps<{ natural_id: string; statement: string }>()),
+        basis: optional(vertexProps<{ statement: string }>()),
+        basisout: optional(vertexProps<{ invalidated?: boolean }>()),
       },
       { id: gate.id },
     );
 
-    const checks = this.checksFrom(rows, await this.withdrawnFindings());
+    const checks = this.checksFrom(rows);
     // Flattened in the same order the checks were assembled in.
     const evaluations = checks.flatMap((c) => c.evaluations);
     const unmet = checks.filter((c) => c.state !== "passed").map((c) => c.proposition);
@@ -1180,38 +1187,21 @@ export class ResearchSession {
    * check is reported must not, or the same condition would read one way
    * through a gate and another through the finding it qualifies.
    */
-  /**
-   * Findings whose analysis was replaced, by identity.
-   *
-   * A separate query rather than a hop hung off the evaluation, because AGE
-   * will not bind a two-relationship `OPTIONAL MATCH`: written as
-   * `OPTIONAL MATCH (ev)-[:BASED_ON]->(b:Evidence)-[:RECORDED_IN]->(a:Artefact)`
-   * the artefact comes back null for every row, including the ones that do
-   * have it — silently, with no error. That is the kind of empty answer that
-   * reads as "nothing was withdrawn", so the shape is deliberate and not a
-   * stylistic choice. See the AGE notes in CLAUDE.md.
-   *
-   * Unscoped on purpose: an invalidated output means the finding is no longer
-   * a source of current inference, wherever it is cited from.
-   */
-  private async withdrawnFindings(): Promise<ReadonlySet<string>> {
-    const rows = await this.graph.query(
-      `MATCH (e:Evidence)-[:RECORDED_IN]->(a:Artefact)
-       WHERE a.invalidated = true
-       RETURN e`,
-      { e: vertexProps<{ natural_id: string }>() },
-    );
-    return new Set(rows.map((r) => r.e.natural_id));
-  }
-
   private checksFrom(
     rows: Array<{
       c: { natural_id: string; proposition: string };
       ev: { natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string } | null;
-      basis: { natural_id: string; statement: string } | null;
+      basis: { statement: string } | null;
+      /**
+       * The artefact the cited finding was recorded in, carrying whether that
+       * analysis has since been replaced.
+       *
+       * Lower-case deliberately, and enforced: `basisOut` here returns present
+       * and NULL for every row, silently, because the AS clause AGE requires
+       * is unquoted SQL and Postgres folds it. See `buildAsClause`.
+       */
+      basisout: { invalidated?: boolean } | null;
     }>,
-    /** Findings whose analysis was replaced — see `withdrawnFindings()`. */
-    withdrawn: ReadonlySet<string>,
   ): CheckStatus[] {
       // Keyed by natural id, not by proposition text. Two criteria worded
       // identically are two criteria; whether they SHOULD be one is an identity
@@ -1240,7 +1230,7 @@ export class ResearchSession {
           if (row.basis) {
             if (!record.basis.includes(row.basis.statement)) record.basis.push(row.basis.statement);
             record.cited += 1;
-            if (!withdrawn.has(row.basis.natural_id)) record.standing += 1;
+            if (!row.basisout?.invalidated) record.standing += 1;
           }
           if (!seen) entry.evaluations.push(record);
         }
@@ -1765,17 +1755,19 @@ export class ResearchSession {
        MATCH (crit:Criterion)-[:QUALIFIES]->(u)
        OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
        OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
-       RETURN crit AS c, ev, basis`,
+       OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)
+       RETURN crit AS c, ev, basis, basisout`,
       {
         c: vertexProps<{ natural_id: string; proposition: string }>(),
         ev: optional(
           vertexProps<{ natural_id: string; value: string; outcome: "pass" | "fail"; evaluated_at: string }>(),
         ),
-        basis: optional(vertexProps<{ natural_id: string; statement: string }>()),
+        basis: optional(vertexProps<{ statement: string }>()),
+        basisout: optional(vertexProps<{ invalidated?: boolean }>()),
       },
       { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
     );
-    const standard = this.checksFrom(standardRows, await this.withdrawnFindings());
+    const standard = this.checksFrom(standardRows);
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
     // and the two must agree, since in S-3 they are the same checks.

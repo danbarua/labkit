@@ -396,6 +396,20 @@ export function buildAsClause(columns: CypherColumn[]): string {
   return columns
     .map((col) => {
       validateIdentifier(col.name, "cypher() column name");
+      // Rejected here rather than left to fail at runtime, because it does not
+      // fail loudly: this clause is unquoted SQL, so Postgres folds `basisOut`
+      // to `basisout`, while AGE keys the returned row by the name the Cypher
+      // RETURN used. The column comes back present and NULL for every row --
+      // no error, no warning, and a decoder reads it as "nothing matched".
+      // That cost a wrong diagnosis once (S-3c); a name that cannot be written
+      // costs nothing. Labels and property keys are unaffected: they are
+      // quoted, and `Criterion` / `natural_id` stay exactly as they are.
+      if (col.name !== col.name.toLowerCase()) {
+        throw new Error(
+          `cypher() column name must be lower-case: "${col.name}" would silently decode as null; ` +
+            `alias it in the query instead (RETURN ${col.name} AS ${col.name.toLowerCase()})`,
+        );
+      }
       if (col.type) validateIdentifier(col.type, "cypher() column type");
       return `${col.name} ${col.type ?? "agtype"}`;
     })

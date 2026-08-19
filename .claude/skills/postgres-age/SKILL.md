@@ -244,6 +244,22 @@ it in a throwaway script first — see PJ-006 for how these were found.
   from a Cypher-grammar error. Verified on pglite-age 2026-08-19. Alias it —
   `RETURN d, from AS origin` — rather than quoting, so the decoder key and the
   column name stay the same string.
+- **A camelCase `RETURN` name comes back `NULL`, silently.** Same mechanism as
+  the reserved-word trap above, opposite symptom: the AS clause is unquoted
+  SQL, so Postgres folds `RETURN basisOut` into a column named `basisout`,
+  while AGE keys the returned row by `basisOut`. Nothing errors. Every row
+  arrives with the column present and `NULL`, which reads exactly like a
+  pattern that matched nothing. Verified directly on pglite-age 2026-08-19:
+  the same query returns `bound=1` with the column aliased `AS x` and
+  `bound=0` named `basisOut`. Alias it, or name the Cypher variable
+  lower-case. LabKit's `buildAsClause()` refuses camelCase column names for
+  this reason.
+- **`OPTIONAL MATCH` binds more than you would guess.** Multi-hop optional
+  patterns work, and so do optional patterns that extend a variable bound by
+  an *earlier* `OPTIONAL MATCH` — both measured against pglite-age
+  2026-08-19, six shapes, all binding. Worth knowing because the case-folding
+  bug above looks exactly like an `OPTIONAL MATCH` limitation and was
+  misdiagnosed as one.
 - **Cypher string literals are typed `agtype`, not `text`.** Calling a
   `LANGUAGE sql` function with `(text, text)` parameters from inside Cypher
   fails with `function ... does not exist` unless the literal arguments are

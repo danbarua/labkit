@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { parseAgtype, type AgtypeNumeric, type AgtypeUnknown } from "../src/db/agtype";
+import { buildAsClause, parseAgtype, validateIdentifier, type AgtypeNumeric, type AgtypeUnknown } from "../src/db/agtype";
 import { TenantGraph } from "../src/db/graph";
 import { agtypeValue } from "../src/db/cypher";
 import type { LabKitDB } from "../src/db/client";
@@ -237,5 +237,33 @@ describe("parseAgtype — against live pglite-age", () => {
     // The actual assertion that matters: no precision was lost anywhere
     // between the database and this value, not just "it's a bigint."
     expect(String(parsed.id)).toBe(rawId);
+  });
+});
+
+/**
+ * The AS clause AGE requires is unquoted SQL, so Postgres case-folds it while
+ * AGE keys its result rows by the name the Cypher RETURN used. A camelCase
+ * column therefore comes back present and NULL for every row -- no error, and
+ * a decoder reads it as "nothing matched". S-3c lost a debugging cycle to
+ * exactly this, and blamed AGE's OPTIONAL MATCH for it.
+ */
+describe("buildAsClause rejects names that would decode as null", () => {
+  test("a camelCase column name is refused, with the alias to use instead", () => {
+    expect(() => buildAsClause([{ name: "basisOut" }])).toThrow(/must be lower-case/);
+    expect(() => buildAsClause([{ name: "basisOut" }])).toThrow(/AS basisout/);
+  });
+
+  test("lower-case and snake_case names are unaffected", () => {
+    expect(buildAsClause([{ name: "c" }, { name: "basis_out" }])).toBe("c agtype, basis_out agtype");
+  });
+
+  /**
+   * The rule is about result-column names only. Labels and property keys are
+   * quoted where they are used, and LabKit's are camelCase and PascalCase
+   * throughout -- a shared rule here would have rejected `CriterionEvaluation`.
+   */
+  test("labels and property keys keep their case", () => {
+    expect(() => validateIdentifier("CriterionEvaluation", "vertex label")).not.toThrow();
+    expect(() => validateIdentifier("natural_id", "property key")).not.toThrow();
   });
 });
