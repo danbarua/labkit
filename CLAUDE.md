@@ -20,15 +20,17 @@ Before touching `src/domain/`, skim 008 (the interaction corpus the service
 layer is built against), 009 (the first scenario built from it), 010 (a
 cold-context review of both), 011 (the control chain under scenario pressure),
 then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
-S-12, S-5), 016 (the standard a finding is held to: S-3b) and **018 (when a
-failed check stops counting: S-3c)** — those are the current state of the domain
-model, and 018 is the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
+S-12, S-5), 016 (the standard a finding is held to: S-3b), 018 (when a failed
+check stops counting: S-3c) and **019 (re-verification is not reproduction:
+S-10)** — those are the current state of the domain model, and 019 is the newest
+decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
-a second external review**, of S-3b and the row V close-out, and it has live
-items: a status token for rows cleared by argument, a nomination for row X, and
-row K's missing S-8 verdict.
+a second external review**, of S-3b and the row V close-out. Its three items are
+closed: `resolved (argued)` exists as a status, row X was nominated and then
+cleared by S-3c (018), and row K's verdict was already in PJ-008 — S-8 was built
+and gave none, and the ledger records *that* as the verdict.
 
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
@@ -152,8 +154,8 @@ back up to the caller. One verb may write many nodes and edges:
 and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
-current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8 and
-S-3b required. Return types are derived one-per-bullet from a scenario's
+current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8,
+S-3b, S-3c and S-10 required. Return types are derived one-per-bullet from a scenario's
 "Afterward" questions
 rather than designed — if a bullet has no natural home in the types, the API
 is wrong, not the bullet.
@@ -200,7 +202,13 @@ did not:
 2. An **empty** result is not a wrong one (PJ-011 §5). It is *unanswerable*,
    which is true of any question the model has never been asked, and any
    missing feature manufactures one. Only a confidently incorrect answer
-   shows the model claiming something it cannot support.
+   shows the model claiming something it cannot support. The same rule read
+   from the other side: **a refusal needs something real to refuse.** S-5's
+   decline-rather-than-guess pattern applies to a verb a caller would
+   otherwise use wrongly; inventing a verb in order to reject its arguments
+   manufactures a refusal exactly as a missing feature manufactures an empty
+   result (S-10, PJ-019). Where no such verb exists, the caveat travels with
+   a report a reader already asks for.
 3. The new edge needs a **reader, not just a writer**. An edge that is
    written and never queried is the dead-code shape PJ-007 found in
    `buildAsClause`.
@@ -224,10 +232,15 @@ gone, an amendment that moves a prespecified comparison reports itself
 unreconstructed is the actual defect.
 
 Ask of every verb that mints something: **does the act record what it
-produced, or only what it acted on?** Two scenarios in unrelated regions (S-1
-sharpening a question, S-7 amending a design) hit the same omission. It is a
-review heuristic, not a relationship — the two needed different remedies, and
-one needed none. See PJ-008 row AB.
+produced, or only what it acted on?** Four scenarios in unrelated regions have
+hit it — S-1 sharpening a question, S-7 amending a design, S-12 narrowing an
+interpretation, S-3c replacing a defective check — and all four needed
+*different* remedies: a new edge, nothing at all, a new edge again, and a field
+on a return type. That is why it stays a review heuristic and not a
+relationship. S-3c adds the sharper form of the question: **ask it of a verb's
+return type, not only of its writes.** `replaceAnalysis()` wrote its replacement
+into the graph correctly and withheld the reference, which blocked a scenario
+outright rather than merely degrading an answer. See PJ-008 row AB.
 
 Ask also **when** a relationship is written, not only what it connects. A
 prespecified check nobody ran must still count against the finding it
@@ -252,9 +265,13 @@ free to be wrong and re-run.
 **Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
 Every label is provisioned into every tenant up front, so declared-but-never-
 walked structure is a computable map of where the model has untested claims —
-`CHALLENGES` sitting empty is the only durable record that the model claims
-evidence can challenge a claim and nothing ever has. A cull would need to
-distinguish *ruled out by the corpus* from *not yet reached by it*.
+`DEFERS` is the current example: `enquiryStatus()` reads it and can report
+`closure: "deferred"`, but no verb writes it, so that branch is unreachable —
+a durable record that the model claims a question can be deliberately parked
+and nothing has ever done so. (Row J owns it; S-14 is the unbuilt scenario.)
+A cull would need to distinguish *ruled out by the corpus* from *not yet
+reached by it*. `CHALLENGES` was this example until S-4 and S-5 walked it,
+which is the outcome the policy exists to allow.
 
 This protects **labels and edges**, which are claims about the domain. It does
 not protect query conveniences with no consumer — the per-tenant CQRS views
