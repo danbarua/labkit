@@ -13,15 +13,17 @@ further scenario would not need a third rename.
 `002_cold_context_reviews.md` ran either side of this one, and its commits are
 in the window at both ends.
 
-> **This session's commits are `45ec5fa`..`dba40f2`.** Anything in the window
-> outside that range belongs to 002. Read 002 for that work; this entry does
-> not restate it.
+> **This entry describes only the commits named in *Changed* below, beginning
+> at `45ec5fa`.** Any commit in the window not named there belongs to 002 —
+> they are interleaved throughout, not merely at the ends. Read 002 for that
+> work; this entry does not restate it.
 
-Stated as *this* session's boundaries rather than as a list of theirs, which is
-the third and last form this warning took. A total was wrong the moment the file
-was committed; a list of foreign shas was wrong the moment the other session
-committed again. Own boundaries are fixed once a session stops committing, and
-that is the only version of this fact that stays true. (`collect.sh` prints its
+Stated by reference to this entry's own contents, which is the fourth and last
+form the warning took. A total was wrong the moment the file was committed; a
+list of foreign shas was wrong the moment the other session committed again; and
+*"this session's commits are X..Y"* was wrong twice over, since Y cannot include
+the commit being written and the range contains theirs anyway. Only a statement
+that points at what this entry already enumerates stays true without maintenance. (`collect.sh` prints its
 own warning too, and since `4692559` says "at least these commits" — it inspects
 only commits touching `docs/session-log/`, so a peer's code-only commits are
 invisible to it. `e386027` and `4692559` are two such.)
