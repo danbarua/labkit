@@ -126,7 +126,7 @@ to act on without re-reading the session.>
 Keep it short. A wrap that restates every commit message has buried the two
 lines that matter.
 
-## 4. Record the state, and leave the commit to the user
+## 4. Record the state, then commit the entry
 
 If a state file path was passed, point it at the entry just written, so a later
 fire in this session updates that file instead of starting another:
@@ -139,18 +139,47 @@ Use the script rather than writing the file by hand — it preserves `baseline`
 and `asked`, which belong to the hook. Clobbering `baseline` would make the
 next wrap cover only the newest commits instead of the session.
 
-**Do not commit the entry.** This runs at turn boundaries mid-session, and
-committing there interleaves doc commits into work in progress. Say in your
-reply that the file is written and uncommitted, and give the `git add`/`git
-commit` line. If the user asks for it to be committed, do it then.
+**Then commit it yourself.** An earlier version of this skill handed the
+`git add`/`git commit` back to the user, on the reasoning that committing at a
+turn boundary interleaves doc commits into work in progress. That reasoning did
+not survive contact: the entry gets committed anyway, one round-trip later, so
+the interleaving happens regardless and the only thing the handoff adds is a
+message the user has to act on before the hook stops firing.
+
+Three rules, because this repo has more than one session in it:
+
+- **Check first, every time.** `git status && git log -1 --oneline`. If HEAD
+  has moved since you last looked, **stop and report** rather than committing on
+  top of work you have not seen. A wrap is a description of a range; if the
+  range changed under you, the description is wrong.
+- **Stage by explicit path. Never `git add -A`.** The wrap entry is one file;
+  name it. `git add -A` has twice swept unrelated working-tree changes into
+  commits in this repo's history — another session's journal entry once, a
+  regenerated dependency graph another time — and in both cases the commit
+  message described neither.
+- **Do not create an empty commit.** The Stop hook fires at every turn boundary
+  where HEAD moved, including the one your own wrap commit causes. If the entry
+  is unchanged, say so and stop; there is nothing to record.
+
+```sh
+git add docs/session-log/<NNN>_<slug>.md
+git commit -m "docs: wrap the <what this session did> session"
+```
+
+If the wrap turn also produced other changes worth committing — a fix the entry
+describes, say — commit those separately and first, so the wrap describes a
+range that already exists.
 
 ## Notes
 
 - The Stop hook advances the recorded sha at the moment it fires, so a HEAD is
   never asked about twice even if this skill errors. Failing loudly is safe.
-- Commits made *during* the wrap turn itself land with `asked` already
-  advanced, so they fire once more at the next real stop. Benign — the entry is
-  rewritten whole — but that is where an unexplained double-fire comes from.
+- **The wrap's own commit fires the hook again.** It moves HEAD, and `asked`
+  was advanced when the hook fired, so the next turn boundary asks once more.
+  That is expected, not a malfunction, and it is why step 4 forbids an empty
+  commit: on that second fire the right outcome is usually "nothing changed,
+  stopping". Only rewrite the entry if a fact in it is actually stale — a
+  changed verification number or a commit the entry does not list.
 - The number is taken at write time, not reserved. Two sessions wrapping in the
   same second can still collide; the re-check in step 3 narrows it, and the
   loser renames. Not worth a lock.
