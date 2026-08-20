@@ -1,8 +1,9 @@
-# 003: clearing ledger rows — S-3c, S-10, S-9, S-14, and two reviews
+# 003: clearing ledger rows — S-3c, S-10, S-9, S-14, S-18, and two reviews
 
 **Session wrap, 2026-08-20, on `spike/drizzle-age`.** Not a decision record —
 see `docs/project-journal/` 018 (S-3c), 019 (S-10), 020 (the third review), 021
-(S-9) and 022 (S-14), and PJ-008 §3 rows E, F, J, P, X and AB for the ledger.
+(S-9), 022 (S-14) and 023 (S-18), and PJ-008 §3 rows E, F, J, K, P, R, X, Y and
+AB for the ledger.
 
 Renamed twice as the session outgrew its title; the slug is now generic so a
 further scenario would not need a third rename.
@@ -12,8 +13,8 @@ further scenario would not need a third rename.
 Prepare an external-review handoff, act on the review that came back, then build
 the scenarios that would move the ledger — row X's discriminator first, then a
 corpus scenario owning an open row. An unplanned review arrived mid-way and was
-acted on in full; S-9 followed, and with it the last mined scenario that owned
-an open row outright.
+acted on in full; S-9, S-14 and finally S-18 followed, and with S-18 **the
+Bonsai corpus is exhausted**.
 
 *Met.* One correction to how the second build was justified: S-10 was described
 in `e1665bf` and in an earlier draft of this entry as "the **only** unbuilt
@@ -24,9 +25,9 @@ scenarios, and it exercises the support machinery S-3c had just changed.
 
 ## Changed
 
-Four scenarios built (S-3c, S-10, S-9, S-14), four ledger rows cleared
-(X, E, P, J) and one half-settled (F), one AGE bug found, two reviews acted on
-in full, five journal entries written.
+Five scenarios built (S-3c, S-10, S-9, S-14, S-18), five ledger rows cleared
+(X, E, P, J, K), one half-settled (F) and one half-settled + swept (Y), one AGE
+bug found, two reviews acted on in full, six journal entries written.
 Every compound domain verb is now atomic, each earned by its own negative test.
 
 *No commit count or total diffstat here, deliberately.* Both go stale the moment
@@ -85,15 +86,34 @@ durable; how many there were is not.
 - `387e056`, `7f7d2a3`, `d017ea4` — **S-14**: predictions, build, PJ-022 and the
   ledger. Row J **resolved** with no new structure, and the last unwalked edge
   walked.
+- `17ca909`, `a449392`, `4c4d417` — **S-18**: predictions, build, PJ-023 and the
+  ledger. Row **K resolved**, row **R**'s successor question answered. One new
+  edge, `PROMOTES`, earned by refuting the prediction that `CHANGES` would serve
+  — `withdrawalOf()` reads any `Decision -CHANGES-> Claim` as a retraction, so
+  promoting a finding made it report `withdrawn: true`. Promotion retracted the
+  thing it promoted. The other prediction, that standing would become *conferred*
+  rather than declared, is **half refuted**: both paths stand, separated by
+  whether the standing was knowable in advance.
+- `2de3e2b` — row Y's stale `°` cleared and S-14's owed verdict written. See
+  error 16.
 - `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, `b7e473f`,
-  `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, `701d868`, `0dd0d2d` (the user's
-  dependency-graph regeneration), and this file's own commit — bookkeeping.
+  `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, `701d868`, `4988938`, `0dd0d2d`
+  (the user's dependency-graph regeneration), and this file's own commit —
+  bookkeeping.
 
 Source: `src/domain/session.ts`, `src/domain/report.ts`, `src/db/domain.ts` (the
-`REVERIFIES` edge), `src/db/graph.ts` (`inTransaction`), `src/db/agtype.ts` (the
-column-name guard). Two new scenario files, plus three tests added to
+`REVERIFIES` and `PROMOTES` edges), `src/db/graph.ts` (`inTransaction`),
+`src/db/agtype.ts` (the column-name guard). Three new scenario files, one
+existing scenario fixture changed (S-1 — see below), plus three tests added to
 `tests/domain-session.test.ts` — the right home for an invariant no researcher
 would ask about.
+
+**S-18 was the first build to change an existing scenario.** Narrowing
+`whatIsKnown().established` to require a promoted finding broke S-1, which was
+the only place in the corpus asserting `established` positively and did so on the
+free default. Its fixture now declares `standing: "confirmatory"` at creation,
+which is what its prespecified prior work is. Not a notation change: until S-18
+`established` could be told apart by nothing at all.
 
 **One file landed that was not this session's work.** `docs/dependency-graph.svg`
 was already modified in the working tree when the session began, and a `git
@@ -105,9 +125,9 @@ entry.
 
 ## Verified
 
-Run at `d017ea4`:
+Run at `a449392`, after S-18:
 
-- `bun test` — **183 pass, 0 fail**, 591 expect() calls, 19 files. Was 145/15 at
+- `bun test` — **188 pass, 0 fail**, 611 expect() calls, 20 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 2 `no-orphans`
@@ -120,17 +140,24 @@ five fire/silence cases. `bun test` does not cover it.
 - `bun examples/full-lifecycle.ts` — ends `closed connection cleanly`, no raw
   graphids (last run at `2b6c80d`).
 - `bun run dev:dependency-cruiser` — regenerated to a byte-identical graph at
-  `2b6c80d`; not re-run since, and S-9 added no module.
+  `2b6c80d`; not re-run since, and neither S-9, S-14 nor S-18 added a module.
 
-**Eight deletion verifications**, each removing the thing and watching the wrong
+**Ten deletion verifications**, each removing the thing and watching the wrong
 answer return: S-3c's narrowing, S-10's `REVERIFIES` write, and `inTransaction()`
 twice — once for the two verbs a scenario can reach, once for the two it cannot.
 S-9's two fixes separately — removing the consumer traversal fails three
-assertions, removing the name refusal fails one — and S-14's two, where removing
-the `DEFERS` write fails four and restoring the old `open: false` fails one. S-3c's was also run in the
-*opposite* direction — widening
-the rule to "the last verdict wins" fails S-3's own two tests, which is what
-distinguishes a narrowing from a removal. Worth repeating if either is revisited.
+assertions, removing the name refusal fails one — S-14's two, where removing the
+`DEFERS` write fails four and restoring the old `open: false` fails one, and
+S-18's two: removing the `established`/`provisional` discriminator puts a
+lunchtime notebook sweep back into `established`, and swapping `PROMOTES` back to
+`CHANGES` reports the promoted finding withdrawn. Both S-18 restores were
+diffed byte-identical against a pre-change copy.
+
+S-3c's was also run in the *opposite* direction — widening the rule to "the last
+verdict wins" fails S-3's own two tests, which is what distinguishes a narrowing
+from a removal. S-18's widening direction is covered by two passing tests rather
+than a manual run: Afterward 2 (promoted) and S-1 (declared) both still reach
+`established`.
 
 **The AGE findings were measured, not reasoned.** Six `OPTIONAL MATCH` shapes
 probed directly; all six bind. The failing shape is a camelCase `RETURN` name,
@@ -138,7 +165,7 @@ which silently returns the column present and `NULL`.
 
 ## Open
 
-**Four self-inflicted errors, all found and fixed, all worth knowing:**
+**Self-inflicted errors, all found and fixed, all worth knowing:**
 
 1. *A wrong diagnosis committed as fact.* `ced0388` shipped a docstring claiming
    AGE cannot bind a two-hop `OPTIONAL MATCH`, with a query restructured around
@@ -194,7 +221,7 @@ which silently returns the column present and `NULL`.
    F needed no lineage edge because "direction is in the act". There is no such
    act — the regenerated artefact is written by an ordinary
    `recordObservations()` naming nothing historical. Row F is back to `open`,
-   with a boundary test making the gap durable.
+   with the gap recorded in PJ-021 and the ledger.
 12. *Absence-vs-difference, missed inside the function written to respect it.*
    `reproducibilityOf()` reported a part the caller had not rebuilt as
    `differing`. New `notRebuilt` state.
@@ -210,6 +237,27 @@ which silently returns the column present and `NULL`.
    `{ kind, id }`. A confident claim about coverage the test did not have.
    Removed; the limitation lives in PJ-021 and the ledger, where a limitation
    belongs.
+15. **Error 2, a third time, and in code rather than prose.** An unqualified
+   replace of `OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)` during S-18 hit
+   `designHistory()` as well as the intended query, breaking all six S-7 tests.
+   Fixed by restoring that one site. The pattern is now clear enough to state as
+   a rule: **Cypher fragments and PJ-008 row text are the two places in this
+   repo where the same string legitimately appears more than once.** Never
+   `replace_all` in either; include enough enclosing context that the match is
+   provably unique, and let the edit tool refuse the ambiguous case. An LSP
+   rename would not have helped — these are string literals and prose, not
+   symbols, and the tool available here is read-only anyway.
+16. *A stale `°` left in the table whose own legend forbids it.* Row Y still
+   carried `S-14°` two builds after S-14 was built, and its S-14 verdict was
+   never written. The legend says to clear the marker "everywhere in this table"
+   when a scenario is built, and to update the Rows-today column in the same
+   change — derived state that "goes stale silently", in its own words. Swept in
+   `2de3e2b`, along with the owed verdict: S-14 settled the *accepted* half of
+   row Y and the *abandoned* half is still a boundary.
+17. *Non-ASCII silently dropped from two commit messages.* `§4` reached
+   `a449392` and `4c4d417` as bare `4` — the `§` was eaten writing the message
+   through a shell heredoc. Not worth rewriting history for, but keep commit
+   messages ASCII on that path.
 
 **What the third review exposed about the method**, and the most portable thing
 here: the scenario discipline is structurally poor at states that exist only
@@ -218,39 +266,40 @@ of that review's most serious findings were of that kind, and neither was
 reachable from a conversation that runs to completion. PJ-020 §"What this says
 about the method" carries it.
 
+**What S-18 exposed about the method**, and it is the same shape one level up: a
+promotion condition recorded in PJ-008 §4 fired at S-8 and sat fired, unnoticed,
+through three external reviews. The ledger's machinery is built to make *state*
+scannable; nothing made a *condition becoming due* scannable. A rule nobody
+re-reads is not a mechanism. PJ-023 carries it.
+
 **Genuinely open, not fixed:**
 
 - **Who may declare a check defective** (S-3c). "The check was defective" is now
   a lever that clears a failure. It requires a recorded `Review` and a
   replacement, so there is a trail; whether that suffices is an authority
   question, and there is no actor model by decision.
-- **The authored-versus-mined precedent.** S-3c is the second authored scenario.
-  S-10 being mined takes pressure off; PJ-016's argument is load-bearing twice.
-- **Where the next kind of pressure comes from.** Thirteen scenarios, zero new
-  node labels; five consecutive have pressed only on relationships, query
-  semantics and identity. That is a real signal — but it is *not* the claim
-  this entry made first, which was that the corpus was exhausted. It is not:
-  **S-14 owns row J and story 18 owns row K**, and both are scheduled (see
-  Next). What is true is that after those two, more of this corpus is unlikely
-  to move the noun inventory, and the leading candidate for different pressure
-  is a real consumer above the domain layer. PJ-021 carries the argument.
+- **The authored-versus-mined precedent.** S-3c is the second authored scenario;
+  S-10, S-9, S-14 and S-18 are all mined, and S-18 was promoted by the corpus's
+  own recorded condition rather than authored at all. PJ-016's argument took no
+  further weight this session.
 - **Row P's structural anomaly survives its own row.** `recordObservations()`
   still creates `Evidence` with no producing `EvidenceUnit`, which PJ-001 calls
   impossible, and `whySupported()` still cannot count an observation as support.
   Three scenarios have been pointed at it; each found a reader's defect, not a
   structural one. Recorded as fact now rather than carried as a prediction.
-- **Ledger:** no row is a live defect shipping green. `open` + unowned: **F**,
-  O, S, T, Z. `open` with an unbuilt owner: **K alone**, owned by story 18,
-  whose promotion condition fired when S-8 gave no verdict. Row F joined the
+- **Ledger:** no row is a live defect shipping green. **No row names an unbuilt
+  owner** — K was the last, and it was built as S-18. `open` + unowned: **F**, O,
+  S, T, Z. `boundary`: Y (accepted half settled by S-14), AA. Row F joined the
   unowned set when S-9 settled artefact identity but not reconstruction
   direction.
 - **The no-cull policy now protects nothing, and that is the result.** As of
-  S-14 every `EDGE_SCHEMA` label has a writer and a reader, and every node
-  label is created by a verb. `DEFERS` was the last unwalked edge — and when
-  S-14 finally entered its branch, the branch was wrong twice over
-  (`open: false` for a question deliberately left open, under a token naming a
-  state nothing could write). Neither was findable by inspection. Keep the
-  policy for what it catches next; it has now paid out twice.
+  S-18 every `EDGE_SCHEMA` label has a writer and a reader, and every node label
+  is created by a verb — `DEFERS` was the last unwalked edge, and `PROMOTES`
+  arrived with both together. When S-14 finally entered the `DEFERS` branch it
+  was wrong twice over (`open: false` for a question deliberately left open,
+  under a token naming a state nothing could write). Neither was findable by
+  inspection. Keep the policy for what it catches next; it has now paid out
+  twice.
 
 ## Next
 
@@ -260,37 +309,30 @@ commit *is* the root, `collect.sh` falls back to the root itself, so
 commit. Pre-existing intent, not introduced by the `--verify` fix, and fixing
 it means deciding what "everything since the beginning" should mean.
 
-**Promote story 18, then freeze the corpus.** S-14 is done (`d017ea4`); story
-18 is the last outstanding item in the corpus.
+**The Bonsai corpus is frozen — checkable, not asserted.** PJ-008's ownership
+table shows no row with an unbuilt owner; S-2 and S-13 own nothing outstanding
+and were never built. Fifteen scenario files: twelve of the fourteen promoted in
+PJ-008, plus S-3b and S-3c as authored discriminators, plus S-18 promoted from
+§4. No freeze *act* is needed and none was taken — the ledger is the record.
+(PJ-021 got this claim wrong once while its own table said otherwise; verify it
+the same way rather than from this sentence.)
 
-1. **Promote story 18 — "scratch work that unexpectedly matters."** PJ-008 §4
-   has carried its promotion condition from the start — *"if row K survives the
-   build, promote this to a scenario"* — and row K survived S-8. The condition
-   fired and sat unnoticed through three reviews. It owns row K: scratch →
-   citable standing, and rows G, K and R are noted in the ledger as possibly one
-   question. Read `### Row K` and §4's story 18 entry together before writing
-   predictions.
-2. **Then freeze this corpus.** S-2 and S-13 own nothing outstanding. S-13 in
-   particular revisits machinery that has already moved.
+**The next step is a real consumer above the domain layer**, done contract-first,
+and it is a new phase rather than a continuation — it needs cold-context agents
+the user has not launched. Recorded here so it is not re-derived:
 
-Commit predictions before building, as every build this session did — that
-discipline is why this session's wrong predictions are legible rather than
-invisible. Two constraints worth carrying from S-14: a state nothing can write
-is a claim nobody has tested, so prefer making a branch reachable over trusting
-it; and if a field's only consumer would be the test asserting it, do not add
-the field.
+1. Cold-context agents design the researcher-facing read surface from the
+   research questions and journals, **without** being shown the graph ontology.
+2. Then the thinnest read-only MCP/CLI adapter that answers those questions.
 
-**After the corpus freeze**, the review's direction, recorded here so it is not
-re-derived: a **real consumer above the domain layer**, done contract-first —
-cold-context agents design the researcher-facing read surface from the research
-questions and journals *without* being shown the graph ontology, then the
-thinnest read-only MCP/CLI adapter that answers those questions. That applies a
-kind of pressure no scenario does — discoverability, navigation, summaries,
-"where am I and what can happen next" — and is far likelier to expose a missing
-noun (`Actor`, programme boundaries, projections, authority, stable references)
-than another Bonsai-shaped scenario. The adversarial PJ-001 review runs
-*alongside* it, not instead: a reviewer can propose ten alternative ontologies,
-and the consumer is what makes one of those disagreements consequential. A second
+That applies a kind of pressure no scenario does — discoverability, navigation,
+summaries, "where am I and what can happen next" — and is far likelier to expose
+a missing noun (`Actor`, programme boundaries, projections, authority, stable
+references) than another Bonsai-shaped scenario. Five consecutive builds have
+pressed only on relationships, query semantics and identity, and the noun
+inventory has not moved in fifteen. The adversarial PJ-001 review runs
+*alongside*, not instead: a reviewer can propose ten alternative ontologies, and
+the consumer is what makes one of those disagreements consequential. A second
 mined corpus — from a real research programme, not authored to attack the model
 — comes third.
 
@@ -299,3 +341,7 @@ distinguishes "re-verify a finding" from "re-run an analysis wholesale". PJ-020:
 ask of every step **"what does this look like halfway through?"** and **"what if
 the second half fails?"** — the questions a happy-path conversation cannot ask,
 and the source of that review's two most serious findings.
+
+And one from S-18, which is about this document rather than the model: when a
+build records a condition for a *future* build, the condition needs a home
+somewhere it will be read. Prose in §4 was not one.
