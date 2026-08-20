@@ -174,16 +174,19 @@ range that already exists.
 
 - The Stop hook advances the recorded sha at the moment it fires, so a HEAD is
   never asked about twice even if this skill errors. Failing loudly is safe.
-- **The wrap's own commit fires the hook again.** It moves HEAD, and `asked`
-  was advanced when the hook fired, so the next turn boundary asks once more.
-  That is expected, not a malfunction, and it is why step 4 forbids an empty
-  commit: on that second fire the right outcome is usually "nothing changed,
-  stopping". Only rewrite the entry if a fact in it is actually stale — a
-  changed verification number or a commit the entry does not list.
+- **The wrap's own commit no longer fires the hook.** It used to: committing
+  the entry moves HEAD, so `asked` stopped matching and the next turn boundary
+  asked whether a commit whose entire content *is* the write-up had been
+  written up. Always yes, and it cost an agent turn each time to say so. The
+  hook now stays quiet when nothing outside `docs/session-log/` changed since
+  it last asked. Narrow on purpose: a wrap commit that also carries real work
+  still fires, which is the other reason step 4 says to commit such work
+  separately and first — bundling it in is what would hide it.
+- **Two places know the log directory**: `collect.sh`'s `log_dir` and
+  `wrap-hook.sh`'s. Both must move together, along with this file and
+  `record-entry.sh`'s guard.
 - The number is taken at write time, not reserved. Two sessions wrapping in the
   same second can still collide; the re-check in step 3 narrows it, and the
   loser renames. Not worth a lock.
-- The path lives in three places if it ever moves again: this file,
-  `collect.sh` (`log_dir`), and `record-entry.sh`'s guard.
 - Numbering restarts at `001` in `docs/session-log/` and is independent of the
   project journal's. Two sequences, two purposes.

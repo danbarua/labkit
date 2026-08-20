@@ -22,6 +22,8 @@ set -euo pipefail
 mode="${1:-stop}"
 root="${CLAUDE_PROJECT_DIR:-$PWD}"
 state_dir="$root/.claude/.wrap-state"
+# Kept in step with collect.sh's own `log_dir` -- see SKILL.md's Notes.
+log_dir="docs/session-log"
 
 payload="$(cat || true)"
 
@@ -83,6 +85,26 @@ fi
 [ "$asked" = "$head_sha" ] && exit 0   # already asked about this HEAD
 
 entry="$(read_state entry)"
+
+# The wrap's own commit must not ask to be wrapped.
+#
+# Committing the entry moves HEAD, so `asked` no longer matches and this fires
+# again -- asking whether a commit whose entire content IS the write-up has
+# been written up. The answer is yes by construction, and it cost a whole agent
+# turn each time to establish that. So: if nothing outside the session log has
+# changed since we last asked, advance `asked` and stay quiet.
+#
+# Deliberately narrow. A wrap turn that also commits real work still fires,
+# because that work genuinely is unwritten -- which is why SKILL.md tells you to
+# commit such work SEPARATELY and first. Bundling it into the wrap commit is
+# what would hide it here.
+if git rev-parse --verify --quiet "$asked" >/dev/null 2>&1; then
+  touched="$(git diff --name-only "$asked..$head_sha" 2>/dev/null || true)"
+  if [ -n "$touched" ] && ! printf '%s\n' "$touched" | grep -qv "^$log_dir/"; then
+    write_state "$baseline" "$head_sha" "$entry"
+    exit 0
+  fi
+fi
 # Advance `asked` BEFORE asking, so a HEAD is never asked about twice even if
 # the skill never runs, never writes, or errors. `baseline` deliberately does
 # NOT move: the entry covers the whole session, and is rewritten whole each
@@ -99,8 +121,13 @@ fi
 python3 -c '
 import json, sys
 count, target, state_file = sys.argv[1], sys.argv[2], sys.argv[3]
+# Says what actually happened, not what it used to claim. The old wording --
+# "N commit(s) ... have not been written up" -- was false whenever the entry
+# already covered them; the trigger is that HEAD moved, and N is the size of
+# the range the entry has to describe, not a backlog.
 reason = (
-    f"Session wrap: {count} commit(s) since the last wrap have not been written up. "
+    f"Session wrap: HEAD has moved since the entry for this session was last written. "
+    f"The entry covers {count} commit(s) from the session baseline. "
     f"Invoke the `wrap` skill now (Skill tool, skill: \"wrap\", args: \"{state_file}\"), "
     f"then stop. {target}"
 )
