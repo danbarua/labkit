@@ -69,6 +69,44 @@ echo "$baseline"
 echo "  origin: $origin"
 echo "  HEAD:   $head_sha"
 echo
+# Commits in this range that another session has already written up.
+#
+# `baseline` is pinned at session start and never moves, which is right for a
+# session that runs to completion. A session RESUMED across another session's
+# work gets a range containing that work -- faithfully reported, and a
+# whole-file rewrite that trusts it will restate their commits as this
+# session's. The tell is a commit touching a session-log entry that is not
+# ours: that entry claims the work around it.
+claimed=""
+# Match by entry NUMBER, not by path. An entry gets renamed when a session
+# outgrows its title (003 was renamed twice), and the commit carrying the
+# rename touches the old path -- which an exact-path exclusion reads as
+# another session's entry, flagging this session's own commit. The number is
+# what is stable.
+entry_num=""
+case "$entry" in "$log_dir"/[0-9][0-9][0-9]_*) entry_num="$(basename "$entry" | cut -c1-3)";; esac
+if [ -d "$log_dir" ]; then
+  while read -r sha; do
+    [ -n "$sha" ] || continue
+    others="$(git diff-tree --no-commit-id --name-only -r "$sha" -- "$log_dir" 2>/dev/null \
+      | grep -v '/README\.md$' \
+      | { [ -n "$entry_num" ] && grep -v "^$log_dir/$entry_num\_" || cat; } || true)"
+    [ -n "$others" ] || continue
+    claimed="$claimed$(git log -1 --format='  %h %s' "$sha")   -> $(printf '%s' "$others" | tr '\n' ' ')
+"
+  done <<EOF
+$(git log --format=%H "$baseline..$head_sha" -- "$log_dir" 2>/dev/null || true)
+EOF
+fi
+if [ -n "$claimed" ]; then
+  echo "## WARNING -- part of this range belongs to another session's entry"
+  printf '%s' "$claimed"
+  echo "  Those commits, and the work they describe, are already written up there."
+  echo "  Cover only this session's own commits, and say plainly in the entry that"
+  echo "  the range is wider than the session. Do not restate the other entry."
+  echo
+fi
+
 echo "## commits since baseline"
 git log --oneline "$baseline..$head_sha" 2>/dev/null || echo "(none)"
 echo

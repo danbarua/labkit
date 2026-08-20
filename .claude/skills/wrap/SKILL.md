@@ -157,6 +157,13 @@ Three rules, because this repo has more than one session in it:
   commits in this repo's history — another session's journal entry once, a
   regenerated dependency graph another time — and in both cases the commit
   message described neither.
+- **Check the index, not just your own `git add`.** `git mv` and `git rm`
+  stage by themselves, so a rename done earlier in the turn is already staged
+  and rides into the next commit behind an explicit `git add` of other paths.
+  That is the same "the message described neither" failure reached without
+  ever typing `git add -A`, and it has happened once — the rename of entry 002
+  landed in the PJ-024 commit. `git status --short` before committing shows it:
+  anything in the left-hand column is going in.
 - **Do not create an empty commit.** The Stop hook fires at every turn boundary
   where HEAD moved, including the one your own wrap commit causes. If the entry
   is unchanged, say so and stop; there is nothing to record.
@@ -182,6 +189,24 @@ range that already exists.
   it last asked. Narrow on purpose: a wrap commit that also carries real work
   still fires, which is the other reason step 4 says to commit such work
   separately and first — bundling it in is what would hide it.
+- **Compaction issues a new session id**, which would otherwise lose this
+  session's state entirely: a fresh baseline at today's HEAD, an empty `entry`,
+  and the second half of one session opening a second numbered entry while the
+  first half is left covered by an entry nobody updates again. `SessionStart`
+  now inherits the predecessor's `baseline` and `entry` when `source` is
+  `compact` or `resume` **and** that session's recorded HEAD is an ancestor of
+  ours. `startup` and `clear` never inherit — those are genuinely new sessions.
+  The ancestry check is what stops a session inheriting an unrelated one that
+  merely wrapped most recently.
+- **`collect.sh` warns when the range is wider than the session.** `baseline`
+  is pinned at session start and never moves, which is right until a session is
+  *resumed* across another session's work — then the range contains commits
+  another entry already covers, and a whole-file rewrite that trusts it will
+  restate their work as yours. The tell is a commit touching a session-log
+  entry that is not this session's; the warning names the entry that claims it.
+  Matching is by entry **number**, not path, because an entry gets renamed when
+  a session outgrows its title and the rename commit touches the old path.
+  Say in the entry that the range is wider than the session, as 002 does.
 - **Two places know the log directory**: `collect.sh`'s `log_dir` and
   `wrap-hook.sh`'s. Both must move together, along with this file and
   `record-entry.sh`'s guard.

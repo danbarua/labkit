@@ -37,11 +37,14 @@ except Exception:
     d = {}
 sid = str(d.get("session_id") or "no-session")
 sid = re.sub(r"[^A-Za-z0-9_-]", "_", sid)[:96]
-print(sid, "true" if d.get("stop_hook_active") else "false", sep="\t")
-' 2>/dev/null || printf 'no-session\tfalse')"
+# SessionStart carries source: startup | resume | clear | compact.
+src = re.sub(r"[^a-z]", "", str(d.get("source") or "").lower())[:16]
+print(sid, "true" if d.get("stop_hook_active") else "false", src, sep="\t")
+' 2>/dev/null || printf 'no-session\tfalse\t')"
 
-session_id="${parsed%%$'\t'*}"
-stop_active="${parsed##*$'\t'}"
+session_id="$(printf '%s' "$parsed" | cut -f1)"
+stop_active="$(printf '%s' "$parsed" | cut -f2)"
+source_kind="$(printf '%s' "$parsed" | cut -f3)"
 state_file="$state_dir/$session_id"
 
 cd "$root" 2>/dev/null || exit 0
@@ -61,7 +64,39 @@ write_state() { # write_state <baseline> <asked> <entry>
 if [ "$mode" = "start" ]; then
   # Only if absent: resuming a session must not re-baseline past work that the
   # original session already did.
-  [ -f "$state_file" ] || write_state "$head_sha" "$head_sha" ""
+  if [ ! -f "$state_file" ]; then
+    inherited=""
+    # Compaction issues a NEW session id, so state keyed by that id vanishes
+    # from under a session that is still going: a fresh baseline at today's
+    # HEAD, an empty `entry`, and the work continues into a SECOND numbered
+    # entry describing half a session. The first half is then covered by an
+    # entry nobody will update again. Inherit the predecessor's state instead.
+    #
+    # Gated on `source` deliberately. `startup` and `clear` are genuinely new
+    # sessions and must re-baseline; only a continuation should inherit.
+    # `resume` is included because resuming can re-issue the id too -- when it
+    # does not, the state file already exists and we never reach here.
+    case "$source_kind" in
+      compact|resume)
+        prev="$(ls -t "$state_dir" 2>/dev/null | head -1 || true)"
+        if [ -n "$prev" ] && [ -f "$state_dir/$prev" ]; then
+          prev_asked="$(sed -n 's/^asked=//p' "$state_dir/$prev" | tail -1)"
+          # Only if that session's history is ours. Otherwise it is simply the
+          # session that happened to wrap most recently, on another branch or
+          # another line of work, and inheriting it would hand this session
+          # someone else's entry to overwrite.
+          if [ -n "$prev_asked" ] && git merge-base --is-ancestor "$prev_asked" "$head_sha" 2>/dev/null; then
+            inherited="$prev"
+          fi
+        fi
+        ;;
+    esac
+    if [ -n "$inherited" ]; then
+      cp "$state_dir/$inherited" "$state_file"
+    else
+      write_state "$head_sha" "$head_sha" ""
+    fi
+  fi
   # Old sessions' state files are just litter.
   find "$state_dir" -type f -mtime +30 -delete 2>/dev/null || true
   exit 0
