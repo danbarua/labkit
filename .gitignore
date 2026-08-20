@@ -10,6 +10,12 @@ bin/
 *.bun-build
 .labkit
 
+# This is a Bun project — `bun.lock` is the lockfile. A tracked
+# `package-lock.json` was removed after the two disagreed about drizzle-kit
+# (0.30.6 vs 0.18.1) with nothing reading the npm one. Ignored so an
+# accidental `npm install` cannot resurrect a second source of truth.
+package-lock.json
+
 .idea
 
 # Claude Code, shared vs local.
