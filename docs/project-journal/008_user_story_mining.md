@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | No artefact-to-artefact lineage | S-9° | open |
+| F | No artefact-to-artefact lineage | **S-9** | refuted |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -684,7 +684,7 @@ this document's original analysis are marked as such.
 | M | A review has no analysis to point at | S-11 | resolved |
 | N | Claim identity is undefined | S-5, S-12 | resolved |
 | O | Withdrawal reason is under-determined | S-3, S-7 | open |
-| P | `Evidence` carries two senses | S-9°, S-10, S-12 | open |
+| P | `Evidence` carries two senses | **S-9**, S-10, S-12 | resolved |
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, story 18° | resolved |
 | S | No agent, person or role exists in the model | S-8 | open |
@@ -717,7 +717,7 @@ to be that well informed:
 
 | Kind | Means | Rows today |
 | --- | --- | --- |
-| `open` + owned | an unbuilt discriminator is named (`°` present) | F, J, K, P |
+| `open` + owned | an unbuilt discriminator is named (`°` present) | J, K |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | O, S, T, Z |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
@@ -939,6 +939,30 @@ S-10 removes is one of the two routes by which they were expected to become a
 wrong answer. The row stays open with S-9 as its only unbuilt owner, and that
 scenario — where an artefact's provenance is partly unrecoverable — is now the
 one that has to produce it or leave the row where it is
+
+**S-9: it fired, against the prediction made for that build too.** Both S-10's
+and S-9's predictions said this row would not move. It moved.
+
+`whatDependsOn()` walked only `Evidence -RECORDED_IN-> Artefact`, which reaches
+an analysis **output**. Aimed at an **input** — which is what "what depends on
+the unreproducible part?" asks — it returned `claims: []` while still naming the
+enquiry: populated, confident, and wrong. The same verb answered one question
+two incompatible ways depending on which end of a computation it was pointed at,
+and S-11 never noticed because S-11 only ever asks about outputs.
+
+**Resolved in the query, not in the model.** The fix walks the consumer route as
+well; no label was split, no property added. That is the outcome this row's own
+note allowed for — "may be correct minimalism" — with the correction that the
+minimalism was correct about *storage* and wrong about *reading*.
+
+**What is not resolved, and is now recorded rather than carried as a
+prediction:** `recordObservations()` still creates `Evidence` with no producing
+`EvidenceUnit`, which PJ-001 defines as impossible, and `whySupported()` still
+cannot count an observation as support. Three of four cold reviewers flagged
+that independently and it remains true. What has changed is that it is no longer
+*owned*: three scenarios have now been pointed at it and the harm they found was
+a reader's, not a structure's. If it is a defect, something else will have to
+demonstrate it
 
 ### Row Q — Question and LineOfEnquiry are collapsed by the service layer
 
@@ -1737,6 +1761,34 @@ service-layer identity fix, then five consecutive scenarios will have pressed
 only on relationships and query semantics, and the question PJ-018/019/020 all
 close on — *is the entity set well chosen, or is the corpus not pressing?* —
 stops being answerable by building more of this corpus.
+
+**Outcomes.** Four predictions held, one was wrong, and the wrong one is the
+useful one.
+
+*Held.* The wrong answer lived where predicted, in `whatDependsOn()` keyed on
+`logical_name` — sixth region for identity-by-wording, and the refusal follows
+S-5. `content_hash` gained its first reader. No new node label. "What would
+resolve this?" needed nothing new.
+
+*Held, and this was the interesting call:* **row F is refuted.** The ledger's
+own fallback held, and no `Artefact → Artefact` edge was earned. One scenario
+after row E *was* earned on the same test, which is the sharpest available
+illustration that the bar is doing work rather than rubber-stamping: direction
+and caveat had homes here and did not there.
+
+*Wrong.* **Row P was predicted not to fire, for the second build running, and it
+fired.** Both S-10's predictions and these said the two senses of `Evidence`
+would stay apart. They did in storage; they did not in reading. That is a better
+outcome than a lucky hit — a row two consecutive builds expected to be inert
+turned out to hold a confidently wrong answer, and only asking it a *third*
+question found it.
+
+*The corpus question this section opened on is now answerable, and the answer is
+uncomfortable.* Five consecutive scenarios have pressed only on relationships,
+query semantics and identity. The noun inventory has not moved in thirteen. What
+S-9 adds is that the last mined scenario owning an open row has now been built,
+so "build more of this corpus" is no longer a way to find out. The remaining
+three — S-2, S-13, S-14 — own nothing outstanding between them.
 
 ## §4 — Held back as stories, not scenarios
 

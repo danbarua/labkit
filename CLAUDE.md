@@ -21,10 +21,10 @@ layer is built against), 009 (the first scenario built from it), 010 (a
 cold-context review of both), 011 (the control chain under scenario pressure),
 then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
 S-12, S-5), 016 (the standard a finding is held to: S-3b), 018 (when a failed
-check stops counting: S-3c), 019 (re-verification is not reproduction: S-10) and
-**020 (a third external review: atomicity, and identity by wording again)** —
-those are the current state of the domain model, and 020 is the newest decision
-in the chain. 012 is the implementing agent's own perspective after S-3, opinion
+check stops counting: S-3c), 019 (re-verification is not reproduction: S-10),
+020 (a third external review: atomicity, and identity by wording again) and
+**021 (a regenerated part is not the part: S-9)** — those are the current state
+of the domain model, and 021 is the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
@@ -168,7 +168,7 @@ and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
 current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8,
-S-3b, S-3c and S-10 required. Return types are derived one-per-bullet from a scenario's
+S-3b, S-3c, S-10 and S-9 required. Return types are derived one-per-bullet from a scenario's
 "Afterward" questions
 rather than designed — if a bullet has no natural home in the types, the API
 is wrong, not the bullet.
@@ -261,10 +261,11 @@ qualifies, so `QUALIFIES` is written when the analysis is recorded and not when
 the check is evaluated — the same edge minted at the later moment cannot
 express the case the scenario exists for (S-3b, PJ-016).
 
-**Identity is never wording.** Five unrelated regions have now had to decide
+**Identity is never wording.** Six unrelated regions have now had to decide
 this — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
-(S-3c), and execution inputs (S-10, caught by review after shipping wrong).
-Three of the five got it right first time because someone asked at the time, so
+(S-3c), execution inputs (S-10, caught by review after shipping wrong) and
+artefacts (S-9, where a regenerated part carries the name of what it replaces).
+Three of the six got it right first time because someone asked at the time, so
 the rule is not "we keep failing at this" but **every new comparison is a fresh
 chance to fail at it**: when you write an equality test between two records, say
 out loud which field carries identity.
