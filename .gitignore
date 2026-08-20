@@ -12,13 +12,16 @@ bin/
 
 .idea
 
-# Local dev tooling, not part of the checkout. Anything under .claude/ is
-# assumed personal (MCP servers, hooks, permissions, machine-specific
-# instructions) unless deliberately shared below.
-.claude/*
-!.claude/skills/
-.mcp.json
-
-# CodeGraph's SQLite index — a derived artefact rebuilt by `codegraph init`,
-# and the reason for the .claude/ and .mcp.json entries above.
-.codegraph/
+# Claude Code, shared vs local.
+#
+# `.claude/settings.json` (the wrap Stop/SessionStart wiring) and
+# `.claude/skills/` are checked in deliberately — a clone or a new worktree
+# needs both for the hook to run at all.
+#
+# What stays out is machine- or session-local:
+.claude/settings.local.json
+# One file per session, keyed by a session UUID, holding three lines derived
+# from git. Meaningless in another checkout, rewritten constantly by concurrent
+# sessions, and swept on a timer — a tracked copy would conflict, go stale, and
+# hand a new worktree some other session's pinned baseline.
+.claude/.wrap-state/

@@ -45,9 +45,12 @@ every named probe has been built.
 
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
-independently; see its README. Note that the Stop/SessionStart wiring lives in
-`.claude/settings.json`, which is **gitignored**, so on a fresh clone the skill
-is present but the hook that runs it is not.
+independently; see its README. The Stop/SessionStart wiring lives in
+`.claude/settings.json`, which is **checked in** — it was gitignored until
+2026-08-20, so a clone got the skill without the hook that runs it. What stays
+out of the repo is `.claude/settings.local.json` (machine-local) and
+`.claude/.wrap-state/` (one file per session, derived from git; a tracked copy
+would hand a new worktree another session's pinned baseline).
 
 ## Commands
 
