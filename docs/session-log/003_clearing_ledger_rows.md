@@ -130,6 +130,17 @@ durable; how many there were is not.
   needed"; three were scannable and F was not. Row S deliberately left alone —
   it is a standing scope decision (identity is cross-cutting infrastructure),
   not an exhausted probe. See error 18.
+- `160e71d` — **`.claude/settings.json` checked in, `.claude/.wrap-state/`
+  ignored.** Housekeeping after CodeGraph was uninstalled: removing it took out
+  `.codegraph/` *and* the `.claude/*` / `.mcp.json` rules, because a comment had
+  named CodeGraph as the reason all three existed. Only the first was its
+  artefact. Rewritten as a shared-vs-local split — the wrap hook's wiring is in
+  (it closes the "clone gets the skill without the hook" gap CLAUDE.md carried,
+  and a worktree would have widened it), while `settings.local.json` and the
+  per-session state files stay out. `settings.local.json` was previously kept
+  out only by a personal global ignore that exists on one machine; it is
+  explicit in the repo now. CLAUDE.md's note updated, since it asserted the
+  opposite.
 - `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, `b7e473f`,
   `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, `701d868`, `4988938`, `0dd0d2d`
   (the user's dependency-graph regeneration), and this file's own commit —
@@ -334,6 +345,19 @@ which silently returns the column present and `NULL`.
    `a449392` and `4c4d417` as bare `4` — the `§` was eaten writing the message
    through a shell heredoc. Not worth rewriting history for, but keep commit
    messages ASCII on that path.
+20. **"Nothing is pushed" — a true fact about one ref, reported about the
+   repo.** After the merge I checked `main` against `origin/main`, correctly
+   found it 117 ahead, and told the user nothing was pushed. But
+   `origin/spike/drizzle-age` was already at `b991da8`: every commit of tonight,
+   both sessions', was on GitHub. `git branch -vv` prints the upstream name with
+   *no* ahead/behind counts when a branch is in sync, and I read past it in
+   output I had already run.
+
+   The mirror of error 18 rather than a repeat: that was a false negative (an
+   empty result read as absence), this is a false **positive** (a narrow true
+   result read as a general one). Same root — the check answered a narrower
+   question than the claim built on it — and it matters more here, because the
+   claim was about what had been published. Caught by the peer session.
 
 **One datum handed to the other session, not acted on here.** They asked what
 `collect.sh` shows against an entry numbered 003, and whether compaction issues
@@ -386,6 +410,16 @@ re-reads is not a mechanism. PJ-023 carries it.
   twice.
 
 ## Next
+
+**The branch for it already exists.** At the end of this session `main` was
+fast-forwarded to `b991da8` — the whole spike, 117 commits, no merge commit —
+and `feat/domain-consumer` was cut from it. All three refs sat at the same sha.
+`origin/main` was **not** pushed and is still at `eeda8b2`; `origin/spike/drizzle-age`
+*was* already at `b991da8`, so tonight's work is on GitHub via the spike branch
+even though `main` is local-only. The housekeeping commit below (`160e71d`)
+landed on the new branch and was then carried to `main` by a second
+fast-forward, so `main` has the shared `.claude/` wiring rather than only the
+feature branch.
 
 Left for the peer session to decide, not changed here: when today's earliest
 commit *is* the root, `collect.sh` falls back to the root itself, so
