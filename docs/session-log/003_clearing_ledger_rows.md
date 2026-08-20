@@ -1,8 +1,8 @@
-# 003: clearing ledger rows — S-3c, S-10, S-9, and a third review
+# 003: clearing ledger rows — S-3c, S-10, S-9, S-14, and two reviews
 
 **Session wrap, 2026-08-20, on `spike/drizzle-age`.** Not a decision record —
-see `docs/project-journal/` 018 (S-3c), 019 (S-10), 020 (the review) and 021
-(S-9), and PJ-008 §3 rows E, F, P, X and AB for the ledger.
+see `docs/project-journal/` 018 (S-3c), 019 (S-10), 020 (the third review), 021
+(S-9) and 022 (S-14), and PJ-008 §3 rows E, F, J, P, X and AB for the ledger.
 
 Renamed twice as the session outgrew its title; the slug is now generic so a
 further scenario would not need a third rename.
@@ -24,9 +24,9 @@ scenarios, and it exercises the support machinery S-3c had just changed.
 
 ## Changed
 
-Three scenarios built (S-3c, S-10, S-9), three ledger rows cleared (X, E, P) and
-one half-settled (F), one AGE bug found, **two** reviews acted on in full, four
-journal entries written.
+Four scenarios built (S-3c, S-10, S-9, S-14), four ledger rows cleared
+(X, E, P, J) and one half-settled (F), one AGE bug found, two reviews acted on
+in full, five journal entries written.
 Every compound domain verb is now atomic, each earned by its own negative test.
 
 *No commit count or total diffstat here, deliberately.* Both go stale the moment
@@ -82,9 +82,12 @@ durable; how many there were is not.
   leaves `$baseline` two lines long, breaking every downstream `git log/diff`.
   `--verify` fixes it. Reproduced in a scratch root-commit repo before applying.
   Unreachable from labkit's own Stop hook, which always passes a state file.
+- `387e056`, `7f7d2a3`, `d017ea4` — **S-14**: predictions, build, PJ-022 and the
+  ledger. Row J **resolved** with no new structure, and the last unwalked edge
+  walked.
 - `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, `b7e473f`,
-  `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, and this file's own commit — wrap
-  bookkeeping.
+  `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, `701d868`, `0dd0d2d` (the user's
+  dependency-graph regeneration), and this file's own commit — bookkeeping.
 
 Source: `src/domain/session.ts`, `src/domain/report.ts`, `src/db/domain.ts` (the
 `REVERIFIES` edge), `src/db/graph.ts` (`inTransaction`), `src/db/agtype.ts` (the
@@ -102,9 +105,9 @@ entry.
 
 ## Verified
 
-Run at `1172e9c` plus the fourth review's second pass:
+Run at `d017ea4`:
 
-- `bun test` — **176 pass, 0 fail**, 568 expect() calls, 18 files. Was 145/15 at
+- `bun test` — **183 pass, 0 fail**, 591 expect() calls, 19 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 2 `no-orphans`
@@ -119,11 +122,12 @@ five fire/silence cases. `bun test` does not cover it.
 - `bun run dev:dependency-cruiser` — regenerated to a byte-identical graph at
   `2b6c80d`; not re-run since, and S-9 added no module.
 
-**Six deletion verifications**, each removing the thing and watching the wrong
+**Eight deletion verifications**, each removing the thing and watching the wrong
 answer return: S-3c's narrowing, S-10's `REVERIFIES` write, and `inTransaction()`
 twice — once for the two verbs a scenario can reach, once for the two it cannot.
-and S-9's two fixes separately — removing the consumer traversal fails three
-assertions, removing the name refusal fails one. S-3c's was also run in the
+S-9's two fixes separately — removing the consumer traversal fails three
+assertions, removing the name refusal fails one — and S-14's two, where removing
+the `DEFERS` write fails four and restoring the old `open: false` fails one. S-3c's was also run in the
 *opposite* direction — widening
 the rule to "the last verdict wins" fails S-3's own two tests, which is what
 distinguishes a narrowing from a removal. Worth repeating if either is revisited.
@@ -236,10 +240,17 @@ about the method" carries it.
   Three scenarios have been pointed at it; each found a reader's defect, not a
   structural one. Recorded as fact now rather than carried as a prediction.
 - **Ledger:** no row is a live defect shipping green. `open` + unowned: **F**,
-  O, S, T, Z. `open` with an unbuilt owner: J (owned by **S-14, a corpus
-  scenario**) and K (owned by **story 18**, whose promotion condition has
-  fired). Row F joined the unowned set when S-9 settled artefact identity but
-  not reconstruction direction.
+  O, S, T, Z. `open` with an unbuilt owner: **K alone**, owned by story 18,
+  whose promotion condition fired when S-8 gave no verdict. Row F joined the
+  unowned set when S-9 settled artefact identity but not reconstruction
+  direction.
+- **The no-cull policy now protects nothing, and that is the result.** As of
+  S-14 every `EDGE_SCHEMA` label has a writer and a reader, and every node
+  label is created by a verb. `DEFERS` was the last unwalked edge — and when
+  S-14 finally entered its branch, the branch was wrong twice over
+  (`open: false` for a question deliberately left open, under a token naming a
+  state nothing could write). Neither was findable by inspection. Keep the
+  policy for what it catches next; it has now paid out twice.
 
 ## Next
 
@@ -249,24 +260,25 @@ commit *is* the root, `collect.sh` falls back to the root itself, so
 commit. Pre-existing intent, not introduced by the `--verify` fix, and fixing
 it means deciding what "everything since the beginning" should mean.
 
-**S-14, then story 18, then freeze the corpus.** Set by external review after
-this entry first claimed, wrongly, that the corpus was exhausted.
+**Promote story 18, then freeze the corpus.** S-14 is done (`d017ea4`); story
+18 is the last outstanding item in the corpus.
 
-1. **S-14 — "deliberately leaving something unresolved."** It genuinely owns row
-   J (deferred versus accepted-as-unresolved), which is also the only row whose
-   `DEFERS` edge has a reader and no writer, making `closure: "deferred"` an
-   unreachable branch today. One constraint from the review to carry in: it
-   should **not** derive scientific standing from the presence of a `Task`.
-2. **Promote story 18 — "scratch work that unexpectedly matters."** PJ-008 §4
+1. **Promote story 18 — "scratch work that unexpectedly matters."** PJ-008 §4
    has carried its promotion condition from the start — *"if row K survives the
    build, promote this to a scenario"* — and row K survived S-8. The condition
-   fired and nobody noticed. It owns row K: scratch → citable standing.
-3. **Then freeze this corpus.** S-2 and S-13 own nothing outstanding. S-13 in
+   fired and sat unnoticed through three reviews. It owns row K: scratch →
+   citable standing, and rows G, K and R are noted in the ledger as possibly one
+   question. Read `### Row K` and §4's story 18 entry together before writing
+   predictions.
+2. **Then freeze this corpus.** S-2 and S-13 own nothing outstanding. S-13 in
    particular revisits machinery that has already moved.
 
-Open `docs/project-journal/008_user_story_mining.md` at `### S-14 —`, and commit
-predictions before building, as every build this session did — that discipline
-is why this session's wrong predictions are legible rather than invisible.
+Commit predictions before building, as every build this session did — that
+discipline is why this session's wrong predictions are legible rather than
+invisible. Two constraints worth carrying from S-14: a state nothing can write
+is a claim nobody has tested, so prefer making a branch reachable over trusting
+it; and if a field's only consumer would be the test asserting it, do not add
+the field.
 
 **After the corpus freeze**, the review's direction, recorded here so it is not
 re-derived: a **real consumer above the domain layer**, done contract-first —
