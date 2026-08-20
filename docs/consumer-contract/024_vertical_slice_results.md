@@ -58,6 +58,24 @@ The first draft's probes 2 and 3 would have stayed **green** after their defects
 were fixed: probe 2 called `whatIsKnown()` with no arguments, so adding `asOf`
 changed nothing; probe 3's builder never invoked a reconstruction mechanism.
 
+**The instrument caught its own author too, and that is the sharpest instance.**
+The reviewer who proposed this test reached its finding by *reading* the probes,
+and said explicitly that not re-running the suite did not matter. It did: "these
+would stay green after a fix" is a claim about what running code does, and it
+became a fact only when the three fields were injected and the three failures
+observed. Until then it had precisely the property it was convicting the probes
+of — persuasive, and not yet demonstrated. The instrument was right; it had not
+been turned on itself.
+
+Recorded because it is the same lesson at one more remove, and because it is the
+reason the injection table exists rather than a paragraph asserting the same
+thing.
+
+**Restoring `session.ts` byte-identical after each injection** is deletion
+verification applied to an *addition* — the standard this repo set for earning
+edges, used on a read surface. Without it the table would report three failures
+and leave three unexplained changes in the tree.
+
 ## Probe 1 — orientation. **Passes, and it carries the other three.**
 
 Stated affirmatively, because the first draft undersold it as a guard against a
