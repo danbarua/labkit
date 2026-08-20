@@ -24,8 +24,9 @@ scenarios, and it exercises the support machinery S-3c had just changed.
 
 ## Changed
 
-Three scenarios built (S-3c, S-10, S-9), four ledger rows cleared (X, E, F, P),
-one AGE bug found, one review acted on in full, four journal entries written.
+Three scenarios built (S-3c, S-10, S-9), three ledger rows cleared (X, E, P) and
+one half-settled (F), one AGE bug found, **two** reviews acted on in full, four
+journal entries written.
 Every compound domain verb is now atomic, each earned by its own negative test.
 
 *No commit count or total diffstat here, deliberately.* Both go stale the moment
@@ -45,9 +46,14 @@ durable; how many there were is not.
 - `e2fa5ff`, `2b6c80d`, `116a719` — **the third review**: seven fixes, PJ-020,
   then the remaining two compound verbs made atomic on their own evidence.
 - `2f937bf`, `b55ff09`, `a987a68` — **S-9**: predictions, build, PJ-021 and the
-  ledger. Row F **refuted** (no artefact lineage edge needed), row P
-  **resolved** against two consecutive predictions that it would not move.
-  `content_hash` gained its first reader since PJ-004.
+  ledger. Row P **resolved** against two consecutive predictions that it would
+  not move; `content_hash` gained its first reader since PJ-004.
+- `2656bd1`, `e09ccfa` — **the fourth review, on S-9.** Three findings, all
+  verified before acting, all correct. Row F un-refuted and returned to `open`
+  with a boundary test; `notRebuilt` added to `reproducibilityOf()`; the
+  corpus-exhaustion claim withdrawn. See errors 10–12 below — the reason this
+  session ends with more recorded mistakes than it started with is that the
+  last review found the ones the first three missed.
 - `177549f` — **the Stop hook no longer fires for the wrap's own commit.** It
   used to ask whether a commit whose entire content is the write-up had been
   written up — a category error, yes by construction, and a full agent turn
@@ -72,7 +78,8 @@ durable; how many there were is not.
   `--verify` fixes it. Reproduced in a scratch root-commit repo before applying.
   Unreachable from labkit's own Stop hook, which always passes a state file.
 - `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, `b7e473f`,
-  and this file's own commit — wrap bookkeeping.
+  `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, and this file's own commit — wrap
+  bookkeeping.
 
 Source: `src/domain/session.ts`, `src/domain/report.ts`, `src/db/domain.ts` (the
 `REVERIFIES` edge), `src/db/graph.ts` (`inTransaction`), `src/db/agtype.ts` (the
@@ -90,9 +97,9 @@ entry.
 
 ## Verified
 
-Run at `a987a68`:
+Run at `2656bd1`:
 
-- `bun test` — **173 pass, 0 fail**, 557 expect() calls, 18 files. Was 145/15 at
+- `bun test` — **176 pass, 0 fail**, 570 expect() calls, 18 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 2 `no-orphans`
