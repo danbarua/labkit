@@ -159,6 +159,29 @@ which silently returns the column present and `NULL`.
    opened question is `unresolved` (it is `untested`, and the distinction is
    correct), and that `whatDependsOn` on an input would conflate two artefacts
    — it returned nothing at all, which is a different and worse defect.
+10. **A claim contradicting a summary written in the same commit.** PJ-021
+   declared the corpus exhausted — "S-2, S-13 and S-14 own nothing outstanding
+   between them" — while PJ-008's ownership table, edited in that same commit,
+   reads `open + owned: J, K`. S-14 owns row J; story 18 owns row K and has
+   carried a promotion condition since PJ-008 was written ("if row K survives
+   the build, promote this to a scenario") which fired when S-8 gave no verdict
+   and had been sitting fired, unnoticed, ever since. Caught by external review.
+
+   This one is a **different class** from the eight above it, and worse. Those
+   were claims made without checking; this was a claim contradicting evidence
+   this same session had just written down two sections away. The ledger is the
+   authority precisely so prose cannot drift from it — and the prose drifted
+   anyway, in the same breath. **The check that would have caught it is
+   mechanical: before asserting anything about what is or is not outstanding,
+   read the ownership table, not your memory of it.**
+11. *A durable property asserted that the code does not have.* PJ-021 argued row
+   F needed no lineage edge because "direction is in the act". There is no such
+   act — the regenerated artefact is written by an ordinary
+   `recordObservations()` naming nothing historical. Row F is back to `open`,
+   with a boundary test making the gap durable.
+12. *Absence-vs-difference, missed inside the function written to respect it.*
+   `reproducibilityOf()` reported a part the caller had not rebuilt as
+   `differing`. New `notRebuilt` state.
 
 **What the third review exposed about the method**, and the most portable thing
 here: the scenario discipline is structurally poor at states that exist only
@@ -200,23 +223,38 @@ commit *is* the root, `collect.sh` falls back to the root itself, so
 commit. Pre-existing intent, not introduced by the `--verify` fix, and fixing
 it means deciding what "everything since the beginning" should mean.
 
-**Not another corpus scenario — decide what the corpus is for now.** S-2, S-13
-and S-14 remain unbuilt and own nothing outstanding between them. Building them
-would exercise the verbs again; PJ-021 argues it would not tell us whether the
-entity set is right, which is the question every recent entry closes on.
+**S-14, then story 18, then freeze the corpus.** Set by external review after
+this entry first claimed, wrongly, that the corpus was exhausted.
 
-Read `docs/project-journal/021_a_regenerated_part_is_not_the_part.md` §"The
-corpus question, now answerable" first — it names the three candidates: a
-different corpus, a real consumer above the domain layer (the MCP/CLI read side,
-which is also what would bring back the relational projection removed in
-`af5a1d2`), or an adversarial reading of PJ-001 itself. That is a decision for
-the user, not a default.
+1. **S-14 — "deliberately leaving something unresolved."** It genuinely owns row
+   J (deferred versus accepted-as-unresolved), which is also the only row whose
+   `DEFERS` edge has a reader and no writer, making `closure: "deferred"` an
+   unreachable branch today. One constraint from the review to carry in: it
+   should **not** derive scientific standing from the presence of a `Task`.
+2. **Promote story 18 — "scratch work that unexpectedly matters."** PJ-008 §4
+   has carried its promotion condition from the start — *"if row K survives the
+   build, promote this to a scenario"* — and row K survived S-8. The condition
+   fired and nobody noticed. It owns row K: scratch → citable standing.
+3. **Then freeze this corpus.** S-2 and S-13 own nothing outstanding. S-13 in
+   particular revisits machinery that has already moved.
 
-If the answer is "keep building scenarios anyway", S-13 is the strongest of the
-three: it revisits question lineage, closure stability and act→product, all of
-which have moved since it was written. Commit predictions first, as every build
-this session did — that discipline is why this session's five wrong predictions
-are legible rather than invisible.
+Open `docs/project-journal/008_user_story_mining.md` at `### S-14 —`, and commit
+predictions before building, as every build this session did — that discipline
+is why this session's wrong predictions are legible rather than invisible.
+
+**After the corpus freeze**, the review's direction, recorded here so it is not
+re-derived: a **real consumer above the domain layer**, done contract-first —
+cold-context agents design the researcher-facing read surface from the research
+questions and journals *without* being shown the graph ontology, then the
+thinnest read-only MCP/CLI adapter that answers those questions. That applies a
+kind of pressure no scenario does — discoverability, navigation, summaries,
+"where am I and what can happen next" — and is far likelier to expose a missing
+noun (`Actor`, programme boundaries, projections, authority, stable references)
+than another Bonsai-shaped scenario. The adversarial PJ-001 review runs
+*alongside* it, not instead: a reviewer can propose ten alternative ontologies,
+and the consumer is what makes one of those disagreements consequential. A second
+mined corpus — from a real research programme, not authored to attack the model
+— comes third.
 
 Two standing questions to carry into whatever comes next. PJ-019: nothing
 distinguishes "re-verify a finding" from "re-run an analysis wholesale". PJ-020:
