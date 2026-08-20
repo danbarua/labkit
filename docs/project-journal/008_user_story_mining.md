@@ -1797,6 +1797,35 @@ inventory has not moved in thirteen. That is a reason to expect the *next* kind
 of pressure to come from somewhere else — but it is not a licence to stop
 building the probes this document has already named.
 
+### S-14 predictions, recorded before the build
+
+Recorded 2026-08-20, against `0dd0d2d`, before a line of test or source. S-14 is
+**mined**, and owns row J outright. It is also the scenario PJ-008 nominated to
+guard PJ-001's "should not accumulate ceremony" bullet.
+
+**Row J's own fallback is the thing this scenario forbids.** The row records the
+no-change route as *"distinguish by whether an open task exists"* — and §2 says
+plainly that *"a model that can only express it as an open task is a failure"*.
+So the route the ledger has carried since it was written is ruled out by the
+scenario that owns it, which is worth noticing before the build rather than
+discovering during it. External review independently set the same constraint:
+S-14 must not derive scientific standing from `Task` presence.
+
+| Question | Prediction |
+| --- | --- |
+| Where the wrong answer lives | **`enquiryStatus()` and `whatIsKnown()`, reporting acceptance as pending work.** With no verb for it, a question deliberately accepted as unresolved is left open, and both readers then classify it exactly as one nobody has got to: `open: true, closure: null`, and a slot in the survey that means "still being worked". That is a confident misclassification of a *decision* as an *absence*, not an empty result |
+| `DEFERS` | **Gets its first writer.** `enquiryStatus()` has been able to report `closure: "deferred"` since it was written and no verb has ever produced that state — the reader-without-writer that CLAUDE.md's no-cull policy holds up as its current example. This is the scenario that either makes the branch reachable or shows it should not exist |
+| Deferred vs accepted — one state or two? | **Genuinely uncertain, and the crux.** Row J says `DEFERS` covers both. Two things could distinguish them without a second edge: `Decision.invalidation_check` already exists and is *exactly* "what would change this", and a deferral pending work has no such condition while an acceptance names one. Predicting that carries it, and that no new property or edge is needed — but if "parked until someone gets to it" and "accepted permanently" need different structure, that is a real model change and the interesting outcome |
+| A `Task` | **None, and this is the acceptance criterion rather than a preference.** The Afterward bullet "does it block anything? → no" is not satisfied by a task nobody intends to do. If the build finds itself creating one to make a query answer correctly, the model has failed the scenario |
+| A new node label | **No.** Fourteen scenarios, none so far |
+| Halfway / second half fails | Per PJ-020: accepting a question is compound — a `Decision`, an edge, and possibly a bearing on the enquiry. It wants `inTransaction` like the others, and the failure mode is a decision that exists while the question still reads as merely open |
+
+**What would refute the prediction usefully.** If `invalidation_check` cannot
+carry the condition — because the condition is about *the world* ("a new data
+source appears") rather than about the decision's own evidence — then the
+distinction needs somewhere else to live, and that is a finding about the
+`Decision` shape rather than about deferral.
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
