@@ -125,6 +125,11 @@ durable; how many there were is not.
   half it did not, with the discriminator named as the deferral rule requires.
   The original prose stays verbatim under a superseded-note. Same class as row
   Y, and again found by someone else reading cold.
+- `99dd25f` — row F gets the `open` + unowned blockquote that rows O, T and Z
+  carry. Four rows say "every named probe is built, a new discriminator is
+  needed"; three were scannable and F was not. Row S deliberately left alone —
+  it is a standing scope decision (identity is cross-cutting infrastructure),
+  not an exhausted probe. See error 18.
 - `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, `b7e473f`,
   `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, `701d868`, `4988938`, `0dd0d2d`
   (the user's dependency-graph regeneration), and this file's own commit —
@@ -287,7 +292,28 @@ which silently returns the column present and `NULL`.
    change — derived state that "goes stale silently", in its own words. Swept in
    `2de3e2b`, along with the owed verdict: S-14 settled the *accepted* half of
    row Y and the *abandoned* half is still a boundary.
-17. *Non-ASCII silently dropped from two commit messages.* `§4` reached
+18. **A silent grep miss read as a fact about the document.** Asked whether row
+   F should carry the `open` + unowned blockquote, I grepped for the phrase,
+   got four hits, and concluded F and S both stated it "in prose instead" —
+   then declined the edit on the grounds that fixing F would leave S the odd
+   one out. Both halves were wrong. F carries the phrase *verbatim*, wrapped
+   across a line break and so invisible to a single-line pattern; S does not
+   contain it at all and is a different kind of row (a standing scope decision
+   about identity, not an exhausted probe). The correct move was the one I had
+   ruled out — mark F, leave S — and S being the odd one out is right.
+
+   The shape is the session's other recurring one: a **silent** miss read as
+   evidence about the world rather than about the query. Same as the camelCase
+   column that decoded as `null` (error 1), where a query returning nothing was
+   diagnosed as an AGE limitation. When a search comes back empty or short,
+   the first question is whether the search could have seen the thing.
+
+   Worth stating as a fact about the arrangement rather than about one session:
+   error 10, error 13, the row F narrative (PJ-024 §5), and this — **four
+   defects found by an outside reader, none by the session that made them.**
+   Row Y is a fifth if the advisor counts, which is a different kind of outside
+   reader; left out rather than counted, since the point does not need it.
+19. *Non-ASCII silently dropped from two commit messages.* `§4` reached
    `a449392` and `4c4d417` as bare `4` — the `§` was eaten writing the message
    through a shell heredoc. Not worth rewriting history for, but keep commit
    messages ASCII on that path.
