@@ -9,6 +9,15 @@ Anything in the second group is worth less, because the material suggested it.
 
 ## The ablation works, and here is the proof
 
+> **Superseded by `023` §2 — kept verbatim.** This section scores a **noun**, not
+> a semantic distinction, which is the instrument revision 2 explicitly
+> abandoned. Verified after external review: Designer 3's Stage A output already
+> had accepting-as-unresolved, positive and negative closure, locked amendment
+> classified mechanical versus scientific, captured-not-admitted, and promotion
+> state with explicit criteria. It had every act; it lacked the word. Stage B
+> supplied the word. That is vocabulary priming, not a new distinction. The
+> telemetry result below is the sound demonstration and `023` promotes it.
+
 **Designer 3 had no concept of a decision until Stage B supplied one.** Its
 revision says plainly: *"Glossary. Adds **Decision**. Does not split Claim."* —
 caused by PJ-001's *"what claims, decisions, and open lines of enquiry become
