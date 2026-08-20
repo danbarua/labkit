@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Sixteen commits, all this session, range clean — no other session's work in it.
+Eighteen commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -28,7 +28,8 @@ Sixteen commits, all this session, range clean — no other session's work in it
  docs/consumer-contract/020_synthesis_blinded.md |  447 +
  docs/consumer-contract/021_mapping_and_scoring.md |  150 +
  docs/consumer-contract/013,014,015_stage_b_*.md |  ~900 +
- docs/consumer-contract/022_stage_b_analysis.md |  105 +
+ docs/consumer-contract/022_stage_b_analysis.md |  113 +
+ docs/consumer-contract/023_post_review_standing.md |  150 +
  docs/session-log/004_*.md                    |  113 +
  package-lock.json                            | 3188 -------------------
  package.json                                 |    5 -
@@ -106,11 +107,12 @@ mapped its clusters onto the domain and ran the paired-world tests — the step
 that needs someone who knows the model, deliberately separated from the step that
 does not.
 
-**H1 survives.** Four candidates pass: attribution (all three, distributed across
-four unanimous clusters rather than forming one — row S); ordering of belief over
-time (all three, three different vocabularies — row Z); bitemporality (D1, and
-strictly stronger than row Z); and what a reconstruction was reconstructing (D2,
-row F, in almost PJ-021's own words by someone who had never heard of row F).
+**H1 survives** — on three after review, not the four claimed at the time:
+attribution (all three designers, distributed across four unanimous clusters
+rather than forming one — row S); ordering of belief over time (all three, three
+different vocabularies — row Z); and what a reconstruction was reconstructing
+(D2, row F, in almost PJ-021's own words by someone who had never heard of row
+F). Bitemporality was demoted by the contract-necessity bar.
 
 Predictions: **2 held, 2 refuted, 1 half**. The useful failure is the prioritised
 worklist — predicted at least one designer would ask, and all three independently
@@ -134,7 +136,28 @@ One new candidate at the query-semantics tier: D2's requirement that an absent
 dependency path never be reported as independence — row I applied to propagation,
 and the third catch on `whatDependsOn()`.
 
-Working tree clean. Eleven commits ahead of `origin/feat/domain-consumer`.
+**Second external review, acted on** (`9bc584c`). Four corrections, two of them
+defects in documents committed earlier the same day; both verified against the
+files before being accepted.
+
+- **A preregistered protocol deviation, unnamed until now.** The brief says
+  synthesise across all six documents after Stage B; what ran was a
+  three-document synthesis with the mapping *before* Stage B. The realised design
+  is arguably better — it freezes the uncontaminated Stage-A reading before the
+  ontology-heavy material arrives — but a deviation that turns out well is still
+  a deviation. Document roles now fixed; no combined synthesis later.
+- **`022`'s headline withdrawn.** It scored a *noun* — "D3 had no concept of a
+  decision" — when D3's Stage A output already had every decision act and lacked
+  only the word. That is the instrument revision 2 abandoned, committed inside
+  the document analysing an experiment rebuilt to avoid it. Kept verbatim under a
+  superseded note; telemetry promoted in its place.
+- **A fourth bar**, contract necessity, between representation and change.
+  Bitemporality fails it and is demoted to candidate extension. **H1 survives on
+  three**, not four.
+- **D2's dependency finding split in two**: open-world traversal is query
+  semantics; certified completeness is preserved as a discriminator, not built.
+
+Working tree clean. Thirteen commits ahead of `origin/feat/domain-consumer`.
 
 ## Verified
 
@@ -216,14 +239,20 @@ worktrees make it easier to fall into.
 
 ## Next
 
-`git push`. The exercise is complete; nothing further is owed to it.
+`git push`, then the implementation probe — **no more designers**. A thin
+vertical slice over four reads, in researcher language with no graph vocabulary
+crossing the boundary, per `023`:
 
-The next thing that would earn a model change is a **demonstration, not another
-designer**. The cheapest is D2's: a scenario where a reader acts on
-`whatDependsOn()` reporting something unaffected and is wrong — query semantics,
-the tier where row P was resolved, and the third catch on that verb.
+1. orientation / why — "where does this stand, and why?"
+2. historical survey — "what did the record hold at time T?"
+3. reconstruction provenance — "what was this reconstruction reconstructing?"
+4. attribution — "who made or authorised the consequential act?"
 
-The four bar-2 candidates need the stage after this one: the contract implemented
-as a thin read surface that has to answer something it cannot. Attribution is the
-strongest and the one this read-only protocol structurally could not validate,
-since authority, assignment and ownership are write-side.
+**Build two durable research worlds for each before writing the read.** If the
+public API returns the same answer where the frozen contract requires different
+ones, that is the consumer-phase equivalent of the scenario method's demonstrated
+wrong answer — a demonstration rather than an absence.
+
+Then the unchanged ladder: reader semantics → existing relationships → new
+relationship, property or reference → a new noun only if unavoidable. Do **not**
+open by adding `Actor`, timestamps or artefact lineage.
