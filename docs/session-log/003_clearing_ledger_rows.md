@@ -43,8 +43,22 @@ durable; how many there were is not.
   ledger, PJ-019.
 - `e2fa5ff`, `2b6c80d`, `116a719` — **the third review**: seven fixes, PJ-020,
   then the remaining two compound verbs made atomic on their own evidence.
-- `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, and this
-  file's own commit — wrap bookkeeping.
+- `a7c5a73` — **the `wrap` skill now commits its own entry**, stages by
+  explicit path, and refuses an empty commit. The old rule handed `git
+  add`/`git commit` to the user to avoid interleaving doc commits into work in
+  progress; the entry got committed a round-trip later anyway, so the
+  interleaving happened regardless and the handoff only added a message someone
+  had to act on. The concurrency rules it now carries are both drawn from this
+  session's own mistakes.
+- `28d4ca5` — **a bug in the `wrap` skill's own `collect.sh`**, reported by a
+  peer session that copied the skill into a two-commit repo and hit it on the
+  first run. `git rev-parse <root-sha>^` prints the unparseable ref to *stdout*
+  before failing, so `2>/dev/null` does not suppress it and the `||` fallback
+  leaves `$baseline` two lines long, breaking every downstream `git log/diff`.
+  `--verify` fixes it. Reproduced in a scratch root-commit repo before applying.
+  Unreachable from labkit's own Stop hook, which always passes a state file.
+- `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, `b7e473f`,
+  and this file's own commit — wrap bookkeeping.
 
 Source: `src/domain/session.ts`, `src/domain/report.ts`, `src/db/domain.ts` (the
 `REVERIFIES` edge), `src/db/graph.ts` (`inTransaction`), `src/db/agtype.ts` (the
@@ -62,7 +76,8 @@ entry.
 
 ## Verified
 
-Run at `116a719`:
+Run at `116a719`. Still current: everything since touches only
+`.claude/skills/wrap/` and this entry — nothing under `src/` or `tests/`.
 
 - `bun test` — **168 pass, 0 fail**, 543 expect() calls, 17 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
@@ -137,6 +152,12 @@ about the method" carries it.
   Z. `open` with an unbuilt owner: F, J, K, P.
 
 ## Next
+
+Left for the peer session to decide, not changed here: when today's earliest
+commit *is* the root, `collect.sh` falls back to the root itself, so
+`$baseline..HEAD` excludes it and a young repo's first wrap misses its first
+commit. Pre-existing intent, not introduced by the `--verify` fix, and fixing
+it means deciding what "everything since the beginning" should mean.
 
 **S-9, "the artefact survived; its provenance didn't."** It solely owns rows F
 and P, and P's cell says explicitly that S-9 is the scenario that has to produce
