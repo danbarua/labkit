@@ -4,14 +4,14 @@
 (`b55ff09`), promoted from §2. Row P **resolved** against two consecutive
 predictions that it would not move; row F **half-settled and still open** — this
 entry first declared it refuted and external review corrected that, recorded
-below rather than edited away. Verification at the time of
-writing: 173 pass / 0 fail, typecheck clean, `npx depcruise src tests
---output-type err` 0 errors.**
+below rather than edited away. Verification after the corrections: 176 pass /
+0 fail, typecheck clean, `npx depcruise src tests --output-type err` 0 errors.**
 
 ## Context
 
-S-9 was the last unbuilt scenario owning an open row outright — sole owner of F,
-and row P's only unbuilt owner. Its story is a cached construction that mostly
+S-9 owned row F outright and was row P's only unbuilt owner. (It was *not* the
+last such scenario — see the corpus section below for how that claim got made
+and why it was wrong.) Its story is a cached construction that mostly
 rebuilds: three components come back byte-identical, and the historical random
 control does not, because whatever generated it was never written down. The
 researcher then asks for the thing the record must not let happen quietly —
@@ -113,15 +113,25 @@ Declared in PJ-004, provisioned into every tenant since, written by
 `recordObservations({ contentHash })`, and consulted by nothing. `reproducibilityOf()`
 is its first reader.
 
-The property earned it by keeping **three** outcomes apart, not two:
+The property earned it by keeping **four** outcomes apart, not two:
 
 - `exact` — recorded hash matches the one the rebuild produced;
 - `differing` — recorded hash disagrees;
-- `unverifiable` — no hash was ever recorded, so nobody can say.
+- `unverifiable` — no hash was ever recorded, so nobody can say;
+- `notRebuilt` — this attempt did not rebuild the part.
 
-A part nobody can check is not a part that differs, and `reproducible` is false
-for either — a construction with an uncheckable component has not been shown to
-reproduce. Row I's absence-versus-difference distinction, asked of an artefact.
+The last of those was missing from the first cut, and external review found it:
+a part with no offered candidate compared unequal to its recorded hash and was
+reported `differing`, claiming evidence of inequality where there was only
+absence of a comparison. **Row I's absence-versus-difference distinction, missed
+inside the very function written to respect it** — the third time in this build
+that a lesson was applied in one branch and dropped in the neighbouring one.
+
+`unverifiable` and `notRebuilt` are separate because they are facts about
+different things: the first is permanent and about the record, the second is
+about this attempt and says nothing about the artefact. `reproducible` is false
+for any of the three non-matching states — anything not shown to match leaves
+the construction unshown.
 
 ## Judgment calls
 
