@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Twenty-four commits, all this session, range clean — no other session's work in it.
+Twenty-six commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -218,7 +218,27 @@ wall-clock time moved has distinguished the test runs, not the research states.
 
 **Nothing in the domain model changed.** No rung of the change bar climbed.
 
-Working tree clean. Nineteen commits ahead of `origin/feat/domain-consumer`,
+**One more correction, recorded on the reviewer's own suggestion** (`95bd263`).
+The reviewer who proposed the detector test reached its finding by *reading* the
+probes and said not re-running the suite did not matter. It did: *"these would
+stay green after a fix"* is a claim about what running code does, and became a
+fact only when the three fields were injected and the three failures observed.
+Until then it had the property it was convicting the probes of. Placed beside the
+injection table in `024`, not here — the session log is disposable and this
+explains why the table exists.
+
+Two shapes, kept apart deliberately rather than tallied as one:
+
+- **a silent negative read as a fact about the world** — a tool returning empty
+  and the emptiness taken as evidence. Three instances today: the camelCase
+  `RETURN` column, a single-line grep for a wrapped blockquote, and nine passing
+  hook tests around a condition that did not exist;
+- **an argument presented as a demonstration** — one instance, and the only one
+  where the instrument caught the person holding it. This is the failure the
+  vertical slice exists to detect, which is why lumping them would have buried
+  the interesting part.
+
+Working tree clean. Twenty-one commits ahead of `origin/feat/domain-consumer`,
 nothing held back.
 
 ## Verified
