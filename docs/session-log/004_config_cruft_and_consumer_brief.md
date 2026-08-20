@@ -1,4 +1,4 @@
-# 004: npm-era config cruft cleared, and the consumer-contract probe run
+# 004: npm-era config cruft cleared, the consumer-contract probe run, three gaps demonstrated
 
 **Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Twenty commits, all this session, range clean — no other session's work in it.
+Twenty-two commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -31,6 +31,9 @@ Twenty commits, all this session, range clean — no other session's work in it.
  docs/consumer-contract/022_stage_b_analysis.md |  113 +
  docs/consumer-contract/023_post_review_standing.md |  150 +
  docs/consumer-contract/prompts/*.md          |  110 +
+ docs/consumer-contract/024_vertical_slice_results.md | 130 +
+ tests/consumer/vertical_slice.test.ts        |  230 +
+ .dependency-cruiser.cjs                      |   12 +
  docs/session-log/004_*.md                    |  113 +
  package-lock.json                            | 3188 -------------------
  package.json                                 |    5 -
@@ -167,7 +170,28 @@ since three are 60–164KB and ~97% material already committed here; the two
 irreducible pieces (the Stage B wrapper and the synthesis instruction) are there
 in full.
 
-Working tree clean. Fifteen commits ahead of `origin/feat/domain-consumer`.
+**The vertical slice** (`d045492`) — the first code this session, and the first
+thing to test the consumer claims against running software rather than prose.
+Four probes in `tests/consumer/vertical_slice.test.ts`, each building **two
+durable research worlds** through research verbs alone and then asking the public
+read surface. Probe 1 (orientation) passes — the control, and it had to, since a
+gap-hunter that finds only gaps is measuring its own construction. Probes 2, 3
+and 4 demonstrate gaps at rows **Z**, **F** and **S**.
+
+Probe 4 is the strongest and the asymmetry is the reason: probes 2 and 3 build
+two worlds that cannot be read apart; probe 4's worlds **cannot be built at
+all**, because no verb accepts an actor.
+
+Two anti-fake measures. `tests/consumer/` may not import `src/db` — a new
+dependency-cruiser **error**, verified by making it fire and then restoring,
+because a probe with graph access could report a distinction no consumer could
+ever make. And the clock is fixed: a read that separates two worlds only because
+wall-clock time moved has distinguished the test runs, not the research states.
+
+**Nothing in the domain model changed.** No rung of the change bar climbed.
+
+Working tree clean. Seventeen commits ahead of `origin/feat/domain-consumer`;
+`d045492` is deliberately unpushed pending review.
 
 ## Verified
 
@@ -203,10 +227,20 @@ worktrees make it easier to fall into.
 
 ## Open
 
-- **Nothing has been implemented, and bar 3 has not been applied.** Four
-  candidates pass the representation bar; none has been tried as query semantics,
-  then relationship, then noun. Row P was resolved in the query after two builds
-  predicted it needed structure.
+- **`labkit-review` has been asked for an eyeball on the slice; the answer has
+  not arrived.** `d045492` is held local until it does. Four things were put to
+  it, two of which this session is genuinely unsure about: whether probe 2 is a
+  real paired world or a missing feature in costume (`whatIsKnown()` takes no
+  time argument, which is uncomfortably close to the empty-result shape PJ-011 §5
+  refuses), and whether probe 3's assertions pin their finding or merely restate
+  that identical inputs give identical outputs — the exact shape PJ-021 killed a
+  row F boundary test over.
+- **Nothing has been implemented, and no rung of the change bar has been
+  climbed.** Three gaps are now demonstrated rather than argued; that earns
+  investigation, not structure. Rows P and F are the cautionary pair — P looked
+  like missing structure across two builds and was resolved in the query, F
+  looked like a missing edge and was answered by a refusal. Do not open with
+  `Actor`, a timestamp, or a lineage edge.
 - **A flaw in my own packet, found by the designers.** All three over-refused
   telemetry at Stage A and had to narrow it at Stage B. The freshly written
   boundary statement drew the W&B/MLflow line hard enough that three independent
@@ -264,20 +298,18 @@ worktrees make it easier to fall into.
 
 ## Next
 
-`git push`, then the implementation probe — **no more designers**. A thin
-vertical slice over four reads, in researcher language with no graph vocabulary
-crossing the boundary, per `023`:
+Wait for `labkit-review`'s verdict on `d045492`, act on it, then push.
 
-1. orientation / why — "where does this stand, and why?"
-2. historical survey — "what did the record hold at time T?"
-3. reconstruction provenance — "what was this reconstruction reconstructing?"
-4. attribution — "who made or authorised the consequential act?"
+After that, take the three demonstrated gaps in cost order, one rung at a time:
 
-**Build two durable research worlds for each before writing the read.** If the
-public API returns the same answer where the frozen contract requires different
-ones, that is the consumer-phase equivalent of the scenario method's demonstrated
-wrong answer — a demonstration rather than an absence.
-
-Then the unchanged ladder: reader semantics → existing relationships → new
-relationship, property or reference → a new noun only if unavoidable. Do **not**
-open by adding `Actor`, timestamps or artefact lineage.
+1. **Row Z — reader semantics first.** `Decision` already has `closed_at` and the
+   event stream carries stamps. Whether a durable ordering can be *derived*
+   rather than stored is untested, and is the first thing to test.
+2. **Row F — an existing relationship before a new one.** Can a reconstruction be
+   recorded as an act with a target using verbs that already exist? That is what
+   S-9 declined to invent and what Designer 2 independently required.
+3. **Row S — last, and deliberately.** The only one of the three that is
+   inexpressible rather than unreadable, so the most likely to need a real noun
+   and the most expensive to get wrong. Also write-side, which a read-only
+   contract could never validate: the requirement is real, the shape is not yet
+   earned.
