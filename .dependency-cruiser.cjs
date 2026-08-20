@@ -13,6 +13,17 @@ module.exports = {
       to: { path: '^src/db' }
     },
     {
+      name: 'consumer-probe-no-persistence',
+      severity: 'error',
+      comment:
+        "The consumer vertical slice asks whether the *public read surface* can tell two " +
+        "research worlds apart. Reaching into src/db would let a probe answer from the " +
+        "graph directly and report a distinction no consumer could ever make, which is " +
+        "the one result the exercise must not be able to fake. tests/helpers/ is exempt.",
+      from: { path: '^tests/consumer' },
+      to: { path: '^src/db' }
+    },
+    {
       name: 'persistence-knows-no-domain',
       severity: 'error',
       comment:
