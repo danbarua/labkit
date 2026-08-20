@@ -302,11 +302,28 @@ which silently returns the column present and `NULL`.
    about identity, not an exhausted probe). The correct move was the one I had
    ruled out — mark F, leave S — and S being the odd one out is right.
 
-   The shape is the session's other recurring one: a **silent** miss read as
-   evidence about the world rather than about the query. Same as the camelCase
-   column that decoded as `null` (error 1), where a query returning nothing was
-   diagnosed as an AGE limitation. When a search comes back empty or short,
-   the first question is whether the search could have seen the thing.
+   The shape is the session's other recurring one: **a silent negative read as
+   a fact about the world.** Three instances tonight, in three unrelated places,
+   and only one of them is mine twice over:
+
+   - the camelCase `RETURN` column that arrives present and `NULL` (error 1) —
+     a query returning nothing, diagnosed as an AGE limitation;
+   - this grep, where four hits for a phrase occurring five times was read as
+     evidence about rows F and S rather than about the pattern;
+   - the other session's compaction guard, where nine synthetic hook tests
+     passed and were taken as evidence the premise held. They only showed the
+     logic was self-consistent; the condition it guarded did not exist. Theirs,
+     and the largest of the three — it shipped in `e386027` and stood until
+     this session answered the auto-compaction question. Recorded here on their
+     argument that the shape is the point, not whose it was; their own entry
+     carries it at `93a30c6`.
+
+   In all three the tool answered a question it had not been asked, and
+   answered it emptily, which is indistinguishable from a real negative. When a
+   search comes back empty or short, the first question is whether the search
+   could have seen the thing. The remedy was the same each time and is neither
+   obvious nor automatic: **run it against something real, or have someone who
+   did not write the query read the result.**
 
    Worth stating as a fact about the arrangement rather than about one session:
    error 10, error 13, the row F narrative (PJ-024 §5), and this — **four
