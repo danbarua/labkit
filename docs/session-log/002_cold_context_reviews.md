@@ -169,3 +169,15 @@ The last three findings came from testing the tooling against a live peer
 session rather than against sample JSON, which is the general lesson: the nine
 synthetic branches all passed while two of the things they were testing were
 wrong about the world.
+
+Sharper, because it happened three times tonight in three unrelated places: **a
+silent negative got read as a fact about the world.** Nine hook branches passed
+and were taken as evidence the premise held. A single-line grep returned four
+hits for a phrase that occurs five times — the fifth wrapped across a line
+break — and the missing hit was read as evidence about the content of rows F and
+S. And CLAUDE.md already carries the same shape as a standing repo trap: a
+camelCase `RETURN` name decodes as `null`, so the column arrives present and
+empty and a decoder reads it as "nothing matched". In all three the tool
+answered a question it had not been asked. The check that broke each of them was
+the same — run it against something real, or have someone who did not write the
+query read the result.
