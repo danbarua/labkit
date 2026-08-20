@@ -6,10 +6,11 @@ see `docs/project-journal/016_…md` for the row V change, and `017_…md` and
 `002_cold_context_review_of_s3b.md` once the session outgrew that title.
 
 **Scope warning, because the numbers mislead.** This session's baseline is
-pinned at `94d3d80` and HEAD was `47799f2` when this was written — 61 commits,
-and still moving: a peer session was committing throughout. **Seven are this
-session's**, and they are the stable fact here; the range is not. The rest belong to `003_clearing_ledger_rows.md` (S-3c, S-10, S-9,
-S-14, S-18 and two external reviews), which ran between this session's two
+pinned at `94d3d80` and HEAD was `d5274f0` when this was written — 67 commits,
+and still moving: a peer session was committing throughout. **Ten are this
+session's**, and they are the stable fact here; the range is not. The rest
+belong to `003_clearing_ledger_rows.md` (S-3c, S-10, S-9, S-14, S-18, two
+external reviews and row F's close-out), which ran between this session's two
 halves. Read 003 for that work; this entry does not restate it. `collect.sh`
 now prints this warning by itself — see the tooling note.
 
@@ -22,8 +23,11 @@ exposed.
 
 ## Changed
 
-Nine commits. The reviews modified nothing; `d34229d` and `b3d6f33` were the
-user acting on the first review, the other seven are this session's.
+Twelve commits. The reviews modified nothing; `d34229d` and `b3d6f33` were the
+user acting on the first review, the other ten are this session's — of which
+**six are successive rewrites of this entry**, each forced by the Stop hook
+re-firing on the peer session's commits. That churn is the seventh tooling
+finding below, visible in the log rather than described.
 
 - `d34229d` — filed the first review as
   `docs/project-journal/017_cold_context_review.md` (+172, byte-identical).
@@ -37,7 +41,8 @@ user acting on the first review, the other seven are this session's.
 - `78a7bbe` — **PJ-024**, the closing review of the completed arc, with
   CLAUDE.md pointed at it in the same commit. Also carries a rename it should
   not: `git mv` had already staged it. Disclosed in that commit's message.
-- `f16978e`, `79c5a6e`, `93be853` — this entry.
+- `f16978e`, `79c5a6e`, `93be853`, `2416a2b`, `93a30c6`, `d5274f0` — this
+  entry, rewritten whole each time as the skill requires.
 - `e386027` — **the wrap tooling fixes** (`wrap-hook.sh`, `collect.sh`,
   `SKILL.md`), below.
 - `4692559` — **corrections to `e386027`**, after testing it. Below.
@@ -113,8 +118,10 @@ Not run: `bun examples/full-lifecycle.ts`.
 
 Nothing owed by this session, and — for the first time in the arc — no known
 open item on the ledger's index either. Row F was the last, and `cc68056`
-closed it, with `99dd25f` making it scannable: a dated verdict splitting what S-9 settled from what it did not, and
-a superseded-note beside the S-9 outcomes prose leaving the original verbatim.
+closed it, with `99dd25f` making it scannable: a dated verdict splitting what
+S-9 settled from what it did not, a superseded-note beside the S-9 outcomes
+prose leaving the original verbatim, and the unowned marker the other three
+comparable rows carry.
 
 The one judgment call left in this session's own work is whether the `resume`
 half of the compaction guard should exist at all — see Open. It is a comment
