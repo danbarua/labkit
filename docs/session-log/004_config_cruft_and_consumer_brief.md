@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Six commits, all this session, range clean — no other session's work in it.
+Eight commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -77,7 +77,16 @@ words versus only after LabKit's design vocabulary was supplied. Panel claim
 softened from independence to triangulation; scope corrected to precursor, not
 the consumer PJ-023 asked for.
 
-Working tree clean. `4ed03ef` is ahead of `origin/feat/domain-consumer`.
+**Packet leak fixes** (`b27f82d`). Two found while assembling what designers
+actually receive, both the shape the review had been finding. The packet's
+preamble explains which glosses were stripped *by naming them*, so designers now
+get only the material below the horizontal rule. And "do not design a database
+or a graph API" told them the store is a graph; reworded to "storage or query
+interface". Audited what is sent: zero backticked terms, no entity names, no
+graph or query vocabulary, 73 lines.
+
+Working tree clean. `4ed03ef`, `3820d62` and `b27f82d` are ahead of
+`origin/feat/domain-consumer`.
 
 ## Verified
 
@@ -107,11 +116,19 @@ worktrees make it easier to fall into.
 
 ## Open
 
-- **No designer has been run.** The protocol is committed and unexecuted, which
-  is the intended state — predictions before results.
-- **Panel composition undecided.** Needs the list of model families `omp` is
-  authenticated for. The llmtrim subagent types were proxy cruft and are gone;
-  `omp-headless` is the route.
+- **Stage A is running as this entry is written** — three `omp` processes,
+  `anthropic/claude-opus-5`, `openai-codex/gpt-5.6-sol` and `xai-oauth/grok-4.6`,
+  all at `--thinking high`. Outputs not yet produced, so nothing has been read.
+  They land as `010`/`011`/`012`, committed verbatim before any cross-reading.
+- **Isolation is enforced, not requested.** `--no-tools` and `--cwd` pointed at
+  an empty scratch directory rather than the repo — with omp's default tool set
+  and `--cwd "$PWD"` a designer would have had `src/` and `CLAUDE.md` in reach,
+  and the brief's "no repository access" would have been a wish. Also
+  `--no-session`, and none is told the others exist.
+- **Neither this session nor the review session is eligible to be a designer.**
+  Both have read the whole ontology. That is why all three run as fresh `omp`
+  processes carrying none of this conversation, rather than as forks or
+  subagents.
 - **I deleted my own wrap state file.** Clearing the 18 foreign state files the
   worktree inherited, I picked "mine" from the newest transcript in the
   worktree's project dir (`4657ab2a…`) and kept that. The Stop hook then passed
@@ -125,8 +142,7 @@ worktrees make it easier to fall into.
 
 ## Next
 
-`git push`, then Stage A: run three designers on
-`docs/consumer-contract/002_stage_a_packet.md` — that file is the complete
-input, nothing else — and commit their outputs verbatim as `010`, `011`, `012`
-**before** reading across them. `003_stage_b_packet.md` stays sealed until then;
-revealing it early destroys the ablation permanently.
+Collect the three Stage A outputs from the background run and commit them
+verbatim as `010`, `011`, `012` **before** reading across them. Then `git push`.
+`003_stage_b_packet.md` stays sealed until all three are committed; revealing it
+early destroys the ablation permanently.
