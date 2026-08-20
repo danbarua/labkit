@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Eighteen commits, all this session, range clean — no other session's work in it.
+Twenty commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -30,6 +30,7 @@ Eighteen commits, all this session, range clean — no other session's work in i
  docs/consumer-contract/013,014,015_stage_b_*.md |  ~900 +
  docs/consumer-contract/022_stage_b_analysis.md |  113 +
  docs/consumer-contract/023_post_review_standing.md |  150 +
+ docs/consumer-contract/prompts/*.md          |  110 +
  docs/session-log/004_*.md                    |  113 +
  package-lock.json                            | 3188 -------------------
  package.json                                 |    5 -
@@ -157,7 +158,16 @@ files before being accepted.
 - **D2's dependency finding split in two**: open-world traversal is query
   semantics; certified completeness is preserved as a discriminator, not built.
 
-Working tree clean. Thirteen commits ahead of `origin/feat/domain-consumer`.
+**Prompts preserved** (`19be601`). The outputs were committed verbatim and
+verified byte-identical to raw stdout — all seven. The *inputs* were not: the
+assembled prompts lived only in a session-scoped scratchpad and would have died
+with the session. A frozen output whose prompt nobody can reconstruct is not a
+reproducible result. Kept as a recipe plus SHA-256 hashes rather than five files,
+since three are 60–164KB and ~97% material already committed here; the two
+irreducible pieces (the Stage B wrapper and the synthesis instruction) are there
+in full.
+
+Working tree clean. Fifteen commits ahead of `origin/feat/domain-consumer`.
 
 ## Verified
 
@@ -211,6 +221,21 @@ worktrees make it easier to fall into.
   scratch can be cited; D2 and D3 permit admission by act, which is what S-18
   built. Recorded, not reopened — but last night's choice is no longer obviously
   the only reading.
+- **`omp-run.sh` added to the `omp-headless` skill** (in `~/.claude/`, not this
+  repo, so uncommitted). Runs omp and leaves an artefact bundle: `prompt.txt`,
+  `stdout.txt`, `stderr.txt`, `invocation.txt`, `manifest.json` with SHA-256 of
+  prompt, invocation and the omp binary. `--isolate` sets `--no-tools` *and* an
+  empty `--cwd`. `manifest.json` records `reached_model` and
+  `last_startup_phase`, which is the 4h46m hang made machine-readable — an empty
+  stdout is identical whether the model returned nothing or was never reached.
+  Smoke-tested; caught a real bug on first run, since macOS bash 3.2 errors on
+  `"${arr[@]}"` for an empty array under `set -u`.
+- **The manifest shape resembles LabKit's `Computation`/`Artefact` provenance**,
+  which is suggestive and is *not* evidence — resemblance is the weakest possible
+  support for a schema its own author wrote twice. One detail is worth a ledger
+  line: the manifest hashes the **binary that did the work**, an actor recorded
+  by identity. That is row S arriving from an unrelated direction, on the write
+  side this read-only exercise structurally could not reach.
 - **The `omp-headless` skill hung for 4h46m** in `phase: readPipedInput` because
   a direct `omp -p` inherits an open stdin. Fixed in `~/.claude/skills/` (not
   this repo) at the user's request: `< /dev/null` in the canonical command and
