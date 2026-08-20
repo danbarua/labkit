@@ -679,14 +679,14 @@ this document's original analysis are marked as such.
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
 | J | Deferred vs accepted-as-unresolved | **S-14** | resolved |
-| K | No provisional/scratch standing | S-8, story 18° | open |
+| K | No provisional/scratch standing | S-8, **S-18** | resolved |
 | L | No execution input lineage | S-11 | resolved |
 | M | A review has no analysis to point at | S-11 | resolved |
 | N | Claim identity is undefined | S-5, S-12 | resolved |
 | O | Withdrawal reason is under-determined | S-3, S-7 | open |
 | P | `Evidence` carries two senses | **S-9**, S-10, S-12 | resolved |
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
-| R | Standing is a birth property, not a transition | S-8, S-7, story 18° | resolved |
+| R | Standing is a birth property, not a transition | S-8, S-7, **S-18** | resolved |
 | S | No agent, person or role exists in the model | S-8 | open |
 | T | Edges cannot carry properties | S-7, row O | open |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
@@ -717,7 +717,7 @@ to be that well informed:
 
 | Kind | Means | Rows today |
 | --- | --- | --- |
-| `open` + owned | an unbuilt discriminator is named (`°` present) | K |
+| `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T, Z |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
@@ -730,7 +730,9 @@ collapsing into one undifferentiated pile.
 `°` is a fact about build state, not about the row: when a scenario is built,
 clear its `°` everywhere in this table **and update the Rows-today column above**
 in the same change — both are derived, and both go stale silently. An owner need not be
-a corpus scenario — row K's is **story 18** and row T's is **row O**. And an owner being built is not the same as it returning a verdict —
+a corpus scenario — row K's *was* **story 18**, a §4 story held back, and row
+T's is **row O**. An owner from §4 is a live claim that the story would settle
+the row, and story 18 did: it was promoted and built as S-18. And an owner being built is not the same as it returning a verdict —
 row K's owner S-8 *was* built and gave none, which is recorded as a verdict in
 its own right rather than left as an omission.
 
@@ -879,7 +881,7 @@ distinction gets earned then
 
 ### Row K — No provisional/scratch standing
 
-**Scenarios:** S-8, story 18 · **Status:** open
+**Scenarios:** S-8, S-18 · **Status:** resolved
 
 **Current state (verified):** `Claim.kind: exploratory \| confirmatory`
 
@@ -896,6 +898,19 @@ nothing in it promotes an exploratory claim to confirmatory, so whether
 standing is conferred by an act (rows G, K, R are one question) is exactly as
 open as it was. Story 18 remains the probe, and K stays `open` with story 18 as
 its only unbuilt owner.
+
+**S-18: resolved, and the row's original line was right — but incomplete.**
+"`exploratory` already is this distinction" was true about the *state* and said
+nothing about the *transition* or about any reader that respects it, which is
+where the whole verdict turned out to live. `Claim.kind` had exactly one reader
+(`confirmatoryResultsBehind()`, S-7), so a question closed on a lunchtime
+notebook sweep landed in `whatIsKnown().established` beside a confirmatory
+result — populated, confident and wrong, and story 18's own sentence about
+scratch entering the record by accident. Resolved with a reader
+(`established` requires promotion; a new `provisional` bucket takes the rest;
+`enquiryStatus().restsOn` says which) and one new edge, `PROMOTES` — which the
+build predicted would be unnecessary and was refuted by demonstration. See
+PJ-023.
 
 ### Row L — No execution input lineage
 
@@ -997,11 +1012,24 @@ demonstrate it
 
 ### Row R — Standing is a birth property, not a transition
 
-**Scenarios:** S-8, S-7, story 18 · **Status:** resolved
+**Scenarios:** S-8, S-7, S-18 · **Status:** resolved
 
 **Current state (verified):** `Claim.kind` is hardcoded `"confirmatory"` by the only writer; `exploratory` unreachable through research verbs
 
 **NEW, from cold review (3 of 4).** Ties to rows **G** and **K**: exploratory→confirmatory is plausibly conferred by an event (preregistration, lock, promotion) rather than set at creation. If so G/K/R are one question about how standing changes, not three **RESOLVED by S-7 at the service layer, with the successor question still open.** Predicted as the likeliest wrong answer and it was: with `kind` hardcoded `"confirmatory"`, amending a solver iteration limit reported `nature: "scientific"` and named a convergence diagnosis as a compromised confirmatory result — a false p-hacking alarm, populated and confident. `Conclusion.standing` now defaults to **exploratory**, which makes `exploratory` reachable for the first time and requires confirmatory standing to be claimed deliberately. What S-7 does *not* settle is whether standing should be **conferred by an act** rather than declared at creation; it does rule out the naive gate-conferred model, since S-17 established that declaring a gate does not satisfy it, so a claim behind an unevaluated confirmatory gate would read exploratory and the scientific amendment would go undetected
+
+**S-18: the successor question answered — both, and the discriminator is
+foresight.** The prediction recorded before the build was "standing becomes
+conferred by an act", and it is **half refuted**. `promote()` confers it, but
+declaring at creation was not removed and should not be: declaring *before the
+run* is what prespecification is, and it is the thing a locked design locks
+(S-7). Declaring it *afterwards* is the p-hacking that lock exists to prevent,
+and no path allows it. So the two are not competing spellings of one mechanism —
+they are separated by whether the standing was knowable in advance, and work
+that could not have declared it pays for the lateness with a recorded reason. A
+reader can tell them apart: `whySupported().promotedBecause` is present only for
+the conferred kind. G/K/R were indeed one question; the answer is a disjunction,
+not a winner.
 
 ### Row S — No agent, person or role exists in the model
 
@@ -1814,6 +1842,11 @@ promote this to a scenario."* Row K survived S-8, so that condition has fired
 and has been sitting fired since. Two probes remain named and unbuilt; the
 corpus is not exhausted.
 
+*(Both were built immediately after: S-14 cleared row J, and story 18, promoted,
+became **S-18** and cleared row K. No row now names an unbuilt owner — see the
+ownership table above, which is the authoritative one. The paragraph is kept as
+written because the false claim and its correction are the record.)*
+
 What is true, and survives the correction: five consecutive scenarios have
 pressed only on relationships, query semantics and identity, and the noun
 inventory has not moved in thirteen. That is a reason to expect the *next* kind
@@ -1931,12 +1964,23 @@ should be revisited if its promoted counterpart passes too easily.
   S-8's promotion gate. Held back because the exploratory/confirmatory
   distinction may already cover it; if row K survives the build, promote
   this to a scenario.
+  **Promoted, and built as S-18** (2026-08-20). Row K survived S-8, which gave
+  it no verdict — so the condition fired at S-8 and then sat unnoticed through
+  three external reviews until the fourth read this line. The distinction did
+  *not* already cover it: the state existed and the transition did not, and
+  nothing but `confirmatoryResultsBehind()` read the state. This is the one
+  §4 condition that has fired, and the lesson is that a condition nobody
+  re-reads is not a mechanism. See PJ-023.
 
 ---
 
 ## Judgment calls
 
-- **Fourteen scenarios, not the eighteen stories.** The mining notes
+- **Fourteen scenarios, not the eighteen stories.** *(Fifteen as built, and not the
+  same fifteen: twelve of the fourteen were built — S-2 and S-13 own nothing
+  outstanding and never needed to be — plus two authored discriminators, S-3b
+  and S-3c, and story 18 promoted as S-18. The reasoning below is why fourteen
+  was the right starting number, not a claim about the final count.)* The mining notes
   suggested twelve to fifteen. Promotion was decided by *distinct control-
   plane mechanic*, so the four held back are the ones whose machinery is
   already under test elsewhere. Interest was explicitly not the criterion —

@@ -23,16 +23,19 @@ then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
 S-12, S-5), 016 (the standard a finding is held to: S-3b), 018 (when a failed
 check stops counting: S-3c), 019 (re-verification is not reproduction: S-10),
 020 (a third external review: atomicity, and identity by wording again), 021 (a
-regenerated part is not the part: S-9) and **022 (leaving a question open on
-purpose: S-14)** — those are the current state of the domain model, and 022 is
-the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
+regenerated part is not the part: S-9), 022 (leaving a question open on
+purpose: S-14) and **023 (capture cheaply, promote before citing: S-18, and the
+Bonsai corpus exhausted)** — those are the current state of the domain model,
+and 023 is the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
 a second external review**, of S-3b and the row V close-out. Its three items are
 closed: `resolved (argued)` exists as a status, row X was nominated and then
 cleared by S-3c (018), and row K's verdict was already in PJ-008 — S-8 was built
-and gave none, and the ledger records *that* as the verdict.
+and gave none, and the ledger records *that* as the verdict. Row K has since
+been settled outright by S-18 (023), which the same §4 condition had nominated
+and which three reviews walked past.
 
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
@@ -169,7 +172,7 @@ and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
 current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8,
-S-3b, S-3c, S-10, S-9 and S-14 required. Return types are derived one-per-bullet from a scenario's
+S-3b, S-3c, S-10, S-9, S-14 and S-18 required. Return types are derived one-per-bullet from a scenario's
 "Afterward" questions
 rather than designed — if a bullet has no natural home in the types, the API
 is wrong, not the bullet.
@@ -288,10 +291,11 @@ free to be wrong and re-run.
 **Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
 Every label is provisioned into every tenant up front, so declared-but-never-
 walked structure is a computable map of where the model has untested claims —
-**There is currently no such example.** As of S-14 every label in
+**There is currently no such example.** As of S-18 every label in
 `EDGE_SCHEMA` has both a writer and a reader, and every node label is created
-by some verb — `DEFERS` was the last unwalked edge, and `CHALLENGES` before it.
-That is the outcome the policy exists to allow, twice over.
+by some verb — `DEFERS` was the last unwalked edge, and `CHALLENGES` before it;
+`PROMOTES` arrived with both. That is the outcome the policy exists to allow,
+twice over.
 
 Keep the policy anyway, for what it caught on the way out. `DEFERS` had a
 reader that could report `closure: "deferred"` and no writer, so the branch was
