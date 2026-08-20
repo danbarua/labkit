@@ -678,7 +678,7 @@ this document's original analysis are marked as such.
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
-| J | Deferred vs accepted-as-unresolved | S-14° | open |
+| J | Deferred vs accepted-as-unresolved | **S-14** | resolved |
 | K | No provisional/scratch standing | S-8, story 18° | open |
 | L | No execution input lineage | S-11 | resolved |
 | M | A review has no analysis to point at | S-11 | resolved |
@@ -717,7 +717,7 @@ to be that well informed:
 
 | Kind | Means | Rows today |
 | --- | --- | --- |
-| `open` + owned | an unbuilt discriminator is named (`°` present) | J, K |
+| `open` + owned | an unbuilt discriminator is named (`°` present) | K |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T, Z |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
@@ -848,11 +848,34 @@ A gate expresses the confirmatory boundary; `is_open` was always meant to carry 
 
 ### Row J — Deferred vs accepted-as-unresolved
 
-**Scenarios:** S-14 · **Status:** open
+**Scenarios:** **S-14** · **Status:** resolved
 
-**Current state (verified):** `DEFERS` edge covers both
+**Current state (verified):** `acceptAsUnresolved()` writes `DEFERS`; `enquiryStatus()` reports `accepted-as-unresolved`, open, with reason and reopening condition
 
 Distinguish by whether an open task exists
+
+**S-14: resolved, and this row's own fallback was the thing the scenario
+forbids.** "Distinguish by whether an open task exists" has been recorded here
+since the document was written, and §2 says plainly that *"a model that can only
+express it as an open task is a failure"*. External review set the same
+constraint independently. No `Task` was created and none was needed.
+
+**The wrong answer was reachable, not missing.** `closeEnquiry()` with nothing
+cited reports the question `abandoned` — nobody worked on it, no result behind
+it. That was the only thing a researcher could do to record "we are leaving
+this", and it misreads a deliberate decision as neglect.
+
+**Two defects surfaced only by making the branch reachable.** The unreachable
+`deferred` branch reported `open: false`, so a question left open on purpose
+read as shut; and the token itself named a state nothing could produce. Both had
+been sitting in a branch no verb could enter. That is the no-cull policy paying
+out exactly as intended — declared-but-unwalked structure is *a computable map
+of where the model has untested claims*, and this claim turned out to be wrong
+in two ways.
+
+**Deferred-pending-work was not built.** Only one of the row's two states has
+ever been needed. If a scenario needs "parked until someone gets to it", the
+distinction gets earned then
 
 ### Row K — No provisional/scratch standing
 
@@ -1825,6 +1848,32 @@ carry the condition — because the condition is about *the world* ("a new data
 source appears") rather than about the decision's own evidence — then the
 distinction needs somewhere else to live, and that is a finding about the
 `Decision` shape rather than about deferral.
+
+**Outcomes.** Every prediction held, including the uncertain one:
+`invalidation_check` carried the reopening condition with no new property, and
+no `Task`, edge or node label was added. The wrong answer was where predicted
+and was *reachable* rather than missing — `closeEnquiry()` reporting a
+deliberately-accepted question as `abandoned`.
+
+*The two findings nobody predicted came from entering an unreachable branch.*
+`DEFERS` had a reader and no writer, and when `acceptAsUnresolved()` finally
+produced the state, the branch waiting for it was wrong twice over: it reported
+`open: false` for a question deliberately left open, under a `deferred` token
+naming a state nothing could produce. Both had been sitting unexecuted since
+the reader was written. This is the strongest evidence so far for the no-cull
+policy: unwalked structure is a map of untested claims, and this claim was
+false.
+
+*Deferred-pending-work was not built.* Row J named two states; only one has ever
+been needed. The other gets earned when a scenario needs it, which is the same
+answer S-10 gave about unit-level re-verification.
+
+*One drafted field was removed rather than shipped.* `EnquiryStatus.blocking`
+would have made "does it block anything? → no" directly assertable, and its only
+consumer would have been that assertion. Inventing a to-do list in order to
+report it empty is the ceremony the scenario exists to forbid — the same shape
+as S-10's `compareNumerically()`, and the second time this session that a
+refusal-or-report was declined for having nothing real to describe.
 
 ## §4 — Held back as stories, not scenarios
 

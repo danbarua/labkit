@@ -22,9 +22,10 @@ cold-context review of both), 011 (the control chain under scenario pressure),
 then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
 S-12, S-5), 016 (the standard a finding is held to: S-3b), 018 (when a failed
 check stops counting: S-3c), 019 (re-verification is not reproduction: S-10),
-020 (a third external review: atomicity, and identity by wording again) and
-**021 (a regenerated part is not the part: S-9)** — those are the current state
-of the domain model, and 021 is the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
+020 (a third external review: atomicity, and identity by wording again), 021 (a
+regenerated part is not the part: S-9) and **022 (leaving a question open on
+purpose: S-14)** — those are the current state of the domain model, and 022 is
+the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
@@ -168,7 +169,7 @@ and one evidence plus one claim per conclusion.
 
 **Verbs are added when a scenario needs them, not in anticipation.** The
 current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8,
-S-3b, S-3c, S-10 and S-9 required. Return types are derived one-per-bullet from a scenario's
+S-3b, S-3c, S-10, S-9 and S-14 required. Return types are derived one-per-bullet from a scenario's
 "Afterward" questions
 rather than designed — if a bullet has no natural home in the types, the API
 is wrong, not the bullet.
@@ -287,13 +288,18 @@ free to be wrong and re-run.
 **Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
 Every label is provisioned into every tenant up front, so declared-but-never-
 walked structure is a computable map of where the model has untested claims —
-`DEFERS` is the current example: `enquiryStatus()` reads it and can report
-`closure: "deferred"`, but no verb writes it, so that branch is unreachable —
-a durable record that the model claims a question can be deliberately parked
-and nothing has ever done so. (Row J owns it; S-14 is the unbuilt scenario.)
-A cull would need to distinguish *ruled out by the corpus* from *not yet
-reached by it*. `CHALLENGES` was this example until S-4 and S-5 walked it,
-which is the outcome the policy exists to allow.
+**There is currently no such example.** As of S-14 every label in
+`EDGE_SCHEMA` has both a writer and a reader, and every node label is created
+by some verb — `DEFERS` was the last unwalked edge, and `CHALLENGES` before it.
+That is the outcome the policy exists to allow, twice over.
+
+Keep the policy anyway, for what it caught on the way out. `DEFERS` had a
+reader that could report `closure: "deferred"` and no writer, so the branch was
+unreachable — and when S-14 finally entered it, the branch was **wrong in two
+ways**: it reported `open: false` for a question deliberately left open, under
+a token naming a state nothing could produce. Unwalked structure is a
+computable map of where the model has untested claims, and that claim was
+untested and false. A cull would have deleted the map along with the error.
 
 This protects **labels and edges**, which are claims about the domain. It does
 not protect query conveniences with no consumer — the per-tenant CQRS views
