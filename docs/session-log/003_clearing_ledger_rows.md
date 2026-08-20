@@ -48,12 +48,17 @@ durable; how many there were is not.
 - `2f937bf`, `b55ff09`, `a987a68` — **S-9**: predictions, build, PJ-021 and the
   ledger. Row P **resolved** against two consecutive predictions that it would
   not move; `content_hash` gained its first reader since PJ-004.
-- `2656bd1`, `e09ccfa` — **the fourth review, on S-9.** Three findings, all
-  verified before acting, all correct. Row F un-refuted and returned to `open`
-  with a boundary test; `notRebuilt` added to `reproducibilityOf()`; the
-  corpus-exhaustion claim withdrawn. See errors 10–12 below — the reason this
-  session ends with more recorded mistakes than it started with is that the
-  last review found the ones the first three missed.
+- `2656bd1`, `e09ccfa`, `5d65065` — **the fourth review, on S-9, in two
+  passes.** Six findings across both, all verified before acting, all correct.
+  First pass: row F un-refuted and returned to `open`; `notRebuilt` added to
+  `reproducibilityOf()`; the corpus-exhaustion claim withdrawn. Second pass
+  (two reviewers, independently, on the same three items): the row F boundary
+  test was removed for pinning the public handle shape rather than the absence
+  it claimed; the withdrawn corpus claim was still standing in this entry's own
+  *Open* section; and two comments still said "three outcomes" after a fourth
+  was added. See errors 10–14 below — the reason this session ends with more
+  recorded mistakes than it started with is that later reviews found what
+  earlier ones missed, including in the corrections themselves.
 - `177549f` — **the Stop hook no longer fires for the wrap's own commit.** It
   used to ask whether a commit whose entire content is the write-up had been
   written up — a category error, yes by construction, and a full agent turn
