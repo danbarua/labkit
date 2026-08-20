@@ -9,13 +9,15 @@ Renamed twice as the session outgrew its title; the slug is now generic so a
 further scenario would not need a third rename.
 
 **Scope warning, because the numbers mislead.** Baseline is pinned at `b3d6f33`
-and HEAD is now `79c5a6e` — 49 commits. **44 are this session's**
-(`45ec5fa`..`e89e80c`). The other five belong to
+and HEAD is now `cc68056` — 52 commits. **46 are this session's**
+(`45ec5fa`..`cc68056`). The other six belong to
 `002_cold_context_reviews.md` — `d6a34c8` below this session's first commit,
-and `78a7bbe`, `f16978e`, `e386027`, `79c5a6e` above its last — which ran either
-side of this one. Read 002 for that work; this entry does not restate it.
-`collect.sh` prints the warning by itself now, though it can only see the four
-that touch `docs/session-log/`; `e386027` is theirs too and is invisible to it.
+and `78a7bbe`, `f16978e`, `e386027`, `79c5a6e`, `4692559` interleaved above —
+which ran either side of this one. Read 002 for that work; this entry does not
+restate it. `collect.sh` prints the warning by itself now, and since `4692559`
+its closing line says "at least these commits": it can only inspect commits
+touching `docs/session-log/`, so `e386027` and `4692559` are theirs and
+invisible to it.
 
 ## Goal
 
@@ -105,6 +107,15 @@ durable; how many there were is not.
   whether the standing was knowable in advance.
 - `2de3e2b` — row Y's stale `°` cleared and S-14's owed verdict written. See
   error 16.
+- `cc68056` — **row F's missing verdict**, the one open item in the other
+  session's PJ-024. Row F's narrative was five lines with no verdict at all,
+  while S-9 was built against it, refuted it, and a review reopened it the same
+  day; and the S-9 outcomes prose still read "row F is refuted" with nothing
+  adjacent, so a reader following the index hit a refutation against a status of
+  `open`. Now dated, split into the identity half S-9 settled and the direction
+  half it did not, with the discriminator named as the deferral rule requires.
+  The original prose stays verbatim under a superseded-note. Same class as row
+  Y, and again found by someone else reading cold.
 - `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, `b7e473f`,
   `191f7e0`, `c2d9828`, `f6ec763`, `c6fedb0`, `701d868`, `4988938`, `0dd0d2d`
   (the user's dependency-graph regeneration), and this file's own commit —
@@ -230,7 +241,11 @@ which silently returns the column present and `NULL`.
    F needed no lineage edge because "direction is in the act". There is no such
    act — the regenerated artefact is written by an ordinary
    `recordObservations()` naming nothing historical. Row F is back to `open`,
-   with the gap recorded in PJ-021 and the ledger.
+   with the gap recorded in PJ-021 and the ledger — but **the ledger narrative
+   itself did not get the correction for four commits**, and the S-9 outcomes
+   prose went on saying "refuted" beside a status of `open`. PJ-024 §5 found it;
+   fixed in `cc68056`. Withdrawing a claim means finding every place it was made
+   is error 13's lesson, and this is its third instance in one session.
 12. *Absence-vs-difference, missed inside the function written to respect it.*
    `reproducibilityOf()` reported a part the caller had not rebuilt as
    `differing`. New `notRebuilt` state.
