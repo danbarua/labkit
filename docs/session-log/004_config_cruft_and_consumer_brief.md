@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Thirteen commits, all this session, range clean — no other session's work in it.
+Sixteen commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -27,6 +27,8 @@ Thirteen commits, all this session, range clean — no other session's work in i
  docs/consumer-contract/012_stage_a_grok.md   | 1248 +
  docs/consumer-contract/020_synthesis_blinded.md |  447 +
  docs/consumer-contract/021_mapping_and_scoring.md |  150 +
+ docs/consumer-contract/013,014,015_stage_b_*.md |  ~900 +
+ docs/consumer-contract/022_stage_b_analysis.md |  105 +
  docs/session-log/004_*.md                    |  113 +
  package-lock.json                            | 3188 -------------------
  package.json                                 |    5 -
@@ -114,7 +116,25 @@ Predictions: **2 held, 2 refuted, 1 half**. The useful failure is the prioritise
 worklist — predicted at least one designer would ask, and all three independently
 *forbade* it, reaching S-14's decision unprompted.
 
-Working tree clean. Eight commits ahead of `origin/feat/domain-consumer`.
+**Stage B run and analysed** (`b0547e2`, `850ad4c`). Each designer got its own
+Stage A design back plus PJ-001's constraints — reconstruction was needed because
+`--no-session` leaves fresh processes with no memory. Protocol vocabulary was
+stripped first: the packet's heading read "The Stage B question", which tells a
+designer it is in a staged experiment and invites a performed revision.
+
+**The ablation demonstrably works.** Designer 3 had no concept of a *decision*
+until Stage B supplied one — *"Adds Decision. Does not split Claim"*, caused by
+one sentence of PJ-001. `Decision` is among the load-bearing thirteen; a cold
+designer never reached for it from eighteen researcher statements. That is both
+the proof the split measures something and a caution about how much of PJ-001's
+should/should-not list is ontology in behavioural clothing.
+
+**No new bar-2 candidate.** All four from `021` arose at Stage A, uncontaminated.
+One new candidate at the query-semantics tier: D2's requirement that an absent
+dependency path never be reported as independence — row I applied to propagation,
+and the third catch on `whatDependsOn()`.
+
+Working tree clean. Eleven commits ahead of `origin/feat/domain-consumer`.
 
 ## Verified
 
@@ -154,10 +174,12 @@ worktrees make it easier to fall into.
   candidates pass the representation bar; none has been tried as query semantics,
   then relationship, then noun. Row P was resolved in the query after two builds
   predicted it needed structure.
-- **Stage B is sealed.** `003_stage_b_packet.md` has not been shown to anyone.
-  The measurement it buys is already banked in one direction: attribution and
-  temporal survey were reached from researchers' own words, before LabKit's
-  design vocabulary could have suggested them.
+- **A flaw in my own packet, found by the designers.** All three over-refused
+  telemetry at Stage A and had to narrow it at Stage B. The freshly written
+  boundary statement drew the W&B/MLflow line hard enough that three independent
+  readers took it as forbidding even a pointer to an external run. A fact about
+  the packet, not about LabKit — but it means Stage A's refusal sets are
+  systematically too broad in that one region.
 - **The synthesiser shares a model family with Designer 2.** Only three providers
   are authenticated and all three are designers, so this could not be avoided;
   blinding means it does not know which output that is, but style is recognisable
@@ -194,8 +216,14 @@ worktrees make it easier to fall into.
 
 ## Next
 
-`git push`, then Stage B: give `003_stage_b_packet.md` to the same three models
-and commit their revision documents as `013`/`014`/`015` — separate documents,
-Stage A outputs never edited. Then decide whether any of the four surviving
-candidates goes to bar 3, remembering that the read-only contract cannot validate
-attribution, which is where the strongest candidate lives.
+`git push`. The exercise is complete; nothing further is owed to it.
+
+The next thing that would earn a model change is a **demonstration, not another
+designer**. The cheapest is D2's: a scenario where a reader acts on
+`whatDependsOn()` reporting something unaffected and is wrong — query semantics,
+the tier where row P was resolved, and the third catch on that verb.
+
+The four bar-2 candidates need the stage after this one: the contract implemented
+as a thin read surface that has to answer something it cannot. Attribution is the
+strongest and the one this read-only protocol structurally could not validate,
+since authority, assignment and ownership are write-side.
