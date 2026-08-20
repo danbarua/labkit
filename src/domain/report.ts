@@ -272,6 +272,30 @@ export interface ReproductionReport {
   incomparableBecause?: string;
 }
 
+/**
+ * How much of a past construction can be rebuilt (S-9).
+ *
+ * Three outcomes per part, not two. A part whose hash was never recorded is
+ * **unverifiable**, which is not the same as one whose hash differs: nobody can
+ * say whether it came back the same, and reporting it as differing would claim
+ * knowledge the record does not have. Row I's absence-versus-difference
+ * distinction, asked of an artefact.
+ */
+export interface ReproducibilityReport {
+  /** Parts whose recorded hash matches the one offered, by name. */
+  exact: string[];
+  /** Parts whose recorded hash disagrees with the one offered. */
+  differing: string[];
+  /** Parts with no recorded hash — unanswerable, not unequal. */
+  unverifiable: string[];
+  /**
+   * Whether the whole construction reproduces. False if anything differs *or*
+   * is unverifiable: a rebuild that cannot be checked has not been shown to
+   * reproduce, and this is the field that must not quietly say otherwise.
+   */
+  reproducible: boolean;
+}
+
 /** What `reverify()` recorded. */
 export interface VerificationReport {
   at: string;

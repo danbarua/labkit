@@ -35,6 +35,7 @@ import {
   systemClock,
 } from "./events";
 import type {
+  ReproducibilityReport,
   ReproductionReport,
   VerificationReport,
   AmendmentRecord,
@@ -2456,11 +2457,80 @@ export class ResearchSession {
    * asks which enquiries REQUIRE the evidence held here, not what any
    * computation read.
    */
+  /**
+   * How much of a past construction can be rebuilt (S-9).
+   *
+   * The caller re-runs whatever it can and offers the hashes it got back; this
+   * says which parts match, which disagree, and which nobody can check because
+   * the original never recorded a hash. `content_hash` had been written and
+   * never read since PJ-004 — declared, carried through every tenant, and
+   * consulted by nothing. This is its first reader.
+   *
+   * Offered per part rather than by name, deliberately. A regenerated part
+   * carries the name of the part it regenerates, so a name-keyed map would
+   * merge exactly the two things this scenario exists to keep apart.
+   */
+  async reproducibilityOf(
+    analysis: AnalysisRef,
+    rebuilt: Array<{ part: ObservationsRef; hash: string }>,
+  ): Promise<ReproducibilityReport> {
+    const offered = new Map(rebuilt.map((r) => [r.part.id, r.hash]));
+    const parts = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
+      { a: vertexProps<{ natural_id: string; logical_name: string; content_hash?: string }>() },
+      { id: analysis.id },
+    );
+
+    const exact: string[] = [];
+    const differing: string[] = [];
+    const unverifiable: string[] = [];
+    for (const { a } of parts) {
+      // No recorded hash means unanswerable, not unequal -- whatever the
+      // rebuild produced, nothing can be compared with it.
+      if (!a.content_hash) unverifiable.push(a.logical_name);
+      else if (offered.get(a.natural_id) === a.content_hash) exact.push(a.logical_name);
+      else differing.push(a.logical_name);
+    }
+
+    return {
+      exact: exact.sort(),
+      differing: differing.sort(),
+      unverifiable: unverifiable.sort(),
+      // A construction with an uncheckable part has not been shown to
+      // reproduce. Saying otherwise is the quiet inheritance S-9 forbids.
+      reproducible: differing.length === 0 && unverifiable.length === 0,
+    };
+  }
+
+  /**
+   * What is affected if this artefact turns out to be wrong?
+   *
+   * Two routes in, and S-9 is what forced the second. An artefact reached by
+   * `Evidence -RECORDED_IN->` is an analysis *output*, and the evidence
+   * recorded in it bears on claims directly — that is the path S-11 walks. An
+   * artefact a computation `CONSUMES` is an *input*, and nothing recorded in it
+   * bears on anything; what rests on it are the claims of every analysis that
+   * read it. Walking only the first returned `claims: []` for an input a claim
+   * demonstrably rested on, while still naming the enquiry — a confident,
+   * populated, wrong answer, and the same verb answering one question two
+   * incompatible ways depending on which end of a computation it was aimed at.
+   * That is ledger row P surfacing: `Evidence` carries two senses, and this
+   * query knew only one of them.
+   *
+   * `subject` is a name while a name identifies one artefact, and an explicit
+   * reference when it does not — S-5's rule, and S-9 is where artefacts needed
+   * it: a regenerated part naturally carries the name of the part it
+   * regenerates. Given an ambiguous name this **refuses** rather than answering
+   * about the union, because the union is exactly the "inferred provenance
+   * silently inheriting the original's standing" the scenario exists to prevent.
+   */
   async whatDependsOn(
-    artefactName: string,
+    subject: string | ObservationsRef,
   ): Promise<{ claims: string[]; enquiries: string[] }> {
+    const artefact = typeof subject === "string" ? await this.artefactNamed(subject) : subject.id;
+
     const rows = await this.graph.query(
-      `MATCH (a:Artefact {logical_name: $name})
+      `MATCH (a:Artefact {natural_id: $id})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(claim:Claim)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(challenged:Claim)
@@ -2471,20 +2541,63 @@ export class ResearchSession {
         challenged: optional(vertexProps<ClaimProps>()),
         loe: optional(vertexProps<{ name: string }>()),
       },
-      { name: artefactName },
+      { id: artefact },
     );
+
+    // The input side. Separate query rather than more OPTIONAL MATCHes on the
+    // same one, because the two routes share no bound variable and combining
+    // them multiplies rows for no gain.
+    const consumers = await this.graph.query(
+      `MATCH (:Artefact {natural_id: $id})<-[:CONSUMES]-(:Computation)<-[:USES]-(u:EvidenceUnit)
+       MATCH (u)-[:PRODUCES]->(e:Evidence)
+       OPTIONAL MATCH (e)-[:SUPPORTS]->(claim:Claim)
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(challenged:Claim)
+       OPTIONAL MATCH (u)-[:ADDRESSES]->(loe:LineOfEnquiry)
+       RETURN claim, challenged, loe`,
+      {
+        claim: optional(vertexProps<ClaimProps>()),
+        challenged: optional(vertexProps<ClaimProps>()),
+        loe: optional(vertexProps<{ name: string }>()),
+      },
+      { id: artefact },
+    );
+
+    const all = [...rows, ...consumers];
     return {
       // A claim whose refutation rested on this record is affected by
       // invalidating it, exactly as a supported one is.
       claims: [
         ...new Set(
-          rows.flatMap((r) =>
+          all.flatMap((r) =>
             [r.claim?.name, r.challenged?.name].filter((n): n is string => !!n),
           ),
         ),
       ],
-      enquiries: [...new Set(rows.flatMap((r) => (r.loe ? [r.loe.name] : [])))],
+      enquiries: [...new Set(all.flatMap((r) => (r.loe ? [r.loe.name] : [])))],
     };
+  }
+
+  /**
+   * Resolves an artefact name to one artefact, or refuses.
+   *
+   * Two artefacts can carry one name — a regenerated part is the case S-9 is
+   * about — and answering about both would merge a historical record with an
+   * inferred one. Declining beats guessing, exactly as it does for a claim
+   * asserted in two lines of enquiry (S-5).
+   */
+  private async artefactNamed(name: string): Promise<string> {
+    const rows = await this.graph.query(
+      `MATCH (a:Artefact {logical_name: $name}) RETURN a`,
+      { a: vertexProps<{ natural_id: string }>() },
+      { name },
+    );
+    if (rows.length === 0) throw new Error(`no artefact named "${name}"`);
+    if (rows.length > 1) {
+      throw new Error(
+        `${rows.length} artefacts are named "${name}"; name which, by the record that produced it`,
+      );
+    }
+    return rows[0]!.a.natural_id;
   }
 
   // -------------------------------------------------------------------------
