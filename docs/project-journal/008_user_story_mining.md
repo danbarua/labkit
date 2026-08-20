@@ -1875,6 +1875,39 @@ report it empty is the ceremony the scenario exists to forbid — the same shape
 as S-10's `compareNumerically()`, and the second time this session that a
 refusal-or-report was declined for having nothing real to describe.
 
+### S-18 predictions, recorded before the build
+
+Recorded 2026-08-20, against `4988938`, before a line of test or source.
+
+**S-18 is a promotion, not an authored scenario.** §4 has carried its condition
+since this document was written — *"held back because the exploratory/confirmatory
+distinction may already cover it; if row K survives the build, promote this to a
+scenario."* Row K survived S-8, which gave it no verdict. The condition fired
+then and sat unnoticed through three external reviews until the fourth found it.
+So unlike S-3b and S-3c this needs no authored-versus-mined defence: the corpus
+nominated it in advance and named the trigger.
+
+Story 18: *low-friction exploration captured without making ephemeral scratch
+part of the scientific record by accident.* Its rule is **capture cheaply, but
+promote before citing.**
+
+| Question | Prediction |
+| --- | --- |
+| Where the wrong answer lives | **`enquiryStatus()` and `whatIsKnown()`, which never consult standing at all.** A question closed on the strength of an exploratory finding reports `closure: "answered"` and lands in `established`, identically to one closed on a confirmatory result. That is scratch entering the scientific record by accident, which is the story's own words, and it is a confident answer rather than an empty one |
+| `Claim.kind` / `Conclusion.standing` | **Has exactly one reader today** — `confirmatoryResultsBehind()`, deciding whether an amendment is scientific or mechanical (S-7). Everything else ignores it. Expect the first cut to be a *reader* problem, as row P was, before anything about the model changes |
+| Row K — provisional/scratch standing | **Predicting `resolved`, and that `exploratory` really was the distinction all along** — as row K's original line said. What was missing is not a state but the *transition* and any reader that respects it |
+| Rows G, K, R as one question | **This is the discriminator, and I am predicting standing becomes conferred by an act.** The whole point of story 18 is that scratch is captured *before* anyone knows it matters, so confirmatory standing cannot be declared at birth — the researcher does not yet have the information the declaration would encode. If that holds, R's successor question is answered: conferred, not declared |
+| New structure | **None.** A promotion is a decision that changes a claim's standing, and `CHANGES: Decision → Claim` already exists and is walked (S-12). Predicting reuse, no new edge, no new node, no migration |
+| The alternative that would refute it | `closeEnquiry()` **refusing** to close on exploratory evidence, with no promotion verb at all — S-5's decline-rather-than-guess. That would settle the reader defect without answering whether standing is conferred by an act, and would leave rows G/K/R exactly where they are. If the scenario can be satisfied that way, the act-confers model has *not* been earned |
+| Halfway / second half fails | Promotion is compound — a decision, an edge, a property change. It wants `inTransaction`, and the failure mode is a claim promoted with no decision explaining why |
+
+**The trap to avoid, stated before the build.** It would be easy to make
+promotion a *gate* — declare a criterion, evaluate it, call the claim
+confirmatory. S-17 already established that declaring a gate does not satisfy
+it, so a claim behind an unevaluated confirmatory gate would read exploratory
+and the S-7 amendment check would miss a scientific change. Row R's note says
+this outright. Promotion must be an act with a reason, not a gate state.
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
