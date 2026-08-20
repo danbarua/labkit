@@ -5,6 +5,11 @@ see `docs/project-journal/016_…md` for the row V change, and `017_…md` and
 `024_…md` for the two reviews this session produced. Renamed from
 `002_cold_context_review_of_s3b.md` once the session outgrew that title.
 
+**Where this landed.** `spike/drizzle-age` was fast-forwarded into `main` with
+no merge commit, `feat/domain-consumer` was cut from the same commit, and all
+three were pushed. `spike/drizzle-age` still exists at `b991da8`, so no sha in
+this entry is stale.
+
 **Scope warning, because the numbers mislead.** This session's baseline is
 pinned at `94d3d80` and HEAD was `d5274f0` when this was written — 67 commits,
 and still moving: a peer session was committing throughout. **Ten are this
