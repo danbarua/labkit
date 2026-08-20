@@ -189,15 +189,19 @@ range that already exists.
   it last asked. Narrow on purpose: a wrap commit that also carries real work
   still fires, which is the other reason step 4 says to commit such work
   separately and first — bundling it in is what would hide it.
-- **Compaction issues a new session id**, which would otherwise lose this
-  session's state entirely: a fresh baseline at today's HEAD, an empty `entry`,
-  and the second half of one session opening a second numbered entry while the
-  first half is left covered by an entry nobody updates again. `SessionStart`
-  now inherits the predecessor's `baseline` and `entry` when `source` is
-  `compact` or `resume` **and** that session's recorded HEAD is an ancestor of
-  ours. `startup` and `clear` never inherit — those are genuinely new sessions.
-  The ancestry check is what stops a session inheriting an unrelated one that
-  merely wrapped most recently.
+- **Compaction does not lose the session's state — the guard against that is
+  insurance, not a working mechanism.** `SessionStart` inherits the
+  predecessor's `baseline` and `entry` when `source` is `compact` or `resume`
+  **and** that session's recorded HEAD is an ancestor of ours; `startup` and
+  `clear` never inherit, being genuinely new sessions, and the ancestry check
+  stops a session inheriting an unrelated one that merely wrapped most
+  recently. It was built on the premise that compaction re-issues the session
+  id — which was then tested, on 2026-08-20, and is **false in this build for
+  both triggers**: manual `/compact`, and auto-compaction on context
+  exhaustion (one session compacted twice). The id is preserved, the state file
+  survives untouched, and the branch is never reached. What it would have cost
+  had the premise held: a session's second half opening a second numbered entry
+  while its first half sits in one nobody updates again.
 - **`collect.sh` warns when the range is wider than the session.** `baseline`
   is pinned at session start and never moves, which is right until a session is
   *resumed* across another session's work — then the range contains commits
@@ -205,7 +209,14 @@ range that already exists.
   restate their work as yours. The tell is a commit touching a session-log
   entry that is not this session's; the warning names the entry that claims it.
   Matching is by entry **number**, not path, because an entry gets renamed when
-  a session outgrows its title and the rename commit touches the old path.
+  a session outgrows its title and the rename commit touches the old path —
+  verified against entry 003, renamed twice, whose three commits touching its
+  two former names are all correctly left unflagged.
+  It reports a **lower bound**, not an inventory: only commits touching the log
+  directory are inspected, so it sees another session's *entry*, never its
+  *work*. A peer whose commits were mostly code leaves commits in your range
+  that it cannot name — entry 003's range contains `e386027`, a wrap-tooling
+  commit touching only `.claude/skills/wrap/`, unflagged.
   Say in the entry that the range is wider than the session, as 002 does.
 - **Two places know the log directory**: `collect.sh`'s `log_dir` and
   `wrap-hook.sh`'s. Both must move together, along with this file and

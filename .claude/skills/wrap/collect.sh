@@ -77,6 +77,13 @@ echo
 # whole-file rewrite that trusts it will restate their commits as this
 # session's. The tell is a commit touching a session-log entry that is not
 # ours: that entry claims the work around it.
+#
+# This detects another session's ENTRY, not another session's WORK. Only
+# commits touching $log_dir are inspected, so a peer whose commits were mostly
+# code contributes nothing to detect and the list is a LOWER BOUND on the
+# overlap. Found by session be5374e7 running this against entry 003: e386027 --
+# a wrap-tooling commit touching only .claude/skills/wrap/ -- sits in its range
+# unflagged. The warning text says so; do not let it read as an inventory.
 claimed=""
 # Match by entry NUMBER, not by path. An entry gets renamed when a session
 # outgrows its title (003 was renamed twice), and the commit carrying the
@@ -101,7 +108,9 @@ fi
 if [ -n "$claimed" ]; then
   echo "## WARNING -- part of this range belongs to another session's entry"
   printf '%s' "$claimed"
-  echo "  Those commits, and the work they describe, are already written up there."
+  echo "  AT LEAST these commits, and the work they describe, are written up there."
+  echo "  Lower bound: only commits touching $log_dir are inspected, so a session"
+  echo "  whose work was mostly code leaves commits here that are NOT listed above."
   echo "  Cover only this session's own commits, and say plainly in the entry that"
   echo "  the range is wider than the session. Do not restate the other entry."
   echo

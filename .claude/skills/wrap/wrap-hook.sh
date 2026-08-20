@@ -66,16 +66,27 @@ if [ "$mode" = "start" ]; then
   # original session already did.
   if [ ! -f "$state_file" ]; then
     inherited=""
-    # Compaction issues a NEW session id, so state keyed by that id vanishes
-    # from under a session that is still going: a fresh baseline at today's
-    # HEAD, an empty `entry`, and the work continues into a SECOND numbered
-    # entry describing half a session. The first half is then covered by an
-    # entry nobody will update again. Inherit the predecessor's state instead.
+    # Guards a continuation that is issued a NEW session id: state keyed by
+    # that id vanishes from under a session still going -- fresh baseline at
+    # today's HEAD, empty `entry`, and the work continues into a SECOND
+    # numbered entry describing half a session, while the first half is left
+    # covered by an entry nobody will update again.
+    #
+    # THIS IS NOT WHAT COMPACTION DOES. The branch was written on the premise
+    # that compaction re-issues the session id. That premise was then tested
+    # and is false in this build, for both triggers: manual /compact (session
+    # 49e462ec, one boundary, id preserved) and auto-compaction on context
+    # exhaustion (session be5374e7, compacted twice, state file intact both
+    # times). The id survives, the state file exists, and this branch is never
+    # reached. Kept as insurance against a build that behaves differently --
+    # if you are debugging state that went missing, this is not the cause.
     #
     # Gated on `source` deliberately. `startup` and `clear` are genuinely new
-    # sessions and must re-baseline; only a continuation should inherit.
-    # `resume` is included because resuming can re-issue the id too -- when it
-    # does not, the state file already exists and we never reach here.
+    # sessions and must re-baseline. `resume` is the weaker half: resuming may
+    # re-issue the id, and when it does not the state file already exists and
+    # we never reach here -- but a resume whose own state file was removed by
+    # the 30-day sweep below inherits whichever session wrapped most recently
+    # on this history, which is a guess rather than a fact.
     case "$source_kind" in
       compact|resume)
         prev="$(ls -t "$state_dir" 2>/dev/null | head -1 || true)"
