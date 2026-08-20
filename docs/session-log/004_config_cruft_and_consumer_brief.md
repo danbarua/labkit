@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Eight commits, all this session, range clean — no other session's work in it.
+Ten commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -22,6 +22,9 @@ Eight commits, all this session, range clean — no other session's work in it.
  docs/consumer-contract/001_design_brief.md   |  236 +
  docs/consumer-contract/002_stage_a_packet.md |   93 +
  docs/consumer-contract/003_stage_b_packet.md |   77 +
+ docs/consumer-contract/010_stage_a_claude.md |  824 +
+ docs/consumer-contract/011_stage_a_gpt.md    | 1026 +
+ docs/consumer-contract/012_stage_a_grok.md   | 1248 +
  docs/session-log/004_*.md                    |  113 +
  package-lock.json                            | 3188 -------------------
  package.json                                 |    5 -
@@ -85,8 +88,14 @@ or a graph API" told them the store is a graph; reworded to "storage or query
 interface". Audited what is sent: zero backticked terms, no entity names, no
 graph or query vocabulary, 73 lines.
 
-Working tree clean. `4ed03ef`, `3820d62` and `b27f82d` are ahead of
-`origin/feat/domain-consumer`.
+**Stage A run and frozen** (`d7ab111`). Three designers, three model families,
+in parallel, all exit 0 — `anthropic/claude-opus-5` (824 lines),
+`openai-codex/gpt-5.6-sol` (1026), `xai-oauth/grok-4.6` (1248). Committed
+**before any was read**: reading one first colours the next two, and cross-
+reading is supposed to happen against fixed text. Each file carries a provenance
+header above a rule; everything below is unedited stdout.
+
+Working tree clean. Five commits ahead of `origin/feat/domain-consumer`.
 
 ## Verified
 
@@ -116,10 +125,22 @@ worktrees make it easier to fall into.
 
 ## Open
 
-- **Stage A is running as this entry is written** — three `omp` processes,
-  `anthropic/claude-opus-5`, `openai-codex/gpt-5.6-sol` and `xai-oauth/grok-4.6`,
-  all at `--thinking high`. Outputs not yet produced, so nothing has been read.
-  They land as `010`/`011`/`012`, committed verbatim before any cross-reading.
+- **Who performs the synthesis is undecided, and it matters more than it
+  sounds.** The clustering step is where this session is the least trustworthy
+  reader available: it knows the thirteen nouns, the ledger and every
+  preregistered prediction, so "cluster semantically" is exactly where three
+  phrasings could be nudged into the bucket that confirms H1, or one requirement
+  split into three to make convergence look weaker. The brief says cluster
+  before mapping but never says *who* clusters. Proposed fix: run the synthesis
+  as a fourth cold `omp` process with the three outputs, the clustering
+  instruction, no LabKit context and no sight of the predictions — then this
+  session maps clusters onto the domain and runs the paired-world tests, which
+  is the part that genuinely needs someone who knows the model. **Put to the
+  user; unanswered.**
+- **Predictions must be scored against the clusters, not against a reading of
+  the raw text.** Otherwise "at least two of three require persistent
+  attribution" is a judgement call made by whoever wrote the prediction.
+- **Stage A outputs are committed and still unread**, deliberately.
 - **Isolation is enforced, not requested.** `--no-tools` and `--cwd` pointed at
   an empty scratch directory rather than the repo — with omp's default tool set
   and `--cwd "$PWD"` a designer would have had `src/` and `CLAUDE.md` in reach,
@@ -142,7 +163,10 @@ worktrees make it easier to fall into.
 
 ## Next
 
-Collect the three Stage A outputs from the background run and commit them
-verbatim as `010`, `011`, `012` **before** reading across them. Then `git push`.
-`003_stage_b_packet.md` stays sealed until all three are committed; revealing it
+Decide who runs the synthesis (see Open), then produce `020`: cluster concepts
+**semantically** across `010`/`011`/`012` — by requirement, not by word — with no
+reference to LabKit's model. Only after that, map clusters onto the current
+domain and put every apparent gap through a paired-world distinguishability test
+before it exerts any pressure on the ontology. Then `git push`.
+`003_stage_b_packet.md` stays sealed until the synthesis is done; revealing it
 early destroys the ablation permanently.
