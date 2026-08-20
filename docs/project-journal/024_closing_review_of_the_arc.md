@@ -129,6 +129,33 @@ content hash, no `Artefact → Artefact` edge earned) and what the review reopen
 (the half it did not settle), dated. Ten minutes, and it closes the last hole in
 a document that is otherwise the most complete artefact here.
 
+> **Closed, 2026-08-20, in `cc68056` — kept above verbatim.** Both halves were
+> taken. Row F now carries a dated S-9 verdict split three ways: what S-9
+> settled (identity — two artefacts may legitimately share a `logical_name`, and
+> refusing an ambiguous one stops a regenerated part inheriting the historical
+> one's dependants), what it did not (direction — PJ-021's *"direction is in the
+> act"* named an act that does not exist, since the regenerated part is written
+> by an ordinary `recordObservations()` naming nothing historical and
+> `reproducibilityOf()` is a read that persists nothing), and why no edge was
+> added anyway (the gap is an unanswerable question, which earns nothing under
+> PJ-011 §5 — against row E, where the wrong answer was demonstrable one
+> scenario earlier on the same test). The discriminator is named as the deferral
+> rule requires, and cannot be a built scenario, so the row is `open` +
+> **unowned** rather than deferred. Beside the S-9 outcomes prose there is now a
+> superseded-note; the original "row F is refuted" paragraph stays verbatim.
+>
+> One correction to my own framing above. I called this "the row-K shape
+> recurring". The implementing agent's sharper reading is right and I take it:
+> it is the third instance in one session of a different lesson — **withdrawing
+> a claim means finding every place it was made, not just the place you
+> noticed.** A corpus-exhaustion claim corrected in two places and left standing
+> in a third, row Y's stale degree-marker, and row F. All three were found by a
+> cold reader. That generalises past this ledger; "the row-K shape" does not.
+>
+> With this, no item on the ledger's index is known-open. Five rows remain
+> `open` + unowned, which is a different and better thing: every named probe has
+> been built.
+
 ## 6. Closing assessment
 
 The three things I would tell someone who wasn't here:

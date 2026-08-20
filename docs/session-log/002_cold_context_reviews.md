@@ -6,8 +6,9 @@ see `docs/project-journal/016_…md` for the row V change, and `017_…md` and
 `002_cold_context_review_of_s3b.md` once the session outgrew that title.
 
 **Scope warning, because the numbers mislead.** This session's baseline is
-pinned at `94d3d80` and HEAD is now `4692559` — 53 commits. Six are this
-session's. The rest belong to `003_clearing_ledger_rows.md` (S-3c, S-10, S-9,
+pinned at `94d3d80` and HEAD was `dba40f2` when this was written — 58 commits,
+and still moving: a peer session was committing throughout. **Six are this
+session's**, and they are the stable fact here; the range is not. The rest belong to `003_clearing_ledger_rows.md` (S-3c, S-10, S-9,
 S-14, S-18 and two external reviews), which ran between this session's two
 halves. Read 003 for that work; this entry does not restate it. `collect.sh`
 now prints this warning by itself — see the tooling note.
@@ -21,8 +22,8 @@ exposed.
 
 ## Changed
 
-Six commits. The reviews modified nothing; `d34229d` and `b3d6f33` were the
-user acting on the first review, the last four are this session's.
+Eight commits. The reviews modified nothing; `d34229d` and `b3d6f33` were the
+user acting on the first review, the other six are this session's.
 
 - `d34229d` — filed the first review as
   `docs/project-journal/017_cold_context_review.md` (+172, byte-identical).
@@ -36,14 +37,15 @@ user acting on the first review, the last four are this session's.
 - `78a7bbe` — **PJ-024**, the closing review of the completed arc, with
   CLAUDE.md pointed at it in the same commit. Also carries a rename it should
   not: `git mv` had already staged it. Disclosed in that commit's message.
-- `f16978e`, `79c5a6e` — this entry.
+- `f16978e`, `79c5a6e`, `93be853` — this entry.
 - `e386027` — **the wrap tooling fixes** (`wrap-hook.sh`, `collect.sh`,
   `SKILL.md`), below.
 - `4692559` — **corrections to `e386027`**, after testing it. Below.
 
-Working tree at wrap time: this entry only. `docs/session-log/003_…md` was
-dirty for part of this session and `fc62154` is a peer session's commit —
-neither was touched or staged here.
+Working tree at wrap time: clean. `docs/session-log/003_…md` and
+`docs/project-journal/008_…md` were both dirty under a peer session during this
+wrap, and `fc62154`, `cc68056` and `805a31d` are that session's commits — none
+was touched or staged here.
 
 ## Verified
 
@@ -54,8 +56,8 @@ Run at `e89e80c`, during this session:
 - `bun run typecheck` → clean. `npx depcruise src tests --output-type err` →
   **0 errors**, 2 warnings, the pre-existing `no-orphans` on the CLI stubs.
 
-Carried to `4692559` on an explicit check:
-`git diff --name-only e89e80c..4692559 -- src tests` returns **zero files** —
+Carried forward on an explicit check:
+`git diff --name-only e89e80c..dba40f2 -- src tests` returns **zero files** —
 everything since is `.claude/`, `CLAUDE.md` and `docs/`.
 
 The corpus-exhaustion claim was checked against §3's **ownership table** rather
@@ -78,11 +80,10 @@ Not run: `bun examples/full-lifecycle.ts`.
 
 ## Open
 
-- **Row F never received its verdict** — PJ-024's only open item, and the last
-  known hole in the ledger. Its narrative is five lines with no S-9 outcome and
-  no record of the review that reopened it, while PJ-008's S-9 outcomes prose
-  still reads *"row F is refuted"* against a status column saying `open`.
-  Being handed to the implementing agent; deliberately untouched here.
+- **Row F — closed while this entry was being written**, by the peer session
+  in `cc68056`, and covered by entry 003. It was PJ-024's only open item. Noted
+  here because this entry's Next named it; nothing of it is this session's work,
+  and PJ-008 was deliberately never touched from here.
 - **The `resume` half of the compaction guard is still a guess**, and is now
   its only justification. Compaction demonstrably does not need it. A resume
   whose own state file was removed by the 30-day sweep would reach the branch
@@ -96,11 +97,14 @@ Not run: `bun examples/full-lifecycle.ts`.
 
 ## Next
 
-Nothing owed by this session. The domain work's next step is row F's verdict,
-in `docs/project-journal/008_…md` — one dated paragraph recording what S-9
-found (identity settled by content hash, no `Artefact → Artefact` edge earned)
-and what the review reopened, plus a correction or annotation on the S-9
-outcomes prose.
+Nothing owed by this session, and — for the first time in the arc — no known
+open item on the ledger's index either. Row F was the last, and `cc68056`
+closed it: a dated verdict splitting what S-9 settled from what it did not, and
+a superseded-note beside the S-9 outcomes prose leaving the original verbatim.
+
+The one judgment call left in this session's own work is whether the `resume`
+half of the compaction guard should exist at all — see Open. It is a comment
+and fifteen lines of shell, not a defect.
 
 ## Tooling note
 

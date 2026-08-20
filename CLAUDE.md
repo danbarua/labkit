@@ -38,9 +38,10 @@ been settled outright by S-18 (023), which the same §4 condition had nominated
 and which three reviews walked past. **024 is a third external review**, of the
 completed arc: it verifies the corpus-exhaustion claim against §3's ownership
 table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
-zero migrations, fifteen scenarios). It carries **one open item** — row F's
-narrative never received its S-9 verdict or the review that reopened it, so the
-status column says `open` while the S-9 outcomes prose still says *refuted*.
+zero migrations, fifteen scenarios). Its one open item — row F's missing S-9
+verdict — was closed the same day, and **no item on the ledger's index is now
+known-open**. Five rows are still `open` + unowned, which is the better kind:
+every named probe has been built.
 
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
