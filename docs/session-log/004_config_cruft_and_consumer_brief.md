@@ -1,67 +1,88 @@
-# 004: npm-era config cruft cleared, and the consumer-contract brief
+# 004: npm-era config cruft cleared, and the consumer-contract protocol built
 
 **Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
-a consumer is the next probe. The first entry written from the
-`labkit-domain-consumer` worktree.
+a consumer is the next probe, and `docs/consumer-contract/001_design_brief.md`
+for the protocol itself. First entry written from the `labkit-domain-consumer`
+worktree.
 
 ## Goal
 
 Clear "the old js .json config hell cruft" and the dead allow-install entries,
-then draft the brief for the cold-context designers PJ-023 called for.
+then draft the brief for the cold-context designers PJ-023 called for — and act
+on the external review of that brief.
 
 ## Changed
 
-Four commits, all this session, range clean — no other session's work in it.
+Six commits, all this session, range clean — no other session's work in it.
 
 ```
- .gitignore                                 |    6 +
- bun.lock                                   |  226 +-
- docs/consumer-contract/001_design_brief.md |  125 +
- docs/session-log/004_*.md                  |   98 +
- package-lock.json                          | 3188 -----------------------
- package.json                               |    5 -
+ .gitignore                                   |    6 +
+ bun.lock                                     |  226 +-
+ docs/consumer-contract/001_design_brief.md   |  236 +
+ docs/consumer-contract/002_stage_a_packet.md |   93 +
+ docs/consumer-contract/003_stage_b_packet.md |   77 +
+ docs/session-log/004_*.md                    |  113 +
+ package-lock.json                            | 3188 -------------------
+ package.json                                 |    5 -
 ```
 
-- **`9109790`** — deleted `package-lock.json` (3,188 tracked lines) and ignored
-  it. The two committed lockfiles were contradicting each other: the npm one
-  pinned drizzle-kit **0.30.6**, `bun.lock` pinned **0.18.1**. Nothing read the
-  npm one — no CI, no script or doc reference, and `npx depcruise` runs a binary
-  from `node_modules` without consulting it. Ignored as well as deleted so an
-  accidental `npm install` cannot resurrect a second source of truth.
-- **`1631f3c`** — re-locked drizzle-kit to 0.30.6 and removed the whole
-  `allowScripts` block. The lockfile change was a **correction, not a bump**:
-  `package.json` declares `^0.30.6`, which `0.18.1` does not satisfy.
-- **`1eeb536`** — this entry, under its former name.
-- **`d54e920`** — `docs/consumer-contract/001_design_brief.md`, the protocol for
-  the contract-first consumer exercise, committed **before any designer runs**
-  so its predictions cannot be edited into hindsight.
+**Config hygiene** (`9109790`, `1631f3c`). Deleted `package-lock.json` (3,188
+tracked lines) and ignored it; re-locked drizzle-kit to 0.30.6; removed the whole
+`allowScripts` block.
 
-Working tree clean. Branch was pushed at `1eeb536`; `d54e920` and this entry are
-ahead of `origin/feat/domain-consumer`.
-
-**One `npm install` explains the whole config mess**, which is worth more than
-the three symptoms separately. Someone bumped `package.json` to `^0.30.6` and
-ran *npm*: that updated `package-lock.json` and added `allowScripts` entries
-describing the tree npm resolved. `bun install` was never run, so `bun.lock`
-stayed at 0.18.1, the `es5-ext@0.10.64` entry went stale, and the block
-correctly described a tree bun had never built. Not three oversights — one
-install with the wrong tool.
-
-`allowScripts` was **wholly** dead, not one line stale: `@lavamoat/allow-scripts`
-is where that field comes from and lavamoat is not installed; bun's equivalent is
-`trustedDependencies` (`node_modules/bun-types/bun.d.ts:9402`), which this
-`package.json` never used.
+*One `npm install` explains all of it.* Someone bumped `package.json` to
+`^0.30.6` and ran **npm** — updating `package-lock.json` and adding
+`allowScripts` entries for the tree npm resolved — and never ran `bun install`.
+So `bun.lock` stayed at 0.18.1 (violating `package.json`'s own range), the
+`es5-ext@0.10.64` entry went stale, and the block described a tree bun had never
+built. Not three oversights, one install with the wrong tool. `allowScripts`
+turned out **wholly** dead, not one line stale: it is `@lavamoat/allow-scripts`'
+field and lavamoat is not installed; bun's equivalent is `trustedDependencies`
+(`node_modules/bun-types/bun.d.ts:9402`), never used here.
 
 Nothing else at the root was cruft, checked rather than assumed:
 `docker-compose.yml` is live (the real-AGE reference platform for the
 postgres-age skill and `examples/full-lifecycle.md`), `.dependency-cruiser.cjs`
 and `drizzle.config.ts` back their scripts, `drizzle/meta/*.json` is
-drizzle-kit's journal, and all four `scripts/` targets in `package.json` exist.
+drizzle-kit's journal, and all four `scripts/` targets exist.
+
+**Consumer-contract protocol** (`d54e920` then `4ed03ef`). Revision 1 went to
+external review before running and was rebuilt. Four pre-run defects, recorded
+in the brief rather than quietly fixed:
+
+1. The reading bar was **circular** — the probe finds what the model cannot
+   express, under a rule saying inability to express earns nothing. Now three
+   bars: an unavailable answer earns a *candidate*; a paired-world test promotes
+   it to evidence when two states the contract must distinguish are identical in
+   durable state; survivors meet the unchanged change bar.
+2. The withholding line **leaked more than admitted**. Revision 1 called PJ-008
+   §1 "researcher language, written before any model existed" — false. Verified:
+   story 9's gloss names `Artefact`/`Evidence`/`Question`/`Decision` and
+   `RecoveredArtefact`, story 12's argues Evidence and Claim are separate, and
+   §1's closing "The shape these describe" is a process diagram in the
+   ontology's own terms (that third one the review missed; checking found it).
+   The **bold sentences alone are clean — zero backticked terms across all
+   eighteen**, which is what Stage A now uses.
+3. The instrument was **lexical and disclosed**. Now an undifferentiated
+   glossary of every concept, supplied or introduced, whose load-bearing field
+   is what two situations become indistinguishable without it.
+4. Predictions **bundled interpretation**, rested on contaminated input, or were
+   unfalsifiable. Now a preregistered H1/H0 with the rest demoted to secondary,
+   each with an explicit falsifier.
+
+Also added: the two-stage reveal (`002` Stage A, `003` Stage B), which is what
+makes the second measurement possible — which concepts came from researchers'
+words versus only after LabKit's design vocabulary was supplied. Panel claim
+softened from independence to triangulation; scope corrected to precursor, not
+the consumer PJ-023 asked for.
+
+Working tree clean. `4ed03ef` is ahead of `origin/feat/domain-consumer`.
 
 ## Verified
 
-Run on the **combined** change (`1631f3c`), not on either half:
+Code verification ran on `1631f3c`, the last commit touching code. The four
+later commits are documentation only.
 
 - `bun test` → **188 pass, 0 fail**, 611 expect() calls, 20 files, 77.14s.
 - `bun run typecheck` → clean.
@@ -71,43 +92,41 @@ Run on the **combined** change (`1631f3c`), not on either half:
 - `node_modules/.bin/drizzle-kit --version` → v0.30.6, executes.
 - Deletion-verify on `allowScripts`: removed the block, `bun install`, esbuild
   0.19.12 still present and its binary still runs.
+- Leak audit for the Stage A packet: grep over PJ-008 §1 for backticked and
+  ontology terms — 3 hits, all in glosses or the closing section, 0 in the
+  eighteen bold sentences.
 
-Not run: `bun examples/full-lifecycle.ts`. The two doc commits change no code.
+Not run: `bun examples/full-lifecycle.ts`.
 
-**Why the combined run mattered.** The two sessions had each verified one half
-against the other's stale side — the review session tested the new lockfile with
-the old `package.json`, this one tested the new `package.json` with the old
-lockfile. Both results were true; neither covered what shipped. That failure
-mode is *created* by clean division of labour, not prevented by it, and separate
+**Why the combined code run mattered.** The two sessions had each verified one
+half against the other's stale side — the review session tested the new lockfile
+with the old `package.json`, this one the new `package.json` with the old
+lockfile. Both results true; neither covered what shipped. That failure mode is
+*created* by clean division of labour, not prevented by it, and separate
 worktrees make it easier to fall into.
 
 ## Open
 
-- **Two questions to the user, unanswered, blocking the designer runs.** Whether
-  designers are told the eighteen stories are mined from a real programme
-  (legibility versus letting them reverse-engineer which were built); and
-  whether all three run on the same model or deliberately different ones — three
-  of one model may share blind spots, which would make agreement much weaker
-  evidence than it looks. Neither is reversible once a designer has read
-  something.
+- **No designer has been run.** The protocol is committed and unexecuted, which
+  is the intended state — predictions before results.
+- **Panel composition undecided.** Needs the list of model families `omp` is
+  authenticated for. The llmtrim subagent types were proxy cruft and are gone;
+  `omp-headless` is the route.
 - **I deleted my own wrap state file.** Clearing the 18 foreign state files the
-  worktree inherited, I identified "mine" from the newest transcript in the
-  worktree's project dir (`4657ab2a…`) and kept that one. The Stop hook then
-  passed `be5374e7…` — this session kept its id across the move. The hook
-  recreated it with a correct baseline (`26a5866`), so the outcome was benign and
-  arguably better than what I would have preserved, but the reasoning was wrong:
-  **the hook's argument is the authority on the session id, not the transcript
-  directory.** `4657ab2a…` is still present and inert (same baseline, empty
-  entry).
+  worktree inherited, I picked "mine" from the newest transcript in the
+  worktree's project dir (`4657ab2a…`) and kept that. The Stop hook then passed
+  `be5374e7…` — this session kept its id across the move. The hook recreated it
+  with a correct baseline, so the outcome was benign, but the reasoning was
+  wrong: **the hook's argument is the authority on the session id, not the
+  transcript directory.**
 - `package-lock.json` is **still tracked on `main`** and arrives there when this
-  branch merges. Correct under the docs-on-`main` / code-on-branch split; noted
-  so it isn't a surprise.
+  branch merges. Correct under the docs-on-`main` / code-on-branch split.
 - This branch is 1 behind `main` (`3c44e01`, a session-log entry).
 
 ## Next
 
-`git push`, then run the three designers per
-`docs/consumer-contract/001_design_brief.md` §Protocol — independent, no
-cross-talk, no repo access, outputs landing verbatim as `002`/`003`/`004` in
-that directory before anything is read across them. Answer the two open
-questions above first; both change what the designers see.
+`git push`, then Stage A: run three designers on
+`docs/consumer-contract/002_stage_a_packet.md` — that file is the complete
+input, nothing else — and commit their outputs verbatim as `010`, `011`, `012`
+**before** reading across them. `003_stage_b_packet.md` stays sealed until then;
+revealing it early destroys the ablation permanently.
