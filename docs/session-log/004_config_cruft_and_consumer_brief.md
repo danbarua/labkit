@@ -1,4 +1,4 @@
-# 004: npm-era config cruft cleared, the consumer-contract probe run, three gaps demonstrated
+# 004: npm-era config cruft cleared, the consumer-contract probe run, three gaps established at bar 4
 
 **Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Twenty-two commits, all this session, range clean — no other session's work in it.
+Twenty-four commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -176,11 +176,39 @@ Four probes in `tests/consumer/vertical_slice.test.ts`, each building **two
 durable research worlds** through research verbs alone and then asking the public
 read surface. Probe 1 (orientation) passes — the control, and it had to, since a
 gap-hunter that finds only gaps is measuring its own construction. Probes 2, 3
-and 4 demonstrate gaps at rows **Z**, **F** and **S**.
+and 4 establish gaps at rows **Z**, **F** and **S**.
 
-Probe 4 is the strongest and the asymmetry is the reason: probes 2 and 3 build
-two worlds that cannot be read apart; probe 4's worlds **cannot be built at
-all**, because no verb accepts an actor.
+**Reviewed by `labkit-review` before pushing, and corrected in `7b9689a`.** One
+wrong claim and two weak probes, all four findings accepted, the two empirical
+ones verified rather than taken:
+
+- **Two bars were conflated.** The draft claimed a paired world was "the way
+  past" PJ-011 §5. It is not — every read these probes call returns a *correct*
+  answer in both worlds. They clear `023`'s **bar 4**; **none clears §5**. That
+  matters: CLAUDE.md permits at most one confirmed wrong answer green at a time
+  and requires clearing it next, so three §5 failures deferred together would
+  have been a rule violation written into the entry the rule keys off.
+- **The natural-id channel.** The draft said the record could not say which
+  history produced it — **false**. `whatIsKnown()` returns
+  `QuestionStanding { question, asks }`; sorting by the id recovers both orders
+  exactly (`Q_1,Q_2` versus `Q_3,Q_4`), and the draft discarded that field. The
+  accurate claim is that no *modelled* read exposes it. A fourth cheat channel,
+  now demonstrated rather than depended on.
+- **Probes 2 and 3 detected nothing.** Both would have stayed green after their
+  defects were fixed. Now verified by injection — `as_of`,
+  `reconstructionTarget` and `decidedBy` added to running code one at a time,
+  each failing its probe, `session.ts` restored byte-identical each time.
+- **Probe 3 was also incoherent**: both worlds shared a `contentHash`, but under
+  S-9 that field *is* artefact identity, so world A was a successful
+  reproduction rather than a distinct artefact — and the tautology was the exact
+  shape PJ-021 deleted a row F boundary test over. Rewritten as a single-world
+  fact about the write surface.
+
+Probe 4 keeps its ranking — inexpressible-on-write is more severe than
+unreadable — but the pairing is demoted to illustration; the severity is a
+single-world fact. Probe 1 is restated affirmatively: it proves the harness *can*
+return unequal answers, without which the other three equalities would be
+uninterpretable.
 
 Two anti-fake measures. `tests/consumer/` may not import `src/db` — a new
 dependency-cruiser **error**, verified by making it fire and then restoring,
@@ -190,8 +218,8 @@ wall-clock time moved has distinguished the test runs, not the research states.
 
 **Nothing in the domain model changed.** No rung of the change bar climbed.
 
-Working tree clean. Seventeen commits ahead of `origin/feat/domain-consumer`;
-`d045492` is deliberately unpushed pending review.
+Working tree clean. Nineteen commits ahead of `origin/feat/domain-consumer`,
+nothing held back.
 
 ## Verified
 
@@ -227,14 +255,16 @@ worktrees make it easier to fall into.
 
 ## Open
 
-- **`labkit-review` has been asked for an eyeball on the slice; the answer has
-  not arrived.** `d045492` is held local until it does. Four things were put to
-  it, two of which this session is genuinely unsure about: whether probe 2 is a
-  real paired world or a missing feature in costume (`whatIsKnown()` takes no
-  time argument, which is uncomfortably close to the empty-result shape PJ-011 §5
-  refuses), and whether probe 3's assertions pin their finding or merely restate
-  that identical inputs give identical outputs — the exact shape PJ-021 killed a
-  row F boundary test over.
+- **Both self-flagged doubts were correct, and a third was worse.** The review
+  confirmed probe 2 was the wrong bar and probe 3 was tautological — the two
+  things this session said it was unsure about. It also found the thing not
+  suspected: probe 3's shared `contentHash` made its premise incoherent.
+- **A pinned clock cannot evaluate row Z's next step.** Whether ordering derives
+  from `closed_at` or event stamps is untestable in this harness; trying it here
+  returns a false negative. Recorded in `024`.
+- **193/0 carries almost no information about these claims.** Probes 2–4 pass
+  *by construction* — that is the finding. The detector-injection table is what
+  carries the weight.
 - **Nothing has been implemented, and no rung of the change bar has been
   climbed.** Three gaps are now demonstrated rather than argued; that earns
   investigation, not structure. Rows P and F are the cautionary pair — P looked
