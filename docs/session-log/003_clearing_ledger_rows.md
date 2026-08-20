@@ -9,21 +9,22 @@ Renamed twice as the session outgrew its title; the slug is now generic so a
 further scenario would not need a third rename.
 
 **Scope warning: the range is wider than the session.** Baseline is pinned at
-`b3d6f33`, and the range from there to HEAD interleaves two sessions. These
-commits are **not** this session's — they belong to
-`002_cold_context_reviews.md`, which ran either side of this one:
+`b3d6f33` and never moves, so `b3d6f33..HEAD` interleaves two sessions —
+`002_cold_context_reviews.md` ran either side of this one, and its commits are
+in the window at both ends.
 
-> `d6a34c8` (below this session's first commit), then `78a7bbe`, `f16978e`,
-> `e386027`, `79c5a6e`, `4692559`, `93be853`.
+> **This session's commits are `45ec5fa`..`dba40f2`.** Anything in the window
+> outside that range belongs to 002. Read 002 for that work; this entry does
+> not restate it.
 
-Everything else from `45ec5fa` onward is this session's. Read 002 for their
-work; this entry does not restate it. `collect.sh` prints the warning by itself
-now, and since `4692559` its closing line says "at least these commits" — it can
-only inspect commits touching `docs/session-log/`, so `e386027` and `4692559`
-are theirs and invisible to it. *No totals here*, for the same reason the next
-section gives none: a count is wrong the moment this file is committed, and the
-Stop hook then fires on the commit that fixed it. Which shas are foreign is
-durable; how many there are is not.
+Stated as *this* session's boundaries rather than as a list of theirs, which is
+the third and last form this warning took. A total was wrong the moment the file
+was committed; a list of foreign shas was wrong the moment the other session
+committed again. Own boundaries are fixed once a session stops committing, and
+that is the only version of this fact that stays true. (`collect.sh` prints its
+own warning too, and since `4692559` says "at least these commits" — it inspects
+only commits touching `docs/session-log/`, so a peer's code-only commits are
+invisible to it. `e386027` and `4692559` are two such.)
 
 ## Goal
 
