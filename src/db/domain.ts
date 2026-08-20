@@ -33,6 +33,7 @@ export const EDGE_LABELS = [
   "SUPPORTS", // Evidence -> Claim
   "CHALLENGES", // Evidence -> Claim
   "REVERIFIES", // Evidence -> Evidence
+  "PROMOTES", // Decision -> Claim
   "USES", // EvidenceUnit -> Computation
   "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
   "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
@@ -211,6 +212,28 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * indivisible thing; nothing has.
    */
   REVERIFIES: [["Evidence", "Evidence"]],
+  /**
+   * The act that confers confirmatory standing on a finding. Earned by S-18.
+   *
+   * The prediction for that build was that `CHANGES` would carry it — a
+   * decision acting on a claim, which is what `CHANGES` already means. It was
+   * refuted by demonstration: `withdrawalOf()` reads *any* `Decision -CHANGES->
+   * Claim` as a retraction (S-12, where that is exactly right), so promoting a
+   * finding made `whySupported()` report it as withdrawn and no longer
+   * supported. Promotion would have retracted the thing it promoted.
+   *
+   * That is the same lesson `GATES` taught in row V, from the other side: one
+   * edge with two readings is the failure shape behind every expensive mistake
+   * in this project. Two acts that both "change a claim" are not the same
+   * relationship when one means *stop asserting this* and the other means
+   * *assert it more strongly*.
+   *
+   * Direction and endpoint match `CHANGES`: the decision is the act, the claim
+   * is what it acts on. Why it was promoted lives on the decision's `reason`,
+   * so a reader can ask what justified the promotion and not merely that one
+   * happened.
+   */
+  PROMOTES: [["Decision", "Claim"]],
   CHANGES: [["Decision", "Criterion"], ["Decision", "Claim"]],
   BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
   RESOLVES: [["Decision", "Question"]],

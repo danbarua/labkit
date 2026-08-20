@@ -306,20 +306,22 @@ export class ResearchSession {
       `MATCH (q:Question)
        OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
        OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
+       OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
        OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)
-       RETURN q, cited, work, accepting`,
+       RETURN q, cited, work, accepting, settled`,
       {
         q: vertexProps<{ natural_id: string; name: string }>(),
         cited: optional(vertexProps<{ natural_id: string }>()),
         work: optional(vertexProps<{ natural_id: string }>()),
         accepting: optional(vertexProps<{ natural_id: string }>()),
+        settled: optional(vertexProps<{ kind?: string }>()),
       },
     );
 
     const byQuestion = new Map<
       string,
-      { asks: string; cited: boolean; worked: boolean; accepted: boolean }
+      { asks: string; cited: boolean; worked: boolean; accepted: boolean; promoted: boolean }
     >();
     for (const row of rows) {
       const entry = byQuestion.get(row.q.natural_id) ?? {
@@ -327,15 +329,18 @@ export class ResearchSession {
         cited: false,
         worked: false,
         accepted: false,
+        promoted: false,
       };
       entry.cited ||= row.cited !== null;
       entry.worked ||= row.work !== null;
       entry.accepted ||= row.accepting !== null;
+      entry.promoted ||= row.settled?.kind === "confirmatory";
       byQuestion.set(row.q.natural_id, entry);
     }
 
     const survey: KnowledgeSurvey = {
       established: [],
+      provisional: [],
       unresolved: [],
       untested: [],
       accepted: [],
@@ -345,7 +350,12 @@ export class ResearchSession {
       // Settled beats accepted: a question answered after being accepted is
       // answered. Accepted beats worked, because a reader scanning for what
       // still needs doing must not find a deliberately-parked question there.
-      if (entry.cited) survey.established.push(standing);
+      // Settled on a promoted finding is established; settled on scratch is
+      // provisional. Both are answered -- what differs is what the answer rests
+      // on, and a reader asking "what do we know" must not get the second
+      // silently mixed into the first (S-18).
+      if (entry.cited && entry.promoted) survey.established.push(standing);
+      else if (entry.cited) survey.provisional.push(standing);
       else if (entry.accepted) survey.accepted.push(standing);
       else if (entry.worked) survey.unresolved.push(standing);
       else survey.untested.push(standing);
@@ -760,6 +770,17 @@ export class ResearchSession {
     // the decision: a question answered by evidence that challenges its
     // proposition was answered "no".
     const challenges = cited.some((r) => r.against !== null);
+
+    // What the closure rests on: promoted work, or scratch nobody promoted.
+    // Answered either way -- the question is settled as far as anyone has taken
+    // it -- but a reader deciding whether to build on it should not have to go
+    // and look (S-18).
+    const promoted = await this.graph.query(
+      `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(:Evidence)-[:SUPPORTS]->(c:Claim)
+       RETURN c`,
+      { c: vertexProps<{ kind?: string }>() },
+      { id: resolving!.natural_id },
+    );
     return {
       enquiry: enquiry.id,
       question,
@@ -767,6 +788,7 @@ export class ResearchSession {
       closure: "answered",
       answer: challenges ? "no" : "yes",
       evidence: [...new Set(cited.map((r) => r.e.statement))],
+      restsOn: promoted.some((r) => r.c.kind === "confirmatory") ? "confirmatory" : "exploratory",
     };
   }
 
@@ -1266,6 +1288,68 @@ export class ResearchSession {
     });
 
     this.emit("acceptAsUnresolved", input.enquiry.id, { because: input.because, until: input.until, at });
+  }
+
+  /**
+   * Promotes an exploratory finding to confirmatory standing (S-18).
+   *
+   * Standing can be **conferred by an act** — the successor question rows G, K
+   * and R left open — because story 18's premise requires it: scratch is
+   * captured before anyone knows it matters, so the researcher recording it
+   * does not yet have the information a birth declaration would encode.
+   *
+   * It does **not** replace declaring standing at creation
+   * (`Conclusion.standing`, S-7), and the prediction that it would was half
+   * refuted. Both paths are legitimate and the discriminator is whether the
+   * standing was knowable in advance: a prespecified comparison declares it
+   * *before* running, which is what prespecification is, and declaring it
+   * afterwards would be the p-hacking the design lock exists to prevent. Work
+   * that could not have declared it gets promoted instead, and pays for the
+   * lateness with a recorded reason. A reader can tell the two apart:
+   * `whySupported().promotedBecause` is present only for the second.
+   *
+   * Writes `PROMOTES`, not `CHANGES`. The prediction for this build said
+   * `CHANGES` would serve, and it was refuted by demonstration — see
+   * `EDGE_SCHEMA.PROMOTES`.
+   *
+   * Deliberately not a gate. S-17 established that declaring a gate does not
+   * satisfy it, so a gate-conferred model would leave a claim behind an
+   * unevaluated confirmatory gate reading exploratory, and S-7's amendment
+   * check would miss a scientific change. Promotion is an act with a reason.
+   */
+  async promote(input: { claim: ConclusionRef; because: string }): Promise<void> {
+    await this.graph.inTransaction(async () => {
+      const claim = await this.claimFor(input.claim);
+      // `invalidation_check` is the verb's own sentence about what would make a
+      // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
+      // `amendDesign` and `reinterpret`. S-14 is the one place the researcher
+      // supplies it, because there naming the condition *is* the act. Taking an
+      // `until:` here that no scenario reads would be the ceremony S-14 forbids.
+      const decision = await this.graph.createNode("Decision", {
+        reason: input.because,
+        invalidation_check: "evidence that the promoted result does not replicate",
+      });
+      await this.graph.createEdge(decision.natural_id, "PROMOTES", claim);
+      await this.graph.query(
+        `MATCH (c:Claim {natural_id: $id}) SET c.kind = 'confirmatory' RETURN c`,
+        { c: vertexProps<ClaimProps>() },
+        { id: claim },
+      );
+    });
+    this.emit("promote", input.claim.analysis.id, { proposition: input.claim.proposition });
+  }
+
+  /** The Claim node a conclusion asserts, within its own line of enquiry. */
+  private async claimFor(ref: ConclusionRef): Promise<string> {
+    const rows = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(:Evidence)-[:SUPPORTS]->(c:Claim {name: $name})
+       RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { id: ref.analysis.id, name: ref.proposition },
+    );
+    const found = rows[0];
+    if (!found) throw new Error(`analysis ${ref.analysis.id} concluded nothing about "${ref.proposition}"`);
+    return found.c.natural_id;
   }
 
   /**
@@ -2493,6 +2577,22 @@ export class ResearchSession {
     // wrong -- which is the one thing S-12 exists to deny.
     const { withdrawn, replacedBy } = await this.withdrawalOf(scope);
 
+    // Standing, and why it was conferred. Read from the claim rather than the
+    // conclusion so a promotion taken later is visible here at all.
+    const promotion = await this.graph.query(
+      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       ${this.withinScope(scope)}
+       OPTIONAL MATCH (d:Decision)-[:PROMOTES]->(c)
+       RETURN c, d`,
+      {
+        c: vertexProps<{ kind?: string }>(),
+        d: optional(vertexProps<{ reason: string }>()),
+      },
+      { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+    );
+    const confirmed = promotion.some((r) => r.c.kind === "confirmatory");
+    const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
+
     return {
       proposition,
       // Three ways to not be supported, and they are different states: no
@@ -2501,6 +2601,8 @@ export class ResearchSession {
       // stays populated in the third case for the same reason it does in the
       // second: the numbers are fine, and blanking them would say otherwise.
       supported: support.length > 0 && !withdrawn && unmet.length === 0,
+      standing: confirmed ? "confirmatory" : "exploratory",
+      ...(confirmed && promotedBecause ? { promotedBecause } : {}),
       support,
       reverifiedBy,
       standard,

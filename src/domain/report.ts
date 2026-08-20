@@ -55,9 +55,14 @@ export interface Conclusion {
    * confirmatory result, which is a false p-hacking alarm rather than an empty
    * answer. Confirmatory standing is claimed deliberately or not at all.
    *
-   * Whether standing should instead be *conferred* by an act — preregistration,
-   * promotion, passing a confirmatory gate — rather than declared at creation
-   * is still open; see PJ-008 rows G, K and R.
+   * Whether standing should instead be *conferred* by an act was open until
+   * S-18 (PJ-008 rows G, K, R), and the answer is **both, for different work**.
+   * Declaring here is prespecification: saying before the run that this is the
+   * confirmatory comparison, which is the thing a locked design locks. Work
+   * that could not have said it — scratch, captured before anyone knew it
+   * mattered — is promoted afterwards by `ResearchSession.promote()` and pays
+   * for the lateness with a recorded reason. Declaring *after* the fact is the
+   * move neither path allows.
    */
   standing?: "exploratory" | "confirmatory";
 }
@@ -97,6 +102,15 @@ export interface EnquiryStatus {
   reopensIf?: string;
   /** Why it was accepted rather than pursued. Present with `reopensIf`. */
   acceptedBecause?: string;
+  /**
+   * The standing of the evidence a closure rests on (S-18). Present when the
+   * question is `answered`.
+   *
+   * `exploratory` does not mean the answer is wrong — it means nothing has
+   * promoted what it rests on, and a reader deciding whether to build on it
+   * should know that without having to go and look.
+   */
+  restsOn?: "exploratory" | "confirmatory";
   /** The findings the closing decision rests on. Empty means nothing was cited. */
   evidence: string[];
 }
@@ -352,6 +366,14 @@ export interface SupportExplanation {
    * this field has been fixed for twice (S-12, S-3b).
    */
   supported: boolean;
+  /**
+   * Whether this finding has been promoted to confirmatory standing (S-18).
+   * `exploratory` until an act says otherwise — scratch is captured before
+   * anyone knows it matters, so the standing cannot be declared at birth.
+   */
+  standing: "exploratory" | "confirmatory";
+  /** Why it was promoted. Present only when `standing` is `confirmatory`. */
+  promotedBecause?: string;
   /** Findings currently supporting the proposition, each with the analysis that produced it. */
   support: Array<{ finding: string; via: string }>;
   /**
@@ -445,6 +467,16 @@ export interface KnowledgeSurvey {
   unresolved: QuestionStanding[];
   /** On the books, never pursued. Not a failure and not an inconclusive result. */
   untested: QuestionStanding[];
+  /**
+   * Answered, but on a finding nobody has promoted (S-18).
+   *
+   * A fourth-and-a-half state, and the distinction the story exists for: a
+   * result is being relied on and the question is settled *as far as anyone has
+   * taken it*, but what settles it is scratch. Kept out of `established` so
+   * that reading the survey for "what do we actually know" cannot silently
+   * include a lunchtime notebook sweep.
+   */
+  provisional: QuestionStanding[];
   /**
    * Open on purpose (S-14). Worked on, not settled, and deliberately left —
    * with the condition that would reopen it recorded on the deciding act.

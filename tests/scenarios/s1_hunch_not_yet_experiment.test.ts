@@ -64,7 +64,19 @@ async function priorState() {
     enquiry: nlEnquiry,
     method: "curvature-fit",
     from: [nlObs],
-    concludes: [{ proposition: NONLINEAR, finding: "departure from linearity well outside the fit interval" }],
+    // `standing` was added here by S-18, and it is not a notation change.
+    // Until then "established" was free: any question closed on any cited
+    // result landed there, so a lunchtime notebook sweep and a confirmatory
+    // comparison were indistinguishable — which is story 18's own sentence
+    // about scratch entering the record by accident. This fixture is the one
+    // place in the corpus that asserted `established` positively, and it did so
+    // on the default. It now has to say which it is, and it says so at
+    // creation, as prespecified work does — the alternative act,
+    // `promote()`, is for findings whose standing was not knowable when they
+    // were recorded, which is not this one.
+    concludes: [
+      { proposition: NONLINEAR, finding: "departure from linearity well outside the fit interval", standing: "confirmatory" },
+    ],
   });
   await session.closeEnquiry({
     enquiry: nlEnquiry,
