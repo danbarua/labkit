@@ -6,8 +6,8 @@ see `docs/project-journal/016_…md` for the row V change, and `017_…md` and
 `002_cold_context_review_of_s3b.md` once the session outgrew that title.
 
 **Scope warning, because the numbers mislead.** This session's baseline is
-pinned at `94d3d80` and HEAD was `dba40f2` when this was written — 58 commits,
-and still moving: a peer session was committing throughout. **Six are this
+pinned at `94d3d80` and HEAD was `47799f2` when this was written — 61 commits,
+and still moving: a peer session was committing throughout. **Seven are this
 session's**, and they are the stable fact here; the range is not. The rest belong to `003_clearing_ledger_rows.md` (S-3c, S-10, S-9,
 S-14, S-18 and two external reviews), which ran between this session's two
 halves. Read 003 for that work; this entry does not restate it. `collect.sh`
@@ -22,8 +22,8 @@ exposed.
 
 ## Changed
 
-Eight commits. The reviews modified nothing; `d34229d` and `b3d6f33` were the
-user acting on the first review, the other six are this session's.
+Nine commits. The reviews modified nothing; `d34229d` and `b3d6f33` were the
+user acting on the first review, the other seven are this session's.
 
 - `d34229d` — filed the first review as
   `docs/project-journal/017_cold_context_review.md` (+172, byte-identical).
@@ -41,6 +41,12 @@ user acting on the first review, the other six are this session's.
 - `e386027` — **the wrap tooling fixes** (`wrap-hook.sh`, `collect.sh`,
   `SKILL.md`), below.
 - `4692559` — **corrections to `e386027`**, after testing it. Below.
+- `a2b500e` — closes **PJ-024 §5**: row F's verdict landed in the peer session's
+  `cc68056`, so §5's finding is kept verbatim with a dated closing note beside
+  it. The note also takes the peer's sharper reading of what §5 found — not "the
+  row-K shape recurring" but the third instance of *withdrawing a claim means
+  finding every place it was made*. Carries CLAUDE.md's pointer, which still
+  advertised 024 as having an open item.
 
 Working tree at wrap time: clean. `docs/session-log/003_…md` and
 `docs/project-journal/008_…md` were both dirty under a peer session during this
@@ -57,7 +63,7 @@ Run at `e89e80c`, during this session:
   **0 errors**, 2 warnings, the pre-existing `no-orphans` on the CLI stubs.
 
 Carried forward on an explicit check:
-`git diff --name-only e89e80c..dba40f2 -- src tests` returns **zero files** —
+`git diff --name-only e89e80c..47799f2 -- src tests` returns **zero files** —
 everything since is `.claude/`, `CLAUDE.md` and `docs/`.
 
 The corpus-exhaustion claim was checked against §3's **ownership table** rather
@@ -84,6 +90,14 @@ Not run: `bun examples/full-lifecycle.ts`.
   in `cc68056`, and covered by entry 003. It was PJ-024's only open item. Noted
   here because this entry's Next named it; nothing of it is this session's work,
   and PJ-008 was deliberately never touched from here.
+- **A second finding raised and closed the same way** — `99dd25f`, also the
+  peer's. Row F stated the unowned convention's exact sentence in prose without
+  its blockquote; the phrase occurs five times in PJ-008 (F, O, T, Z, AA) and F
+  alone was unformatted, which a grep misses because it wraps across a line.
+  Row S, offered as the reason to leave it, turned out to be a different kind of
+  row — a standing scope decision on identity rather than an exhausted-probe
+  row — so the four comparable rows are F, O, T, Z and three carried the marker.
+  PJ-008 was deliberately never touched from this session.
 - **The `resume` half of the compaction guard is still a guess**, and is now
   its only justification. Compaction demonstrably does not need it. A resume
   whose own state file was removed by the 30-day sweep would reach the branch
@@ -99,7 +113,7 @@ Not run: `bun examples/full-lifecycle.ts`.
 
 Nothing owed by this session, and — for the first time in the arc — no known
 open item on the ledger's index either. Row F was the last, and `cc68056`
-closed it: a dated verdict splitting what S-9 settled from what it did not, and
+closed it, with `99dd25f` making it scannable: a dated verdict splitting what S-9 settled from what it did not, and
 a superseded-note beside the S-9 outcomes prose leaving the original verbatim.
 
 The one judgment call left in this session's own work is whether the `resume`
