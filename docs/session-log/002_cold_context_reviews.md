@@ -122,8 +122,8 @@ and fifteen lines of shell, not a defect.
 
 ## Tooling note
 
-Six findings. Two were fixed in `e386027`; testing that commit produced two
-more, fixed in `4692559`.
+Seven findings. Two were fixed in `e386027`; testing that commit produced two
+more, fixed in `4692559`. The last is recorded, not fixed.
 
 **Both previously-untested Stop-hook branches have run.** The first fire
 created this entry from clean state; the second detected it and forced
@@ -164,6 +164,17 @@ unflagged because it touches only `.claude/skills/wrap/`.
 Entry 003 was renamed *twice*. Three of its commits touch its two former names
 and none is flagged; exact-path matching would have misattributed two of them
 to another session. Recorded in `SKILL.md` as the evidence for the rule.
+
+**The Stop hook fires on a peer's commits in a shared checkout.** `baseline` is
+per-session but HEAD is shared, so any non-log commit by another session in this
+worktree re-triggers the wrap and asks this session to write up work that is not
+its own — observed repeatedly tonight while the peer committed to PJ-008. The
+quiet rule only exempts commits that are entirely within `docs/session-log/`.
+`collect.sh`'s warning is the mitigation, not a fix: it tells you the range is
+wider than the session, having been asked in the first place. Not fixed here.
+Two sessions in one checkout is the unusual case, and the honest options are
+narrowing the trigger to commits this session authored — which git cannot
+distinguish, both commit as the same author — or accepting it.
 
 The last three findings came from testing the tooling against a live peer
 session rather than against sample JSON, which is the general lesson: the nine
