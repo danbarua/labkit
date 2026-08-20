@@ -43,6 +43,15 @@ durable; how many there were is not.
   ledger, PJ-019.
 - `e2fa5ff`, `2b6c80d`, `116a719` — **the third review**: seven fixes, PJ-020,
   then the remaining two compound verbs made atomic on their own evidence.
+- `177549f` — **the Stop hook no longer fires for the wrap's own commit.** It
+  used to ask whether a commit whose entire content is the write-up had been
+  written up — a category error, yes by construction, and a full agent turn
+  each time to say so. Narrow on purpose: a wrap commit that also carries real
+  work still fires. Fixed a second defect in the same place, which is why the
+  hook's message read oddly all session: "N commit(s) ... have not been written
+  up" was false whenever the entry already covered them. Tested across five
+  cases in a scratch repo; `bash -n` caught an apostrophe that would have
+  broken the hook at runtime.
 - `a7c5a73` — **the `wrap` skill now commits its own entry**, stages by
   explicit path, and refuses an empty commit. The old rule handed `git
   add`/`git commit` to the user to avoid interleaving doc commits into work in
@@ -77,7 +86,10 @@ entry.
 ## Verified
 
 Run at `116a719`. Still current: everything since touches only
-`.claude/skills/wrap/` and this entry — nothing under `src/` or `tests/`.
+`.claude/skills/wrap/` and this entry — nothing under `src/` or `tests/`. The
+wrap tooling was verified separately, in a scratch repo rather than this one:
+`collect.sh` against a single-root-commit repo, and `wrap-hook.sh` across five
+fire/silence cases.
 
 - `bun test` — **168 pass, 0 fail**, 543 expect() calls, 17 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
