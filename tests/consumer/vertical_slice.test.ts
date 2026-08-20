@@ -15,11 +15,17 @@
  *   3. if it returns the same answer, that is a demonstrated failure rather
  *      than an absence.
  *
- * PJ-011 §5 refuses to let a missing feature earn anything, because an empty
- * result is unanswerable rather than wrong. A paired world is the way past
- * that: the two states genuinely differ, the contract genuinely requires them
- * apart, and the record genuinely cannot say which one it holds. Nothing is
- * fixed here — this file only establishes which failures are real.
+ * **Two bars are in play and they must not be conflated.** PJ-011 §5 needs a
+ * *confidently incorrect* answer before the model changes; an empty or absent
+ * one is unanswerable, not wrong. `023`'s bar 4 needs only that losing the
+ * distinction "materially prevent or corrupt a read the frozen contract
+ * requires", and *prevent* covers absence.
+ *
+ * **None of the probes below clears §5.** Every read they call returns a
+ * correct answer in both worlds. What they clear is bar 4. That is a real
+ * result and it earns investigation — it does not license a model change, and
+ * it does not engage CLAUDE.md's one-wrong-answer-at-a-time rule, which keys
+ * off §5. Nothing is fixed here.
  *
  * Imports only src/domain, never src/db (enforced — see .dependency-cruiser.cjs).
  */
@@ -69,9 +75,11 @@ const CONVERGES = "the pruning schedule shifts the convergence point";
 
 describe("Probe 1 — orientation: where does this stand, and why?", () => {
   /**
-   * The control, and it must pass. If a probe designed to find gaps finds
-   * nothing but gaps, it is measuring its own construction. This is the
-   * question LabKit was built for, so it should answer it.
+   * The control, and it does more than guard against a self-fulfilling result.
+   * It proves the harness **can** return unequal answers for two worlds, which
+   * is what stops the equalities in probes 2, 3 and 4 being artefacts of
+   * `inTwoWorlds` rather than facts about the read surface. Without it those
+   * equalities would be uninterpretable.
    *
    * The worlds differ in one respect a researcher cares about: whether a
    * prespecified robustness condition held. Story 3's "formally significant
@@ -111,51 +119,77 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
 
 describe("Probe 2 — historical survey: what did the record hold at time T?", () => {
   /**
-   * DEMONSTRATED GAP — ledger row Z, and cluster 21 of the blinded synthesis,
-   * where all three designers required it in three different vocabularies.
+   * BAR 4 — ledger row Z. Required by all three designers (cluster 21) in three
+   * different vocabularies, which is semantic convergence despite lexical
+   * disagreement.
    *
-   * Two programmes settle the same two questions in opposite orders. A reader
-   * asking "what did we hold once the first question was answered, but before
-   * the second?" needs them apart. `whatIsKnown()` is the only survey read and
-   * takes no time argument, so both worlds return the same thing.
+   * **Not a §5 wrong answer.** `whatIsKnown()` is *correct* in both worlds:
+   * both programmes really do hold both beliefs. There is no incorrect answer
+   * and not even an empty one. What is missing is the read — no operation on
+   * the surface accepts a time — and that is prevention, not corruption.
    *
-   * This is not "the feature is missing". The two research histories genuinely
-   * differ, a researcher genuinely asks this, and the durable record cannot
-   * say which history produced it.
+   * The first draft of this probe compared `asks` and asserted the two worlds
+   * were indistinguishable. That was **false**, and the way it was false is the
+   * finding: sorting by natural id recovers creation order exactly, so the
+   * durable record *does* carry the ordering. It carries it in a generator
+   * artefact CLAUDE.md forbids reading meaning into — which is a different and
+   * more precise claim than "the record cannot say".
    */
-  test("two opposite orderings of belief are one indistinguishable answer", async () => {
-    const settle = async (s: ResearchSession, asks: string, proposition: string) => {
-      const enquiry = await s.openEnquiry(asks);
-      const observations = await s.recordObservations({
-        enquiry, name: `${proposition} readings`, finding: `measurements for ${proposition}`,
-      });
-      const analysis = await s.recordAnalysis({
-        enquiry, method: "paired-comparison", from: [observations],
-        concludes: [{ proposition, finding: `result for ${proposition}` }],
-      });
-      await s.promote({ claim: { analysis, proposition }, because: "re-run under seed control" });
-      await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition } });
-    };
+  const FIRST = { asks: "does pruning move convergence?", prop: "pruning moves convergence" };
+  const SECOND = { asks: "does depth move convergence?", prop: "depth moves convergence" };
 
-    const FIRST = { asks: "does pruning move convergence?", prop: "pruning moves convergence" };
-    const SECOND = { asks: "does depth move convergence?", prop: "depth moves convergence" };
+  const settle = async (s: ResearchSession, asks: string, proposition: string) => {
+    const enquiry = await s.openEnquiry(asks);
+    const observations = await s.recordObservations({
+      enquiry, name: `${proposition} readings`, finding: `measurements for ${proposition}`,
+    });
+    const analysis = await s.recordAnalysis({
+      enquiry, method: "paired-comparison", from: [observations],
+      concludes: [{ proposition, finding: `result for ${proposition}` }],
+    });
+    await s.promote({ claim: { analysis, proposition }, because: "re-run under seed control" });
+    await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition } });
+  };
 
-    const survey = async (s: ResearchSession) => {
-      const known = await s.whatIsKnown();
-      return known.established.map((q) => q.asks).sort();
-    };
+  const inOrder = (first: typeof FIRST, second: typeof FIRST) => async (s: ResearchSession) => {
+    await settle(s, first.asks, first.prop);
+    await settle(s, second.asks, second.prop);
+    return (await s.whatIsKnown()).established;
+  };
 
-    const { a, b } = await inTwoWorlds(
-      async (s) => { await settle(s, FIRST.asks, FIRST.prop); await settle(s, SECOND.asks, SECOND.prop); return survey(s); },
-      async (s) => { await settle(s, SECOND.asks, SECOND.prop); await settle(s, FIRST.asks, FIRST.prop); return survey(s); },
+  test("no read on the surface takes a time, so the as-of question has no answer", async () => {
+    const { a, b } = await inTwoWorlds(inOrder(FIRST, SECOND), inOrder(SECOND, FIRST));
+
+    // Both worlds hold both beliefs. Correct in both, which is why this is bar
+    // 4 rather than PJ-011 §5.
+    expect(a.map((q) => q.asks).sort()).toEqual([FIRST.asks, SECOND.asks].sort());
+    expect(b.map((q) => q.asks).sort()).toEqual(a.map((q) => q.asks).sort());
+
+    // The detector, and it flips the day row Z closes: nothing a survey row
+    // carries is temporal, so a caller has nowhere to read an as-of answer from.
+    // If someone adds one, this fails and must be updated deliberately.
+    const temporalFields = Object.keys(a[0]!).filter((k) =>
+      /as_?of|believ|assert(ed)?_?at|recorded_?at|effective|when|timestamp|version/i.test(k),
     );
+    expect(temporalFields).toEqual([]);
+    expect(Object.keys(a[0]!).sort()).toEqual(["asks", "question"]);
+  });
 
-    // Both worlds hold both beliefs, which is right and is not the finding.
-    expect(a).toEqual([SECOND.asks, FIRST.asks].sort());
-    // The finding: the orders are gone. Nothing distinguishes a programme that
-    // believed FIRST while SECOND was still open from one that believed SECOND
-    // while FIRST was still open, and those are different scientific histories.
-    expect(a).toEqual(b);
+  test("the ordering survives only as a natural-id artefact, which is not a modelled read", async () => {
+    const { a, b } = await inTwoWorlds(inOrder(FIRST, SECOND), inOrder(SECOND, FIRST));
+    const bySequence = (rows: typeof a) =>
+      [...rows].sort((x, y) => Number(x.question.slice(2)) - Number(y.question.slice(2))).map((q) => q.asks);
+
+    // The two histories ARE recoverable -- from id order, which tracks
+    // allocation. Recorded because the earlier claim that they were not was
+    // wrong, and because this is the channel a probe could cheat through.
+    expect(bySequence(a)).toEqual([FIRST.asks, SECOND.asks]);
+    expect(bySequence(b)).toEqual([SECOND.asks, FIRST.asks]);
+
+    // And it must not be relied on. CLAUDE.md forbids reading meaning into
+    // natural-id values; the sequence is global, shared across entity types,
+    // and not reset between tests. A consumer keying on it would be reading a
+    // generator artefact as scientific chronology.
   });
 });
 
@@ -163,48 +197,70 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
 
 describe("Probe 3 — reconstruction provenance: what was this reconstructing?", () => {
   /**
-   * DEMONSTRATED GAP — ledger row F, required by Designer 2, which named a
-   * durable "Reconstruction attempt" whose remembered fields include its
-   * historical target.
+   * BAR 4 — ledger row F. Required by Designer 2, which named a durable
+   * reconstruction attempt whose remembered fields include its historical
+   * target.
    *
-   * PJ-021 stated this gap in almost these words and correctly refused to let
-   * it earn anything, because an unanswerable question is not a wrong answer.
-   * The paired world is what changes that: one artefact reconstructs a lost
-   * historical control, the other is fresh work that happens to share its name,
-   * and every read returns the same thing about both.
+   * The first draft of this probe was **incoherent and tautological**, and both
+   * faults are worth keeping visible because they are the ones this project
+   * keeps making.
+   *
+   * *Incoherent:* both worlds passed the same `contentHash`. Under S-9 the
+   * content hash **is** artefact identity — `reproducibilityOf()` compares
+   * exactly that field to decide `exact` versus `differing` — so a
+   * byte-identical "regeneration" is a successful reproduction, not a distinct
+   * artefact. World A contradicted the rule the probe's own comment cited.
+   *
+   * *Tautological:* the two worlds were one builder differing in a free-text
+   * argument, so asserting that non-text-derived outputs matched was asserting
+   * that the same code returns the same result. PJ-021 removed a row F boundary
+   * test for exactly this and it was rebuilt here.
+   *
+   * The finding is not a comparison at all. It is a **single-world fact about
+   * the write surface**, in probe 4's category: no verb records that one
+   * artefact was an attempt to reconstruct another, so the question has nowhere
+   * to be answered from.
    */
-  test("a reconstruction and unrelated fresh work are the same durable state", async () => {
-    const build = (finding: string) => async (s: ResearchSession) => {
+  test("reproducibility is a read the caller must already know the answer to", async () => {
+    const graph = await scenario.begin();
+    try {
+      const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
       const enquiry = await s.openEnquiry("does the encoding beat the historical control?");
-      const rebuilt = await s.recordObservations({
-        enquiry, name: "random control", finding, contentHash: "sha256:aaaa",
+
+      // The historical control, as it survives: recorded, hashed.
+      const historical = await s.recordObservations({
+        enquiry, name: "random control", finding: "the 2024 control, as archived",
+        contentHash: "sha256:1111",
       });
       const analysis = await s.recordAnalysis({
-        enquiry, method: "paired-comparison", from: [rebuilt],
+        enquiry, method: "paired-comparison", from: [historical],
         concludes: [{ proposition: "the encoding beats the control", finding: "difference 2.1%" }],
       });
-      const why = await s.whySupported({ analysis, proposition: "the encoding beats the control" });
-      return { restingOn: why.restingOn, support: why.support };
-    };
 
-    const { a: reconstruction, b: freshWork } = await inTwoWorlds(
-      // A: regenerated from an inferred algorithm, standing in for a lost original.
-      build("regenerated control, algorithm inferred from the 2024 write-up"),
-      // B: a control generated for this study, owing nothing to any predecessor.
-      build("control generated for this study under the recorded procedure"),
-    );
+      // A regeneration that does NOT match -- coherent, unlike the first draft.
+      const report = await s.reproducibilityOf(analysis, [
+        { part: historical, hash: "sha256:2222" },
+      ]);
+      expect(report.differing).toEqual(["random control"]);
+      expect(report.reproducible).toBe(false);
 
-    // Both name the same artefact, which is correct -- S-9 settled that two
-    // artefacts may legitimately share a logical name.
-    expect(reconstruction.restingOn).toEqual(["random control"]);
-    expect(freshWork.restingOn).toEqual(reconstruction.restingOn);
-
-    // The finding: what a reader can recover is identical in structure. The
-    // only trace that one of these reconstructs something is a sentence a human
-    // wrote in a finding -- which is identity by wording, the error this project
-    // has now fixed in six regions, reappearing as the *only* available answer.
-    expect(Object.keys(reconstruction)).toEqual(Object.keys(freshWork));
-    expect(reconstruction.support.map((x) => x.via)).toEqual(freshWork.support.map((x) => x.via));
+      // The finding, in two parts.
+      //
+      // One: the caller had to *pass in* the historical part. The direction of
+      // the reconstruction is an argument, supplied by someone who already knew
+      // it, and nothing is written down as a result -- reproducibilityOf is a
+      // read that persists nothing.
+      //
+      // Two: no field of the report, and no other read, names what a rebuilt
+      // artefact was an attempt to reconstruct. This detector flips the day row
+      // F closes.
+      const provenanceFields = Object.keys(report).filter((k) =>
+        /target|reconstruct|attempt|of_?artefact|predecessor|derived_?from|lineage/i.test(k),
+      );
+      expect(provenanceFields).toEqual([]);
+    } finally {
+      await scenario.end();
+    }
   });
 });
 
@@ -215,12 +271,16 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
    * DEMONSTRATED GAP, and the strongest of the four — ledger row S, required by
    * all three designers across four unanimous clusters of the blinded synthesis.
    *
-   * It is stronger than probes 2 and 3 for a reason worth stating precisely:
-   * those two worlds *can* be built and then cannot be read apart. Here the two
-   * worlds **cannot be built at all**. `closeEnquiry` takes
-   * `{ enquiry, answeredBy? }` and no verb on the surface accepts an actor, so
-   * a researcher who wants the record to say who closed a question has exactly
-   * one route -- write the name into a finding's prose.
+   * It is the most severe of the three, and the severity comes from the
+   * **write** surface rather than from any comparison. `closeEnquiry` takes
+   * `{ enquiry, answeredBy? }` and no verb accepts an actor, so a researcher
+   * who wants the record to say who closed a question has exactly one route --
+   * write the name into a finding's prose.
+   *
+   * The paired world below contributes nothing to that argument and is kept
+   * only as illustration: `closure`, `answer` and `open` match because both
+   * worlds ran the same code. The load-bearing assertion is the last one, a
+   * single-world fact that flips the day an attribution field appears.
    *
    * That is not a workaround, it is the failure. The project has spent six
    * regions establishing that identity is never wording; attribution is
