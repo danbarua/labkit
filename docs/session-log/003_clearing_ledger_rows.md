@@ -41,13 +41,16 @@ durable; how many there were is not.
   AGE column-name fix, then PJ-018 and the ledger.
 - `e1665bf`, `dd5c683`, `3b12e61`, `29a58ab` — **S-10**: predictions, build,
   ledger, PJ-019.
-- `e2fa5ff`, `2b6c80d` — **the third review**: seven fixes, then PJ-020.
+- `e2fa5ff`, `2b6c80d`, `116a719` — **the third review**: seven fixes, PJ-020,
+  then the remaining two compound verbs made atomic on their own evidence.
 - `45ec5fa`, `7e36b31`, `f6ca9cc`, `0740eea`, `21dc34d`, `248b3f5`, and this
   file's own commit — wrap bookkeeping.
 
 Source: `src/domain/session.ts`, `src/domain/report.ts`, `src/db/domain.ts` (the
 `REVERIFIES` edge), `src/db/graph.ts` (`inTransaction`), `src/db/agtype.ts` (the
-column-name guard). Two new scenario files.
+column-name guard). Two new scenario files, plus three tests added to
+`tests/domain-session.test.ts` — the right home for an invariant no researcher
+would ask about.
 
 **One file landed that was not this session's work.** `docs/dependency-graph.svg`
 was already modified in the working tree when the session began, and a `git
@@ -59,9 +62,9 @@ entry.
 
 ## Verified
 
-Run at `2b6c80d`:
+Run at `116a719`:
 
-- `bun test` — **166 pass, 0 fail**, 533 expect() calls, 17 files. Was 145/15 at
+- `bun test` — **168 pass, 0 fail**, 543 expect() calls, 17 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 2 `no-orphans`
@@ -70,9 +73,10 @@ Run at `2b6c80d`:
   graphids.
 - `bun run dev:dependency-cruiser` — regenerates to a byte-identical graph.
 
-**Three deletion verifications**, each removing the thing and watching the wrong
-answer return: S-3c's narrowing, S-10's `REVERIFIES` write, and
-`inTransaction()`. S-3c's was also run in the *opposite* direction — widening
+**Four deletion verifications**, each removing the thing and watching the wrong
+answer return: S-3c's narrowing, S-10's `REVERIFIES` write, and `inTransaction()`
+twice — once for the two verbs a scenario can reach, once for the two it cannot.
+S-3c's was also run in the *opposite* direction — widening
 the rule to "the last verdict wins" fails S-3's own two tests, which is what
 distinguishes a narrowing from a removal. Worth repeating if either is revisited.
 
@@ -98,6 +102,19 @@ which silently returns the column present and `NULL`.
 4. *A `git add -A` sweeping a pre-existing working-tree change.* See Changed.
    This is the second occurrence in this session's lineage; `git add <paths>` is
    the cheap fix.
+5. *The wrong bar applied to a non-model change.* `reinterpret()` and
+   `amendDesign()` were left non-atomic on the grounds that nothing had
+   demonstrated harm — but that bar governs new labels and edges, not service-
+   layer invariants, and no scenario could ever have reached the harm because
+   "does this roll back?" is not a researcher's question. Corrected in
+   `116a719`. Two tests, both harms demonstrated first.
+6. *A guess about where a compound verb hurts, wrong.* For `reinterpret()` the
+   obvious failure point leaves both sentences standing (the S-5/S-12 duplicate
+   state) and changes no reader's answer. The damage is one write later:
+   original withdrawn, evidence not yet carried across. Found by probing each
+   write in turn rather than by reasoning. PJ-020 carries it.
+7. *A tautological assertion*, comparing `interpretationHistory` to itself, in
+   the first draft of that same test.
 
 **What the third review exposed about the method**, and the most portable thing
 here: the scenario discipline is structurally poor at states that exist only
