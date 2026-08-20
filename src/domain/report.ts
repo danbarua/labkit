@@ -275,11 +275,12 @@ export interface ReproductionReport {
 /**
  * How much of a past construction can be rebuilt (S-9).
  *
- * Three outcomes per part, not two. A part whose hash was never recorded is
- * **unverifiable**, which is not the same as one whose hash differs: nobody can
- * say whether it came back the same, and reporting it as differing would claim
- * knowledge the record does not have. Row I's absence-versus-difference
- * distinction, asked of an artefact.
+ * Four outcomes per part, and only two of them are comparisons. `exact` and
+ * `differing` are completed comparisons; `unverifiable` and `notRebuilt` are
+ * states where no comparison happened at all, for two different reasons. Both
+ * were at some point folded into `differing`, which claims knowledge the record
+ * does not have — Row I's absence-versus-difference distinction, asked of an
+ * artefact, and got wrong twice before it was got right.
  */
 export interface ReproducibilityReport {
   /** Parts whose recorded hash matches the one offered, by name. */

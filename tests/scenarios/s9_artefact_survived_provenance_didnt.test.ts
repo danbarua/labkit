@@ -262,14 +262,24 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
    * arguments and persists nothing. So the direction lives in the caller's
    * variables and in prose, not in durable state.
    *
-   * This test asserts the limitation rather than hiding it: a reader holding
-   * only the regenerated artefact cannot recover what it was reconstructing.
-   * It is a boundary, recorded so it cannot be quietly forgotten — and the
-   * reason row F is **not** refuted.
+   * What this test pins is the half that IS demonstrable: the two artefacts
+   * have distinct identity and distinct dependants.
    *
-   * It deliberately does not demand an `Artefact -> Artefact` edge. Nothing has
-   * yet shown a *wrong* answer that needs one; what is shown here is an
-   * unanswerable question, which under PJ-011 §5 earns nothing on its own.
+   * What it deliberately does **not** try to pin is the absence itself. An
+   * earlier version ended with `expect(Object.keys(regenerated)).toEqual([...])`
+   * and claimed that assertion was "what changes when lineage is earned". It
+   * was not — an `Artefact -> Artefact` edge could be added tomorrow and an
+   * opaque `ObservationsRef` should still be `{ kind, id }`. The assertion
+   * pinned the public handle shape and nothing about lineage, so it was a
+   * confident claim about coverage that the test did not have. Removed.
+   *
+   * The honest position, and the reason row F is `open` rather than refuted:
+   * "no existing domain answer reconstructs their relationship" is an
+   * **absence of capability**. Under PJ-011 §5 that earns nothing, and trying
+   * to assert it strongly would mean inventing the very query the rule says
+   * not to invent. The limitation lives in PJ-021 and the ledger, where a
+   * limitation belongs; the executable part of this scenario asserts only what
+   * it can actually observe.
    */
   test("BOUNDARY: nothing durable says what a regeneration was reconstructing", async () => {
     const { enquiry, parts } = await aCachedConstructionWithOneUnrecordedPart();
@@ -283,17 +293,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     });
 
     const reader = await afterwards();
-    // The two are properly distinct -- that half S-9 did establish.
+    // What S-9 did establish, and all this test claims to pin:
     expect(regenerated.id).not.toBe(original.id);
     expect((await reader.whatDependsOn(regenerated)).claims).toEqual([]);
     expect((await reader.whatDependsOn(original)).claims).toEqual([PROPOSITION]);
-
-    // But nothing connects them. Every route out of the regenerated artefact
-    // reaches its own enquiry and stops; none reaches the artefact it was
-    // built to stand in for.
-    const fromRegenerated = await reader.whatDependsOn(regenerated);
-    expect(fromRegenerated.enquiries).toEqual(["does the accelerated path match the reference?"]);
-    // If a lineage relationship is ever earned, this assertion is what changes.
-    expect(Object.keys(regenerated)).toEqual(["kind", "id"]);
   });
 });

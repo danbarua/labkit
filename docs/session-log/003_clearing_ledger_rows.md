@@ -97,9 +97,9 @@ entry.
 
 ## Verified
 
-Run at `2656bd1`:
+Run at `1172e9c` plus the fourth review's second pass:
 
-- `bun test` — **176 pass, 0 fail**, 570 expect() calls, 18 files. Was 145/15 at
+- `bun test` — **176 pass, 0 fail**, 568 expect() calls, 18 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 2 `no-orphans`
@@ -189,6 +189,18 @@ which silently returns the column present and `NULL`.
 12. *Absence-vs-difference, missed inside the function written to respect it.*
    `reproducibilityOf()` reported a part the caller had not rebuilt as
    `differing`. New `notRebuilt` state.
+13. **Error 10, committed a second time in the same file.** The corpus-exhaustion
+   claim was corrected in PJ-021 and in this entry's *Next* — and left standing
+   in this entry's *Open*, where a cold reader would hit it first. Withdrawing
+   a claim means finding every place it was made, and "I fixed that" is not the
+   same as having checked. Caught by the fourth review's second pass, not by me.
+14. *A boundary test that pinned nothing.* The row F test ended with
+   `expect(Object.keys(regenerated)).toEqual(["kind", "id"])`, commented as
+   "what changes when lineage is earned". It would not have: an
+   `Artefact -> Artefact` edge could be added and the opaque handle stay
+   `{ kind, id }`. A confident claim about coverage the test did not have.
+   Removed; the limitation lives in PJ-021 and the ledger, where a limitation
+   belongs.
 
 **What the third review exposed about the method**, and the most portable thing
 here: the scenario discipline is structurally poor at states that exist only
@@ -205,22 +217,24 @@ about the method" carries it.
   question, and there is no actor model by decision.
 - **The authored-versus-mined precedent.** S-3c is the second authored scenario.
   S-10 being mined takes pressure off; PJ-016's argument is load-bearing twice.
-- **The corpus can no longer answer its own question.** Thirteen scenarios,
-  zero new node labels; five consecutive have pressed only on relationships,
-  query semantics and identity. S-9 was the last mined scenario owning an open
-  row, so "build more of this corpus" has stopped being a way to find out
-  whether PJ-001's entity set is right. PJ-021 closes on what would be — a
-  different corpus, a real consumer above the domain layer, or an adversarial
-  reading of PJ-001 itself. **This is the biggest open question in the project
-  and nothing scheduled addresses it.**
+- **Where the next kind of pressure comes from.** Thirteen scenarios, zero new
+  node labels; five consecutive have pressed only on relationships, query
+  semantics and identity. That is a real signal — but it is *not* the claim
+  this entry made first, which was that the corpus was exhausted. It is not:
+  **S-14 owns row J and story 18 owns row K**, and both are scheduled (see
+  Next). What is true is that after those two, more of this corpus is unlikely
+  to move the noun inventory, and the leading candidate for different pressure
+  is a real consumer above the domain layer. PJ-021 carries the argument.
 - **Row P's structural anomaly survives its own row.** `recordObservations()`
   still creates `Evidence` with no producing `EvidenceUnit`, which PJ-001 calls
   impossible, and `whySupported()` still cannot count an observation as support.
   Three scenarios have been pointed at it; each found a reader's defect, not a
   structural one. Recorded as fact now rather than carried as a prediction.
-- **Ledger:** no row is a live defect shipping green. `open` + unowned: O, S, T,
-  Z. `open` with an unbuilt owner: J, K — and both owners are unbuilt *stories*,
-  not corpus scenarios.
+- **Ledger:** no row is a live defect shipping green. `open` + unowned: **F**,
+  O, S, T, Z. `open` with an unbuilt owner: J (owned by **S-14, a corpus
+  scenario**) and K (owned by **story 18**, whose promotion condition has
+  fired). Row F joined the unowned set when S-9 settled artefact identity but
+  not reconstruction direction.
 
 ## Next
 

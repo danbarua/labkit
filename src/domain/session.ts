@@ -2487,11 +2487,13 @@ export class ResearchSession {
     const notRebuilt: string[] = [];
     for (const { a } of parts) {
       const candidate = offered.get(a.natural_id);
-      // Three ways to be uncomparable, and none of them is inequality. The
-      // record having no hash is permanent; this attempt not rebuilding the
-      // part is not. Folding either into `differing` claims evidence the
-      // record does not have -- external review found exactly that, and it is
-      // the conflation this whole report was written to respect.
+      // Two ways for no comparison to happen, and neither is inequality:
+      // the record has no hash (permanent, about the artefact), or this
+      // attempt did not rebuild the part (about the attempt). `differing` is a
+      // comparison that ran and came out unequal, which is a different kind of
+      // statement. Folding either absence into it claims evidence the record
+      // does not have -- external review found exactly that, in the function
+      // written to respect the distinction.
       if (!a.content_hash) unverifiable.push(a.logical_name);
       else if (candidate === undefined) notRebuilt.push(a.logical_name);
       else if (candidate === a.content_hash) exact.push(a.logical_name);
