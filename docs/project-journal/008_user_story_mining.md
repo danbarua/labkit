@@ -822,6 +822,44 @@ something that could not be true
 
 Content-hash comparison plus an open question about the generator
 
+**S-9 (2026-08-20): refuted, then reopened by review the same day — half
+settled, and the row stays `open` and now unowned.** This verdict was missing
+for four commits; PJ-024 §5 found the hole and it is filled here rather than
+left to PJ-021 alone.
+
+*What S-9 settled: identity.* Two artefacts may legitimately share a
+`logical_name`, and a regenerated part naturally carries the name of the part it
+replaces. Refusing an ambiguous name — S-5's decline-rather-than-guess, reaching
+artefacts for the first time — is enough to stop the regenerated one inheriting
+the historical one's dependants, which is the Afterward bullet *"inferred
+provenance must not silently inherit the original's standing"* word for word. No
+lineage edge was needed for that, and the caveat has a home: `whatIsKnown()`
+keeps the question in `untested` rather than letting a workaround close it.
+
+*What it did not settle: direction — and the first write-up claimed otherwise.*
+PJ-021 argued no edge was needed because *"direction is in the act: a
+regeneration knows what it regenerates."* **There is no such act.** The
+regenerated part is written by an ordinary `recordObservations()` naming nothing
+historical, and `reproducibilityOf()` is a *read* that takes the historical
+parts as arguments and persists nothing. A reader holding only the regenerated
+artefact cannot answer *what was this reconstructing?* External review caught it;
+the claim is left visible in PJ-021 rather than rewritten, because how the
+conclusion was reached is the part worth keeping.
+
+*Why no edge was added anyway.* Nothing has demonstrated a **wrong** answer
+requiring one — the gap is an unanswerable question, and under PJ-011 §5 that
+earns nothing. The contrast with row E, earned by S-10 one scenario earlier on
+the same test, is the sharpest available illustration that the bar discriminates:
+there a shared claim could carry neither direction nor caveat and the wrong
+answer was demonstrable; here the caveat has a home and the direction gap is so
+far only an absence.
+
+*The discriminator, named as the deferral rule requires:* a scenario in which a
+reader must **recover** what a reconstruction was reconstructing, and gets a
+confidently wrong answer without it. No scenario currently named would settle
+this, which is why the row is `open` + **unowned** rather than deferred. See
+PJ-021 and PJ-024 §5.
+
 ### Row G — "Locked" is not distinct from "decision record still active"
 
 **Scenarios:** S-7, S-13 · **Status:** resolved
@@ -1841,6 +1879,13 @@ own fallback held, and no `Artefact → Artefact` edge was earned. One scenario
 after row E *was* earned on the same test, which is the sharpest available
 illustration that the bar is doing work rather than rubber-stamping: direction
 and caveat had homes here and did not there.
+
+> **Superseded the same day, kept verbatim above.** External review found that
+> *"direction had a home"* was false — the home was an act that does not exist.
+> **Row F is `open`, not refuted**, and the status column has said so since;
+> what was missing until now was this pointer, so a reader arriving here from
+> the index hit "refuted" with nothing adjacent to correct it. The later verdict
+> is under `### Row F`. Only the identity half was settled.
 
 *Wrong.* **Row P was predicted not to fire, for the second build running, and it
 fired.** Both S-10's predictions and these said the two senses of `Evidence`
