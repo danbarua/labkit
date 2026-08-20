@@ -693,7 +693,7 @@ this document's original analysis are marked as such.
 | V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
 | X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b, **S-3c** | resolved |
-| Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, S-14° | boundary |
+| Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, **S-14** | boundary |
 | Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
@@ -1229,11 +1229,26 @@ answering it
 
 ### Row Y — Closure without a cited result is classified by whether anyone worked on it
 
-**Scenarios:** **S-1**, S-14 · **Status:** boundary
+**Scenarios:** **S-1**, **S-14** · **Status:** boundary (accepted half settled)
 
 **Current state (verified):** `whatIsKnown()` buckets an abandoned question under `unresolved` if anything ever addressed it, and a deferred one under `untested` if nothing did
 
 **NEW, KNOWN BOUNDARY, deliberately not fixed.** S-1 needs three states and gets them from structure — resolved-on-cited-evidence, worked-on, never-touched. It never poses a question that was abandoned or deferred, so it has no standing to say where those belong, and inventing a fourth and fifth list to hold cases the scenario never exercised is how the survey stops being derived. Row J already owns the deferred-vs-accepted distinction; S-14 should decide both together
+
+**S-14: half of it settled, and the half that remains is still a boundary
+rather than a defect.** An **accepted** question is no longer classified by
+whether anyone worked on it — it has its own `accepted` bucket, written by
+`acceptAsUnresolved()`, and the survey reaches it through the deciding act
+rather than through activity. An **abandoned** one still is: `closeEnquiry()`
+with nothing cited reports `abandoned`, and `whatIsKnown()` still places it by
+whether an `EvidenceUnit` ever addressed the enquiry. S-14 asserts that
+directly, as the contrast that gives accepting its meaning, so the remaining
+half is exercised rather than merely unvisited. It stays `boundary` on the same
+grounds as before: no scenario has yet wanted an abandoned question to sit
+anywhere in particular, and a fifth bucket built for nobody is the ceremony
+S-14 itself declined a field over. *(This verdict was written two builds late —
+the `°` on S-14 was cleared here rather than when S-14 was built, which is the
+staleness the legend above warns about, happening to the person who wrote it.)*
 
 ### Row Z — Chronology exists for evidence but not for status
 
