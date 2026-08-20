@@ -1,8 +1,8 @@
-# 003: clearing ledger rows — S-3c (row X), S-10 (row E), and a third review
+# 003: clearing ledger rows — S-3c, S-10, S-9, and a third review
 
 **Session wrap, 2026-08-20, on `spike/drizzle-age`.** Not a decision record —
-see `docs/project-journal/` 018 (S-3c), 019 (S-10) and 020 (the review), and
-PJ-008 §3 rows E, P, X and AB for the ledger.
+see `docs/project-journal/` 018 (S-3c), 019 (S-10), 020 (the review) and 021
+(S-9), and PJ-008 §3 rows E, F, P, X and AB for the ledger.
 
 Renamed twice as the session outgrew its title; the slug is now generic so a
 further scenario would not need a third rename.
@@ -11,8 +11,9 @@ further scenario would not need a third rename.
 
 Prepare an external-review handoff, act on the review that came back, then build
 the scenarios that would move the ledger — row X's discriminator first, then a
-corpus scenario owning an open row. A second, unplanned review arrived at the
-end and was acted on in full.
+corpus scenario owning an open row. An unplanned review arrived mid-way and was
+acted on in full; S-9 followed, and with it the last mined scenario that owned
+an open row outright.
 
 *Met.* One correction to how the second build was justified: S-10 was described
 in `e1665bf` and in an earlier draft of this entry as "the **only** unbuilt
@@ -23,9 +24,9 @@ scenarios, and it exercises the support machinery S-3c had just changed.
 
 ## Changed
 
-Two scenarios built, two ledger rows cleared, one AGE bug found, one review
-acted on in full, three journal entries written. Every compound domain verb is
-now atomic, each earned by its own negative test.
+Three scenarios built (S-3c, S-10, S-9), four ledger rows cleared (X, E, F, P),
+one AGE bug found, one review acted on in full, four journal entries written.
+Every compound domain verb is now atomic, each earned by its own negative test.
 
 *No commit count or total diffstat here, deliberately.* Both go stale the moment
 this file is committed, and the Stop hook then re-fires on the commit that fixed
@@ -43,6 +44,10 @@ durable; how many there were is not.
   ledger, PJ-019.
 - `e2fa5ff`, `2b6c80d`, `116a719` — **the third review**: seven fixes, PJ-020,
   then the remaining two compound verbs made atomic on their own evidence.
+- `2f937bf`, `b55ff09`, `a987a68` — **S-9**: predictions, build, PJ-021 and the
+  ledger. Row F **refuted** (no artefact lineage edge needed), row P
+  **resolved** against two consecutive predictions that it would not move.
+  `content_hash` gained its first reader since PJ-004.
 - `177549f` — **the Stop hook no longer fires for the wrap's own commit.** It
   used to ask whether a commit whose entire content is the write-up had been
   written up — a category error, yes by construction, and a full agent turn
@@ -85,25 +90,29 @@ entry.
 
 ## Verified
 
-Run at `116a719`. Still current: everything since touches only
-`.claude/skills/wrap/` and this entry — nothing under `src/` or `tests/`. The
-wrap tooling was verified separately, in a scratch repo rather than this one:
-`collect.sh` against a single-root-commit repo, and `wrap-hook.sh` across five
-fire/silence cases.
+Run at `a987a68`:
 
-- `bun test` — **168 pass, 0 fail**, 543 expect() calls, 17 files. Was 145/15 at
+- `bun test` — **173 pass, 0 fail**, 557 expect() calls, 18 files. Was 145/15 at
   session start. (Exit code ignored, per CLAUDE.md.)
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 2 `no-orphans`
   warnings on the empty CLI stubs.
-- `bun examples/full-lifecycle.ts` — ends `closed connection cleanly`, no raw
-  graphids.
-- `bun run dev:dependency-cruiser` — regenerates to a byte-identical graph.
 
-**Four deletion verifications**, each removing the thing and watching the wrong
+The wrap tooling was verified separately, in a scratch repo rather than this
+one: `collect.sh` against a single-root-commit repo, and `wrap-hook.sh` across
+five fire/silence cases. `bun test` does not cover it.
+
+- `bun examples/full-lifecycle.ts` — ends `closed connection cleanly`, no raw
+  graphids (last run at `2b6c80d`).
+- `bun run dev:dependency-cruiser` — regenerated to a byte-identical graph at
+  `2b6c80d`; not re-run since, and S-9 added no module.
+
+**Six deletion verifications**, each removing the thing and watching the wrong
 answer return: S-3c's narrowing, S-10's `REVERIFIES` write, and `inTransaction()`
 twice — once for the two verbs a scenario can reach, once for the two it cannot.
-S-3c's was also run in the *opposite* direction — widening
+and S-9's two fixes separately — removing the consumer traversal fails three
+assertions, removing the name refusal fails one. S-3c's was also run in the
+*opposite* direction — widening
 the rule to "the last verdict wins" fails S-3's own two tests, which is what
 distinguishes a narrowing from a removal. Worth repeating if either is revisited.
 
@@ -142,6 +151,14 @@ which silently returns the column present and `NULL`.
    write in turn rather than by reasoning. PJ-020 carries it.
 7. *A tautological assertion*, comparing `interpretationHistory` to itself, in
    the first draft of that same test.
+8. *Identity-by-wording, nearly reintroduced inside the fix for it.*
+   `reproducibilityOf()` first took its rebuilt hashes keyed by `logical_name`
+   — one function away from the refusal being added, in the scenario about two
+   artefacts sharing a name. Caught while writing the test.
+9. *Two wrong assertions about the model in S-9's first draft*: that a freshly
+   opened question is `unresolved` (it is `untested`, and the distinction is
+   correct), and that `whatDependsOn` on an input would conflate two artefacts
+   — it returned nothing at all, which is a different and worse defect.
 
 **What the third review exposed about the method**, and the most portable thing
 here: the scenario discipline is structurally poor at states that exist only
@@ -158,10 +175,22 @@ about the method" carries it.
   question, and there is no actor model by decision.
 - **The authored-versus-mined precedent.** S-3c is the second authored scenario.
   S-10 being mined takes pressure off; PJ-016's argument is load-bearing twice.
-- **The noun inventory has not moved in twelve scenarios.** PJ-018, PJ-019 and
-  PJ-020 all close on this and none can answer it.
+- **The corpus can no longer answer its own question.** Thirteen scenarios,
+  zero new node labels; five consecutive have pressed only on relationships,
+  query semantics and identity. S-9 was the last mined scenario owning an open
+  row, so "build more of this corpus" has stopped being a way to find out
+  whether PJ-001's entity set is right. PJ-021 closes on what would be — a
+  different corpus, a real consumer above the domain layer, or an adversarial
+  reading of PJ-001 itself. **This is the biggest open question in the project
+  and nothing scheduled addresses it.**
+- **Row P's structural anomaly survives its own row.** `recordObservations()`
+  still creates `Evidence` with no producing `EvidenceUnit`, which PJ-001 calls
+  impossible, and `whySupported()` still cannot count an observation as support.
+  Three scenarios have been pointed at it; each found a reader's defect, not a
+  structural one. Recorded as fact now rather than carried as a prediction.
 - **Ledger:** no row is a live defect shipping green. `open` + unowned: O, S, T,
-  Z. `open` with an unbuilt owner: F, J, K, P.
+  Z. `open` with an unbuilt owner: J, K — and both owners are unbuilt *stories*,
+  not corpus scenarios.
 
 ## Next
 
@@ -171,22 +200,26 @@ commit *is* the root, `collect.sh` falls back to the root itself, so
 commit. Pre-existing intent, not introduced by the `--verify` fix, and fixing
 it means deciding what "everything since the beginning" should mean.
 
-**S-9, "the artefact survived; its provenance didn't."** It solely owns rows F
-and P, and P's cell says explicitly that S-9 is the scenario that has to produce
-that wrong answer or leave the row where it is — S-10 was predicted to fire P
-and did not.
+**Not another corpus scenario — decide what the corpus is for now.** S-2, S-13
+and S-14 remain unbuilt and own nothing outstanding between them. Building them
+would exercise the verbs again; PJ-021 argues it would not tell us whether the
+entity set is right, which is the question every recent entry closes on.
 
-Open `docs/project-journal/008_user_story_mining.md` at `### S-9 —`. Its stated
-expressibility route is content-hash equality plus an open question, and it
-deliberately does not ask for a recovered-artefact type: if the general entities
-cannot carry it, that is the finding. Commit predictions before building, as
-`3023cb1` and `e1665bf` did — that discipline is why this session's wrong
-predictions are legible rather than invisible.
+Read `docs/project-journal/021_a_regenerated_part_is_not_the_part.md` §"The
+corpus question, now answerable" first — it names the three candidates: a
+different corpus, a real consumer above the domain layer (the MCP/CLI read side,
+which is also what would bring back the relational projection removed in
+`af5a1d2`), or an adversarial reading of PJ-001 itself. That is a decision for
+the user, not a default.
 
-Two things to carry in: PJ-019 notes that nothing yet distinguishes "re-verify a
-finding" from "re-run an analysis wholesale", and S-9 regenerating an artefact
-is close to that. And per PJ-020, ask of every step **"what does this look like
-halfway through?"** and **"what if the second half fails?"** — the questions the
-happy-path conversation cannot ask.
+If the answer is "keep building scenarios anyway", S-13 is the strongest of the
+three: it revisits question lineage, closure stability and act→product, all of
+which have moved since it was written. Commit predictions first, as every build
+this session did — that discipline is why this session's five wrong predictions
+are legible rather than invisible.
 
-Remaining corpus after S-9: S-2, S-13, S-14.
+Two standing questions to carry into whatever comes next. PJ-019: nothing
+distinguishes "re-verify a finding" from "re-run an analysis wholesale". PJ-020:
+ask of every step **"what does this look like halfway through?"** and **"what if
+the second half fails?"** — the questions a happy-path conversation cannot ask,
+and the source of that review's two most serious findings.
