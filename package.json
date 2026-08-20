@@ -44,10 +44,5 @@
     "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0",
     "zod": "^4.4.3"
-  },
-  "allowScripts": {
-    "es5-ext@0.10.64": true,
-    "esbuild@0.18.20": true,
-    "esbuild@0.19.12": true
   }
 }
