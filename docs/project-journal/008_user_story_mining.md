@@ -1715,6 +1715,29 @@ bearing question needed no third bearing beyond `SUPPORTS`/`CHALLENGES`.
 *The incidental regression pressure found nothing.* S-3c's narrowing was hours
 old and S-10 runs through the same support machinery; 159 pass, 0 fail.
 
+### S-9 predictions, recorded before the build
+
+Recorded 2026-08-20, against `c2d9828`, before a line of test or source. S-9 is
+**mined**, and the last unbuilt scenario owning any open row outright — it
+solely owns F, and is row P's only unbuilt owner.
+
+| Question | Prediction |
+| --- | --- |
+| Where the wrong answer lives | **`whatDependsOn()`, keyed on `logical_name`.** S-9 regenerates an artefact, and a regenerated artefact naturally carries the name of the thing it regenerates. Two artefacts, one name — so "what depends on the unreproducible part?" answers with the *union*, and the third Afterward bullet ("inferred provenance must not silently inherit the original's standing") describes a defect that is already present rather than a risk to avoid. **Sixth region** for identity-by-wording, after claims, interpretations, criteria, evaluations and execution inputs |
+| Row F — artefact-to-artefact lineage | **Predicting `refuted`, and this is the interesting one.** The ledger's fallback — content-hash equality plus an open question — is not obviously insufficient the way S-10's shared-claim encoding was. What S-10 could not carry was direction and caveat; here direction is *recorded in the act* (a regeneration knows what it regenerates) and the caveat is the open question. If fixing identity is enough, no edge is earned and row F joins A and H as a refuted prediction |
+| `content_hash` | **Gets its first reader, or the row moves.** It has been written and never read since PJ-004 — a writer without a reader, which rule 3 forbids for edges and which nothing has yet forced for a property. S-9's whole fallback route runs through it. If it still has no reader after this scenario, that is a finding about the property, not about S-9 |
+| Row P — `Evidence` carries two senses | **Predicting it does not fire, again.** "Three components reproduce byte-exactly" is a statement about artefacts and their hashes, not about findings. If P survives S-9 untouched it has no unbuilt owner left, and it should be re-classified `open` + unowned rather than left looking like it has a probe coming |
+| "What would resolve this?" | **Expressible today.** `pose()` plus `whatIsKnown()`. The requirement is that the regeneration must *not* close it — a question quietly closed by a workaround is the failure, and nothing currently closes a question as a side effect |
+| A new node label | **No**, and the scenario says so itself: it deliberately does not ask for a recovered-artefact type. If the general entities cannot carry this, that is the finding and it should be recorded rather than designed around |
+| Halfway through / second half fails | Per PJ-020: a regeneration interrupted after the new artefact exists but before its provenance is recorded would leave an artefact indistinguishable from the original. If that is reachable, it wants `inTransaction` like the others |
+
+**What would make this a failure of the corpus rather than the model.** S-9 is
+the last mined scenario owning an open row. If it too produces nothing but a
+service-layer identity fix, then five consecutive scenarios will have pressed
+only on relationships and query semantics, and the question PJ-018/019/020 all
+close on — *is the entity set well chosen, or is the corpus not pressing?* —
+stops being answerable by building more of this corpus.
+
 ## §4 — Held back as stories, not scenarios
 
 Cut by mechanical overlap with a promoted scenario, not by interest. Each
