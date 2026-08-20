@@ -201,4 +201,99 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
 
     await expect((await afterwards()).whatDependsOn(CONTROL)).rejects.toThrow(/2 artefacts are named/);
   });
+
+  /**
+   * External review. A part the caller simply did not rebuild is not a part
+   * that came back different.
+   *
+   * The first cut reported it `differing`, because the offered map had no entry
+   * and "no entry" compared unequal to the recorded hash — claiming evidence of
+   * inequality where there was only absence of a comparison. That is the exact
+   * conflation this report was written to avoid, one branch away from the
+   * branch that avoids it.
+   *
+   * Three reasons a part cannot be compared, and they are not the same: the
+   * record never had a hash (`unverifiable`), or this attempt did not rebuild
+   * it (`notRebuilt`). The first is a permanent property of the record; the
+   * second is a property of this attempt and says nothing about the artefact.
+   */
+  test("a part that was not rebuilt is not a part that differs", async () => {
+    const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
+
+    // Only two of the three hashed parts were rebuilt.
+    const report = await (await afterwards()).reproducibilityOf(analysis, [
+      { part: parts[0]!, hash: "sha256:aaa" },
+      { part: parts[1]!, hash: "sha256:bbb" },
+    ]);
+
+    expect(report.exact.sort()).toEqual(["splits", "weights"]);
+    expect(report.differing).toEqual([]);
+    expect(report.notRebuilt).toEqual(["priors"]);
+    expect(report.unverifiable).toEqual([CONTROL]);
+    expect(report.reproducible).toBe(false);
+  });
+
+  /**
+   * External review, and the sharper half of it. A part that really did come
+   * back different must still say so — the fix above must not turn every
+   * mismatch into "you did not rebuild it".
+   */
+  test("a part that was rebuilt and differs still reports as differing", async () => {
+    const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
+
+    const report = await (await afterwards()).reproducibilityOf(analysis, [
+      { part: parts[0]!, hash: "sha256:aaa" },
+      { part: parts[1]!, hash: "sha256:DIFFERENT" },
+      { part: parts[2]!, hash: "sha256:ccc" },
+    ]);
+
+    expect(report.exact.sort()).toEqual(["priors", "weights"]);
+    expect(report.differing).toEqual(["splits"]);
+    expect(report.notRebuilt).toEqual([]);
+  });
+
+  /**
+   * External review, and the correction to this build's own conclusion.
+   *
+   * PJ-021 first claimed that a regeneration needs no artefact lineage because
+   * "direction is in the act". It is not. The regenerated part is created with
+   * an ordinary `recordObservations()` that names nothing historical, and
+   * `reproducibilityOf()` is a read that takes the historical parts as
+   * arguments and persists nothing. So the direction lives in the caller's
+   * variables and in prose, not in durable state.
+   *
+   * This test asserts the limitation rather than hiding it: a reader holding
+   * only the regenerated artefact cannot recover what it was reconstructing.
+   * It is a boundary, recorded so it cannot be quietly forgotten — and the
+   * reason row F is **not** refuted.
+   *
+   * It deliberately does not demand an `Artefact -> Artefact` edge. Nothing has
+   * yet shown a *wrong* answer that needs one; what is shown here is an
+   * unanswerable question, which under PJ-011 §5 earns nothing on its own.
+   */
+  test("BOUNDARY: nothing durable says what a regeneration was reconstructing", async () => {
+    const { enquiry, parts } = await aCachedConstructionWithOneUnrecordedPart();
+    const original = parts[3]!;
+
+    const regenerated = await session.recordObservations({
+      enquiry,
+      name: CONTROL,
+      finding: "randomised control series, regenerated from an inferred algorithm",
+      contentHash: "sha256:regenerated",
+    });
+
+    const reader = await afterwards();
+    // The two are properly distinct -- that half S-9 did establish.
+    expect(regenerated.id).not.toBe(original.id);
+    expect((await reader.whatDependsOn(regenerated)).claims).toEqual([]);
+    expect((await reader.whatDependsOn(original)).claims).toEqual([PROPOSITION]);
+
+    // But nothing connects them. Every route out of the regenerated artefact
+    // reaches its own enquiry and stops; none reaches the artefact it was
+    // built to stand in for.
+    const fromRegenerated = await reader.whatDependsOn(regenerated);
+    expect(fromRegenerated.enquiries).toEqual(["does the accelerated path match the reference?"]);
+    // If a lineage relationship is ever earned, this assertion is what changes.
+    expect(Object.keys(regenerated)).toEqual(["kind", "id"]);
+  });
 });

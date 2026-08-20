@@ -289,9 +289,23 @@ export interface ReproducibilityReport {
   /** Parts with no recorded hash — unanswerable, not unequal. */
   unverifiable: string[];
   /**
-   * Whether the whole construction reproduces. False if anything differs *or*
-   * is unverifiable: a rebuild that cannot be checked has not been shown to
-   * reproduce, and this is the field that must not quietly say otherwise.
+   * Parts this attempt did not rebuild.
+   *
+   * Distinct from `unverifiable`, and external review caught them being
+   * conflated with `differing`: a missing candidate compared unequal to a
+   * recorded hash, so LabKit claimed evidence of inequality where there was
+   * only absence of a comparison — the very conflation this report exists to
+   * respect, one branch from the branch that respects it.
+   *
+   * `unverifiable` is a permanent property of the record; `notRebuilt` is a
+   * property of *this attempt* and says nothing about the artefact.
+   */
+  notRebuilt: string[];
+  /**
+   * Whether the whole construction reproduces. False unless every part was
+   * rebuilt and matched: anything differing, unverifiable or not attempted
+   * leaves the construction unshown, and this is the field that must not
+   * quietly say otherwise.
    */
   reproducible: boolean;
 }

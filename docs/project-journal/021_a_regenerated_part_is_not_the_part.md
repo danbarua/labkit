@@ -1,8 +1,10 @@
-# PJ-021: A regenerated part is not the part — row F refuted, row P resolved
+# PJ-021: A regenerated part is not the part — row P resolved, row F half-settled
 
 **Status: implemented (2026-08-20), on `spike/drizzle-age`. Covers S-9
-(`b55ff09`), promoted from §2. Row F **refuted**, row P **resolved** against two
-consecutive predictions that it would not move. Verification at the time of
+(`b55ff09`), promoted from §2. Row P **resolved** against two consecutive
+predictions that it would not move; row F **half-settled and still open** — this
+entry first declared it refuted and external review corrected that, recorded
+below rather than edited away. Verification at the time of
 writing: 173 pass / 0 fail, typecheck clean, `npx depcruise src tests
 --output-type err` 0 errors.**
 
@@ -15,23 +17,43 @@ control does not, because whatever generated it was never written down. The
 researcher then asks for the thing the record must not let happen quietly —
 infer the old algorithm, regenerate the part, carry on.
 
-## Row F: refuted, and the contrast with row E is the point
+## Row F: half-settled, and the half this entry got wrong
 
-No `Artefact → Artefact` edge was earned. The fallback this row recorded from
-the beginning — content-hash equality plus an open question — held exactly as
-written.
+**What S-9 settled: identity.** Two artefacts can legitimately share a
+`logical_name`; a regenerated part carries the name of the part it replaces; and
+refusing an ambiguous name is enough to stop the regenerated one inheriting the
+historical one's dependants. No lineage edge was needed for that, and the caveat
+has a home — `whatIsKnown()` keeps the question in `untested` rather than letting
+a workaround close it.
 
-The two things a lineage edge would have carried already had homes. **Direction**
-is in the act: a regeneration knows what it regenerates, and `reproducibilityOf()`
-reads that off `CONSUMES`. The **caveat** is the open question, which
-`whatIsKnown()` keeps in `untested` rather than letting a workaround close it.
+**What it did not settle: direction — and this entry first claimed otherwise.**
+The original text argued a lineage edge was unnecessary because *"direction is in
+the act: a regeneration knows what it regenerates."* External review pointed out
+there is no such act. The regenerated part is written by an ordinary
+`recordObservations()` naming nothing historical, and `reproducibilityOf()` is a
+**read** that takes the historical parts as arguments and persists nothing. A
+reader holding only the regenerated artefact cannot answer *what was this
+reconstructing?*
 
-This lands one scenario after row E was *earned* on the same test, which is the
-sharpest available demonstration that the bar discriminates rather than
-rubber-stamps. S-10's shared-claim encoding could not carry direction or caveat;
-S-9's regeneration carries both. The structural difference: a regeneration is a
-**single recorded act**, while two runs supporting one claim are two independent
-acts with nothing between them to hold the relationship.
+That is an assertion of a durable property the code does not have — the same
+error class this project has caught in itself repeatedly, made this time in a
+journal entry rather than in code. The claim is left visible above rather than
+quietly rewritten, because how the conclusion was reached is the part worth
+keeping.
+
+**Row F therefore stays `open`, now unowned**, with a boundary test in the
+scenario recording the gap so it cannot be forgotten. No edge is added: nothing
+has demonstrated a *wrong* answer requiring one, and an unanswerable question
+earns nothing under PJ-011 §5. The discriminator would be a scenario where a
+reader must **recover** what a reconstruction was reconstructing, and gets a
+confidently wrong answer without it.
+
+The contrast with row E, earned by S-10 one scenario earlier on the same test,
+survives the correction and is sharper for it: there a shared claim could carry
+neither direction nor caveat and the wrong answer was demonstrable. Here the
+caveat has a home and the direction gap is so far only an absence. The bar
+discriminating between a demonstrated wrong answer and a missing one is the
+point — and it discriminated correctly even while the prose around it did not.
 
 ## Row P: resolved, against two consecutive predictions
 
@@ -112,18 +134,34 @@ would have made the caller decide which end of a computation they were asking
 about, which is a question about the graph, not about the research. One verb,
 both routes.
 
-## The corpus question, now answerable
+## The corpus question — and a false premise, corrected
 
-Every previous entry closed on some version of *is PJ-001's entity set unusually
-well chosen, or is the corpus not applying pressure that would move it?*
+This entry originally closed by declaring the corpus exhausted: *"the last mined
+scenario owning an open row has now been built — S-2, S-13 and S-14 own nothing
+outstanding between them."*
 
-S-9 makes it answerable in one direction at least. Thirteen scenarios, zero new
-node labels. Five consecutive scenarios have pressed only on relationships,
-query semantics and identity. And **the last mined scenario owning an open row
-has now been built** — S-2, S-13 and S-14 own nothing outstanding between them,
-so "build more of this corpus" has stopped being a way to find out.
+**That was false, and contradicted by PJ-008's own ownership table in the same
+commit**, which reads `open + owned: J, K`. **S-14 owns row J.** **Story 18 owns
+row K** — and §4 has carried a promotion condition for it since the document was
+written: *"if row K survives the build, promote this to a scenario."* Row K
+survived S-8. The condition fired, and had been sitting fired, unnoticed.
 
-That is not a conclusion that the entity set is right. It is a conclusion that
-this corpus can no longer test it, and that a different kind of probe — a
-different corpus, a real consumer above the domain layer, or an adversarial
-reading of PJ-001 itself — is what would.
+Worth being precise about the failure: this was not a claim made without
+checking. It was a claim contradicting a summary written *in the same commit,
+two sections above*. The ledger was right; the prose was not.
+
+What survives the correction: thirteen scenarios, zero new node labels, and five
+consecutive builds pressing only on relationships, query semantics and identity.
+That is a real signal about where the *next* kind of pressure has to come from.
+It is not a licence to skip the two probes this document has already named.
+
+So the sequence is: **S-14** (row J — deferred versus deliberately accepted as
+unresolved), then **story 18 promoted** (row K — scratch work that unexpectedly
+matters), then freeze this corpus. Only then the question of what applies a
+different kind of pressure, for which the leading candidate is a real consumer
+above the domain layer rather than another authored corpus — a researcher-facing
+read surface designed from the research questions *without* exposing the graph
+ontology, which is far likelier to expose a missing noun than another
+Bonsai-shaped scenario. An adversarial reading of PJ-001 runs alongside it, not
+instead of it: a reviewer can propose ten plausible alternative ontologies, and
+the consumer is what makes one of those disagreements consequential.

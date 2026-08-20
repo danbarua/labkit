@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | No artefact-to-artefact lineage | **S-9** | refuted |
+| F | No artefact-to-artefact lineage | **S-9** | open |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -718,7 +718,7 @@ to be that well informed:
 | Kind | Means | Rows today |
 | --- | --- | --- |
 | `open` + owned | an unbuilt discriminator is named (`°` present) | J, K |
-| `open` + unowned | every named probe is built; a **new** discriminator is needed | O, S, T, Z |
+| `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T, Z |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
 Only the middle kind is a gap in the *method* — CLAUDE.md's deferral rule says
@@ -1783,12 +1783,19 @@ outcome than a lucky hit — a row two consecutive builds expected to be inert
 turned out to hold a confidently wrong answer, and only asking it a *third*
 question found it.
 
-*The corpus question this section opened on is now answerable, and the answer is
-uncomfortable.* Five consecutive scenarios have pressed only on relationships,
-query semantics and identity. The noun inventory has not moved in thirteen. What
-S-9 adds is that the last mined scenario owning an open row has now been built,
-so "build more of this corpus" is no longer a way to find out. The remaining
-three — S-2, S-13, S-14 — own nothing outstanding between them.
+*The corpus-exhaustion claim in the first write-up was simply false*, and
+contradicted by this document's own ownership table in the same commit. **S-14
+still owns row J**, and **story 18 still owns row K** — with a promotion
+condition recorded in §4 from the beginning: *"if row K survives the build,
+promote this to a scenario."* Row K survived S-8, so that condition has fired
+and has been sitting fired since. Two probes remain named and unbuilt; the
+corpus is not exhausted.
+
+What is true, and survives the correction: five consecutive scenarios have
+pressed only on relationships, query semantics and identity, and the noun
+inventory has not moved in thirteen. That is a reason to expect the *next* kind
+of pressure to come from somewhere else — but it is not a licence to stop
+building the probes this document has already named.
 
 ## §4 — Held back as stories, not scenarios
 

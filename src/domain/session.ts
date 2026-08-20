@@ -2484,11 +2484,17 @@ export class ResearchSession {
     const exact: string[] = [];
     const differing: string[] = [];
     const unverifiable: string[] = [];
+    const notRebuilt: string[] = [];
     for (const { a } of parts) {
-      // No recorded hash means unanswerable, not unequal -- whatever the
-      // rebuild produced, nothing can be compared with it.
+      const candidate = offered.get(a.natural_id);
+      // Three ways to be uncomparable, and none of them is inequality. The
+      // record having no hash is permanent; this attempt not rebuilding the
+      // part is not. Folding either into `differing` claims evidence the
+      // record does not have -- external review found exactly that, and it is
+      // the conflation this whole report was written to respect.
       if (!a.content_hash) unverifiable.push(a.logical_name);
-      else if (offered.get(a.natural_id) === a.content_hash) exact.push(a.logical_name);
+      else if (candidate === undefined) notRebuilt.push(a.logical_name);
+      else if (candidate === a.content_hash) exact.push(a.logical_name);
       else differing.push(a.logical_name);
     }
 
@@ -2496,9 +2502,11 @@ export class ResearchSession {
       exact: exact.sort(),
       differing: differing.sort(),
       unverifiable: unverifiable.sort(),
-      // A construction with an uncheckable part has not been shown to
-      // reproduce. Saying otherwise is the quiet inheritance S-9 forbids.
-      reproducible: differing.length === 0 && unverifiable.length === 0,
+      notRebuilt: notRebuilt.sort(),
+      // Anything not shown to match leaves the construction unshown. Saying
+      // otherwise is the quiet inheritance S-9 forbids.
+      reproducible:
+        differing.length === 0 && unverifiable.length === 0 && notRebuilt.length === 0,
     };
   }
 
