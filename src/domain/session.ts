@@ -306,27 +306,31 @@ export class ResearchSession {
       `MATCH (q:Question)
        OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
        OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
+       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
        OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)
-       RETURN q, cited, work`,
+       RETURN q, cited, work, accepting`,
       {
         q: vertexProps<{ natural_id: string; name: string }>(),
         cited: optional(vertexProps<{ natural_id: string }>()),
         work: optional(vertexProps<{ natural_id: string }>()),
+        accepting: optional(vertexProps<{ natural_id: string }>()),
       },
     );
 
     const byQuestion = new Map<
       string,
-      { asks: string; cited: boolean; worked: boolean }
+      { asks: string; cited: boolean; worked: boolean; accepted: boolean }
     >();
     for (const row of rows) {
       const entry = byQuestion.get(row.q.natural_id) ?? {
         asks: row.q.name,
         cited: false,
         worked: false,
+        accepted: false,
       };
       entry.cited ||= row.cited !== null;
       entry.worked ||= row.work !== null;
+      entry.accepted ||= row.accepting !== null;
       byQuestion.set(row.q.natural_id, entry);
     }
 
@@ -334,10 +338,15 @@ export class ResearchSession {
       established: [],
       unresolved: [],
       untested: [],
+      accepted: [],
     };
     for (const [question, entry] of byQuestion) {
       const standing: QuestionStanding = { question, asks: entry.asks };
+      // Settled beats accepted: a question answered after being accepted is
+      // answered. Accepted beats worked, because a reader scanning for what
+      // still needs doing must not find a deliberately-parked question there.
       if (entry.cited) survey.established.push(standing);
+      else if (entry.accepted) survey.accepted.push(standing);
       else if (entry.worked) survey.unresolved.push(standing);
       else survey.untested.push(standing);
     }
@@ -673,7 +682,7 @@ export class ResearchSession {
       {
         q: vertexProps<{ name: string }>(),
         resolving: optional(vertexProps<{ natural_id: string }>()),
-        deferring: optional(vertexProps<{ natural_id: string }>()),
+        deferring: optional(vertexProps<{ natural_id: string; reason: string; invalidation_check: string }>()),
       },
       { id: enquiry.id },
     );
@@ -692,14 +701,27 @@ export class ResearchSession {
         evidence: [],
       };
     }
-    if (deferred && !resolving) {
+    // Accepted, not closed. `open` stays TRUE, which is the correction S-14
+    // forced: the previous branch reported `open: false`, so a question left
+    // open on purpose read as shut. The question has not been answered and
+    // nobody claims it has; what changed is that leaving it open is now a
+    // recorded decision rather than an absence of one.
+    const accepting = rows.find((r) => r.deferring)?.deferring ?? null;
+    if (accepting && !resolving) {
+      const inLightOf = await this.graph.query(
+        `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence) RETURN e`,
+        { e: vertexProps<{ statement: string }>() },
+        { id: accepting.natural_id },
+      );
       return {
         enquiry: enquiry.id,
         question,
-        open: false,
-        closure: "deferred",
+        open: true,
+        closure: "accepted-as-unresolved",
         answer: null,
-        evidence: [],
+        evidence: [...new Set(inLightOf.map((r) => r.e.statement))],
+        acceptedBecause: accepting.reason,
+        reopensIf: accepting.invalidation_check,
       };
     }
 
@@ -1187,6 +1209,63 @@ export class ResearchSession {
               : "the two runs consumed different inputs",
           }),
     };
+  }
+
+  /**
+   * Records that a question is being left open on purpose (S-14).
+   *
+   * Not closing it. `closeEnquiry()` with nothing cited reports the question
+   * **abandoned** — nobody worked on it, no result behind it — which is a
+   * confident misreading of a deliberate decision as neglect, and was the only
+   * thing a researcher could do here before this verb existed.
+   *
+   * `until` is the condition that would reopen it, and it lands on the
+   * decision's `invalidation_check`, which already meant exactly that: what
+   * would make this decision wrong. The bullet it answers insists the condition
+   * be about the world — new design, new data — rather than "run the analysis
+   * again", and nothing here can enforce that; what the model guarantees is
+   * that a condition was named at all, which is the difference between deciding
+   * to stop and drifting to a halt.
+   *
+   * **No `Task` is created**, and none may be needed to make any of this
+   * answerable. A to-do item nobody intends to action, minted so a survey can
+   * report it, is the ceremony PJ-001 forbids and the failure mode §2 names.
+   *
+   * Writes `DEFERS`, which is its first writer since PJ-004 declared it —
+   * CLAUDE.md's standing example of a reader with no writer, now walked.
+   */
+  async acceptAsUnresolved(input: {
+    enquiry: EnquiryRef;
+    /** Why it is being accepted rather than pursued. */
+    because: string;
+    /** What would reopen it. About the world, not about re-running the same analysis. */
+    until: string;
+    /** The finding it is being accepted in light of — what was known at the time. */
+    inLightOf: ConclusionRef;
+  }): Promise<void> {
+    const at = this.clock.now();
+    await this.graph.inTransaction(async () => {
+      const question = await this.questionBehind(input.enquiry);
+      if (!question) throw new Error(`enquiry ${input.enquiry.id} pursues no question`);
+
+      const basis = await this.findingFor(input.inLightOf.analysis, input.inLightOf.proposition);
+      if (!basis) {
+        throw new Error(
+          `analysis ${input.inLightOf.analysis.id} concluded nothing about "${input.inLightOf.proposition}"`,
+        );
+      }
+
+      const decision = await this.graph.createNode("Decision", {
+        reason: input.because,
+        invalidation_check: input.until,
+      });
+      await this.graph.createEdge(decision.natural_id, "DEFERS", question);
+      // What was known when the call was made -- S-1's requirement, and the
+      // reason `evidence` is answerable afterwards rather than only now.
+      await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
+    });
+
+    this.emit("acceptAsUnresolved", input.enquiry.id, { because: input.because, until: input.until, at });
   }
 
   /**

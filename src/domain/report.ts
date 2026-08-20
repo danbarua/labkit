@@ -74,8 +74,29 @@ export interface EnquiryStatus {
   enquiry: string;
   question: string;
   open: boolean;
-  closure: "answered" | "abandoned" | "deferred" | null;
+  /**
+   * `accepted-as-unresolved` replaces the `deferred` token, which no verb ever
+   * wrote — `enquiryStatus()` could report it and nothing could produce it.
+   * S-14 gives the state its one meaning: left open on purpose, with the
+   * condition that would reopen it named. "Parked pending work" is a different
+   * state and has not been needed by any scenario; it gets built when one needs
+   * it, not before.
+   */
+  closure: "answered" | "abandoned" | "accepted-as-unresolved" | null;
   answer: "yes" | "no" | null;
+  /**
+   * The condition that would reopen an accepted question — "a genuinely new
+   * design, or a data source other than the spent confirmatory set".
+   *
+   * Carried on the accepting decision's `invalidation_check`, which already
+   * meant exactly this: what would make this decision wrong. Present only when
+   * `closure` is `accepted-as-unresolved`; a question left open by inaction
+   * names no condition, and that is the difference between deciding to stop and
+   * not having got there.
+   */
+  reopensIf?: string;
+  /** Why it was accepted rather than pursued. Present with `reopensIf`. */
+  acceptedBecause?: string;
   /** The findings the closing decision rests on. Empty means nothing was cited. */
   evidence: string[];
 }
@@ -424,6 +445,16 @@ export interface KnowledgeSurvey {
   unresolved: QuestionStanding[];
   /** On the books, never pursued. Not a failure and not an inconclusive result. */
   untested: QuestionStanding[];
+  /**
+   * Open on purpose (S-14). Worked on, not settled, and deliberately left —
+   * with the condition that would reopen it recorded on the deciding act.
+   *
+   * A fourth bucket rather than a flag on `unresolved`, because a reader
+   * scanning for what still needs doing must not find it there. That is the
+   * whole of PJ-001's "should not accumulate ceremony" bullet: the alternative
+   * is a to-do list that can never be emptied and is therefore never read.
+   */
+  accepted: QuestionStanding[];
 }
 
 /**
