@@ -35,7 +35,15 @@ if [ -z "$baseline" ]; then
   # Nothing in the log yet. Today's commits are a bounded, honest guess.
   earliest="$(git log --since=midnight --format=%H 2>/dev/null | tail -1)"
   if [ -n "$earliest" ]; then
-    baseline="$(git rev-parse "$earliest^" 2>/dev/null || echo "$earliest")"
+    # --verify is load-bearing, not defensive. Without it, `git rev-parse
+    # <root-sha>^` prints the literal unparseable ref to STDOUT before exiting
+    # non-zero, so 2>/dev/null does not suppress it and the || appends a second
+    # line -- leaving $baseline as two lines and breaking every downstream
+    # `git log/diff $baseline..HEAD`. --verify prints nothing on failure.
+    # Reported by a peer session that copied this skill into a two-commit repo,
+    # where today's earliest commit genuinely is the root; reproduced here
+    # before applying. Any young repo hits it.
+    baseline="$(git rev-parse --verify "$earliest^" 2>/dev/null || echo "$earliest")"
     origin="the commit before today's first commit (no session state, nothing in $log_dir yet)"
   else
     baseline="$(git rev-parse HEAD)"
