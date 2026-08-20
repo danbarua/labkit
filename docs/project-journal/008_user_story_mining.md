@@ -820,6 +820,11 @@ something that could not be true
 
 **Current state (verified):** no `Artefact`→`Artefact` edge
 
+> **No scenario currently named would settle this.** Every scenario in
+> its row has been built. Under CLAUDE.md's deferral rule that makes it
+> unresolved and unowned rather than deferred — recorded here rather than
+> left to look like a decision.
+
 Content-hash comparison plus an open question about the generator
 
 **S-9 (2026-08-20): refuted, then reopened by review the same day — half
@@ -856,9 +861,8 @@ far only an absence.
 
 *The discriminator, named as the deferral rule requires:* a scenario in which a
 reader must **recover** what a reconstruction was reconstructing, and gets a
-confidently wrong answer without it. No scenario currently named would settle
-this, which is why the row is `open` + **unowned** rather than deferred. See
-PJ-021 and PJ-024 §5.
+confidently wrong answer without it. Nothing named would settle it, which is
+what the marker above records. See PJ-021 and PJ-024 §5.
 
 ### Row G — "Locked" is not distinct from "decision record still active"
 
