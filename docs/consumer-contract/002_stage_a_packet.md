@@ -67,9 +67,10 @@ Produce three things.
 
 **1. The read operations.** For each: its name, what the caller passes, what
 comes back, and which of the statements above it serves. Use whatever language
-you would want a researcher to read. Do not design a database or a graph API —
-if an operation's answer is "traverse from X to Y", the interface has leaked an
-implementation and should be restated in terms of what the researcher asked.
+you would want a researcher to read. Do not design a storage or query interface:
+if an operation is described in terms of how the data is held or navigated
+rather than what the researcher wants to know, restate it as the question they
+actually asked.
 
 **2. Questions you expect to be refused.** Where a system like this would have
 to say "I cannot answer that", and what you would want it to say instead of a
