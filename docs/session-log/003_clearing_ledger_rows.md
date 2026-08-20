@@ -8,6 +8,15 @@ AB for the ledger.
 Renamed twice as the session outgrew its title; the slug is now generic so a
 further scenario would not need a third rename.
 
+**Scope warning, because the numbers mislead.** Baseline is pinned at `b3d6f33`
+and HEAD is now `79c5a6e` — 49 commits. **44 are this session's**
+(`45ec5fa`..`e89e80c`). The other five belong to
+`002_cold_context_reviews.md` — `d6a34c8` below this session's first commit,
+and `78a7bbe`, `f16978e`, `e386027`, `79c5a6e` above its last — which ran either
+side of this one. Read 002 for that work; this entry does not restate it.
+`collect.sh` prints the warning by itself now, though it can only see the four
+that touch `docs/session-log/`; `e386027` is theirs too and is invisible to it.
+
 ## Goal
 
 Prepare an external-review handoff, act on the review that came back, then build
@@ -258,6 +267,14 @@ which silently returns the column present and `NULL`.
    `a449392` and `4c4d417` as bare `4` — the `§` was eaten writing the message
    through a shell heredoc. Not worth rewriting history for, but keep commit
    messages ASCII on that path.
+
+**One datum handed to the other session, not acted on here.** They asked what
+`collect.sh` shows against an entry numbered 003, and whether compaction issues
+a new session id. It does not: this session was auto-compacted once on context
+exhaustion and manually `/compact`ed once, and the session id, state file path
+and file contents survived both untouched. Their `SessionStart` inheritance
+branch is therefore unreachable for auto-compaction as well as the manual case
+they had already disproved. Their fix is theirs to make; nothing changed here.
 
 **What the third review exposed about the method**, and the most portable thing
 here: the scenario discipline is structurally poor at states that exist only
