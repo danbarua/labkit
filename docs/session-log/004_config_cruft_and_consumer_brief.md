@@ -1,4 +1,4 @@
-# 004: npm-era config cruft cleared, and the consumer-contract protocol built
+# 004: npm-era config cruft cleared, and the consumer-contract probe run
 
 **Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Ten commits, all this session, range clean — no other session's work in it.
+Thirteen commits, all this session, range clean — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -25,6 +25,8 @@ Ten commits, all this session, range clean — no other session's work in it.
  docs/consumer-contract/010_stage_a_claude.md |  824 +
  docs/consumer-contract/011_stage_a_gpt.md    | 1026 +
  docs/consumer-contract/012_stage_a_grok.md   | 1248 +
+ docs/consumer-contract/020_synthesis_blinded.md |  447 +
+ docs/consumer-contract/021_mapping_and_scoring.md |  150 +
  docs/session-log/004_*.md                    |  113 +
  package-lock.json                            | 3188 -------------------
  package.json                                 |    5 -
@@ -95,7 +97,24 @@ in parallel, all exit 0 — `anthropic/claude-opus-5` (824 lines),
 reading is supposed to happen against fixed text. Each file carries a provenance
 header above a rule; everything below is unedited stdout.
 
-Working tree clean. Five commits ahead of `origin/feat/domain-consumer`.
+**Synthesis and mapping** (`5c2cf1f`, `022d362`). A fourth cold process
+clustered the three designs semantically, blinded to model identity and given no
+brief, no predictions, no ontology and no statement of purpose. Then this session
+mapped its clusters onto the domain and ran the paired-world tests — the step
+that needs someone who knows the model, deliberately separated from the step that
+does not.
+
+**H1 survives.** Four candidates pass: attribution (all three, distributed across
+four unanimous clusters rather than forming one — row S); ordering of belief over
+time (all three, three different vocabularies — row Z); bitemporality (D1, and
+strictly stronger than row Z); and what a reconstruction was reconstructing (D2,
+row F, in almost PJ-021's own words by someone who had never heard of row F).
+
+Predictions: **2 held, 2 refuted, 1 half**. The useful failure is the prioritised
+worklist — predicted at least one designer would ask, and all three independently
+*forbade* it, reaching S-14's decision unprompted.
+
+Working tree clean. Eight commits ahead of `origin/feat/domain-consumer`.
 
 ## Verified
 
@@ -112,7 +131,13 @@ later commits are documentation only.
   0.19.12 still present and its binary still runs.
 - Leak audit for the Stage A packet: grep over PJ-008 §1 for backticked and
   ontology terms — 3 hits, all in glosses or the closing section, 0 in the
-  eighteen bold sentences.
+  eighteen bold sentences. Audit of what designers actually received: 0 hits,
+  73 lines.
+- Leak audit of the synthesiser's prompt for provider and model strings: **0**.
+- Attribution gap checked against `src/db/domain.ts`, not recalled: thirteen node
+  labels, none denoting a person, agent or role; `EvidenceUnitRole` is a kind of
+  enquiry activity. Gate states confirmed as
+  `never-evaluated | incomplete | blocked | satisfied`.
 
 Not run: `bun examples/full-lifecycle.ts`.
 
@@ -125,22 +150,28 @@ worktrees make it easier to fall into.
 
 ## Open
 
-- **Who performs the synthesis is undecided, and it matters more than it
-  sounds.** The clustering step is where this session is the least trustworthy
-  reader available: it knows the thirteen nouns, the ledger and every
-  preregistered prediction, so "cluster semantically" is exactly where three
-  phrasings could be nudged into the bucket that confirms H1, or one requirement
-  split into three to make convergence look weaker. The brief says cluster
-  before mapping but never says *who* clusters. Proposed fix: run the synthesis
-  as a fourth cold `omp` process with the three outputs, the clustering
-  instruction, no LabKit context and no sight of the predictions — then this
-  session maps clusters onto the domain and runs the paired-world tests, which
-  is the part that genuinely needs someone who knows the model. **Put to the
-  user; unanswered.**
-- **Predictions must be scored against the clusters, not against a reading of
-  the raw text.** Otherwise "at least two of three require persistent
-  attribution" is a judgement call made by whoever wrote the prediction.
-- **Stage A outputs are committed and still unread**, deliberately.
+- **Nothing has been implemented, and bar 3 has not been applied.** Four
+  candidates pass the representation bar; none has been tried as query semantics,
+  then relationship, then noun. Row P was resolved in the query after two builds
+  predicted it needed structure.
+- **Stage B is sealed.** `003_stage_b_packet.md` has not been shown to anyone.
+  The measurement it buys is already banked in one direction: attribution and
+  temporal survey were reached from researchers' own words, before LabKit's
+  design vocabulary could have suggested them.
+- **The synthesiser shares a model family with Designer 2.** Only three providers
+  are authenticated and all three are designers, so this could not be avoided;
+  blinding means it does not know which output that is, but style is recognisable
+  and a nudge cannot be ruled out.
+- **`promote()` turns out to be contested.** D1 requires re-execution before
+  scratch can be cited; D2 and D3 permit admission by act, which is what S-18
+  built. Recorded, not reopened — but last night's choice is no longer obviously
+  the only reading.
+- **The `omp-headless` skill hung for 4h46m** in `phase: readPipedInput` because
+  a direct `omp -p` inherits an open stdin. Fixed in `~/.claude/skills/` (not
+  this repo) at the user's request: `< /dev/null` in the canonical command and
+  every example, a guardrail with the evidence, the note that `--max-time` does
+  not bound startup, and that isolating a child needs `--no-tools` **and** an
+  empty `--cwd`.
 - **Isolation is enforced, not requested.** `--no-tools` and `--cwd` pointed at
   an empty scratch directory rather than the repo — with omp's default tool set
   and `--cwd "$PWD"` a designer would have had `src/` and `CLAUDE.md` in reach,
@@ -163,10 +194,8 @@ worktrees make it easier to fall into.
 
 ## Next
 
-Decide who runs the synthesis (see Open), then produce `020`: cluster concepts
-**semantically** across `010`/`011`/`012` — by requirement, not by word — with no
-reference to LabKit's model. Only after that, map clusters onto the current
-domain and put every apparent gap through a paired-world distinguishability test
-before it exerts any pressure on the ontology. Then `git push`.
-`003_stage_b_packet.md` stays sealed until the synthesis is done; revealing it
-early destroys the ablation permanently.
+`git push`, then Stage B: give `003_stage_b_packet.md` to the same three models
+and commit their revision documents as `013`/`014`/`015` — separate documents,
+Stage A outputs never edited. Then decide whether any of the four surviving
+candidates goes to bar 3, remembering that the read-only contract cannot validate
+attribution, which is where the strongest candidate lives.
