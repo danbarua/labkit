@@ -8,16 +8,22 @@ AB for the ledger.
 Renamed twice as the session outgrew its title; the slug is now generic so a
 further scenario would not need a third rename.
 
-**Scope warning, because the numbers mislead.** Baseline is pinned at `b3d6f33`
-and HEAD is now `cc68056` — 52 commits. **46 are this session's**
-(`45ec5fa`..`cc68056`). The other six belong to
-`002_cold_context_reviews.md` — `d6a34c8` below this session's first commit,
-and `78a7bbe`, `f16978e`, `e386027`, `79c5a6e`, `4692559` interleaved above —
-which ran either side of this one. Read 002 for that work; this entry does not
-restate it. `collect.sh` prints the warning by itself now, and since `4692559`
-its closing line says "at least these commits": it can only inspect commits
-touching `docs/session-log/`, so `e386027` and `4692559` are theirs and
-invisible to it.
+**Scope warning: the range is wider than the session.** Baseline is pinned at
+`b3d6f33`, and the range from there to HEAD interleaves two sessions. These
+commits are **not** this session's — they belong to
+`002_cold_context_reviews.md`, which ran either side of this one:
+
+> `d6a34c8` (below this session's first commit), then `78a7bbe`, `f16978e`,
+> `e386027`, `79c5a6e`, `4692559`, `93be853`.
+
+Everything else from `45ec5fa` onward is this session's. Read 002 for their
+work; this entry does not restate it. `collect.sh` prints the warning by itself
+now, and since `4692559` its closing line says "at least these commits" — it can
+only inspect commits touching `docs/session-log/`, so `e386027` and `4692559`
+are theirs and invisible to it. *No totals here*, for the same reason the next
+section gives none: a count is wrong the moment this file is committed, and the
+Stop hook then fires on the commit that fixed it. Which shas are foreign is
+durable; how many there are is not.
 
 ## Goal
 
