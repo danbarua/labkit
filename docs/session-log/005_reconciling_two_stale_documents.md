@@ -1,4 +1,4 @@
-# 005: two handover documents were stale, and nothing was going to catch it
+# 005: two stale documents, a false claim in the wrap hook, and a merge
 
 **Session wrap, 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/` for the reasoning behind anything below.
@@ -32,12 +32,30 @@ docs/session-log/004_config_cruft_and_consumer_brief.md | 24 ++++-
   pending. Setup told a new clone to configure `.githooks` and install graphviz —
   neither exists any more.
 
+## Also changed, after the entry was first written
+
+- `a637e3f` — **`wrap-hook.sh` claimed the session id always survives.** True for
+  compaction, tested both triggers; never tested for forks. `labkit-minion`
+  demonstrated a fork of `be5374e7` coming up as `74f9b207` with its own
+  transcript directory, so the branch the comment called unreachable insurance
+  covers a case that exists. It still would not have helped there: the fork ran
+  in a different **worktree**, `.claude/.wrap-state/` is untracked, SessionStart
+  never fired, and the failure is silent — no baseline means self-baseline at
+  HEAD and `exit 0`, swallowing the first fire *and* landing the baseline after
+  the work it should cover. SKILL.md gains the seeding recipe.
+- `96a50a3` — **merged `feat/minion`**: row F's third reporting bite (S-9d,
+  `restingOn` deduplicating by name) and row T **refuted, four for four**
+  (S-10b). Merged while the branches shared **zero** changed files, precisely
+  because that would not last — both touch the ledger and `TASKS.md` next.
+
 ## Verified
 
-Documentation only; no code changed since the last full run (235 pass / 0 fail).
+Documentation only until the merge; then a full run.
 
+- `bun test` → **241 pass / 0 fail**, 32 files, after the merge.
 - `bun run check:ledger` → clean, and it is what the row-status claims were
   checked against rather than memory.
+- `bun run check:doc-comments` → clean. `npx depcruise` → 0 errors.
 - Row statuses read directly from §3: O `resolved`, S `refuted`, T `refuted`,
   AD `resolved`, AE `resolved`, F `open`.
 - `.githooks/` and `docs/dependency-graph.svg` confirmed absent before rewriting
@@ -69,6 +87,14 @@ be true rather than from what was just observed.
 
 ## Next
 
-`labkit-minion` is on row T's discriminator in its own worktree and takes entry
-**006**. This session takes `src/mcp/` — the MCP adapter, the last piece of
-PJ-023's next phase now the CLI has shipped.
+**`labkit-minion` must reset onto the merge (`96a50a3`) before starting row F**,
+or the branches re-diverge immediately — and re-seed its wrap state there, or
+entry 006 will cover this session's commits too.
+
+**Merge each row as it finishes, rather than letting branches drift.** Row T
+merged with zero conflicts because it was taken immediately. The ledger and
+`TASKS.md` are prose, and a conflict in them is one neither side can resolve
+confidently.
+
+This session takes `src/mcp/` — the last piece of PJ-023's next phase now the
+CLI has shipped.
