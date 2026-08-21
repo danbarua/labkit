@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | No artefact-to-artefact lineage | **S-9** | open |
+| F | No artefact-to-artefact lineage | **S-9**, **S-9b** | open |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -698,6 +698,7 @@ this document's original analysis are marked as such.
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
+| AD | Observation-only work on a question reads as no work at all | **S-9b** | open |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -719,9 +720,18 @@ to be that well informed:
 | --- | --- | --- |
 | `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T |
+| `open` + **demonstrated** | a wrong answer is on the record and the fix is what is unbuilt | **AD** |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
-Only the middle kind is a gap in the *method* — CLAUDE.md's deferral rule says
+The **demonstrated** kind is new with row AD and is the only one with a
+deadline: CLAUDE.md permits at most one confirmed wrong answer shipping green
+and requires that clearing it be the next thing built. A second row of this kind
+appearing before AD is cleared is a rule violation on its face, not a judgment
+call. It is distinguished from `open` + unowned because nothing about it is
+waiting for a discriminator — S-9b's seventh test is the discriminator, and what
+is unbuilt is the fix.
+
+Only the second kind is a gap in the *method* — CLAUDE.md's deferral rule says
 a row that cannot name a scenario is unresolved and unowned rather than
 `deferred`, and those rows say so in their own section. The first kind is
 ordinary backlog. Keeping the three apart is what stops "we haven't decided"
@@ -861,8 +871,35 @@ far only an absence.
 
 *The discriminator, named as the deferral rule requires:* a scenario in which a
 reader must **recover** what a reconstruction was reconstructing, and gets a
-confidently wrong answer without it. Nothing named would settle it, which is
-what the marker above records. See PJ-021 and PJ-024 §5.
+confidently wrong answer without it. See PJ-021 and PJ-024 §5.
+
+**S-9b (2026-08-21): the discriminator was built, and rung 2 held.** No longer a
+named probe waiting to exist — see `docs/consumer-contract/027` and `028`.
+
+*What it established.* A reconstruction and independent fresh work leave records
+identical in every field a reader can ask for, so the row clears bar 4 and still
+does **not** clear PJ-011 §5. The one wrong answer available — `whySupported()`
+reporting a proposition rebuilt once as resting on two independent findings — is
+S-10's wrong answer at the artefact level, and **`reverify()` already prevents
+it**. Two entries in `support` is correct in one world and wrong in the other,
+and nothing but the researcher's choice of verb distinguishes them; the record
+cannot check the choice, which is a real limit and is not a missing relationship.
+
+*Where rung 2 stops, and why the row stays open.* `reverify()` re-checks a
+*conclusion*, so it refuses a rebuild that concluded nothing — which is exactly
+Designer 2's case, an input regenerated so later work could proceed. Rung 2
+holds for the case that could produce a wrong answer and refuses the case the
+contract requires. The ladder is **paused at rung 3**, gated on the adapter
+phase's reconstruction-provenance read, per `023`'s own sequencing.
+
+*A reclassification considered and rejected.* `027` predicted this build would
+end with F moved to `boundary` and called that the bigger result. It would
+contradict `023`, which scores F's contract necessity **strong** — a row cannot
+be both a requirement of the frozen contract and a limit nobody claims should be
+fixed. Row Z is the precedent against it too: Z never cleared §5 either and
+earned its property on bar 4 plus a demonstrated rung-1 failure. Recorded
+because a prediction that frames one outcome as impressive is a thumb on the
+scale, and it nearly worked.
 
 ### Row G — "Locked" is not distinct from "decision record still active"
 
@@ -1384,6 +1421,37 @@ replacement into the graph correctly; what it withheld was the reference
 
 **NEW, from review of the finished scenario, and a real wrong answer before it was guarded.** `withdrawalOf()` reports a sentence withdrawn only when *every* node asserting it has been changed, so a colleague who had not read the review could record an analysis concluding it again and the record would silently un-retract itself — objection still standing, `withdrawn` back to `false`, `replacedBy` gone. Demonstrated before fixing. Now refused, on the same principle as S-7's design fork: a command that declines beats state that reads back wrong. What that leaves missing is the legitimate case — new evidence genuinely re-opening a settled reading — which needs a **deliberate** verb rather than a side effect of recording work. Not built, because S-12 does not contain one **S-5 found this guard had the same defect it was fixing.** `recordAnalysis()`'s withdrawal check was unscoped, so a sentence withdrawn in one line of enquiry would have blocked legitimate work concluding the same words in another. Now scoped to the enquiry being recorded
 
+
+### Row AD — Observation-only work on a question reads as no work at all
+
+**Scenarios:** **S-9b** · **Status:** open
+
+**Current state (verified):** `recordObservations()` creates `Evidence` with no producing `EvidenceUnit`; `whatIsKnown()`'s `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`
+
+**NEW, from S-9b, and the only confirmed wrong answer currently shipping green.**
+A researcher opens a question and works on it — three candidate algorithms tried,
+none reproduces the recorded series, which is a negative result and therefore a
+result. `whatIsKnown()` reports the question **`untested`**: *"one nothing has
+ever been run against"*. Populated, confident and false. The same survey in the
+same test classifies a sibling question `unresolved`, because that one was worked
+on through `recordAnalysis()`, which does mint a unit — that contrast is what
+isolates the cause rather than alleging it.
+
+The missing unit is not new. PJ-001 defines `Evidence` without a producing
+`EvidenceUnit` as impossible; three cold reviewers flagged it independently
+(PJ-021) and **three scenarios were pointed at it without finding harm beyond a
+reader's**. The deferral was right each of those three times, which is what makes
+the fourth mean something: this is the first to produce a wrong answer rather
+than an untidy one.
+
+*The discriminator is already built* — S-9b's seventh test, which asserts the
+wrong answer on purpose with the assertion it *should* make left in a comment
+beside it. When this is fixed the test is **inverted, not deleted**.
+
+Under CLAUDE.md's rule that at most one confirmed wrong answer ships green at a
+time and clearing it is the next thing built, this is that one, and it is next.
+It touches every read that walks the unit (`whatIsKnown`, `whySupported`,
+`reproductionOf`), so it is a real build rather than a one-line fix.
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from

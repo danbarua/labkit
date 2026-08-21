@@ -45,6 +45,16 @@ every named probe has been built. **Row Z was closed on 2026-08-21** by the
 consumer probe (`docs/consumer-contract/025`, `026`) — one property,
 `Decision.decided_at`, no migration, after rung 1 was built and shown to fail.
 
+**Row F's discriminator was built the same day**, as S-9b
+(`docs/consumer-contract/027`, `028`): rung 2 held — `reverify()` already records
+a rebuild as an act with a target — and then refused the case the consumer
+contract requires, a rebuild that concludes nothing. F stays `open` with its
+ladder paused at rung 3, and reclassifying it `boundary` was considered and
+rejected. That probe also produced **row AD**, a fourth kind of unfinished row
+and the only one with a deadline: `open` + *demonstrated*, where the wrong
+answer is on the record and what is unbuilt is the fix. Read §3's legend before
+treating the four kinds as one pile.
+
 The dependency graph is **self-maintaining, in two forms for two readers**:
 `docs/dependency-graph.svg` for a person in a browser, where graphviz's edge
 routing is what makes a graph this dense legible (PJ-007 records a design change
@@ -370,12 +380,16 @@ Two rules, so this is checkable rather than remembered:
    cleared another row is nominated too, demonstrated or not** — otherwise
    clearing one row can quietly make a second worse while the rule that would
    have caught it stops applying, which is exactly what happened to row X when
-   S-3b cleared row V (PJ-017 §3). **No row is currently that one.** Row V was
-   cleared by S-3b (PJ-016) and row X — nominated under exactly that widening
-   rule, then demonstrated and cleared by S-3c (PJ-018) — was the last. The
-   nomination rule worked end to end: a row made worse by another row's fix was
-   named, built and closed, and the four scenarios X spent unowned are the
-   measure of what the rule is for.
+   S-3b cleared row V (PJ-017 §3). **Row AD is currently that one**, found by
+   S-9b on 2026-08-21: `recordObservations()` mints no `EvidenceUnit`, so a
+   question worked on through observations alone reports itself as one nothing
+   has ever been run against. Clearing it is the next thing built — not a
+   priority call — and no second row of this kind may be opened until it is.
+   Before AD, row V was cleared by S-3b (PJ-016) and row X — nominated under
+   exactly that widening rule, then demonstrated and cleared by S-3c (PJ-018) —
+   was the last. The nomination rule worked end to end: a row made worse by
+   another row's fix was named, built and closed, and the four scenarios X spent
+   unowned are the measure of what the rule is for.
 2. **Every deferred row names the scenario that would settle it.** A row that
    cannot name one is not deferred, it is unresolved and unowned, and it should
    say so in its own cell. "Record both and pick neither" is a decision about

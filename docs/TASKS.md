@@ -8,9 +8,23 @@ here disagrees with the ledger, the ledger is right and this file is stale.
 
 Grouped by **what stops someone picking it up**, because the items are not the
 same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against
-`5e300de`.
+`c636533`.
 
 ---
+
+## Next, and not optional
+
+- [ ] **`recordObservations()` must produce an `EvidenceUnit`.** Ledger row
+  **AD**, and the only confirmed wrong answer currently shipping green. A
+  question worked on through observations alone reads `untested` — *"one nothing
+  has ever been run against"* — while a sibling question worked on through
+  `recordAnalysis()` reads `unresolved`. Demonstrated by S-9b's seventh test,
+  which asserts the wrong answer on purpose. CLAUDE.md permits one such row at a
+  time and requires that clearing it be the next thing built, so this is not a
+  priority call.
+  **Invert that test rather than deleting it**, and re-run S-9b's shape
+  detectors afterwards. It touches every read that walks the unit —
+  `whatIsKnown`, `whySupported`, `reproductionOf` — so it is a real build.
 
 ## Ready to build
 
@@ -34,12 +48,15 @@ each needs a *new* one. These are research questions, not tickets — "do row F"
 not actionable, and writing a scenario to satisfy a row would manufacture the
 result (PJ-011 §5).
 
-- [ ] **Row F — no artefact-to-artefact lineage.** Moved from *known absence* to
-  *consumer-required distinction*: Designer 2 independently required a durable
-  reconstruction attempt keyed on its historical target, and probe 3 demonstrated
-  a reconstruction and unrelated fresh work are the same durable state. Still has
-  not earned an edge. Cheapest of the four, and may need no structure at all —
-  S-9 answered it once with a refusal.
+- [ ] **Row F — no artefact-to-artefact lineage.** **Discriminator built** as
+  S-9b; see `consumer-contract/027`, `028`. Rung 2 held — `reverify()` already
+  records a rebuild as an act with a target and prevents the only wrong answer
+  available — and then refused the case the contract actually requires, a rebuild
+  that concludes nothing. Ladder **paused at rung 3**, gated on the adapter
+  phase's reconstruction-provenance read. Reclassifying it `boundary` was
+  considered and rejected: it would contradict `023`'s strong contract-necessity
+  score. What it still needs is not a new probe but the adapter read to fail
+  against real state.
 - [ ] **Row S — no agent, person or role.** The strongest consumer finding: all
   three designers required *persistent* attribution across four unanimous
   clusters. S-8 recorded the absence as a standing decision (identity is
@@ -82,10 +99,6 @@ better than the work.
 - **An instant on `EvidenceUnit`.** Would let `whatWasKnown()` split `open` into
   worked-on and untouched. Nothing has needed it; `026` names where it would go
   and says it should be earned the way `decided_at` was.
-- **`recordObservations()` creates `Evidence` with no producing `EvidenceUnit`**,
-  which PJ-001 defines as impossible (PJ-021). Three cold reviewers flagged it
-  independently and it remains true. Not owned: three scenarios have been pointed
-  at it and the harm they found was a reader's, not a structure's.
 - **Rows Y and AA** are `boundary` — characterised limits, with no claim they
   should be fixed.
 
