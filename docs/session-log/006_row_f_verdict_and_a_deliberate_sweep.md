@@ -4,16 +4,17 @@
 `docs/project-journal/027`, `028` and `docs/consumer-contract/036`, `037` for the
 reasoning.
 
-**The range is wider than this session.** `collect.sh` reports seventeen commits
+**The range is wider than this session.** `collect.sh` reports twenty commits
 since baseline `79de6f3`; most are `labkit-dev`'s and four of those are written
 up in entry 005. This entry covers **`afcbc58`, `079798f`, `ecbd29f`, `136fbc4`,
-`5204809`** and the two merges, and nothing else.
+`5204809`, `4dd44a7`, `8afae1c`, `cfb639b`** and the two merges, and nothing else.
 
 ## Goal
 
 Close row F. Then — at `labkit-dev`'s request — look *on purpose* for the defect
 PJ-027 names, which until now had only ever been found by accident, and answer
-whether any of it can be machine-checked.
+whether any of it can be machine-checked. Then fix what the sweep found that
+nobody else had claimed.
 
 ## Changed
 
@@ -42,43 +43,67 @@ whether any of it can be machine-checked.
 - `5204809` — `docs/project-journal/028`, `scripts/check-tests-assert.ts`,
   `package.json`, CLAUDE.md.
 
+**Cleanup the sweep found, taken at Dan's direction after `labkit-dev` released
+them:**
+
+- `4dd44a7` — `docs/dependency-graph.mmd` regenerated. It predated `src/mcp` and
+  the CLI rewrite, so a reader consulting "the module dependency graph" got one
+  missing two of `src/`'s five entries plus three test files.
+- `8afae1c` — the seven wrong counts, and four stale-symbol comments in the same
+  files. **Zero of the seven earned an assertion** — see Open.
+- `cfb639b` — PJ-028 corrected by its own repair, plus CLAUDE.md's paragraph.
+
 Merges `70817a2` (fast-forward: `Question.posed_at`, the `whatWasKnown` fixes,
 `src/mcp/`, the CLI rewrite) and `2623d02`. Pushed to `origin/feat/minion`.
 
 ## Verified
 
-- `bun test` — **261 pass, 0 fail**, 855 expect() calls, 36 files, 95.99s, after
-  the second merge. A fully clean run; the flake did not appear when nothing else
-  was loading the machine. An earlier run in this session, with six subagents
-  reading concurrently, gave 256 pass / 2 fail — both S-11 tests timing out at
-  6.2s and 7.0s against bun's 5000ms ceiling, i.e. the documented flake.
+- `bun test` — **261 pass, 0 fail**, 855 expect() calls, 36 files. Run three
+  times across this session's second half, clean each time (95.99s, 114.93s).
+  An earlier run, with six subagents reading the repo concurrently, gave
+  256 pass / 2 fail — both S-11 tests timing out at 6.2s and 7.0s against bun's
+  5000ms ceiling. Same code, different machine load: the documented flake, and
+  both numbers are recorded rather than only the good one.
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **0 errors**, 1 pre-existing
   warning (`no-orphans: src/index.ts`).
-- `bun run check:ledger`, `check:doc-comments` — both green.
-- `bun run check:tests-assert` — **exit 1, on purpose.** See Open.
-- `bun examples/full-lifecycle.ts` — **fails**, exit 1. See Open.
+- `bun run check:ledger`, `check:doc-comments`, `check:stdout` — all green.
+- `bun run check:tests-assert` — **green**, after `labkit-dev`'s fixes landed.
+  It was committed **red on purpose**, naming the two tests it was written from;
+  the failing check was the demonstration, in the same order every other fix here
+  is made. Red from here on means a test has stopped testing.
 
 ## Open
 
-**`check:tests-assert` is red and is meant to be.** It names the two files it was
-written from — `tests/leader-election.test.ts` (no assertion anywhere in the file)
-and `tests/trace.test.ts:61` (`expect(true).toBe(true)`). `labkit-dev` owns both
-fixes and was told; CLAUDE.md's Commands block and the PJ-028 paragraph both say
-so, so nobody merges and thinks they broke it. The failing check *is* the
-demonstration, in the same order every other fix here is made.
+**Nothing from the sweep is left unowned.** `labkit-dev` cleared its four items
+in `7c6853f`, `0c214ca`, `20fef4f` and `30f975b`: both assertion-free tests fixed
+and injection-verified, `examples/full-lifecycle.ts` resurrected after 221 dead
+commits, the read-only claim widened across both surfaces via
+`tests/helpers/read-only.ts` with its residual hole stated, and the row Z detector
+repointed. `check-progress-to-stdout.sh` — a transplant that ran green on a
+fiction — was replaced by `check:stdout`.
 
-**`examples/full-lifecycle.ts` has been broken for 221 commits.** It reads back
-through the per-tenant SQL views removed on 2026-08-19 by `af5a1d2`, dies at
-`relation "labkit_t1.claim" does not exist`, and never reaches
-`closed connection cleanly`.
+**Zero of the seven counts earned an assertion**, which corrects PJ-028's first
+conclusion and is recorded there as a correction rather than a footnote. Six were
+decoration on an argument that survives without them. The seventh sat in a test
+file beside a real denominator (`NODE_LABELS`/`EDGE_LABELS`) and still did not
+earn one: the property it gestures at is already asserted empirically one line
+below, by a guard that *tightens* as labels are added where a count assertion
+would merely break. **An assertion protecting nothing an existing assertion does
+not is a change-detector.** The rule that survives is *a numeral either earns an
+assertion or it should not be in the prose*.
 
-The instructive part is `399cbb1` — same day, *after* the break, subject
-"close out the plan's last verification step, and two exit-code traps" — which
-added CLAUDE.md's rule for judging this script: *ignore the exit code, read the
-output*. That rule is exactly what would have caught it, written by someone who
-did not run it; and because it declares the exit code meaningless, the genuine
-exit 1 had nobody watching either. `labkit-dev` has taken this one.
+The defect fired once more during its own repair — the first version of that test
+comment said the counts were "asserted below" before any assertion existed.
+Caught by going to write the assertion the sentence promised, then finding it
+should not exist.
+
+**The eighth instance added a third branch.** CLAUDE.md's "edge labels 19 → 24"
+was wrong against 25, in the paragraph introducing PJ-028. `labkit-dev` did not
+delete it, correctly: the figures come from PJ-024, which is a *review*, so they
+are a dated measurement and a historical record is legitimate prose. The framing
+was the defect — it read as current state. The rule is now **earn an assertion,
+be deleted, or be explicitly dated**.
 
 **The sweep's unverified remainder.** Six readers produced 28 candidates of the
 guarantee-broken kind; I demonstrated seven and left the rest labelled *inferred*
@@ -103,14 +128,18 @@ gets another session's baseline and cannot be seen to have wrapped.
 
 ## Next
 
-`labkit-dev` is fixing the two tests that `check:tests-assert` names; when they
-land it goes green, and green then means nothing has regressed.
+**The sweep is closed. What is left is the inferred pile, and it needs
+demonstrations, not edits.**
 
-Two cheap things nobody owns: the **seven wrong counts** in comments — "eight
-scenarios" (24), "1,051 lines" (1,563), "three states" (five fields) and four
-more, listed in PJ-028 — each a one-line assertion away from being checked
-instead of asserted. And `docs/dependency-graph.mmd` has no `src/mcp` or
-`src/cli.ts`; `bun run dev:dependency-cruiser` regenerates it.
+Start with the one flagged above: take `sharpen` or `closeEnquiry`, show what an
+interruption between its writes actually leaves in the graph, and only then
+decide whether `write.ts:9` is wrong or its word "compound" is narrower than it
+reads. One verb, one demonstration. Do not sweep.
 
-Read `sweep-report.md` before re-deriving any of the sweep — it labels every item
-demonstrated or inferred, and the inferred ones are inferred on purpose.
+Read `sweep-report.md` in this session's scratchpad first — it labels every item
+demonstrated or inferred, and the inferred ones are inferred on purpose. Six
+readers looking for one shape find that shape and are silent about others, so
+treat the list as a lead sheet, not an inventory.
+
+The wrap hook's worktree bug is still live and will bite the next session that
+moves between checkouts. Nothing depends on it; it just makes the hook lie.
