@@ -308,16 +308,26 @@ export interface ReproductionReport {
 }
 
 /**
- * One part in a reproducibility report: what it is, and what it is called.
+ * An artefact in a report: what it is, and what it is called.
  *
  * `part` is identity; `name` is what a person reads. Keeping both is row F's
- * lesson applied to the output side — S-9 already took parts by *reference* on
- * the way in, with a comment that a name-keyed map "would merge exactly the two
- * things this scenario exists to keep apart", and then reported bare names on
- * the way out. With an original and its regeneration under one name, that put
- * the same string in `exact` and `differing` at once (S-9c).
+ * lesson applied to the **output** side of a read — S-9 already took parts by
+ * *reference* on the way in, with a comment that a name-keyed map "would merge
+ * exactly the two things this scenario exists to keep apart", and then reported
+ * bare names on the way out.
+ *
+ * Two reads have now been caught doing that, which is why this is a shared
+ * shape rather than one report's private type. `reproducibilityOf()` put a
+ * single name in `exact` and `differing` at once (S-9c), and
+ * `whySupported().restingOn` deduplicated two distinct inputs into one entry
+ * (S-9d) — hiding, in that case, that a regeneration with inferred provenance
+ * was underneath a conclusion.
+ *
+ * Named for what it is rather than for either caller: the first version of this
+ * was `IdentifiedArtefact`, which stopped being accurate the moment a second read
+ * needed it.
  */
-export interface ReproducedPart {
+export interface IdentifiedArtefact {
   /** The observations handle — identity, and the only thing that is. */
   part: string;
   /** Its `logical_name`. Two parts may legitimately share one. */
@@ -336,11 +346,11 @@ export interface ReproducedPart {
  */
 export interface ReproducibilityReport {
   /** Parts whose recorded hash matches the one offered. */
-  exact: ReproducedPart[];
+  exact: IdentifiedArtefact[];
   /** Parts whose recorded hash disagrees with the one offered. */
-  differing: ReproducedPart[];
+  differing: IdentifiedArtefact[];
   /** Parts with no recorded hash — unanswerable, not unequal. */
-  unverifiable: ReproducedPart[];
+  unverifiable: IdentifiedArtefact[];
   /**
    * Parts this attempt did not rebuild.
    *
@@ -353,7 +363,7 @@ export interface ReproducibilityReport {
    * `unverifiable` is a permanent property of the record; `notRebuilt` is a
    * property of *this attempt* and says nothing about the artefact.
    */
-  notRebuilt: ReproducedPart[];
+  notRebuilt: IdentifiedArtefact[];
   /**
    * Whether the whole construction reproduces. False unless every part was
    * rebuilt and matched: anything differing, unverifiable or not attempted
@@ -473,7 +483,7 @@ export interface SupportExplanation {
    * asserting on the wrong one is a mistake this project has already made
    * once.
    */
-  restingOn: string[];
+  restingOn: IdentifiedArtefact[];
   /** Findings withdrawn because their analysis was replaced — bullet 5. Either bearing. */
   superseded: Array<{ finding: string; via: string; reason: string; bearing: "supports" | "challenges" }>;
   /**

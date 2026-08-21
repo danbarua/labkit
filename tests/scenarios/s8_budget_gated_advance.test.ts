@@ -236,7 +236,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const why = await later.whySupported({ analysis: measured, proposition: COST });
     expect(why.supported).toBe(true);
     expect(why.support.map((s) => s.finding)).toEqual(["9,100 GPU-hours projected from the measured rate"]);
-    expect(why.restingOn).toEqual(["feasibility slice timings"]);
+    expect(why.restingOn.map((a) => a.name)).toEqual(["feasibility slice timings"]);
   });
 
   /**

@@ -45,7 +45,7 @@ import type {
   InterpretationHistory,
   Revision,
   DependencyReport,
-  ReproducedPart,
+  IdentifiedArtefact,
   SupportExplanation,
 } from "./report";
 import { SessionCore } from "./core";
@@ -1182,7 +1182,9 @@ export class ReadSurface extends SessionCore {
        WHERE out.invalidated IS NULL OR out.invalidated = false
        RETURN a, e`,
       {
-        a: vertexProps<ArtefactProps>(),
+        // `natural_id` because `restingOn` deduplicates by identity, not by
+        // name -- see where it is built below, and S-9d.
+        a: vertexProps<ArtefactProps & { natural_id: string }>(),
         e: vertexProps<{ natural_id: string }>(),
       },
       {
@@ -1286,12 +1288,18 @@ export class ReadSurface extends SessionCore {
       // finding (external review of S-10). Filtered in TypeScript rather than
       // in the query because AGE rejects a `NOT (pattern)` predicate outright
       // -- `cypher_yyerror`, not a decode problem.
+      // Deduplicated by **identity**, never by name. Two artefacts may share a
+      // `logical_name` -- a regeneration carries the name of the part it
+      // replaces (S-9) -- and collapsing on the name reported a conclusion
+      // resting on one input when it rested on two, with the vanished one
+      // indistinguishable from the survivor (S-9d). Same defect S-9c fixed in
+      // `reproducibilityOf()`, in the read researchers actually use.
       restingOn: [
-        ...new Set(
+        ...new Map(
           resting
             .filter((r) => !reverifying.has(r.e.natural_id))
-            .map((r) => r.a.logical_name),
-        ),
+            .map((r) => [r.a.natural_id, { part: r.a.natural_id, name: r.a.logical_name }]),
+        ).values(),
       ],
       superseded,
       challenged: against.length > 0,
@@ -1325,10 +1333,10 @@ export class ReadSurface extends SessionCore {
       { id: analysis.id },
     );
 
-    const exact: ReproducedPart[] = [];
-    const differing: ReproducedPart[] = [];
-    const unverifiable: ReproducedPart[] = [];
-    const notRebuilt: ReproducedPart[] = [];
+    const exact: IdentifiedArtefact[] = [];
+    const differing: IdentifiedArtefact[] = [];
+    const unverifiable: IdentifiedArtefact[] = [];
+    const notRebuilt: IdentifiedArtefact[] = [];
     for (const { a } of parts) {
       const candidate = offered.get(a.natural_id);
       // Two ways for no comparison to happen, and neither is inequality:
@@ -1348,7 +1356,7 @@ export class ReadSurface extends SessionCore {
       else differing.push(entry);
     }
 
-    const byName = (a: ReproducedPart, b: ReproducedPart) =>
+    const byName = (a: IdentifiedArtefact, b: IdentifiedArtefact) =>
       a.name.localeCompare(b.name) || a.part.localeCompare(b.part);
     return {
       exact: exact.sort(byName),

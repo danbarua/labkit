@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c**, **S-9d** | demonstrated |
+| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c**, **S-9d** | open |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -838,7 +838,7 @@ something that could not be true
 
 ### Row F — No artefact-to-artefact lineage
 
-**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d** · **Status:** demonstrated
+**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d** · **Status:** open
 
 **Current state (verified):** no `Artefact`→`Artefact` edge
 
@@ -923,6 +923,17 @@ name is ambiguous in two places and collapses on it in a third.
 
 *Predicted before the test* (`docs/consumer-contract/033`), including that the
 remedy would be rung 1 again and that the row would still not close.
+
+**Fixed the same day, at rung 1.** `restingOn` deduplicates by identity and
+carries `{ part, name }` — `IdentifiedArtefact`, the shape S-9c introduced for
+`reproducibilityOf()` and renamed here because a second read needed it and
+`ReproducedPart` stopped being accurate. One field, no noun, no edge, no
+property, no migration. Deletion-verified: keying the dedupe on name again fails
+both assertions.
+
+**Row F stays `open`.** This was the third *report* to lack identity, not the
+model. Whether two artefacts can be two versions of one thing is still
+untouched, and still unbitten.
 
 **Three reporting bites, no model bite.** S-9c and S-9d are one defect in two
 functions: a rule enforced on the way *in* and dropped on the way *out*.

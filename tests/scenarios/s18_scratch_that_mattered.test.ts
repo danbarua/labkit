@@ -142,7 +142,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     expect(why.support).toEqual([
       { finding: "convergence point moves by ~3 steps", via: "notebook-sweep" },
     ]);
-    expect(why.restingOn).toEqual(["lunchtime sweep"]);
+    expect(why.restingOn.map((a) => a.name)).toEqual(["lunchtime sweep"]);
     // And promoting must not read as retracting. `CHANGES: Decision -> Claim`
     // means "withdrawn" to `withdrawalOf()` (S-12), so reusing it for
     // promotion makes a promoted finding report as no longer asserted.

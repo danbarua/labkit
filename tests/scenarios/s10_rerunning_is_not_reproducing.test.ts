@@ -415,6 +415,6 @@ describe("S-10: rerunning is not reproducing", () => {
     const why = await (await afterwards()).whySupported({ analysis: historical, proposition: PROPOSITION });
     expect(why.support.map((s) => s.via)).toEqual(["annealing-v1"]);
     expect(why.reverifiedBy).toEqual(["annealing-v1, re-run"]);
-    expect(why.restingOn).toEqual(["original conditions"]);
+    expect(why.restingOn.map((a) => a.name)).toEqual(["original conditions"]);
   });
 });

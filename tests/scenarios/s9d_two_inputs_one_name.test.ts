@@ -86,31 +86,30 @@ describe("S-9d: resting on one thing, or two?", () => {
   });
 
   /**
-   * **KNOWN WRONG — row F.** The same two inputs, asked the question a
-   * researcher actually asks: *why does this conclusion count as supported?*
+   * The question a researcher actually asks: *why does this conclusion count as
+   * supported?* — and the answer now names both inputs.
    *
-   * `restingOn` is built as `[...new Set(rows.map((r) => r.a.logical_name))]`,
-   * so two artefacts sharing a name become **one entry**. The record states the
-   * conclusion rests on a single input when it rests on two — and the one that
-   * disappears is indistinguishable from the one that remains, so a reader
-   * auditing the basis of a claim cannot see that a regeneration with inferred
-   * provenance is underneath it at all.
+   * **Inverted, not deleted.** This shipped asserting the wrong answer, with the
+   * assertion it should make sitting in a comment; that comment is the live
+   * assertion now. `restingOn` was
+   * `[...new Set(rows.map((r) => r.a.logical_name))]`, so two artefacts sharing
+   * a name collapsed into one entry: the record stating a conclusion rested on
+   * a single input when it rested on two, with the vanished one
+   * indistinguishable from the survivor. A reader auditing the basis of a claim
+   * could not see that a regeneration with inferred provenance was underneath.
    *
-   * Populated, confident and short. Not an absence: `restingOn` answers, and
-   * answers wrongly.
-   *
-   * Asserted as wrong on purpose, with the assertion it *should* make in the
-   * comment beside it. Invert when the remedy lands; do not delete.
+   * Deduplicated by identity now. The names stay identical — that is the point.
    */
-  test("KNOWN WRONG: two inputs sharing a name are reported as one", async () => {
-    const { analysis } = await anAnalysisRestingOnBothControls(session);
-    expect(analysis).toBeDefined();
+  test("two inputs sharing a name are reported as two", async () => {
+    const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
 
     const why = await (await afterwards()).whySupported(DIVERGE);
 
-    // What it should say, and does not — two inputs, distinguishable:
-    //   expect(why.restingOn).toHaveLength(2);
-    expect(why.restingOn).toEqual([NAME]);
+    expect(why.restingOn).toHaveLength(2);
+    expect(why.restingOn.map((a) => a.part).sort()).toEqual(
+      [surviving.id, regenerated.id].sort(),
+    );
+    expect(why.restingOn.map((a) => a.name)).toEqual([NAME, NAME]);
     expect(why.supported).toBe(true);
   });
 
@@ -120,8 +119,9 @@ describe("S-9d: resting on one thing, or two?", () => {
    *
    * The graph holds two artefacts, each carrying the claim independently, and
    * the surface already knows the name is ambiguous — `whatDependsOn()` refuses
-   * it, which is S-9 working. The report of what the conclusion rests on still
-   * says one.
+   * it, which is S-9 working. Three reads, three consistent answers; before the
+   * fix the third one disagreed with the other two about how many things were
+   * there.
    */
   test("the collapse is in the read, not in what was recorded", async () => {
     const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
@@ -135,6 +135,7 @@ describe("S-9d: resting on one thing, or two?", () => {
 
     await expect(reader.whatDependsOn(NAME)).rejects.toThrow(/2 artefacts are named/);
 
-    expect((await reader.whySupported(DIVERGE)).restingOn).toEqual([NAME]);
+    const restingOn = (await reader.whySupported(DIVERGE)).restingOn;
+    expect(restingOn.map((a) => a.part).sort()).toEqual([surviving.id, regenerated.id].sort());
   });
 });
