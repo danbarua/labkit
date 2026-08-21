@@ -480,9 +480,32 @@ readers. Adding `"observation"` was declined — vocabulary with no consumer, an
 the no-cull policy covers labels and edges, not property values. Left as a
 finding; what would settle it is a reader.
 
+**Three more from review, after the row was closed** (`8afdd39`). The
+`PRODUCES` question got **reframed** rather than answered: "does this read
+right" is the question whose answer is always yes to whoever wrote the code, and
+*name the read that goes wrong* is checkable. No read goes wrong either way,
+because nothing walks `EvidenceUnit -PRODUCES-> Artefact` — so CLAUDE.md's claim
+that every `EDGE_SCHEMA` label has a writer and a reader is true per **label**
+and false per **endpoint pair**, and an entry *is* a list of pairs. Named rather
+than culled, beside `EvidenceUnitRole`, where the same shape gets the opposite
+answer.
+
+**A backfill is owed.** Every observation written before `17b9976` has no unit,
+so `whatIsKnown()` would report those questions `untested` — the wrong answer
+row AD closed, made permanent for everything historical. Free today because no
+database survives a run, which is why it would surface at first deploy. In
+CLAUDE.md's migrations section as a **graph** migration owed the moment data
+persists, and as the first concrete instance of the non-additive change this
+project has no story for.
+
+The transferable line: **the build verified the fix against every record it
+could create, and had no way to think about records it could not.** Every test
+here constructs its own world, so the suite is structurally blind to data it did
+not write. That is not a gap in the tests; it is what tests are.
+
 ## Verified
 
-Run on `5d730a1`, the final commit.
+Run on `8afdd39`, the final commit.
 
 - `bun test` → **208 pass, 0 fail**, 22 files.
 - `bun run typecheck` → clean.
@@ -661,6 +684,11 @@ scenario.
 
 Row F needs no new probe — it needs the adapter phase's reconstruction-provenance
 read to fail against real state, per `023`'s own sequencing.
+
+**Owed at first deploy, not before:** a graph migration minting an
+`EvidenceUnit` per observation `Evidence` that has none. See CLAUDE.md's
+migrations section — it is the first non-additive change this project has
+actually incurred.
 
 **Two journal entries are the user's to commission, and deliberately unwritten:**
 the three fired conditions (K, Z, P — each reading *"if X, then this row moves"*
