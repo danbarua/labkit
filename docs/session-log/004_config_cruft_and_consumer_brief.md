@@ -511,12 +511,20 @@ worktrees make it easier to fall into.
   beside it. Three cold reviewers flagged the missing unit and three scenarios
   found no harm beyond a reader's; this is the fourth and the first to produce a
   wrong answer. CLAUDE.md permits one such row and requires clearing it next.
-- **Both checks written this session had the blind spot of the class they
-  closed.** The doc-comment scan could not see one-line comments, and its first
-  repair stranded a fresh comment in the gap; `check-ledger` read one of two
-  copies of a fact whose failure mode is copies drifting. Both were built by
-  someone who had just diagnosed the disease. Worth a journal line with the
-  predictions-document rule.
+- **An instrument inherits its author's model of the defect, and that model is
+  the thing that just failed.** Both checks written this session had the blind
+  spot of the class they closed: the doc-comment scan could not see one-line
+  comments, and its first repair stranded a fresh comment in the gap;
+  `check-ledger` read one of two copies of a fact whose failure mode is copies
+  drifting. The same sentence explains the three fired conditions — a ledger's
+  conditions are written by someone who will not be the one reading them.
+- **Two stale copies in one CLAUDE.md paragraph, needing different defences.**
+  `labkit-review`'s was written true and falsified later by someone else's edit,
+  which is what "withdrawing a claim means finding every place it was made"
+  already covers. Mine was **born** describing a thing I had changed two commits
+  earlier — announcing a new status in the vocabulary that status replaced. That
+  one wants the writer to check they are writing in the vocabulary they just
+  changed, and no existing rule says so.
 - **The ledger gained a fourth status**, `demonstrated`, for a row whose
   discriminator is built, whose wrong answer is demonstrated, and whose **fix**
   is what is unbuilt. `labkit-review` accepted it on a better argument than the
