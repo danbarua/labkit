@@ -632,6 +632,26 @@ built on a premise about actors nobody had checked against the actual actors. F
 named its remedy and called it the problem. All three survived cold review, and
 all three fell to someone asking what the row *said* rather than what it needed.
 
+**A glossary, because `D2` means two different things** (`bc4e6f8`). Asked
+"WTF is D2?" and the answer is Designer 2 — defined on line 10 of a document that
+then uses it 218 times, and nowhere else. Every other document, this entry
+included, used it cold. Worse: `D1`/`D2` are *also* `Decision` nodes in PJ-001's
+and PJ-003's ASCII diagrams — same token, unrelated referent, same repo, nothing
+saying so.
+
+`docs/GLOSSARY.md` is **pointers, not definitions** — a gloss plus where the real
+definition lives. A second copy of a definition is a second thing to go stale,
+which this week produced a doc comment on the wrong function, a ledger status
+disagreeing with itself, a CLAUDE.md sentence outliving its truth, and a row
+whose title contradicted a document beside it. A glossary restating definitions
+would have been the fifth.
+
+**Second time in one session the user hit unreadable shorthand**, and the first
+time it was noted and dropped: after `check-ledger`'s output was rewritten I
+observed that the repo's vocabulary had no glossary and "probably should", then
+did nothing. Worth recording as its own small failure — noticing a general
+problem and fixing only the instance is how the instance recurs.
+
 ## Verified
 
 Run on `d87d0c5`, the final commit.
