@@ -1,4 +1,5 @@
-# 004: config cruft cleared, the consumer-contract probe run, session.ts split
+# 004: config cruft cleared, the consumer-contract probe run, session.ts split,
+# the dependency graph made self-maintaining
 
 **Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -14,8 +15,8 @@ on the external review of that brief.
 
 ## Changed
 
-Thirty commits, range clean apart from `8299ecb` (a regenerated dependency
-graph, committed by the user) — no other session's work in it.
+Thirty-four commits, range clean apart from `8299ecb` and `3b769c0` (dependency
+graph regenerations, committed by the user) — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -281,13 +282,37 @@ so it could see them.
 
 Twenty-five commits ahead of `origin/feat/domain-consumer`, nothing held back.
 
-**The tree is not clean**, and an earlier draft of this entry said it was.
-`docs/dependency-graph.svg` is modified and uncommitted: the committed copy
-(`8299ecb`) predates the split and still shows a single `src/domain/session.ts`,
-while the working copy carries `core.ts`, `read.ts` and `write.ts`. The working
-copy is the correct one. It is left uncommitted because the user has owned that
-file's regenerations, not because it is in doubt — `bun run dev:dependency-cruiser`
-is the command, and the checked-in graph is stale until someone runs it.
+**The dependency graph is now self-maintaining** (`1679b88`), which is what that
+staleness prompted. It had been hand-regenerated three times in this history and
+was stale in HEAD twice on 2026-08-20 alone; the user committed the post-split
+regeneration as `3b769c0` mid-session.
+
+- `.githooks/pre-commit` — tracked, regenerates and stages the SVG **only** when
+  a commit touches `src/` or `tests/`. Enable per clone or worktree with
+  `git config core.hooksPath .githooks`; the hook travels, the config does not.
+  On `main` the directory does not exist yet, so git runs no hook until the
+  branch merges — safe degradation.
+- **Not a gate.** `npx depcruise src tests --output-type err` is the gate. The
+  hook never blocks a commit, not on missing graphviz and not on generation
+  failure: a refused commit over a diagram is worse than a stale diagram, and
+  the staleness is announced.
+- `scripts/update-dependency-graph.sh` — generation moved out of `package.json`
+  because **the one-liner was a pipeline**. `$?` after a pipeline reports the
+  last command's status, so a crashed `depcruise` left `dot` reading empty input,
+  writing a valid-but-empty SVG, and reporting success. CLAUDE.md documents that
+  trap under "Commands"; automating it would have made an occasional silent
+  failure routine. Each stage is now checked separately and nothing moves into
+  place without a closing `</svg>`.
+- The hook warns when unstaged `src/`/`tests/` changes exist, because generation
+  reads the working tree rather than the index — a partial stage yields a
+  diagram describing code the commit does not contain. Reported, not fixed.
+
+**graphviz is a real dependency**, now declared in CLAUDE.md.
+`depcruise --output-type mermaid` needs no binary, renders on GitHub, and is
+**3KB against the SVG's 135KB** — 261 lines versus 1,447, so readable diffs
+rather than a blob on every code commit. Recorded as the option not taken, since
+PJ-007 cites reading the SVG. Given the hook now commits it automatically, the
+size argument is stronger than it was.
 
 ## Verified
 
@@ -419,6 +444,14 @@ are kept here because they are the reasoning, not the outcome.
 - **Untidied, deliberately:** the import block was copied wholesale into all
   three modules. Harmless (`noUnusedLocals` is off) but noisy; pruning it is a
   separate, purely mechanical change.
+- **The SVG-versus-mermaid choice is open**, and the hook makes it consequential
+  rather than cosmetic.
+- **A test of the hook was invalid and nearly reported as a pass.** Staleness was
+  faked by appending a marker; regeneration removed the marker, restoring the
+  file to its committed content, so there was nothing to stage and the hook
+  correctly did nothing. The flaw was the test. Re-run with a change that
+  genuinely alters the graph — a staged `tests/` file adding a node — it
+  regenerated, staged, and the node appeared.
 
 Then take the three gaps in cost order, one rung at a time:
 
