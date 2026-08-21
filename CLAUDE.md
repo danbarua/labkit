@@ -39,9 +39,10 @@ and which three reviews walked past. **024 is a third external review**, of the
 completed arc: it verifies the corpus-exhaustion claim against §3's ownership
 table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
 zero migrations, fifteen scenarios). Its one open item — row F's missing S-9
-verdict — was closed the same day, and **no item on the ledger's index is now
-known-open**. Four rows are still `open` + unowned, which is the better kind:
-every named probe has been built. **Row Z was closed on 2026-08-21** by the
+verdict — was closed the same day, and no item on the ledger's index was
+known-open **until S-9b produced row AD** on 2026-08-21 (below). Four rows are
+still `open` + unowned, which is the better kind: every named probe has been
+built. **Row Z was closed on 2026-08-21** by the
 consumer probe (`docs/consumer-contract/025`, `026`) — one property,
 `Decision.decided_at`, no migration, after rung 1 was built and shown to fail.
 
@@ -50,10 +51,19 @@ consumer probe (`docs/consumer-contract/025`, `026`) — one property,
 a rebuild as an act with a target — and then refused the case the consumer
 contract requires, a rebuild that concludes nothing. F stays `open` with its
 ladder paused at rung 3, and reclassifying it `boundary` was considered and
-rejected. That probe also produced **row AD**, a fourth kind of unfinished row
-and the only one with a deadline: `open` + *demonstrated*, where the wrong
-answer is on the record and what is unbuilt is the fix. Read §3's legend before
-treating the four kinds as one pile.
+rejected. That probe also produced **row AD**, carrying a fourth status and the
+only one with a deadline: `demonstrated`, where the wrong answer is on the
+record and what is unbuilt is the fix. Read §3's legend before treating the four
+kinds as one pile.
+
+**This file is a third copy of the ledger's state, and only a reader can
+reconcile it.** §3 records every row's status twice — index table and the row's
+own cell — and `bun run check:ledger` holds those two to each other. It cannot
+see this file, and it deliberately will not: CLAUDE.md's claims are narrative,
+and a checker over prose would be wrong more often than the prose is. So a green
+`check:ledger` means *the ledger agrees with itself*, never *these paragraphs
+are current*. The sentence above said no row was known-open for a day after row
+AD made it false, in the file every agent reads first.
 
 The dependency graph is **self-maintaining, in two forms for two readers**:
 `docs/dependency-graph.svg` for a person in a browser, where graphviz's edge
