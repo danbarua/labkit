@@ -71,14 +71,28 @@ too — and wider, because a green tick reads as evidence. The runner-up, a nume
 in a comment next to something countable, was **seven for seven wrong** and is
 deliberately *not* one check: each has a different denominator, and a generic
 warning would fire on every past-tense measurement this repo keeps on purpose.
-Fixing all seven then corrected 028 itself: **a numeral either earns an assertion
-or it should not be in the prose**, and **zero of the seven earned one** — six
-were decoration on an argument that survives without them, and the seventh was
-already asserted empirically one line below, by a guard that *tightens* as labels
-are added where a count assertion would merely break. An assertion protecting
-nothing an existing assertion does not is a change-detector.
-028's sharpest instance: `918f420`, the commit that *fixed* a 027 instance, minted
-two more in the same hunk.
+Fixing all seven then corrected 028 itself: **a numeral in prose must earn an
+assertion, be deleted, or be explicitly dated**, and **zero of the seven earned
+an assertion** — six were decoration on an argument that survives without them,
+and the seventh was already asserted empirically one line below, by a guard that
+*tightens* as labels are added where a count assertion would merely break. An
+assertion protecting nothing an existing assertion does not is a change-detector.
+The third branch is what the arc-totals figures above are doing: a review's
+numbers are a dated measurement, and those are fine as long as they say so.
+
+**028's real argument is its last section, and it is the one to read.** Four
+instances of this defect were committed *in one day, by two authors who had it
+in front of them* — including the commit that fixed one, a comment promising an
+assertion nobody had written, a failure signature piped away ten minutes after
+its author agreed in writing that this was the mistake worth recording, and a
+rule generalised from a single observation inside the correction for that.
+Under the best conditions anyone gets — the defect named, catalogued, freshly in
+mind — **"be more careful" is not available as a remedy, because these are what
+being careful looks like.** Each is a small asymmetry, and attention is exactly
+what does not distribute evenly across one. What worked: checking the *other
+side* of the operation you are looking at (three of the four), and a disagreeing
+measurement (the fourth). That is the argument for a checker, not for resolving
+to concentrate harder.
 
 024's one open item — row F's missing S-9 verdict — was closed the same day.
 **One row is `open` + unowned today: AF**, and it earns nothing under §5 by its
