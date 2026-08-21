@@ -699,6 +699,7 @@ this document's original analysis are marked as such.
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
 | AD | Observation-only work on a question reads as no work at all | **S-9b** | resolved |
+| AE | An analysis cannot read another analysis's output | **S-11c**, **S-11d** | demonstrated |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -1614,6 +1615,39 @@ replacement into the graph correctly; what it withheld was the reference
 
 **NEW, from review of the finished scenario, and a real wrong answer before it was guarded.** `withdrawalOf()` reports a sentence withdrawn only when *every* node asserting it has been changed, so a colleague who had not read the review could record an analysis concluding it again and the record would silently un-retract itself — objection still standing, `withdrawn` back to `false`, `replacedBy` gone. Demonstrated before fixing. Now refused, on the same principle as S-7's design fork: a command that declines beats state that reads back wrong. What that leaves missing is the legitimate case — new evidence genuinely re-opening a settled reading — which needs a **deliberate** verb rather than a side effect of recording work. Not built, because S-12 does not contain one **S-5 found this guard had the same defect it was fixing.** `recordAnalysis()`'s withdrawal check was unscoped, so a sentence withdrawn in one line of enquiry would have blocked legitimate work concluding the same words in another. Now scoped to the enquiry being recorded
 
+
+### Row AE — An analysis cannot read another analysis's output
+
+**Scenarios:** **S-11c**, **S-11d** · **Status:** demonstrated
+
+**Current state (verified):** `recordAnalysis({ from })` accepts only `ObservationsRef`, and `recordObservations()` is the only thing that produces one
+
+**NEW, from S-11c, and it clears §5 in S-11d.** A two-stage pipeline — raw
+data, calibration, then an analysis reading the calibrated series — has one way
+to be recorded: re-enter the intermediate as if it were fresh measurement. That
+is not misuse, it is the only thing the surface permits. Fifteen scenarios never
+needed a second stage, which is why the verb does not exist.
+
+*The wrong answer.* Raw series with no content hash, so stage one correctly
+reports `reproducible: false` and names the raw series `unverifiable`. Stage two
+consumes the re-entered intermediate, which has a hash of its own, and reports
+**`reproducible: true`** — a positive claim of reproducibility for work resting
+on data the record itself calls unrecoverable. `reproducible` is the field
+CLAUDE.md says "must not quietly say otherwise", and it says otherwise.
+
+*And no route out.* Nothing connects the intermediate to the analysis that
+produced it, so a reader cannot walk from stage two to the thing that makes its
+answer wrong.
+
+*Related but distinct from row F.* F is about an artefact having no identity
+apart from its content; this is about the **write surface** having no way to say
+one analysis read another. F would not fix this on its own — a versioned
+artefact still could not be passed to `recordAnalysis({ from })`.
+
+*Not yet built:* the remedy. Candidates are a verb that records a stage reading
+a prior analysis's output, or widening `from` to accept an analysis reference.
+The second is cheaper and may be enough; neither has been demonstrated to be the
+right one.
 
 ### Row AD — Observation-only work on a question reads as no work at all
 
