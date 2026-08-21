@@ -501,7 +501,16 @@ project has no story for.
 The transferable line: **the build verified the fix against every record it
 could create, and had no way to think about records it could not.** Every test
 here constructs its own world, so the suite is structurally blind to data it did
-not write. That is not a gap in the tests; it is what tests are.
+not write. That is not a gap in the tests; it is what tests are — so the backfill
+was unreachable by any test at any coverage, and reachable only by someone
+reasoning about the fix instead of running it.
+
+Pair it with the opposite result from the same session and neither ordering is
+the lesson. Consumer probes 2 and 3 stayed **green** after their own defects were
+fixed, and only injection proved it — execution caught what reading missed.
+The backfill went the other way. The pairing is the finding: a defect where the
+code is correct about everything it can see is invisible to execution, and a
+claim about what running code does is invisible to reading.
 
 ## Verified
 
