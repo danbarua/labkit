@@ -72,14 +72,22 @@ if [ "$mode" = "start" ]; then
     # numbered entry describing half a session, while the first half is left
     # covered by an entry nobody will update again.
     #
-    # THIS IS NOT WHAT COMPACTION DOES. The branch was written on the premise
-    # that compaction re-issues the session id. That premise was then tested
-    # and is false in this build, for both triggers: manual /compact (session
-    # 49e462ec, one boundary, id preserved) and auto-compaction on context
-    # exhaustion (session be5374e7, compacted twice, state file intact both
-    # times). The id survives, the state file exists, and this branch is never
-    # reached. Kept as insurance against a build that behaves differently --
-    # if you are debugging state that went missing, this is not the cause.
+    # NOT COMPACTION -- that was tested and does not re-issue the id, for
+    # either trigger: manual /compact (session 49e462ec, one boundary, id
+    # preserved) and auto-compaction on context exhaustion (session be5374e7,
+    # compacted twice, state file intact both times).
+    #
+    # FORKING DOES. Demonstrated 2026-08-21: a fork of session be5374e7 came up
+    # as 74f9b207 with its own transcript directory. This branch was written as
+    # insurance against a case its own comment then called unreachable, and the
+    # case exists -- it just arrives through a fork rather than a compaction.
+    # The comment was wrong for as long as it was confident.
+    #
+    # It still did not help there, because the fork ran in a different WORKTREE
+    # and `.claude/.wrap-state/` is untracked, so SessionStart never fired in
+    # that tree at all and there was no state dir to inherit from. A fork into
+    # the SAME tree is the case this branch would actually catch. Seed the state
+    # file by hand when forking into a fresh worktree -- see SKILL.md.
     #
     # Gated on `source` deliberately. `startup` and `clear` are genuinely new
     # sessions and must re-baseline. `resume` is the weaker half: resuming may

@@ -177,6 +177,32 @@ If the wrap turn also produced other changes worth committing — a fix the entr
 describes, say — commit those separately and first, so the wrap describes a
 range that already exists.
 
+## Forking, and forking into a worktree
+
+**A fork re-issues the session id** (demonstrated 2026-08-21: a fork of
+`be5374e7` came up as `74f9b207`, with its own transcript directory). Compaction
+does not — that was tested separately and the id survives.
+
+A fork into the **same** tree is handled: SessionStart inherits the predecessor's
+`baseline` when its recorded HEAD is an ancestor of ours.
+
+A fork into a **new worktree is not**, and fails quietly. `.claude/.wrap-state/`
+is untracked, so the new tree has no state dir and nothing to inherit; the first
+Stop finds no `baseline`, self-baselines at whatever HEAD is then, and **exits
+without asking**. The first fire is swallowed *and* the baseline lands after the
+work it should have covered.
+
+Seed it before the first stop:
+
+```sh
+mkdir -p .claude/.wrap-state
+printf 'baseline=%s\nasked=%s\nentry=\n' <start-sha> <start-sha> \
+  > .claude/.wrap-state/<session-id>
+```
+
+Pick `<start-sha>` as the commit your work begins *after* — not the fork point,
+if the fork point includes commits from the session you forked from.
+
 ## Closing an entry and starting the next one
 
 One session does not have to mean one entry. A session that wraps a piece of
