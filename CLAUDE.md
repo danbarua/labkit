@@ -26,7 +26,7 @@ check stops counting: S-3c), 019 (re-verification is not reproduction: S-10),
 regenerated part is not the part: S-9), 022 (leaving a question open on
 purpose: S-14) and **023 (capture cheaply, promote before citing: S-18, and the
 Bonsai corpus exhausted)** — those are the current state of the domain model,
-and 023 is the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
+and 023 is the newest decision about the **model**; 027 is the newest entry in the chain, and is about the method. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
@@ -38,34 +38,40 @@ been settled outright by S-18 (023), which the same §4 condition had nominated
 and which three reviews walked past. **024 is a third external review**, of the
 completed arc: it verifies the corpus-exhaustion claim against §3's ownership
 table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
-zero migrations, fifteen scenarios). **025 and 026 are about the method rather
-than the model** — 025 on why a condition recorded where nobody re-reads it is
-not a mechanism (rows K, Z and P all fired unread), and 026 on the one failure
-mode the predictions protocol cannot see from inside itself: a predictions
-document may state what will happen and what would refute it, and may **not**
-rank the outcomes by how impressive they would be. Its one open item — row F's missing S-9
-verdict — was closed the same day, and no item on the ledger's index was
-known-open **until S-9b produced row AD** on 2026-08-21 (below). Four rows are
-still `open` + unowned, which is the better kind: every named probe has been
-built. **Row Z was closed on 2026-08-21** by the
+zero migrations, fifteen scenarios). **025, 026 and 027 are about the method
+rather than the model** — 025 on why a condition recorded where nobody re-reads
+it is not a mechanism (rows K, Z and P all fired unread); 026 on the one failure
+mode the predictions protocol cannot see from inside itself, that a predictions
+document may state what will happen and what would refute it and may **not**
+rank the outcomes by how impressive they would be; and 027 on why **prose
+agreeing with itself is not evidence that the code agrees with the prose** —
+three unrelated places held a rule in a comment and code that ignored it, each
+an asymmetry where the rule was applied where the author happened to be looking.
+All three are one shape: a document doing the work of a check.
+
+024's one open item — row F's missing S-9 verdict — was closed the same day.
+**One row is `open` + unowned today: AF**, and it earns nothing under §5 by its
+own cell. **Row Z was closed on 2026-08-21** by the
 consumer probe (`docs/consumer-contract/025`, `026`) — one property,
 `Decision.decided_at`, no migration, after rung 1 was built and shown to fail.
 
-**Row F's discriminator was built the same day**, as S-9b
-(`docs/consumer-contract/027`, `028`): rung 2 held — `reverify()` already records
-a rebuild as an act with a target — and then refused the case the consumer
-contract requires, a rebuild that concludes nothing. F stays `open` with its
-ladder paused at rung 3, and reclassifying it `boundary` was considered and
-rejected. That probe also produced **row AD**, carrying a fourth status and the
-only one with a deadline: `demonstrated`, where the wrong answer is on the
-record and what is unbuilt is the fix. **AD was opened and closed the same day**
-(`029`, `030`) — `recordObservations()` now mints the `EvidenceUnit` PJ-001 says
-must exist, one node and two edges, no migration. **Row O closed the same day
-too** (`031`, `032`), on an external challenge rather than a prediction of this
-project's own: `INVALIDATED_BY: Artefact → Review` records which review a
-retraction rested on, where before `replaceAnalysis()` validated `because` and
-wrote it nowhere. That **orphans row T**, whose only named owner it was. Read §3's legend before
-treating the four kinds as one pile.
+**Row F reached `boundary` the same day** (`035`, `036`), after four bites that
+were all in *reporting* — `reproducibilityOf()`, `whySupported().restingOn`,
+`reproductionOf().differs` — and all fixed by carrying `natural_id`, which
+already existed. A version-of relationship would have fixed none of them, so
+they are evidence against the row. **Row F was the only candidate in this
+project's history that would have required a first new noun, and it did not.**
+It reopens if anyone asks for versions as an ordered sequence.
+
+That arc also produced **row AD**, carrying a fourth status and the only one with
+a deadline: `demonstrated`, where the wrong answer is on the record and what is
+unbuilt is the fix. **AD was opened and closed the same day** (`029`, `030`) —
+`recordObservations()` now mints the `EvidenceUnit` PJ-001 says must exist.
+**Row O closed too** (`031`, `032`), on an external challenge rather than a
+prediction of this project's own: `INVALIDATED_BY: Artefact → Review` records
+which review a retraction rested on. **Rows S and T are `refuted`** — there is no
+*who* to attribute work to when agents run the analyses, and edges do carry
+properties. Read §3's legend before treating the statuses as one pile.
 
 **This file is a third copy of the ledger's state, and only a reader can
 reconcile it.** §3 records every row's status twice — index table and the row's
