@@ -38,16 +38,36 @@ been settled outright by S-18 (023), which the same §4 condition had nominated
 and which three reviews walked past. **024 is a third external review**, of the
 completed arc: it verifies the corpus-exhaustion claim against §3's ownership
 table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
-zero migrations, fifteen scenarios). **025, 026 and 027 are about the method
+zero migrations, fifteen scenarios). **025 through 028 are about the method
 rather than the model** — 025 on why a condition recorded where nobody re-reads
 it is not a mechanism (rows K, Z and P all fired unread); 026 on the one failure
 mode the predictions protocol cannot see from inside itself, that a predictions
 document may state what will happen and what would refute it and may **not**
-rank the outcomes by how impressive they would be; and 027 on why **prose
+rank the outcomes by how impressive they would be; 027 on why **prose
 agreeing with itself is not evidence that the code agrees with the prose** —
 three unrelated places held a rule in a comment and code that ignored it, each
-an asymmetry where the rule was applied where the author happened to be looking.
-All three are one shape: a document doing the work of a check.
+an asymmetry where the rule was applied where the author happened to be looking;
+and **028**, which is 027 tested rather than argued. All four are one shape: a
+document doing the work of a check.
+
+**028 is the first deliberate sweep for 027's defect**, six read-only readers
+over ~19,000 lines, and it answers a question 027 left open: *can any of this be
+machine-checked?* Mostly no, now measured rather than asserted. Of two proposed
+comment-shaped checks, one found only stale prose and the other found **nothing**
+— every real instance was cross-file and needed its own lookup. What generalised
+was not about prose at all: **a test that asserts nothing**, two forms, two hits,
+two findings, zero false positives (`bun run check:tests-assert`). **That check is
+red on purpose right now** — it names the two tests it was written from, and
+`labkit-dev` owns both fixes; it is the demonstration, in the same order every
+other fix here is made. It goes green when they land, and a green
+`check:tests-assert` after that means nothing has regressed. A test's name
+is a claim and its body is the check on that claim, so 027's mechanism opens there
+too — and wider, because a green tick reads as evidence. The runner-up, a numeral
+in a comment next to something countable, was **seven for seven wrong** and is
+deliberately *not* one check: each has a different denominator, and a generic
+warning would fire on every past-tense measurement this repo keeps on purpose.
+028's sharpest instance: `918f420`, the commit that *fixed* a 027 instance, minted
+two more in the same hunk.
 
 024's one open item — row F's missing S-9 verdict — was closed the same day.
 **One row is `open` + unowned today: AF**, and it earns nothing under §5 by its
@@ -159,6 +179,7 @@ bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:ledger           # fails if two PJ-008 rows are `demonstrated` at once
+bun run check:tests-assert     # finds tests that assert nothing (PJ-028) — RED, see below
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)

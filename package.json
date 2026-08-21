@@ -21,6 +21,7 @@
     "check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
     "check:progress": "bash scripts/check-progress-to-stdout.sh",
     "check:pglite-concurrency": "bash scripts/check-pglite-concurrency.sh",
+    "check:tests-assert": "bun scripts/check-tests-assert.ts",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom"
   },
