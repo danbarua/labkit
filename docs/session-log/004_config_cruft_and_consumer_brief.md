@@ -1,4 +1,4 @@
-# 004: config cruft cleared, the consumer probe run, session.ts split, rows Z, AD and O closed
+# 004: config cruft cleared, the consumer probe run, session.ts split, five ledger rows moved
 
 **Session wrap, 2026-08-20 to 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -584,13 +584,58 @@ scratchpad copies and string replacements, and a stale `expect(a).toEqual(b)`
 survived alongside its own replacement — so a passing fix read as a failure. The
 same string-replace hazard this session opened with.
 
+**Rows S and T refuted, row F reframed** (`489d103`, `d87d0c5`) — three user
+observations, none of which any amount of building would have produced.
+
+*"We're not building an app for users. You can't ask **who** because there is no
+**who** with AI agents."* Row S was `023`'s **strongest** consumer finding: all
+three cold designers required attribution, and `021` framed it as *"World A:
+Alice took the decision; World B: Bob took it"*. That framing is the error.
+Alice and Bob are not two values of a missing property — they are two instances
+of a kind of entity the domain does not contain. What the question reaches for is
+provenance, and the model already carries it: **S-8b** shows two analyses
+differing only in the agent configuration they consumed are separated by
+`reproducibilityOf()`, and the configuration carries dependants like any other
+input. Row L's `CONSUMES`, nothing added. First consumer requirement refuted
+**below** bar 4, which never asks whether the contract was right to require the
+thing. H1 drops three → two.
+
+*"Edges cannot carry properties — well, DB tables can."* Row T's **title was
+false**, and CLAUDE.md's own AGE notes had said so through four cold reviewers
+and eleven scenarios. Then: *"what's stopping you from just adding a
+parameter?"* Nothing was — and `buildPropertyClause()`'s own comment already
+called itself the shape "createNode()/**createEdge()** already build on".
+Added, though not through that helper: it names parameters after keys, and this
+query binds `$from`/`$to`, so a property called `from` would silently rebind the
+source node. Adding it surfaced the row's real content — `createEdge()` is
+create-if-absent, so a repeat call **drops** properties, and an upsert would let
+callers race under a contract promising retries are free.
+
+*"What you're describing is a versioned domain entity."* Row F spent the whole
+arc asking where the `Artefact → Artefact` edge was. The missing thing is one
+level down: **an artefact has no identity apart from its content.**
+`logical_name` is wording, which S-9 refused as identity; `content_hash` is the
+bytes; so there is nothing two artefacts can be two *versions of*. That
+reconciles S-9 (two artefacts may share a name without being the same thing) with
+S-9b's designer (a reconstruction must remember its target) — both are right, and
+a versioned entity is what makes them both right. Same shape as row O: the writer
+knows, the verb never asks, the reader infers wrongly. **Not built** — a genuine
+new noun, and S-9b cleared bar 4, not §5. What the reframe buys is a
+discriminator naming a *shape* rather than a remedy.
+
+**The pattern across all three: a row can be wrong about itself, and re-reading
+it is not enough to notice.** T contradicted a document in the same repo. S was
+built on a premise about actors nobody had checked against the actual actors. F
+named its remedy and called it the problem. All three survived cold review, and
+all three fell to someone asking what the row *said* rather than what it needed.
+
 ## Verified
 
-Run on `17f21b4`, the final commit.
+Run on `d87d0c5`, the final commit.
 
-- `bun test` → **210 pass, 1 fail**, 23 files. The failure is
-  `tests/leader-election.test.ts`, which passed twice on isolated re-runs — the
-  known pglite-socket flake CLAUDE.md documents.
+- `bun test` → **216 pass, 0 fail**, 24 files. An earlier run in this session
+  showed one failure, reproduced as `tests/leader-election.test.ts` and passing
+  on isolated re-runs — the known pglite-socket flake CLAUDE.md documents.
 - `bun run typecheck` → clean.
 - `npx depcruise src tests --output-type err` → **0 errors**, 2 orphan warnings
   (`src/index.ts`, `src/cli.ts`, both known stubs).
@@ -754,16 +799,18 @@ worktrees make it easier to fall into.
 
 ## Next
 
-1. **Row S**, the last of the three consumer-contract candidates and the only
-   row left with a live consumer requirement. Write-side, inexpressible rather
-   than unreadable, and the most likely of any open row to need a real noun —
-   which is why it was kept for last.
-2. **D2's open-world `unaffected`** — a reader acting on "unaffected" and being
-   wrong. Query semantics, tier 1.
+1. **D2's open-world `unaffected`** — a reader acting on "unaffected" and being
+   wrong. Query semantics, tier 1, and the cheapest thing left.
+2. **The thin read-only MCP/CLI adapter** over the frozen contract. Four reads,
+   two durable worlds each, before the read is written.
 
-Rows **T** and **F** need new discriminators and have none: T because O's remedy
-orphaned it, F because its ladder waits on the adapter read rather than another
-probe.
+**Row F is the expensive one and is not next.** Its discriminator now names a
+shape — *a scenario in which the record must distinguish a new version of a
+thing from a new thing, and gets it wrong* — but it needs a genuine new noun and
+S-9b cleared bar 4, not §5.
+
+`open` + unowned is down from four rows to **two** (F and Y/AA aside): O closed,
+S and T refuted.
 
 Row T is **orphaned** and its cell says so: its only named owner was row O, and
 if O is settled by a plain `Decision → Review` edge, T loses that owner. It is
