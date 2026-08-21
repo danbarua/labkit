@@ -336,3 +336,116 @@ test("a partial sharpen leaves nothing a reader can reach", async () => {
   const survey = await session.whatIsKnown();
   expect(survey.untested.map((q) => q.asks)).toEqual(["is the coating durable?"]);
 });
+
+/**
+ * `evaluateCriterion`'s three interruption windows — the second item off
+ * PJ-028's inferred pile, and a real test of `039`'s rule rather than a repeat.
+ *
+ * `sharpen` cleared because its reachability edge (`MOTIVATES`) is written
+ * **last**, so an interruption leaves nothing to walk to. This verb writes
+ * `EVALUATED_AS` **second**, so from the third write onward the evaluation is
+ * reachable and the edges after it are the ones that say what it means.
+ *
+ * Predictions in `docs/consumer-contract/040`, including the competing rule the
+ * third window discriminates between. See `041` for the verdict.
+ */
+const aGatedCheck = async () => {
+  const enquiry = await session.openEnquiry("does the solver converge?");
+  const obs = await session.recordObservations({
+    enquiry, name: "sweep", finding: "residuals recorded",
+  });
+  const analysis = await session.recordAnalysis({
+    enquiry, method: "convergence", from: [obs],
+    concludes: [{ proposition: "the solver converges", finding: "residual 1e-9" }],
+  });
+  const work = await session.planWork({
+    objective: "scale to the full grid", acceptance: "convergence holds",
+  });
+  const criterion = await session.stateCriterion("residual below 1e-8");
+  const gate = await session.declareGate({
+    governedBy: [criterion], consequence: "do not scale up", protecting: [work],
+  });
+  return { enquiry, obs, analysis, criterion, gate };
+};
+
+/**
+ * All three edges, one test each, because the verb is now transactional and the
+ * assertion is the same at every window: nothing survives.
+ *
+ * Before the fix these behaved differently, and the difference is the finding.
+ * Window 1 (`EVALUATED_AS`) left an orphan node no reader could reach — an
+ * absence. Window 2 (`TRIGGERS`) left a state in which one gate reported the
+ * check `never-run` *and* `everFailed: true` from a single call — startling, and
+ * **not** a defect, because the no-gate S-3b path produces it legitimately and
+ * `everFailed`'s scope is documented as deliberately unfiltered by gate.
+ *
+ * Window 3 is the one that earned the transaction, and it is asserted below in
+ * the only form that stays true after the fix: the verdict does not exist, so it
+ * cannot stand. What it did before is in `041`.
+ */
+for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
+  test(`evaluateCriterion interrupted at ${edge} writes no verdict at all`, async () => {
+    const { analysis, criterion, gate } = await aGatedCheck();
+
+    const realCreateEdge = graph.createEdge.bind(graph);
+    graph.createEdge = (async (from: string, e: string, to: string) => {
+      if (e === edge) throw new Error(`injected: ${edge} failed`);
+      return realCreateEdge(from as never, e as never, to as never);
+    }) as typeof graph.createEdge;
+
+    await expect(
+      session.evaluateCriterion({
+        criterion, gate, value: "9e-9", outcome: "fail",
+        citing: { analysis, proposition: "the solver converges" },
+      }),
+    ).rejects.toThrow(/injected/);
+    graph.createEdge = realCreateEdge;
+
+    const left = await graph.query(
+      `MATCH (ev:CriterionEvaluation) RETURN ev`,
+      { ev: vertexProps<{ outcome: string }>() },
+    );
+    expect(left).toEqual([]);
+
+    const status = await session.gateStatus(gate);
+    expect(status.state).toBe("never-evaluated");
+    expect(status.everFailed).toBe(false);
+  });
+}
+
+/**
+ * The wrong answer the transaction exists to prevent, asserted from the other
+ * side: with the writes intact, retracting the evidence a verdict was reached
+ * against **does** withdraw it.
+ *
+ * Before the fix, an interruption before `BASED_ON` left `cited === 0`, and
+ * `isWithdrawn` is `cited > 0 && standing === 0` — so the verdict could never be
+ * withdrawn, and the gate stayed `blocked` by a `fail` the record insisted still
+ * stood. `basis: []` alone is an empty result and not a wrong answer (PJ-011 §5);
+ * *"this verdict still stands"* after its basis was retracted is a wrong answer,
+ * and that distinction is what `041` settles.
+ */
+test("a verdict is withdrawn when the evidence it was reached against is retracted", async () => {
+  const { enquiry, obs, analysis, criterion, gate } = await aGatedCheck();
+
+  await session.evaluateCriterion({
+    criterion, gate, value: "9e-9", outcome: "fail",
+    citing: { analysis, proposition: "the solver converges" },
+  });
+  const before = await session.gateStatus(gate);
+  expect(before.checks[0]?.evaluations[0]?.basis).toEqual(["residual 1e-9"]);
+  expect(before.state).toBe("blocked");
+
+  const review = await session.recordReview({
+    of: analysis, verdict: "the sweep dropped the last decade",
+  });
+  await session.replaceAnalysis({
+    supersedes: analysis, because: review, enquiry,
+    method: "convergence, all decades", from: [obs],
+    concludes: [{ proposition: "the solver converges", finding: "residual 4e-9" }],
+  });
+
+  const after = await session.gateStatus(gate);
+  expect(after.checks[0]?.evaluations[0]?.withdrawn).toBe(true);
+  expect(after.state).not.toBe("blocked");
+});
