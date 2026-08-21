@@ -404,14 +404,30 @@ two independent findings — S-10's wrong answer at the artefact level). It then
 **refuses the case the contract requires**, a rebuild that concludes nothing,
 because it re-checks a *conclusion*. Ladder paused at rung 3.
 
-**A rule made checkable** (`e868aac`). `demonstrated` becomes a ledger status
-rather than a kind described only in the ownership legend, and
+**A rule made checkable** (`e868aac`, `8c61ac5`). `demonstrated` becomes a
+ledger status rather than a kind described only in the ownership legend, and
 `bun run check:ledger` fails when a second row carries it. CLAUDE.md's
 one-wrong-answer-at-a-time rule has had a precondition the ledger could not mark
 for eleven scenarios, so whether it was engaged could only be settled by reading
 prose — row K's failure mode, and row K's trigger sat fired through three
-external reviews. Verified by injection: marking row O `demonstrated` fails the
-check and names both rows; the ledger restored byte-identical.
+external reviews.
+
+*The first version had the same blind spot as the defect class it closed.* §3
+records every status twice, index table and the row's own cell, and the check
+read only the table — so it passed while row AD carried `demonstrated` in the
+table and `open` in its cell, hours after the status was invented. Caught by
+`labkit-review`. The consequence is worse than a stale word: reconciling two
+disagreeing sources by trusting the prose and editing the table would leave the
+check passing with **zero** demonstrated rows while one shipped green. It now
+checks that the two agree, which found two more nobody had reported — row **P**
+`resolved`/`open`, four scenarios stale, and row **Y** carrying a qualifier in a
+column that is a vocabulary.
+
+Row P's closing paragraph turned out to be a **fired condition**: *"if it is a
+defect, something else will have to demonstrate it."* S-9b did. That is the third
+such condition to fire unread (K, Z, P), and it is exactly what the check cannot
+help with — recorded in the row rather than left to make the check look more
+capable than it is.
 
 *The seam measurements that justified the split* are kept here because they are
 the reasoning rather than the outcome: 28% comments and 6% blank, so 1,927 code
@@ -430,7 +446,10 @@ Run on `6281aa3`, the final commit.
 - `npx depcruise src tests --output-type err` → **0 errors**, 2 orphan warnings
   (`src/index.ts`, `src/cli.ts`, both known stubs).
 - `bun run check:doc-comments` → clean (the check added this session).
-- `bun run check:ledger` → row AD is the one demonstrated wrong answer.
+- `bun run check:ledger` → row AD is the one demonstrated wrong answer, and no
+  row's status disagrees with itself. Verified by injection both ways —
+  flipping AD's cell back to `open` fails and names both lines, marking a second
+  row `demonstrated` fails the count — ledger restored byte-identical each time.
 - `bun run check:migrations` → OK.
 
 **One run reported 199 pass / 1 fail and it was not a regression.** Reproduced by
@@ -481,6 +500,12 @@ worktrees make it easier to fall into.
   beside it. Three cold reviewers flagged the missing unit and three scenarios
   found no harm beyond a reader's; this is the fourth and the first to produce a
   wrong answer. CLAUDE.md permits one such row and requires clearing it next.
+- **Both checks written this session had the blind spot of the class they
+  closed.** The doc-comment scan could not see one-line comments, and its first
+  repair stranded a fresh comment in the gap; `check-ledger` read one of two
+  copies of a fact whose failure mode is copies drifting. Both were built by
+  someone who had just diagnosed the disease. Worth a journal line with the
+  predictions-document rule.
 - **The ledger gained a fourth status**, `demonstrated`, for a row whose
   discriminator is built, whose wrong answer is demonstrated, and whose **fix**
   is what is unbuilt. `labkit-review` accepted it on a better argument than the
