@@ -1049,7 +1049,7 @@ PJ-023.
 
 ### Row P — `Evidence` carries two senses
 
-**Scenarios:** S-9, S-10, S-12 · **Status:** open
+**Scenarios:** **S-9**, S-10, S-12 · **Status:** resolved
 
 **Current state (verified):** one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position
 
@@ -1091,6 +1091,22 @@ that independently and it remains true. What has changed is that it is no longer
 *owned*: three scenarios have now been pointed at it and the harm they found was
 a reader's, not a structure's. If it is a defect, something else will have to
 demonstrate it
+
+**S-9b demonstrated it, and this paragraph is the condition that fired.** A
+question worked on through observations alone reports itself `untested` —
+*"one nothing has ever been run against"* — because `whatIsKnown()`'s `worked`
+test walks the `EvidenceUnit` that was never minted. That is row **AD**, and it
+belongs there rather than here: P is about `Evidence` carrying two senses and was
+resolved in the query, while AD is about a unit that is never created at all.
+Same sentence in this cell, different row, and the cause-or-fix test separates
+them — minting the unit clears AD and changes nothing about the two senses.
+
+**Third time a condition recorded deep in a document has fired and had to be
+noticed by someone re-reading it** — row K was the first, row Z the second. All
+three read *"if X, then this row moves"*, and in all three X happened while the
+sentence sat unread. That is what `bun run check:ledger` cannot do anything
+about: it checks that a status agrees with itself, not that a condition written
+four scenarios ago has quietly come true
 
 ### Row Q — Question and LineOfEnquiry are collapsed by the service layer
 
@@ -1319,7 +1335,7 @@ answering it
 
 ### Row Y — Closure without a cited result is classified by whether anyone worked on it
 
-**Scenarios:** **S-1**, **S-14** · **Status:** boundary (accepted half settled)
+**Scenarios:** **S-1**, **S-14** · **Status:** boundary
 
 **Current state (verified):** `whatIsKnown()` buckets an abandoned question under `unresolved` if anything ever addressed it, and a deferred one under `untested` if nothing did
 
@@ -1435,7 +1451,7 @@ replacement into the graph correctly; what it withheld was the reference
 
 ### Row AD — Observation-only work on a question reads as no work at all
 
-**Scenarios:** **S-9b** · **Status:** open
+**Scenarios:** **S-9b** · **Status:** demonstrated
 
 **Current state (verified):** `recordObservations()` creates `Evidence` with no producing `EvidenceUnit`; `whatIsKnown()`'s `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`
 
