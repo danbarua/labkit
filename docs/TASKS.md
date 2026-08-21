@@ -126,10 +126,24 @@ row AF's absence. Four for four against: S-7, S-12, row O, and this.
   `ResearchSession`, and the test derives the forbidden verb list from
   `WriteSurface.prototype` so a verb added later is covered without anyone
   remembering.
-- [ ] **The MCP adapter.** Same four reads through a different door. **Two
-  durable worlds per read, before the read is written** — if the public API
-  returns one answer where the contract needs two, that is a demonstration
-  rather than an absence.
+- [x] ~~**The MCP adapter**~~ — done (`70817a2`, `84da50d`). `src/mcp/`:
+  **seven** tools, not four. The CLI's four plus the three history reads an agent
+  plausibly asks and a person at a terminal does not — `design_history`,
+  `interpretation_history`, `reproduction_of`. Read-only structurally, same as the
+  CLI, and the test derives the forbidden verb list the same way. It returns the
+  **whole** structured report rather than a chosen subset, which is the property
+  `tests/mcp.test.ts` asserts without naming a field: the CLI's hand-picked prose
+  had fallen behind the report types three times over, and a transport that ships
+  the report entire cannot.
+- [x] ~~**The CLI adapter defects an external review found**~~ — done (`70817a2`).
+  `accepted-as-unresolved` rendered as plain `open`; `withdrawn`, `challenged` and
+  never-examined all rendered as bare "NOT supported"; an answered enquiry did not
+  say whether its closure rested on exploratory or confirmatory work. All three
+  were correct in `--json` all along. Also: the arg parser took positionals as
+  "the first thing not starting with `--`", so a flag before the positional read
+  the flag's *value* as the argument; and `why` had no way to answer
+  `whySupported()`'s ambiguity refusal, which turned a good refusal into a dead
+  end (`--analysis <id>` now, and an optional `analysis` on the MCP tool).
 
 ## Waiting on a decision, not on work
 

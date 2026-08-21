@@ -1690,6 +1690,29 @@ collapses them into `open` rather than splitting them by reading today's evidenc
 units. If that split is ever needed, `EvidenceUnit` is where the instant goes,
 and it should be earned the same way. See `docs/consumer-contract/025` and `026`.
 
+**A second dated property, the same day, from an external review.** `whatWasKnown()`
+began `MATCH (q:Question)` — every question that exists *now* — and classified each
+by dated `Decision`s. A question posed after the stated instant has none, so it fell
+into `open`, which is an assertion rather than an absence: it says the question was
+on the record and nothing had settled it. Reported for a question nobody had asked
+yet, it back-dates the programme's agenda. Demonstrated before anything was changed
+(`tests/consumer/historical_survey.test.ts`), cleared by `Question.posed_at` — one
+property, one writer (`posed()`, which `pose`, `openEnquiry` and `sharpen` all route
+through), no migration, no new noun. So this row's rung 3 cost **two** properties in
+the end, not one, and the second was found by someone reading the code rather than by
+a scenario.
+
+The same review found a second defect in the same method: `at` was validated with
+`Date.parse()` and then compared as text against stamps a `Clock` always writes as
+UTC, so `2026-03-01T09:00:00-05:00` — 14:00Z — sorted before 10:00Z and the survey
+reported a question unresolved four hours after it was resolved. Validating a string
+is not the same as being able to order it; it is canonicalised once now.
+
+The test that pinned the first defect had **asserted it**: "before anything was
+decided, everything is open" passed because the assertion and the bug agreed with
+each other. That is PJ-027's shape one level up — a second copy of the code's
+opinion, mistaken for a check on it.
+
 ### Row AA — `BASED_ON` carries two senses
 
 **Scenarios:** **S-1**, S-7, S-12 · **Status:** boundary
