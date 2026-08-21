@@ -694,7 +694,7 @@ this document's original analysis are marked as such.
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
 | X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b, **S-3c** | resolved |
 | Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, **S-14** | boundary |
-| Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
+| Z | Chronology exists for evidence but not for status | **S-1**, S-7, consumer probe | resolved |
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
@@ -718,7 +718,7 @@ to be that well informed:
 | Kind | Means | Rows today |
 | --- | --- | --- |
 | `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
-| `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T, Z |
+| `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
 Only the middle kind is a gap in the *method* — CLAUDE.md's deferral rule says
@@ -1294,7 +1294,7 @@ staleness the legend above warns about, happening to the person who wrote it.)*
 
 ### Row Z — Chronology exists for evidence but not for status
 
-**Scenarios:** **S-1**, S-7 · **Status:** open
+**Scenarios:** **S-1**, S-7, the consumer probe · **Status:** resolved
 
 **Current state (verified):** `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only
 
@@ -1306,6 +1306,35 @@ staleness the legend above warns about, happening to the person who wrote it.)*
 **NEW, CHARACTERISED, no change earned.** S-1's hardest Afterward question — what was known when this question was sharpened, asked after later evidence arrived — is answered from durable state, with an empty event log open beside it, because `sharpen()` freezes the standing findings onto the decision when the act is recorded. What that cannot reconstruct is the *survey*: whether a given question was established at that moment needs an ordering between two `Decision`s, and there is none. Natural ids happen to be allocated in order, which is an accident of the sequence and not a modelled fact — CLAUDE.md already forbids reading meaning into their values. So the temporal seam took real pressure and held at the level S-1 asked about; the level above it is a real gap that S-7 (post-lock amendment) is better placed to price, and neither a durable event sink nor a `decided_at` property is earned by a question nobody has yet been unable to answer
 
 **S-7: narrowed, as predicted, and the distinction is the result.** In-chain order is structural — `SUPERSEDES` alone orders two amendments to one design, with no timestamp, an empty event log, and natural-id order never consulted. Two decisions on *different* designs remain unordered, and S-7 includes an unrelated sharpening precisely to show that the answer covers one class of history and not chronology in general. Not a partial fix: a smaller true claim
+
+**RESOLVED by the consumer probe (2026-08-21), on this row's own stated
+condition.** The entry above ended *"neither a durable event sink nor a
+`decided_at` property is earned by a question nobody has yet been unable to
+answer."* Someone was then unable to answer it: three cold designers required
+historical ordering independently (cluster 21, in three vocabularies), and the
+vertical slice demonstrated it against running code. The second time a condition
+recorded deep in a document has fired and had to be noticed by a re-reader; row K
+was the first.
+
+The change bar was walked rather than skipped. **Rung 1 was built and shown to
+fail twice** — a closure with no prespecified check has no temporal anchor at all,
+and even with checks on both, two programmes closing sixty days apart in opposite
+orders produce identical bounds, because the bound records when the evidence was
+*checked* rather than when the question was *settled*. **Rung 2 was declined by
+argument** — sequence is a property of each act, not a relation between two — and
+that is the weaker move, recorded as such. **Rung 3 is one property**:
+`Decision.decided_at`, required, six creation sites, no migration.
+
+It is **record time, not belief time**, and the property says so — a single
+timestamp otherwise looks like a fix while silently choosing a reading, which
+PJ-024's successor documents warned about. Bitemporality stays a candidate
+extension: real, unrepresentable, and required by no source obligation.
+
+What is **not** closed, and is now precisely stated: `EvidenceUnit` carries no
+instant, so worked-on and untouched cannot be told apart as-of. `whatWasKnown()`
+collapses them into `open` rather than splitting them by reading today's evidence
+units. If that split is ever needed, `EvidenceUnit` is where the instant goes,
+and it should be earned the same way. See `docs/consumer-contract/025` and `026`.
 
 ### Row AA — `BASED_ON` carries two senses
 

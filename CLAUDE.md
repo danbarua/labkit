@@ -40,8 +40,10 @@ completed arc: it verifies the corpus-exhaustion claim against §3's ownership
 table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
 zero migrations, fifteen scenarios). Its one open item — row F's missing S-9
 verdict — was closed the same day, and **no item on the ledger's index is now
-known-open**. Five rows are still `open` + unowned, which is the better kind:
-every named probe has been built.
+known-open**. Four rows are still `open` + unowned, which is the better kind:
+every named probe has been built. **Row Z was closed on 2026-08-21** by the
+consumer probe (`docs/consumer-contract/025`, `026`) — one property,
+`Decision.decided_at`, no migration, after rung 1 was built and shown to fail.
 
 The dependency graph is **self-maintaining, in two forms for two readers**:
 `docs/dependency-graph.svg` for a person in a browser, where graphviz's edge
