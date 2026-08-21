@@ -14,7 +14,8 @@ on the external review of that brief.
 
 ## Changed
 
-Twenty-six commits, all this session, range clean — no other session's work in it.
+Twenty-eight commits, range clean apart from `8299ecb` (a regenerated
+dependency graph, committed by the user) — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -238,7 +239,7 @@ Two shapes, kept apart deliberately rather than tallied as one:
   vertical slice exists to detect, which is why lumping them would have buried
   the interesting part.
 
-Working tree clean. Twenty-one commits ahead of `origin/feat/domain-consumer`,
+Working tree clean. Twenty-three commits ahead of `origin/feat/domain-consumer`,
 nothing held back.
 
 ## Verified
@@ -348,9 +349,33 @@ worktrees make it easier to fall into.
 
 ## Next
 
-Wait for `labkit-review`'s verdict on `d045492`, act on it, then push.
+**A refactor decision is open and has measurements behind it.** `src/domain/session.ts`
+is 2,920 lines and the user asked for sensible seams before any further building.
+Nothing was changed; the analysis is below so it need not be re-derived.
 
-After that, take the three demonstrated gaps in cost order, one rung at a time:
+- **Size is less alarming than the number.** 28% comments — load-bearing in this
+  repo — and 6% blank, so **1,927 code lines across 62 members**, ~31 each.
+  Nothing is individually bloated; the file is long because it does many things.
+- **Read/write partitions perfectly.** 18 write verbs (845 lines) against 14 read
+  verbs (1,051 lines), **no member doing both**. `emit` has 18 callers and every
+  one is a write — the temporal seam is already an invariant, just an unenforced
+  one. The reads are the *bigger* half, and are exactly what the consumer
+  contract and rows Z/F/S concern.
+- **The shared core is exactly five helpers**: `withinScope`, `scopeFor`,
+  `workGatedBy`, `confirmatoryResultsBehind`, `decidedOnTheStrengthOf`. Every
+  other private helper is one-sided.
+- **dependency-cruiser cannot find the seam** — it sees `session.ts` as one node
+  (`N 1, Ca 1, Ce 5`). It can enforce one afterwards, which is the main argument
+  for bothering: an unenforced shared core becomes a junk drawer.
+- Proposed shape, not yet agreed: `ResearchSession` stays a facade so the public
+  API cannot move (21 test files bind to it, and `tests/scenarios/` may not reach
+  past it), with `write.ts` / `read.ts` / `core.ts` behind it and rules that reads
+  and writes may not import each other.
+- Two open questions: whether `whySupported` (208 lines) plus `checksFrom` (151)
+  — 19% of the code, straddling claims and criteria — is one concern deserving
+  its own module; and whether a 62-method delegating facade earns its boilerplate.
+
+Then take the three gaps in cost order, one rung at a time:
 
 1. **Row Z — reader semantics first.** `Decision` already has `closed_at` and the
    event stream carries stamps. Whether a durable ordering can be *derived*
