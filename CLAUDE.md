@@ -43,18 +43,30 @@ verdict — was closed the same day, and **no item on the ledger's index is now
 known-open**. Five rows are still `open` + unowned, which is the better kind:
 every named probe has been built.
 
-`docs/dependency-graph.svg` is **self-maintaining**: `.githooks/pre-commit`
-regenerates and stages it whenever a commit touches `src/` or `tests/`. Enable
-it once per clone or worktree with `git config core.hooksPath .githooks` — the
-hook is tracked, the config is not. It is **not a gate**: `npx depcruise src
-tests --output-type err` is the gate, and the hook never blocks a commit, not
-even when graphviz is absent, because a stale diagram beats a refused commit.
-The generation lives in `scripts/update-dependency-graph.sh` rather than a
-`package.json` one-liner because the one-liner was a pipeline, and `$?` after a
-pipeline reports `dot`'s status — a crashed `depcruise` used to yield an empty
-SVG and a success code. It needs **graphviz** (`brew install graphviz`);
-`depcruise --output-type mermaid` would remove that dependency and is 45x
-smaller, but the committed artefact is still SVG.
+The dependency graph is **self-maintaining, in two forms for two readers**:
+`docs/dependency-graph.svg` for a person in a browser, where graphviz's edge
+routing is what makes a graph this dense legible (PJ-007 records a design change
+prompted by *reading* it), and `docs/dependency-graph.mmd` for an agent reading
+text — 3KB against 134KB, and it diffs, so a moved edge is visible where 1,444
+lines of generated SVG hide it. **One `depcruise` run renders both** via
+`depcruise-fmt`, so the two cannot describe different graphs.
+
+`.githooks/pre-commit` regenerates them when a commit touches `src/` or `tests/`
+and stages only what actually moved. That makes "the graph changed" mean "the
+module structure changed", because the output is byte-stable: two runs over an
+unchanged tree are identical, and an edit touching no import yields an identical
+graph. Correctness never rests on guessing which edits are structural — an
+import added inside an existing file moves the graph exactly as a new file does.
+Cost is ~1s; a comment-only commit stages nothing.
+
+Enable once per clone or worktree with `git config core.hooksPath .githooks` —
+the hook is tracked, the config is not. It is **not a gate**: `npx depcruise src
+tests --output-type err` is, and the hook never blocks a commit. **graphviz is
+optional** (`brew install graphviz`): without it the mermaid graph is still
+maintained and only the SVG goes stale, announced. Generation lives in
+`scripts/update-dependency-graph.sh` rather than a `package.json` one-liner
+because the one-liner was a pipeline, and `$?` after a pipeline reports `dot`'s
+status — a crashed `depcruise` used to yield an empty SVG and a success code.
 
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered

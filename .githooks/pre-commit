@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 #
-# Keep docs/dependency-graph.svg honest: regenerate it whenever a commit touches
-# src/ or tests/, and stage it alongside.
+# Keep the dependency graphs honest: regenerate whenever a commit touches src/ or
+# tests/, and stage them alongside.
+#
+# Two forms, two readers -- docs/dependency-graph.svg for a person in a browser,
+# docs/dependency-graph.mmd for an agent reading text. One analysis renders both,
+# so they cannot disagree.
+#
+# It regenerates on any src/ or tests/ change but stages only what actually
+# moved, which is what makes "the graph changed" mean "the module structure
+# changed". That holds because the output is byte-stable: two runs over an
+# unchanged tree are identical, and an edit touching no import produces an
+# identical graph. Both verified. So a comment-only commit costs ~1s and stages
+# nothing, and correctness never rests on guessing which edits are structural --
+# an import added inside an existing file moves the graph exactly as a new file
+# does, and a heuristic gate would miss it.
 #
 # Enable with:  git config core.hooksPath .githooks
 #
@@ -28,18 +41,24 @@ fi
 # cheap to fix properly -- fixing it means checking the index out to a temp
 # tree -- so it is reported rather than papered over.
 if git diff --name-only --diff-filter=ACMRD | grep -Eq '^(src|tests)/'; then
-  echo "pre-commit: unstaged changes under src/ or tests/ -- the dependency graph" >&2
+  echo "pre-commit: unstaged changes under src/ or tests/ -- the dependency graphs" >&2
   echo "  will describe the working tree, not this commit." >&2
 fi
 
 if ! scripts/update-dependency-graph.sh; then
-  echo "pre-commit: dependency graph not updated; committing anyway." >&2
+  echo "pre-commit: dependency graphs not updated; committing anyway." >&2
   exit 0
 fi
 
 # Only stage it if regeneration actually moved it.
-if ! git diff --quiet -- docs/dependency-graph.svg; then
-  git add docs/dependency-graph.svg
-  echo "pre-commit: staged the regenerated dependency graph."
-fi
+staged=""
+for graph in docs/dependency-graph.svg docs/dependency-graph.mmd; do
+  [ -f "$graph" ] || continue
+  if ! git diff --quiet -- "$graph"; then
+    git add "$graph"
+    staged="$staged $(basename "$graph")"
+  fi
+done
+[ -n "$staged" ] && echo "pre-commit: staged$staged"
+
 exit 0
