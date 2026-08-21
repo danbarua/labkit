@@ -43,6 +43,17 @@ hook it flagged on the way out.
   right and one-directional — a count above it means a double report — but the
   converse is what a detector needs, and it is false. `docs/TASKS.md` now says
   so, and records what did separate the two runs.
+- `b2047f4` — merged `labkit-minion`'s PJ-028 rewrite. The entry's argument is
+  now its last section: **four instances of this defect in one day, by two
+  authors who had it in front of them**, and the conclusion one instance could
+  not support — *"be more careful" is not available as a remedy, because these
+  are what being careful looks like*. Item 4 is mine, item 3 is its.
+- `1e5aee5` — CLAUDE.md carries that conclusion instead of the anecdote it used
+  to end on, and states the numeral rule with all **three** branches. The
+  two-branch form it had — earn an assertion or don't be in the prose — omitted
+  *be explicitly dated*, and so condemned the arc-totals figures four
+  paragraphs above it in the same file. A fifth instance, in the file
+  documenting the defect, found by reading the other side of the operation.
 
 Working tree clean apart from this entry.
 
@@ -108,6 +119,12 @@ suite — and stated as a rule. And the literal `261` was a numeral in prose
 earning no assertion and carrying no date, which is the pattern this branch
 closed out three hours earlier; `docs/TASKS.md` now gives the derivation and
 tells the reader not to trust the number.
+
+It is item 4 of PJ-028's closing section, and the section is why it is recorded
+rather than quietly fixed. Two authors produced four of these in one day with
+the defect named and in front of them, which is what rules out "be more
+careful" as the remedy. Read that section before deciding this repo's checkers
+are over-engineered.
 
 **The sweep's inferred pile remains unverified**, and `006`'s Next names the
 right way in: demonstrate one verb (`sharpen` or `closeEnquiry`) against
