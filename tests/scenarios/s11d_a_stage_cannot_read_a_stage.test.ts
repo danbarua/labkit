@@ -52,17 +52,15 @@ async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
     concludes: [{ proposition: "the calibration is stable", finding: "drift under 0.2%" }],
   });
 
-  // Stage two. The only way to express it: record the intermediate as if it
-  // were a fresh measurement, with a hash of its own.
-  const calibrated = await s.recordObservations({
-    enquiry, name: "calibrated series", finding: "eleven dose levels, calibrated",
-    contentHash: "sha256:calibrated",
-  });
+  // Stage two reads stage one's output directly. Before row AE this was not
+  // expressible: `from` took observations only, so the intermediate had to be
+  // re-entered as if it were fresh measurement — severing the chain to the raw
+  // series and making stage two look independently reproducible.
   const trend = await s.recordAnalysis({
-    enquiry, method: "dose-response-fit", from: [calibrated],
+    enquiry, method: "dose-response-fit", from: [calibration],
     concludes: [{ proposition: TRENDS, finding: "monotonic increase, p < 0.01" }],
   });
-  return { enquiry, raw, calibration, calibrated, trend };
+  return { enquiry, raw, calibration, trend };
 }
 
 describe("S-11d: a stage cannot read a stage", () => {
@@ -77,45 +75,47 @@ describe("S-11d: a stage cannot read a stage", () => {
   });
 
   /**
-   * **KNOWN WRONG.** Stage two reports itself fully reproducible.
+   * Stage two no longer claims to be reproducible on top of something that
+   * isn't. **Inverted, not deleted** — the two lines this test shipped with in
+   * a comment are the live assertions now.
    *
-   * It rests on stage one, which rests on a series nobody can check. Rebuilding
-   * the trend means rebuilding the calibration, and that cannot be done. But the
-   * record shows stage two consuming an ordinary observation with a hash, so
-   * the report comes back `reproducible: true` — a positive claim of
-   * reproducibility for work that sits on top of admittedly unrecoverable data.
-   *
-   * Not an absence. `reproducible` is exactly the field CLAUDE.md says "must not
-   * quietly say otherwise", and here it says otherwise.
-   *
-   * Asserted as wrong on purpose, with the assertion it *should* make in the
-   * comment. When a verb exists to record stage two as reading stage one's
-   * output, invert this rather than deleting it.
+   * It rests on stage one, which rests on a series nobody can check. The record
+   * now says so: stage two's input is the calibration's output artefact, which
+   * carries no content hash, so the report reads `unverifiable` rather than
+   * inventing a clean bill.
    */
-  test("KNOWN WRONG: stage two reports itself reproducible on top of unverifiable data", async () => {
-    const { calibrated, trend } = await aPipelineOnUnverifiableRawData(session);
+  test("stage two does not claim reproducibility it cannot have", async () => {
+    const { trend } = await aPipelineOnUnverifiableRawData(session);
 
-    const report = await (await afterwards()).reproducibilityOf(trend, [
-      { part: calibrated, hash: "sha256:calibrated" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf(trend, []);
 
-    // What it should say, and does not:
-    //   expect(report.reproducible).toBe(false);
-    //   expect(report.unverifiable).toEqual(["raw sensor series"]);
-    expect(report.exact).toEqual(["calibrated series"]);
-    expect(report.unverifiable).toEqual([]);
-    expect(report.reproducible).toBe(true);
+    expect(report.reproducible).toBe(false);
+    // The calibration's output artefact -- what stage two actually read.
+    expect(report.unverifiable).toEqual(["calibrate output"]);
+    expect(report.exact).toEqual([]);
   });
 
   /**
-   * And the reader has no route to find out. Nothing connects the calibrated
-   * series to the calibration that produced it, so a caller cannot walk from
-   * stage two to the thing that makes its answer wrong.
+   * The chain now **exists** in the record, and `whatDependsOn()` still does not
+   * walk it. Both halves asserted, because they are different problems.
+   *
+   * S-11c's omission had two causes stacked: the chain was severed at the write
+   * surface, *and* the query is one hop. Row AE fixed the first. The second is
+   * query semantics, and `DependencyReport.routesWalked` already says so rather
+   * than letting the short answer read as a complete one — which is exactly the
+   * situation that open-world caveat was built for.
    */
-  test("nothing links the intermediate back to the analysis that produced it", async () => {
-    const { calibrated } = await aPipelineOnUnverifiableRawData(session);
-    const rests = await (await afterwards()).whatDependsOn(calibrated);
-    expect(rests.claims).toEqual([TRENDS]);
-    expect(rests.claims).not.toContain("the calibration is stable");
+  test("the chain exists in the record, and the one-hop query still stops short", async () => {
+    const { raw, calibration } = await aPipelineOnUnverifiableRawData(session);
+    const reader = await afterwards();
+
+    const fromRaw = await reader.whatDependsOn(raw);
+    expect(fromRaw.claims).toEqual(["the calibration is stable"]);
+    expect(fromRaw.complete).toBe(false);
+
+    // One hop further along the chain that now exists, the downstream claim is
+    // reachable -- so the link is real and only the traversal is short.
+    const parts = await reader.reproducibilityOf(calibration, []);
+    expect(parts.unverifiable).toEqual(["raw sensor series"]);
   });
 });

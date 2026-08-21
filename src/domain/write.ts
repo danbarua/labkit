@@ -323,7 +323,23 @@ export class WriteSurface extends SessionCore {
   private async recorded(input: {
     enquiry: EnquiryRef;
     method: string;
-    from: ObservationsRef[];
+    /**
+     * What this analysis read: recorded observations, or **another analysis's
+     * output**. Earned by S-11d, row AE.
+     *
+     * Until it accepted an `AnalysisRef`, a two-stage pipeline had one
+     * recordable form — re-enter the intermediate as if it were fresh
+     * measurement — and that produced a confidently wrong answer: stage two
+     * reported `reproducible: true` while resting on data the record itself
+     * called unverifiable, because the re-entered intermediate carried a hash
+     * of its own and the chain to the real input was severed.
+     *
+     * No new edge. `CONSUMES: Computation -> Artefact` already existed and
+     * already meant "this run read that"; an analysis output is an `Artefact`
+     * like any other, so the second rung of the change bar was enough and
+     * nothing was added to the model.
+     */
+    from: Array<ObservationsRef | AnalysisRef>;
     concludes: Conclusion[];
     /**
      * The planned work this analysis carries out, if it carries out any.
@@ -413,12 +429,12 @@ export class WriteSurface extends SessionCore {
       "PRODUCES",
       output.natural_id,
     );
-    for (const observations of input.from) {
-      await this.graph.createEdge(
-        computation.natural_id,
-        "CONSUMES",
-        observations.id,
-      );
+    for (const source of input.from) {
+      // An analysis is named by its computation; what it *read* is that
+      // computation's output artefact, which is what CONSUMES points at.
+      const artefact =
+        source.kind === "analysis" ? await this.outputArtefactOf(source) : source.id;
+      await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact);
     }
 
     for (const conclusion of input.concludes) {

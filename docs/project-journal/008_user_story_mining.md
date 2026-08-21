@@ -699,7 +699,7 @@ this document's original analysis are marked as such.
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
 | AD | Observation-only work on a question reads as no work at all | **S-9b** | resolved |
-| AE | An analysis cannot read another analysis's output | **S-11c**, **S-11d** | demonstrated |
+| AE | An analysis cannot read another analysis's output | **S-11c**, **S-11d** | resolved |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -1618,7 +1618,7 @@ replacement into the graph correctly; what it withheld was the reference
 
 ### Row AE — An analysis cannot read another analysis's output
 
-**Scenarios:** **S-11c**, **S-11d** · **Status:** demonstrated
+**Scenarios:** **S-11c**, **S-11d** · **Status:** resolved
 
 **Current state (verified):** `recordAnalysis({ from })` accepts only `ObservationsRef`, and `recordObservations()` is the only thing that produces one
 
@@ -1644,10 +1644,23 @@ apart from its content; this is about the **write surface** having no way to say
 one analysis read another. F would not fix this on its own — a versioned
 artefact still could not be passed to `recordAnalysis({ from })`.
 
-*Not yet built:* the remedy. Candidates are a verb that records a stage reading
-a prior analysis's output, or widening `from` to accept an analysis reference.
-The second is cheaper and may be enough; neither has been demonstrated to be the
-right one.
+**Resolved the same day, at rung 2 — no new edge, no new noun, no migration.**
+`recordAnalysis({ from })` now accepts an `AnalysisRef` alongside observations,
+and `CONSUMES: Computation → Artefact` carries it: that edge already existed and
+already meant *this run read that*, and an analysis output is an `Artefact` like
+any other. The cheaper of the two candidates was enough, and the more obvious one
+— a new verb for "stage two reads stage one" — was not needed.
+
+Stage two now reports `unverifiable: ["calibrate output"]` and
+`reproducible: false`, because what it reads is a computed artefact carrying no
+content hash. That is the honest answer: a computed intermediate cannot be
+checked by hash unless somebody recorded one.
+
+*What this does not fix, asserted in the same scenario:* `whatDependsOn()` is
+one hop, so it still stops at the stage-one claim. S-11c's omission had two
+causes stacked — a severed chain **and** a short traversal. This fixed the
+first. The second is query semantics, and `DependencyReport.routesWalked` and
+`complete: false` already stop the short answer reading as a complete one.
 
 ### Row AD — Observation-only work on a question reads as no work at all
 
