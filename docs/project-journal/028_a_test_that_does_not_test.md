@@ -108,9 +108,40 @@ delegation count, `wc -l`, call sites, interface fields. A generic warning that
 numbers in comments go stale would fire on every past-tense measurement in the
 repository, and this project keeps those deliberately.
 
-Seven small assertions would not be noise. And they would be *assertions*, which
-is what PJ-027 already concluded: where a prose guard can be a test, it should be.
-The counts are the largest available supply of prose guards that can.
+### Corrected the same day, on the way to fixing them
+
+This entry first concluded that seven small assertions would beat one generic
+check, because they would be *assertions* and PJ-027 says to prefer those. Fixing
+the seven showed that half wrong, and the correction is the more useful sentence:
+
+> **A numeral either earns an assertion or it should not be in the prose.**
+
+Six of the seven were decoration on an argument that survives without them.
+*"1,051 lines against the write side's 845"* argues that one half is larger; the
+numbers add nothing to that and are a maintenance claim nobody agreed to keep.
+Deleting a claim is not giving up on checking it — it is the stronger move,
+because what remains is true and what left was never going to be maintained.
+
+The seventh looked like the exception and is the instructive one. A test file
+carried *"13 node + 19 edge labels"* next to `NODE_LABELS`/`EDGE_LABELS` — a real
+denominator, an assertion for free. But the property that comment gestures at is
+**already asserted** one line below, empirically, against the real graphid; and
+that guard *tightens* as labels are added, where `expect(EDGE_LABELS.length)
+.toBe(25)` would merely break. **An assertion that protects nothing an existing
+assertion does not is a change-detector**, and adding one would have been
+ceremony wearing the costume of rigour.
+
+So: zero of seven earned an assertion, and all seven stopped being counts. That
+is a better result than seven new checks, and it does not weaken this entry's
+conclusion — it is the same conclusion applied one level up. The check that
+survived, `check:tests-assert`, survived because it catches something nothing
+else catches.
+
+**And the defect fired once more during its own repair.** The first version of
+that test comment said the counts were *"asserted below rather than written
+here"* — written before any assertion existed, in the edit fixing the very defect
+of prose describing code that does not agree with it. Caught before commit, by
+going to write the assertion the sentence promised.
 
 ## What this does not change
 

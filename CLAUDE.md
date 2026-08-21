@@ -66,6 +66,12 @@ too — and wider, because a green tick reads as evidence. The runner-up, a nume
 in a comment next to something countable, was **seven for seven wrong** and is
 deliberately *not* one check: each has a different denominator, and a generic
 warning would fire on every past-tense measurement this repo keeps on purpose.
+Fixing all seven then corrected 028 itself: **a numeral either earns an assertion
+or it should not be in the prose**, and **zero of the seven earned one** — six
+were decoration on an argument that survives without them, and the seventh was
+already asserted empirically one line below, by a guard that *tightens* as labels
+are added where a count assertion would merely break. An assertion protecting
+nothing an existing assertion does not is a change-detector.
 028's sharpest instance: `918f420`, the commit that *fixed* a 027 instance, minted
 two more in the same hunk.
 
