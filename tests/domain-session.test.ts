@@ -48,7 +48,7 @@ test("whySupported treats an explicit invalidated:false the same as an absent on
   });
 
   const absent = await session.whySupported("P");
-  expect(absent.restingOn).toEqual(["obs"]);
+  expect(absent.restingOn.map((a) => a.name)).toEqual(["obs"]);
   expect(absent.supported).toBe(true);
 
   await graph.query(
@@ -57,7 +57,7 @@ test("whySupported treats an explicit invalidated:false the same as an absent on
   );
 
   const explicit = await session.whySupported("P");
-  expect(explicit.restingOn).toEqual(absent.restingOn);
+  expect(explicit.restingOn.map((a) => a.name)).toEqual(absent.restingOn.map((a) => a.name));
   expect(explicit.supported).toBe(true);
 });
 

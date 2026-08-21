@@ -170,7 +170,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // observations, and those observations were never invalidated.
     const why = await session.whySupported("T beats rewired");
     expect(await (await afterwards()).whySupported("T beats rewired")).toEqual(why);
-    expect(why.restingOn).toContain("per-image classification results");
+    expect(why.restingOn.map((a) => a.name)).toContain("per-image classification results");
   });
 
   test("Afterward 4: the replacement conclusion is supported via a different inference", async () => {
@@ -249,10 +249,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
 
     const onMnist = await session.whySupported("T beats lattice on MNIST");
-    expect(onMnist.restingOn).toEqual(["mnist per-image results"]);
+    expect(onMnist.restingOn.map((a) => a.name)).toEqual(["mnist per-image results"]);
 
     const onFashion = await session.whySupported("T beats lattice on Fashion");
-    expect(onFashion.restingOn).toEqual(["fashion-mnist per-image results"]);
+    expect(onFashion.restingOn.map((a) => a.name)).toEqual(["fashion-mnist per-image results"]);
   });
 
   test("why support was withdrawn is answerable from the graph, not just the event log", async () => {

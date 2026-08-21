@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c** | open |
+| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c**, **S-9d** | open |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -688,7 +688,7 @@ this document's original analysis are marked as such.
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, **S-18** | resolved |
 | S | No agent, person or role exists in the model | S-8, **S-8b** | refuted |
-| T | Edges cannot carry properties | S-7, ~~row O~~ | refuted |
+| T | Edges cannot carry properties | S-7, ~~row O~~, **S-10b** | refuted |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
@@ -700,6 +700,7 @@ this document's original analysis are marked as such.
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
 | AD | Observation-only work on a question reads as no work at all | **S-9b** | resolved |
 | AE | An analysis cannot read another analysis's output | **S-11c**, **S-11d** | resolved |
+| AF | Execution input order is not recorded | **S-10b** | open |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -838,7 +839,7 @@ something that could not be true
 
 ### Row F — No artefact-to-artefact lineage
 
-**Scenarios:** S-9 · **Status:** open
+**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d** · **Status:** open
 
 **Current state (verified):** no `Artefact`→`Artefact` edge
 
@@ -903,6 +904,46 @@ Designer 2's case, an input regenerated so later work could proceed. Rung 2
 holds for the case that could produce a wrong answer and refuses the case the
 contract requires. The ladder is **paused at rung 3**, gated on the adapter
 phase's reconstruction-provenance read, per `023`'s own sequencing.
+
+**S-9d (2026-08-21): the same shape again, in the most-used read, and this one
+is not fixed.** `whySupported().restingOn` is
+`[...new Set(rows.map((r) => r.a.logical_name))]` — deduplicated **by name**.
+
+An analysis resting on a surviving fragment *and* its regeneration reports
+`restingOn: ["control series"]`: one entry for two inputs. The record states a
+conclusion rests on a single thing when it rests on two, and the input that
+disappears is indistinguishable from the one that remains — so a reader auditing
+the basis of a claim cannot see that a regeneration with inferred provenance is
+underneath it. Populated, confident, short; `restingOn` answers, and answers
+wrongly.
+
+Demonstrated against durable state, twice: `reproducibilityOf()` reports both
+parts from the same graph (it was taught identity in S-9c), and
+`whatDependsOn()` **refuses** the shared name. So the surface already knows the
+name is ambiguous in two places and collapses on it in a third.
+
+*Predicted before the test* (`docs/consumer-contract/033`), including that the
+remedy would be rung 1 again and that the row would still not close.
+
+**Fixed the same day, at rung 1.** `restingOn` deduplicates by identity and
+carries `{ part, name }` — `IdentifiedArtefact`, the shape S-9c introduced for
+`reproducibilityOf()` and renamed here because a second read needed it and
+`ReproducedPart` stopped being accurate. One field, no noun, no edge, no
+property, no migration. Deletion-verified: keying the dedupe on name again fails
+both assertions.
+
+**Row F stays `open`.** This was the third *report* to lack identity, not the
+model. Whether two artefacts can be two versions of one thing is still
+untouched, and still unbitten.
+
+**Three reporting bites, no model bite.** S-9c and S-9d are one defect in two
+functions: a rule enforced on the way *in* and dropped on the way *out*.
+`reproducibilityOf()` took parts by reference and argued for it in a comment,
+then reported bare names; `restingOn` never took identity at all. That is
+evidence about where row F's defect lives — in what the reads *say*, not in what
+the model *holds* — and it is the strongest argument yet that the row is a
+`boundary` rather than an open model gap. Not concluded here: a fourth
+instance would settle it, and three is a pattern rather than a proof.
 
 **S-9c (2026-08-21): the row bit, in the reporting rather than the model.**
 S-9 took parts by *reference* on the way into `reproducibilityOf()`, with a
@@ -1097,6 +1138,30 @@ PJ-023.
 **S-7: prediction held — did not bite.** An amendment names its own cause, so the ambiguity O describes never arose. Still deferred
 
 **S-12: still does not bite.** A reinterpretation mints both the review and the decision that acted on it, so which review caused the change is recorded rather than inferred. Note what this establishes in passing: a review is *not* a retraction — reviews also confirm, and distinguishing them from a free-text verdict would be text-matching. That is why the `Decision` exists at all here
+
+### Row AF — Execution input order is not recorded
+
+**Scenarios:** **S-10b** · **Status:** open
+
+**Current state (verified):** `CONSUMES` records which artefacts a computation read, never in what sequence
+
+**NEW, from S-10b, and it earns nothing yet.** `recordAnalysis({ from })` takes
+an ordered list and the record keeps a set. Two runs of an order-sensitive
+method — an alignment computing *first minus second*, where reversing flips the
+sign — are indistinguishable in durable state, so `reproducibilityOf()` reports
+the reversed rebuild `reproducible: true` and `reverify()` accepts it as a
+re-verification of the original finding.
+
+*Why that is an absence and not a wrong answer.* The reports claim the two runs
+consumed the same inputs, and they did. What a reader *infers* — same inputs,
+same computation — is the wrong part, and the record never asserted it. Under
+PJ-011 §5 an unanswerable question earns nothing, and the model has no concept
+of an ordered input list to be wrong within.
+
+*What would move it:* a reader acting on "reproduced" for a reversed run and
+being wrong in a way the record states rather than implies. Not built, and no
+scenario currently named would settle it — unresolved and unowned, recorded here
+rather than left to look like a decision.
 
 **S-11b (2026-08-21): resolved, and the row's own description of itself was
 wrong.** See `docs/consumer-contract/031`, `032`.
@@ -1321,6 +1386,22 @@ Recorded here rather than handed the durable-event-sink phase as a substitute:
 an unbuilt *phase* is not a scenario, and naming one turns "we have no
 discriminator" into "it's handled", which is the failure the ownership taxonomy
 exists to prevent.
+
+**S-10b (2026-08-21): a fourth candidate, and it went the same way — four for
+four against the row.** Input order on `CONSUMES` is the best shape row T could
+hope for: intrinsic to the relationship, unchanging, incapable of recurring
+between one pair, and badly served by a node, since reifying "the second input"
+as an entity is worse than a number on an edge.
+
+It is genuinely lost, and a reversed rebuild does report itself reproducible.
+**But an ordinal on the edge would not fix it**, which is the result. Nothing
+compares the orders, because the record does not know the method is
+order-sensitive. Row T would be taking credit for an absence that belongs to
+row **AF** — the model has no concept of an ordered input list at all, and where
+the ordinal could live is not the question.
+
+Predicted before the test (`docs/consumer-contract/034`), including that this
+exact confusion was the trap to avoid.
 
 **Refuted the same day, and the row's title was simply false.** Every AGE label
 is a real Postgres table, edge labels included, and an edge row has the same

@@ -200,7 +200,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // assertion attached to the amendment.
     const why = await later.whySupported(MULTICOLLINEAR);
     expect(why.supported).toBe(true);
-    expect(why.restingOn).toContain("non-convergence traces");
+    expect(why.restingOn.map((a) => a.name)).toContain("non-convergence traces");
   });
 
   /**

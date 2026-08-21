@@ -169,7 +169,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // The observations underneath are untouched -- this is what separates a
     // reinterpretation from S-11's replacement, where the output was
     // invalidated and the findings became historical.
-    expect(now.restingOn.sort()).toEqual([
+    expect(now.restingOn.map((a) => a.name).sort()).toEqual([
       "attenuation readings, cohort A",
       "attenuation readings, cohort B",
     ]);
