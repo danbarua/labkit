@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | No artefact-to-artefact lineage | **S-9**, **S-9b** | open |
+| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b** | open |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -902,6 +902,38 @@ Designer 2's case, an input regenerated so later work could proceed. Rung 2
 holds for the case that could produce a wrong answer and refuses the case the
 contract requires. The ladder is **paused at rung 3**, gated on the adapter
 phase's reconstruction-provenance read, per `023`'s own sequencing.
+
+**Reframed 2026-08-21, and the reframe is the discriminator the row never had.**
+*"What you're describing is a versioned domain entity."*
+
+Row F has been asking "where is the `Artefact → Artefact` edge?" for the whole
+arc, and S-9b showed the missing thing is not lineage between two artefacts. It
+is that **an artefact has no identity apart from its content.** `logical_name`
+is wording, which S-9 correctly refused to treat as identity, and `content_hash`
+is the bytes — so there is nothing in the model that two artefacts can be two
+versions *of*. That is why "is this a rebuild of that, or independent work?" has
+no answer: both readings need an entity neither has.
+
+This resolves the tension S-9 and S-9b left standing. S-9 said two artefacts may
+share a name without being the same thing; S-9b's designer required a
+reconstruction to remember its historical target. Both are right, and the thing
+that reconciles them is a **versioned entity**: the name is not identity, the
+bytes are not identity, and the entity the versions belong to is what the
+researcher knows at write time and is never asked for.
+
+Which makes the shape identical to row **O**, closed the same day: information
+the writer holds, that the verb does not request, that the reader then infers
+wrongly or not at all. `recordObservations()` never asks *what is this a new
+version of* — not once, not optionally. That is row **AB** asked of an argument
+list rather than of a return type.
+
+**Not built.** It is a genuine noun (rung 4), it is the most expensive change
+anyone has proposed to this model, and the demonstration standard is unchanged:
+S-9b established bar 4 and did **not** clear §5. What the reframe buys is that
+the row finally has a discriminator that names a shape rather than an edge —
+*a scenario in which the record must distinguish a new version of a thing from a
+new thing, and gets it wrong* — where before it named the remedy and called it
+the problem.
 
 *A reclassification considered and rejected.* `027` predicted this build would
 end with F moved to `boundary` and called that the bigger result. It would

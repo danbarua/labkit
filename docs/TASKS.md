@@ -8,7 +8,7 @@ here disagrees with the ledger, the ledger is right and this file is stale.
 
 Grouped by **what stops someone picking it up**, because the items are not the
 same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against
-`d33734a`.
+`489d103`.
 
 ---
 
@@ -33,6 +33,11 @@ Someone could start these today.
   migration (`consumer-contract/025`, `026`).
 - **Row AD** — observation-only work reading as no work. One node, two edges, no
   migration (`029`, `030`). `recordObservations()` is now transactional.
+- **Rows S and T** — refuted, not merely closed. There is no *who* to attribute
+  work to when analyses are run by agents, and what the question reaches for is
+  provenance the model already carries (`S-8b`). Edges *can* carry properties;
+  `createEdge()` now takes them, and what survives is that a property cannot be
+  part of edge identity.
 - **Row O** — which review a retraction rested on. One edge label,
   `INVALIDATED_BY: Artefact → Review`, no migration (`031`, `032`). Taken up on
   an external challenge whose *discriminator was unbuildable* and whose
@@ -41,25 +46,23 @@ Someone could start these today.
 
 ## Needs a discriminator before it can be built
 
-Four ledger rows sit `open` + **unowned**: every named probe has been built, so
-each needs a *new* one. These are research questions, not tickets — "do row F" is
+Two ledger rows sit `open` + **unowned** — down from four. Rows **O** and **S**
+closed on 2026-08-21 and row **T** was refuted the same day. These are research questions, not tickets — "do row F" is
 not actionable, and writing a scenario to satisfy a row would manufacture the
 result (PJ-011 §5).
 
-- [ ] **Row F — no artefact-to-artefact lineage.** **Discriminator built** as
-  S-9b; see `consumer-contract/027`, `028`. Rung 2 held — `reverify()` already
-  records a rebuild as an act with a target and prevents the only wrong answer
-  available — and then refused the case the contract actually requires, a rebuild
-  that concludes nothing. Ladder **paused at rung 3**, gated on the adapter
-  phase's reconstruction-provenance read. Reclassifying it `boundary` was
-  considered and rejected: it would contradict `023`'s strong contract-necessity
-  score. What it still needs is not a new probe but the adapter read to fail
-  against real state.
-- [ ] **Row S — no agent, person or role.** The strongest consumer finding: all
-  three designers required *persistent* attribution across four unanimous
-  clusters. S-8 recorded the absence as a standing decision (identity is
-  infrastructure, not domain) and three cold designers disagree. **Write-side**,
-  so a read-only contract structurally cannot settle its shape.
+- [ ] **Row F — artefacts are not versioned entities.** Retitled 2026-08-21: the
+  row spent the whole arc asking for an `Artefact → Artefact` edge, and the
+  missing thing is one level down. An artefact has no identity apart from its
+  content — `logical_name` is wording, which S-9 refused to treat as identity,
+  and `content_hash` is the bytes — so there is nothing two artefacts can be two
+  **versions of**. Same shape as row O: the writer knows, the verb never asks,
+  the reader infers wrongly.
+  Still **not built**, and it is now the most expensive open item: a genuine new
+  noun (rung 4). S-9b cleared bar 4 and not §5. Its discriminator, which it
+  never had before, is *a scenario in which the record must distinguish a new
+  version of a thing from a new thing, and gets it wrong.*
+
 - [ ] **Row T — edges cannot carry properties.** **Orphaned**, as predicted. Row
   O was its only named owner and closed with `INVALIDATED_BY`, a plain edge with
   no properties — so T contributed nothing and has no owner at all. Needs a
