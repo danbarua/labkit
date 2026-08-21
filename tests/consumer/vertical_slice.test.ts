@@ -31,7 +31,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type AnalysisRef, type Clock, type EnquiryRef } from "../../src/domain";
+import { ReadSurface, ResearchSession, inMemoryEventLog, type AnalysisRef, type Clock, type EnquiryRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
 let scenario: Scenario;
@@ -162,22 +162,44 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     return (await s.whatIsKnown()).established;
   };
 
-  test("no read on the surface takes a time, so the as-of question has no answer", async () => {
+  /**
+   * **Renamed 2026-08-21. Its old name became false and the test did not
+   * notice** — the detector it carried was pointed at the wrong thing.
+   *
+   * It was called *"no read on the surface takes a time, so the as-of question
+   * has no answer"*, and its comment said *"it flips the day row Z closes"*.
+   * Row Z closed. `whatWasKnown(at)` exists, the CLI ships `known --at` and the
+   * MCP server exposes it — and this went on passing, because it scanned the
+   * keys of a survey **row** and the capability arrived as a **method**. A
+   * condition recorded where nothing re-reads it is not a mechanism (PJ-025);
+   * a condition pointed at the wrong object is not one either, and this is the
+   * cleanest instance of it in the repo.
+   *
+   * What it actually checks is still worth checking, so it keeps the assertion
+   * and takes a name that matches: the as-of answer is a separate read, not a
+   * timestamp smuggled onto a present-tense row. Those are different designs
+   * and only one of them was chosen.
+   */
+  test("the as-of answer is a separate read, not a field on a present-tense row", async () => {
     const { a, b } = await inTwoWorlds(inOrder(FIRST, SECOND), inOrder(SECOND, FIRST));
 
-    // Both worlds hold both beliefs. Correct in both, which is why this is bar
-    // 4 rather than PJ-011 §5.
+    // Both worlds hold both beliefs. Correct in both, which is why the original
+    // probe was bar 4 rather than PJ-011 §5.
     expect(a.map((q) => q.asks).sort()).toEqual([FIRST.asks, SECOND.asks].sort());
     expect(b.map((q) => q.asks).sort()).toEqual(a.map((q) => q.asks).sort());
 
-    // The detector, and it flips the day row Z closes: nothing a survey row
-    // carries is temporal, so a caller has nowhere to read an as-of answer from.
-    // If someone adds one, this fails and must be updated deliberately.
+    // A survey row carries identity and words, and no time. Adding one here
+    // would mean a caller could read an as-of answer off a present-tense
+    // result, which is the leak `whatWasKnown()`'s own docstring refuses.
     const temporalFields = Object.keys(a[0]!).filter((k) =>
       /as_?of|believ|assert(ed)?_?at|recorded_?at|effective|when|timestamp|version/i.test(k),
     );
     expect(temporalFields).toEqual([]);
     expect(Object.keys(a[0]!).sort()).toEqual(["asks", "question"]);
+
+    // And the other half, which is what the old detector was reaching for and
+    // could not see: the capability exists, as a read of its own.
+    expect(typeof ReadSurface.prototype.whatWasKnown).toBe("function");
   });
 
   test("the ordering survives only as a natural-id artefact, which is not a modelled read", async () => {

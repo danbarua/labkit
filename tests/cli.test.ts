@@ -8,7 +8,8 @@
  */
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { ReadSurface, WriteSurface } from "../src/domain";
+import { ReadSurface } from "../src/domain";
+import { writeVerbNames, writeVerbsCalledIn } from "./helpers/read-only";
 
 const source = readFileSync("src/cli.ts", "utf8");
 /** Comments explain what the CLI deliberately does not do, and naming a thing
@@ -22,15 +23,14 @@ test("the CLI imports the read half and not the write half", () => {
 });
 
 test("no write verb name appears in the CLI", () => {
-  // Every method on WriteSurface, checked against the CLI's text. A new write
-  // verb added later is covered automatically -- the list is derived, not typed
-  // out, so this cannot go stale the way a hand-written list would.
-  const writeVerbs = Object.getOwnPropertyNames(WriteSurface.prototype).filter(
-    (n) => n !== "constructor" && !n.startsWith("_"),
-  );
-  expect(writeVerbs.length).toBeGreaterThan(10);
-  const leaked = writeVerbs.filter((v) => new RegExp(`\\b${v}\\s*\\(`).test(code));
-  expect(leaked).toEqual([]);
+  // Derived, not typed out, so a verb added later is covered without anyone
+  // remembering -- and derived from BOTH surfaces the CLI holds. Until PJ-028
+  // this checked `WriteSurface` alone, which by construction could never
+  // contain `TenantGraph.createNode`; the CLI holds one of those too. See
+  // tests/helpers/read-only.ts, including what this does and does not prove.
+  expect(writeVerbNames().length).toBeGreaterThan(10);
+  expect(writeVerbNames()).toContain("createNode");
+  expect(writeVerbsCalledIn(code)).toEqual([]);
 });
 
 test("every command the usage text advertises is implemented", () => {

@@ -184,6 +184,7 @@ bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:ledger           # fails if two PJ-008 rows are `demonstrated` at once
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
+bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)

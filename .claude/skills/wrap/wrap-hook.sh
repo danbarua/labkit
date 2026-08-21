@@ -6,9 +6,11 @@
 #   wrap-hook.sh stop    Stop: ask Claude to write the session log entry,
 #                        but only if HEAD has moved since the last time we asked.
 #
-# Wired from .claude/settings.json, which is personal (gitignored) -- the
-# mechanism is shared, the wiring is not. Reads the hook payload as JSON on
-# stdin and writes its decision as JSON on stdout.
+# Wired from .claude/settings.json, which is CHECKED IN -- it was gitignored
+# until 2026-08-20, so a clone got this skill without the hook that runs it.
+# What stays out of the repo is .claude/settings.local.json and
+# .claude/.wrap-state/. Reads the hook payload as JSON on stdin and writes its
+# decision as JSON on stdout.
 #
 # The loop this is built to avoid: Stop fires on every turn, and a hook that
 # blocks unconditionally blocks forever. Three things stop that here --
