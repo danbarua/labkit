@@ -512,6 +512,17 @@ The backfill went the other way. The pairing is the finding: a defect where the
 code is correct about everything it can see is invisible to execution, and a
 claim about what running code does is invisible to reading.
 
+**And the caveat, so this does not read as an advertisement: the habit costs
+roughly double.** Neither session accepted the other's verification, so most
+facts here were established twice. That only paid because the artefacts were
+written precisely enough to re-derive cheaply — the unwalked-pair claim was
+checkable in four commands because it named the file and the line, while row F's
+missing verdict needed a reviewer to notice because nothing named it at all. The
+mechanism is not scepticism; it is **scepticism against work that made itself
+checkable**. Against work that has not, the same six rounds produce six
+arguments. That is the case for the predictions-first protocol, more than any
+single finding in this log.
+
 ## Verified
 
 Run on `8afdd39`, the final commit.
