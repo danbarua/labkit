@@ -56,11 +56,10 @@ machine-checked?* Mostly no, now measured rather than asserted. Of two proposed
 comment-shaped checks, one found only stale prose and the other found **nothing**
 — every real instance was cross-file and needed its own lookup. What generalised
 was not about prose at all: **a test that asserts nothing**, two forms, two hits,
-two findings, zero false positives (`bun run check:tests-assert`). **That check is
-red on purpose right now** — it names the two tests it was written from, and
-`labkit-dev` owns both fixes; it is the demonstration, in the same order every
-other fix here is made. It goes green when they land, and a green
-`check:tests-assert` after that means nothing has regressed. A test's name
+two findings, zero false positives (`bun run check:tests-assert`). It was landed
+**red on purpose**, naming the two tests it was written from — the demonstration
+first, in the same order every other fix here is made. Both are now fixed
+(`7c6853f`) and it is green; a red one means a test has stopped testing. A test's name
 is a claim and its body is the check on that claim, so 027's mechanism opens there
 too — and wider, because a green tick reads as evidence. The runner-up, a numeral
 in a comment next to something countable, was **seven for seven wrong** and is
@@ -184,7 +183,7 @@ bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:ledger           # fails if two PJ-008 rows are `demonstrated` at once
-bun run check:tests-assert     # finds tests that assert nothing (PJ-028) — RED, see below
+bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
@@ -192,16 +191,36 @@ bun examples/full-lifecycle.ts # runnable end-to-end smoke test of the persisten
 ```
 
 There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
-binary — `src/cli.ts`/`src/index.ts` are currently stubs, not a working CLI.
+binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is four
+read-only commands over `ReadSurface` (`known`, `why`, `affects`, `enquiry`),
+and `src/mcp/server.ts` is the same reads for an agent caller, seven tools over
+stdio (`bun run mcp`).
 
 `bun test` exits with a non-zero code even when every test passes — this is
 a known `bun test` + PGlite WASM teardown interaction, not a failure signal.
 Read the actual pass/fail counts in the output, don't trust the exit code.
-`bun examples/full-lifecycle.ts` does the same: it exits **99** on a completely
-successful run, and has since long before anyone noticed. Judge it by whether
-the output ends with `closed connection cleanly` and contains no raw graphids.
+`bun examples/full-lifecycle.ts` **used to do the same and no longer does.** It
+exited 99 on a success, so this file told everyone to ignore its exit code and
+read the output instead — and the script had been dead since `af5a1d2` deleted
+the views it read back through, dying at `relation "labkit_t1.claim" does not
+exist` for 221 commits. The rule was added *the same day, after the break*, by
+the commit whose subject was closing out the last verification step. Declaring
+the exit code meaningless left the genuine failure with no watcher either. It
+now ends with an explicit `process.exit(0)`, so **0 means it worked** and
+anything else means it did not; it also asserts the provenance chain it walks
+and refuses any id that is not a natural id, rather than leaving that to a
+reader's eye.
+
+The general lesson, which cost more than the script did: **a rule that tells
+readers to ignore a signal removes the only watcher that signal had.** If a
+signal is unreliable, fix it or delete it — do not annotate it.
+
 Note also that `$?` after a pipeline reports the *last* command's status, so
-`bun ... | tail` will happily report success that isn't there.
+`bun ... | tail` will happily report success that isn't there. This has now
+caught someone twice: the second time with `${PIPESTATUS[1]:-$?}`, which is
+**bash** — this shell is zsh, where it is lowercase `pipestatus` — so the
+expression fell through to `$?` and reported `wc -l`, passing a fix that was
+dead code.
 
 ## Architecture: two persistence halves, deliberately not one
 
