@@ -686,6 +686,14 @@ measurement, which breaks the chain in the record while it holds in the world.
 Fifteen scenarios never needed a second stage. Now its own queue item, because
 the remedy is a verb and wants its own demonstration.
 
+*Two failures of my own, during the flake hunt.* A glob excluding
+`leader-election` used both `tests/*.test.ts` and `tests/**/*.test.ts`, which
+**duplicates five paths** — those files ran twice in one process against shared
+module state, and the result briefly looked like evidence that
+`leader-election` was innocent. And a commit message carried backticks inside
+double quotes, so the shell ran `bun test` *inside the commit command*. Both are
+in `TASKS.md` as warnings rather than only here.
+
 *Two things worth keeping.* S-9b's shape detector fired on a change with nothing
 to do with row F — it guards the report's shape and cannot tell which field
 arrived, which is what it is for; updated, not loosened. And the first version
@@ -698,7 +706,15 @@ completeness does not typecheck. TypeScript said so via an unused
 
 Run on `80c605b`, the final commit.
 
-- `bun test` → **218 pass, 1 fail**, 25 files, and the failure is not stable.
+- `bun test` → **unstable.** Five consecutive plain runs gave 0, 2, 2, 9 and 1
+  failures. Every file passes in isolation, all 28, one per process. Files run
+  **sequentially** — the isolated runs sum to 81.1s and one combined run takes
+  82.3s — so it is not parallel PGlite contention. It concentrates in
+  `tests/consumer/vertical_slice.test.ts`, and the nine-failure run was that
+  whole file cascading after one death, with `graph "labkit_t1" does not exist`.
+  That cascade is the shape `tests/helpers/db.ts` already documents. Root cause
+  **not** found; see `docs/TASKS.md` for what is and is not established.
+- (superseded) `bun test` → 218 pass, 1 fail, 25 files, and the failure is not stable.
   Three consecutive full runs failed a *different* test each time — first
   `domain-session`, then two consumer probes, then `domain-session` again — with
   `graph "labkit_t1" does not exist` as the error. Every implicated file passes
@@ -869,10 +885,12 @@ worktrees make it easier to fall into.
 
 ## Next
 
-1. **The teardown flake.** Three full runs, three different failures, all
-   `graph "labkit_t1" does not exist`. It was `leader-election` only; it is not
-   any more. Cheapest and now the most misleading thing in the repo, because a
-   red suite that is red for the wrong reason trains people to ignore it.
+1. **The suite flake.** Investigated and **not solved** — evidence in
+   `docs/TASKS.md`, including two of my own errors during the hunt, both worth
+   knowing before repeating it. The productive part took ninety seconds; the
+   rest was re-running the suite hoping for a pattern, which is not a method.
+   Still the most misleading thing in the repo: a suite that goes red for the
+   wrong reason trains people to ignore it.
 2. **An analysis cannot read another analysis's output** — the missing verb
    S-11c exposed. Needs its own demonstration: what does a caller get wrong when
    they cannot express the second stage?
