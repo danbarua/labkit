@@ -84,13 +84,28 @@ export class TenantGraph {
     this.depth += 1;
     try {
       const result = await work();
-      this.depth -= 1;
       await this.db.query("COMMIT");
       return result;
     } catch (err) {
-      this.depth -= 1;
-      await this.db.query("ROLLBACK");
+      // A failed ROLLBACK must not become the error the caller sees. The
+      // original is why we are here; the rollback failure is a consequence of
+      // it, and reporting the consequence loses the cause.
+      try {
+        await this.db.query("ROLLBACK");
+      } catch {
+        // deliberately swallowed -- see above
+      }
       throw err;
+    } finally {
+      // In `finally`, so it happens exactly once on every path. It used to be
+      // decremented before COMMIT *and* again in the catch, so a throwing
+      // COMMIT left `depth` at -1 -- and since re-entrancy is keyed on
+      // `depth > 0`, the next compound verb would run at an apparent depth of
+      // 0 and a verb nested inside it would issue a second BEGIN instead of
+      // joining. The re-entrancy contract silently inverted, for the life of
+      // the TenantGraph. Never observed firing; found while investigating the
+      // suite flake and demonstrated in tests/domain-graph.test.ts.
+      this.depth -= 1;
     }
   }
 

@@ -610,3 +610,77 @@ test("createEdge refuses a property key that is not an identifier", async () => 
     }),
   ).rejects.toThrow();
 });
+
+/**
+ * `inTransaction()`'s depth counter must survive a failing COMMIT, and a
+ * failing ROLLBACK must not replace the error that caused it.
+ *
+ * Found incidentally while investigating the suite flake, and it was never
+ * observed to fire in a real run — every capture had COMMIT succeed. It is a
+ * latent defect rather than a live one, which is why it gets a demonstration
+ * before a fix: the old code decremented `depth` before COMMIT *and* again in
+ * the catch, so a throwing COMMIT left `depth` at **-1**. Re-entrancy is
+ * keyed on `depth > 0`, so the next compound verb would open a transaction
+ * that read as depth 0, and a verb nested inside it would issue a **second
+ * BEGIN** rather than joining the outer one. That is the re-entrancy contract
+ * silently inverted, and it survives for the life of the TenantGraph.
+ */
+test("a failing COMMIT does not corrupt the transaction depth", async () => {
+  const issued: string[] = [];
+  let failCommit = true;
+  const brittleDb: LabKitDB = {
+    async query(sql: string, params?: unknown[]) {
+      if (typeof sql === "string" && /^(BEGIN|COMMIT|ROLLBACK)$/.test(sql.trim())) {
+        issued.push(sql.trim());
+        if (sql.trim() === "COMMIT" && failCommit) {
+          failCommit = false;
+          throw new Error("injected: COMMIT failed");
+        }
+      }
+      return db.query(sql, params);
+    },
+  };
+  const brittle = new TenantGraph(ctx, brittleDb);
+
+  await expect(
+    brittle.inTransaction(async () => "done"),
+  ).rejects.toThrow(/injected/);
+
+  // The depth is not observable directly, so observe what it controls: a
+  // nested call must join the outer transaction rather than opening its own.
+  issued.length = 0;
+  await brittle.inTransaction(async () => {
+    await brittle.inTransaction(async () => "nested");
+  });
+  expect(issued.filter((s) => s === "BEGIN")).toEqual(["BEGIN"]);
+  expect(issued.filter((s) => s === "COMMIT")).toEqual(["COMMIT"]);
+});
+
+/**
+ * A failing ROLLBACK must not mask the error that triggered it.
+ *
+ * Fully mocked rather than wrapping the real connection: injecting a ROLLBACK
+ * failure into a live session leaves it in an aborted transaction, and the
+ * teardown that follows then stalls for five seconds — which is the very
+ * failure mode this test file is helping to characterise. A test that
+ * reproduces the bug it is adjacent to is not a useful test.
+ */
+test("a failing ROLLBACK does not replace the original error", async () => {
+  const issued: string[] = [];
+  const brittleDb: LabKitDB = {
+    async query(sql: unknown) {
+      const text = String(sql).trim();
+      issued.push(text);
+      if (text === "ROLLBACK") throw new Error("injected: ROLLBACK failed");
+      return { rows: [] } as never;
+    },
+  } as LabKitDB;
+  const brittle = new TenantGraph(ctx, brittleDb);
+
+  await expect(
+    brittle.inTransaction(async () => {
+      throw new Error("the real problem");
+    }),
+  ).rejects.toThrow(/the real problem/);
+  expect(issued).toEqual(["BEGIN", "ROLLBACK"]);
+});
