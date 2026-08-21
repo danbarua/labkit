@@ -61,11 +61,36 @@ Not fixed, deliberately: the sweep it was found by is read-only, and a fix
 belongs with a decision about whether the example gets a graph-based read-back
 or goes away.
 
-**The deliberate PJ-027 sweep is in flight** — six read-only region agents. One
-has reported (`src/domain/write.ts`, `core.ts`, `session.ts`, `events.ts`,
-`index.ts`): five candidates of the guarantee-broken kind, four of the
-gone-stale kind, none verified by me yet. **Candidates, not findings** — the
-whole point of PJ-027 is that reading is not verification.
+**The deliberate PJ-027 sweep is done** — six read-only region agents over
+~19,000 lines: 28 candidates of the guarantee-broken kind, 27 gone-stale, ~93
+that are intent rather than a claim. I verified a subset before reporting;
+report at `sweep-report.md` in this session's scratchpad, sent to `labkit-dev`.
+
+Seven demonstrated, of which the sharpest is that **`918f420` — the commit that
+fixed a PJ-027 instance — minted two more in the same hunk**: the rename comment
+names the new type as the former one, and `restingOn`'s docstring still tells a
+reader to key on the name the same commit stopped keying on.
+
+Also demonstrated: `reproducibilityOf()` returns `reproducible: true` for a
+construction with no parts *and* for an analysis that does not exist, while
+`reproductionOf()` one function away carries that exact rule written out;
+`promote()` says an analysis "concluded nothing about" a proposition it
+challenged; `tests/leader-election.test.ts` contains **zero** `expect(`;
+`tests/trace.test.ts`'s guard passes 5/5 with the `finally` it exists to protect
+removed; and `vertical_slice.test.ts:173`'s detector, whose comment says it
+"flips the day row Z closes", did not flip when row Z closed.
+
+**Nothing was fixed.** `reproducibilityOf()` is a demonstrated wrong answer and
+nominates a ledger row; `labkit-dev` was told before any build, since only one
+may ship green.
+
+**The checkability answer is a negative with one exception.** Neither
+"a comment naming a missing symbol" nor "X is never Y with a literal Y nearby"
+caught anything in the severe pile — the first is a stale-docs detector, the
+second has zero hits in that form because every real instance is cross-file.
+What did generalise is **a test that asserts nothing**: two greps, two hits, two
+confirmed findings, no false positives. Prose is not machine-checkable and a
+test that does not test is, which is the same defect one level up.
 
 **The wrap hook fired from the wrong worktree.** It passed
 `/Users/dan/Code/science/labkit-domain-consumer/.claude/.wrap-state/74f9b207-…`,
@@ -77,9 +102,14 @@ session's original project directory rather than the cwd.
 
 ## Next
 
-Collect the remaining five region reports, then **verify** before anything is
-called a finding — the `src/domain/write.ts` transaction-boundary and
-`SUPPORTS`-only-lookup candidates are the two worth running something against
-first. Report the four piles to `labkit-dev`, and answer its second question:
-whether any instance had a machine-checkable form. Build nothing until then —
-a demonstrated wrong answer nominates a ledger row, and only one may ship green.
+Wait on `labkit-dev`'s call on which row to nominate for `reproducibilityOf()`,
+then build that one. Everything else in the sweep stays unbuilt on purpose.
+
+Two cheap things anyone can pick up without a decision: the seven wrong counts
+in comments (each is a one-line assertion away from being a check rather than a
+sentence), and a `grep -rL "expect(" --include='*.test.ts' tests/` guard, which
+is the only shape the sweep found that generalises.
+
+Read `sweep-report.md` in this session's scratchpad before re-deriving any of
+it — it labels every item demonstrated or inferred, and the inferred ones are
+inferred on purpose.
