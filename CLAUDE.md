@@ -98,6 +98,14 @@ is. Generation lives in `scripts/update-dependency-graph.sh` rather than a
 pipeline reports the last command's status — a crashed `depcruise` used to yield
 an empty SVG and a success code.
 
+**Do not use this repo's shorthand when reporting to the user.** `§5`, `bar 4`,
+`D2`, "the rungs", the ledger status words and the row letters are compression
+that pays between documents and costs on sight. Say *"we showed it gives a wrong
+answer"*, not *"it clears §5"*. A glossary makes documents readable and does
+nothing for a sentence in a reply — the user hit unexplained shorthand three
+times in one session, twice after it was noticed and once in the same message
+that announced the glossary.
+
 `docs/GLOSSARY.md` is a pointer table for the shorthand this repo uses across
 documents — `D2`, `§5`, `bar 4`, the rungs, the ledger status words. It defines
 nothing itself; every entry names where the real definition lives, because a
