@@ -43,6 +43,19 @@ verdict — was closed the same day, and **no item on the ledger's index is now
 known-open**. Five rows are still `open` + unowned, which is the better kind:
 every named probe has been built.
 
+`docs/dependency-graph.svg` is **self-maintaining**: `.githooks/pre-commit`
+regenerates and stages it whenever a commit touches `src/` or `tests/`. Enable
+it once per clone or worktree with `git config core.hooksPath .githooks` — the
+hook is tracked, the config is not. It is **not a gate**: `npx depcruise src
+tests --output-type err` is the gate, and the hook never blocks a commit, not
+even when graphviz is absent, because a stale diagram beats a refused commit.
+The generation lives in `scripts/update-dependency-graph.sh` rather than a
+`package.json` one-liner because the one-liner was a pipeline, and `$?` after a
+pipeline reports `dot`'s status — a crashed `depcruise` used to yield an empty
+SVG and a success code. It needs **graphviz** (`brew install graphviz`);
+`depcruise --output-type mermaid` would remove that dependency and is 45x
+smaller, but the committed artefact is still SVG.
+
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
 independently; see its README. The Stop/SessionStart wiring lives in
@@ -60,7 +73,7 @@ bun test                       # run all tests
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
-bun run dev:dependency-cruiser  # regenerate dependency-graph.svg
+bun run dev:dependency-cruiser  # regenerate dependency-graph.svg (needs graphviz)
 bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"

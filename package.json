@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "dev:dependency-cruiser": "npx depcruise tests --output-type dot | dot -T svg > docs/dependency-graph.svg",
+    "dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
     "build": "bun build --compile --outfile bin/labkit src/cli.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
