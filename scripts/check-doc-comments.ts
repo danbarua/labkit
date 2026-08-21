@@ -47,20 +47,28 @@ for await (const path of glob.scan(".")) {
     const orphaned = after === "}" || after === "(end of file)";
     const displaced = after.startsWith("/**") && !leading;
     if (orphaned || displaced) {
+      if (strays === 0) {
+        console.error("❌ check-doc-comments FAILED: comments have come loose from the code they describe.");
+        console.error(
+          "   Usually caused by moving code between files, or inserting a declaration\n" +
+            "   between a comment and what it documented.\n",
+        );
+      }
       strays++;
       const first = (lines[i + 1] ?? lines[i] ?? "").trim().replace(/^\*\s?/, "");
       console.error(
-        `${path}:${i + 1}: doc comment documents ${orphaned ? "nothing" : "another doc comment"}`,
+        `   ${path}:${i + 1} — this comment is followed by ${orphaned ? "no declaration at all" : "another comment, not by code"}`,
       );
-      console.error(`    ${first.slice(0, 90)}`);
+      console.error(`      ${first.slice(0, 90)}`);
     }
     i = end;
   }
 }
 
 if (strays > 0) {
-  console.error(`\n${strays} stray doc comment${strays === 1 ? "" : "s"}.`);
-  console.error("Each belongs to some declaration; find it and move it back.");
+  console.error(
+    `\n   ${strays} comment${strays === 1 ? "" : "s"} to move back. Each belongs to some declaration; find it and put it there.`,
+  );
   process.exit(1);
 }
-console.log("check-doc-comments: every doc comment documents something.");
+console.log("✅ check-doc-comments OK: every doc comment sits directly above the thing it describes.");

@@ -40,6 +40,11 @@
  *
  * Exit 0 = at most one `demonstrated` row, and every status agrees with itself.
  * Exit 1 = otherwise, listed.
+ *
+ * Output says pass or fail in the first three characters, then what was checked
+ * in plain words. An earlier version printed "no demonstrated wrong answer is
+ * shipping green", which states a finding in the ledger's private vocabulary and
+ * leaves a reader unable to tell whether that is the good outcome.
  */
 import { readFileSync } from "node:fs";
 
@@ -86,48 +91,60 @@ const disagreements: string[] = [];
 for (const [row, { status: table, line }] of tableStatus) {
   const cell = cells.get(row);
   if (!cell) {
-    disagreements.push(`  row ${row}: in the index table (line ${line}), no cell of its own`);
+    disagreements.push(`   row ${row}: in the index table (line ${line}), no cell of its own`);
   } else if (cell.status !== table) {
     disagreements.push(
-      `  row ${row}: table says "${table}" (line ${line}), cell says "${cell.status}" (line ${cell.line})`,
+      `   row ${row}: table says "${table}" (line ${line}), cell says "${cell.status}" (line ${cell.line})`,
     );
   }
 }
 for (const [row, { line }] of cells) {
   if (!tableStatus.has(row)) {
-    disagreements.push(`  row ${row}: has a cell (line ${line}), missing from the index table`);
+    disagreements.push(`   row ${row}: has a cell (line ${line}), missing from the index table`);
   }
 }
 
 if (disagreements.length > 0) {
-  console.error(`${LEDGER}: a row's status disagrees with itself.`);
+  console.error("❌ check-ledger FAILED: a row's status is recorded twice and the two disagree.");
+  console.error(`   in ${LEDGER}\n`);
   for (const d of disagreements) console.error(d);
   console.error(
-    "\nThe index and the cell record the same fact. A reader following the index",
+    "\n   Each row's status appears in the index table at the top of §3 and again",
   );
   console.error(
-    "reaches the wrong verdict — PJ-024 §5 found exactly that, in row F.",
+    "   in the row's own section. Fix whichever is stale so they match. A reader",
   );
+  console.error(
+    "   following the index otherwise reaches the wrong verdict — PJ-024 §5 found",
+  );
+  console.error("   exactly that, in row F.");
   process.exit(1);
 }
 
 if (demonstrated.length > 1) {
   console.error(
-    `${LEDGER}: ${demonstrated.length} rows are \`demonstrated\`, and CLAUDE.md permits one.`,
+    `❌ check-ledger FAILED: ${demonstrated.length} known bugs are shipping at once, and the limit is 1.`,
   );
-  for (const d of demonstrated) console.error(`    row ${d.row} — ${d.what}`);
+  console.error(`   in ${LEDGER}\n`);
+  for (const d of demonstrated) console.error(`   row ${d.row} — ${d.what}`);
   console.error(
-    "\nA demonstrated wrong answer is a live defect with a comment on it. One is a",
+    "\n   A `demonstrated` row means: we have proved this gives a wrong answer, and",
   );
   console.error(
-    "considered trade; two means the trade stopped being considered. Clear one",
+    "   we have not fixed it yet. CLAUDE.md allows one of those at a time and says",
   );
-  console.error("before opening another, or argue in the ledger why this is not that.");
+  console.error(
+    "   fixing it is the next thing built. Two means that trade stopped being made",
+  );
+  console.error(
+    "   deliberately. Fix one before opening another, or say in the ledger why this",
+  );
+  console.error("   one does not count.");
   process.exit(1);
 }
 
 console.log(
   demonstrated.length === 1
-    ? `check-ledger: row ${demonstrated[0]!.row} is the one demonstrated wrong answer. Clearing it is next.`
-    : "check-ledger: no demonstrated wrong answer is shipping green.",
+    ? `✅ check-ledger OK: 1 known bug is waiting to be fixed (row ${demonstrated[0]!.row}, the limit is 1), and every row's status matches in both places it is written.`
+    : "✅ check-ledger OK: no known bug is waiting to be fixed, and every row's status matches in both places it is written.",
 );
