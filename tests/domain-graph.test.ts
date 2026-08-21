@@ -107,6 +107,7 @@ describe("invalidation propagation", () => {
     const decision = await graph.createNode("Decision", {
       reason: "promote accelerated ridge to production",
       invalidation_check: "equivalence within tolerance on held-out batch",
+      decided_at: "2026-01-01T00:00:00.000Z",
     });
     await graph.createEdge(decision.natural_id, "BASED_ON", evidence.natural_id);
 
@@ -160,6 +161,7 @@ describe("open lines of enquiry", () => {
     const decision = await graph.createNode("Decision", {
       reason: "accelerated ridge confirmed equivalent",
       invalidation_check: "n/a",
+      decided_at: "2026-01-01T00:00:00.000Z",
     });
     await graph.createEdge(decision.natural_id, "RESOLVES", question.natural_id);
 
@@ -200,8 +202,8 @@ describe("failed/planned inquiry provenance", () => {
 
 describe("decision amendments", () => {
   test("an amendment is a decision that supersedes an earlier one", async () => {
-    const d1 = await graph.createNode("Decision", { reason: "use float32 batching", invalidation_check: "n/a" });
-    const d2 = await graph.createNode("Decision", { reason: "switch to float64 for stability", invalidation_check: "n/a" });
+    const d1 = await graph.createNode("Decision", { reason: "use float32 batching", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d2 = await graph.createNode("Decision", { reason: "switch to float64 for stability", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
     const rows = await graph.query(
@@ -216,9 +218,9 @@ describe("decision amendments", () => {
   });
 
   test("walks the full amendment chain back to the original decision", async () => {
-    const d1 = await graph.createNode("Decision", { reason: "d1-original", invalidation_check: "n/a" });
-    const d2 = await graph.createNode("Decision", { reason: "d2-amendment", invalidation_check: "n/a" });
-    const d3 = await graph.createNode("Decision", { reason: "d3-amendment", invalidation_check: "n/a" });
+    const d1 = await graph.createNode("Decision", { reason: "d1-original", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d2 = await graph.createNode("Decision", { reason: "d2-amendment", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d3 = await graph.createNode("Decision", { reason: "d3-amendment", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.createEdge(d3.natural_id, "SUPERSEDES", d2.natural_id);
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
@@ -236,24 +238,24 @@ describe("decision amendments", () => {
 
 describe("decision lifecycle integrity", () => {
   test("createNode rejects a Decision created already-open with closed_at set", async () => {
-    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", is_open: true, closed_at: "2026-08-18T00:00:00Z" })).rejects.toThrow(
+    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z", is_open: true, closed_at: "2026-08-18T00:00:00Z" })).rejects.toThrow(
       /cannot have closed_at/,
     );
   });
 
   test("createNode rejects a Decision created already-closed without closed_at", async () => {
-    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", is_open: false })).rejects.toThrow(/requires closed_at/);
+    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z", is_open: false })).rejects.toThrow(/requires closed_at/);
   });
 
   test("createNode defaults is_open to true when omitted", async () => {
-    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x" });
+    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
     const props = d.properties as DecisionProps;
     expect(props.is_open).toBe(true);
     expect(props.closed_at).toBeUndefined();
   });
 
   test("closeDecision sets is_open and closed_at together", async () => {
-    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x" });
+    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.closeDecision(d.natural_id, "2026-08-18T12:00:00Z");
 
     const rows = await graph.query(`MATCH (n:Decision {natural_id: $id}) RETURN n`, { n: vertexProps<DecisionProps>() }, { id: d.natural_id });
@@ -341,7 +343,7 @@ describe("all node labels", () => {
     EvidenceUnit: { role: "experiment" },
     Evidence: { statement: "e" },
     Claim: { name: "c" },
-    Decision: { reason: "r", invalidation_check: "x" },
+    Decision: { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" },
     Criterion: { proposition: "p" },
     CriterionEvaluation: { value: "v", outcome: "pass", evaluated_at: "2026-08-17T00:00:00Z" },
     Gate: { consequence: "c" },

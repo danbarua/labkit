@@ -304,6 +304,25 @@ export interface ClaimProps {
 export interface DecisionProps {
   reason: string;
   invalidation_check: string;
+  /**
+   * When the act was recorded, from the injected clock. Earned by row Z.
+   *
+   * **Record time, not belief time**, and the distinction is load-bearing rather
+   * than pedantic. This says when the decision entered the record; it does not
+   * say when the researcher came to hold it, and nothing here can. A designer in
+   * the consumer exercise required both readings separately — *"recorded by 3
+   * March"* against *"asserted as held on 3 March but written down later"* — and
+   * `023` demoted that to a candidate extension because no source obligation
+   * requires it. Naming the reading here is what stops the next reader assuming
+   * the other one: a single timestamp otherwise looks like a fix while silently
+   * choosing a side.
+   *
+   * Required, not optional. A decision whose instant is unknown cannot be
+   * ordered, and an ordering with holes is the thing row Z already had —
+   * `CriterionEvaluation.evaluated_at` bounded some closures and left the rest
+   * unplaceable, which is why deriving the order from evidence failed.
+   */
+  decided_at: string;
   is_open?: boolean;
   closed_at?: string;
 }

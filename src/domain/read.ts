@@ -18,6 +18,7 @@ import type {
   EvidenceProps,
 } from "../db/domain";
 import type {
+  HistoricalSurvey,
   ReproducibilityReport,
   ReproductionReport,
   AmendmentRecord,
@@ -115,6 +116,75 @@ export class ReadSurface extends SessionCore {
    * words to a claim's; the buckets come from what is attached to each
    * question, not from what it says.
    */
+  /**
+   * What the record held at a stated moment. Row Z.
+   *
+   * Every act that moves belief is a `Decision`, and each now carries
+   * `decided_at`, so this filters on the acts rather than on their consequences.
+   * Two things that took a build to learn:
+   *
+   * **Promotion is dated, not read off the claim.** `whatIsKnown()` asks whether
+   * `Claim.kind` is `confirmatory` — correct for the present and wrong for any
+   * past moment, because it would report a question `established` in March on
+   * the strength of a promotion made in August. Here it is the `PROMOTES`
+   * decision's own instant that decides.
+   *
+   * **`open` is not split.** See {@link HistoricalSurvey}: nothing records when
+   * work began, so worked-on and untouched cannot be told apart as-of, and this
+   * declines to guess rather than leaking today's evidence units into a question
+   * about the past.
+   */
+  async whatWasKnown(at: string): Promise<HistoricalSurvey> {
+    if (Number.isNaN(Date.parse(at)))
+      throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
+
+    const rows = await this.graph.query(
+      `MATCH (q:Question)
+       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
+       OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
+       OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
+       OPTIONAL MATCH (promoting:Decision)-[:PROMOTES]->(settled)
+       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
+       RETURN q, resolving, cited, settled, promoting, accepting`,
+      {
+        q: vertexProps<{ natural_id: string; name: string }>(),
+        resolving: optional(vertexProps<{ decided_at: string }>()),
+        cited: optional(vertexProps<{ natural_id: string }>()),
+        settled: optional(vertexProps<{ natural_id: string }>()),
+        promoting: optional(vertexProps<{ decided_at: string }>()),
+        accepting: optional(vertexProps<{ decided_at: string }>()),
+      },
+    );
+
+    // Filtered here rather than in the query: the comparison is a plain string
+    // ordering on ISO-8601, and keeping it in TypeScript avoids threading a
+    // parameter through five OPTIONAL MATCHes for no gain in clarity.
+    const by = new Map<string, { asks: string; resolved: boolean; promoted: boolean; accepted: boolean }>();
+    for (const row of rows) {
+      const entry = by.get(row.q.natural_id) ?? {
+        asks: row.q.name, resolved: false, promoted: false, accepted: false,
+      };
+      const resolvedByThen = row.resolving !== null && row.resolving.decided_at <= at;
+      entry.resolved ||= resolvedByThen && row.cited !== null;
+      // A promotion only counts toward *this* question if the resolution it
+      // qualifies had also happened -- otherwise a claim promoted early would
+      // establish a question resolved later.
+      entry.promoted ||= resolvedByThen && row.promoting !== null && row.promoting.decided_at <= at;
+      entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= at;
+      by.set(row.q.natural_id, entry);
+    }
+
+    const survey: HistoricalSurvey = { at, established: [], provisional: [], accepted: [], open: [] };
+    for (const [question, e] of by) {
+      const standing: QuestionStanding = { question, asks: e.asks };
+      if (e.resolved && e.promoted) survey.established.push(standing);
+      else if (e.resolved) survey.provisional.push(standing);
+      else if (e.accepted) survey.accepted.push(standing);
+      else survey.open.push(standing);
+    }
+    return survey;
+  }
+
   async whatIsKnown(): Promise<KnowledgeSurvey> {
     const rows = await this.graph.query(
       `MATCH (q:Question)

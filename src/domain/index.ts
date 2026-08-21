@@ -17,6 +17,7 @@ export type {
   QuestionRef,
   QuestionStanding,
   KnowledgeSurvey,
+  HistoricalSurvey,
   QuestionOrigin,
   AmendmentReport,
   AmendmentRecord,

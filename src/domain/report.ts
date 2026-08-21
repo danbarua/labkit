@@ -441,6 +441,41 @@ export interface SupportExplanation {
  * ways and poses two identically-worded questions, and neither may be
  * resolved by comparing text.
  */
+/**
+ * What the record held at a stated moment — the as-of view (row Z).
+ *
+ * Deliberately a **narrower shape** than `KnowledgeSurvey`, and the narrowing is
+ * the honest part. `Decision` now carries `decided_at`, so resolution,
+ * acceptance and promotion can all be placed in time. `EvidenceUnit` carries no
+ * instant, so *whether anyone had yet worked on a question* cannot be. The
+ * present-tense survey splits that into `unresolved` and `untested`; this one
+ * cannot, and collapses them into `open` rather than reporting a split it would
+ * have to infer from current state.
+ *
+ * That collapse is the finding, not a shortcut. Reporting `untested` as-of by
+ * reading today's evidence units would answer a question about March with facts
+ * from August — the same current-state leak that makes a survey say a question
+ * was `established` before the promotion that established it.
+ */
+export interface HistoricalSurvey {
+  /** The instant asked about, echoed back so an answer cannot be mistaken for the present. */
+  at: string;
+  /** Resolved by then, on a finding promoted by then. */
+  established: QuestionStanding[];
+  /** Resolved by then, on a finding nothing had promoted yet. */
+  provisional: QuestionStanding[];
+  /** Accepted as unresolved by then (S-14). */
+  accepted: QuestionStanding[];
+  /**
+   * Neither resolved nor accepted by then.
+   *
+   * Not split into worked-on and untouched, because nothing durable records when
+   * work began. If that split is ever needed as-of, `EvidenceUnit` is where the
+   * instant would have to go, and it should be earned the way this one was.
+   */
+  open: QuestionStanding[];
+}
+
 export interface QuestionStanding {
   question: string;
   asks: string;

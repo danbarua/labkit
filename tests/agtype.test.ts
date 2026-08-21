@@ -217,8 +217,8 @@ describe("parseAgtype — against live pglite-age", () => {
     const ctx = await resolveTenantContext(db, "labkit");
     const graph = new TenantGraph(ctx, db);
 
-    const d1 = await graph.createNode("Decision", { reason: "r1", invalidation_check: "x" });
-    const d2 = await graph.createNode("Decision", { reason: "r2", invalidation_check: "x" });
+    const d1 = await graph.createNode("Decision", { reason: "r1", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d2 = await graph.createNode("Decision", { reason: "r2", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
     const rawIdRows = await db.query<{ id: string }>(`SELECT id::text FROM "${ctx.graphName}"."SUPERSEDES"`);

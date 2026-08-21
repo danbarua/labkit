@@ -126,6 +126,7 @@ export class WriteSurface extends SessionCore {
       throw new Error(`no question ${input.from.id} to sharpen`);
 
     const decision = await this.graph.createNode("Decision", {
+      decided_at: this.clock.now(),
       reason: input.because,
       invalidation_check:
         "evidence that the sharper question was the wrong one to ask",
@@ -430,6 +431,7 @@ export class WriteSurface extends SessionCore {
     }
 
     const decision = await this.graph.createNode("Decision", {
+      decided_at: this.clock.now(),
       reason: input.answeredBy
         ? `answered on "${input.answeredBy.proposition}"`
         : "closed without a cited result",
@@ -700,6 +702,7 @@ export class WriteSurface extends SessionCore {
       }
 
       const decision = await this.graph.createNode("Decision", {
+      decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: input.until,
       });
@@ -748,6 +751,7 @@ export class WriteSurface extends SessionCore {
       // supplies it, because there naming the condition *is* the act. Taking an
       // `until:` here that no scenario reads would be the ceremony S-14 forbids.
       const decision = await this.graph.createNode("Decision", {
+      decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: "evidence that the promoted result does not replicate",
       });
@@ -870,6 +874,7 @@ export class WriteSurface extends SessionCore {
           await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
 
         const decision = await this.graph.createNode("Decision", {
+      decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check:
             "evidence that the amended setting was not the constraint after all",
@@ -1101,6 +1106,7 @@ export class WriteSurface extends SessionCore {
       // objection was acted on. Reviews also confirm, so a review alone cannot
       // mean "withdrawn" without reading its prose.
       const decision = await this.graph.createNode("Decision", {
+      decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check:
           "evidence that the original reading was right after all",

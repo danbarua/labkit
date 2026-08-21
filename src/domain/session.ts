@@ -51,6 +51,7 @@ export class ResearchSession {
   readonly sharpen: WriteSurface["sharpen"] = (...args) => this.writes.sharpen(...args);
   readonly originOf: ReadSurface["originOf"] = (...args) => this.reads.originOf(...args);
   readonly whatIsKnown: ReadSurface["whatIsKnown"] = (...args) => this.reads.whatIsKnown(...args);
+  readonly whatWasKnown: ReadSurface["whatWasKnown"] = (...args) => this.reads.whatWasKnown(...args);
   readonly recordObservations: WriteSurface["recordObservations"] = (...args) => this.writes.recordObservations(...args);
   readonly recordAnalysis: WriteSurface["recordAnalysis"] = (...args) => this.writes.recordAnalysis(...args);
   readonly recordReview: WriteSurface["recordReview"] = (...args) => this.writes.recordReview(...args);
