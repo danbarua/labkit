@@ -22,17 +22,38 @@ Someone could start these today.
   - **Every file passes in isolation**, run one per process, all 28.
   - **Files run sequentially**, not in parallel — the isolated runs sum to 81.1s
     and one combined run takes 82.3s. So it is not concurrent PGlite instances.
-  - **It concentrates in `tests/consumer/vertical_slice.test.ts`.** The
-    nine-failure run was that whole file cascading: one test dies and every test
-    after it in the file dies too, with `graph "labkit_t1" does not exist`.
+  - **It concentrates in the consumer probes.** The nine-failure run was one
+    file cascading: a test dies and every test after it in that file dies too.
+    Those probes have since been **split into two files** (`7352a5f`), so a
+    desynced connection can only take half of them down. Containment, not a fix.
   - That cascade is the shape `tests/helpers/db.ts` already documents — a
     connection hitting the pglite-socket defect "desyncs permanently and stays
     broken for the rest of its life" (electric-sql/pglite#1046). The containment
     is one connection per test, and **that file is the only one where a single
     test opens two connections in sequence** (`inTwoWorlds`), which makes it the
     weakest point of the containment rather than an unrelated bug.
-  - Not yet established: why sharing a process matters at all when each file
-    has its own PGlite and the files run one after another.
+  - **The failure depends on how bun is invoked, not on the tests.** Passing the
+    26 files explicitly gave **0 failures across 8 runs** — in alphabetical
+    order, reverse, consumer-first, consumer-last, and in bun's own discovered
+    order copied out of a junit report. Bare `bun test` over the same 26 files
+    fails about half the time. At a ~50% rate, eight clean explicit runs
+    happening by chance is about 1 in 250, so the difference is real even though
+    the mechanism is not known. It points at bun's runner rather than at LabKit.
+  - **Every failure begins with a 5-second timeout** — a hang, not an error —
+    and `graph "labkit_t1" does not exist` is fallout from the test that was
+    abandoned mid-flight.
+  - Not established: what hangs, or why bare invocation differs.
+
+  **A second warning.** Three consecutive bare runs failed the *same four tests*
+  and were written up here as deterministic. Two more runs then gave 0 and 3.
+  Three identical runs is not determinism, and the claim should have been
+  re-tested before it was recorded — it briefly made the problem look solved
+  when it was not.
+
+  A cheap workaround exists and has not been taken: make `bun run test` pass an
+  explicit file list. It is a workaround rather than a fix, it would hide the
+  problem rather than solve it, and hiding a flake is how a suite stops being
+  trusted — so it is recorded as an option and left undone deliberately.
 
   **A warning for whoever picks this up.** One experiment here produced a
   confident wrong answer: `ls tests/*.test.ts tests/**/*.test.ts` yields five
