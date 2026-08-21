@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c**, **S-9d** | open |
+| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c**, **S-9d**, **S-10c** | boundary |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -727,7 +727,7 @@ to be that well informed:
 | `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T |
 | `demonstrated` | a wrong answer is on the record and the fix is what is unbuilt | **none** — AD was the first and was cleared the day it opened |
-| `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
+| `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA, **F** |
 
 The **demonstrated** kind is new with row AD and is the only one with a
 deadline: CLAUDE.md permits at most one confirmed wrong answer shipping green
@@ -839,7 +839,7 @@ something that could not be true
 
 ### Row F — No artefact-to-artefact lineage
 
-**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d** · **Status:** open
+**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d**, **S-10c** · **Status:** boundary
 
 **Current state (verified):** no `Artefact`→`Artefact` edge
 
@@ -924,6 +924,30 @@ name is ambiguous in two places and collapses on it in a third.
 
 *Predicted before the test* (`docs/consumer-contract/033`), including that the
 remedy would be rung 1 again and that the row would still not close.
+
+**VERDICT 2026-08-21: `boundary`** — see `docs/consumer-contract/035`, `036`.
+
+*The row's first half is false.* Artefacts have `natural_id`. What four bites
+showed is that the **reads were not using it**: `reproducibilityOf()` put one
+name in `exact` and `differing` at once (S-9c), `whySupported().restingOn`
+deduplicated two inputs into one (S-9d), and `reproductionOf().differs` reported
+two contradicting entries under one label (S-10c). Each was fixed by carrying
+identity **that already existed**. A version-of relationship would have fixed
+none of them, so they are evidence *against* the row.
+
+*And no read needs one.* Every read on `ReadSurface` touching an artefact either
+takes a **reference**, or takes a name and **refuses** when ambiguous, or
+**returns** identity — enumerated, and asserted in S-10c rather than left as
+prose. The model was never missing identity.
+
+*What would reopen it:* "show me the history of this control series" — versions
+as an ordered sequence, asked of a name rather than of one artefact. No verb asks
+it, and under PJ-011 §5 a question never asked earns nothing. That would be the
+first read needing identity its caller does not hold, which is exactly what the
+enumeration above rules out today.
+
+*Row F was the only candidate in this project's history that would have required
+the first new noun.* It did not.
 
 **Fixed the same day, at rung 1.** `restingOn` deduplicates by identity and
 carries `{ part, name }` — `IdentifiedArtefact`, the shape S-9c introduced for
