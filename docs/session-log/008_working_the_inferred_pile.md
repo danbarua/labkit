@@ -15,7 +15,12 @@ base rate of "looked wrong on reading, was fine" as it accumulates.
 ## Changed
 
 - `b10cb98` — `docs/consumer-contract/040`: predictions for `evaluateCriterion`,
-  the second item. **Nothing else.** No code, no test, no run.
+  the second item.
+- `421f58c` — this entry.
+- `37728a8` — `040`'s addendum (a competing rule, below) and PJ-028's fifth and
+  sixth self-instances.
+
+**No code, no test, no run.** Three commits, all documents.
 
 ## Verified
 
@@ -61,21 +66,51 @@ clause on the rule, not a transaction.
 
 All of it is prediction. None of it is evidence, which is the entry's whole point.
 
+**The pending run now discriminates between two rules instead of confirming one.**
+`labkit-dev` read `039`'s rule and found my two clauses are not parallel: clause 2
+is about **answers** (an unreachable state produces none, so none can be false),
+clause 1 is about **shapes**, and a shape has no truth value. Two identical shapes
+differ in truth when the histories that produced them differ — which is window 3
+exactly. Their reformulation subsumes both:
+
+> A partial state is acceptable exactly when every answer a reader can derive from
+> it is true.
+
+The two rules **disagree on window 3** — mine says acceptable, theirs says defect
+— and that disagreement is recorded in `040` before any run. So is the criterion,
+so it cannot be chosen afterwards: **a derived answer that is positively false
+rather than merely empty.** `basis: []` is an empty result and PJ-011 §5 says that
+is not a wrong answer; but `isWithdrawn` is `cited > 0 && standing === 0`, so an
+evaluation that cited nothing can never be withdrawn, and a reader derives *"this
+verdict still stands"* after its real basis was invalidated. That is a positive
+claim, and its truth decides between the rules.
+
+**PJ-028 took a fifth instance and produced a sixth in the taking.** The fifth is
+`labkit-dev`'s, quoted at its request because its account is better than the
+entry's own: *"A passing check on the file I edited told me nothing about the two
+I didn't"* — the defect as a property of **verification** rather than authorship.
+The sixth is mine: adding the fifth left the heading saying "four" and the text
+"five", a stale numeral inside the entry that closed out seven of them. Fixed by
+**dating the heading** rather than correcting the count.
+
 **Base rate: one examined, one not a defect.** Reported as it accumulates rather
 than at the end, because the pile is 28 items produced by six agents told what
 shape to look for, and the rate is the most useful thing the sweep will produce.
 
 ## Next
 
-Wait for `labkit-dev` to release the machine, then run the `evaluateCriterion`
-demonstration — deterministic injection at each of the three windows, following
-`tests/domain-session.test.ts`'s two existing negative tests.
+Wait for `labkit-dev` to release the machine. Then, in this order:
+
+1. **An independent confirmation run of its flake patch on this worktree** — its
+   238 pass / 29 fail / 24 errors was measured under this session's load, and a
+   clean run from a second tree is worth more than a second run of its own. Owed
+   before my own work, so its measurement is not waiting on mine.
+2. **The `evaluateCriterion` demonstration** — deterministic injection at each of
+   the three windows, following `tests/domain-session.test.ts`'s two existing
+   negative tests.
 
 **Stop at the first window that is not a defect and say so**, rather than
-continuing until something looks fixable. If the verdict is "not a defect, and
-the rule needs a clause", that is the result and it goes in `041`.
-
-Offer standing to `labkit-dev`: an independent confirmation run on this worktree
-once it is done, since its failing measurement was taken under this session's load
-and a clean comparison from a second tree is worth more than a second run on its
-own.
+continuing until something looks fixable. The verdict goes in `041`, and it has
+three possible shapes now rather than two: a defect, or not a defect, or **not a
+defect under my rule and a defect under `labkit-dev`'s** — which is the outcome
+that settles which rule the project keeps.
