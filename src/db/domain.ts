@@ -50,6 +50,7 @@ export const EDGE_LABELS = [
   "DEFERS", // Decision -> Question
   "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
   "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
+  "INVALIDATED_BY", // Artefact -> Review (which review the retraction rested on)
   "IMPLEMENTS", // Task -> EvidenceUnit
 ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
@@ -255,6 +256,39 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * scenario reviewing an execution, but S-11 did not earn it.
    */
   EVALUATES: [["Review", "Claim"], ["Review", "Decision"], ["Review", "Evidence"], ["Review", "EvidenceUnit"]],
+  /**
+   * Which review a retraction actually rested on. Earned by S-11b, row O.
+   *
+   * `replaceAnalysis()` took a `because: ReviewRef`, checked it reviewed the
+   * analysis being replaced, and then wrote it nowhere — the reference reached
+   * the event stream and stopped. So `whySupported()` reported a superseded
+   * finding's reason from `OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)`, any
+   * review of the unit. With a critical review and a confirming one on the same
+   * analysis — which is what a programme with two reviewers produces
+   * constantly — it reported *"numbers check out; independently recomputed the
+   * same values"* as a reason the work was retracted. An approval presented as
+   * a retraction, demonstrated in two worlds that differ only in which review
+   * the researcher acted on and that the read surface could not tell apart.
+   *
+   * **Not `EVALUATES`.** `Review -> Evidence` already exists and means *this
+   * was reviewed*; using it for *this caused the retraction* is one edge with
+   * two readings, which CLAUDE.md names as the failure shape behind every
+   * expensive mistake here. `PROMOTES` was split from `CHANGES` for exactly
+   * this reason.
+   *
+   * **Not `BASED_ON`.** Semantically it fits — the invalidation rested on this
+   * review — and that is the trap. Row AA is a live `boundary` recording that
+   * `BASED_ON` already carries two senses, and a third would widen a row while
+   * closing this one. Its sources are also judgments (`Decision`,
+   * `CriterionEvaluation`); an `Artefact` is not one.
+   *
+   * The endpoint is the invalidated `Artefact` because that is the thing whose
+   * standing changed and the thing a reader is holding when the question
+   * arises: *why is this no longer valid?* The direction is passive, like
+   * `BASED_ON` and `RECORDED_IN`, because a review does not retract anything —
+   * a researcher does, on the strength of it.
+   */
+  INVALIDATED_BY: [["Artefact", "Review"]],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
 };
 

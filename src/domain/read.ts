@@ -380,7 +380,7 @@ export class ReadSurface extends SessionCore {
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
         comp: vertexProps<ComputationProps>(),
-        a: optional(vertexProps<ArtefactProps>()),
+        a: optional(vertexProps<ArtefactProps & { natural_id: string }>()),
         r: optional(vertexProps<{ verdict: string }>()),
       },
       {
@@ -1115,6 +1115,21 @@ export class ReadSurface extends SessionCore {
       ).map((r) => r.e.natural_id),
     );
 
+    // The review each retraction actually rested on (row O). Absent for an
+    // artefact invalidated by anything other than replaceAnalysis(), which is
+    // why the reader still falls back rather than assuming the edge is there.
+    const retractedBy = new Map(
+      (
+        await this.graph.query(
+          `MATCH (a:Artefact)-[:INVALIDATED_BY]->(r:Review) RETURN a, r`,
+          {
+            a: vertexProps<{ natural_id: string }>(),
+            r: vertexProps<{ verdict: string }>(),
+          },
+        )
+      ).map((row) => [row.a.natural_id, row.r.verdict] as const),
+    );
+
     const support: SupportExplanation["support"] = [];
     const reverifiedBy: string[] = [];
     const against: SupportExplanation["against"] = [];
@@ -1126,11 +1141,17 @@ export class ReadSurface extends SessionCore {
       for (const row of rows) {
         const entry = { finding: row.e.statement, via: row.comp.kind };
         if (row.a?.invalidated) {
-          superseded.push({
-            ...entry,
-            bearing,
-            reason: row.r?.verdict ?? "its analysis was replaced",
-          });
+          // Deduped, and the reason comes from INVALIDATED_BY rather than from
+          // whichever review the OPTIONAL MATCH happened to return. Two defects
+          // in one line before row O: a finding superseded once was reported
+          // once per review of its unit, each with a different reason, and the
+          // reasons contradicted each other.
+          if (!superseded.some((x) => x.finding === entry.finding && x.bearing === bearing))
+            superseded.push({
+              ...entry,
+              bearing,
+              reason: retractedBy.get(row.a.natural_id) ?? "its analysis was replaced",
+            });
         } else if (
           bearing === "supports" &&
           reverifying.has(row.e.natural_id)

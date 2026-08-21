@@ -1093,6 +1093,14 @@ export class WriteSurface extends SessionCore {
         { a: vertexProps<ArtefactProps>() },
         { id: output },
       );
+      // Which review this rested on, recorded rather than validated and
+      // discarded (row O). `because` was checked against the analysis and then
+      // written nowhere, so a reader asking why the finding no longer stands
+      // got the verdict of an arbitrary review of the same unit -- and with a
+      // critical review and a confirming one on one analysis, reported the
+      // approval as the reason for the retraction. See
+      // EDGE_SCHEMA.INVALIDATED_BY.
+      await this.graph.createEdge(output, "INVALIDATED_BY", input.because.id);
 
       // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
       //
