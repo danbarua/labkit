@@ -399,6 +399,14 @@ export class WriteSurface extends SessionCore {
     // execution output. Without the second, CONSUMES would be half a pair --
     // "what did this computation read" answerable in one hop while "what did
     // it produce" still needed a detour through the unit.
+    //
+    // The FIRST of the two is unwalked: nothing reads `EvidenceUnit -PRODUCES->
+    // Artefact`. Every PRODUCES traversal in src/ ends at an Evidence except
+    // `outputArtefactOf`, which starts at the Computation. Kept under the
+    // no-cull policy -- an endpoint pair is a claim about the domain the same
+    // way a label is -- and named here so it is a computable map rather than an
+    // oversight. Found by review of row AD, when `recordObservations()`
+    // deliberately did NOT write the matching edge; see consumer-contract/030.
     await this.graph.createEdge(unit.natural_id, "PRODUCES", output.natural_id);
     await this.graph.createEdge(
       computation.natural_id,

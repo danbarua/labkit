@@ -98,6 +98,52 @@ this distinction. `role: "experiment"` is a placeholder and the code says so.
 adapter phase, where a relational projection actually pays, is where one would
 appear. Until then it is a nine-value union recording one bit.
 
+## Two findings the review added, and they are the same shape at different levels
+
+Both are **declared structure with a writer and no reader**, and the no-cull
+policy answers them differently. The contrast is the point.
+
+**`PRODUCES: ["EvidenceUnit", "Artefact"]` is unwalked.** `recorded()` writes it;
+nothing reads it. Every `PRODUCES` traversal in `src/` ends at an `Evidence`
+except one, and that one starts at a `Computation`. So CLAUDE.md's claim that
+every `EDGE_SCHEMA` label has a writer and a reader is true at **label**
+granularity and false at **endpoint-pair** granularity — and a label's entry is a
+list of pairs, each a separate claim about the domain.
+
+This also answers the question `029` actually asked. The question was *should
+`recordObservations()` write the artefact edge too, as `recorded()` does?*
+Reframed properly — **name the read that goes wrong** — the answer is that no
+read goes wrong either way, because nothing walks the pair. That is a weaker
+vindication of the asymmetry than it looks: the reasoning behind it ("the
+artefact **is** the record of the measurement, not an output of it") may be right
+or wrong and no query would notice. Naming it in the code was still correct, as
+an unexplained asymmetry reads as an oversight and invites a symmetry fix.
+
+Kept, not culled, and **named as unwalked** — the policy exists to make untested
+claims a computable map, and an unnamed one is a map nobody has.
+
+**`EvidenceUnitRole` gets the opposite answer.** Nine values, one writer, no
+readers, and a tenth was declined. The policy protects labels and edges because
+they are claims about the domain; a property value is not one, which is the line
+the per-tenant CQRS views were removed on.
+
+## A backfill is now owed, and it is the first of its kind
+
+Every observation written before `17b9976` has no `EvidenceUnit`. `whatIsKnown()`
+reports those questions `untested` — **the wrong answer this row closed, made
+permanent for everything historical.**
+
+It costs nothing today because no database survives a run, and that is exactly
+why it is easy to miss now and expensive to find at first deploy. CLAUDE.md says
+there is deliberately no story yet for a non-additive schema change; **this is
+the first concrete instance of one**, and it is a graph migration rather than a
+`drizzle/` one — mint a unit per observation `Evidence` that has no producer.
+
+Recorded in CLAUDE.md's migrations section as owed the moment data persists.
+Found by review *after* the row was closed, which is worth saying: the build
+verified the fix against every record it could create and had no way to think
+about records it could not.
+
 ## Standing after this build
 
 | Candidate | Bar | Status |

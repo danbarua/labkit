@@ -357,11 +357,28 @@ free to be wrong and re-run.
 **Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
 Every label is provisioned into every tenant up front, so declared-but-never-
 walked structure is a computable map of where the model has untested claims —
-**There is currently no such example.** As of S-18 every label in
+**There is no such example at label granularity.** As of S-18 every label in
 `EDGE_SCHEMA` has both a writer and a reader, and every node label is created
 by some verb — `DEFERS` was the last unwalked edge, and `CHALLENGES` before it;
 `PROMOTES` arrived with both. That is the outcome the policy exists to allow,
 twice over.
+
+**There is one at endpoint-pair granularity, and the distinction was not being
+made until row AD's review found it.** `PRODUCES` has readers in abundance, and
+every one of them ends at an `Evidence`; the single traversal reaching an
+`Artefact` starts at a `Computation` (`write.ts`'s `outputArtefactOf`). So
+`PRODUCES: ["EvidenceUnit", "Artefact"]` — written by `recorded()`, carried
+through every tenant — **has a writer and no reader**. A label's entry in
+`EDGE_SCHEMA` is a list of endpoint pairs and each pair is a separate claim
+about the domain, so "the label is walked" is the wrong unit to check.
+
+Named rather than culled, which is the policy working: an unwalked pair is a
+computable map of where the model has an untested claim, and an *unnamed* one is
+a map nobody has. Contrast it with `EvidenceUnitRole` — nine values, one writer,
+no readers — which was **not** given the same protection and had a tenth value
+declined, because that policy covers labels and edges as claims about the domain
+and a property value is not one. The two are the same shape at different levels
+and the policy's answer differs; that contrast is the informative part.
 
 Keep the policy anyway, for what it caught on the way out. `DEFERS` had a
 reader that could report `closure: "deferred"` and no writer, so the branch was
@@ -487,6 +504,18 @@ changes, migrations get edited/regenerated *in place* rather than stacked —
 see the "License to rewrite history" note in
 `docs/project-journal/004_tenancy_implementation_plan.md`. Once a real
 database exists, that stops being true and this note should be updated.
+
+**One backfill is already owed, and it is the first concrete instance of the
+non-additive change this project has no story for.** Row AD (2026-08-21) made
+`recordObservations()` mint an `EvidenceUnit`. Every observation written before
+it has none, so `whatIsKnown()` reports those questions `untested` — *"one
+nothing has ever been run against"* — which is exactly the wrong answer row AD
+closed, made permanent for everything historical. It costs nothing today because
+no database survives a run, which is precisely why it is easy to miss now and
+expensive to find at first deploy. The fix is a one-time graph migration minting
+a unit per unowned observation `Evidence`; **it is owed the moment data
+persists**, not before. Found by review after the row was closed, not by the
+build.
 
 ## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
 
