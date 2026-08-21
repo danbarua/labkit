@@ -6,10 +6,37 @@
  * made structural: one event per research action, stamped from the injected
  * clock, at the single choke point below.
  *
- * A compound verb runs inside `graph.inTransaction()` — everything it writes
+ * Some verbs here run inside `graph.inTransaction()` — everything they write
  * commits together or none of it does. The `TenantGraph` is shared with the read
  * surface, so its re-entrancy depth is shared too, which is what a facade
  * composing both halves requires.
+ *
+ * **Which ones, and why it is not "the compound ones".** This header used to say
+ * a *compound* verb is transactional, and that word already means something else
+ * two paragraphs away in CLAUDE.md, where `openEnquiry` is the archetypal
+ * composed verb — and `openEnquiry` is not transactional. Writing more than once
+ * is not the test either. The rule, which is PJ-011 §5 applied to interruption:
+ *
+ *   **A partial state is acceptable exactly when some other verb could
+ *   legitimately have produced it, or when no reader can reach it at all.**
+ *
+ * An unreachable leftover is an absence. A partial state that *misreports* is a
+ * wrong answer, and only that earns a transaction. Each verb is decided on its
+ * own by negative test, which is how the rule was earned in the first place
+ * (PJ-020, S-3c) — not by a category anyone can read off a signature.
+ *
+ * Worked both ways so the distinction is not just asserted:
+ * `recordObservations` is transactional because a failure between the evidence
+ * and its unit writes exactly the invariant the fix removed, indistinguishable
+ * from real history. `sharpen` is not, because its half-built decision is
+ * unreachable — `originOf()` is the only reader of `NARROWS` and matches
+ * `MOTIVATES` first, which `sharpen` writes last. Both have a negative test in
+ * `tests/domain-session.test.ts`; the second exists to fail if a `NARROWS`
+ * reader ever stops requiring `MOTIVATES`.
+ *
+ * The other non-transactional verbs here are **undecided, not cleared** — see
+ * `docs/consumer-contract/039`. `evaluateCriterion` is the strongest candidate,
+ * by its own comment below.
  */
 
 import type { TenantGraph } from "../db/graph";

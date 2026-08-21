@@ -256,3 +256,83 @@ test("recordObservations writes the unit and the evidence together or not at all
   });
   expect(again.id).toMatch(/^ART_/);
 });
+
+/**
+ * `sharpen` is NOT transactional, and this test records that it does not need
+ * to be — the first item taken off PJ-028's *inferred* pile, and the first to
+ * come back "read wrong, was fine".
+ *
+ * `write.ts`'s header says a compound verb runs inside `inTransaction()`.
+ * `sharpen` writes five things and does not. On reading alone that looks like
+ * the defect `recordObservations` above was fixed for. It is not, and the
+ * discriminator is the one PJ-011 §5 already gives, applied to interruption:
+ *
+ *   **A partial state is acceptable exactly when some other verb could
+ *   legitimately have produced it, or when no reader can reach it at all.**
+ *
+ * Both of `sharpen`'s failure windows clear that bar, which is why the fix was
+ * to the sentence and not to the code:
+ *
+ * - Fail inside the `BASED_ON` loop and the decision keeps a *subset* of what
+ *   was standing — a confidently wrong answer if anything read it. Nothing can:
+ *   `originOf()` is the only reader of `NARROWS`, and it matches `MOTIVATES`
+ *   first, which `sharpen` writes last. The leftover is unreachable.
+ * - Fail on `MOTIVATES` and the sharper question survives with no origin —
+ *   exactly what `pose()` produces, reported as `untested`, which is true: it
+ *   is on the books and nothing has been run against it.
+ *
+ * A real property rather than an accident of today's code, so it is asserted
+ * rather than left in prose (PJ-028). **If someone adds a reader of `NARROWS`
+ * that does not require `MOTIVATES`, the first case stops being unreachable and
+ * `sharpen` becomes transactional.** This test is what says so.
+ */
+test("a partial sharpen leaves nothing a reader can reach", async () => {
+  const enquiry = await session.openEnquiry("does the coating hold?");
+  const obs = await session.recordObservations({
+    enquiry, name: "run A", finding: "no delamination",
+  });
+  await session.recordAnalysis({
+    enquiry, method: "cycling", from: [obs],
+    concludes: [
+      { proposition: "the coating survives cycling", finding: "no delamination at 200 cycles" },
+      { proposition: "the coating survives heat", finding: "no delamination at 200C" },
+    ],
+  });
+  const original = await session.pose("is the coating durable?");
+
+  // Fail on the second BASED_ON edge: the decision keeps one finding of three.
+  const realCreateEdge = graph.createEdge.bind(graph);
+  let basedOn = 0;
+  graph.createEdge = (async (from: string, edge: string, to: string) => {
+    if (edge === "BASED_ON" && ++basedOn === 2) {
+      throw new Error("injected: the second BASED_ON failed");
+    }
+    return realCreateEdge(from as never, edge as never, to as never);
+  }) as typeof graph.createEdge;
+
+  await expect(
+    session.sharpen({ from: original, into: "is it durable at 200C?", because: "too vague" }),
+  ).rejects.toThrow(/injected/);
+  graph.createEdge = realCreateEdge;
+
+  // The half-built decision survives...
+  const orphaned = await graph.query(
+    `MATCH (d:Decision)-[:NARROWS]->(:Question) RETURN d`,
+    { d: vertexProps<{ reason: string }>() },
+  );
+  expect(orphaned.map((r) => r.d.reason)).toEqual(["too vague"]);
+
+  // ...and no reader can reach it, because `originOf` needs the MOTIVATES that
+  // was never written. That is what makes the subset harmless rather than a
+  // wrong answer, and it is the whole argument for leaving sharpen alone.
+  const motivates = await graph.query(
+    `MATCH (:Decision)-[:MOTIVATES]->(q:Question) RETURN q`,
+    { q: vertexProps<{ name: string }>() },
+  );
+  expect(motivates).toEqual([]);
+  expect(await session.originOf(original)).toBeNull();
+
+  // The sharper question was never created, so the survey is simply correct.
+  const survey = await session.whatIsKnown();
+  expect(survey.untested.map((q) => q.asks)).toEqual(["is the coating durable?"]);
+});
