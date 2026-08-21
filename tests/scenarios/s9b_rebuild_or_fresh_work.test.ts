@@ -245,37 +245,35 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * **The wrong answer, and it is not row F's.**
+   * **Row AD, and this test has been inverted rather than deleted.**
    *
-   * `027` predicted the confidently wrong answer would be on the question side
-   * rather than the artefact side. It is — and the mechanism is not the one
-   * predicted, which is the part worth keeping.
+   * It shipped asserting the wrong answer on purpose, with the assertion it
+   * *should* make sitting in a comment beside it, and those are now the two
+   * live lines. Nothing about the scenario changed — only what the record says
+   * about it.
    *
    * A researcher opens the question of what generated the historical control
    * and works on it: three candidate algorithms tried, none reproduces the
    * recorded series. That is real, recorded, durable work, and a negative
-   * result is a result. `whatIsKnown()` then reports the question as
+   * result is a result. `whatIsKnown()` used to report the question
    * **`untested`** — *"one nothing has ever been run against"*, in the survey's
-   * own words. Populated, confident, and false.
-   *
-   * The cause is `recordObservations()` creating `Evidence` with no producing
-   * `EvidenceUnit`, which PJ-001 defines as impossible. `whatIsKnown()`'s
-   * `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`, so work
-   * recorded as observations is invisible to it while work recorded as an
-   * analysis is not. The other question in this same test reads `unresolved`
-   * for exactly that reason.
+   * own words — because `recordObservations()` created `Evidence` with no
+   * producing `EvidenceUnit`, which PJ-001 defines as impossible, and the
+   * survey's `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`.
+   * Work recorded as observations was invisible to it; work recorded as an
+   * analysis was not. The sibling question below reads `unresolved` and always
+   * did, which is what isolated the cause rather than alleging it.
    *
    * Three cold reviewers flagged the missing unit independently and three
-   * scenarios were pointed at it without finding harm beyond a reader's
-   * (see docs/TASKS.md). This is the fourth, and it is the first to produce a
-   * wrong answer rather than an untidy one. Under PJ-011 §5 that is what earns
-   * a change, and under CLAUDE.md's one-wrong-answer-at-a-time rule, clearing
-   * it is the next thing built.
+   * scenarios were pointed at it without finding harm beyond a reader's. This
+   * was the fourth and the first to produce a wrong answer, which is what
+   * PJ-011 §5 asks for and what made the fix mandatory rather than optional.
    *
-   * Asserted as wrong on purpose. This test documents a defect; when it is
-   * fixed, this test must be inverted rather than deleted.
+   * The sibling assertion is kept for the same reason it was useful as a
+   * diagnosis: if a future change makes `unresolved` unreachable, this test
+   * must fail for that too, not quietly agree with itself.
    */
-  test("KNOWN WRONG: observation-only work on a question reads as no work at all", async () => {
+  test("a reconstruction attempt that fails is not a question nobody has looked at", async () => {
     const { untested, unresolved } = await inOneWorld(async (s) => {
       const { enquiry } = await theCachedConstruction(s);
       const provenance = await s.openEnquiry("what generated the historical random control?");
@@ -299,15 +297,12 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       };
     });
 
-    // What it should say, and does not:
-    //   expect(unresolved).toContain("what generated the historical random control?");
-    expect(untested).toContain("what generated the historical random control?");
-    expect(unresolved).not.toContain("what generated the historical random control?");
+    expect(unresolved).toContain("what generated the historical random control?");
+    expect(untested).not.toContain("what generated the historical random control?");
 
-    // And the contrast that isolates the cause: the same survey, the same
-    // graph, a question worked on through recordAnalysis() rather than
-    // recordObservations(), classified correctly.
-    expect(unresolved).toEqual(["does the accelerated path match the reference?"]);
+    // The sibling, unchanged by the fix and unchanged before it: a question
+    // worked on through recordAnalysis(), which always minted a unit.
+    expect(unresolved).toContain("does the accelerated path match the reference?");
   });
 
   /**

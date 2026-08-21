@@ -190,3 +190,69 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
   expect(after.checks.map((c) => c.proposition)).toEqual(["solver converges within 500 iterations"]);
   expect(after).toEqual(before);
 });
+
+/**
+ * Row AD's atomicity, and the reason this test exists at all.
+ *
+ * `recordObservations()` wrote two nodes and two edges for eighteen scenarios
+ * with no transaction around them, and that was survivable: an interrupted call
+ * left a half-written record, but nothing the model called impossible.
+ *
+ * Minting the `EvidenceUnit` changes that. A failure between the evidence and
+ * the unit writes *precisely* the invariant the fix exists to remove — an
+ * `Evidence` with no producing `EvidenceUnit` — durably, and looking exactly
+ * like the records that predate the fix, which is the worst possible disguise
+ * for a defect. So the verb became transactional in the same change, and this
+ * is the negative test every other compound verb in `src/domain` already has.
+ *
+ * Deterministic by injection rather than by racing: the graph's `createNode` is
+ * made to throw on the `EvidenceUnit` specifically, which is the one ordering
+ * where a partial write would be indistinguishable from history. See CLAUDE.md
+ * on why `Promise.all()` against two live connections is not an option here.
+ */
+test("recordObservations writes the unit and the evidence together or not at all", async () => {
+  const enquiry = await session.openEnquiry("does the coating hold at temperature?");
+
+  const realCreateNode = graph.createNode.bind(graph);
+  let unitAttempted = false;
+  graph.createNode = (async (label: string, props: Record<string, unknown>) => {
+    if (label === "EvidenceUnit") {
+      unitAttempted = true;
+      throw new Error("injected: the unit write failed");
+    }
+    return realCreateNode(label as never, props as never);
+  }) as typeof graph.createNode;
+
+  await expect(
+    session.recordObservations({
+      enquiry,
+      name: "thermal cycling run",
+      finding: "no delamination after 200 cycles",
+    }),
+  ).rejects.toThrow(/injected/);
+  graph.createNode = realCreateNode;
+
+  expect(unitAttempted).toBe(true);
+
+  // Nothing survives -- not the artefact written before the failure, and not
+  // the evidence that would otherwise stand with no unit behind it.
+  const orphans = await graph.query(
+    `MATCH (e:Evidence) RETURN e`,
+    { e: vertexProps<{ statement: string }>() },
+  );
+  expect(orphans.map((r) => r.e.statement)).toEqual([]);
+  const artefacts = await graph.query(
+    `MATCH (a:Artefact) RETURN a`,
+    { a: vertexProps<{ logical_name: string }>() },
+  );
+  expect(artefacts.map((r) => r.a.logical_name)).toEqual([]);
+
+  // And the verb still works afterwards -- the rollback released the
+  // transaction rather than leaving the session wedged in a failed one.
+  const again = await session.recordObservations({
+    enquiry,
+    name: "thermal cycling run",
+    finding: "no delamination after 200 cycles",
+  });
+  expect(again.id).toMatch(/^ART_/);
+});

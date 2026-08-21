@@ -197,6 +197,29 @@ export class WriteSurface extends SessionCore {
    * interprets. Kept distinct from the conclusions drawn from them, which is
    * the entire premise of S-11: an inference can be wrong while the
    * observations it consumed remain fine.
+   *
+   * **Taking measurements is work, and this records it as such (row AD).** For
+   * eighteen scenarios it created `Evidence` with no producing `EvidenceUnit`,
+   * which PJ-001 defines as impossible. Three cold reviewers flagged it and
+   * three scenarios were pointed at it without finding harm; S-9b found the
+   * harm. `whatIsKnown()` decides whether anyone has looked at a question from
+   * `EvidenceUnit -ADDRESSES-> LineOfEnquiry`, so a question pursued only
+   * through observations reported itself `untested` — *"one nothing has ever
+   * been run against"*. Populated, confident, and false.
+   *
+   * The unit `PRODUCES` the evidence and **not** the artefact, which is where
+   * this differs from `recorded()`. There the artefact is an analysis *output*
+   * the unit brought into existence; here the artefact **is** the observation
+   * record, and the unit did not produce the measurement — it is the activity
+   * of taking it. Wiring the second edge would claim the record was generated
+   * by the act that describes it.
+   *
+   * No `Computation`, deliberately. LabKit did not run the instrument, and
+   * minting one to make this shape match the analysis path would invent
+   * execution state that never existed. It is also what keeps the blast radius
+   * to one read: every other query that reaches a unit does so either through
+   * `Evidence -SUPPORTS|CHALLENGES-> Claim`, which observation evidence has
+   * neither of, or through a required `USES -> Computation`.
    */
   async recordObservations(input: {
     enquiry: EnquiryRef;
@@ -204,28 +227,62 @@ export class WriteSurface extends SessionCore {
     finding: string;
     contentHash?: string;
   }): Promise<ObservationsRef> {
-    const artefact = await this.graph.createNode("Artefact", {
-      kind: "observations",
-      logical_name: input.name,
-      ...(input.contentHash ? { content_hash: input.contentHash } : {}),
+    // Atomic, and this is the sharper half of row AD's fix. Before the unit
+    // existed there was nothing an interrupted call could leave behind that the
+    // model called impossible; now a failure between the evidence and the unit
+    // would write *precisely* the invariant this verb was changed to stop --
+    // durably, and looking exactly like the eighteen scenarios of records that
+    // predate the fix. See TenantGraph.inTransaction.
+    const artefact = await this.graph.inTransaction(async () => {
+      const artefact = await this.graph.createNode("Artefact", {
+        kind: "observations",
+        logical_name: input.name,
+        ...(input.contentHash ? { content_hash: input.contentHash } : {}),
+      });
+      const evidence = await this.graph.createNode("Evidence", {
+        statement: input.finding,
+      });
+      // `role` is recorded because the property is not optional, not because
+      // anything reads it: `EvidenceUnitRole` has nine values, and until this
+      // call one writer and no readers anywhere in `src/`. An "observation"
+      // value was the obvious move and was declined -- adding vocabulary to a
+      // union nothing consumes is the dead shape PJ-007 found in
+      // `buildAsClause`, and the no-cull policy does not cover it: that policy
+      // protects labels and edges, which are claims about the domain, and the
+      // CQRS views were removed on exactly this distinction. `experiment` is
+      // the nearest existing value for a measurement taken rather than
+      // inferred, and it is a placeholder until something reads the field.
+      const unit = await this.graph.createNode("EvidenceUnit", {
+        role: "experiment",
+      });
+      await this.graph.createEdge(
+        evidence.natural_id,
+        "RECORDED_IN",
+        artefact.natural_id,
+      );
+      await this.graph.createEdge(
+        unit.natural_id,
+        "PRODUCES",
+        evidence.natural_id,
+      );
+      await this.graph.createEdge(
+        unit.natural_id,
+        "ADDRESSES",
+        input.enquiry.id,
+      );
+      // The enquiry requires these observations -- a statement about the
+      // enquiry, not about any analysis. What a given analysis actually read is
+      // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
+      // it. Kept alongside ADDRESSES rather than replaced by it: REQUIRES says
+      // the enquiry depends on this evidence, ADDRESSES says this work was done
+      // towards the enquiry, and `whatDependsOn()` reads the first.
+      await this.graph.createEdge(
+        input.enquiry.id,
+        "REQUIRES",
+        evidence.natural_id,
+      );
+      return artefact;
     });
-    const evidence = await this.graph.createNode("Evidence", {
-      statement: input.finding,
-    });
-    await this.graph.createEdge(
-      evidence.natural_id,
-      "RECORDED_IN",
-      artefact.natural_id,
-    );
-    // The enquiry requires these observations -- a statement about the
-    // enquiry, not about any analysis. What a given analysis actually read is
-    // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
-    // it.
-    await this.graph.createEdge(
-      input.enquiry.id,
-      "REQUIRES",
-      evidence.natural_id,
-    );
 
     this.emit("recordObservations", artefact.natural_id, { name: input.name });
     return { kind: "observations", id: artefact.natural_id };
