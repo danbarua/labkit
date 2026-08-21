@@ -289,7 +289,19 @@ export interface ReproductionReport {
    * known to agree. Row I's distinction, asked of execution instead of evidence.
    */
   differs: Array<{
-    what: string;
+    /**
+     * The input, identified. Not a bare name: two artefacts legitimately share
+     * a `logical_name` — a regeneration carries the name of the part it
+     * replaces — and a re-run that swapped one for the other reported **two**
+     * entries reading "control series", one `changed` and one
+     * `not-used-by-the-re-run`, contradicting each other under one label with
+     * nothing to tell them apart (S-10c).
+     *
+     * Fourth read caught doing this, after `reproducibilityOf()` (S-9c) and
+     * `whySupported().restingOn` (S-9d). Each decided by `natural_id` and
+     * reported the name, which is the shape rather than the incident.
+     */
+    what: IdentifiedArtefact;
     standing: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run";
   }>;
   /** Which way the re-run cuts for the historical claim. */

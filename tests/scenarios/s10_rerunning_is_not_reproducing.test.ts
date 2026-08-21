@@ -152,7 +152,7 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    expect(report.differs).toEqual([
+    expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
       { what: "initial conditions, newly specified", standing: "unrecorded-in-the-original" },
     ]);
   });
@@ -295,10 +295,23 @@ describe("S-10: rerunning is not reproducing", () => {
     // Both directions, and both are true: the re-run read an "initial
     // conditions" the original did not, and the original read one the re-run
     // did not. Identical names, two artefacts, two differences.
-    expect(report.differs).toEqual([
-      { what: "initial conditions", standing: "changed" },
-      { what: "initial conditions", standing: "not-used-by-the-re-run" },
+    //
+    // This test named that situation and then asserted the two entries by their
+    // identical names, which could not tell them apart -- the defect S-10c
+    // found, sitting inside the test whose own comment describes it. The
+    // entries now carry identity, so "which one changed" is answerable.
+    expect(report.differs.map((d) => d.what.name)).toEqual([
+      "initial conditions",
+      "initial conditions",
     ]);
+    // Both standings present, on two distinct artefacts. Not asserted as an
+    // ordered list: entries now sort by name and then by identity, and which
+    // natural id sorts first is not a fact about the research.
+    expect(report.differs.map((d) => d.standing).sort()).toEqual([
+      "changed",
+      "not-used-by-the-re-run",
+    ]);
+    expect(new Set(report.differs.map((d) => d.what.part)).size).toBe(2);
   });
 
   /**
@@ -348,7 +361,9 @@ describe("S-10: rerunning is not reproducing", () => {
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
     expect(report.execution).toBe("not-reproduced");
-    expect(report.differs).toEqual([{ what: "conditions B", standing: "not-used-by-the-re-run" }]);
+    expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
+      { what: "conditions B", standing: "not-used-by-the-re-run" },
+    ]);
   });
 
   /**
