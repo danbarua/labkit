@@ -1389,8 +1389,61 @@ export class ReadSurface extends SessionCore {
   async whatDependsOn(
     subject: string | ObservationsRef,
   ): Promise<DependencyReport> {
-    const artefact = typeof subject === "string" ? await this.artefactNamed(subject) : subject.id;
+    const start = typeof subject === "string" ? await this.artefactNamed(subject) : subject.id;
 
+    // Walk the pipeline downstream before asking what rests on it. An analysis
+    // can read another analysis's output (row AE), so invalidating a raw input
+    // reaches every stage built on top of it -- and asking only about the
+    // artefact handed in stopped at the first stage, which is the other half of
+    // S-11c's omission.
+    //
+    // Iterative rather than a variable-length pattern: the chain alternates
+    // CONSUMES and PRODUCES, and AGE has no edge-type alternation at all
+    // (see CLAUDE.md's gotchas). Visited-set rather than a depth cap, so a
+    // cycle terminates without silently truncating a legitimate long pipeline.
+    const reached = new Set<string>([start]);
+    for (let frontier = [start]; frontier.length > 0; ) {
+      const next: string[] = [];
+      for (const id of frontier) {
+        const downstream = await this.graph.query(
+          `MATCH (:Artefact {natural_id: $id})<-[:CONSUMES]-(:Computation)-[:PRODUCES]->(out:Artefact)
+           RETURN out`,
+          { out: vertexProps<{ natural_id: string }>() },
+          { id },
+        );
+        for (const row of downstream) {
+          if (reached.has(row.out.natural_id)) continue;
+          reached.add(row.out.natural_id);
+          next.push(row.out.natural_id);
+        }
+      }
+      frontier = next;
+    }
+
+    const claims = new Set<string>();
+    const enquiries = new Set<string>();
+    for (const artefact of reached) {
+      const { claims: c, enquiries: e } = await this.restingOnArtefact(artefact);
+      for (const name of c) claims.add(name);
+      for (const name of e) enquiries.add(name);
+    }
+
+    return {
+      claims: [...claims],
+      enquiries: [...enquiries],
+      routesWalked: [
+        "evidence recorded in this artefact, and the claims it bears on",
+        "computations that consumed this artefact, and the claims their findings bear on",
+        "the same, for every artefact downstream of this one through CONSUMES/PRODUCES",
+      ],
+      complete: false,
+    };
+  }
+
+  /** The claims and enquiries resting on one artefact, by the two direct routes. */
+  private async restingOnArtefact(
+    artefact: string,
+  ): Promise<{ claims: string[]; enquiries: string[] }> {
     const rows = await this.graph.query(
       `MATCH (a:Artefact {natural_id: $id})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
@@ -1428,22 +1481,10 @@ export class ReadSurface extends SessionCore {
     return {
       // A claim whose refutation rested on this record is affected by
       // invalidating it, exactly as a supported one is.
-      claims: [
-        ...new Set(
-          all.flatMap((r) =>
-            [r.claim?.name, r.challenged?.name].filter((n): n is string => !!n),
-          ),
-        ),
-      ],
-      enquiries: [...new Set(all.flatMap((r) => (r.loe ? [r.loe.name] : [])))],
-      // Named rather than counted: a reader deciding whether to trust an empty
-      // answer needs to know what was looked at, and two routes is not the same
-      // claim as "everything". See DependencyReport.
-      routesWalked: [
-        "evidence recorded in this artefact, and the claims it bears on",
-        "computations that consumed this artefact, and the claims their findings bear on",
-      ],
-      complete: false,
+      claims: all.flatMap((r) =>
+        [r.claim?.name, r.challenged?.name].filter((n): n is string => !!n),
+      ),
+      enquiries: all.flatMap((r) => (r.loe ? [r.loe.name] : [])),
     };
   }
 

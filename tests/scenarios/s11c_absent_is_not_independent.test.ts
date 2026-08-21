@@ -89,15 +89,24 @@ describe("S-11c: nothing found is not nothing there", () => {
    * trend claim rests on that raw data through the calibration and is missing
    * from the list — so a reader who works the list leaves it standing.
    */
-  test("what depends on the raw series omits the claim that rests on it", async () => {
+  test("a re-entered intermediate still severs the chain, and the report says so", async () => {
     const { raw } = await aTwoStagePipeline(session);
 
     const affected = await (await afterwards()).whatDependsOn(raw);
 
-    // Populated and confident. That is what makes it actionable and wrong: an
-    // empty result would at least look like ignorance.
+    // The traversal is transitive now (row AE), but this builder deliberately
+    // re-enters the intermediate as fresh observations rather than reading the
+    // first analysis's output -- which is what a researcher had to do before
+    // `from` accepted an AnalysisRef. There is no CONSUMES/PRODUCES link to
+    // follow, so the trend claim is still out of reach.
+    //
+    // That is the point the row makes: the reader cannot tell this from a
+    // subject nothing depends on, which is why `complete: false` is not
+    // decoration. Recording the second stage properly is what fixes it, and
+    // S-11d asserts that it does.
     expect(affected.claims).toEqual([CALIBRATION]);
     expect(affected.claims).not.toContain(TREND);
+    expect(affected.complete).toBe(false);
   });
 
   /**
@@ -127,7 +136,7 @@ describe("S-11c: nothing found is not nothing there", () => {
     // A reader can also see what was actually considered, which is what makes
     // the caveat actionable rather than decorative -- the omission in the test
     // above is precisely a route not on this list.
-    expect(none.routesWalked.length).toBe(2);
+    expect(none.routesWalked.length).toBe(3);
     expect(none.routesWalked).toEqual(under.routesWalked);
   });
 

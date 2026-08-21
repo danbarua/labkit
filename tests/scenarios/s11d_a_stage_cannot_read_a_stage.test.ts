@@ -96,26 +96,20 @@ describe("S-11d: a stage cannot read a stage", () => {
   });
 
   /**
-   * The chain now **exists** in the record, and `whatDependsOn()` still does not
-   * walk it. Both halves asserted, because they are different problems.
-   *
    * S-11c's omission had two causes stacked: the chain was severed at the write
-   * surface, *and* the query is one hop. Row AE fixed the first. The second is
-   * query semantics, and `DependencyReport.routesWalked` already says so rather
-   * than letting the short answer read as a complete one — which is exactly the
-   * situation that open-world caveat was built for.
+   * surface, *and* the query walked one hop. Row AE fixed the first; this is
+   * the second. Invalidating the raw series now reaches the trend claim two
+   * stages downstream.
+   *
+   * Still open-world. Transitive is not complete: `complete: false` and
+   * `routesWalked` stay, because a longer walk is still a walk of *some* routes.
    */
-  test("the chain exists in the record, and the one-hop query still stops short", async () => {
-    const { raw, calibration } = await aPipelineOnUnverifiableRawData(session);
-    const reader = await afterwards();
+  test("what depends on the raw series reaches every stage built on it", async () => {
+    const { raw } = await aPipelineOnUnverifiableRawData(session);
 
-    const fromRaw = await reader.whatDependsOn(raw);
-    expect(fromRaw.claims).toEqual(["the calibration is stable"]);
+    const fromRaw = await (await afterwards()).whatDependsOn(raw);
+    expect(fromRaw.claims.sort()).toEqual(["the calibration is stable", TRENDS].sort());
+    // Still open-world -- the traversal is now transitive, not complete.
     expect(fromRaw.complete).toBe(false);
-
-    // One hop further along the chain that now exists, the downstream claim is
-    // reachable -- so the link is real and only the traversal is short.
-    const parts = await reader.reproducibilityOf(calibration, []);
-    expect(parts.unverifiable).toEqual(["raw sensor series"]);
   });
 });
