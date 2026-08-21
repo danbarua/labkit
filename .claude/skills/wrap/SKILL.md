@@ -192,6 +192,18 @@ Stop finds no `baseline`, self-baselines at whatever HEAD is then, and **exits
 without asking**. The first fire is swallowed *and* the baseline lands after the
 work it should have covered.
 
+**A second worktree bug, fixed 2026-08-21.** The hook resolved `state_dir` from
+`$CLAUDE_PROJECT_DIR`, which is the directory the session *started* in — so a
+session working in a worktree read the **other** checkout's state: another
+session's baseline, and an `entry=` naming a file that does not exist on its
+side. It reported "no entry yet" indefinitely, lying about whether the session
+had wrapped, until an unrelated merge made the file appear. It now resolves from
+`git rev-parse --show-toplevel`, which names the same directory for a session
+that is not in a worktree, so there is no special case beside a normal one.
+
+That fix does **not** remove the need to seed. It puts the state file in the
+right tree; the tree still starts empty.
+
 Seed it before the first stop:
 
 ```sh

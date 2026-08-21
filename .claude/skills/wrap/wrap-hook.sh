@@ -22,7 +22,22 @@
 set -euo pipefail
 
 mode="${1:-stop}"
-root="${CLAUDE_PROJECT_DIR:-$PWD}"
+
+# The tree we are actually working in, which is NOT always
+# $CLAUDE_PROJECT_DIR. That variable holds the directory the session was
+# *started* in, so a session working in a git worktree -- which is how parallel
+# sessions run here -- got the other checkout's `.claude/.wrap-state/`, and
+# therefore another session's baseline and an `entry=` naming a file that does
+# not exist on its side. The hook then reported "no entry yet" indefinitely: it
+# lied about whether the session had wrapped, three times in one afternoon,
+# until an unrelated merge made the file appear.
+#
+# `git rev-parse --show-toplevel` from $PWD names the worktree, and for a
+# session that is not in one it names the same directory $CLAUDE_PROJECT_DIR
+# does, so this is not a special case with a normal case beside it. The
+# fallbacks are for running outside a repo at all.
+root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+[ -d "$root" ] || root="${CLAUDE_PROJECT_DIR:-$PWD}"
 state_dir="$root/.claude/.wrap-state"
 # Kept in step with collect.sh's own `log_dir` -- see SKILL.md's Notes.
 log_dir="docs/session-log"
