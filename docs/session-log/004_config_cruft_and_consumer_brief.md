@@ -279,8 +279,15 @@ instrument for *checking* the move, and confirmed the regex-derived call graph
 before any code moved. Unlike the earlier Cypher-string case, these are symbols,
 so it could see them.
 
-Working tree clean. Twenty-five commits ahead of `origin/feat/domain-consumer`,
-nothing held back.
+Twenty-five commits ahead of `origin/feat/domain-consumer`, nothing held back.
+
+**The tree is not clean**, and an earlier draft of this entry said it was.
+`docs/dependency-graph.svg` is modified and uncommitted: the committed copy
+(`8299ecb`) predates the split and still shows a single `src/domain/session.ts`,
+while the working copy carries `core.ts`, `read.ts` and `write.ts`. The working
+copy is the correct one. It is left uncommitted because the user has owned that
+file's regenerations, not because it is in doubt — `bun run dev:dependency-cruiser`
+is the command, and the checked-in graph is stale until someone runs it.
 
 ## Verified
 
