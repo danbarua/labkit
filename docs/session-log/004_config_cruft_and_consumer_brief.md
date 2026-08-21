@@ -664,13 +664,48 @@ The general shape, and it is the same one as `check-doc-comments` and
 recurs** — and a fix aimed at the wrong surface looks like a fix until the
 problem happens again somewhere the fix does not reach.
 
+**The dependency query stops overstating itself** (`c8e6362`, `80c605b`), and
+the demonstration found something larger than the fix.
+
+*The wrong answer.* A two-stage pipeline — raw series, calibration, trend
+analysis. `whatDependsOn(raw)` names the calibration claim and omits the trend
+claim that rests on the raw data through it. Populated, confident and short; an
+empty answer would at least look like ignorance. A reader working the list
+invalidates the raw data and leaves the trend claim standing on it.
+
+*The remedy is the answer shape and nothing else*, as `022` §4 predicted:
+`DependencyReport` names the routes walked and carries `complete: false` as a
+**literal type**, so completeness cannot be read off it and cannot be widened
+into a flag by accident. The coverage assertion `023` §4 forbids stays unbuilt.
+
+*The cause is a missing verb, not a missing edge.* `recordAnalysis({ from })`
+accepts only observations handles and `recordObservations()` is the only source
+of one — so **an analysis cannot read another analysis's output**. A second
+stage can only be recorded by re-entering the intermediate as fresh
+measurement, which breaks the chain in the record while it holds in the world.
+Fifteen scenarios never needed a second stage. Now its own queue item, because
+the remedy is a verb and wants its own demonstration.
+
+*Two things worth keeping.* S-9b's shape detector fired on a change with nothing
+to do with row F — it guards the report's shape and cannot tell which field
+arrived, which is what it is for; updated, not loosened. And the first version
+of the completeness test asserted the wrong direction: `false` is assignable to
+`boolean`, so the guarantee worth having is that a report *claiming*
+completeness does not typecheck. TypeScript said so via an unused
+`@ts-expect-error`.
+
 ## Verified
 
-Run on `d87d0c5`, the final commit.
+Run on `80c605b`, the final commit.
 
-- `bun test` → **216 pass, 0 fail**, 24 files. An earlier run in this session
-  showed one failure, reproduced as `tests/leader-election.test.ts` and passing
-  on isolated re-runs — the known pglite-socket flake CLAUDE.md documents.
+- `bun test` → **218 pass, 1 fail**, 25 files, and the failure is not stable.
+  Three consecutive full runs failed a *different* test each time — first
+  `domain-session`, then two consumer probes, then `domain-session` again — with
+  `graph "labkit_t1" does not exist` as the error. Every implicated file passes
+  twice in isolation. That is a teardown race, the pglite-socket family CLAUDE.md
+  documents, and it is now hitting more than `leader-election`. **Worth its own
+  look**: the containment strategy is one connection per test, and a teardown
+  race is a gap in that strategy rather than an instance of it.
 - `bun run typecheck` → clean.
 - `npx depcruise src tests --output-type err` → **0 errors**, 2 orphan warnings
   (`src/index.ts`, `src/cli.ts`, both known stubs).
@@ -834,9 +869,14 @@ worktrees make it easier to fall into.
 
 ## Next
 
-1. **D2's open-world `unaffected`** — a reader acting on "unaffected" and being
-   wrong. Query semantics, tier 1, and the cheapest thing left.
-2. **The thin read-only MCP/CLI adapter** over the frozen contract. Four reads,
+1. **The teardown flake.** Three full runs, three different failures, all
+   `graph "labkit_t1" does not exist`. It was `leader-election` only; it is not
+   any more. Cheapest and now the most misleading thing in the repo, because a
+   red suite that is red for the wrong reason trains people to ignore it.
+2. **An analysis cannot read another analysis's output** — the missing verb
+   S-11c exposed. Needs its own demonstration: what does a caller get wrong when
+   they cannot express the second stage?
+3. **The thin read-only MCP/CLI adapter** over the frozen contract. Four reads,
    two durable worlds each, before the read is written.
 
 **Row F is the expensive one and is not next.** Its discriminator now names a
