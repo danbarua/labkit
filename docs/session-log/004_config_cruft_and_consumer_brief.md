@@ -716,6 +716,14 @@ with X happening unnoticed), and the rule that a predictions document may not sa
 in advance which outcome would be more impressive, for which `027` is the
 evidence.
 
+A third was reported to the user as a gap and **is not one**: the ledger needs no
+convention for a refuted *challenge*, because a challenge is a prediction with a
+different author. Rows A and B keep refuted predictions because someone committed
+to an outcome before the build and the record says what happened; who committed
+changes the attribution line and nothing else. Recorded on row O in `TASKS.md`
+with the write-up bar that matters more — **say what the challenge got wrong, not
+that it was wrong.**
+
 **Still waiting on a decision, not on work:** whether the SVG earns its 134KB now
 that a diffable form exists (the rendered comparison is published as an
 artifact); whether `whySupported` + `checksFrom` want their own module inside
