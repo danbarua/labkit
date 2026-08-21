@@ -67,30 +67,27 @@ and a checker over prose would be wrong more often than the prose is. So a green
 are current*. The sentence above said no row was known-open for a day after row
 AD made it false, in the file every agent reads first.
 
-The dependency graph is **self-maintaining, in two forms for two readers**:
-`docs/dependency-graph.svg` for a person in a browser, where graphviz's edge
-routing is what makes a graph this dense legible (PJ-007 records a design change
-prompted by *reading* it), and `docs/dependency-graph.mmd` for an agent reading
-text — 3KB against 134KB, and it diffs, so a moved edge is visible where 1,444
-lines of generated SVG hide it. **One `depcruise` run renders both** via
-`depcruise-fmt`, so the two cannot describe different graphs.
+`docs/dependency-graph.mmd` is the module dependency graph, as text.
+`bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
 
-`.githooks/pre-commit` regenerates them when a commit touches `src/` or `tests/`
-and stages only what actually moved. That makes "the graph changed" mean "the
-module structure changed", because the output is byte-stable: two runs over an
-unchanged tree are identical, and an edit touching no import yields an identical
-graph. Correctness never rests on guessing which edits are structural — an
-import added inside an existing file moves the graph exactly as a new file does.
-Cost is ~1s; a comment-only commit stages nothing.
+It was briefly self-maintaining, via a `.githooks/pre-commit` that regenerated on
+every commit touching `src/` or `tests/`, alongside a 134KB SVG. Both were
+removed on 2026-08-21. The graph is documentation, and documentation that
+rewrites itself inside someone else's commit buys less than it costs: it put a
+generated artefact in the diff of every code commit, and the byte-stability that
+made "the graph changed" mean "the module structure changed" was there to stop
+that being noise rather than to make it useful. The SVG went for its own reasons
+— 1,444 generated lines in which a moved edge is invisible, against 3KB of
+mermaid that renders on GitHub and diffs line by line. PJ-007 records a design
+change prompted by *reading* the SVG, which is the case for having had one; it is
+not a case for regenerating it forever. `npx depcruise-fmt -T dot` over the
+cruise JSON recovers one if a person wants it.
 
-Enable once per clone or worktree with `git config core.hooksPath .githooks` —
-the hook is tracked, the config is not. It is **not a gate**: `npx depcruise src
-tests --output-type err` is, and the hook never blocks a commit. **graphviz is
-optional** (`brew install graphviz`): without it the mermaid graph is still
-maintained and only the SVG goes stale, announced. Generation lives in
-`scripts/update-dependency-graph.sh` rather than a `package.json` one-liner
-because the one-liner was a pipeline, and `$?` after a pipeline reports `dot`'s
-status — a crashed `depcruise` used to yield an empty SVG and a success code.
+It is **not a gate** and never was: `npx depcruise src tests --output-type err`
+is. Generation lives in `scripts/update-dependency-graph.sh` rather than a
+`package.json` one-liner because the one-liner was a pipeline, and `$?` after a
+pipeline reports the last command's status — a crashed `depcruise` used to yield
+an empty SVG and a success code.
 
 `docs/TASKS.md` is the **work queue** — what is ready to build, what needs a
 discriminator first, what waits on a decision, and what is deliberately not being
@@ -115,7 +112,7 @@ bun test                       # run all tests
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
-bun run dev:dependency-cruiser  # regenerate dependency-graph.svg (needs graphviz)
+bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
 bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
@@ -151,9 +148,9 @@ forcing them into FK tables would just reimplement graph traversal as
 recursive CTEs.
 
 `src/db/` is layered, not a hub — each module has one job, and the
-dependency direction is enforced by `bun run dev:dependency-cruiser`
-(renders `dependency-graph.svg`; `npx depcruise src tests --output-type err`
-for violations only):
+dependency direction is enforced by `npx depcruise src tests --output-type err`
+(violations only; `bun run dev:dependency-cruiser` redraws
+`docs/dependency-graph.mmd`):
 
 | module | job |
 | --- | --- |
@@ -505,17 +502,6 @@ see the "License to rewrite history" note in
 `docs/project-journal/004_tenancy_implementation_plan.md`. Once a real
 database exists, that stops being true and this note should be updated.
 
-**One backfill is already owed, and it is the first concrete instance of the
-non-additive change this project has no story for.** Row AD (2026-08-21) made
-`recordObservations()` mint an `EvidenceUnit`. Every observation written before
-it has none, so `whatIsKnown()` reports those questions `untested` — *"one
-nothing has ever been run against"* — which is exactly the wrong answer row AD
-closed, made permanent for everything historical. It costs nothing today because
-no database survives a run, which is precisely why it is easy to miss now and
-expensive to find at first deploy. The fix is a one-time graph migration minting
-a unit per unowned observation `Evidence`; **it is owed the moment data
-persists**, not before. Found by review after the row was closed, not by the
-build.
 
 ## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
 

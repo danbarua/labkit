@@ -490,13 +490,14 @@ and false per **endpoint pair**, and an entry *is* a list of pairs. Named rather
 than culled, beside `EvidenceUnitRole`, where the same shape gets the opposite
 answer.
 
-**A backfill is owed.** Every observation written before `17b9976` has no unit,
-so `whatIsKnown()` would report those questions `untested` — the wrong answer
-row AD closed, made permanent for everything historical. Free today because no
-database survives a run, which is why it would surface at first deploy. In
-CLAUDE.md's migrations section as a **graph** migration owed the moment data
-persists, and as the first concrete instance of the non-additive change this
-project has no story for.
+**A backfill was recorded as owed and then withdrawn** — the user challenged it
+and was right. There is no persisted data anywhere: the only database is a
+gitignored scratch directory, and migrations are rewritten in place until first
+deploy, so **first deploy happens with the fix already in the code** and the
+records the backfill would repair can never exist. An obligation conditional on a
+subject that cannot exist is not an obligation — the same shape as *a refusal
+needs something real to refuse*. Removed from CLAUDE.md rather than softened; see
+`030`.
 
 The transferable line: **the build verified the fix against every record it
 could create, and had no way to think about records it could not.** Every test
@@ -704,11 +705,6 @@ scenario.
 
 Row F needs no new probe — it needs the adapter phase's reconstruction-provenance
 read to fail against real state, per `023`'s own sequencing.
-
-**Owed at first deploy, not before:** a graph migration minting an
-`EvidenceUnit` per observation `Evidence` that has none. See CLAUDE.md's
-migrations section — it is the first non-additive change this project has
-actually incurred.
 
 **Two journal entries are the user's to commission, and deliberately unwritten:**
 the three fired conditions (K, Z, P — each reading *"if X, then this row moves"*

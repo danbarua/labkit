@@ -127,22 +127,42 @@ readers, and a tenth was declined. The policy protects labels and edges because
 they are claims about the domain; a property value is not one, which is the line
 the per-tenant CQRS views were removed on.
 
-## A backfill is now owed, and it is the first of its kind
+## A backfill was recorded as owed, and then withdrawn
 
-Every observation written before `17b9976` has no `EvidenceUnit`. `whatIsKnown()`
-reports those questions `untested` — **the wrong answer this row closed, made
-permanent for everything historical.**
+Recorded here first, because the withdrawal is the more useful half.
 
-It costs nothing today because no database survives a run, and that is exactly
-why it is easy to miss now and expensive to find at first deploy. CLAUDE.md says
-there is deliberately no story yet for a non-additive schema change; **this is
-the first concrete instance of one**, and it is a graph migration rather than a
-`drizzle/` one — mint a unit per observation `Evidence` that has no producer.
+The claim was: every observation written before `17b9976` has no `EvidenceUnit`,
+so `whatIsKnown()` reports those questions `untested` — the wrong answer this row
+closed, made permanent for everything historical — and a one-time graph migration
+is owed the moment data persists. It went into CLAUDE.md's migrations section as
+the first concrete instance of the non-additive change this project has no story
+for.
 
-Recorded in CLAUDE.md's migrations section as owed the moment data persists.
-Found by review *after* the row was closed, which is worth saying: the build
-verified the fix against every record it could create and had no way to think
-about records it could not.
+**It is not owed, and the reasoning was wrong rather than merely early.** There
+is no persisted data anywhere. The only database is `.labkit/pglite`, a
+gitignored 42MB scratch directory any developer can delete and recreate, and
+migrations are rewritten in place until first deploy. So the records the backfill
+would repair do not exist and cannot come to exist: **first deploy will happen
+with the fix already in the code**, which means there is never a moment at which
+a production database contains observations written by the old verb.
+
+An obligation conditional on a subject that can never exist is not an obligation.
+It is the same shape as the rule this project already has in another register —
+*a refusal needs something real to refuse* (PJ-019) — and the same shape as an
+edge with a writer and no reader. **An obligation needs something real to be owed
+about.** Withdrawn from CLAUDE.md rather than softened.
+
+What survives is narrower and still true: *if* a database is ever populated by a
+version of a verb and kept across a change to that verb, the repair is a graph
+migration rather than a `drizzle/` one, because the affected structure lives in
+AGE. That is a fact about where such a migration would go, not a task, and it
+belongs in the migrations note only when something actually needs it.
+
+The finding underneath is the one to keep, and it is unaffected: **the build
+verified the fix against every record it could create, and had no way to think
+about records it could not.** That reasoning was right. What it produced here was
+a hazard with no possible instance, which is worth recording precisely because
+the reasoning that produced it was sound.
 
 ## Standing after this build
 
