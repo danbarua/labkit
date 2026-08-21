@@ -71,6 +71,11 @@ the in-flight set"* whose comment says **"this test exists so removing it is
 loud."** Its assertion is `expect(true).toBe(true)`. Removing the `finally` it
 names leaves five tests passing and none failing — demonstrated, then restored.
 
+**The check was landed red**, naming both, and `labkit-dev` fixed them the same
+day; it is green now. That order was deliberate: the failing check is the
+demonstration, which is how every other fix in this project is made. A red
+`check:tests-assert` from here on means a test has stopped testing.
+
 ## Why this is the same defect and not a different one
 
 PJ-027's mechanism was that prose and code are checked by different acts, and
@@ -108,9 +113,81 @@ delegation count, `wc -l`, call sites, interface fields. A generic warning that
 numbers in comments go stale would fire on every past-tense measurement in the
 repository, and this project keeps those deliberately.
 
-Seven small assertions would not be noise. And they would be *assertions*, which
-is what PJ-027 already concluded: where a prose guard can be a test, it should be.
-The counts are the largest available supply of prose guards that can.
+### Corrected the same day, on the way to fixing them
+
+This entry first concluded that seven small assertions would beat one generic
+check, because they would be *assertions* and PJ-027 says to prefer those. Fixing
+the seven showed that half wrong, and the correction is the more useful sentence:
+
+> **A numeral either earns an assertion, or it should be deleted, or it should be
+> explicitly dated.**
+
+Six of the seven were decoration on an argument that survives without them.
+*"1,051 lines against the write side's 845"* argues that one half is larger; the
+numbers add nothing to that and are a maintenance claim nobody agreed to keep.
+Deleting a claim is not giving up on checking it — it is the stronger move,
+because what remains is true and what left was never going to be maintained.
+
+The seventh looked like the exception and is the instructive one. A test file
+carried *"13 node + 19 edge labels"* next to `NODE_LABELS`/`EDGE_LABELS` — a real
+denominator, an assertion for free. But the property that comment gestures at is
+**already asserted** one line below, empirically, against the real graphid; and
+that guard *tightens* as labels are added, where `expect(EDGE_LABELS.length)
+.toBe(25)` would merely break. **An assertion that protects nothing an existing
+assertion does not is a change-detector**, and adding one would have been
+ceremony wearing the costume of rigour.
+
+So: zero of seven earned an assertion, and all seven stopped being counts. That
+is a better result than seven new checks, and it does not weaken this entry's
+conclusion — it is the same conclusion applied one level up. The check that
+survived, `check:tests-assert`, survived because it catches something nothing
+else catches.
+
+**The third branch came from an eighth instance.** CLAUDE.md's arc totals said
+*"edge labels 19 → 24"* against 25 — in the paragraph introducing this entry.
+It was not deleted, and the reason is a case the two-branch rule does not cover:
+those figures come from PJ-024, which is a **review**, so they are a dated
+measurement and a historical record is legitimate prose. What was wrong was the
+framing — it read as current state. It now says *as they stood when it was
+written*, names the live figure, and points at `NODE_LABELS.length` /
+`EDGE_LABELS.length` as the only counts anyone should read as current.
+
+So: earn an assertion, be deleted, or be explicitly dated. A number that is none
+of the three is a maintenance claim nobody agreed to keep.
+
+**And the defect fired once more during its own repair.** The first version of
+that test comment said the counts were *"asserted below rather than written
+here"* — written before any assertion existed, in the edit fixing the very defect
+of prose describing code that does not agree with it. Caught before commit, by
+going to write the assertion the sentence promised and finding it should not
+exist.
+
+That one is worth more than the seven counts, and it is the answer to *why is
+this not carelessness*. It was committed by someone who had spent the day
+cataloguing this exact defect, with the specific instance in front of them,
+inside the edit that fixed it. It is the sweep's headline — `918f420`, the commit
+that fixed a PJ-027 instance and minted two more in the same hunk — reproduced in
+miniature, under the best conditions anyone is going to get.
+
+## A check that could not fail
+
+One more, found in the same sweep and one level out from the tests.
+
+`scripts/check-progress-to-stdout.sh` was a transplant from another project. It
+cited a version, a source file and three CLI flags that have never existed here,
+and greps `src/` for a pattern that has never occurred — then prints a tick. **A
+check that cannot fail, wearing the costume of one that passed.**
+
+That is this entry's shape at the next level up: a test that asserts nothing is a
+claim with no check behind it; a check that cannot fail is a *suite* with no check
+behind it, and it is worse, because it is counted as coverage. It has been
+replaced by `check:stdout`, which guards something real now that stdout is the
+MCP protocol channel.
+
+The general form, which cost more than the script did and is now in CLAUDE.md:
+**a rule that tells readers to ignore a signal removes the only watcher that
+signal had.** The broken example script survived 221 commits behind exactly such
+a rule. If a signal is unreliable, fix it or delete it — do not annotate it.
 
 ## What this does not change
 

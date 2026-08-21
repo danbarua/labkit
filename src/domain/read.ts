@@ -1,10 +1,12 @@
 /**
  * The verbs that answer questions about the record, and change nothing.
  *
- * The larger half — 1,051 lines against the write side's 845 — and the half the
- * consumer contract is about. `docs/consumer-contract/024_vertical_slice_results.md`
- * demonstrates three gaps here at bar 4 (rows Z, F and S), so this is where the
- * next three builds land.
+ * The larger half, and the half the consumer contract is about.
+ * `docs/consumer-contract/024_vertical_slice_results.md` demonstrated three gaps
+ * here at bar 4 — rows Z, F and S. **All three have since landed**: Z resolved
+ * with `Decision.decided_at` and `Question.posed_at`, F closed `boundary`, S
+ * refuted. The sentence used to say "this is where the next three builds land"
+ * and pointed a new reader at finished work.
  *
  * Nothing in this file may emit. `emit` is not reachable from `SessionCore`, so
  * that is enforced by construction rather than by review.
@@ -196,11 +198,13 @@ export class ReadSurface extends SessionCore {
   /**
    * What the programme knows: settled, unsettled, and never looked at.
    *
-   * Three states rather than two, classified structurally — established is a
+   * More states than settled-or-not, classified structurally — established is a
    * question resolved on cited evidence, untested is one nothing has ever been
-   * run against, unresolved is the rest. Nothing here compares a question's
-   * words to a claim's; the buckets come from what is attached to each
-   * question, not from what it says.
+   * run against, and `provisional` and `accepted` are each checked before
+   * `unresolved`, which takes the rest. See `KnowledgeSurvey` for what each
+   * bucket means and why none is a flag on another. Nothing here compares a
+   * question's words to a claim's; the buckets come from what is attached to
+   * each question, not from what it says.
    */
   async whatIsKnown(): Promise<KnowledgeSurvey> {
     const rows = await this.graph.query(

@@ -16,7 +16,7 @@
  * saying it should not.
  *
  * Delegation is written as `readonly x: Surface["x"] = (...args) => ...` rather
- * than as 32 restated signatures. The types come from the surfaces, so a
+ * than restating every signature. The types come from the surfaces, so a
  * signature cannot drift here, and the line names which half owns the verb.
  */
 
