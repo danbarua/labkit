@@ -355,6 +355,54 @@ export interface VerificationReport {
   of: AnalysisRef;
 }
 
+/**
+ * What is affected if this record turns out to be wrong — and, deliberately, a
+ * statement that the answer is a **lower bound**.
+ *
+ * Designer 2 required that *"no dependency found"* never read as
+ * *"independent"*. `docs/consumer-contract/022` §4 classified it as query
+ * semantics rather than missing structure and declined to act until someone
+ * demonstrated a reader acting on the gap and being wrong. S-11c is that
+ * demonstration, and this shape is the whole remedy: no new durable state, no
+ * new edge, just an answer that stops overstating itself.
+ *
+ * The fourth catch on this one verb. PJ-021 found it returning `claims: []` for
+ * an input while still naming the enquiry.
+ */
+export interface DependencyReport {
+  /** Claims found to rest on the subject, supporting or challenging. */
+  claims: string[];
+  /** Lines of enquiry found to reach it. */
+  enquiries: string[];
+  /**
+   * The routes actually walked, named so a reader knows what was considered.
+   *
+   * Anything connected by a route not listed here is absent from `claims` and
+   * `enquiries` and is **not thereby independent**. The known gap, demonstrated
+   * in S-11c: `recordAnalysis({ from })` accepts only observations handles, so
+   * an analysis cannot read another analysis's output, and a multi-stage
+   * pipeline is recorded as disconnected stages. Everything downstream of such
+   * a break is unreachable from here.
+   */
+  routesWalked: string[];
+  /**
+   * Always `false`, and it is a type-level statement rather than a flag.
+   *
+   * Traversal here is **open-world**: this reports what was found, never that
+   * nothing else exists. A caller cannot write `if (report.complete)` and have
+   * it mean anything, which is the point — the alternative is a reader
+   * inferring completeness from a populated-looking list, which is what S-11c
+   * shows going wrong.
+   *
+   * **Do not widen this to `boolean`.** Asserting completeness needs to know
+   * the relevant dependency set *is* complete, which is durable coverage state
+   * this model does not have; `023` §4 preserves that as a discriminator for
+   * later and says explicitly not to build it. Widening the type here would
+   * ship the assertion without the state behind it.
+   */
+  complete: false;
+}
+
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */
 export interface SupportExplanation {
   proposition: string;

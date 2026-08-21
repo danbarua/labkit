@@ -374,8 +374,16 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // closed, which is the defect external review found in the first draft
       // of consumer probe 3. Give any read on this path a field naming what
       // was rebuilt and this line fails.
+      //
+      // It has already fired once, correctly, on a change that had nothing to
+      // do with row F: S-11c added `routesWalked` and `complete` to this
+      // report. The detector cannot tell which field arrived, only that the
+      // shape moved -- which is what it is for, and why the list is updated
+      // rather than loosened.
       const exact = await reader.whatDependsOn(regenerated);
-      expect(Object.keys(exact).sort()).toEqual(["claims", "enquiries"]);
+      expect(Object.keys(exact).sort()).toEqual([
+        "claims", "complete", "enquiries", "routesWalked",
+      ]);
       expect(exact.claims).toEqual([MATCHES]);
 
       // Same detector on the other read a consumer would reach for. The

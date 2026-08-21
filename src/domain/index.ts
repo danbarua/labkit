@@ -34,6 +34,7 @@ export type {
   ChangedConclusion,
   ReplacementReport,
   UnaffectedRecord,
+  DependencyReport,
   SupportExplanation,
   GateStatus,
   CheckStatus,

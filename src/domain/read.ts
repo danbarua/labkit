@@ -44,6 +44,7 @@ import type {
   QuestionStanding,
   InterpretationHistory,
   Revision,
+  DependencyReport,
   SupportExplanation,
 } from "./report";
 import { SessionCore } from "./core";
@@ -1387,7 +1388,7 @@ export class ReadSurface extends SessionCore {
    */
   async whatDependsOn(
     subject: string | ObservationsRef,
-  ): Promise<{ claims: string[]; enquiries: string[] }> {
+  ): Promise<DependencyReport> {
     const artefact = typeof subject === "string" ? await this.artefactNamed(subject) : subject.id;
 
     const rows = await this.graph.query(
@@ -1435,6 +1436,14 @@ export class ReadSurface extends SessionCore {
         ),
       ],
       enquiries: [...new Set(all.flatMap((r) => (r.loe ? [r.loe.name] : [])))],
+      // Named rather than counted: a reader deciding whether to trust an empty
+      // answer needs to know what was looked at, and two routes is not the same
+      // claim as "everything". See DependencyReport.
+      routesWalked: [
+        "evidence recorded in this artefact, and the claims it bears on",
+        "computations that consumed this artefact, and the claims their findings bear on",
+      ],
+      complete: false,
     };
   }
 
