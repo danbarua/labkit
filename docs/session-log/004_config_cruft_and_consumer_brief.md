@@ -686,7 +686,14 @@ measurement, which breaks the chain in the record while it holds in the world.
 Fifteen scenarios never needed a second stage. Now its own queue item, because
 the remedy is a verb and wants its own demonstration.
 
-*Two failures of my own, during the flake hunt.* A glob excluding
+*Three failures of my own, during the flake hunt.* The third is the one worth
+carrying: **three consecutive runs failing the same four tests was written up as
+deterministic, and two further runs then gave 0 and 3.** Three identical samples
+is not determinism. It should have been re-tested before it was recorded, and
+for a few minutes it made a problem look solved that was not — the same shape as
+`024`'s reviewer concluding from reading that a re-run would not matter.
+
+*And two mechanical ones.* A glob excluding
 `leader-election` used both `tests/*.test.ts` and `tests/**/*.test.ts`, which
 **duplicates five paths** — those files ran twice in one process against shared
 module state, and the result briefly looked like evidence that
@@ -706,15 +713,15 @@ completeness does not typecheck. TypeScript said so via an unused
 
 Run on `80c605b`, the final commit.
 
-- `bun test` → **unstable.** Five consecutive plain runs gave 0, 2, 2, 9 and 1
-  failures. Every file passes in isolation, all 28, one per process. Files run
-  **sequentially** — the isolated runs sum to 81.1s and one combined run takes
-  82.3s — so it is not parallel PGlite contention. It concentrates in
-  `tests/consumer/vertical_slice.test.ts`, and the nine-failure run was that
-  whole file cascading after one death, with `graph "labkit_t1" does not exist`.
-  That cascade is the shape `tests/helpers/db.ts` already documents. Root cause
-  **not** found; see `docs/TASKS.md` for what is and is not established.
-- (superseded) `bun test` → 218 pass, 1 fail, 25 files, and the failure is not stable.
+- `bun test` → **unstable, and the instability is in the invocation.** Bare
+  `bun test` fails about half of runs. Passing the same 26 files **explicitly**
+  gave 0 failures across 8 runs, in five orderings including bun's own
+  discovered order lifted from a junit report — at a ~50% rate that is about a
+  1-in-250 coincidence, so the difference is real. Every failure begins with a
+  **5-second timeout**, a hang rather than an error, and the
+  `graph "labkit_t1" does not exist` errors are fallout from a test abandoned
+  mid-flight. Every file passes in isolation. Root cause **not** found; it
+  points at bun's runner rather than at LabKit. See `docs/TASKS.md`.
   Three consecutive full runs failed a *different* test each time — first
   `domain-session`, then two consumer probes, then `domain-session` again — with
   `graph "labkit_t1" does not exist` as the error. Every implicated file passes
@@ -885,12 +892,16 @@ worktrees make it easier to fall into.
 
 ## Next
 
-1. **The suite flake.** Investigated and **not solved** — evidence in
-   `docs/TASKS.md`, including two of my own errors during the hunt, both worth
-   knowing before repeating it. The productive part took ninety seconds; the
-   rest was re-running the suite hoping for a pattern, which is not a method.
-   Still the most misleading thing in the repo: a suite that goes red for the
-   wrong reason trains people to ignore it.
+1. **The suite flake.** Investigated at length and **not solved.** What was
+   bought: the wound-clock probes are now their own file (`7352a5f`), halving
+   the cascade's blast radius, and the failure is localised to how bun is
+   invoked rather than to any test. Evidence and both of my wrong turns are in
+   `docs/TASKS.md`. The obvious workaround — an explicit file list in
+   `bun run test` — is recorded and deliberately **not taken**: it would make
+   the suite green without making it correct.
+   Next probe for whoever picks it up: **find what hangs.** Every failure starts
+   with a 5s timeout and the database errors are downstream of it, so chasing
+   `graph does not exist` is chasing the symptom.
 2. **An analysis cannot read another analysis's output** — the missing verb
    S-11c exposed. Needs its own demonstration: what does a caller get wrong when
    they cannot express the second stage?
