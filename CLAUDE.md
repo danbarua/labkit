@@ -98,6 +98,13 @@ is. Generation lives in `scripts/update-dependency-graph.sh` rather than a
 pipeline reports the last command's status — a crashed `depcruise` used to yield
 an empty SVG and a success code.
 
+`docs/GLOSSARY.md` is a pointer table for the shorthand this repo uses across
+documents — `D2`, `§5`, `bar 4`, the rungs, the ledger status words. It defines
+nothing itself; every entry names where the real definition lives, because a
+second copy is a second thing to go stale. Read it if a token in a journal entry
+means nothing to you; `D1`/`D2` in particular mean two unrelated things
+depending on the document.
+
 `docs/TASKS.md` is the **work queue** — what is ready to build, what needs a
 discriminator first, what waits on a decision, and what is deliberately not being
 done. It is not a record: PJ-008 §3's ledger stays authoritative on what the

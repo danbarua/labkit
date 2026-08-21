@@ -6,6 +6,9 @@ a consumer is the next probe, and `docs/consumer-contract/001_design_brief.md`
 for the protocol itself. First entry written from the `labkit-domain-consumer`
 worktree.
 
+> Shorthand in this entry — `D1/D2/D3`, `§5`, `bar 4`, the rungs, the ledger
+> status words — is glossed in `docs/GLOSSARY.md`.
+
 ## Goal
 
 Clear "the old js .json config hell cruft" and the dead allow-install entries,
@@ -117,7 +120,7 @@ does not.
 attribution (all three designers, distributed across four unanimous clusters
 rather than forming one — row S); ordering of belief over time (all three, three
 different vocabularies — row Z); and what a reconstruction was reconstructing
-(D2, row F, in almost PJ-021's own words by someone who had never heard of row
+(Designer 2, row F, in almost PJ-021's own words by someone who had never heard of row
 F). Bitemporality was demoted by the contract-necessity bar.
 
 Predictions: **2 held, 2 refuted, 1 half**. The useful failure is the prioritised
