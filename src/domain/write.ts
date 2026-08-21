@@ -827,14 +827,6 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * S-17/S-3: may this gate be relied on, and on what evidence?
-   *
-   * Every governing condition is itemised, including the ones nobody has
-   * evaluated. That is the point: S-3 requires a failed check to be
-   * distinguishable from a check never run, and an absent list entry cannot
-   * carry that difference.
-   */
-  /**
    * Amends a locked design: replaces one condition with another, recording the
    * act rather than editing the setting.
    *
@@ -1255,15 +1247,6 @@ export class WriteSurface extends SessionCore {
     return found.a.natural_id;
   }
 
-  /**
-   * A replacement must be justified by a review OF the analysis being
-   * replaced -- otherwise any review's verdict could retire any analysis,
-   * and `whySupported()` would report a withdrawal reason that never
-   * referred to the withdrawn work.
-   *
-   * This is why `Review -[:EVALUATES]-> EvidenceUnit` is not decorative: it
-   * constrains a research action, not just an explanatory query.
-   */
   private async assertCriterionGovernsGate(
     criterion: CriterionRef,
     gate: GateRef,
@@ -1293,6 +1276,15 @@ export class WriteSurface extends SessionCore {
       );
     }
   }
+  /**
+   * A replacement must be justified by a review OF the analysis being
+   * replaced -- otherwise any review's verdict could retire any analysis,
+   * and `whySupported()` would report a withdrawal reason that never
+   * referred to the withdrawn work.
+   *
+   * This is why `Review -[:EVALUATES]-> EvidenceUnit` is not decorative: it
+   * constrains a research action, not just an explanatory query.
+   */
   private async assertReviewOf(
     review: ReviewRef,
     analysis: AnalysisRef,

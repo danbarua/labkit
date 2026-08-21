@@ -705,6 +705,14 @@ export class ReadSurface extends SessionCore {
     }
     return ordered;
   }
+  /**
+   * S-17/S-3: may this gate be relied on, and on what evidence?
+   *
+   * Every governing condition is itemised, including the ones nobody has
+   * evaluated. That is the point: S-3 requires a failed check to be
+   * distinguishable from a check never run, and an absent list entry cannot
+   * carry that difference.
+   */
   async gateStatus(gate: GateRef): Promise<GateStatus> {
     const declared = await this.graph.query(
       `MATCH (g:Gate {natural_id: $id}) RETURN g`,
@@ -1271,16 +1279,6 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * "What is affected if this record is invalidated?" -- PJ-001's MVP
-   * propagation query. Deliberately the affected side only; what is *not*
-   * affected is reported by replaceAnalysis, because it depends on what the
-   * replacement rests on rather than on the invalidated record alone.
-   *
-   * Unrelated to whySupported()'s `restingOn`, which moved to CONSUMES: this
-   * asks which enquiries REQUIRE the evidence held here, not what any
-   * computation read.
-   */
-  /**
    * How much of a past construction can be rebuilt (S-9).
    *
    * The caller re-runs whatever it can and offers the hashes it got back; this
@@ -1336,6 +1334,15 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
+   * "What is affected if this record is invalidated?" -- PJ-001's MVP
+   * propagation query. Deliberately the affected side only; what is *not*
+   * affected is reported by replaceAnalysis, because it depends on what the
+   * replacement rests on rather than on the invalidated record alone.
+   *
+   * Unrelated to whySupported()'s `restingOn`, which moved to CONSUMES: this
+   * asks which enquiries REQUIRE the evidence held here, not what any
+   * computation read.
+   *
    * What is affected if this artefact turns out to be wrong?
    *
    * Two routes in, and S-9 is what forced the second. An artefact reached by

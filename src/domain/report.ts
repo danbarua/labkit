@@ -436,12 +436,6 @@ export interface SupportExplanation {
 }
 
 /**
- * A question on the record. `question` is its identity; `asks` is what it
- * says. The two are kept apart deliberately: S-1 pursues one question two
- * ways and poses two identically-worded questions, and neither may be
- * resolved by comparing text.
- */
-/**
  * What the record held at a stated moment — the as-of view (row Z).
  *
  * Deliberately a **narrower shape** than `KnowledgeSurvey`, and the narrowing is
@@ -476,6 +470,12 @@ export interface HistoricalSurvey {
   open: QuestionStanding[];
 }
 
+/**
+ * A question on the record. `question` is its identity; `asks` is what it
+ * says. The two are kept apart deliberately: S-1 pursues one question two
+ * ways and poses two identically-worded questions, and neither may be
+ * resolved by comparing text.
+ */
 export interface QuestionStanding {
   question: string;
   asks: string;
