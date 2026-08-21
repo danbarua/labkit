@@ -70,6 +70,12 @@ maintained and only the SVG goes stale, announced. Generation lives in
 because the one-liner was a pipeline, and `$?` after a pipeline reports `dot`'s
 status — a crashed `depcruise` used to yield an empty SVG and a success code.
 
+`docs/TASKS.md` is the **work queue** — what is ready to build, what needs a
+discriminator first, what waits on a decision, and what is deliberately not being
+done. It is not a record: PJ-008 §3's ledger stays authoritative on what the
+model knows, and TASKS.md points at it rather than restating verdicts. Where the
+two disagree, the ledger is right and TASKS.md is stale.
+
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
 independently; see its README. The Stop/SessionStart wiring lives in

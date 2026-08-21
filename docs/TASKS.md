@@ -1,0 +1,104 @@
+# Outstanding work
+
+**A queue, not a record.** What the model knows and does not know lives in
+`docs/project-journal/008_user_story_mining.md` §3 — the ledger is authoritative
+and this file points at it rather than restating verdicts. Two places describing
+the same state is the failure this project keeps catching; if a row's status
+here disagrees with the ledger, the ledger is right and this file is stale.
+
+Grouped by **what stops someone picking it up**, because the items are not the
+same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against
+`5e300de`.
+
+---
+
+## Ready to build
+
+Someone could start these today.
+
+- [ ] **An absent dependency path must not read as independence.**
+  `whatDependsOn()` walks a fixed set of routes and lets everything it did not
+  reach read as unaffected. Required by Designer 2; classified in
+  `consumer-contract/022` as **query semantics** (change-bar tier 1), not a model
+  change. Needs the usual shape first: **a scenario where a reader acts on
+  "unaffected" and is wrong.** Third catch on this verb — PJ-021 found it
+  returning `claims: []` for an input while still naming the enquiry.
+  *Do not* build Designer 2's `Dependency coverage assertion`; `023` §4 keeps
+  that as a discriminator for later, since certified completeness needs durable
+  state that open-world traversal does not.
+
+## Needs a discriminator before it can be built
+
+Four ledger rows sit `open` + **unowned**: every named probe has been built, so
+each needs a *new* one. These are research questions, not tickets — "do row F" is
+not actionable, and writing a scenario to satisfy a row would manufacture the
+result (PJ-011 §5).
+
+- [ ] **Row F — no artefact-to-artefact lineage.** Moved from *known absence* to
+  *consumer-required distinction*: Designer 2 independently required a durable
+  reconstruction attempt keyed on its historical target, and probe 3 demonstrated
+  a reconstruction and unrelated fresh work are the same durable state. Still has
+  not earned an edge. Cheapest of the four, and may need no structure at all —
+  S-9 answered it once with a refusal.
+- [ ] **Row S — no agent, person or role.** The strongest consumer finding: all
+  three designers required *persistent* attribution across four unanimous
+  clusters. S-8 recorded the absence as a standing decision (identity is
+  infrastructure, not domain) and three cold designers disagree. **Write-side**,
+  so a read-only contract structurally cannot settle its shape.
+- [ ] **Row O — withdrawal reason under-determined.**
+- [ ] **Row T — edges cannot carry properties.** Owned by row O, which is itself
+  unowned.
+
+## Next phase
+
+- [ ] **A thin read-only MCP/CLI adapter over the frozen contract.** PJ-023 named
+  it; `023`/`024` narrowed it. The contract exists in
+  `consumer-contract/010`–`015`; the vertical slice is the pattern. Build four
+  reads first, not twenty operations. **Two durable worlds per read, before the
+  read is written** — if the public API returns one answer where the contract
+  needs two, that is a demonstration rather than an absence.
+
+## Waiting on a decision, not on work
+
+- [ ] **Does the SVG still earn 134KB?** Both forms are committed and
+  self-maintaining; the question narrowed once a diffable form existed. Rendered
+  comparison published as an artifact. One line in
+  `scripts/update-dependency-graph.sh` either way.
+- [ ] **Should `whySupported` + `checksFrom` be their own module?** 359 lines,
+  19% of the pre-split code, straddling claims and criteria. Deferred by the user
+  during the read/write split; nothing depends on it.
+- [ ] **`package-lock.json` is still tracked on `main`** and arrives there when
+  this branch merges. Correct under the docs-on-`main` / code-on-branch split —
+  noted so it is not a surprise.
+
+## Recorded, deliberately not being done
+
+Here so nobody re-discovers them as gaps. Each has a reason, and the reason is
+better than the work.
+
+- **Bitemporality (row Z+).** Record-time versus belief-time is real and
+  unrepresentable, and **no source obligation requires it** — demoted by `023`'s
+  contract-necessity bar. `Decision.decided_at` is record time and says so.
+- **An instant on `EvidenceUnit`.** Would let `whatWasKnown()` split `open` into
+  worked-on and untouched. Nothing has needed it; `026` names where it would go
+  and says it should be earned the way `decided_at` was.
+- **`recordObservations()` creates `Evidence` with no producing `EvidenceUnit`**,
+  which PJ-001 defines as impossible (PJ-021). Three cold reviewers flagged it
+  independently and it remains true. Not owned: three scenarios have been pointed
+  at it and the harm they found was a reader's, not a structure's.
+- **Rows Y and AA** are `boundary` — characterised limits, with no claim they
+  should be fixed.
+
+---
+
+## Setup a new clone or worktree needs
+
+Not tasks, but the things that are not in the repo and will not announce
+themselves.
+
+- `git config core.hooksPath .githooks` — enables the dependency-graph hook. The
+  hook is tracked; the config is not.
+- `brew install graphviz` — optional. Without it the mermaid graph is still
+  maintained and only the SVG goes stale, announced on stderr.
+- `.claude/settings.local.json` and `.claude/.wrap-state/` are deliberately
+  untracked. See CLAUDE.md.
