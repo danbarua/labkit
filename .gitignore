@@ -26,6 +26,11 @@ package-lock.json
 #
 # What stays out is machine- or session-local:
 .claude/settings.local.json
+# hookify rules — enforcement, not record. Each encodes an incident that already
+# has a durable home in docs/TASKS.md or docs/session-log/; these files only
+# make the machine nag about it. `.local` is hookify's own convention for
+# machine-scoped rules.
+.claude/hookify.*.local.md
 # One file per session, keyed by a session UUID, holding three lines derived
 # from git. Meaningless in another checkout, rewritten constantly by concurrent
 # sessions, and swept on a timer — a tracked copy would conflict, go stale, and
