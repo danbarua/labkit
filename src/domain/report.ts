@@ -575,7 +575,10 @@ export interface QuestionStanding {
 }
 
 /**
- * What the programme knows, in three states rather than two.
+ * What the programme knows, in more states than settled-or-not. The buckets are
+ * the fields below; they have been added one scenario at a time and the count
+ * is deliberately not written here, because it was wrong for every scenario
+ * after the third (PJ-028).
  *
  * `untested` is not a weak form of `unresolved`: one is a question nothing has
  * ever been run against, the other is a question something has been run
@@ -598,7 +601,7 @@ export interface KnowledgeSurvey {
   /**
    * Answered, but on a finding nobody has promoted (S-18).
    *
-   * A fourth-and-a-half state, and the distinction the story exists for: a
+   * Its own bucket, and the distinction the story exists for: a
    * result is being relied on and the question is settled *as far as anyone has
    * taken it*, but what settles it is scratch. Kept out of `established` so
    * that reading the survey for "what do we actually know" cannot silently
@@ -609,7 +612,7 @@ export interface KnowledgeSurvey {
    * Open on purpose (S-14). Worked on, not settled, and deliberately left —
    * with the condition that would reopen it recorded on the deciding act.
    *
-   * A fourth bucket rather than a flag on `unresolved`, because a reader
+   * Its own bucket rather than a flag on `unresolved`, because a reader
    * scanning for what still needs doing must not find it there. That is the
    * whole of PJ-001's "should not accumulate ceremony" bullet: the alternative
    * is a to-do list that can never be emptied and is therefore never read.
