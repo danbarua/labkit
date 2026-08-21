@@ -177,18 +177,6 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   TRIGGERS: [["CriterionEvaluation", "Gate"]],
   GATES: [["Gate", "Task"], ["Gate", "Computation"]],
   /**
-   * What a decision withdrew or replaced. A design condition (S-7), an
-   * interpretation (S-12).
-   *
-   * The `Claim` pair is earned by S-12. With only a `Review` recording that an
-   * interpretation had been criticised, `whySupported()` went on reporting the
-   * retracted sentence as supported — the record confidently asserting
-   * something the reviewer had just withdrawn, which is the worst thing a
-   * provenance system can do. A review is not a retraction: reviews also
-   * confirm, and telling the two apart from a free-text verdict would be
-   * text-matching.
-   */
-  /**
    * "Re-checked that finding, without reproducing the run behind it." Earned
    * by S-10.
    *
@@ -234,6 +222,18 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * happened.
    */
   PROMOTES: [["Decision", "Claim"]],
+  /**
+   * What a decision withdrew or replaced. A design condition (S-7), an
+   * interpretation (S-12).
+   *
+   * The `Claim` pair is earned by S-12. With only a `Review` recording that an
+   * interpretation had been criticised, `whySupported()` went on reporting the
+   * retracted sentence as supported — the record confidently asserting
+   * something the reviewer had just withdrawn, which is the worst thing a
+   * provenance system can do. A review is not a retraction: reviews also
+   * confirm, and telling the two apart from a free-text verdict would be
+   * text-matching.
+   */
   CHANGES: [["Decision", "Criterion"], ["Decision", "Claim"]],
   BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
   RESOLVES: [["Decision", "Question"]],
