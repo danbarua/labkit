@@ -683,12 +683,12 @@ this document's original analysis are marked as such.
 | L | No execution input lineage | S-11 | resolved |
 | M | A review has no analysis to point at | S-11 | resolved |
 | N | Claim identity is undefined | S-5, S-12 | resolved |
-| O | Withdrawal reason is under-determined | S-3, S-7 | open |
+| O | Withdrawal reason is under-determined | S-3, S-7, **S-11b** | resolved |
 | P | `Evidence` carries two senses | **S-9**, S-10, S-12 | resolved |
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, **S-18** | resolved |
 | S | No agent, person or role exists in the model | S-8 | open |
-| T | Edges cannot carry properties | S-7, row O | open |
+| T | Edges cannot carry properties | S-7, ~~row O~~ | open |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
@@ -1032,7 +1032,7 @@ PJ-023.
 
 ### Row O — Withdrawal reason is under-determined
 
-**Scenarios:** S-3, S-7 · **Status:** open
+**Scenarios:** S-3, S-7, **S-11b** · **Status:** resolved
 
 **Current state (verified):** `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation
 
@@ -1046,6 +1046,55 @@ PJ-023.
 **S-7: prediction held — did not bite.** An amendment names its own cause, so the ambiguity O describes never arose. Still deferred
 
 **S-12: still does not bite.** A reinterpretation mints both the review and the decision that acted on it, so which review caused the change is recorded rather than inferred. Note what this establishes in passing: a review is *not* a retraction — reviews also confirm, and distinguishing them from a free-text verdict would be text-matching. That is why the `Decision` exists at all here
+
+**S-11b (2026-08-21): resolved, and the row's own description of itself was
+wrong.** See `docs/consumer-contract/031`, `032`.
+
+*The gap was absence, not ambiguity.* This cell says the causal review is
+ambiguous when several review one unit. In fact `replaceAnalysis()` took
+`because`, checked it reviewed the analysis being replaced, and wrote it
+**nowhere** — the reference reached the event stream and stopped. The causal
+review was absent with *one* review. Two reviews are only what makes the absence
+visible, because with one the arbitrary pick happens to be right. Every scenario
+before this had at most one review per analysis, so the read was correct by
+coincidence in every world the corpus contained — which is how the deferral
+survived eleven scenarios.
+
+*The wrong answer.* `whySupported()` reported a superseded finding's reason from
+`OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)` — any review of the unit. With a
+critical review and a confirming one on one analysis, it reported *"numbers check
+out; independently recomputed the same values"* as a reason the work was
+retracted: an approval presented as a retraction. Two worlds differing only in
+which review the researcher acted on were byte-identical to every read on the
+surface. A second defect in the same line reported one supersession twice, with
+contradictory reasons.
+
+*The remedy, with rung 1 built and shown insufficient.* Dedupe plus dropping the
+verdict attribution removes the wrong answer and leaves both worlds saying *"its
+analysis was replaced"* — honest and uninformative. What earns the edge is not an
+ugly query but that `because` was supplied, validated and discarded, which is row
+AB's shape. `INVALIDATED_BY: Artefact → Review`, one label, one pair, no noun, no
+migration.
+
+*The prediction that was refuted is the useful one.* `031` predicted a new
+endpoint pair on an **existing** label. `BASED_ON` reads almost perfectly — and
+row **AA** is a live boundary recording that it already carries two senses, so a
+third would have widened a boundary row while closing an open one, firing
+CLAUDE.md's nomination rule on the same commit. The general preference for an
+existing label is subordinate to a specific fact recorded four scenarios earlier
+by someone who would not be present for this build. `EVALUATES` failed
+next door: `Review → Evidence` means *this was reviewed*, and reusing it for
+*this caused the retraction* is one edge with two readings.
+
+*What the challenge got wrong.* The row was taken up on an external challenge,
+and a challenge is a prediction with a different author. Its **discriminator
+cannot be built**: it proposed invalidating the causal review, and `invalidated`
+is a property of `Artefact` alone while `ReviewProps` is `{ verdict }` — nothing
+can invalidate a review. Its **reasoning was right and decisive**: the cell
+deferred to the event model on the grounds that this describes *why state
+changed*, while its own verified-state line describes a present-tense question.
+Wrong about the experiment, right about the reasoning, and the reasoning is the
+part no amount of running things would have recovered
 
 ### Row P — `Evidence` carries two senses
 
@@ -1171,6 +1220,20 @@ any other. This row therefore has no owner again until identity work begins.
 **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed
 
 **S-7: prediction held — no pressure.** The amendment `Decision` is the reification; reason, evidence and order all have a node to live on. Untested still
+
+**S-11b (2026-08-21): orphaned.** Row O was this row's only named owner and is
+now resolved — by `INVALIDATED_BY`, a plain edge with **no properties**. So T
+contributed nothing to the remedy and has no named owner at all. Predicted
+before the build (`031`) rather than noticed after it.
+
+Recorded here rather than handed the durable-event-sink phase as a substitute:
+an unbuilt *phase* is not a scenario, and naming one turns "we have no
+discriminator" into "it's handled", which is the failure the ownership taxonomy
+exists to prevent. T is `open` + unowned and needs a **new** discriminator — a
+case where reifying the fact to a node is genuinely worse than a property on the
+edge would be. Three rows have now been settled by giving the fact its own node
+or its own edge (S-7's amendment `Decision`, S-12's, and this one), which is
+mild evidence against the row rather than for it
 
 ### Row U — A gate records no condition until it is evaluated
 

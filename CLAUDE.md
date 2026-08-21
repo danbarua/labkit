@@ -60,7 +60,11 @@ rejected. That probe also produced **row AD**, carrying a fourth status and the
 only one with a deadline: `demonstrated`, where the wrong answer is on the
 record and what is unbuilt is the fix. **AD was opened and closed the same day**
 (`029`, `030`) — `recordObservations()` now mints the `EvidenceUnit` PJ-001 says
-must exist, one node and two edges, no migration. Read §3's legend before
+must exist, one node and two edges, no migration. **Row O closed the same day
+too** (`031`, `032`), on an external challenge rather than a prediction of this
+project's own: `INVALIDATED_BY: Artefact → Review` records which review a
+retraction rested on, where before `replaceAnalysis()` validated `because` and
+wrote it nowhere. That **orphans row T**, whose only named owner it was. Read §3's legend before
 treating the four kinds as one pile.
 
 **This file is a third copy of the ledger's state, and only a reader can

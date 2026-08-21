@@ -8,7 +8,7 @@ here disagrees with the ledger, the ledger is right and this file is stale.
 
 Grouped by **what stops someone picking it up**, because the items are not the
 same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against
-`17b9976`.
+`d33734a`.
 
 ---
 
@@ -32,8 +32,12 @@ Someone could start these today.
 - **Row Z** — historical ordering. `Decision.decided_at`, one property, no
   migration (`consumer-contract/025`, `026`).
 - **Row AD** — observation-only work reading as no work. One node, two edges, no
-  migration (`029`, `030`). `recordObservations()` is now transactional, and
-  `bun run check:ledger` reports no demonstrated wrong answer shipping green.
+  migration (`029`, `030`). `recordObservations()` is now transactional.
+- **Row O** — which review a retraction rested on. One edge label,
+  `INVALIDATED_BY: Artefact → Review`, no migration (`031`, `032`). Taken up on
+  an external challenge whose *discriminator was unbuildable* and whose
+  *reasoning was right*; the row's own cell had described the gap as ambiguity
+  when it was absence.
 
 ## Needs a discriminator before it can be built
 
@@ -56,28 +60,12 @@ result (PJ-011 §5).
   clusters. S-8 recorded the absence as a standing decision (identity is
   infrastructure, not domain) and three cold designers disagree. **Write-side**,
   so a read-only contract structurally cannot settle its shape.
-- [ ] **Row O — withdrawal reason under-determined.** **Deferral withdrawn on
-  challenge** (`labkit-review`, 2026-08-21): the cell defers to the event model
-  as a *why state changed* question while its own verified-state line describes
-  a *what is true now* one, and `replaceAnalysis` requiring a review of the
-  analysis being replaced already closes half of it. The candidate
-  discriminator — an analysis retired on the strength of a review that is later
-  itself invalidated; does the retirement still read as resting on valid
-  grounds? — needs **no event sink**. Predictions first: if the propagation
-  query comes back correct, that is a result and the cell can finally say why it
-  stays unowned in terms of something that was run.
-  A refuted *challenge* needs no new ledger convention — **it is a prediction
-  with a different author**, and rows A and B keep refuted predictions because
-  someone committed to an outcome before the build, not because of who they
-  were. Only the attribution line changes. If it goes that way, the cell must
-  say **what the challenge got wrong**, not that it was wrong: *"the deferral was
-  right, and here is the reason"* is a verdict; *"the challenge was refuted"* is
-  the shrug this row has had for eleven scenarios.
-- [ ] **Row T — edges cannot carry properties.** **Orphaned.** Its only named
-  owner was row O, and if O is settled by a plain `Decision → Review` edge then T
-  contributes nothing to it and loses that owner. Says so in its own cell rather
-  than being handed a future phase as a fake owner — an unbuilt *phase* is not a
-  scenario, and naming one turns "we have no discriminator" into "it's handled".
+- [ ] **Row T — edges cannot carry properties.** **Orphaned**, as predicted. Row
+  O was its only named owner and closed with `INVALIDATED_BY`, a plain edge with
+  no properties — so T contributed nothing and has no owner at all. Needs a
+  genuinely new discriminator: a case where reifying the fact to a node is worse
+  than a property on the edge would be. Three rows have now been settled by
+  giving the fact its own node or edge, which is mild evidence *against* the row.
 
 ## Next phase
 
