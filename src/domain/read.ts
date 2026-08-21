@@ -1361,6 +1361,19 @@ export class ReadSurface extends SessionCore {
     rebuilt: Array<{ part: ObservationsRef; hash: string }>,
   ): Promise<ReproducibilityReport> {
     const offered = new Map(rebuilt.map((r) => [r.part.id, r.hash]));
+
+    // An absent subject and an empty one are different states, and answering
+    // them alike is what let this report say `reproducible: true` about nothing
+    // (S-9e). The existence check is separate from the parts query because both
+    // return zero rows and only one of them is a caller error -- there is a real
+    // analysis to refuse a report about, so this is not a manufactured refusal.
+    const subject = await this.graph.query(
+      `MATCH (c:Computation {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { id: analysis.id },
+    );
+    if (subject.length === 0) throw new Error(`no analysis ${analysis.id}`);
+
     const parts = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
       { a: vertexProps<{ natural_id: string; logical_name: string; content_hash?: string }>() },
@@ -1399,8 +1412,20 @@ export class ReadSurface extends SessionCore {
       notRebuilt: notRebuilt.sort(byName),
       // Anything not shown to match leaves the construction unshown. Saying
       // otherwise is the quiet inheritance S-9 forbids.
+      //
+      // `exact.length > 0` is the conjunct three empty lists cannot supply: an
+      // analysis that consumed nothing satisfies "nothing differed, nothing was
+      // unverifiable, nothing went unrebuilt" vacuously, and reported that a
+      // construction with no parts reproduces (S-9e). The rule was already
+      // written out one function away -- `reproductionOf()`'s "absence on BOTH
+      // sides is still absence: two runs that each recorded nothing have not
+      // reproduced anything" -- and never travelled to the function whose own
+      // docstring says that rule was learned here.
       reproducible:
-        differing.length === 0 && unverifiable.length === 0 && notRebuilt.length === 0,
+        exact.length > 0 &&
+        differing.length === 0 &&
+        unverifiable.length === 0 &&
+        notRebuilt.length === 0,
     };
   }
 

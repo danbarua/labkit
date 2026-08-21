@@ -381,6 +381,12 @@ export interface ReproducibilityReport {
    * rebuilt and matched: anything differing, unverifiable or not attempted
    * leaves the construction unshown, and this is the field that must not
    * quietly say otherwise.
+   *
+   * **And false when there were no parts at all** — the sentence above was
+   * satisfied vacuously by an analysis that consumed nothing, so this reported
+   * that a construction with nothing in it reproduces (S-9e). At least one part
+   * must be in `exact`. An analysis whose subject does not exist is refused
+   * rather than reported on; absent and empty are different states.
    */
   reproducible: boolean;
 }
