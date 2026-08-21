@@ -105,6 +105,26 @@ and the first to produce a wrong answer instead of an untidy one. The rule that
 kept it deferred was right each of those three times, and it is what makes the
 fourth mean something.
 
+## Is AD one finding split in two to improve the arithmetic?
+
+Worth asking, because AD was found by a row F probe and a row that appears
+alongside a disappointing result is exactly the kind that gets invented. The test
+is not a judgment call: **do the two share a cause, or share a fix?**
+
+- *Cause.* AD is `recordObservations()` minting no unit. F is the absence of a
+  recoverable reconstruction target. Unrelated mechanisms.
+- *Fix.* Minting a unit clears AD and leaves F exactly where it is. Adding
+  lineage clears F and leaves the question still reading `untested`.
+
+Neither holds, so they are two rows. Found *by* an F probe is not *about* F.
+
+The sharper residual question is whether AD belongs in the **ledger** at all,
+since §3 tracks predicted design pressure and this is a demonstrated defect in a
+shipped read. Ledger, on this project's own precedent: row P was resolved in the
+query and stayed a row, and the deferral rule locates demonstrated wrong answers
+in the ledger by construction — which is precisely why the ledger now needs a
+status that can say so.
+
 ## What this changes about the queue
 
 CLAUDE.md permits **one** confirmed wrong answer shipping green, and requires

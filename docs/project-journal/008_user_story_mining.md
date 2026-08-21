@@ -698,13 +698,17 @@ this document's original analysis are marked as such.
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
-| AD | Observation-only work on a question reads as no work at all | **S-9b** | open |
+| AD | Observation-only work on a question reads as no work at all | **S-9b** | demonstrated |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
 be one. `resolved (argued)` — settled, but the closing move was an argument
 rather than a demonstrated wrong answer; weaker, and scannable as such rather
-than distinguished only in the prose below. `deferred` — real, deliberately not
+than distinguished only in the prose below. `demonstrated` — a wrong answer is
+on the record and the **fix** is what is unbuilt; CLAUDE.md permits at most one
+of these at a time and requires clearing it next, and
+`bun run check:ledger` fails when a second appears, so the rule is an
+invariant rather than an intention. `deferred` — real, deliberately not
 acted on, **and with a scenario named that would settle it**. `boundary` — a
 known limit of the current model, recorded rather than fixed.
 
@@ -720,7 +724,7 @@ to be that well informed:
 | --- | --- | --- |
 | `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T |
-| `open` + **demonstrated** | a wrong answer is on the record and the fix is what is unbuilt | **AD** |
+| `demonstrated` | a wrong answer is on the record and the fix is what is unbuilt | **AD** |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
 The **demonstrated** kind is new with row AD and is the only one with a
@@ -730,6 +734,13 @@ appearing before AD is cleared is a rule violation on its face, not a judgment
 call. It is distinguished from `open` + unowned because nothing about it is
 waiting for a discriminator — S-9b's seventh test is the discriminator, and what
 is unbuilt is the fix.
+
+It exists because the deferral rule **already referenced this state and the
+vocabulary could not express it**. "At most one confirmed wrong answer ships
+green" has a precondition the ledger had no way to mark, so whether the rule was
+engaged could only be established by reading prose — which is row K's failure
+mode exactly, a condition recorded where nobody re-reads it. A fourth label that
+nothing counts would repeat that, so `bun run check:ledger` counts it.
 
 Only the second kind is a gap in the *method* — CLAUDE.md's deferral rule says
 a row that cannot name a scenario is unresolved and unowned rather than
