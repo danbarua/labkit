@@ -839,11 +839,38 @@ the existing one on `reconcile()`, and I committed before reading
 second of mine — and the first caught **in the act** rather than months later,
 which is the argument for the check.
 
+**Row AE — demonstrated and resolved the same hour** (`0b2bbb3`, `e6e6293`).
+The missing verb S-11c exposed, taken from gap to fix.
+
+*The wrong answer.* `recordAnalysis({ from })` took only observations handles, so
+a two-stage pipeline had one recordable form: re-enter the intermediate as if it
+were fresh measurement. Stage two then reported **`reproducible: true`** while
+resting on a raw series the record itself called `unverifiable` — the field
+CLAUDE.md says "must not quietly say otherwise", saying otherwise. §5 cleared.
+
+*The fix, at rung 2, and the cheap candidate was enough.* `from` accepts an
+`AnalysisRef`; `CONSUMES: Computation → Artefact` carries it, because that edge
+already existed and already meant *this run read that*, and an analysis output is
+an `Artefact` like any other. **No new edge, noun or migration.** The obvious
+remedy — a verb for "stage two reads stage one" — was not needed.
+
+*What it does not fix, asserted rather than implied.* `whatDependsOn()` is one
+hop and still stops at the stage-one claim. S-11c's omission had **two causes
+stacked** — a severed chain *and* a short traversal — and this fixed only the
+first. `routesWalked` and `complete: false` already stop the short answer reading
+as complete, which is what that caveat was built for.
+
+*Four hookify rules added* (`.claude/`, gitignored), each from something that
+happened today: committing while `check:doc-comments` was failing; a backtick in
+a double-quoted `-m` executing `bun test` inside the commit; overlapping globs
+yielding five duplicate paths; `git add -A`. All warn, none block.
+
 ## Verified
 
 Run on `80c605b`, the final commit.
 
-- `bun test` → 226 tests, **unstable**: runs give 0-2 failures with wall times
+- `bun test` → **229 pass / 0 fail**, 28 files, 79.6s on the final run. Still
+  intermittently unstable: runs give 0-2 failures with wall times
   between 74s and 135s. Mechanism known (below), fix outstanding. Formerly
   reported as **cause unknown**. Bare `bun test` fails about
   half of runs. Every failure begins with a **5-second timeout** — a hang, not
@@ -1046,10 +1073,12 @@ worktrees make it easier to fall into.
    suspect is `pg_advisory_xact_lock` in `provisionTenantGraph()`, which every
    test contends on under the same key. Control for machine load: sibling
    sessions running `bun test` invalidated an earlier dataset.
-2. **An analysis cannot read another analysis's output** — the missing verb
-   S-11c exposed. Needs its own demonstration: what does a caller get wrong when
-   they cannot express the second stage?
-3. **The thin read-only MCP/CLI adapter** over the frozen contract. Four reads,
+2. ~~An analysis cannot read another analysis's output~~ — **done**, row AE.
+3. **`whatDependsOn()` is one hop.** The chain now exists in the record and the
+   query still does not walk it. Query semantics, and the caveat fields already
+   stop it lying — but a reader wanting the real blast radius has to walk it
+   themselves.
+4. **The thin read-only MCP/CLI adapter** over the frozen contract. Four reads,
    two durable worlds each, before the read is written.
 
 **Row F is the expensive one and is not next.** Its discriminator now names a
