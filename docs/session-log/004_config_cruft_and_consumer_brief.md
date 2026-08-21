@@ -282,8 +282,10 @@ so it could see them.
 
 Twenty-five commits ahead of `origin/feat/domain-consumer`, nothing held back.
 
-**The dependency graph is now self-maintaining** (`1679b88`), which is what that
-staleness prompted. It had been hand-regenerated three times in this history and
+**The dependency graph was made self-maintaining** (`1679b88`) and then
+**un-made** (`ce97456`, at the user's call) — see below. What follows is why it
+was built, kept because the reasoning against it only makes sense against the
+reasoning for it. It is what that staleness prompted. It had been hand-regenerated three times in this history and
 was stale in HEAD twice on 2026-08-20 alone; the user committed the post-split
 regeneration as `3b769c0` mid-session.
 
@@ -706,7 +708,25 @@ scenario.
 Row F needs no new probe — it needs the adapter phase's reconstruction-provenance
 read to fail against real state, per `023`'s own sequencing.
 
-**Two journal entries are the user's to commission, and deliberately unwritten:**
+**The hook and the SVG are gone** (`ce97456`). Documentation that rewrites
+itself inside someone else's commit costs more than it buys: it put a generated
+artefact in every code commit's diff, and the byte-stability work existed to stop
+that being noise rather than to make it useful. The SVG went for its own reasons
+— 134KB and 1,444 lines in which a moved edge is invisible, against 3KB of
+mermaid that renders on GitHub and diffs. `bun run dev:dependency-cruiser`
+regenerates by hand; `npx depcruise-fmt -T dot` recovers an SVG on demand. The
+script's per-stage error checking survived, since the pipeline-`$?` trap does not
+care how many outputs there are.
+
+**Both journal entries are written** (`2be5cb1`), at the user's direction.
+**PJ-025** — a condition recorded where nobody re-reads it is not a mechanism;
+rows K, Z and P all fired unread, and the cause is that a ledger's conditions are
+written by someone who will not be the one reading them. **PJ-026** — a
+predictions document may state what will happen and what would refute it, and may
+not rank the outcomes by how impressive they would be; `027` is left unedited
+with its offending sentence in place, as the evidence.
+
+The record of what those entries were, before they existed:
 the three fired conditions (K, Z, P — each reading *"if X, then this row moves"*
 with X happening unnoticed), and the rule that a predictions document may not say
 in advance which outcome would be more impressive, for which `027` is the
