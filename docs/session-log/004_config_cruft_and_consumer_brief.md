@@ -14,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Forty-five commits, range clean apart from `8299ecb` and `3b769c0` (dependency
+Forty-seven commits, range clean apart from `8299ecb` and `3b769c0` (dependency
 graph regenerations, committed by the user) — no other session's work in it.
 
 ```
