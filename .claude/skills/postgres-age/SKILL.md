@@ -172,11 +172,13 @@ SELECT (properties::text)::jsonb ->> 'natural_id' AS natural_id
 FROM "labkit_t1"."Question";
 ```
 
-Each tenant's CQRS read-side views (`src/db/provisioning.ts`'s `ensureView()`, one
-per label, e.g. `"labkit_t1".question`) use exactly this pattern — no
-`cypher()` call, no `::vertex`-suffix parsing, just ordinary
-schema-qualified SQL, scoped per tenant so there's never a naming collision
-between tenants' views.
+LabKit used exactly this pattern for a per-tenant CQRS view per label
+(`"labkit_t1".question` and so on) — no `cypher()` call, no `::vertex`-suffix
+parsing, just ordinary schema-qualified SQL. **Those views were removed on
+2026-08-19** after eight scenarios without a reader, and `ensureView()` went
+with them; `git show 51b70d6:src/db/provisioning.ts` has the implementation.
+The pattern above is still the right one if a relational projection ever pays
+again — the MCP/CLI read layer is where it would.
 
 **Provisioning is reconciliation, not a one-time gate.** `create_graph`/
 `create_vlabel`/`create_elabel`/index/view creation all happen via

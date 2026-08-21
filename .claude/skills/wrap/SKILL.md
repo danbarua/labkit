@@ -250,8 +250,10 @@ covers what comes next.
   id — which was then tested, on 2026-08-20, and is **false in this build for
   both triggers**: manual `/compact`, and auto-compaction on context
   exhaustion (one session compacted twice). The id is preserved, the state file
-  survives untouched, and the branch is never reached. What it would have cost
-  had the premise held: a session's second half opening a second numbered entry
+  survives untouched, and the branch is not reached *by compaction*. It **is**
+  reached by a fork, which does re-issue the id -- see §Forking above, added
+  after this bullet and leaving it saying "never" for a while. What it would
+  have cost had the compaction premise held: a session's second half opening a second numbered entry
   while its first half sits in one nobody updates again.
 - **`collect.sh` warns when the range is wider than the session.** `baseline`
   is pinned at session start and never moves, which is right until a session is

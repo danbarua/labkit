@@ -335,9 +335,15 @@ export interface ReproductionReport {
  * (S-9d) — hiding, in that case, that a regeneration with inferred provenance
  * was underneath a conclusion.
  *
- * Named for what it is rather than for either caller: the first version of this
- * was `IdentifiedArtefact`, which stopped being accurate the moment a second read
- * needed it.
+ * Named for what it is rather than for either caller: this was `ReproducedPart`
+ * until a second read needed it, at which point the name described one caller's
+ * use of it rather than the thing.
+ *
+ * The sentence above said `IdentifiedArtefact` — the **new** name — as though it
+ * were the old one, directly over the declaration. Written in the same hunk as
+ * the rename, in the commit that was itself fixing a comment that disagreed with
+ * its code. That is PJ-028's headline: the fix went where the author was
+ * looking, and the prose one line up did not.
  */
 export interface IdentifiedArtefact {
   /** The observations handle — identity, and the only thing that is. */
@@ -495,11 +501,19 @@ export interface SupportExplanation {
    */
   unmet: string[];
   /**
-   * Observations the supporting findings ultimately rest on, by the **name**
-   * they were recorded under — `recordObservations({ name })`, not the
-   * `finding` text. Two different strings describe an observation set, and
-   * asserting on the wrong one is a mistake this project has already made
-   * once.
+   * Observations the supporting findings ultimately rest on — **identified**,
+   * not named.
+   *
+   * `name` is `recordObservations({ name })` and never the `finding` text; two
+   * different strings describe an observation set and asserting on the wrong
+   * one is a mistake this project has already made. But the name is not the
+   * identity: `part` is, and `IdentifiedArtefact` says in its own docstring
+   * that *"two parts may legitimately share"* a name. Keying on the name
+   * collapsed two same-named inputs into one entry (S-9d).
+   *
+   * This field was `string[]` and this docstring told the reader to key on the
+   * name. The commit that widened the type left the instruction standing, so
+   * it went on recommending exactly the mistake it had just fixed.
    */
   restingOn: IdentifiedArtefact[];
   /** Findings withdrawn because their analysis was replaced — bullet 5. Either bearing. */

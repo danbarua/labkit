@@ -10,7 +10,8 @@
  * Two properties, and they are different:
  *
  *   - **structural**: no write verb is reachable, and every tool declares
- *     itself read-only. Derived from `WriteSurface.prototype`, never listed.
+ *     itself read-only. Derived from both surfaces the server holds, never
+ *     listed — see tests/helpers/read-only.ts.
  *   - **behavioural**: the seven tools answer, over the wire, what the read
  *     surface answers directly.
  */
@@ -19,11 +20,12 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ReadSurface, ResearchSession, WriteSurface, inMemoryEventLog, type Clock } from "../src/domain";
+import { ReadSurface, ResearchSession, inMemoryEventLog, type Clock } from "../src/domain";
 import { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
 import { TOOLS } from "../src/mcp/tools";
 import { openScenario, type Scenario } from "./helpers/scenario";
+import { writeVerbNames, writeVerbsCalledIn } from "./helpers/read-only";
 
 let scenario: Scenario;
 beforeAll(async () => { scenario = await openScenario(); });
@@ -46,11 +48,14 @@ describe("structure", () => {
   });
 
   test("no write verb name appears anywhere under src/mcp", () => {
-    const writeVerbs = Object.getOwnPropertyNames(WriteSurface.prototype).filter(
-      (n) => n !== "constructor" && !n.startsWith("_"),
-    );
-    expect(writeVerbs.length).toBeGreaterThan(10);
-    expect(writeVerbs.filter((v) => new RegExp(`\\b${v}\\s*\\(`).test(mcpSource))).toEqual([]);
+    // Both surfaces the server holds, not only WriteSurface -- it builds a
+    // TenantGraph, whose createNode/createEdge are writes that a list derived
+    // from WriteSurface can never contain. PJ-028 found that hole here and in
+    // the CLI at the same time; tests/helpers/read-only.ts states what the
+    // check proves and what it does not.
+    expect(writeVerbNames().length).toBeGreaterThan(10);
+    expect(writeVerbNames()).toContain("createEdge");
+    expect(writeVerbsCalledIn(mcpSource)).toEqual([]);
   });
 
   test("every tool names a real read-surface method and declares itself read-only", async () => {

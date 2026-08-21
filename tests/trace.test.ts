@@ -9,7 +9,7 @@
  * and per-connection totals.
  */
 import { afterEach, expect, test } from "bun:test";
-import { traced, traceTotals } from "../src/db/trace";
+import { traced, traceTotals, tracedInFlight } from "../src/db/trace";
 import type { LabKitDB } from "../src/db/client";
 
 const stub: LabKitDB = { async query() { return { rows: [] }; } };
@@ -51,14 +51,29 @@ test("when on, it wraps and counts per connection", async () => {
 
 test("a throwing query is still cleared from the in-flight set", async () => {
   process.env.LABKIT_TRACE = "1";
+
+  // Both directions, because only the pair proves anything. Asserting the set
+  // is empty afterwards is satisfied by a tracker that never records at all.
+  let release!: () => void;
+  const pending: LabKitDB = {
+    query: () => new Promise((resolve) => { release = () => resolve({ rows: [] }); }),
+  };
+  const slow = traced(pending, "conn-pending");
+  const inProgress = slow.query("SELECT waiting");
+  expect(tracedInFlight().filter((q) => q.connection === "conn-pending")).toHaveLength(1);
+  release();
+  await inProgress;
+  expect(tracedInFlight().filter((q) => q.connection === "conn-pending")).toEqual([]);
+
+  // And the failure mode this test exists for: a leaked entry would make the
+  // watchdog report a phantom stuck query forever, which is the one thing that
+  // would make this module lie. Until PJ-028 it was described in a comment
+  // above `expect(true).toBe(true)` -- and moving `inFlight.delete(id)` out of
+  // traced()'s `finally` left the whole suite green.
   const boom: LabKitDB = { async query() { throw new Error("nope"); } };
   const t = traced(boom, "conn-boom");
   await expect(t.query("SELECT bad")).rejects.toThrow(/nope/);
-  // Nothing to assert directly -- the in-flight map is module-private -- but a
-  // leaked entry would make the watchdog report a phantom stuck query forever,
-  // which is the one failure mode that would make this tool lie. The `finally`
-  // in traced() is what prevents it; this test exists so removing it is loud.
-  expect(true).toBe(true);
+  expect(tracedInFlight().filter((q) => q.connection === "conn-boom")).toEqual([]);
 });
 
 test("parameters are never emitted", async () => {

@@ -2,15 +2,28 @@
  * Runnable, end-to-end walkthrough of LabKit's persistence layer: connect
  * (leader election), migrate, resolve the default tenant (provisioning its
  * AGE graph), build the journal's worked example provenance chain, then
- * read it back through the CQRS views — printing ONLY natural ids. If a raw
- * AGE graphid (a large bigint) ever shows up in this script's output,
- * something in the containment boundary (TenantGraph.createNode / the
- * per-tenant views) has regressed.
+ * read it back — printing ONLY natural ids. If a raw AGE graphid (a large
+ * bigint) ever shows up in this script's output, the containment boundary
+ * (`TenantGraph.createNode`) has regressed.
+ *
+ * **It read back through the per-tenant CQRS views, and those were deleted on
+ * 2026-08-19 (`af5a1d2`).** It has been dying at
+ * `relation "labkit_t1.claim" does not exist` for 221 commits, and nobody
+ * noticed because CLAUDE.md said to ignore its exit code — a rule added the
+ * same day, *after* the break, so the genuine failure had no watcher either.
+ * The read-back now goes through `graph.query()`, which is the only read path
+ * that exists.
+ *
+ * **The exit code means something again.** It used to exit 99 on a completely
+ * successful run — a PGlite WASM teardown artefact — which is why the rule
+ * existed. An explicit `process.exit(0)` after the last line makes success 0
+ * and any throw non-zero, so this is a check rather than something a person
+ * has to read.
  *
  * Usage: bun examples/full-lifecycle.ts
  * See ./full-lifecycle.md for the checklist this script exists to satisfy.
  */
-import { connectDb, resolveTenantContext, TenantGraph } from "../src/db";
+import { connectDb, resolveTenantContext, TenantGraph, vertexProps } from "../src/db";
 
 const conn = await connectDb(process.cwd());
 console.log(`connected as ${conn.role}`);
@@ -63,19 +76,49 @@ await graph.createEdge(evidenceUnit.natural_id, "PRODUCES", evidence.natural_id)
 await graph.createEdge(evidence.natural_id, "SUPPORTS", claim.natural_id);
 console.log("linked the provenance chain");
 
-console.log("\n--- reading back through CQRS views (natural ids only) ---");
+console.log("\n--- reading back through the graph (natural ids only) ---");
 
-const claims = await conn.db.query<{ natural_id: string; name: string; kind: string }>(
-  `SELECT natural_id, name, kind FROM "${ctx.graphName}".claim WHERE name = $1`,
-  [claim.properties.name],
+const claims = await graph.query(
+  `MATCH (c:Claim {name: $name}) RETURN c`,
+  { c: vertexProps<{ natural_id: string; name: string; kind: string }>() },
+  { name: claim.properties.name },
 );
-console.log("claims:", claims.rows);
+console.log("claims:", claims.map((r) => r.c));
 
-const computations = await conn.db.query<{ natural_id: string; external_run_id: string; status: string }>(
-  `SELECT natural_id, external_run_id, status FROM "${ctx.graphName}".computation WHERE external_run_id = $1`,
-  ["run-42"],
+const computations = await graph.query(
+  `MATCH (c:Computation {external_run_id: $run}) RETURN c`,
+  { c: vertexProps<{ natural_id: string; external_run_id: string; status: string }>() },
+  { run: "run-42" },
 );
-console.log("computations:", computations.rows);
+console.log("computations:", computations.map((r) => r.c));
+
+// The whole point of the script: nothing above may have leaked a graphid.
+// Asserted rather than left for a reader to spot, because a reader is exactly
+// what this script went without for 221 commits.
+// Anchored on *this* run's question. The script appends to a persistent tenant
+// rather than starting clean, so an unanchored walk finds every previous run's
+// chain too -- which is how the first version of this assertion failed.
+const chain = await graph.query(
+  `MATCH (q:Question {natural_id: $question})-[:MOTIVATES]->(l:LineOfEnquiry)<-[:ADDRESSES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)-[:SUPPORTS]->(c:Claim)
+   RETURN q, l, u, e, c`,
+  {
+    q: vertexProps<{ natural_id: string }>(),
+    l: vertexProps<{ natural_id: string }>(),
+    u: vertexProps<{ natural_id: string }>(),
+    e: vertexProps<{ natural_id: string }>(),
+    c: vertexProps<{ natural_id: string }>(),
+  },
+  { question: question.natural_id },
+);
+if (chain.length !== 1) throw new Error(`expected one provenance chain, walked ${chain.length}`);
+for (const [name, node] of Object.entries(chain[0]!)) {
+  if (!/^[A-Z]+_\d+$/.test(node.natural_id))
+    throw new Error(`${name} carries ${node.natural_id}, which is not a natural id`);
+}
+console.log("walked the chain end to end:", Object.values(chain[0]!).map((n) => n.natural_id).join(" -> "));
 
 await conn.close();
 console.log("\nclosed connection cleanly");
+
+// Explicit, so the exit code is a verdict rather than a teardown artefact.
+process.exit(0);

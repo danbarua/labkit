@@ -104,6 +104,23 @@ function ensureWatchdog(stuckMs: number): void {
   watchdog.unref?.();
 }
 
+/**
+ * What is in flight right now, as a snapshot.
+ *
+ * The watchdog above is the production consumer; this exists so the claim can
+ * be **asserted** rather than described. `tests/trace.test.ts` used to say in a
+ * comment that a thrown query must not leave a phantom entry — the one failure
+ * mode that would make this module lie — and then assert `expect(true)`, which
+ * is a second copy of the claim rather than a check on it (PJ-028). Moving
+ * `inFlight.delete(id)` out of the `finally` left the whole suite green; with
+ * the snapshot exported it fails, which is the difference.
+ *
+ * A copy, not the map: a caller holding the live map could clear it.
+ */
+export function tracedInFlight(): Array<{ id: number; connection: string; sql: string }> {
+  return [...inFlight].map(([id, q]) => ({ id, connection: q.connection, sql: q.sql }));
+}
+
 /** Per-connection totals, for answering "how much work was this test doing?". */
 const counts = new Map<string, { queries: number; totalMs: number }>();
 
