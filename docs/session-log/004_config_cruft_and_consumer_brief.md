@@ -791,11 +791,61 @@ error that caused it. Latent, never observed firing, demonstrated then fixed
 `TASKS.md`, CLAUDE.md's testing section, and `tests/helpers/db.ts`'s own header,
 which is the one that misled two investigations.
 
+**Gated query tracing, and the provisioning cost it measured** (`626cfef`,
+`6eeeb92`, `7d5e3ca`).
+
+*The tracer ships because the investigation built it twice.* `src/db/trace.ts`
+wraps the `LabKitDB` seam — a one-method interface everything already goes
+through — and is **off unless `LABKIT_TRACE` is set**, returning the object it
+was handed so a disabled trace costs one env read at construction. Asserted by
+*identity*, not behaviour: a wrapper that merely behaved the same would still
+allocate and still branch per query. It records the two things that settled the
+flake — **in-flight queries past a threshold** (the only way to produce "nothing
+hung", since a query that never finishes never writes a completion line) and
+**per-connection counts and durations**. Parameters are never logged; they carry
+propositions and verdicts, and a trace file gets pasted into issues.
+
+*Then it answered a question written in 2026.* PJ-005 removed a `schema_version`
+gate and said **"measure first if this ever needs revisiting."** Tracing one
+scenario file: **2,448 queries, 1,086 of them (44%) provisioning bookkeeping**,
+across fourteen reconciliations that each found nothing to do — 78 round trips
+per call. The note was answered by a tool built to answer something else.
+
+*The fix reads AGE's catalog once instead of asking 78 times.*
+`ag_catalog.ag_label` joined to `ag_graph` gives every label in one query;
+`pg_indexes` scoped to the tenant's schema gives every index in another. DDL
+only for what is missing. **30% fewer queries overall, 69% fewer provisioning
+queries**; three round trips in the steady state instead of eighty.
+
+*And it is emphatically not the gate PJ-005 reverted.* That gate skipped
+reconciliation when a stored version matched, so drift stopped being repaired
+the moment the number agreed. This reads the **actual** catalog every single
+time; it just asks in one question. Nothing is remembered between calls, and
+`reconciliation.test.ts` — which provisions a new edge label against an
+already-provisioned tenant through the production path — still passes.
+
+*Writing to AGE's tables was considered and declined.* AGE's bulk-import advice
+concerns inserting **data rows** to bypass Cypher, which is not what this path
+does. `create_vlabel` does catalog bookkeeping *and* creates a table; hand-rolling
+it would couple us to AGE internals for a cost paid once per tenant.
+
+*It does not fix the flake and is not claimed to* — it lowers the pressure that
+puts a test within reach of the 5000ms ceiling. Two runs after: 2 failures then
+0, wall times 132s and 74s. Same flake, same load variance.
+
+*One self-inflicted wound.* The perf change inserted a new doc comment **above**
+the existing one on `reconcile()`, and I committed before reading
+`check:doc-comments`, which had already failed. Fourth instance of that defect,
+second of mine — and the first caught **in the act** rather than months later,
+which is the argument for the check.
+
 ## Verified
 
 Run on `80c605b`, the final commit.
 
-- `bun test` → **unstable, cause still unknown.** Bare `bun test` fails about
+- `bun test` → 226 tests, **unstable**: runs give 0-2 failures with wall times
+  between 74s and 135s. Mechanism known (below), fix outstanding. Formerly
+  reported as **cause unknown**. Bare `bun test` fails about
   half of runs. Every failure begins with a **5-second timeout** — a hang, not
   an error — and the `graph "labkit_t1" does not exist` errors are fallout from
   a test abandoned mid-flight. Every file passes in isolation.
@@ -980,6 +1030,9 @@ worktrees make it easier to fall into.
    bun's timeout cannot interleave two tests; short-circuit provisioning for
    `current()` (provably less work, untested alone); raise the ceiling (works,
    hides). Evidence in `docs/TASKS.md`.
+   **Provisioning is now 69% cheaper** (`6eeeb92`) which lowers the pressure
+   without removing the ceiling. Use `LABKIT_TRACE=all` rather than rebuilding
+   instrumentation — that is what it is for.
 2. ~~**The suite flake.** Investigated at length and **not solved.**~~ What was
    bought: the wound-clock probes are now their own file (`7352a5f`), halving
    the cascade's blast radius, and the failure is localised to how bun is
