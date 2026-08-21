@@ -16,6 +16,33 @@ same kind of thing and a flat list hides that. Last reconciled 2026-08-21 agains
 
 Someone could start these today.
 
+- [ ] **The suite is flaky, and it is not just `leader-election` any more.**
+  Five consecutive plain `bun test` runs on 2026-08-21 gave 0, 2, 2, 9 and 1
+  failures. What is established:
+  - **Every file passes in isolation**, run one per process, all 28.
+  - **Files run sequentially**, not in parallel — the isolated runs sum to 81.1s
+    and one combined run takes 82.3s. So it is not concurrent PGlite instances.
+  - **It concentrates in `tests/consumer/vertical_slice.test.ts`.** The
+    nine-failure run was that whole file cascading: one test dies and every test
+    after it in the file dies too, with `graph "labkit_t1" does not exist`.
+  - That cascade is the shape `tests/helpers/db.ts` already documents — a
+    connection hitting the pglite-socket defect "desyncs permanently and stays
+    broken for the rest of its life" (electric-sql/pglite#1046). The containment
+    is one connection per test, and **that file is the only one where a single
+    test opens two connections in sequence** (`inTwoWorlds`), which makes it the
+    weakest point of the containment rather than an unrelated bug.
+  - Not yet established: why sharing a process matters at all when each file
+    has its own PGlite and the files run one after another.
+
+  **A warning for whoever picks this up.** One experiment here produced a
+  confident wrong answer: `ls tests/*.test.ts tests/**/*.test.ts` yields five
+  **duplicated** paths, so those files run twice in one process against shared
+  module state. Any measurement using that list is worthless, and it briefly
+  looked like evidence that `leader-election` was innocent. Use `bun test` or an
+  explicit list.
+
+  Worth fixing before it trains anyone to ignore a red suite.
+
 - [ ] **An analysis cannot read another analysis's output.** Found by S-11c
   while demonstrating the dependency gap, and not itself part of it.
   `recordAnalysis({ from })` accepts only observations handles, and
