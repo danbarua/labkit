@@ -709,19 +709,55 @@ of the completeness test asserted the wrong direction: `false` is assignable to
 completeness does not typecheck. TypeScript said so via an unused
 `@ts-expect-error`.
 
+**The flake, farmed out to three parallel agents** — and the most useful result
+was the refutation of my own finding.
+
+*What I had claimed.* Bare `bun test` fails ~50% of runs; passing the 26 files
+"explicitly" gave 0 failures across 8 runs; at that rate a 1-in-250 coincidence,
+so the difference must be real and must be bun's runner.
+
+*Why it is wrong.* **Bun treats arguments as substring filters matched against a
+fresh discovery walk, not as paths.** `bun test consumer` — a bare word that is
+not a path at all — runs both consumer files. So 26 "explicit paths" selected
+the same 26 files, by the same walk, in the same single process. The two arms
+were **the same invocation**.
+
+*And the error is not "n too small".* The arithmetic was fine. **I computed a
+p-value against a control I never established**, because the two commands looked
+different on the command line. Statistics cannot rescue a comparison whose arms
+are the same thing.
+
+*What the agents established.* Bun's runner is cleared — bare `bun test` stayed
+a single process for 185s, sampled at 0.25s, no `--test-worker` children, and
+`--parallel`/`--isolate` are opt-in. And a **load confound** is real and was
+never controlled for: sibling Claude sessions run `bun test` concurrently on
+this machine, load ~6 on 10 cores, throughout the hours the original data was
+gathered. That agent found it while watching `ps` for something else entirely.
+
+*What replaced the dead finding, and it is sharper.* **The block is finite.**
+The slowest `describe` in the suite is 3.61s with **nothing between 4s and 6s**,
+so a 5000ms timeout is a 10-25x outlier against a test's own normal rather than
+creeping slowness; and three bare runs at `--timeout 20000` gave 0 failures
+(n=3, no paired control — suggestive only). Something stalls **more than 5s and
+less than 20s, then clears** — contention that resolves, not a wait for a reply
+that never arrives. `tenants.id` restarts at 1 every test, so every file
+contends on the **same** `pg_advisory_xact_lock` key.
+
+*Two agents still running at wrap time*: one localising exactly what blocks
+(advisory lock prioritised), one on resource growth and teardown overlap.
+
 ## Verified
 
 Run on `80c605b`, the final commit.
 
-- `bun test` → **unstable, and the instability is in the invocation.** Bare
-  `bun test` fails about half of runs. Passing the same 26 files **explicitly**
-  gave 0 failures across 8 runs, in five orderings including bun's own
-  discovered order lifted from a junit report — at a ~50% rate that is about a
-  1-in-250 coincidence, so the difference is real. Every failure begins with a
-  **5-second timeout**, a hang rather than an error, and the
-  `graph "labkit_t1" does not exist` errors are fallout from a test abandoned
-  mid-flight. Every file passes in isolation. Root cause **not** found; it
-  points at bun's runner rather than at LabKit. See `docs/TASKS.md`.
+- `bun test` → **unstable, cause still unknown.** Bare `bun test` fails about
+  half of runs. Every failure begins with a **5-second timeout** — a hang, not
+  an error — and the `graph "labkit_t1" does not exist` errors are fallout from
+  a test abandoned mid-flight. Every file passes in isolation.
+  **My "the instability is in the invocation" finding is refuted** — see below
+  and `docs/TASKS.md`. What replaced it: the block is **finite** (>5s, <20s,
+  then clears), bun's runner is cleared, and a load confound is real and
+  unquantified.
   Three consecutive full runs failed a *different* test each time — first
   `domain-session`, then two consumer probes, then `domain-session` again — with
   `graph "labkit_t1" does not exist` as the error. Every implicated file passes
@@ -899,9 +935,12 @@ worktrees make it easier to fall into.
    `docs/TASKS.md`. The obvious workaround — an explicit file list in
    `bun run test` — is recorded and deliberately **not taken**: it would make
    the suite green without making it correct.
-   Next probe for whoever picks it up: **find what hangs.** Every failure starts
-   with a 5s timeout and the database errors are downstream of it, so chasing
-   `graph does not exist` is chasing the symptom.
+   Next probe for whoever picks it up: **find what blocks for 5-20s and then
+   clears.** Every failure starts with a 5s timeout and the database errors are
+   downstream, so chasing `graph does not exist` is chasing the symptom. Prime
+   suspect is `pg_advisory_xact_lock` in `provisionTenantGraph()`, which every
+   test contends on under the same key. Control for machine load: sibling
+   sessions running `bun test` invalidated an earlier dataset.
 2. **An analysis cannot read another analysis's output** — the missing verb
    S-11c exposed. Needs its own demonstration: what does a caller get wrong when
    they cannot express the second stage?
