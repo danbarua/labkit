@@ -19,55 +19,14 @@
  */
 
 import type { TenantGraph } from "../db/graph";
-import { optional, scalar, vertexProps } from "../db/cypher";
-import type {
-  ArtefactProps,
-  ClaimProps,
-  ComputationProps,
-  EvidenceProps,
-} from "../db/domain";
+import { optional, vertexProps } from "../db/cypher";
 import {
   type Clock,
   type EventSink,
   inMemoryEventLog,
   systemClock,
 } from "./events";
-import type {
-  ReproducibilityReport,
-  ReproductionReport,
-  VerificationReport,
-  AmendmentRecord,
-  TaskContract,
-  ClaimSubject,
-  ConflictSide,
-  ConflictVerdict,
-  AmendmentReport,
-  AnalysisRef,
-  CheckStatus,
-  EnquiryStatus,
-  EvaluationRecord,
-  CriterionRef,
-  GateRef,
-  GateStatus,
-  WorkRef,
-  ChangedConclusion,
-  Conclusion,
-  ConclusionRef,
-  DesignHistory,
-  EnquiryRef,
-  KnowledgeSurvey,
-  ObservationsRef,
-  QuestionOrigin,
-  QuestionRef,
-  QuestionStanding,
-  InterpretationHistory,
-  ReinterpretationReport,
-  ReplacementReport,
-  Revision,
-  ReviewRef,
-  SupportExplanation,
-  UnaffectedRecord,
-} from "./report";
+import type { ClaimSubject, AnalysisRef } from "./report";
 
 export interface ResearchSessionOptions {
   clock?: Clock;

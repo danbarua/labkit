@@ -9,7 +9,7 @@
  * Nothing in this file may emit. `emit` is not reachable from `SessionCore`, so
  * that is enforced by construction rather than by review.
  */
-import type { TenantGraph } from "../db/graph";
+
 import { optional, scalar, vertexProps } from "../db/cypher";
 import type {
   ArtefactProps,
@@ -17,22 +17,14 @@ import type {
   ComputationProps,
   EvidenceProps,
 } from "../db/domain";
-import {
-  type Clock,
-  type EventSink,
-  inMemoryEventLog,
-  systemClock,
-} from "./events";
 import type {
   ReproducibilityReport,
   ReproductionReport,
-  VerificationReport,
   AmendmentRecord,
   TaskContract,
   ClaimSubject,
   ConflictSide,
   ConflictVerdict,
-  AmendmentReport,
   AnalysisRef,
   CheckStatus,
   EnquiryStatus,
@@ -41,8 +33,6 @@ import type {
   GateRef,
   GateStatus,
   WorkRef,
-  ChangedConclusion,
-  Conclusion,
   ConclusionRef,
   DesignHistory,
   EnquiryRef,
@@ -52,12 +42,8 @@ import type {
   QuestionRef,
   QuestionStanding,
   InterpretationHistory,
-  ReinterpretationReport,
-  ReplacementReport,
   Revision,
-  ReviewRef,
   SupportExplanation,
-  UnaffectedRecord,
 } from "./report";
 import { SessionCore } from "./core";
 

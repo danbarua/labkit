@@ -11,54 +11,28 @@
  * surface, so its re-entrancy depth is shared too, which is what a facade
  * composing both halves requires.
  */
+
 import type { TenantGraph } from "../db/graph";
 import { optional, scalar, vertexProps } from "../db/cypher";
+import type { ArtefactProps, ClaimProps, EvidenceProps } from "../db/domain";
 import type {
-  ArtefactProps,
-  ClaimProps,
-  ComputationProps,
-  EvidenceProps,
-} from "../db/domain";
-import {
-  type Clock,
-  type EventSink,
-  inMemoryEventLog,
-  systemClock,
-} from "./events";
-import type {
-  ReproducibilityReport,
-  ReproductionReport,
   VerificationReport,
-  AmendmentRecord,
   TaskContract,
   ClaimSubject,
-  ConflictSide,
-  ConflictVerdict,
   AmendmentReport,
   AnalysisRef,
-  CheckStatus,
-  EnquiryStatus,
-  EvaluationRecord,
   CriterionRef,
   GateRef,
-  GateStatus,
   WorkRef,
   ChangedConclusion,
   Conclusion,
   ConclusionRef,
-  DesignHistory,
   EnquiryRef,
-  KnowledgeSurvey,
   ObservationsRef,
-  QuestionOrigin,
   QuestionRef,
-  QuestionStanding,
-  InterpretationHistory,
   ReinterpretationReport,
   ReplacementReport,
-  Revision,
   ReviewRef,
-  SupportExplanation,
   UnaffectedRecord,
 } from "./report";
 import { SessionCore } from "./core";
