@@ -1,4 +1,4 @@
-# 004: npm-era config cruft cleared, the consumer-contract probe run, three gaps established at bar 4
+# 004: config cruft cleared, the consumer-contract probe run, session.ts split
 
 **Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -14,8 +14,8 @@ on the external review of that brief.
 
 ## Changed
 
-Twenty-eight commits, range clean apart from `8299ecb` (a regenerated
-dependency graph, committed by the user) — no other session's work in it.
+Thirty commits, range clean apart from `8299ecb` (a regenerated dependency
+graph, committed by the user) — no other session's work in it.
 
 ```
  .gitignore                                   |    6 +
@@ -239,7 +239,47 @@ Two shapes, kept apart deliberately rather than tallied as one:
   vertical slice exists to detect, which is why lumping them would have buried
   the interesting part.
 
-Working tree clean. Twenty-three commits ahead of `origin/feat/domain-consumer`,
+**`session.ts` split on the read/write seam** (`bc2db7b`) — the last work of the
+session, and behaviour-preserving: **no test changed**.
+
+```
+core.ts      306   graph, clock, sink, nine shared helpers
+write.ts    1314   18 verbs + 15 write-only helpers, and emit
+read.ts     1406   14 verbs + 5 read-only helpers
+session.ts    79   facade -- 32 delegating one-liners, no logic
+```
+
+Cut on a seam the domain already asserts rather than on size. Three things the
+measurement changed:
+
+- **Nine core helpers, not five.** Transitive closure through the five
+  direct-shared ones pulled in `findingFor`, `enquiriesClaiming`,
+  `enquiryAddressedBy` and `withdrawalOf` — the last of which a regex pass had
+  called read-only.
+- **`emit` sits on the write side, not in core.** All 18 callers are writes, so
+  core ownership would have let a read stamp an event. Now it structurally
+  cannot.
+- **The facade is a usage affordance only.** `findReferences` reported 113
+  references across 19 files and **every one outside `src/domain` is a test** —
+  `src/cli.ts` empty, `src/index.ts` a hello-world. Both halves are exported, so
+  a read-only adapter that never constructs a `WriteSurface` cannot write.
+
+Two dependency-cruiser **errors** lock it in, each verified by injecting a
+violating import, watching it fire, and restoring byte-identical: reads and
+writes may not import each other; core may not import a surface. That
+enforcement was the argument for splitting rather than merely reading a long
+file — an unenforced shared core becomes a junk drawer.
+
+Delegation is `readonly x: Surface["x"] = (...args) => ...` rather than 32
+restated signatures, so a signature cannot drift and each line names its half.
+
+**The LSP cannot refactor** — it is read-only (`findReferences`,
+`incomingCalls`, `documentSymbol`, no rename or code actions). It was the right
+instrument for *checking* the move, and confirmed the regex-derived call graph
+before any code moved. Unlike the earlier Cypher-string case, these are symbols,
+so it could see them.
+
+Working tree clean. Twenty-five commits ahead of `origin/feat/domain-consumer`,
 nothing held back.
 
 ## Verified
@@ -349,9 +389,8 @@ worktrees make it easier to fall into.
 
 ## Next
 
-**A refactor decision is open and has measurements behind it.** `src/domain/session.ts`
-is 2,920 lines and the user asked for sensible seams before any further building.
-Nothing was changed; the analysis is below so it need not be re-derived.
+**The refactor is done** (`bc2db7b`, above); the measurements that justified it
+are kept here because they are the reasoning, not the outcome.
 
 - **Size is less alarming than the number.** 28% comments — load-bearing in this
   repo — and 6% blank, so **1,927 code lines across 62 members**, ~31 each.
@@ -367,13 +406,12 @@ Nothing was changed; the analysis is below so it need not be re-derived.
 - **dependency-cruiser cannot find the seam** — it sees `session.ts` as one node
   (`N 1, Ca 1, Ce 5`). It can enforce one afterwards, which is the main argument
   for bothering: an unenforced shared core becomes a junk drawer.
-- Proposed shape, not yet agreed: `ResearchSession` stays a facade so the public
-  API cannot move (21 test files bind to it, and `tests/scenarios/` may not reach
-  past it), with `write.ts` / `read.ts` / `core.ts` behind it and rules that reads
-  and writes may not import each other.
-- Two open questions: whether `whySupported` (208 lines) plus `checksFrom` (151)
-  — 19% of the code, straddling claims and criteria — is one concern deserving
-  its own module; and whether a 62-method delegating facade earns its boilerplate.
+- **Still deferred, on the user's call:** whether `whySupported` (208 lines) plus
+  `checksFrom` (151) — 19% of the code, straddling claims and criteria — is one
+  concern deserving its own module inside `read.ts`.
+- **Untidied, deliberately:** the import block was copied wholesale into all
+  three modules. Harmless (`noUnusedLocals` is off) but noisy; pruning it is a
+  separate, purely mechanical change.
 
 Then take the three gaps in cost order, one rung at a time:
 
