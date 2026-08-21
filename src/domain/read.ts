@@ -49,6 +49,7 @@ import type {
 import { SessionCore } from "./core";
 
 export class ReadSurface extends SessionCore {
+  /** Every line of enquiry pursuing this question. */
   async pursuitsOf(question: QuestionRef): Promise<EnquiryRef[]> {
     const rows = await this.graph.query(
       `MATCH (:Question {natural_id: $id})-[:MOTIVATES]->(loe:LineOfEnquiry) RETURN loe`,
@@ -185,6 +186,15 @@ export class ReadSurface extends SessionCore {
     return survey;
   }
 
+  /**
+   * What the programme knows: settled, unsettled, and never looked at.
+   *
+   * Three states rather than two, classified structurally — established is a
+   * question resolved on cited evidence, untested is one nothing has ever been
+   * run against, unresolved is the rest. Nothing here compares a question's
+   * words to a claim's; the buckets come from what is attached to each
+   * question, not from what it says.
+   */
   async whatIsKnown(): Promise<KnowledgeSurvey> {
     const rows = await this.graph.query(
       `MATCH (q:Question)

@@ -38,6 +38,19 @@ import type {
 import { SessionCore } from "./core";
 
 export class WriteSurface extends SessionCore {
+  /**
+   * Puts a question on the record without pursuing it.
+   *
+   * This is what makes "untested" a state of the record rather than something
+   * a reader invents: S-1 must answer *what has not been tested*, and a
+   * question nobody has written down cannot be reported as untested without
+   * manufacturing it. Posing is deliberately cheap — a hunch is allowed on the
+   * books before anyone knows what the experiment is.
+   *
+   * Identity is the returned handle, never the wording. Posing the same words
+   * twice gives two questions, because two people can ask the same thing for
+   * different reasons and only the asker knows whether they meant one.
+   */
   async pose(question: string): Promise<QuestionRef> {
     const asked = await this.posed(question);
     this.emit("pose", asked.id, { question });

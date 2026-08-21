@@ -45,6 +45,7 @@ export class SessionCore {
     this.events = options.events ?? inMemoryEventLog();
   }
 
+  /** The single finding by which an analysis concluded something about one proposition. */
   protected async findingFor(
     analysis: AnalysisRef,
     proposition: string,
@@ -72,6 +73,7 @@ export class SessionCore {
       : "";
   }
 
+  /** Work these gates protect, and which therefore has to be run again when their condition changes. */
   protected async workGatedBy(gates: string[]): Promise<string[]> {
     const objectives = new Set<string>();
     for (const gate of gates) {
@@ -113,6 +115,7 @@ export class SessionCore {
     return [...affected].sort();
   }
 
+  /** Whether the record has stopped asserting a proposition, and what replaced it. */
   protected async withdrawalOf(scope: {
     proposition: string;
     enquiry?: string;
@@ -254,12 +257,4 @@ export class SessionCore {
     );
     return rows[0]?.loe.natural_id;
   }
-
-  /**
-   * Whether two findings actually conflict.
-   *
-   * Answered from what each claim is attached to — the question it answers and
-   * the way its evidence bears — never from comparing the two sentences. In
-   * S-5 the sentences are identical and the answer is "no".
-   */
 }
