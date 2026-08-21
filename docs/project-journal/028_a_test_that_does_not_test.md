@@ -155,19 +155,57 @@ written*, names the live figure, and points at `NODE_LABELS.length` /
 So: earn an assertion, be deleted, or be explicitly dated. A number that is none
 of the three is a maintenance claim nobody agreed to keep.
 
-**And the defect fired once more during its own repair.** The first version of
-that test comment said the counts were *"asserted below rather than written
-here"* — written before any assertion existed, in the edit fixing the very defect
-of prose describing code that does not agree with it. Caught before commit, by
-going to write the assertion the sentence promised and finding it should not
-exist.
+**And the defect fired during its own repair** — twice, in the edits making these
+very fixes. Both are below, with the two that bracket them.
 
-That one is worth more than the seven counts, and it is the answer to *why is
-this not carelessness*. It was committed by someone who had spent the day
-cataloguing this exact defect, with the specific instance in front of them,
-inside the edit that fixed it. It is the sweep's headline — `918f420`, the commit
-that fixed a PJ-027 instance and minted two more in the same hunk — reproduced in
-miniature, under the best conditions anyone is going to get.
+## Four times in one day, by people holding the answer
+
+This is the entry's real argument, and it is worth more than the seven counts.
+
+PJ-027 claimed its defect is not carelessness, and reasoned from three instances
+whose authors were not thinking about it at the time. The obvious objection is
+that attention would fix it. **Four instances in this one day answer that**, and
+every one was committed by someone who had the defect in front of them.
+
+1. **`918f420`.** The commit that closed a PJ-027 instance — making a report carry
+   identity instead of a name — wrote a comment in the same hunk naming the *new*
+   type as the former one, and left the docstring above the changed field still
+   advising the reader to key on the name it had just stopped keying on. Two fresh
+   instances in the lines being edited to remove one.
+
+2. **"asserted below rather than written here."** A comment in the edit fixing the
+   numeral defect, claiming an assertion that did not exist yet. Caught only by
+   going to write the assertion the sentence promised, and finding it should not
+   exist at all.
+
+3. **A failure signature piped away.** A run producing five failures was piped
+   through `tail -5`, discarding the only thing that could distinguish a teardown
+   cascade from real assertion failures — **ten minutes after** the author had
+   agreed, in writing, that this exact mistake was worth recording. The re-run came
+   back clean and the signature is gone for good.
+
+4. **A rule generalised from one observation, inside the correction for (3).**
+   A test count seen once — in a run that was racing a second suite — was written
+   into `docs/TASKS.md` as a detector. It was refuted within the hour by a run that
+   flaked with a *normal* count, so the derivation held in the direction it was
+   derived and failed in the direction a detector needs. The same paragraph
+   hardcoded `261`: a numeral earning no assertion and carrying no date, three
+   hours after this entry closed out the first eight of those.
+
+Two authors, four instances, all under the best conditions anyone is going to get:
+the defect named, catalogued, and freshly in mind. **"Be more careful" is not
+available as a remedy**, because these are what being careful looks like. Each is
+a small asymmetry — the type and not the sentence above it, the code and not the
+comment promising it, the counts and not the diagnosis, the direction derived and
+not its converse — and attention is precisely the thing that does not distribute
+evenly across an asymmetry.
+
+What does help is the shape PJ-027 already named: check the **other side** of the
+operation you are looking at. Three of the four were caught that way, by someone
+else or by the author going one step further. The fourth was caught by a
+disagreeing measurement inside an hour, which is the only remedy with any
+generality — and it is the argument for this entry's one checker rather than for
+resolving to concentrate harder.
 
 ## A check that could not fail
 
@@ -206,13 +244,8 @@ looking for something else. These were found while looking — but by six reader
 told what shape to look for, which finds that shape and is silent about others.
 A sweep is not a census.
 
-**The best single instance was in the fix.** `918f420` — the commit that closed a
-PJ-027 instance by making a report carry identity instead of a name — wrote a
-comment in the same hunk naming the *new* type as the former one, and left the
-docstring above the changed field still advising the reader to key on the name it
-had just stopped keying on. The commit that fixed the defect committed it twice
-more, in the lines it was editing.
-
-That is not irony. It is the mechanism, at the moment it is easiest to observe:
-the author was looking at the type and the code, and the sentence above them was
-somebody else's job.
+**The four self-instances are not irony.** They are the mechanism at the moment it
+is easiest to observe: in `918f420` the author was looking at the type and the
+code, and the sentence above them was somebody else's job. That is the same
+sentence one would write about all four, and it is why PJ-027's §"What this
+licenses" gives a direction to look rather than a resolution to try harder.
