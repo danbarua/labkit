@@ -436,6 +436,22 @@ attempted. There is a merge hazard — `main` carries the original sentence, so 
 resolution keeping `main`'s line restores the contradiction silently and the
 check still passes.
 
+*And neither check could say whether it had passed* (`a3fca8c`). `check-ledger`
+printed *"no demonstrated wrong answer is shipping green"* — a finding in the
+ledger's private vocabulary, leaving the reader unable to tell if that was the
+good outcome. Reported by the user on a check written the same day, which is the
+shortest gap in this session between writing something and it being unreadable.
+Both now follow `check-migrations`' existing convention: **pass or fail in the
+first three characters, then plain words**. "Known bug" replaces "demonstrated
+wrong answer" in the output — the ledger keeps its own term, which distinguishes
+a proved wrong answer from an absence, but a command line does not carry the
+ledger's context. Failure paths rewritten and checked by injection, since that is
+when they are read.
+
+The pattern, third instance: **the check was verified for correctness by
+injection and never once for legibility.** Same shape as the split being verified
+as behaviour-preserving and not as documentation-preserving.
+
 Row P's closing paragraph turned out to be a **fired condition**: *"if it is a
 defect, something else will have to demonstrate it."* S-9b did. That is the third
 such condition to fire unread (K, Z, P), and it is exactly what the check cannot
