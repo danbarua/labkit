@@ -37,6 +37,22 @@ Someone could start these today.
     keeps running and its late `scenario.end()` resets the database and closes a
     connection that by then belongs to the *next* test. Traced at log-line
     granularity in two files independently.
+  - **A run's test count is a detector, and it is exact.** The suite has 249
+    static `test(` declarations, one of which is inside
+    `for (const label of NODE_LABELS)` (`tests/domain-graph.test.ts:362`) and
+    expands to thirteen. `249 - 1 + 13 = 261`, with no remainder — so **261 is
+    derived, not observed**, and any other number means a test was reported
+    twice. That is the previous bullet's mechanism seen from the counter: a
+    test whose body keeps running after the ceiling stops waiting gets counted
+    at the timeout and again on completion.
+
+    Found on 2026-08-21 in a run reporting **262 tests, 239 pass / 23 fail** —
+    which also happened to be racing a second full `bun test` against the same
+    directory, so it says nothing about the flake's usual cause. The count
+    check is the useful part and is cheaper than reading durations: **if
+    `Ran N tests` is not 261, a test crossed the ceiling.** Recompute the 261
+    if a test file or a node label is added; it is a derived constant, so it is
+    supposed to move.
 
   **Refuted, with evidence:** advisory-lock contention (346 acquisitions, max
   **38ms**); pglite#1046 desync as the primary mechanism (no desync signature,
