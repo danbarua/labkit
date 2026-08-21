@@ -486,13 +486,18 @@ export class ReadSurface extends SessionCore {
     // places (S-5, S-12, S-3b, and here, by external review).
     const inputs = async (
       computation: string,
-    ): Promise<Map<string, string>> => {
+    ): Promise<Map<string, IdentifiedArtefact>> => {
       const rows = await this.graph.query(
         `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
         { a: vertexProps<{ natural_id: string; logical_name: string }>() },
         { id: computation },
       );
-      return new Map(rows.map((r) => [r.a.natural_id, r.a.logical_name]));
+      return new Map(
+        rows.map((r) => [
+          r.a.natural_id,
+          { part: r.a.natural_id, name: r.a.logical_name },
+        ]),
+      );
     };
     const mine = await inputs(verification.id);
     const theirs = await inputs(found.oldcomp.natural_id);
@@ -504,12 +509,10 @@ export class ReadSurface extends SessionCore {
     // scenario exists for.
     const provenanceMissing = theirs.size === 0;
     const differs: ReproductionReport["differs"] = provenanceMissing
-      ? [...mine.values()]
-          .sort()
-          .map((what) => ({
-            what,
-            standing: "unrecorded-in-the-original" as const,
-          }))
+      ? [...mine.values()].map((what) => ({
+          what,
+          standing: "unrecorded-in-the-original" as const,
+        }))
       : [
           ...[...mine]
             .filter(([id]) => !theirs.has(id))
@@ -523,7 +526,12 @@ export class ReadSurface extends SessionCore {
               what,
               standing: "not-used-by-the-re-run" as const,
             })),
-        ].sort((a, b) => a.what.localeCompare(b.what));
+        ];
+    // Sorted by name then identity: the name is what a reader scans, and the
+    // identity is what breaks the tie when two inputs share one (S-10c).
+    differs.sort(
+      (a, b) => a.what.name.localeCompare(b.what.name) || a.what.part.localeCompare(b.what.part),
+    );
 
     const reproduced = !provenanceMissing && differs.length === 0;
 

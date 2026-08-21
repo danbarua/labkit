@@ -77,41 +77,47 @@ Someone could start these today.
 
 ## Needs a discriminator before it can be built
 
-**One** ledger row sits `open` + unowned — down from four. Verified against §3,
-not recalled: O `resolved`, S `refuted`, T `refuted`, AD `resolved`,
-AE `resolved`, **F `open`**. A research question, not a ticket — "do row F" is
-not actionable, and writing a scenario to satisfy a row would manufacture the
-result (PJ-011 §5).
+**No ledger row sits `open` + unowned.** Verified against §3, not recalled:
+O `resolved`, S `refuted`, T `refuted`, AD `resolved`, AE `resolved`,
+**F `boundary`** — and **AF `open`**, added the same day, which is the one row
+still wanting a discriminator.
 
-- [ ] **Row F — artefacts are not versioned entities.** Retitled 2026-08-21: the
-  row spent the whole arc asking for an `Artefact → Artefact` edge, and the
-  missing thing is one level down. An artefact has no identity apart from its
-  content — `logical_name` is wording, which S-9 refused to treat as identity,
-  and `content_hash` is the bytes — so there is nothing two artefacts can be two
-  **versions of**. Same shape as row O: the writer knows, the verb never asks,
-  the reader infers wrongly.
-  Still **not built**, and it is the most expensive open item: a genuine new noun
-  (rung 4), which would be the project's first.
+**Row F reached a verdict on 2026-08-21: `boundary`** (`docs/consumer-contract/035`,
+`036`). Argued, not accumulated to. Four bites, all in *reporting* —
+`reproducibilityOf()` (S-9c), `whySupported().restingOn` (S-9d), and
+`reproductionOf().differs` (S-10c) — and **every one was fixed by carrying
+`natural_id`, which already existed**. A version-of relationship would have
+fixed none of them, so they are evidence against the row rather than for it.
 
-  **Three bites so far, all in *reporting*, none in the model.** `reproducibilityOf()`
-  took parts by reference and reported bare names (S-9c); `restingOn` deduplicated
-  by name, so a conclusion resting on a surviving fragment *and* its regeneration
-  reported one entry (S-9d, `labkit-minion`); `whatDependsOn()` correctly
-  **refuses** the ambiguous name. The surface knows a name is ambiguous in two
-  places and collapses on it in a third. Both bites were fixed at rung 1 — one
-  field each, no model change — and **the row stayed open both times**.
+The enumeration is what makes it a verdict: every read on `ReadSurface` touching
+an artefact takes a **reference**, or takes a name and **refuses** when it is
+ambiguous, or **returns** identity. S-10c asserts that rather than leaving it as
+prose. The model was never missing identity; the reads were not using it.
 
-  That is the strongest case yet for `boundary`: the defect keeps living in how
-  answers are reported, not in what the model can hold. Not concluded — three is
-  a pattern, not a proof.
+**It reopens if** anyone asks for versions as an ordered sequence — *"show me the
+history of this control series"* — asked of a name rather than of one artefact.
+No verb asks it, and under PJ-011 §5 a question never asked earns nothing. That
+would be the first read needing identity its caller does not hold.
+
+Row F was the only candidate in this project's history that would have required
+a first new noun. It did not.
+
+- [ ] **Row AF — execution input order is not recorded.** `CONSUMES` says which
+  artefacts a computation read, never in what sequence, so two runs of an
+  order-sensitive method are indistinguishable (S-10b). **Earns nothing under
+  §5**: the reports claim the two runs consumed the same inputs, and they did —
+  what a reader *infers* is the wrong part, and the record never asserted it.
+  Needs a reader acting on "reproduced" for a reversed run and being wrong in a
+  way the record **states** rather than implies. Unowned.
 
 **Row T is `refuted`, not open** — this file said both at once until 2026-08-21.
 Edges *do* carry properties; `createEdge()` takes them. What survives is that an
 edge property cannot be part of edge identity, nor changed by re-calling the verb
-that created it. `labkit-minion` is looking for a discriminator anyway — a case
-where reifying to a node is genuinely worse — and expects not to find one: three
-rows have been settled by giving the fact its own node or edge (S-7, S-12,
-row O), which is three-for-three against.
+that created it. Its best remaining candidate was tested and went
+the same way (S-10b): input order on `CONSUMES` is genuinely lost, and **an
+ordinal on the edge would not fix it**, because nothing compares orders — the
+record does not know a method is order-sensitive. Row T would have been claiming
+row AF's absence. Four for four against: S-7, S-12, row O, and this.
 
 ## Next phase
 
