@@ -53,8 +53,10 @@ contract requires, a rebuild that concludes nothing. F stays `open` with its
 ladder paused at rung 3, and reclassifying it `boundary` was considered and
 rejected. That probe also produced **row AD**, carrying a fourth status and the
 only one with a deadline: `demonstrated`, where the wrong answer is on the
-record and what is unbuilt is the fix. Read §3's legend before treating the four
-kinds as one pile.
+record and what is unbuilt is the fix. **AD was opened and closed the same day**
+(`029`, `030`) — `recordObservations()` now mints the `EvidenceUnit` PJ-001 says
+must exist, one node and two edges, no migration. Read §3's legend before
+treating the four kinds as one pile.
 
 **This file is a third copy of the ledger's state, and only a reader can
 reconcile it.** §3 records every row's status twice — index table and the row's
@@ -392,12 +394,14 @@ Two rules, so this is checkable rather than remembered:
    cleared another row is nominated too, demonstrated or not** — otherwise
    clearing one row can quietly make a second worse while the rule that would
    have caught it stops applying, which is exactly what happened to row X when
-   S-3b cleared row V (PJ-017 §3). **Row AD is currently that one**, found by
-   S-9b on 2026-08-21: `recordObservations()` mints no `EvidenceUnit`, so a
-   question worked on through observations alone reports itself as one nothing
-   has ever been run against. Clearing it is the next thing built — not a
-   priority call — and no second row of this kind may be opened until it is.
-   Before AD, row V was cleared by S-3b (PJ-016) and row X — nominated under
+   S-3b cleared row V (PJ-017 §3). **No row is currently that one, and this is
+   now checked rather than asserted** — `bun run check:ledger` fails when two
+   §3 rows carry the `demonstrated` status. Row AD held it for a few hours on
+   2026-08-21: `recordObservations()` minted no `EvidenceUnit`, so a question
+   worked on through observations alone reported itself as one nothing had ever
+   been run against. It was found by S-9b and cleared the same day, which is the
+   rule working at the speed it was written for. Before AD, row V was cleared by
+   S-3b (PJ-016) and row X — nominated under
    exactly that widening rule, then demonstrated and cleared by S-3c (PJ-018) —
    was the last. The nomination rule worked end to end: a row made worse by
    another row's fix was named, built and closed, and the four scenarios X spent

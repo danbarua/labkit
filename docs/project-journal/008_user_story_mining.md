@@ -698,7 +698,7 @@ this document's original analysis are marked as such.
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
-| AD | Observation-only work on a question reads as no work at all | **S-9b** | demonstrated |
+| AD | Observation-only work on a question reads as no work at all | **S-9b** | resolved |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -724,7 +724,7 @@ to be that well informed:
 | --- | --- | --- |
 | `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
 | `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T |
-| `demonstrated` | a wrong answer is on the record and the fix is what is unbuilt | **AD** |
+| `demonstrated` | a wrong answer is on the record and the fix is what is unbuilt | **none** — AD was the first and was cleared the day it opened |
 | `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
 
 The **demonstrated** kind is new with row AD and is the only one with a
@@ -1451,7 +1451,7 @@ replacement into the graph correctly; what it withheld was the reference
 
 ### Row AD — Observation-only work on a question reads as no work at all
 
-**Scenarios:** **S-9b** · **Status:** demonstrated
+**Scenarios:** **S-9b** · **Status:** resolved
 
 **Current state (verified):** `recordObservations()` creates `Evidence` with no producing `EvidenceUnit`; `whatIsKnown()`'s `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`
 
@@ -1476,9 +1476,38 @@ wrong answer on purpose with the assertion it *should* make left in a comment
 beside it. When this is fixed the test is **inverted, not deleted**.
 
 Under CLAUDE.md's rule that at most one confirmed wrong answer ships green at a
-time and clearing it is the next thing built, this is that one, and it is next.
-It touches every read that walks the unit (`whatIsKnown`, `whySupported`,
-`reproductionOf`), so it is a real build rather than a one-line fix.
+time and clearing it is the next thing built, this was that one.
+
+**Resolved 2026-08-21, `17b9976`** — see `docs/consumer-contract/029`, `030`.
+`recordObservations()` mints the unit, `ADDRESSES` to the enquiry and `PRODUCES`
+to the evidence. One node, two edges, **no migration**, no new label or edge
+type.
+
+*The fear that it touched every read that walks the unit was wrong, and why is
+the useful part.* Every other query reaching an `EvidenceUnit` gets there either
+through `Evidence -SUPPORTS|CHALLENGES-> Claim` — which observation evidence has
+neither of, S-11's premise expressed structurally — or through a required
+`USES -> Computation`, which an observation unit does not have because LabKit
+did not run the instrument. `whatIsKnown()`'s `worked` test is the only one
+reaching a unit by `ADDRESSES` alone, which is exactly why it was the only wrong
+read and the only one that changed. **One read changed; exactly one test broke,
+the one asserting the wrong answer on purpose**, and it was inverted rather than
+deleted.
+
+*What was not demonstrated, and was still built.* The verb became transactional
+in the same change, because the fix **creates** the hazard: after it, a failure
+between the evidence and the unit writes precisely the invariant being removed,
+durably and indistinguishable from the eighteen scenarios of records that
+predate the fix. A defect disguised as history is the worst case available.
+Argued rather than demonstrated, and then given a negative test that was
+deletion-verified.
+
+*A finding on the way out.* `EvidenceUnitRole` has nine values, and until this
+build one writer and no readers. Adding `"observation"` was declined —
+vocabulary with no consumer is the dead shape PJ-007 found in `buildAsClause`,
+and the no-cull policy protects labels and edges rather than property values,
+which is the line the CQRS views were removed on. Left as a finding; what would
+settle it is a reader, and the adapter phase is where one would appear.
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from

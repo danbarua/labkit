@@ -8,23 +8,9 @@ here disagrees with the ledger, the ledger is right and this file is stale.
 
 Grouped by **what stops someone picking it up**, because the items are not the
 same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against
-`c636533`.
+`17b9976`.
 
 ---
-
-## Next, and not optional
-
-- [ ] **`recordObservations()` must produce an `EvidenceUnit`.** Ledger row
-  **AD**, and the only confirmed wrong answer currently shipping green. A
-  question worked on through observations alone reads `untested` — *"one nothing
-  has ever been run against"* — while a sibling question worked on through
-  `recordAnalysis()` reads `unresolved`. Demonstrated by S-9b's seventh test,
-  which asserts the wrong answer on purpose. CLAUDE.md permits one such row at a
-  time and requires that clearing it be the next thing built, so this is not a
-  priority call.
-  **Invert that test rather than deleting it**, and re-run S-9b's shape
-  detectors afterwards. It touches every read that walks the unit —
-  `whatIsKnown`, `whySupported`, `reproductionOf` — so it is a real build.
 
 ## Ready to build
 
@@ -40,6 +26,14 @@ Someone could start these today.
   *Do not* build Designer 2's `Dependency coverage assertion`; `023` §4 keeps
   that as a discriminator for later, since certified completeness needs durable
   state that open-world traversal does not.
+
+## Recently closed, so nobody re-opens them
+
+- **Row Z** — historical ordering. `Decision.decided_at`, one property, no
+  migration (`consumer-contract/025`, `026`).
+- **Row AD** — observation-only work reading as no work. One node, two edges, no
+  migration (`029`, `030`). `recordObservations()` is now transactional, and
+  `bun run check:ledger` reports no demonstrated wrong answer shipping green.
 
 ## Needs a discriminator before it can be built
 
@@ -62,9 +56,21 @@ result (PJ-011 §5).
   clusters. S-8 recorded the absence as a standing decision (identity is
   infrastructure, not domain) and three cold designers disagree. **Write-side**,
   so a read-only contract structurally cannot settle its shape.
-- [ ] **Row O — withdrawal reason under-determined.**
-- [ ] **Row T — edges cannot carry properties.** Owned by row O, which is itself
-  unowned.
+- [ ] **Row O — withdrawal reason under-determined.** **Deferral withdrawn on
+  challenge** (`labkit-review`, 2026-08-21): the cell defers to the event model
+  as a *why state changed* question while its own verified-state line describes
+  a *what is true now* one, and `replaceAnalysis` requiring a review of the
+  analysis being replaced already closes half of it. The candidate
+  discriminator — an analysis retired on the strength of a review that is later
+  itself invalidated; does the retirement still read as resting on valid
+  grounds? — needs **no event sink**. Predictions first: if the propagation
+  query comes back correct, that is a result and the cell can finally say why it
+  stays unowned in terms of something that was run.
+- [ ] **Row T — edges cannot carry properties.** **Orphaned.** Its only named
+  owner was row O, and if O is settled by a plain `Decision → Review` edge then T
+  contributes nothing to it and loses that owner. Says so in its own cell rather
+  than being handed a future phase as a fake owner — an unbuilt *phase* is not a
+  scenario, and naming one turns "we have no discriminator" into "it's handled".
 
 ## Next phase
 
