@@ -35,6 +35,17 @@ import { dropTenantGraph } from "../../src/db/provisioning";
  * connection for an entire test file means one bad interaction anywhere in
  * that file can cascade into failing every test after it, at an
  * unpredictable point — which is exactly the flakiness this design avoids.
+ *
+ * **This header has been read as explaining the suite's intermittent failures.
+ * It does not, and that misattribution cost two investigations.** The
+ * `graph "labkit_t1" does not exist` and `Connection terminated` bursts are a
+ * teardown race, not Defect A: bun's 5000ms per-test timeout does not cancel
+ * the test body, so an overrunning test keeps executing while the next one
+ * starts, and its late `scenario.end()` resets the database and closes the next
+ * test's connection. Instrumentation across a failing run tracked 59,086
+ * queries with **zero** unfinished and found no desync signature at all. What
+ * pushes a test to the ceiling is `provisionTenantGraph()` re-checking every
+ * node and edge label on each `begin()` and `current()`. See `docs/TASKS.md`.
  */
 export interface TestDb {
   /** Opens a fresh, independently-bootstrapped connection — call in `beforeEach`, not once for the whole file. See the file-level comment. */

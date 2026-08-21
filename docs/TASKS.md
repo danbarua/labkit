@@ -16,79 +16,53 @@ same kind of thing and a flat list hides that. Last reconciled 2026-08-21 agains
 
 Someone could start these today.
 
-- [ ] **The suite is flaky, and it is not just `leader-election` any more.**
-  Five consecutive plain `bun test` runs on 2026-08-21 gave 0, 2, 2, 9 and 1
-  failures. What is established:
-  - **Every file passes in isolation**, run one per process, all 28.
-  - **Files run sequentially**, not in parallel — the isolated runs sum to 81.1s
-    and one combined run takes 82.3s. So it is not concurrent PGlite instances.
-  - **It concentrates in the consumer probes.** The nine-failure run was one
-    file cascading: a test dies and every test after it in that file dies too.
-    Those probes have since been **split into two files** (`7352a5f`), so a
-    desynced connection can only take half of them down. Containment, not a fix.
-  - That cascade is the shape `tests/helpers/db.ts` already documents — a
-    connection hitting the pglite-socket defect "desyncs permanently and stays
-    broken for the rest of its life" (electric-sql/pglite#1046). The containment
-    is one connection per test, and **that file is the only one where a single
-    test opens two connections in sequence** (`inTwoWorlds`), which makes it the
-    weakest point of the containment rather than an unrelated bug.
-  - ~~**The failure depends on how bun is invoked.**~~ **Refuted 2026-08-21.**
-    Passing the 26 files "explicitly" gave 0 failures across 8 runs while bare
-    `bun test` failed ~50% — and the two invocations turn out to be **the same
-    invocation**. Bun treats arguments as **substring filters matched against a
-    fresh discovery walk**, not as paths: `bun test consumer`, a bare word that
-    is not a path at all, runs both consumer files. So 26 "explicit paths"
-    selected the same 26 files by the same walk in the same single process.
-    Identical invocations cannot differ by invocation, so the 0/8 was
-    time-clustered, not caused. **A ~1-in-250 coincidence was reported as a real
-    effect because the two arms were never actually different.** Statistics
-    cannot rescue a comparison whose arms are the same thing, and the arms were
-    never checked.
-  - **A load confound is the leading explanation for the clustering**, found by
-    an agent watching `ps` for something else: sibling Claude Code sessions run
-    `bun test` concurrently on this machine, load average ~6 on 10 cores. The
-    original dataset was gathered over hours with no control for it.
-  - **Bun's runner is not implicated.** Bare `bun test` stays a single process —
-    sampled every 0.25s for 185s, no `--test-worker` children — and
-    `--parallel`/`--isolate` are opt-in, not implied by arguments.
-  - **Every failure begins with a 5-second timeout** — a hang, not an error —
-    and `graph "labkit_t1" does not exist` is fallout from the test that was
-    abandoned mid-flight.
-  - **The block is finite, and that is the sharpest live lead.** Nothing in the
-    suite is naturally slow: one junit-reported run at load 5.87 puts the
-    slowest `describe` at **3.61s**, with **nothing between 4s and 6s**, so a
-    test hitting 5000ms is a 10-25x outlier against its own normal rather than
-    creeping slowness. And three bare runs at `--timeout 20000` under load
-    4.7-6.0 gave 0 failures — suggestive only at n=3, with no paired 5s control.
-    Together: something stalls **more than 5s and less than 20s, then clears**.
-    That argues against a connection waiting forever for a reply, and for
-    contention that resolves — a lock wait whose holder commits, or a teardown
-    overlapping the next file's setup. Note `tenants.id` restarts at 1 every
-    test, so every file contends on the **same** `pg_advisory_xact_lock` key.
-  - Not established: what hangs, or why bare invocation differs.
+- [ ] **The suite is flaky. The mechanism is now known; the fix is not.**
+  Investigated 2026-08-21 by three parallel agents. **Every earlier hypothesis
+  in this entry was wrong, including two of mine**, and the corrections are
+  worth more than the conclusion.
 
-  **A second warning.** Three consecutive bare runs failed the *same four tests*
-  and were written up here as deterministic. Two more runs then gave 0 and 3.
-  Three identical runs is not determinism, and the claim should have been
-  re-tested before it was recorded — it briefly made the problem look solved
-  when it was not.
+  **What actually happens, demonstrated:**
+  - **Nothing hangs.** 59,086 queries tracked start-to-finish across a run that
+    reproduced 11 failures — **zero** unfinished. A watchdog polling for
+    anything outstanding >3s never fired.
+  - **A test's legitimate work crosses bun's fixed 5000ms ceiling.** One
+    timing-out test issued **311 sequential queries** summing 4.955s against a
+    4.979s wall span — 99.5% real round trips, no idle. The dominant cost is
+    `provisionTenantGraph()` re-checking thirteen node labels and twenty-odd
+    edge labels, one round trip each, on **every** `scenario.begin()` *and*
+    every `scenario.current()`. The documented two-reader pattern pays twice.
+  - **A teardown race turns one timeout into a cascade.** Bun's timeout does
+    **not cancel the test body** — it only stops waiting. The abandoned test
+    keeps running and its late `scenario.end()` resets the database and closes a
+    connection that by then belongs to the *next* test. Traced at log-line
+    granularity in two files independently.
 
-  The workaround once recorded here — "make `bun run test` pass an explicit file
-  list" — is **withdrawn as meaningless**: an explicit list is the same
-  invocation. What is now known to move the failure rate is `--timeout 20000`,
-  and that is a real option with a real objection: it would make the suite green
-  without making it correct, and if the block is a lock wait then a longer
-  ceiling hides a bug that would surface again under a slower machine or a
-  larger suite.
+  **Refuted, with evidence:** advisory-lock contention (346 acquisitions, max
+  **38ms**); pglite#1046 desync as the primary mechanism (no desync signature,
+  247/247 clean closes); file-descriptor or socket exhaustion (flat 86–92);
+  WASM heap growth (non-monotonic, *declining* at the failure point); `afterAll`
+  not awaited (every gap positive, 4–17ms); bun's runner (single process for
+  185s, no worker children).
 
-  **A warning for whoever picks this up.** One experiment here produced a
-  confident wrong answer: `ls tests/*.test.ts tests/**/*.test.ts` yields five
-  **duplicated** paths, so those files run twice in one process against shared
-  module state. Any measurement using that list is worthless, and it briefly
-  looked like evidence that `leader-election` was innocent. Use `bun test` or an
-  explicit list.
+  **A fix was tried and failed.** FIFO connection ownership with deferred reset,
+  plus `current()` reusing the resolved context. Paired A/B, three rounds under
+  shared load: **FIX 2/4/0, BASE 2/0/0.** No improvement, direction against it,
+  reverted. **It bundled two independent changes**, so it says nothing about
+  either half — `current()` skipping re-provisioning is provably less work and
+  remains an untested candidate on its own.
 
-  Worth fixing before it trains anyone to ignore a red suite.
+  **Named, not built:** drive `begin()`/`end()` from `beforeEach`/`afterEach` so
+  bun's timeout cannot interleave two tests' setup and teardown; short-circuit
+  provisioning for `current()`; raise the ceiling (works, hides rather than
+  fixes). The real target is the **provisioning cost** — it is what puts a test
+  within reach of 5000ms at all.
+
+  **Two measurement traps this burned, both mine.** Comparing runs taken hours
+  apart under uncontrolled machine load — sibling Claude sessions run `bun test`
+  concurrently here, load ~6 on 10 cores — produced one confident wrong finding
+  and nearly produced a second in the opposite direction. Use a **paired**
+  design. And `bun test <paths>` is not a different invocation from bare
+  `bun test`: arguments are substring **filters** over a fresh discovery walk.
 
 - [ ] **An analysis cannot read another analysis's output.** Found by S-11c
   while demonstrating the dependency gap, and not itself part of it.

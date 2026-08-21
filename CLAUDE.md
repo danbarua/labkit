@@ -647,3 +647,15 @@ election/socket-sharing actually works. It's a live, unresolved instance of
 the pglite-socket bug above (see PJ-006) — flaky, and not fixable the way
 the other tests were, since it deliberately needs genuine concurrent
 connections to prove what it proves.
+
+**The suite's *other* flakiness is not that bug, and attributing it there cost
+two investigations.** Intermittent `graph "labkit_t1" does not exist` and
+`Connection terminated unexpectedly` bursts look like the socket defect and are
+not: a test's legitimate work crosses bun's fixed **5000ms** ceiling, bun's
+timeout **does not cancel the test body**, and the abandoned test's late
+`scenario.end()` then resets the database and closes the *next* test's
+connection. Nothing hangs — 59,086 queries were tracked across a failing run
+with zero unfinished. The cost that pushes a test to the ceiling is
+`provisionTenantGraph()` running full reconciliation on every `begin()` and
+every `current()`. See `docs/TASKS.md` for the evidence and for the fix that was
+tried and refuted.
