@@ -646,11 +646,23 @@ disagreeing with itself, a CLAUDE.md sentence outliving its truth, and a row
 whose title contradicted a document beside it. A glossary restating definitions
 would have been the fifth.
 
-**Second time in one session the user hit unreadable shorthand**, and the first
-time it was noted and dropped: after `check-ledger`'s output was rewritten I
-observed that the repo's vocabulary had no glossary and "probably should", then
-did nothing. Worth recording as its own small failure — noticing a general
-problem and fixing only the instance is how the instance recurs.
+**Third time in one session the user hit unreadable shorthand, and the third was
+in the message announcing the glossary that fixed the first two.** The sequence:
+`check-ledger` printing "no demonstrated wrong answer is shipping green"; then
+`D2` used cold nine times in this entry; then *"S-9b cleared bar 4, not §5"* in a
+reply, one message after the glossary landed.
+
+The glossary was the wrong fix, or rather an incomplete one — it makes
+**documents** readable and does nothing for a sentence in a reply, which is where
+the user actually meets the vocabulary. That is a habit, not a missing file, so
+CLAUDE.md now says plainly: do not report to the user in this repo's shorthand.
+Say *"we showed it gives a wrong answer"*, not *"it clears §5"* (`e5e1765`).
+
+The general shape, and it is the same one as `check-doc-comments` and
+`check-ledger` both shipping with the blind spot of the class they closed:
+**noticing a general problem and fixing only the instance is how the instance
+recurs** — and a fix aimed at the wrong surface looks like a fix until the
+problem happens again somewhere the fix does not reach.
 
 ## Verified
 
