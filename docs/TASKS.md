@@ -7,8 +7,9 @@ the same state is the failure this project keeps catching; if a row's status
 here disagrees with the ledger, the ledger is right and this file is stale.
 
 Grouped by **what stops someone picking it up**, because the items are not the
-same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against
-`0b2bbb3`.
+same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against `53eead1`, **after Dan found both this
+file and session-log 004 stale in the same reading**. Reconcile against the
+ledger and the working tree, not against memory of what was decided.
 
 ---
 
@@ -57,6 +58,15 @@ Someone could start these today.
   fixes). The real target is the **provisioning cost** — it is what puts a test
   within reach of 5000ms at all.
 
+  **Since that was written, provisioning got 69% cheaper** (`6eeeb92`): the
+  catalog is read in two queries instead of ~78 checks, three round trips in the
+  steady state. Lower pressure, same ceiling — not a fix, and not measured
+  against the failure rate. **Use `LABKIT_TRACE=all` rather than rebuilding
+  instrumentation**; `src/db/trace.ts` exists precisely so the next investigation
+  does not start where the last two did.
+
+  **Dan has deprioritised this** — it is not obstructing work.
+
   **Two measurement traps this burned, both mine.** Comparing runs taken hours
   apart under uncontrolled machine load — sibling Claude sessions run `bun test`
   concurrently here, load ~6 on 10 cores — produced one confident wrong finding
@@ -67,8 +77,9 @@ Someone could start these today.
 
 ## Needs a discriminator before it can be built
 
-Two ledger rows sit `open` + **unowned** — down from four. Rows **O** and **S**
-closed on 2026-08-21 and row **T** was refuted the same day. These are research questions, not tickets — "do row F" is
+**One** ledger row sits `open` + unowned — down from four. Verified against §3,
+not recalled: O `resolved`, S `refuted`, T `refuted`, AD `resolved`,
+AE `resolved`, **F `open`**. A research question, not a ticket — "do row F" is
 not actionable, and writing a scenario to satisfy a row would manufacture the
 result (PJ-011 §5).
 
@@ -79,33 +90,43 @@ result (PJ-011 §5).
   and `content_hash` is the bytes — so there is nothing two artefacts can be two
   **versions of**. Same shape as row O: the writer knows, the verb never asks,
   the reader infers wrongly.
-  Still **not built**, and it is now the most expensive open item: a genuine new
-  noun (rung 4). S-9b cleared bar 4 and not §5. Its discriminator, which it
-  never had before, is *a scenario in which the record must distinguish a new
-  version of a thing from a new thing, and gets it wrong.*
+  Still **not built**, and it is the most expensive open item: a genuine new noun
+  (rung 4), which would be the project's first.
 
-- [ ] **Row T — edges cannot carry properties.** **Orphaned**, as predicted. Row
-  O was its only named owner and closed with `INVALIDATED_BY`, a plain edge with
-  no properties — so T contributed nothing and has no owner at all. Needs a
-  genuinely new discriminator: a case where reifying the fact to a node is worse
-  than a property on the edge would be. Three rows have now been settled by
-  giving the fact its own node or edge, which is mild evidence *against* the row.
+  **Three bites so far, all in *reporting*, none in the model.** `reproducibilityOf()`
+  took parts by reference and reported bare names (S-9c); `restingOn` deduplicated
+  by name, so a conclusion resting on a surviving fragment *and* its regeneration
+  reported one entry (S-9d, `labkit-minion`); `whatDependsOn()` correctly
+  **refuses** the ambiguous name. The surface knows a name is ambiguous in two
+  places and collapses on it in a third. Both bites were fixed at rung 1 — one
+  field each, no model change — and **the row stayed open both times**.
+
+  That is the strongest case yet for `boundary`: the defect keeps living in how
+  answers are reported, not in what the model can hold. Not concluded — three is
+  a pattern, not a proof.
+
+**Row T is `refuted`, not open** — this file said both at once until 2026-08-21.
+Edges *do* carry properties; `createEdge()` takes them. What survives is that an
+edge property cannot be part of edge identity, nor changed by re-calling the verb
+that created it. `labkit-minion` is looking for a discriminator anyway — a case
+where reifying to a node is genuinely worse — and expects not to find one: three
+rows have been settled by giving the fact its own node or edge (S-7, S-12,
+row O), which is three-for-three against.
 
 ## Next phase
 
-- [ ] **A thin read-only MCP/CLI adapter over the frozen contract.** PJ-023 named
-  it; `023`/`024` narrowed it. The contract exists in
-  `consumer-contract/010`–`015`; the vertical slice is the pattern. Build four
-  reads first, not twenty operations. **Two durable worlds per read, before the
-  read is written** — if the public API returns one answer where the contract
-  needs two, that is a demonstration rather than an absence.
+- [x] ~~**A thin read-only CLI**~~ — done (`21cd68f`). `known`, `why`, `affects`,
+  `enquiry`. Read-only **structurally**: it builds a `ReadSurface`, never a
+  `ResearchSession`, and the test derives the forbidden verb list from
+  `WriteSurface.prototype` so a verb added later is covered without anyone
+  remembering.
+- [ ] **The MCP adapter.** Same four reads through a different door. **Two
+  durable worlds per read, before the read is written** — if the public API
+  returns one answer where the contract needs two, that is a demonstration
+  rather than an absence.
 
 ## Waiting on a decision, not on work
 
-- [ ] **Does the SVG still earn 134KB?** Both forms are committed and
-  self-maintaining; the question narrowed once a diffable form existed. Rendered
-  comparison published as an artifact. One line in
-  `scripts/update-dependency-graph.sh` either way.
 - [ ] **Should `whySupported` + `checksFrom` be their own module?** 359 lines,
   19% of the pre-split code, straddling claims and criteria. Deferred by the user
   during the read/write split; nothing depends on it.
@@ -134,9 +155,13 @@ better than the work.
 Not tasks, but the things that are not in the repo and will not announce
 themselves.
 
-- `git config core.hooksPath .githooks` — enables the dependency-graph hook. The
-  hook is tracked; the config is not.
-- `brew install graphviz` — optional. Without it the mermaid graph is still
-  maintained and only the SVG goes stale, announced on stderr.
-- `.claude/settings.local.json` and `.claude/.wrap-state/` are deliberately
-  untracked. See CLAUDE.md.
+- **Nothing to configure for hooks.** `.githooks/` and the SVG were both removed
+  (`ce97456`); `bun run dev:dependency-cruiser` regenerates
+  `docs/dependency-graph.mmd` by hand, and graphviz is no longer needed.
+- `.claude/settings.local.json`, `.claude/.wrap-state/` and
+  `.claude/hookify.*.local.md` are untracked, so a **worktree will not have
+  them**. The hookify rules are the ones worth copying across — they warn on
+  four mistakes made in this repo today. See CLAUDE.md.
+- Checks worth knowing: `bun run check:ledger`, `check:doc-comments`,
+  `check:migrations`. The first two each caught a real defect within hours of
+  being written.
