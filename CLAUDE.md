@@ -235,6 +235,13 @@ caught someone twice: the second time with `${PIPESTATUS[1]:-$?}`, which is
 expression fell through to `$?` and reported `wc -l`, passing a fix that was
 dead code.
 
+**The pipe costs the diagnosis as well as the status, and that half is easier to
+walk into.** `bun test | tail -5` keeps the pass/fail counts and throws away
+every `(fail)` line, so a run reporting 23 failures leaves you unable to name a
+single failing test — or to tell a real regression from a teardown cascade.
+Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
+about the pipe, not about that incident.
+
 ## Architecture: two persistence halves, deliberately not one
 
 The domain has ~14 entities (Question, LineOfEnquiry, EvidenceUnit,
