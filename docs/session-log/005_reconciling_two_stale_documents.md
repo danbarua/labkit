@@ -1,4 +1,4 @@
-# 005: two stale documents, a false claim in the wrap hook, and a merge
+# 005: two stale documents, a false claim in the wrap hook, and row F closed
 
 **Session wrap, 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/` for the reasoning behind anything below.
@@ -57,11 +57,32 @@ docs/session-log/004_config_cruft_and_consumer_brief.md | 24 ++++-
   through. Recorded in CLAUDE.md with the general form: a parallel session's
   **worktree** state is invisible to you in a way its branch state is not.
 
+- `b482675` — **merged row F's verdict: `boundary`.** `labkit-minion` found a
+  fourth reporting bite (`reproductionOf().differs`, deciding by `natural_id`
+  and reporting bare `logical_name`) and then closed the row by argument rather
+  than tally: artefacts **do** have identity, the reads were not using it, and
+  every one of the four fixes carried identity that already existed. A
+  version-of relationship would have fixed none of them, so the bites are
+  evidence *against* the row. The enumeration is what makes it a verdict —
+  every read touching an artefact takes a reference, refuses an ambiguous name,
+  or returns identity, and `s10c` asserts that instead of leaving it as prose.
+
+  **Row F was the only candidate in this project's history that would have
+  required a first new noun. It did not.** Node labels stay at thirteen.
+
+  Reopening condition recorded rather than papered over: *"show me the history
+  of this control series"* — versions as an ordered sequence, asked of a name.
+  No verb asks it, and under §5 a question never asked earns nothing.
+
 ## Verified
 
-Documentation only until the merge; then a full run.
+Documentation only until the merge; then full runs.
 
-- `bun test` → **241 pass / 0 fail**, 32 files, after the merge.
+- `bun test` → **244 pass / 0 fail**, 33 files, after the second merge.
+  **The flake at its worst was observed and correctly diagnosed by the fork
+  before I saw it**: run 1 of 2 gave 10 failures on an identical tree, run 2
+  gave none. Not a regression — the only changes were markdown, checked with
+  `git diff --name-only` rather than assumed.
 - `bun run check:ledger` → clean, and it is what the row-status claims were
   checked against rather than memory.
 - `bun run check:doc-comments` → clean. `npx depcruise` → 0 errors.
@@ -112,9 +133,10 @@ be true rather than from what was just observed.
 
 ## Next
 
-**`labkit-minion` must reset onto the merge (`96a50a3`) before starting row F**,
-or the branches re-diverge immediately — and re-seed its wrap state there, or
-entry 006 will cover this session's commits too.
+**Ledger after this session:** F `boundary`, T `refuted`, S `refuted`,
+O/AD/AE `resolved`, **AF `open` and unowned** — the only row wanting a
+discriminator, and its own cell says it earns nothing under §5. There may be
+nothing worth pointing a session at.
 
 **Merge each row as it finishes, rather than letting branches drift.** Row T
 merged with zero conflicts because it was taken immediately. The ledger and
