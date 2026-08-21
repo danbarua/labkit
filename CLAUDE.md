@@ -119,6 +119,18 @@ done. It is not a record: PJ-008 §3's ledger stays authoritative on what the
 model knows, and TASKS.md points at it rather than restating verdicts. Where the
 two disagree, the ledger is right and TASKS.md is stale.
 
+**Never suggest `git reset --hard` to another session.** You cannot see its
+working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
+commit; it had **five uncommitted files** at that moment, including a fix and a
+predictions document, and the command would have destroyed all of them silently.
+It rebased instead and said so. `rebase` reaches the same place and refuses when
+the tree is dirty, which is the property that matters across a boundary you
+cannot see through. The advice was right in shape and wrong in verb.
+
+More generally: a parallel session's **worktree state is invisible to you** in a
+way its branch state is not. `git log` tells you where it is; nothing tells you
+what it is holding.
+
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
 independently; see its README. The Stop/SessionStart wiring lives in
