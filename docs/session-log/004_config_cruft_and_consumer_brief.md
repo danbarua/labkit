@@ -1,4 +1,4 @@
-# 004: config cruft cleared, the consumer probe run, session.ts split, rows Z and F probed
+# 004: config cruft cleared, the consumer probe run, session.ts split, rows Z and AD closed
 
 **Session wrap, 2026-08-20 to 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -448,20 +448,54 @@ exactly five helpers; `emit` has 18 callers and every one is a write.
 dependency-cruiser could not find the seam (it saw one node) but can enforce one
 afterwards, which is the main argument for bothering.
 
+**Row AD closed** (`37c8a06`, `17b9976`, `5d730a1`). The wrong answer S-9b
+found, cleared the day it opened. `recordObservations()` now mints the
+`EvidenceUnit` PJ-001 says must exist — `ADDRESSES` to the enquiry, `PRODUCES`
+to the evidence. **One node, two edges, no migration.**
+
+*The blast radius was the only prediction carrying risk, and it held at the
+floor.* The ledger cell had feared the fix "touches every read that walks the
+unit". One read changed and exactly one test broke. Every other query reaching an
+`EvidenceUnit` arrives through `Evidence -SUPPORTS|CHALLENGES-> Claim`, which
+observation evidence has neither of, or through a required `USES -> Computation`
+an observation unit does not have. Declining to mint a fake `Computation` is
+load-bearing twice — honest, and what kept the fix from altering the reproduction
+verdict and the support count.
+
+*The transaction is not there because a test failed.* The fix **creates** the
+hazard: after it, a torn write leaves precisely the invariant being removed,
+durably and indistinguishable from the eighteen scenarios of records that predate
+it. Deletion-verified — with `inTransaction` removed the negative test fails,
+`write.ts` restored byte-identical.
+
+*`PRODUCES` goes to the evidence and not the artefact*, unlike `recorded()`,
+because there the artefact is an analysis output the unit created and here it
+**is** the observation record. Predicted in `029` as the wrong answer I would be
+tempted by, and named in the code so the asymmetry reads as deliberate. Out with
+`labkit-review` for a second opinion — it is the kind of thing that reads right
+to whoever just wrote it.
+
+*Found on the way out:* `EvidenceUnitRole` has nine values, one writer and no
+readers. Adding `"observation"` was declined — vocabulary with no consumer, and
+the no-cull policy covers labels and edges, not property values. Left as a
+finding; what would settle it is a reader.
+
 ## Verified
 
-Run on `6281aa3`, the final commit.
+Run on `5d730a1`, the final commit.
 
-- `bun test` → **207 pass, 0 fail**, 22 files.
+- `bun test` → **208 pass, 0 fail**, 22 files.
 - `bun run typecheck` → clean.
 - `npx depcruise src tests --output-type err` → **0 errors**, 2 orphan warnings
   (`src/index.ts`, `src/cli.ts`, both known stubs).
 - `bun run check:doc-comments` → clean (the check added this session).
-- `bun run check:ledger` → row AD is the one demonstrated wrong answer, and no
-  row's status disagrees with itself. Verified by injection both ways —
+- `bun run check:ledger` → **no demonstrated wrong answer is shipping green**,
+  and no row's status disagrees with itself. Verified by injection both ways —
   flipping AD's cell back to `open` fails and names both lines, marking a second
   row `demonstrated` fails the count — ledger restored byte-identical each time.
 - `bun run check:migrations` → OK.
+- Deletion-verify on row AD's transaction: removed `inTransaction`, the negative
+  test fails; restored byte-identical.
 
 **One run reported 199 pass / 1 fail and it was not a regression.** Reproduced by
 running `tests/leader-election.test.ts` alone three times: pass, pass, fail. That
@@ -502,7 +536,11 @@ worktrees make it easier to fall into.
 
 ## Open
 
-- **One confirmed wrong answer is now shipping green, and it is not row F's.**
+- **Row AD is closed, so nothing is currently shipping a demonstrated wrong
+  answer** — and `bun run check:ledger` says so rather than a paragraph.
+  Recorded below as it stood when found, because the deferral history is the
+  part that gives it weight.
+- **One confirmed wrong answer was shipping green, and it was not row F's.**
   Ledger row **AD**: `recordObservations()` mints no `EvidenceUnit`, so a
   question worked on through observations alone reports itself `untested` —
   *"one nothing has ever been run against"* — while a sibling question worked on
@@ -607,22 +645,28 @@ worktrees make it easier to fall into.
 
 ## Next
 
-1. **`recordObservations()` must produce an `EvidenceUnit`** — row AD, mandated
-   rather than chosen. Start at `src/domain/write.ts:201`. **Invert** S-9b's
-   seventh test rather than deleting it, and re-run its shape detectors after.
-   It touches every read that walks the unit — `whatIsKnown`, `whySupported`,
-   `reproductionOf` — so it is a real build, not a one-line fix.
-2. **Row O's discriminator**, with predictions recorded first the way row Z's
-   and row F's were: an analysis retired on the strength of a review, that
+1. **Row O's discriminator**, with predictions recorded first the way row Z's,
+   row F's and row AD's were: an analysis retired on the strength of a review, that
    review later invalidated — does the retirement still read as resting on valid
    grounds? Needs no event sink. If the propagation query comes back *correct*,
    that is a result and O's cell can finally say why it stays unowned in terms
    of something that was run.
-3. **Row S last**, and deliberately: write-side, inexpressible rather than
+2. **Row S last**, and deliberately: write-side, inexpressible rather than
    unreadable, the most likely to need a real noun.
+
+Row T is **orphaned** and its cell says so: its only named owner was row O, and
+if O is settled by a plain `Decision → Review` edge, T loses that owner. It is
+not handed the event-sink phase as a substitute — an unbuilt phase is not a
+scenario.
 
 Row F needs no new probe — it needs the adapter phase's reconstruction-provenance
 read to fail against real state, per `023`'s own sequencing.
+
+**Two journal entries are the user's to commission, and deliberately unwritten:**
+the three fired conditions (K, Z, P — each reading *"if X, then this row moves"*
+with X happening unnoticed), and the rule that a predictions document may not say
+in advance which outcome would be more impressive, for which `027` is the
+evidence.
 
 **Still waiting on a decision, not on work:** whether the SVG earns its 134KB now
 that a diffable form exists (the rendered comparison is published as an
