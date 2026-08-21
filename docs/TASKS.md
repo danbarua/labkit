@@ -37,22 +37,41 @@ Someone could start these today.
     keeps running and its late `scenario.end()` resets the database and closes a
     connection that by then belongs to the *next* test. Traced at log-line
     granularity in two files independently.
-  - **A run's test count is a detector, and it is exact.** The suite has 249
-    static `test(` declarations, one of which is inside
-    `for (const label of NODE_LABELS)` (`tests/domain-graph.test.ts:362`) and
-    expands to thirteen. `249 - 1 + 13 = 261`, with no remainder — so **261 is
-    derived, not observed**, and any other number means a test was reported
-    twice. That is the previous bullet's mechanism seen from the counter: a
-    test whose body keeps running after the ceiling stops waiting gets counted
-    at the timeout and again on completion.
+  - **The test count is one-directional, and was briefly written down here as a
+    detector. It is not one.** The suite's count is derived rather than
+    observed: count the `test(` declarations at line start (excluding
+    `RegExp.prototype.test` calls, of which there are five), subtract the one
+    generating declaration inside `for (const label of NODE_LABELS)`
+    (`tests/domain-graph.test.ts:362`), add `NODE_LABELS.length` for its
+    expansions. On 2026-08-21 that was `249 - 1 + 13 = 261`, exactly. **Derive
+    it; do not trust that literal** — it moves whenever a test file or a node
+    label is added, and a bare number in this paragraph would earn no assertion
+    and carry no date.
 
-    Found on 2026-08-21 in a run reporting **262 tests, 239 pass / 23 fail** —
-    which also happened to be racing a second full `bun test` against the same
-    directory, so it says nothing about the flake's usual cause. The count
-    check is the useful part and is cheaper than reading durations: **if
-    `Ran N tests` is not 261, a test crossed the ceiling.** Recompute the 261
-    if a test file or a node label is added; it is a derived constant, so it is
-    supposed to move.
+    A count *above* the derived value means a test was reported twice, which is
+    the previous bullet seen from the counter: a body that keeps running after
+    the ceiling stops waiting is counted at the timeout and again on
+    completion. Observed once, in a run reporting **262 tests, 239 pass / 23
+    fail** — which was also racing a second `bun test` against the same
+    directory, so it says nothing about the flake's usual cause.
+
+    **The converse is false, demonstrated the same day.** A natural flake on a
+    quiet machine lost five tests to the ceiling and reported **261** — the
+    normal count. So the count catches some crossings and misses others, at a
+    rate nobody has measured except that it is not zero.
+
+  - **What did separate a flaking run from a clean one, on the same tree:**
+
+    | | tests | result | expects | wall |
+    |---|---|---|---|---|
+    | A | 261 | 256 pass / 5 fail / 5 errors | 856 | 280.87s |
+    | B | 261 | 261 pass / 0 fail | 867 | 88.98s |
+
+    Wall clock separated them 3.2×, and the **`expect()` count** dropped 11.
+    The assertion count is the better of the two: it measures work that did not
+    happen rather than time that passed, so it does not move with machine load.
+    Neither is a threshold anyone has calibrated — they are what to compare
+    between two runs of the same tree, which needs no constant at all.
 
   **Refuted, with evidence:** advisory-lock contention (346 acquisitions, max
   **38ms**); pglite#1046 desync as the primary mechanism (no desync signature,

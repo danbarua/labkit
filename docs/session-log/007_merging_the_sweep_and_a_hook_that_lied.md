@@ -1,4 +1,4 @@
-# 007: merging the sweep, a hook that answered about the wrong tree, and a flake detector
+# 007: merging the sweep, a hook that answered about the wrong tree, and a detector that wasn't
 
 **Session wrap, 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/028_a_test_that_does_not_test.md` for the reasoning
@@ -33,10 +33,16 @@ hook it flagged on the way out.
   for a session that had written one — three times in an afternoon — until an
   unrelated merge made the file appear elsewhere and the answer changed on its
   own. Resolves from `git rev-parse --show-toplevel` now.
-- `7ac64af` — **a run's test count is an exact flake detector.** `docs/TASKS.md`
-  gains the derivation and the rule; CLAUDE.md gains the other half of its own
-  pipeline trap (`bun test | tail` keeps the counts and discards every `(fail)`
-  line, so a failing run cannot be diagnosed at all). See **Verified**.
+- `7ac64af` — CLAUDE.md gains the other half of its own pipeline trap
+  (`bun test | tail` keeps the counts and discards every `(fail)` line, so a
+  failing run cannot be diagnosed at all). It also claimed a run's test count
+  was an **exact flake detector**, which was wrong; see the next commit.
+- `<this commit>` — **that detector is refuted and the claim withdrawn.**
+  `labkit-minion` caught a natural flake within the hour: five tests lost to
+  bun's ceiling, and the run reported the *normal* count. The derivation is
+  right and one-directional — a count above it means a double report — but the
+  converse is what a detector needs, and it is false. `docs/TASKS.md` now says
+  so, and records what did separate the two runs.
 
 Working tree clean apart from this entry.
 
@@ -53,11 +59,12 @@ Working tree clean apart from this entry.
   it. Reported because a wrap that keeps only the run agreeing with it is the
   shape this session spent the day removing.
 
-  It also reported **262 tests**, and that turned out to be the useful part: the
-  suite's count is derived (`249 - 1 + 13 = 261`, one generator over
-  `NODE_LABELS`), so any other number means a test was counted twice — which is
-  what a body that keeps running past bun's ceiling does. Written up in
-  `docs/TASKS.md` as a detector.
+  It also reported **262 tests**, which is a real signal but a much smaller one
+  than I first claimed. The count is derived (`249 - 1 + 13 = 261`, one
+  generator over `NODE_LABELS`), so a count *above* it means a test was
+  reported twice — a body still running after the ceiling stopped waiting. I
+  wrote that into `docs/TASKS.md` as a **detector**, and it is not one: a
+  natural flake the same day lost five tests and reported 261. See **Open**.
 - `bun run typecheck` → clean.
 - `npx depcruise src tests --output-type err` → **no violations at all**, 0
   errors and 0 warnings.
@@ -87,6 +94,21 @@ earned by instances rather than argued from them, and three found on one day by
 two agents looking for something else is a weak sample. **If a fourth turns up,
 write it.**
 
+**The test count is not a flake detector, and I published it as one.** The
+derivation is exact and one-directional: a count above it means a double
+report. I wrote the converse into `docs/TASKS.md` — *"if `Ran N tests` is not
+261, a test crossed the ceiling"* — within an hour of a natural flake that lost
+five tests and reported 261. Withdrawn there, with the counter-example and with
+what did separate the runs (wall clock 3.2×; `expect()` total down 11, which is
+the better signal because it counts work not done rather than time passed).
+
+Two things worth keeping from how it went wrong. The claim was **generalised
+from one observation** — a 262 seen once, in a run that was also racing another
+suite — and stated as a rule. And the literal `261` was a numeral in prose
+earning no assertion and carrying no date, which is the pattern this branch
+closed out three hours earlier; `docs/TASKS.md` now gives the derivation and
+tells the reader not to trust the number.
+
 **The sweep's inferred pile remains unverified**, and `006`'s Next names the
 right way in: demonstrate one verb (`sharpen` or `closeEnquiry`) against
 `write.ts`'s "every compound verb runs in `inTransaction()`", rather than
@@ -105,7 +127,8 @@ If work resumes: `docs/TASKS.md` is the queue, and PJ-008 §3 is authoritative
 where the two disagree. The one live thread is the inferred pile above — start
 with `bun test tests/scenarios/` and a single verb, not a sweep.
 
-Run the suite as `bun test > run.log 2>&1` and check two things in the log:
-`0 fail`, and `Ran 261 tests`. A count that is not 261 means a test crossed
-bun's ceiling even if nothing failed — recompute the 261 from
-`docs/TASKS.md`'s derivation if a test file or a node label has been added.
+Run the suite as `bun test > run.log 2>&1` — never through `tail`, which keeps
+the counts and discards every `(fail)` line. Judge it by `0 fail`. If a run
+flakes, the thing to compare is a second run of the **same tree**: wall clock
+and the `expect()` total both separated a flaking run from a clean one where
+the test count did not, and comparing two runs needs no constant.
