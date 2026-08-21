@@ -865,11 +865,40 @@ happened today: committing while `check:doc-comments` was failing; a backtick in
 a double-quoted `-m` executing `bun test` inside the commit; overlapping globs
 yielding five duplicate paths; `git add -A`. All warn, none block.
 
+**Three queue items cleared** (`33756c4`, `21cd68f`, `6cd8d4b`, `1eab282`).
+
+*`whatDependsOn()` walks the pipeline.* Iterative, not a variable-length
+pattern: the chain alternates `CONSUMES` and `PRODUCES` and AGE has no
+edge-type alternation. Visited-set rather than a depth cap, so a cycle
+terminates without truncating a long pipeline. Still `complete: false` —
+transitive is not complete.
+
+*A read-only CLI* — `known`, `why`, `affects`, `enquiry`. **Read-only
+structurally**: it builds a `ReadSurface`, never a `ResearchSession`, so no
+write verb is in scope. The test derives the forbidden list from
+`WriteSurface.prototype` rather than hardcoding it, so a verb added later is
+covered without anyone remembering. Prose by default, `--json` for programs;
+`affects` prints the open-world caveat inline, where someone acts on it.
+Verified end to end against a seeded record. Clears one no-orphans warning.
+
+*Row F bit — in the reporting, not the model.* `reproducibilityOf()` took parts
+by **reference** on the way in, with a comment arguing a name-keyed map "would
+merge exactly the two things this scenario exists to keep apart" — and reported
+bare **names** on the way out. An original and its regeneration under one name
+put the same string in `exact` *and* `differing` at once; a reader working from
+`exact` would conclude the control reproduced. Fixed at rung 1 with
+`{ part, name }`. **Row F stays open** — the *report* lacked identity, not the
+artefact.
+
+The guard existed, was argued for in writing, and was applied to one direction
+only. Seventh region to hit identity-is-never-wording, and the first **inside a
+function written to respect the rule**.
+
 ## Verified
 
 Run on `80c605b`, the final commit.
 
-- `bun test` → **229 pass / 0 fail**, 28 files, 79.6s on the final run. Still
+- `bun test` → **235 pass / 0 fail**, 30 files, 82.6s on the final run. Still
   intermittently unstable: runs give 0-2 failures with wall times
   between 74s and 135s. Mechanism known (below), fix outstanding. Formerly
   reported as **cause unknown**. Bare `bun test` fails about
@@ -1074,11 +1103,12 @@ worktrees make it easier to fall into.
    test contends on under the same key. Control for machine load: sibling
    sessions running `bun test` invalidated an earlier dataset.
 2. ~~An analysis cannot read another analysis's output~~ — **done**, row AE.
-3. **`whatDependsOn()` is one hop.** The chain now exists in the record and the
-   query still does not walk it. Query semantics, and the caveat fields already
-   stop it lying — but a reader wanting the real blast radius has to walk it
-   themselves.
-4. **The thin read-only MCP/CLI adapter** over the frozen contract. Four reads,
+3. ~~`whatDependsOn()` is one hop~~ — **done**.
+4. ~~The thin read-only CLI~~ — **done**. What remains of that phase is the MCP
+   adapter proper; the CLI is the same four reads through a different door.
+5. **Row F and row T** still need demonstrations. S-9c bit the *report*, not the
+   model — an artefact still has no identity apart from its content, and row T
+   needs a discriminator it has never had. over the frozen contract. Four reads,
    two durable worlds each, before the read is written.
 
 **Row F is the expensive one and is not next.** Its discriminator now names a
