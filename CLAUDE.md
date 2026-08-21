@@ -38,7 +38,12 @@ been settled outright by S-18 (023), which the same §4 condition had nominated
 and which three reviews walked past. **024 is a third external review**, of the
 completed arc: it verifies the corpus-exhaustion claim against §3's ownership
 table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
-zero migrations, fifteen scenarios). Its one open item — row F's missing S-9
+zero migrations, fifteen scenarios). **025 and 026 are about the method rather
+than the model** — 025 on why a condition recorded where nobody re-reads it is
+not a mechanism (rows K, Z and P all fired unread), and 026 on the one failure
+mode the predictions protocol cannot see from inside itself: a predictions
+document may state what will happen and what would refute it, and may **not**
+rank the outcomes by how impressive they would be. Its one open item — row F's missing S-9
 verdict — was closed the same day, and no item on the ledger's index was
 known-open **until S-9b produced row AD** on 2026-08-21 (below). Four rows are
 still `open` + unowned, which is the better kind: every named probe has been
