@@ -66,6 +66,13 @@ result (PJ-011 §5).
   grounds? — needs **no event sink**. Predictions first: if the propagation
   query comes back correct, that is a result and the cell can finally say why it
   stays unowned in terms of something that was run.
+  A refuted *challenge* needs no new ledger convention — **it is a prediction
+  with a different author**, and rows A and B keep refuted predictions because
+  someone committed to an outcome before the build, not because of who they
+  were. Only the attribution line changes. If it goes that way, the cell must
+  say **what the challenge got wrong**, not that it was wrong: *"the deferral was
+  right, and here is the reason"* is a verdict; *"the challenge was refuted"* is
+  the shrug this row has had for eleven scenarios.
 - [ ] **Row T — edges cannot carry properties.** **Orphaned.** Its only named
   owner was row O, and if O is settled by a plain `Decision → Review` edge then T
   contributes nothing to it and loses that owner. Says so in its own cell rather
