@@ -43,27 +43,69 @@ export interface Scenario {
 
 export async function openScenario(): Promise<Scenario> {
   const testDb: TestDb = await setupTestDb();
-  let db: (LabKitDB & { close(): Promise<void> }) | undefined;
+
+  /**
+   * Connections opened by `begin()` and not yet closed by `end()`, oldest
+   * first. **Normally length one**; it reaches two exactly when a test
+   * overran bun's ceiling and the next one started while its body was still
+   * running.
+   *
+   * A single mutable `db` was what made that case destructive: the overrunning
+   * test's late `end()` closed whatever `db` pointed at, and by then it pointed
+   * at the *next* test's connection. See the header note below.
+   */
+  const open: Array<LabKitDB & { close(): Promise<void> }> = [];
 
   return {
     async begin() {
+      // Normally a no-op, and that is the point. `open` is empty on the happy
+      // path, because the previous test's `end()` already reset — off-budget,
+      // in `afterEach`. It is non-empty only when the previous test overran
+      // bun's ceiling and never tore down, and *that* test's `end()` will find
+      // this connection open and skip its reset. So this is the one place the
+      // reset can happen for an abandoned predecessor, and it costs the normal
+      // path nothing.
+      if (open.length > 0) await testDb.reset();
       // A fresh connection per test -- see tests/helpers/db.ts on why that is
       // load-bearing rather than tidiness.
-      db = await testDb.openClient();
+      const db = await testDb.openClient(`test-${open.length + 1}`);
+      open.push(db);
       const ctx = await resolveTenantContext(db, "labkit");
       return new TenantGraph(ctx, db);
     },
     async current() {
+      const db = open[open.length - 1];
       if (!db) throw new Error("scenario not begun");
       const ctx = await resolveTenantContext(db, "labkit");
       return new TenantGraph(ctx, db);
     },
     async end() {
-      await testDb.reset();
-      await db?.close();
-      db = undefined;
+      // Oldest first, which is the order `end()` calls arrive in even when one
+      // of them is late: the overrunning test began first, so it also reaches
+      // its own `end()` first. It therefore closes *its* connection and not
+      // the live test's.
+      await open.shift()?.close();
+
+      // Reset only when nothing is left running. A late teardown from an
+      // abandoned test finds the live test's connection still open and skips
+      // it, which is the whole cascade: it used to drop the graphs of a test
+      // already querying them.
+      //
+      // **Kept here rather than moved into `begin()`, and that placement is
+      // load-bearing.** Twenty-three of the twenty-nine files call `end()`
+      // from `afterEach`, which bun runs *outside* the per-test timeout, so
+      // this cost is off-budget where it is. Moving it to `begin()` — tried,
+      // measured, reverted — puts a graph drop and a truncate inside every
+      // test's 5000ms allowance and pushes more tests over the ceiling than
+      // the cascade ever cost: paired A/B gave BASE 0 failures in two runs,
+      // that version 18 failures in one of two, at the lowest load of the
+      // four. See docs/TASKS.md.
+      if (open.length === 0) await testDb.reset();
     },
     async close() {
+      // Anything a test never ended -- an abandoned body that was still
+      // running when the file finished.
+      while (open.length > 0) await open.shift()?.close().catch(() => {});
       await testDb.close();
     },
   };
