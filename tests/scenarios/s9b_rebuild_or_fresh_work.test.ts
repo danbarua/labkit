@@ -245,6 +245,72 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
+   * **The wrong answer, and it is not row F's.**
+   *
+   * `027` predicted the confidently wrong answer would be on the question side
+   * rather than the artefact side. It is — and the mechanism is not the one
+   * predicted, which is the part worth keeping.
+   *
+   * A researcher opens the question of what generated the historical control
+   * and works on it: three candidate algorithms tried, none reproduces the
+   * recorded series. That is real, recorded, durable work, and a negative
+   * result is a result. `whatIsKnown()` then reports the question as
+   * **`untested`** — *"one nothing has ever been run against"*, in the survey's
+   * own words. Populated, confident, and false.
+   *
+   * The cause is `recordObservations()` creating `Evidence` with no producing
+   * `EvidenceUnit`, which PJ-001 defines as impossible. `whatIsKnown()`'s
+   * `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`, so work
+   * recorded as observations is invisible to it while work recorded as an
+   * analysis is not. The other question in this same test reads `unresolved`
+   * for exactly that reason.
+   *
+   * Three cold reviewers flagged the missing unit independently and three
+   * scenarios were pointed at it without finding harm beyond a reader's
+   * (see docs/TASKS.md). This is the fourth, and it is the first to produce a
+   * wrong answer rather than an untidy one. Under PJ-011 §5 that is what earns
+   * a change, and under CLAUDE.md's one-wrong-answer-at-a-time rule, clearing
+   * it is the next thing built.
+   *
+   * Asserted as wrong on purpose. This test documents a defect; when it is
+   * fixed, this test must be inverted rather than deleted.
+   */
+  test("KNOWN WRONG: observation-only work on a question reads as no work at all", async () => {
+    const { untested, unresolved } = await inOneWorld(async (s) => {
+      const { enquiry } = await theCachedConstruction(s);
+      const provenance = await s.openEnquiry("what generated the historical random control?");
+
+      // The attempt, recorded against the question it is an attempt to answer.
+      await s.recordObservations({
+        enquiry: provenance, name: "regeneration attempt",
+        finding: "three candidate algorithms tried; none reproduces the recorded series",
+      });
+      // And an unrelated regeneration on the original enquiry, so the two
+      // enquiries are not trivially distinguishable by having any work at all.
+      await s.recordObservations({
+        enquiry, name: CONTROL, contentHash: "sha256:second",
+        finding: "randomised control series, regenerated from an inferred algorithm",
+      });
+
+      const known = await (await afterwards()).whatIsKnown();
+      return {
+        untested: known.untested.map((q) => q.asks),
+        unresolved: known.unresolved.map((q) => q.asks),
+      };
+    });
+
+    // What it should say, and does not:
+    //   expect(unresolved).toContain("what generated the historical random control?");
+    expect(untested).toContain("what generated the historical random control?");
+    expect(unresolved).not.toContain("what generated the historical random control?");
+
+    // And the contrast that isolates the cause: the same survey, the same
+    // graph, a question worked on through recordAnalysis() rather than
+    // recordObservations(), classified correctly.
+    expect(unresolved).toEqual(["does the accelerated path match the reference?"]);
+  });
+
+  /**
    * Where rung 2 stops, stated precisely rather than gestured at.
    *
    * `reverify()` re-checks a **conclusion**: it looks up the finding by which
