@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
+    "mcp": "bun run src/mcp/server.ts",
     "dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
     "build": "bun build --compile --outfile bin/labkit src/cli.ts",
     "test": "bun test",
