@@ -133,6 +133,15 @@ be true rather than from what was just observed.
 
 ## Next
 
+**A two-point diff read as a change set, and it nearly cost a false accusation.**
+`git diff b482675..feat/minion` showed my own `005` sections as removals, and I
+read that as the fork having deleted them. It is a diff between two divergent
+tips, not a record of what changed — `b482675` was never an ancestor of that
+branch, so the "removals" were simply commits it did not have. Caught with
+`merge-base --is-ancestor` before saying anything. Same shape as the other
+mistakes today: a command answered a question I had not asked, and the answer
+looked like a fact.
+
 **Ledger after this session:** F `boundary`, T `refuted`, S `refuted`,
 O/AD/AE `resolved`, **AF `open` and unowned** — the only row wanting a
 discriminator, and its own cell says it earns nothing under §5. There may be
