@@ -308,16 +308,6 @@ export interface ReproductionReport {
 }
 
 /**
- * How much of a past construction can be rebuilt (S-9).
- *
- * Four outcomes per part, and only two of them are comparisons. `exact` and
- * `differing` are completed comparisons; `unverifiable` and `notRebuilt` are
- * states where no comparison happened at all, for two different reasons. Both
- * were at some point folded into `differing`, which claims knowledge the record
- * does not have — Row I's absence-versus-difference distinction, asked of an
- * artefact, and got wrong twice before it was got right.
- */
-/**
  * One part in a reproducibility report: what it is, and what it is called.
  *
  * `part` is identity; `name` is what a person reads. Keeping both is row F's
@@ -334,6 +324,16 @@ export interface ReproducedPart {
   name: string;
 }
 
+/**
+ * How much of a past construction can be rebuilt (S-9).
+ *
+ * Four outcomes per part, and only two of them are comparisons. `exact` and
+ * `differing` are completed comparisons; `unverifiable` and `notRebuilt` are
+ * states where no comparison happened at all, for two different reasons. Both
+ * were at some point folded into `differing`, which claims knowledge the record
+ * does not have — Row I's absence-versus-difference distinction, asked of an
+ * artefact, and got wrong twice before it was got right.
+ */
 export interface ReproducibilityReport {
   /** Parts whose recorded hash matches the one offered. */
   exact: ReproducedPart[];
