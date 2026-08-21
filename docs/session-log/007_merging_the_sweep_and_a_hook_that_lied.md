@@ -1,4 +1,4 @@
-# 007: merging the sweep, and a hook that answered about the wrong tree
+# 007: merging the sweep, a hook that answered about the wrong tree, and a flake detector
 
 **Session wrap, 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/028_a_test_that_does_not_test.md` for the reasoning
@@ -33,6 +33,10 @@ hook it flagged on the way out.
   for a session that had written one — three times in an afternoon — until an
   unrelated merge made the file appear elsewhere and the answer changed on its
   own. Resolves from `git rev-parse --show-toplevel` now.
+- `7ac64af` — **a run's test count is an exact flake detector.** `docs/TASKS.md`
+  gains the derivation and the rule; CLAUDE.md gains the other half of its own
+  pipeline trap (`bun test | tail` keeps the counts and discards every `(fail)`
+  line, so a failing run cannot be diagnosed at all). See **Verified**.
 
 Working tree clean apart from this entry.
 
@@ -100,3 +104,8 @@ merged level.
 If work resumes: `docs/TASKS.md` is the queue, and PJ-008 §3 is authoritative
 where the two disagree. The one live thread is the inferred pile above — start
 with `bun test tests/scenarios/` and a single verb, not a sweep.
+
+Run the suite as `bun test > run.log 2>&1` and check two things in the log:
+`0 fail`, and `Ran 261 tests`. A count that is not 261 means a test crossed
+bun's ceiling even if nothing failed — recompute the 261 from
+`docs/TASKS.md`'s derivation if a test file or a node label has been added.
