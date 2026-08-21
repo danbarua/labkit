@@ -423,6 +423,17 @@ checks that the two agree, which found two more nobody had reported — row **P*
 `resolved`/`open`, four scenarios stale, and row **Y** carrying a qualifier in a
 column that is a vocabulary.
 
+*And a third copy, in CLAUDE.md* (`1cee3a5`). It said **"no item on the ledger's
+index is now known-open"** three paragraphs above **"Row AD is currently that
+one"** — the first sentence written on `main` when it was true, surviving the
+edits that made it false, in the file every agent reads first. Reported by
+`labkit-review`, who wrote it. Recorded with the limit that produced it: a green
+`check:ledger` means the ledger agrees with *itself*, never that CLAUDE.md's
+paragraphs are current, and machine-checking narrative prose is deliberately not
+attempted. There is a merge hazard — `main` carries the original sentence, so a
+resolution keeping `main`'s line restores the contradiction silently and the
+check still passes.
+
 Row P's closing paragraph turned out to be a **fired condition**: *"if it is a
 defect, something else will have to demonstrate it."* S-9b did. That is the third
 such condition to fire unread (K, Z, P), and it is exactly what the check cannot
