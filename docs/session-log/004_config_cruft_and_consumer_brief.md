@@ -15,7 +15,7 @@ on the external review of that brief.
 
 ## Changed
 
-Thirty-four commits, range clean apart from `8299ecb` and `3b769c0` (dependency
+Thirty-seven commits, range clean apart from `8299ecb` and `3b769c0` (dependency
 graph regenerations, committed by the user) — no other session's work in it.
 
 ```
@@ -307,6 +307,38 @@ regeneration as `3b769c0` mid-session.
   reads the working tree rather than the index — a partial stage yields a
   diagram describing code the commit does not contain. Reported, not fixed.
 
+**Imports pruned** (`31a6196`) — 71 unused names removed from the three split
+modules, 37 of them from `core.ts`. The split had copied `session.ts`'s whole
+import block into each file; safe, since `noUnusedLocals` is off, but each header
+now states what its module actually depends on.
+
+**A windable clock, and row Z narrowed by it** (`93ef2ba`). `024` claimed a
+pinned clock meant the harness *structurally* could not evaluate row Z.
+**Withdrawn** — wrong twice: `{ now: () => "..." }` is a frozen value with a call
+signature rather than a clock, and the limit was the fixture's.
+
+Wound, the answer is observable rather than argued. **Of the six places a write
+verb reads the clock, exactly one reaches the graph** — `evaluateCriterion`,
+stamping `CriterionEvaluation.evaluated_at`. `reverify`, `acceptAsUnresolved`,
+`amendDesign`, `replaceAnalysis` and `reinterpret` stamp only the event stream,
+which is not durable state. Probe 5 winds sixty days across an evaluation and a
+closure: the evaluation keeps its instant — the wound one, not the start — and
+the closure keeps nothing.
+
+So **row Z is narrower than `024` said: evaluations are ordered, decisions are
+not**, and `Decision` carries closure, deferral, amendment, promotion and
+withdrawal — every act by which belief moves. A frozen clock could not have shown
+it, because every stamp was identical. It also says a `decided_at` would be a
+smaller change than "add time to the model" implied. Still bar 4, nothing built.
+
+`tests/helpers/clock.ts` names three clocks for three jobs — frozen when a read
+must not see time, auto-advancing when stamps must differ but not matter,
+windable when the interval is the subject — because picking the wrong one
+quietly weakens a test. The paired-world probes keep the frozen one deliberately.
+
+**The hook fired twice on its own**, correctly, both commits having changed the
+graph. First production use.
+
 **graphviz is a real dependency**, now declared in CLAUDE.md.
 `depcruise --output-type mermaid` needs no binary, renders on GitHub, and is
 **3KB against the SVG's 135KB** — 261 lines versus 1,447, so readable diffs
@@ -441,11 +473,11 @@ are kept here because they are the reasoning, not the outcome.
 - **Still deferred, on the user's call:** whether `whySupported` (208 lines) plus
   `checksFrom` (151) — 19% of the code, straddling claims and criteria — is one
   concern deserving its own module inside `read.ts`.
-- **Untidied, deliberately:** the import block was copied wholesale into all
-  three modules. Harmless (`noUnusedLocals` is off) but noisy; pruning it is a
-  separate, purely mechanical change.
 - **The SVG-versus-mermaid choice is open**, and the hook makes it consequential
-  rather than cosmetic.
+  rather than cosmetic — 135KB regenerated on every code commit against 3KB and
+  readable diffs. The mermaid variant was rendered for the user to judge; the
+  decision is theirs and is a one-line change in
+  `scripts/update-dependency-graph.sh` either way.
 - **A test of the hook was invalid and nearly reported as a pass.** Staleness was
   faked by appending a marker; regeneration removed the marker, restoring the
   file to its committed content, so there was nothing to stage and the hook
@@ -455,9 +487,12 @@ are kept here because they are the reasoning, not the outcome.
 
 Then take the three gaps in cost order, one rung at a time:
 
-1. **Row Z — reader semantics first.** `Decision` already has `closed_at` and the
-   event stream carries stamps. Whether a durable ordering can be *derived*
-   rather than stored is untested, and is the first thing to test.
+1. **Row Z — narrowed, and the next rung is now specific.** Probe 5 established
+   that evaluations carry a durable instant and decisions carry none. `closed_at`
+   exists only on *closed* decisions and is guarded by a biconditional, so it
+   cannot order two open ones. The question is therefore whether belief-ordering
+   can be derived from `evaluated_at` plus edges alone, or whether `Decision`
+   needs an instant — a far smaller question than `024` originally posed.
 2. **Row F — an existing relationship before a new one.** Can a reconstruction be
    recorded as an act with a target using verbs that already exist? That is what
    S-9 declined to invent and what Designer 2 independently required.
