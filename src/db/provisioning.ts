@@ -87,13 +87,12 @@ class TenantGraphProvisioner {
    * brand-new tenants.
    *
    * Deliberately not a claim of full structural reconciliation: indexes are
-   * checked by name (`IF NOT EXISTS`), not compared by definition, and
-   * labels are checked for existence, not arbitrary structural equivalence.
-   * A change that isn't purely additive — renaming a label, reshaping a
-   * property that already has data — has no story here; see
+   * checked by name, not compared by definition, and labels are checked for
+   * existence, not arbitrary structural equivalence. A change that isn't
+   * purely additive — renaming a label, reshaping a property that already has
+   * data — has no story here; see
    * docs/project-journal/005_provisioning_reconciliation.md.
-   */
-  /**
+   *
    * **Asked once, not seventy-eight times.** Every label and every index this
    * tenant already has is read in two queries up front, and the loops below
    * then issue DDL only for what is genuinely missing. In the steady state —
