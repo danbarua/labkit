@@ -687,8 +687,8 @@ this document's original analysis are marked as such.
 | P | `Evidence` carries two senses | **S-9**, S-10, S-12 | resolved |
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, **S-18** | resolved |
-| S | No agent, person or role exists in the model | S-8 | open |
-| T | Edges cannot carry properties | S-7, ~~row O~~ | open |
+| S | No agent, person or role exists in the model | S-8, **S-8b** | refuted |
+| T | Edges cannot carry properties | S-7, ~~row O~~ | refuted |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
@@ -1188,7 +1188,7 @@ not a winner.
 
 ### Row S — No agent, person or role exists in the model
 
-**Scenarios:** S-8 · **Status:** open
+**Scenarios:** S-8, **S-8b** · **Status:** refuted
 
 **Current state (verified):** no node label, no property, anywhere
 
@@ -1206,11 +1206,51 @@ to our own corpus. The *other* half of the same bullet — "on what projected
 cost" — needed nothing new: a cost projection is a finding with provenance like
 any other. This row therefore has no owner again until identity work begins.
 
+**S-8b (2026-08-21): refuted, and the consumer requirement is refuted with it.**
+
+`023` scored attribution the **strongest** consumer finding of the whole
+exercise — all three cold designers required authority to persist, across four
+unanimous clusters, and `021` framed it as *"World A: Alice took the decision;
+World B: Bob took it"*. That framing is the error, and no amount of care inside
+it would have found the error, because **the designers were designing for a
+population of actors this system does not have.**
+
+*There is no "who".* An analysis here is run by an agent, not by a person with
+tenure and accountability. An agent invocation does not persist between runs,
+accrues no standing, and cannot be held to anything. Asking it to sign work
+imports a governance model from human organisations into a record of
+computations. `Alice` and `Bob` are not two values of a missing property; they
+are two instances of a kind of entity the domain does not contain.
+
+*What the question was reaching for is provenance, and the model already carries
+it.* **What ran, on what inputs, under what configuration** — and a
+configuration is an input artefact like any other, with a content hash.
+Demonstrated rather than argued: two analyses differing only in the agent
+configuration they consumed are distinguished by `reproducibilityOf()`, which
+reports the configuration `differing` when the wrong one is offered against it,
+and the configuration carries its dependants through `whatDependsOn()` like any
+other input. That is row **L**'s `CONSUMES` lineage doing the job S-11 earned it
+for, with nothing added.
+
+*The other half of S-8's Afterward was never the hard half.* "On what projected
+cost" is a finding with provenance; and **approval is a decision taken on
+evidence against a stated condition** — `whySupported()` returns the finding, the
+criterion it was held to, and whether that criterion was met, with no signer
+anywhere in the answer. Both halves were expressible when S-8 ran.
+
+*What this costs.* `023`'s H1 count drops from three to two. Attribution was
+scored strong on **contract necessity** — bar 4 asks whether losing the
+distinction corrupts a read the frozen contract requires, and it never asks
+whether the contract was right to require it. This is the first case of a
+consumer requirement being refuted **below** bar 4, and it is worth naming as a
+limit of the instrument: three independent designers agreeing is strong evidence
+about what designers expect and weaker evidence about what the domain contains
+
 ### Row T — Edges cannot carry properties
 
-**Scenarios:** S-7, row O · **Status:** open
+**Scenarios:** S-7, ~~row O~~ · **Status:** refuted
 
-**Current state (verified):** `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)`
+**Current state (verified):** an AGE edge carries properties like any vertex; `createEdge(from, edge, to)` does not expose them, and edge identity is `UNIQUE (start_id, end_id)`
 
 > **No scenario currently named would settle this.** Every scenario in
 > its row has been built. Under CLAUDE.md's deferral rule that makes it
@@ -1229,11 +1269,42 @@ before the build (`031`) rather than noticed after it.
 Recorded here rather than handed the durable-event-sink phase as a substitute:
 an unbuilt *phase* is not a scenario, and naming one turns "we have no
 discriminator" into "it's handled", which is the failure the ownership taxonomy
-exists to prevent. T is `open` + unowned and needs a **new** discriminator — a
-case where reifying the fact to a node is genuinely worse than a property on the
-edge would be. Three rows have now been settled by giving the fact its own node
-or its own edge (S-7's amendment `Decision`, S-12's, and this one), which is
-mild evidence against the row rather than for it
+exists to prevent.
+
+**Refuted the same day, and the row's title was simply false.** Every AGE label
+is a real Postgres table, edge labels included, and an edge row has the same
+`properties` agtype column a vertex row has. Verified twice in
+`tests/domain-graph.test.ts`: a property written through Cypher reads back
+through Cypher, and reads back from plain SQL against the edge label's own
+table. This was **already stated in CLAUDE.md's AGE gotchas** — *"every AGE label
+(vertex or edge) is a real Postgres table"* — and the row survived four cold
+reviewers and eleven scenarios next to a document saying it was wrong.
+
+The honest statement was two narrower facts, and only one of them survived the
+day:
+
+1. `createEdge(from, edge, to)` took no properties. An **API choice**, and
+   reversible whenever something needed it — *"well, what's stopping you from
+   just adding a parameter?"* Nothing was. `createEdge()` now takes optional
+   properties, and `buildPropertyClause()`'s own comment had described itself
+   as the shape "createNode()/createEdge() already build on" the whole time.
+2. Edge identity is `UNIQUE (start_id, end_id)`, so a property can annotate a
+   relationship but can never **distinguish** two of them. That one is real, and
+   it is what the row should have said.
+
+Adding the parameter surfaced the fact the row was groping for. `createEdge()`
+is **create-if-absent**, so a second call against an existing edge is a no-op and
+any properties it carries are dropped. Making it an upsert would let two callers
+race to overwrite each other under a contract that promises retries are free.
+Both behaviours are now asserted, along with a refusal for a property key that is
+not an identifier. So the residue is not "edges cannot carry properties" but
+**"an edge property cannot be part of edge identity, and cannot be changed by
+re-calling the verb that created it"** — which is a design consequence, recorded,
+rather than a gap.
+
+The row was added by a cold review, which is the right way to add rows and is
+also how a plausible-sounding claim enters the record without anyone running it.
+Rows P–T all arrived that way and this is the first to be refuted outright
 
 ### Row U — A gate records no condition until it is evaluated
 

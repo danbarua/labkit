@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { TenantGraph } from "../src/db/graph";
-import { edgeProps, optional, vertexProps } from "../src/db/cypher";
+import { agtypeValue, edgeProps, optional, scalar, vertexProps } from "../src/db/cypher";
 import {
   NODE_LABELS,
   NODE_TYPES,
@@ -521,3 +521,92 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
   });
 });
 
+/**
+ * Row T says "edges cannot carry properties". They can, and this is the check
+ * that keeps the correction from being re-derived wrongly.
+ *
+ * Every AGE label is a real Postgres table, edge labels included, and an edge
+ * row has the same `properties` agtype column a vertex row has. So the
+ * constraint row T describes is not a storage limit at all — it is two narrower
+ * facts about this codebase:
+ *
+ *   1. `createEdge(from, edge, to)` takes no properties. An API choice.
+ *   2. Edge identity is `UNIQUE (start_id, end_id)`, so a property can annotate
+ *      a relationship but can never distinguish two of them. That one is real
+ *      and is the honest statement of the row.
+ *
+ * Written through `graph.query()` rather than `createEdge()` on purpose: the
+ * point is what the backend supports, not what the write surface exposes.
+ */
+test("an edge carries properties, in Cypher and in the table underneath it", async () => {
+  const question = await graph.createNode("Question", { name: "q" });
+  const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+
+  await graph.query(
+    `MATCH (a:Question {natural_id: $from}), (b:LineOfEnquiry {natural_id: $to})
+     CREATE (a)-[e:MOTIVATES {why: $why}]->(b) RETURN e`,
+    { e: agtypeValue() },
+    { from: question.natural_id, to: loe.natural_id, why: "the reviewer asked for it" },
+  );
+
+  const read = await graph.query(
+    `MATCH (:Question)-[e:MOTIVATES]->(:LineOfEnquiry) RETURN e.why AS why`,
+    { why: scalar<string>() },
+  );
+  expect(read.map((r) => r.why)).toEqual(["the reviewer asked for it"]);
+
+  // And from plain SQL, because the edge label is a table like any other --
+  // which is how natural-id uniqueness and edge uniqueness already work.
+  const rows = await db.query(
+    `SELECT properties::text AS props FROM ${ctx.graphName}."MOTIVATES"`,
+  );
+  expect(rows.rows[0]?.props).toContain("the reviewer asked for it");
+});
+
+/**
+ * `createEdge()` writes properties, and the idempotency contract decides what
+ * happens on the second call. Row T again, from the write surface this time.
+ *
+ * Create-if-absent means a repeat call is a no-op, so properties it carries are
+ * dropped. Asserted rather than left to be discovered: an upsert would let two
+ * callers race to overwrite each other under a contract that promises retries
+ * are free, and a property that needs to change later wants its own verb, the
+ * way `closeDecision()` is the only sanctioned way to set `is_open`.
+ */
+test("createEdge writes edge properties, and a repeat call does not change them", async () => {
+  const question = await graph.createNode("Question", { name: "q" });
+  const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+
+  await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {
+    why: "the reviewer asked for it",
+    ordinal: 1,
+  });
+  const written = await graph.query(
+    `MATCH (:Question)-[e:MOTIVATES]->(:LineOfEnquiry) RETURN e.why AS why, e.ordinal AS ordinal`,
+    { why: scalar<string>(), ordinal: scalar<number>() },
+  );
+  expect(written).toEqual([{ why: "the reviewer asked for it", ordinal: 1 }]);
+
+  // The second call is the same no-op it has always been. Properties are not
+  // part of edge identity -- UNIQUE (start_id, end_id) is -- so this neither
+  // creates a parallel edge nor overwrites the first one's properties.
+  await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {
+    why: "something else entirely",
+  });
+  const after = await graph.query(
+    `MATCH (:Question)-[e:MOTIVATES]->(:LineOfEnquiry) RETURN e.why AS why`,
+    { why: scalar<string>() },
+  );
+  expect(after).toEqual([{ why: "the reviewer asked for it" }]);
+});
+
+/** A property key cannot smuggle clause text into the CREATE. */
+test("createEdge refuses a property key that is not an identifier", async () => {
+  const question = await graph.createNode("Question", { name: "q" });
+  const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+  await expect(
+    graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {
+      "why}]->(:X) CREATE (a)-[:MOTIVATES": "injected",
+    }),
+  ).rejects.toThrow();
+});
