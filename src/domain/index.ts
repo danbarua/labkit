@@ -35,6 +35,7 @@ export type {
   ReplacementReport,
   UnaffectedRecord,
   DependencyReport,
+  ReproducedPart,
   SupportExplanation,
   GateStatus,
   CheckStatus,

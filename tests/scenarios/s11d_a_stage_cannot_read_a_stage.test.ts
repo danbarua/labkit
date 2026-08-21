@@ -70,7 +70,7 @@ describe("S-11d: a stage cannot read a stage", () => {
     const report = await (await afterwards()).reproducibilityOf(calibration, [
       { part: raw, hash: "sha256:whatever" },
     ]);
-    expect(report.unverifiable).toEqual(["raw sensor series"]);
+    expect(report.unverifiable.map((p) => p.name)).toEqual(["raw sensor series"]);
     expect(report.reproducible).toBe(false);
   });
 
@@ -91,8 +91,8 @@ describe("S-11d: a stage cannot read a stage", () => {
 
     expect(report.reproducible).toBe(false);
     // The calibration's output artefact -- what stage two actually read.
-    expect(report.unverifiable).toEqual(["calibrate output"]);
-    expect(report.exact).toEqual([]);
+    expect(report.unverifiable.map((p) => p.name)).toEqual(["calibrate output"]);
+    expect(report.exact.map((p) => p.name)).toEqual([]);
   });
 
   /**

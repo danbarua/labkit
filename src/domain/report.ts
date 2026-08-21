@@ -317,13 +317,30 @@ export interface ReproductionReport {
  * does not have — Row I's absence-versus-difference distinction, asked of an
  * artefact, and got wrong twice before it was got right.
  */
+/**
+ * One part in a reproducibility report: what it is, and what it is called.
+ *
+ * `part` is identity; `name` is what a person reads. Keeping both is row F's
+ * lesson applied to the output side — S-9 already took parts by *reference* on
+ * the way in, with a comment that a name-keyed map "would merge exactly the two
+ * things this scenario exists to keep apart", and then reported bare names on
+ * the way out. With an original and its regeneration under one name, that put
+ * the same string in `exact` and `differing` at once (S-9c).
+ */
+export interface ReproducedPart {
+  /** The observations handle — identity, and the only thing that is. */
+  part: string;
+  /** Its `logical_name`. Two parts may legitimately share one. */
+  name: string;
+}
+
 export interface ReproducibilityReport {
-  /** Parts whose recorded hash matches the one offered, by name. */
-  exact: string[];
+  /** Parts whose recorded hash matches the one offered. */
+  exact: ReproducedPart[];
   /** Parts whose recorded hash disagrees with the one offered. */
-  differing: string[];
+  differing: ReproducedPart[];
   /** Parts with no recorded hash — unanswerable, not unequal. */
-  unverifiable: string[];
+  unverifiable: ReproducedPart[];
   /**
    * Parts this attempt did not rebuild.
    *
@@ -336,7 +353,7 @@ export interface ReproducibilityReport {
    * `unverifiable` is a permanent property of the record; `notRebuilt` is a
    * property of *this attempt* and says nothing about the artefact.
    */
-  notRebuilt: string[];
+  notRebuilt: ReproducedPart[];
   /**
    * Whether the whole construction reproduces. False unless every part was
    * rebuilt and matched: anything differing, unverifiable or not attempted

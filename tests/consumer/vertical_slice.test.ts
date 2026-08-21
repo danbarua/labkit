@@ -246,7 +246,7 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
       const report = await s.reproducibilityOf(analysis, [
         { part: historical, hash: "sha256:2222" },
       ]);
-      expect(report.differing).toEqual(["random control"]);
+      expect(report.differing.map((p) => p.name)).toEqual(["random control"]);
       expect(report.reproducible).toBe(false);
 
       // The finding, in two parts.

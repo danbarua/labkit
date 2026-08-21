@@ -45,6 +45,7 @@ import type {
   InterpretationHistory,
   Revision,
   DependencyReport,
+  ReproducedPart,
   SupportExplanation,
 } from "./report";
 import { SessionCore } from "./core";
@@ -1324,10 +1325,10 @@ export class ReadSurface extends SessionCore {
       { id: analysis.id },
     );
 
-    const exact: string[] = [];
-    const differing: string[] = [];
-    const unverifiable: string[] = [];
-    const notRebuilt: string[] = [];
+    const exact: ReproducedPart[] = [];
+    const differing: ReproducedPart[] = [];
+    const unverifiable: ReproducedPart[] = [];
+    const notRebuilt: ReproducedPart[] = [];
     for (const { a } of parts) {
       const candidate = offered.get(a.natural_id);
       // Two ways for no comparison to happen, and neither is inequality:
@@ -1337,17 +1338,23 @@ export class ReadSurface extends SessionCore {
       // statement. Folding either absence into it claims evidence the record
       // does not have -- external review found exactly that, in the function
       // written to respect the distinction.
-      if (!a.content_hash) unverifiable.push(a.logical_name);
-      else if (candidate === undefined) notRebuilt.push(a.logical_name);
-      else if (candidate === a.content_hash) exact.push(a.logical_name);
-      else differing.push(a.logical_name);
+      // Keyed by natural id, never by name. An original and its regeneration
+      // legitimately share a `logical_name` (S-9), and reporting bare names put
+      // that one string in `exact` and `differing` at once -- see S-9c.
+      const entry = { part: a.natural_id, name: a.logical_name };
+      if (!a.content_hash) unverifiable.push(entry);
+      else if (candidate === undefined) notRebuilt.push(entry);
+      else if (candidate === a.content_hash) exact.push(entry);
+      else differing.push(entry);
     }
 
+    const byName = (a: ReproducedPart, b: ReproducedPart) =>
+      a.name.localeCompare(b.name) || a.part.localeCompare(b.part);
     return {
-      exact: exact.sort(),
-      differing: differing.sort(),
-      unverifiable: unverifiable.sort(),
-      notRebuilt: notRebuilt.sort(),
+      exact: exact.sort(byName),
+      differing: differing.sort(byName),
+      unverifiable: unverifiable.sort(byName),
+      notRebuilt: notRebuilt.sort(byName),
       // Anything not shown to match leaves the construction unshown. Saying
       // otherwise is the quiet inheritance S-9 forbids.
       reproducible:

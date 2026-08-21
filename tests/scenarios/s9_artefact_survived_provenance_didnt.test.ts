@@ -91,9 +91,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       { part: parts[3]!, hash: "sha256:regenerated" },
     ]);
 
-    expect(report.exact.sort()).toEqual(["priors", "splits", "weights"]);
-    expect(report.unverifiable).toEqual([CONTROL]);
-    expect(report.differing).toEqual([]);
+    expect(report.exact.map((p) => p.name).sort()).toEqual(["priors", "splits", "weights"]);
+    expect(report.unverifiable.map((p) => p.name)).toEqual([CONTROL]);
+    expect(report.differing.map((p) => p.name)).toEqual([]);
     expect(report.reproducible).toBe(false);
   });
 
@@ -226,10 +226,10 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       { part: parts[1]!, hash: "sha256:bbb" },
     ]);
 
-    expect(report.exact.sort()).toEqual(["splits", "weights"]);
-    expect(report.differing).toEqual([]);
-    expect(report.notRebuilt).toEqual(["priors"]);
-    expect(report.unverifiable).toEqual([CONTROL]);
+    expect(report.exact.map((p) => p.name).sort()).toEqual(["splits", "weights"]);
+    expect(report.differing.map((p) => p.name)).toEqual([]);
+    expect(report.notRebuilt.map((p) => p.name)).toEqual(["priors"]);
+    expect(report.unverifiable.map((p) => p.name)).toEqual([CONTROL]);
     expect(report.reproducible).toBe(false);
   });
 
@@ -247,9 +247,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       { part: parts[2]!, hash: "sha256:ccc" },
     ]);
 
-    expect(report.exact.sort()).toEqual(["priors", "weights"]);
-    expect(report.differing).toEqual(["splits"]);
-    expect(report.notRebuilt).toEqual([]);
+    expect(report.exact.map((p) => p.name).sort()).toEqual(["priors", "weights"]);
+    expect(report.differing.map((p) => p.name)).toEqual(["splits"]);
+    expect(report.notRebuilt.map((p) => p.name)).toEqual([]);
   });
 
   /**

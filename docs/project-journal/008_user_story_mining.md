@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b** | open |
+| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c** | open |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -903,6 +903,24 @@ Designer 2's case, an input regenerated so later work could proceed. Rung 2
 holds for the case that could produce a wrong answer and refuses the case the
 contract requires. The ladder is **paused at rung 3**, gated on the adapter
 phase's reconstruction-provenance read, per `023`'s own sequencing.
+
+**S-9c (2026-08-21): the row bit, in the reporting rather than the model.**
+S-9 took parts by *reference* on the way into `reproducibilityOf()`, with a
+comment that a name-keyed map "would merge exactly the two things this scenario
+exists to keep apart" — and then reported bare **names** on the way out. With an
+original and its regeneration under one name, that put the same string in
+`exact` **and** `differing` at once: the record stating a part had reproduced
+exactly and come back different, with no way to tell which was which. A reader
+working from `exact` would conclude the control reproduced.
+
+Fixed at rung 1, in the query: the report now carries `{ part, name }` —
+identity and label — so a shared name cannot merge two parts. No model change,
+and the row stays **open**, because this was the *report* lacking identity, not
+the artefact. The versioned-entity question below is untouched.
+
+The instructive part: the guard existed, was argued for in a comment, and was
+applied to one direction only. Six regions had decided identity-is-never-wording
+before this; the seventh was inside a function written to respect the rule.
 
 **Reframed 2026-08-21, and the reframe is the discriminator the row never had.**
 *"What you're describing is a versioned domain entity."*

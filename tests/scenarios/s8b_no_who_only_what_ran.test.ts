@@ -107,9 +107,9 @@ describe("S-8b: there is no who, only what ran", () => {
       };
     });
 
-    expect(result.matched.exact.sort()).toEqual([CONFIG, "sweep readings"]);
+    expect(result.matched.exact.map((p) => p.name).sort()).toEqual([CONFIG, "sweep readings"]);
     expect(result.matched.reproducible).toBe(true);
-    expect(result.mismatched.differing).toEqual([CONFIG]);
+    expect(result.mismatched.differing.map((p) => p.name)).toEqual([CONFIG]);
     expect(result.mismatched.reproducible).toBe(false);
     expect(result.rests.claims).toEqual([MOVES]);
   });

@@ -128,9 +128,9 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     };
     const { a, b } = await inTwoWorlds(build("sha256:one"), build("sha256:two"));
 
-    expect(a.exact).toEqual(["second control"]);
+    expect(a.exact.map((p) => p.name)).toEqual(["second control"]);
     expect(a.reproducible).toBe(true);
-    expect(b.differing).toEqual(["second control"]);
+    expect(b.differing.map((p) => p.name)).toEqual(["second control"]);
     expect(b.reproducible).toBe(false);
   });
 
