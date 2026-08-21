@@ -64,7 +64,7 @@ export class WriteSurface extends SessionCore {
    * an enquiry did one thing, not three.
    */
   private async posed(question: string): Promise<QuestionRef> {
-    const asked = await this.graph.createNode("Question", { name: question });
+    const asked = await this.graph.createNode("Question", { name: question, posed_at: this.clock.now() });
     return { kind: "question", id: asked.natural_id };
   }
 

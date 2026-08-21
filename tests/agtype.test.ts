@@ -178,7 +178,7 @@ describe("parseAgtype — against live pglite-age", () => {
     const ctx = await resolveTenantContext(db, "labkit");
     const graph = new TenantGraph(ctx, db);
 
-    const a = await graph.createNode("Question", { name: "q" });
+    const a = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const b = await graph.createNode("LineOfEnquiry", { name: "loe" });
     await graph.createEdge(a.natural_id, "MOTIVATES", b.natural_id);
 

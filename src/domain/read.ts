@@ -115,13 +115,31 @@ export class ReadSurface extends SessionCore {
    * work began, so worked-on and untouched cannot be told apart as-of, and this
    * declines to guess rather than leaking today's evidence units into a question
    * about the past.
+   *
+   * **A question that did not exist yet is not open.** `open` is an assertion —
+   * the question was on the record and nothing had settled it — so a question
+   * posed after the instant must be absent from the survey entirely, not placed
+   * in the bucket every unclassified row falls into. That took a new property,
+   * `Question.posed_at`, earned by demonstration: see its docstring in
+   * `src/db/domain.ts` and tests/consumer/historical_survey.test.ts.
+   *
+   * **The instant is canonicalised before anything is compared.** Every stamp
+   * this reads is written by a `Clock` as UTC ISO-8601, where lexical order and
+   * instant order agree. A caller's string need not be: `2026-03-01T09:00:00-05:00`
+   * is 14:00Z and sorts before `2026-03-01T10:00:00.000Z`, so comparing the raw
+   * text reported a question unresolved four hours after it was resolved.
+   * `Date.parse` accepted it, which is exactly why validating a string is not
+   * the same as being able to order it.
    */
   async whatWasKnown(at: string): Promise<HistoricalSurvey> {
-    if (Number.isNaN(Date.parse(at)))
+    const parsed = Date.parse(at);
+    if (Number.isNaN(parsed))
       throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
+    const asOf = new Date(parsed).toISOString();
 
     const rows = await this.graph.query(
       `MATCH (q:Question)
+       WHERE q.posed_at <= $at
        OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
        OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
        OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
@@ -136,27 +154,35 @@ export class ReadSurface extends SessionCore {
         promoting: optional(vertexProps<{ decided_at: string }>()),
         accepting: optional(vertexProps<{ decided_at: string }>()),
       },
+      { at: asOf },
     );
 
-    // Filtered here rather than in the query: the comparison is a plain string
-    // ordering on ISO-8601, and keeping it in TypeScript avoids threading a
-    // parameter through five OPTIONAL MATCHes for no gain in clarity.
+    // The decision cutoffs stay in TypeScript while the question cutoff is in
+    // the query, and the split is not arbitrary. `posed_at` decides whether a
+    // row belongs in the answer at all, so filtering it in Cypher means the
+    // rows that arrive are already the right set. The decision stamps only
+    // decide which *bucket* a row lands in, and there are three of them across
+    // five OPTIONAL MATCHes — pushing those down would mean an OPTIONAL MATCH
+    // per predicate for no change in the result.
     const by = new Map<string, { asks: string; resolved: boolean; promoted: boolean; accepted: boolean }>();
     for (const row of rows) {
       const entry = by.get(row.q.natural_id) ?? {
         asks: row.q.name, resolved: false, promoted: false, accepted: false,
       };
-      const resolvedByThen = row.resolving !== null && row.resolving.decided_at <= at;
+      const resolvedByThen = row.resolving !== null && row.resolving.decided_at <= asOf;
       entry.resolved ||= resolvedByThen && row.cited !== null;
       // A promotion only counts toward *this* question if the resolution it
       // qualifies had also happened -- otherwise a claim promoted early would
       // establish a question resolved later.
-      entry.promoted ||= resolvedByThen && row.promoting !== null && row.promoting.decided_at <= at;
-      entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= at;
+      entry.promoted ||= resolvedByThen && row.promoting !== null && row.promoting.decided_at <= asOf;
+      entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= asOf;
       by.set(row.q.natural_id, entry);
     }
 
-    const survey: HistoricalSurvey = { at, established: [], provisional: [], accepted: [], open: [] };
+    // The canonical instant, not the caller's text: it is what every comparison
+    // above actually used, and echoing back a form that was not compared would
+    // describe an answer nobody computed.
+    const survey: HistoricalSurvey = { at: asOf, established: [], provisional: [], accepted: [], open: [] };
     for (const [question, e] of by) {
       const standing: QuestionStanding = { question, asks: e.asks };
       if (e.resolved && e.promoted) survey.established.push(standing);

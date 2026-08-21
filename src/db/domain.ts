@@ -308,6 +308,28 @@ export type EvidenceUnitRole =
 
 export interface QuestionProps {
   name: string;
+  /**
+   * When the question entered the record, from the injected clock.
+   *
+   * Earned the way `Decision.decided_at` was, and by the same kind of
+   * demonstration: without it `whatWasKnown()` began `MATCH (q:Question)` —
+   * every question that exists *now* — and reported a question posed in April
+   * as `open` in March. `open` is an assertion, not an absence: it says the
+   * question was on the record and nothing had settled it. Applied to a
+   * question nobody had asked yet it back-dates the programme's own agenda,
+   * which is the mirror of the failure that method already guarded against for
+   * promotion. See tests/consumer/historical_survey.test.ts, which demonstrates
+   * it rather than arguing it.
+   *
+   * **Record time, not the moment the researcher first wondered.** Same reading
+   * as `decided_at`, and named here for the same reason: a bare timestamp looks
+   * like a fix while silently choosing a side.
+   *
+   * Required, not optional. A question whose instant is unknown cannot be
+   * placed in time at all, and a survey that quietly includes the unplaceable
+   * is the wrong answer this property exists to stop.
+   */
+  posed_at: string;
 }
 
 export interface LineOfEnquiryProps {

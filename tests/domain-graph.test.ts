@@ -61,7 +61,7 @@ afterEach(async () => {
 });
 
 async function seedResearchThread() {
-  const question = await graph.createNode("Question", { name: "does the accelerated ridge implementation match the reference?" });
+  const question = await graph.createNode("Question", { name: "does the accelerated ridge implementation match the reference?", posed_at: "2026-01-01T00:00:00.000Z" });
   const lineOfEnquiry = await graph.createNode("LineOfEnquiry", { name: "numerical equivalence of accelerated ridge" });
   const evidenceUnit = await graph.createNode("EvidenceUnit", { role: "verification" });
   const computation = await graph.createNode("Computation", { kind: "equivalence_check", status: "completed", backend: "wandb", external_run_id: "run-42" });
@@ -281,12 +281,12 @@ describe("edge integrity", () => {
   });
 
   test("createEdge throws when the target natural id doesn't exist", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     await expect(graph.createEdge(question.natural_id, "MOTIVATES", "LOE_999")).rejects.toThrow(/not found/);
   });
 
   test("createEdge is idempotent — calling it twice creates exactly one edge", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
     await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
@@ -338,7 +338,7 @@ describe("all node labels", () => {
   // doesn't satisfy its label's *Props interface is now a compile error
   // here, not a runtime surprise inside AGE.
   const fixtures: { [L in NodeLabel]: NodePropsByLabel[L] } = {
-    Question: { name: "q" },
+    Question: { name: "q", posed_at: "2026-01-01T00:00:00.000Z" },
     LineOfEnquiry: { name: "loe" },
     EvidenceUnit: { role: "experiment" },
     Evidence: { statement: "e" },
@@ -403,7 +403,7 @@ describe("tenant isolation", () => {
     const graphA = new TenantGraph(ctxA, db);
     const graphB = new TenantGraph(ctxB, db);
 
-    const questionA = await graphA.createNode("Question", { name: "q-in-a" });
+    const questionA = await graphA.createNode("Question", { name: "q-in-a", posed_at: "2026-01-01T00:00:00.000Z" });
     const loeB = await graphB.createNode("LineOfEnquiry", { name: "loe-in-b" });
 
     await expect(graphA.createEdge(questionA.natural_id, "MOTIVATES", loeB.natural_id)).rejects.toThrow(/not found/);
@@ -454,7 +454,7 @@ describe("provisioning reconciliation", () => {
 
 describe("edge uniqueness is DB-enforced, not just app-checked", () => {
   test("a duplicate CREATE that bypasses the app-level check is still blocked at the database", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
     await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
 
@@ -488,7 +488,7 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
   // raise from a real conflict, without needing two connections to
   // actually collide to get there.
   test("createEdge treats a 23505 from the CREATE step as success, not a race failure", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
     let createAttempts = 0;
@@ -539,7 +539,7 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
  * point is what the backend supports, not what the write surface exposes.
  */
 test("an edge carries properties, in Cypher and in the table underneath it", async () => {
-  const question = await graph.createNode("Question", { name: "q" });
+  const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
   const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
   await graph.query(
@@ -574,7 +574,7 @@ test("an edge carries properties, in Cypher and in the table underneath it", asy
  * way `closeDecision()` is the only sanctioned way to set `is_open`.
  */
 test("createEdge writes edge properties, and a repeat call does not change them", async () => {
-  const question = await graph.createNode("Question", { name: "q" });
+  const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
   const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
   await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {
@@ -602,7 +602,7 @@ test("createEdge writes edge properties, and a repeat call does not change them"
 
 /** A property key cannot smuggle clause text into the CREATE. */
 test("createEdge refuses a property key that is not an identifier", async () => {
-  const question = await graph.createNode("Question", { name: "q" });
+  const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
   const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
   await expect(
     graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {

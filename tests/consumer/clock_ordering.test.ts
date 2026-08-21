@@ -373,7 +373,25 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
     }
   });
 
-  test("before anything was decided, everything is open", async () => {
+  /**
+   * **Rewritten on 2026-08-21. It used to assert the bug.**
+   *
+   * The old form posed a question in March, asked what was known in *February*,
+   * and asserted the question came back `open` — "before anything was decided,
+   * everything is open". That reads like a boundary case and is a wrong answer:
+   * in February the question had not been asked. Nothing was open because
+   * nothing existed. The test passed because `whatWasKnown()` began
+   * `MATCH (q:Question)` and dropped every unclassified row into `open`, so the
+   * assertion and the defect agreed with each other.
+   *
+   * Worth leaving the note rather than quietly editing the file. A test that
+   * encodes the behaviour it was written to pin is the same shape as PJ-027's
+   * comments — a second copy of the code's opinion, mistaken for a check on it.
+   *
+   * The two moments are now separated: before the question exists, and after it
+   * exists but before anything settles it. Only the second is `open`.
+   */
+  test("a question is open only between being asked and being settled", async () => {
     const graph = await scenario.begin();
     try {
       const c = windableClock(MARCH);
@@ -388,11 +406,19 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: FIRST.prop } });
 
       const reader = new ResearchSession(await scenario.current(), { clock: c, events: inMemoryEventLog() });
+
+      // February: the question had not been posed. Absent, not open.
       const before = await reader.whatWasKnown("2026-02-01T00:00:00.000Z");
-      expect(before.open.map((q) => q.asks)).toEqual([FIRST.asks]);
+      expect(before.open).toEqual([]);
       expect(before.established).toEqual([]);
       expect(before.provisional).toEqual([]);
+      expect(before.accepted).toEqual([]);
       expect(before.at).toBe("2026-02-01T00:00:00.000Z");
+
+      // Five days in: asked, and nothing has settled it.
+      const during = await reader.whatWasKnown("2026-03-06T09:00:00.000Z");
+      expect(during.open.map((q) => q.asks)).toEqual([FIRST.asks]);
+      expect(during.provisional).toEqual([]);
     } finally {
       await scenario.end();
     }

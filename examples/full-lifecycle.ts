@@ -22,6 +22,7 @@ const graph = new TenantGraph(ctx, conn.db);
 
 const question = await graph.createNode("Question", {
   name: "does the accelerated ridge implementation match the reference?",
+  posed_at: new Date().toISOString(),
 });
 console.log(`created ${question.natural_id}`);
 
