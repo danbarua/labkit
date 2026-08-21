@@ -15,7 +15,7 @@ on the external review of that brief.
 
 ## Changed
 
-Thirty-seven commits, range clean apart from `8299ecb` and `3b769c0` (dependency
+Thirty-nine commits, range clean apart from `8299ecb` and `3b769c0` (dependency
 graph regenerations, committed by the user) — no other session's work in it.
 
 ```
@@ -339,7 +339,31 @@ quietly weakens a test. The paired-world probes keep the frozen one deliberately
 **The hook fired twice on its own**, correctly, both commits having changed the
 graph. First production use.
 
-**graphviz is a real dependency**, now declared in CLAUDE.md.
+**Both graph forms kept** (`623b0b0`), on the user's reading that they serve
+different readers — `docs/dependency-graph.svg` for a person in a browser, where
+graphviz's edge routing is what makes a graph this dense legible, and
+`docs/dependency-graph.mmd` for an agent reading text: 3KB against 134KB, and it
+**diffs**, so a moved edge is visible where 1,444 lines of generated SVG hide it.
+
+**One `depcruise` run renders both**, via `depcruise-fmt`. Two independent
+cruises would make agreement a matter of luck; one analysis makes disagreement
+impossible, and it is cheaper — the analysis is 0.6s of the 0.9s.
+
+**graphviz is now optional rather than required**: without it the mermaid graph
+is still maintained and only the SVG goes stale, announced on stderr. That closes
+the portability gap without giving up the human-readable form.
+
+**On "the graph shouldn't update on every code commit"** — checked rather than
+assumed. What gets *committed* already moves only when the module structure does,
+because output is **byte-stable across runs** and an edit touching no import
+yields an **identical graph** (both verified). So compare-then-stage is exact: a
+comment-only commit regenerates, matches, and stages nothing.
+
+Gating the *run* on a heuristic was declined deliberately. "Only when files are
+added or moved" would have missed the import pruning in `31a6196`, which removed
+an edge with no file added or renamed — a cheap gate would have skipped it and
+left the graph stale, which is the failure the hook exists to prevent. ~1s per
+src commit to never be wrong beats guessing which edits are structural.
 `depcruise --output-type mermaid` needs no binary, renders on GitHub, and is
 **3KB against the SVG's 135KB** — 261 lines versus 1,447, so readable diffs
 rather than a blob on every code commit. Recorded as the option not taken, since
@@ -473,11 +497,10 @@ are kept here because they are the reasoning, not the outcome.
 - **Still deferred, on the user's call:** whether `whySupported` (208 lines) plus
   `checksFrom` (151) — 19% of the code, straddling claims and criteria — is one
   concern deserving its own module inside `read.ts`.
-- **The SVG-versus-mermaid choice is open**, and the hook makes it consequential
-  rather than cosmetic — 135KB regenerated on every code commit against 3KB and
-  readable diffs. The mermaid variant was rendered for the user to judge; the
-  decision is theirs and is a one-line change in
-  `scripts/update-dependency-graph.sh` either way.
+- **The SVG-versus-mermaid choice is settled: both.** They serve different
+  readers. What remains open is only whether the SVG earns its 134KB now that a
+  diffable form exists — a narrower question, and one the rendered comparison
+  (published as an artifact) is there to answer.
 - **A test of the hook was invalid and nearly reported as a pass.** Staleness was
   faked by appending a marker; regeneration removed the marker, restoring the
   file to its committed content, so there was nothing to stage and the hook
