@@ -52,3 +52,55 @@ fix to justify the reading.
 
 No `bun test` until `labkit-dev` releases the machine. Predictions are recorded
 first precisely so the demonstration cannot be tuned to them afterwards.
+
+---
+
+## Addendum — a competing rule, recorded before the run
+
+**Added after the predictions above were committed and still before any run.**
+`labkit-dev` proposed a reformulation, and it is better than mine for a reason I
+had not seen: **my two clauses are not parallel.**
+
+Clause 2 (*no reader can reach it*) is about **answers** — an unreachable state
+produces none, so none can be false. Clause 1 (*another verb could legitimately
+have produced it*) is about **shapes**, and a shape has no truth value. Two
+identical shapes can differ in truth because the histories that produced them
+differ. So clause 1 cannot see window 3, where a verdict with no `BASED_ON` is
+true when nothing was cited and false when the write was interrupted.
+
+Their rule, which subsumes both:
+
+> **A partial state is acceptable exactly when every answer a reader can derive
+> from it is true.**
+
+Unreachability stops being a clause and becomes the trivial case: no readers, no
+answers, nothing to be false. "Another verb could have produced it" stops being a
+test and becomes *evidence* — good when the reachable state carries no claim about
+how it arose, worthless when it does.
+
+### This changes the predicted verdict, which is the point of writing it down
+
+The two rules **disagree on window 3**, and that disagreement is now on the record
+before the demonstration:
+
+| | window 3 verdict |
+| --- | --- |
+| my rule (`039`) | **acceptable** — the state is legitimately reachable by calling without `citing` |
+| the reformulation | **defect** — if the caller cited and the write was interrupted, a reader derives claims that are false |
+
+One run discriminates between two rules instead of confirming one. That is a
+better experiment than the one `040` was written for, and it arrived by someone
+reading the rule rather than the code.
+
+**What I will look for, stated now so it cannot be chosen afterwards:** whether
+any derived answer is *positively false* rather than merely empty. `basis: []` is
+an empty result, and PJ-011 §5 says an empty result is not a wrong answer. But
+`isWithdrawn` is `cited > 0 && standing === 0`, so an evaluation that cited
+nothing can **never** be withdrawn — and a reader therefore derives *"this verdict
+still stands"* after its real basis has been invalidated. That is a positive claim,
+and if it is false, window 3 is a defect and the reformulation wins.
+
+If instead the only derivable answers are empty ones, my rule wins and the
+reformulation is over-strict. **I do not know which**, and the honest position
+before running is that the reformulation looks right and its own best test is the
+one I am about to run against it.
