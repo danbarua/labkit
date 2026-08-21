@@ -693,6 +693,14 @@ is not determinism. It should have been re-tested before it was recorded, and
 for a few minutes it made a problem look solved that was not — the same shape as
 `024`'s reviewer concluding from reading that a re-run would not matter.
 
+*A fourth, and it is the same shape as the third.* I compared a change against a
+baseline measured **hours earlier under different machine load**, concluded it
+made things worse, and nearly reverted a change I then measured as three times
+better — before a paired test showed it was neither. Sibling Claude sessions run
+`bun test` on this machine at load ~6 on 10 cores. **One confident wrong finding
+and very nearly a second in the opposite direction, from the same uncontrolled
+variable.** Paired A/B is the only design that survives it.
+
 *And two mechanical ones.* A glob excluding
 `leader-election` used both `tests/*.test.ts` and `tests/**/*.test.ts`, which
 **duplicates five paths** — those files ran twice in one process against shared
@@ -743,8 +751,45 @@ less than 20s, then clears** — contention that resolves, not a wait for a repl
 that never arrives. `tenants.id` restarts at 1 every test, so every file
 contends on the **same** `pg_advisory_xact_lock` key.
 
-*Two agents still running at wrap time*: one localising exactly what blocks
-(advisory lock prioritised), one on resource growth and teardown overlap.
+*Both agents then landed, and the mechanism is settled — my "finite block" was
+wrong too.*
+
+**Nothing hangs.** 59,086 queries tracked start-to-finish across a run that
+reproduced 11 failures: **zero** unfinished, and a watchdog polling for anything
+outstanding over 3s never fired once.
+
+**A test's legitimate work crosses bun's fixed 5000ms ceiling.** One timing-out
+test issued **311 sequential queries** summing 4.955s against a 4.979s wall
+span — 99.5% real round trips, no idle. The dominant cost is
+`provisionTenantGraph()` re-checking thirteen node labels and twenty-odd edge
+labels, one round trip each, on **every** `begin()` *and* every `current()`.
+
+**A teardown race turns one timeout into a cascade.** Bun's timeout does not
+cancel the test body — the abandoned test keeps running, and its late
+`scenario.end()` resets the database and closes a connection that by then
+belongs to the *next* test. Traced at log-line granularity in two files
+independently. That is the whole `graph does not exist` story this repo had
+attributed to an upstream socket defect.
+
+**Refuted with evidence:** advisory-lock contention (346 acquisitions, max
+38ms), pglite#1046 desync as primary (247/247 clean closes), FD exhaustion (flat
+86-92), WASM heap growth (declining at the failure point), `afterAll` not
+awaited (gaps all positive), and bun's runner (single process, no children).
+
+**A fix was tried and refuted.** FIFO connection ownership plus `current()`
+reusing its context. Paired A/B under shared load: **FIX 2/4/0, BASE 2/0/0.**
+Reverted. It **bundled two independent changes**, so it says nothing about
+either half — recorded as the error it is.
+
+*Kept from the same investigation:* `inTransaction()` double-decremented its
+depth counter when `COMMIT` threw, leaving it at -1 and silently inverting
+re-entrancy for the life of the object; and a failing `ROLLBACK` replaced the
+error that caused it. Latent, never observed firing, demonstrated then fixed
+(`0db47eb`).
+
+*Three documents asserted a cause now known wrong* and were corrected —
+`TASKS.md`, CLAUDE.md's testing section, and `tests/helpers/db.ts`'s own header,
+which is the one that misled two investigations.
 
 ## Verified
 
@@ -928,7 +973,14 @@ worktrees make it easier to fall into.
 
 ## Next
 
-1. **The suite flake.** Investigated at length and **not solved.** What was
+1. **The suite flake — mechanism known, fix not.** The target is the
+   **provisioning cost**: full label reconciliation on every `begin()` and
+   `current()` is what puts a test within reach of the 5000ms ceiling at all.
+   Named and unbuilt: drive `begin()`/`end()` from `beforeEach`/`afterEach` so
+   bun's timeout cannot interleave two tests; short-circuit provisioning for
+   `current()` (provably less work, untested alone); raise the ceiling (works,
+   hides). Evidence in `docs/TASKS.md`.
+2. ~~**The suite flake.** Investigated at length and **not solved.**~~ What was
    bought: the wound-clock probes are now their own file (`7352a5f`), halving
    the cascade's blast radius, and the failure is localised to how bun is
    invoked rather than to any test. Evidence and both of my wrong turns are in
