@@ -48,6 +48,15 @@ docs/session-log/004_config_cruft_and_consumer_brief.md | 24 ++++-
   (S-10b). Merged while the branches shared **zero** changed files, precisely
   because that would not last — both touch the ledger and `TASKS.md` next.
 
+- `c27df4c` — **never suggest `git reset --hard` to another session.** Told
+  `labkit-minion` to reset onto the merge so it would not re-diverge; it had
+  **five uncommitted files** at that moment, including a fix and a predictions
+  document, and the command would have destroyed them silently. It checked
+  instead of complying and rebased. `rebase` reaches the same place and refuses
+  on a dirty tree — the property that matters across a boundary you cannot see
+  through. Recorded in CLAUDE.md with the general form: a parallel session's
+  **worktree** state is invisible to you in a way its branch state is not.
+
 ## Verified
 
 Documentation only until the merge; then a full run.
@@ -79,6 +88,22 @@ when its work finishes retires its open questions with it, instead of carrying
 them into work they no longer belong to. `004` reached 1,165 lines over 115
 commits and a dozen unrelated pieces of work before that existed. TASKS.md has no
 equivalent and probably should not — it is a live queue, not a record.
+
+**A guard stated in prose beside code that does not honour it** — three
+instances found today, in three unrelated places, and this session wrote one of
+them:
+
+- `reproducibilityOf()` argued for reference-keying *in a comment*, then
+  reported bare names (S-9c).
+- `wrap-hook.sh`'s comment called a branch unreachable insurance; a fork
+  reaches it (`a637e3f`).
+- S-10's own test described *"Identical names, two artefacts, two differences"*
+  and then asserted the collapsed behaviour as correct — eleven scenarios ago,
+  found by `labkit-minion` while closing row F.
+
+A method finding rather than a domain one, like PJ-025 and PJ-026. **Not
+written up** — it constrains how this project writes, so it is Dan's to
+commission.
 
 **A fresh false claim while correcting a stale one** is the sharper lesson.
 Checking `package-lock.json` and then writing the opposite, in one commit, is the
