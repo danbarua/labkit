@@ -33,13 +33,18 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { windableClock, minutes, days } from "../helpers/clock";
 
 let scenario: Scenario;
 
 /**
- * A fixed clock. Deliberate: if a read can tell two worlds apart only because
- * wall-clock time moved between them, it has not distinguished the research
- * states, it has distinguished the test runs.
+ * A frozen clock for the paired-world probes. Deliberate: if a read can tell two
+ * worlds apart only because wall-clock time moved between them, it has not
+ * distinguished the research states, it has distinguished the test runs.
+ *
+ * It is a frozen *value*, not a clock, and probe 5 uses a real one — see
+ * `tests/helpers/clock.ts` for why the distinction is load-bearing rather than
+ * pedantic.
  */
 const clock: Clock = { now: () => "2026-08-20T09:00:00.000Z" };
 
@@ -325,5 +330,84 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
       /author|actor|by$|who|person|approv|decid.*by/i.test(k),
     );
     expect(attributionFields).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
+  /**
+   * `024` claimed a pinned clock meant this harness "structurally cannot
+   * evaluate whether row Z's ordering can be derived from `closed_at` or event
+   * stamps". **Withdrawn.** The limitation was the fixture's: a constant
+   * function is a frozen value, not a clock, and winding one is all it took.
+   *
+   * Wound, the answer is observable rather than argued. Of the six places a
+   * write verb reads the clock, **one** reaches the graph — `evaluateCriterion`,
+   * stamping `CriterionEvaluation.evaluated_at`. The other five reach only the
+   * event stream, which CLAUDE.md excludes from "what is true now".
+   *
+   * So row Z is narrower than "the record has no time in it", and the narrower
+   * statement is the useful one: **evaluations are ordered, decisions are not**.
+   * A frozen clock could not have shown this, because every stamp was identical.
+   */
+  test("an evaluation carries the time it was reached; a decision carries none", async () => {
+    const graph = await scenario.begin();
+    try {
+      const winding = windableClock("2026-03-01T09:00:00.000Z");
+      const s = new ResearchSession(graph, { clock: winding, events: inMemoryEventLog() });
+
+      const enquiry = await s.openEnquiry("does the schedule move convergence?");
+      const check = await s.stateCriterion("stable across five seeds");
+      const observations = await s.recordObservations({
+        enquiry, name: "sweep readings", finding: "twelve runs",
+      });
+      const analysis = await s.recordAnalysis({
+        enquiry, method: "convergence-fit", from: [observations],
+        concludes: [{ proposition: CONVERGES, finding: "moves by ~3 steps" }],
+        heldTo: [check],
+      });
+
+      winding.wind(days(30));
+      const whenEvaluated = winding.peek();
+      await s.evaluateCriterion({
+        criterion: check, value: "spread 0.4 steps", outcome: "pass",
+        citing: { analysis, proposition: CONVERGES },
+      });
+
+      // A month later the question is closed -- a Decision, and the act that
+      // changes what the programme believes.
+      winding.wind(days(30));
+      await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: CONVERGES } });
+
+      const reader = new ResearchSession(await scenario.current(), {
+        clock: winding, events: inMemoryEventLog(),
+      });
+
+      // The evaluation kept its instant, and it is the wound one rather than
+      // the start -- so the clock genuinely drives durable state here.
+      const why = await reader.whySupported({ analysis, proposition: CONVERGES });
+      expect(why.standard[0]?.evaluations[0]?.at).toBe(whenEvaluated);
+      expect(why.standard[0]?.evaluations[0]?.at).not.toBe("2026-03-01T09:00:00.000Z");
+
+      // The closure carries no instant at all. Sixty days of wound clock left no
+      // durable trace of *when* the programme came to believe this, which is the
+      // half of row Z that matters -- belief moves on decisions, not evaluations.
+      const status = await reader.enquiryStatus(enquiry);
+      expect(status.closure).toBe("answered");
+      const timeFields = Object.keys(status).filter((k) => /_?at$|when|time|date/i.test(k));
+      expect(timeFields).toEqual([]);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  /** The clock refuses to run backwards. A clock that can is a variable. */
+  test("winding is monotonic", () => {
+    const c = windableClock("2026-03-01T09:00:00.000Z");
+    c.wind(minutes(5));
+    expect(() => c.wind(-1)).toThrow(/non-negative/);
+    expect(() => c.windTo("2026-01-01T00:00:00.000Z")).toThrow(/before the current time/);
+    expect(c.peek()).toBe("2026-03-01T09:05:00.000Z");
   });
 });

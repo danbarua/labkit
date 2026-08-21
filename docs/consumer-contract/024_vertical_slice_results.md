@@ -179,10 +179,15 @@ file must be unable to fake.
 
 The clock is fixed at a constant for the same reason. A read that tells two
 worlds apart only because wall-clock time moved between them has distinguished
-the test runs, not the research states. **A limitation follows that the next
-session must know**: a harness with a pinned clock structurally cannot evaluate
-whether row Z's ordering can be derived from `closed_at` or event stamps. Trying
-that here would return a false negative.
+the test runs, not the research states.
+
+> **The limitation this originally claimed is withdrawn.** It said a harness
+> with a pinned clock *structurally* cannot evaluate whether row Z's ordering
+> derives from durable state. Wrong twice: a constant function is a frozen value
+> rather than a clock, and the limit was the fixture's, not the harness's.
+> `tests/helpers/clock.ts` winds, probe 5 uses it, and the paired-world probes
+> keep the frozen one because they need it. **Row Z is narrower than this entry
+> said** — see probe 5.
 
 **Natural-id ordering is the third channel** and is not closed by either measure —
 see probe 2. It is demonstrated rather than blocked, because a consumer *could*
@@ -192,6 +197,31 @@ read it and must be told not to.
 construction* — that is the finding — so 192/0 carries very little information
 about the claims under review. The detector-injection table above is what carries
 it.
+
+## Probe 5 — what a wound clock reaches. **Row Z, narrowed.**
+
+Added after review, and it corrects this entry rather than extending it.
+
+Of the six places a write verb reads the clock, **exactly one reaches the
+graph**: `evaluateCriterion`, stamping `CriterionEvaluation.evaluated_at`. The
+other five — `reverify`, `acceptAsUnresolved`, `amendDesign`, `replaceAnalysis`,
+`reinterpret` — stamp only the event stream, which CLAUDE.md excludes from "what
+is true now".
+
+The probe winds sixty days across an evaluation and a closure. The evaluation
+keeps its instant, and it is the wound one rather than the start, so the clock
+genuinely drives durable state there. The closure keeps nothing: sixty days left
+no durable trace of when the programme came to believe the thing.
+
+So the accurate statement of row Z is **not** "the record has no time in it".
+It is **evaluations are ordered; decisions are not** — and `Decision` is the node
+carrying closure, deferral, amendment, promotion and withdrawal, which is to say
+every act by which belief moves. A frozen clock could not have shown this,
+because every stamp was identical.
+
+That narrowing is the useful part: it says where to look first, and it says a
+`decided_at` would be a smaller change than "add time to the model" implied.
+Still bar 4, still nothing built.
 
 ## Standing
 
