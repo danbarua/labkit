@@ -6,6 +6,7 @@ import { Client } from "pg";
 import { runMigrations } from "../../src/db/migrate";
 import { bootstrapSession, type LabKitDB } from "../../src/db/client";
 import { dropTenantGraph } from "../../src/db/provisioning";
+import { traced } from "../../src/db/trace";
 
 /**
  * Application-code tests should exercise `LabKitDB` the same way production
@@ -49,7 +50,7 @@ import { dropTenantGraph } from "../../src/db/provisioning";
  */
 export interface TestDb {
   /** Opens a fresh, independently-bootstrapped connection — call in `beforeEach`, not once for the whole file. See the file-level comment. */
-  openClient(): Promise<LabKitDB & { close(): Promise<void> }>;
+  openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }>;
   /** Drops every AGE graph and truncates every LabKit-owned table — call in `afterEach`, before closing that test's client. */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -71,18 +72,24 @@ export async function setupTestDb(): Promise<TestDb> {
   const [host, portStr] = server.getServerConn().split(":");
   const port = Number(portStr);
 
-  async function openClient(): Promise<LabKitDB & { close(): Promise<void> }> {
+  let opened = 0;
+  async function openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }> {
     const c = new Client({ host, port, database: "postgres", user: "postgres" });
     await c.connect();
     await bootstrapSession(c);
-    return { query: c.query.bind(c), close: () => c.end() };
+    // Traced only when LABKIT_TRACE is set; otherwise `traced()` hands back the
+    // same object and this costs nothing. Labelled per connection because
+    // telling two connections apart is most of what a trace is for -- the
+    // teardown race described above is invisible without it.
+    const db = traced({ query: c.query.bind(c) }, label ?? `conn-${++opened}`);
+    return { query: db.query, close: () => c.end() };
   }
 
   // Dedicated to reset()/teardown, deliberately separate from whatever
   // connection each test opens for itself via openClient() — reset() runs
   // every test, so it's the one connection worth keeping simple and
   // unlikely to ever see an errored query itself.
-  const admin = await openClient();
+  const admin = await openClient("admin");
 
   return {
     openClient,
