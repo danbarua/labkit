@@ -17,10 +17,47 @@ ledger and the working tree, not against memory of what was decided.
 
 Someone could start these today.
 
-- [ ] **The suite is flaky. The mechanism is now known; the fix is not.**
-  Investigated 2026-08-21 by three parallel agents. **Every earlier hypothesis
-  in this entry was wrong, including two of mine**, and the corrections are
-  worth more than the conclusion.
+- [ ] **The suite is flaky. The cascade is fixed (2026-08-22); the ceiling
+  crossings are not.** Investigated 2026-08-21 by three parallel agents.
+  **Every earlier hypothesis in this entry was wrong, including two of mine**,
+  and the corrections are worth more than the conclusion.
+
+  **What was fixed** (`2de1060`): a test that overran bun's ceiling used to
+  take the next one with it, because `scenario.end()` closed whatever a single
+  mutable `db` pointed at — and by then it pointed at the live test. FIFO
+  connection ownership, plus a reset that only fires when nothing is
+  outstanding. Demonstrated deterministically rather than statistically: a real
+  six-second overrun reproduces the cascade 100% in 7.5s, and
+  `tests/scenario-harness.test.ts` pins the same ordering in milliseconds.
+
+  **What was not fixed:** tests still cross the ceiling and still fail. Only
+  the amplification is gone. **The falsifiable prediction, recorded before the
+  next flake rather than after it: a crossing should now produce roughly one
+  failure, not a burst.** The 17 failures in the baseline run below were spread
+  across **nine** test groups; a post-fix failing run spread across nine groups
+  refutes this outright. Record the count *and* the spread.
+
+  **The version that failed is the useful half.** The first attempt moved
+  `testDb.reset()` into `begin()` so every test isolated itself. Paired,
+  interleaved A/B on one tree in one session:
+
+  | arm | pass | fail | ran | wall | load |
+  |---|---|---|---|---|---|
+  | BASE | 261 | 0 | 261 | 187s | 7.04 |
+  | reset-at-begin | 261 | 0 | 261 | 165s | 5.80 |
+  | BASE | 261 | 0 | 261 | 142s | 3.51 |
+  | reset-at-begin | 245 | **18** | **263** | 386s | **3.22** |
+
+  It failed at the *lowest* load of the four, so load does not explain it — and
+  it had a mechanism. **Twenty-three of the twenty-nine files call `end()` from
+  `afterEach`, which bun runs outside the per-test timeout.** Moving the reset
+  into `begin()` put a graph drop and a truncate *inside* every test's 5000ms
+  budget, trading the cascade for more crossings, which is what causes the
+  cascade. `ran=263` is the tell: crossings, double-counted.
+
+  **Round 1 was 261/0 for both arms and marginally faster for the fix.**
+  Stopping there would have shipped it. That is the argument for the paired
+  design in one sentence.
 
   **What actually happens, demonstrated:**
   - **Nothing hangs.** 59,086 queries tracked start-to-finish across a run that
