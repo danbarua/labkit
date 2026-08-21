@@ -84,7 +84,16 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   const connection = await connectDb();
   const ctx = await resolveTenantContext(connection.db, tenant);
   const server = buildServer(new ReadSurface(new TenantGraph(ctx, connection.db)));
-  await server.connect(new StdioServerTransport());
+
+  const transport = new StdioServerTransport();
+  // A client that closes the pipe expects the server to go away. Without this
+  // the open database connection keeps the event loop alive and the process
+  // sits there forever -- found by driving the real transport from a shell,
+  // which the in-process test cannot see.
+  transport.onclose = () => {
+    void connection.close().finally(() => process.exit(0));
+  };
+  await server.connect(transport);
 }
 
 if (import.meta.main) await main();
