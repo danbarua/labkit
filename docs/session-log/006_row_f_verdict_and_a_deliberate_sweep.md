@@ -4,10 +4,16 @@
 `docs/project-journal/027`, `028` and `docs/consumer-contract/036`, `037` for the
 reasoning.
 
-**The range is wider than this session.** `collect.sh` reports twenty commits
-since baseline `79de6f3`; most are `labkit-dev`'s and four of those are written
-up in entry 005. This entry covers **`afcbc58`, `079798f`, `ecbd29f`, `136fbc4`,
-`5204809`, `4dd44a7`, `8afae1c`, `cfb639b`** and the two merges, and nothing else.
+**The range is wider than this session.** Most commits since baseline `79de6f3`
+are `labkit-dev`'s, and several are written up in entry 005. This entry covers
+**`afcbc58`, `079798f`, `ecbd29f`, `136fbc4`, `5204809`, `4dd44a7`, `8afae1c`,
+`cfb639b`, `1dfc224`** and the merges listed below, and nothing else.
+
+No count of the range here, deliberately: `collect.sh` recomputes it on every
+fire, and this line carried "seventeen" and then "twenty" while the number was
+something else. A numeral either earns an assertion, is deleted, or is dated
+(PJ-028) — and in a document rewritten whole each time, deleting is the only one
+of the three that stays true.
 
 ## Goal
 
@@ -52,21 +58,25 @@ them:**
 - `8afae1c` — the seven wrong counts, and four stale-symbol comments in the same
   files. **Zero of the seven earned an assertion** — see Open.
 - `cfb639b` — PJ-028 corrected by its own repair, plus CLAUDE.md's paragraph.
+- `1dfc224` — PJ-028's third branch (dated measurements) and the transplanted
+  check that could not fail.
 
-Merges `70817a2` (fast-forward: `Question.posed_at`, the `whatWasKnown` fixes,
-`src/mcp/`, the CLI rewrite) and `2623d02`. Pushed to `origin/feat/minion`.
+Merges `70817a2`, `2623d02`, `20fef4f` and `b451955`, the last carrying
+`labkit-dev`'s four sweep fixes and the wrap-hook fix. Pushed to
+`origin/feat/minion`; `labkit-dev` has merged it back at `29d81dd`.
 
 ## Verified
 
-- `bun test` — **261 pass, 0 fail**, 855 expect() calls, 36 files. Run three
-  times across this session's second half, clean each time (95.99s, 114.93s).
-  An earlier run, with six subagents reading the repo concurrently, gave
-  256 pass / 2 fail — both S-11 tests timing out at 6.2s and 7.0s against bun's
-  5000ms ceiling. Same code, different machine load: the documented flake, and
-  both numbers are recorded rather than only the good one.
+- `bun test` — **261 pass, 0 fail**, 867 expect() calls, 36 files. Run five times
+  across this session's second half, clean every time (95.99s–114.93s). An earlier
+  run, with six subagents reading the repo concurrently, gave 256 pass / 2 fail —
+  both S-11 tests timing out at 6.2s and 7.0s against bun's 5000ms ceiling. Same
+  code, different machine load: the documented flake, and both numbers are
+  recorded rather than only the good one.
 - `bun run typecheck` — clean.
-- `npx depcruise src tests --output-type err` — **0 errors**, 1 pre-existing
-  warning (`no-orphans: src/index.ts`).
+- `npx depcruise src tests --output-type err` — **no violations at all**, 81
+  modules, 237 dependencies. The standing `no-orphans: src/index.ts` warning was
+  cleared by `labkit-dev`'s work in this range; it had been there all session.
 - `bun run check:ledger`, `check:doc-comments`, `check:stdout` — all green.
 - `bun run check:tests-assert` — **green**, after `labkit-dev`'s fixes landed.
   It was committed **red on purpose**, naming the two tests it was written from;
@@ -117,14 +127,33 @@ every compound verb runs inside `inTransaction()`, and `sharpen`, `openEnquiry`,
 defect or "compound" is narrower than the comment reads — and getting that
 backwards wraps things that should not be.
 
-**The wrap hook resolves its state from the wrong worktree.** This session began
-in `labkit-domain-consumer` and works in `labkit-minion`. The hook hands over
-`/Users/dan/Code/science/labkit-domain-consumer/.claude/.wrap-state/74f9b207-…`,
-whose `baseline` is `005465c` — the *other* branch's tip — and then looks for this
-entry inside that checkout. Until `labkit-dev` merged, the file was not there and
-the hook reported "no entry yet" on every fire, three times. Both state files are
-now pointed at this entry. Worth fixing: a session that moves between worktrees
-gets another session's baseline and cannot be seen to have wrapped.
+**The wrap hook read its state from the wrong worktree — found here, fixed by
+`labkit-dev` in `b451955`.** This session began in `labkit-domain-consumer` and
+works in `labkit-minion`, and the hook took `state_dir` from `$CLAUDE_PROJECT_DIR`,
+which names where a session *started* rather than the tree it is working in. So it
+read the other checkout's state — that branch's baseline, and an `entry=` naming a
+file absent on this side — and reported "no entry yet" three times about a session
+that had wrapped. It now resolves from `git rev-parse --show-toplevel`, which names
+the same directory for a session that is not in a worktree, so there is no special
+case beside the normal path.
+
+Verified from this side rather than accepted: `--show-toplevel` gives
+`/Users/dan/Code/science/labkit-minion`, the state file it now reads carries
+`baseline=79de6f3` and this entry's path, and the file exists here. All three were
+wrong before. **The fix does not replace the seeding recipe** — the state file is
+now in the right tree, but a fork into a fresh worktree still finds that tree empty
+and self-baselines at whatever HEAD is then.
+
+**Worth more than the fix: the shape of the bug.** The hook did not error and was
+not missing anything. It returned a well-formed, confident answer computed from the
+wrong subject, and that answer was indistinguishable from a true one. Two others
+found today are the same shape — `whatWasKnown()` reporting a question `open` in a
+month before it was posed, and `reproducibilityOf()` reporting that an analysis
+nobody ever created reproduces. **None of the three would have been caught by this
+session's sweep**, because all three code paths do exactly what their comments say.
+All three were found by someone noticing an answer was wrong. Not written up: three
+instances argued from is the bar PJ-027 sets for *not* generalising yet, and a
+fourth should earn it.
 
 ## Next
 
@@ -141,5 +170,5 @@ demonstrated or inferred, and the inferred ones are inferred on purpose. Six
 readers looking for one shape find that shape and are silent about others, so
 treat the list as a lead sheet, not an inventory.
 
-The wrap hook's worktree bug is still live and will bite the next session that
-moves between checkouts. Nothing depends on it; it just makes the hook lie.
+Nothing else is outstanding on either branch. The ledger is unchanged: **AF is the
+only open row**, unowned, and earns nothing under §5 by its own cell.
