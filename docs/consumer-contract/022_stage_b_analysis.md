@@ -90,6 +90,23 @@ this time by someone who had never seen it.
 **Not implemented.** It needs a demonstration first, in the project's own terms:
 a scenario where a reader acts on "unaffected" and is wrong.
 
+> **Implemented 2026-08-21 (`c8e6362`), after S-11c supplied that
+> demonstration.** The reader acts on a two-stage pipeline: `recordAnalysis({
+> from })` takes only observations handles, so an analysis cannot read another
+> analysis's output and the intermediate has to be re-entered as fresh
+> measurement. `whatDependsOn(rawSeries)` then names the first stage's claim and
+> omits the second's, which rests on the raw data through it.
+>
+> The remedy is the answer shape and nothing else, as this section predicted:
+> `DependencyReport` names the routes walked and carries `complete: false` as a
+> **literal type**, so no caller can read completeness off it and no later
+> change can widen it to a flag without confronting §4's discriminator. The
+> coverage assertion stays unbuilt.
+>
+> The prediction that this sits at the query-semantics tier held exactly. What
+> the demonstration added was the *reason* the routes are incomplete, which is
+> a missing verb rather than a missing edge — now its own queue item.
+
 ## Standing after both stages
 
 | Candidate | Designers | Stage | Bar | Ledger |

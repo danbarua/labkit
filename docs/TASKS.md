@@ -8,7 +8,7 @@ here disagrees with the ledger, the ledger is right and this file is stale.
 
 Grouped by **what stops someone picking it up**, because the items are not the
 same kind of thing and a flat list hides that. Last reconciled 2026-08-21 against
-`489d103`.
+`c8e6362`.
 
 ---
 
@@ -16,16 +16,20 @@ same kind of thing and a flat list hides that. Last reconciled 2026-08-21 agains
 
 Someone could start these today.
 
-- [ ] **An absent dependency path must not read as independence.**
-  `whatDependsOn()` walks a fixed set of routes and lets everything it did not
-  reach read as unaffected. Required by Designer 2; classified in
-  `consumer-contract/022` as **query semantics** (change-bar tier 1), not a model
-  change. Needs the usual shape first: **a scenario where a reader acts on
-  "unaffected" and is wrong.** Third catch on this verb — PJ-021 found it
-  returning `claims: []` for an input while still naming the enquiry.
-  *Do not* build Designer 2's `Dependency coverage assertion`; `023` §4 keeps
-  that as a discriminator for later, since certified completeness needs durable
-  state that open-world traversal does not.
+- [ ] **An analysis cannot read another analysis's output.** Found by S-11c
+  while demonstrating the dependency gap, and not itself part of it.
+  `recordAnalysis({ from })` accepts only observations handles, and
+  `recordObservations()` is the only thing that produces one — so a two-stage
+  pipeline can only be recorded by re-entering the intermediate as if it were
+  fresh measurement, which breaks the provenance chain in the record while it
+  holds in the world. Fifteen scenarios never needed a second stage, which is
+  why it does not exist.
+  Needs the usual shape first: **a reader acting on the broken chain and being
+  wrong.** S-11c has half of it — the omission is demonstrated — but the remedy
+  is a verb, not a query, so it wants its own demonstration of what a caller
+  gets wrong when they cannot express the second stage. Related to row F: an
+  analysis output that can be fed onward is a thing with an identity apart from
+  its bytes.
 
 ## Recently closed, so nobody re-opens them
 
@@ -33,6 +37,12 @@ Someone could start these today.
   migration (`consumer-contract/025`, `026`).
 - **Row AD** — observation-only work reading as no work. One node, two edges, no
   migration (`029`, `030`). `recordObservations()` is now transactional.
+- **D2's open-world `unaffected`** — `whatDependsOn()` presented a lower bound
+  as a complete answer. Fixed in the query shape alone (`c8e6362`):
+  `DependencyReport` now names the routes walked and carries `complete: false`
+  as a literal type. Demonstrated first by **S-11c**. The coverage assertion
+  `023` §4 forbids is still not built and the type is written so it cannot be
+  added by accident.
 - **Rows S and T** — refuted, not merely closed. There is no *who* to attribute
   work to when analyses are run by agents, and what the question reaches for is
   provenance the model already carries (`S-8b`). Edges *can* carry properties;
