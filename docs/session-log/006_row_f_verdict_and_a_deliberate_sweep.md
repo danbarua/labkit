@@ -60,19 +60,23 @@ them:**
 - `cfb639b` — PJ-028 corrected by its own repair, plus CLAUDE.md's paragraph.
 - `1dfc224` — PJ-028's third branch (dated measurements) and the transplanted
   check that could not fail.
+- `b2047f4` — PJ-028's four self-instances, collected from three scattered
+  sections into the entry's actual argument. See Open.
 
-Merges `70817a2`, `2623d02`, `20fef4f` and `b451955`, the last carrying
-`labkit-dev`'s four sweep fixes and the wrap-hook fix. Pushed to
-`origin/feat/minion`; `labkit-dev` has merged it back at `29d81dd`.
+Merges `70817a2`, `2623d02`, `20fef4f`, `b451955` and `20cfcca`. Pushed to
+`origin/feat/minion`; `labkit-dev` merges it back as it goes.
 
 ## Verified
 
-- `bun test` — **261 pass, 0 fail**, 867 expect() calls, 36 files. Run five times
-  across this session's second half, clean every time (95.99s–114.93s). An earlier
-  run, with six subagents reading the repo concurrently, gave 256 pass / 2 fail —
-  both S-11 tests timing out at 6.2s and 7.0s against bun's 5000ms ceiling. Same
-  code, different machine load: the documented flake, and both numbers are
-  recorded rather than only the good one.
+- `bun test` — **261 pass, 0 fail**, 867 expect() calls, 36 files, most recently
+  88.98s serial on an unloaded machine. Clean on six of eight runs this session.
+  **The two that were not are recorded here on purpose**, because a wrap that
+  reports only the runs agreeing with it is the shape this session spent the day
+  removing:
+  - 256 pass / 2 fail, with six subagents reading the repo concurrently — two S-11
+    tests crossing bun's 5000ms ceiling at 6.2s and 7.0s.
+  - 256 pass / **5 fail, 5 errors**, 856 expects, **280.87s** — a natural flake on
+    an unloaded machine, same tree as a clean 88.98s run minutes later.
 - `bun run typecheck` — clean.
 - `npx depcruise src tests --output-type err` — **no violations at all**, 81
   modules, 237 dependencies. The standing `no-orphans: src/index.ts` warning was
@@ -84,6 +88,33 @@ Merges `70817a2`, `2623d02`, `20fef4f` and `b451955`, the last carrying
   is made. Red from here on means a test has stopped testing.
 
 ## Open
+
+**A flake detector was proposed, published and refuted inside an hour, and the
+refutation is the useful part.** `labkit-dev` derived the suite's test count
+exactly — 249 static declarations, minus the one generator at
+`domain-graph.test.ts:362`, plus its `NODE_LABELS.length` expansions, equals 261 —
+and inferred that a count above it means a test crossed bun's ceiling and was
+reported twice. True in that direction. It was written into `docs/TASKS.md` as a
+detector, which needs the *converse*, and the natural flake above killed it: **five
+tests lost, count still 261.** Withdrawn in `20cfcca`.
+
+Duration separated the two runs where count did not (280.87s against 88.98s), and
+the `expect()` total is better than either — 856 against 867 counts *work that did
+not happen*, so it does not move with machine load. Neither is in a document as a
+number; a duration in prose earns no assertion.
+
+**The failure signature is gone, and that is mine.** I piped the flaking run
+through `tail -5`, discarding the only evidence that could distinguish a teardown
+cascade from real assertion failures — ten minutes after agreeing in writing that
+this was the mistake worth recording. The re-run came back clean. **The next
+person to see this flake should capture the full output before anything else.**
+
+**PJ-028's argument changed shape because of that.** Four instances in one day of
+someone committing the defect they were holding — `918f420`, my "asserted below"
+comment, my `tail`, and the detector generalised from one observation inside the
+correction for my `tail` — support a conclusion one instance could not: *"be more
+careful" is not available as a remedy, because these are what being careful looks
+like*. Each is an asymmetry, and attention does not distribute evenly across one.
 
 **Nothing from the sweep is left unowned.** `labkit-dev` cleared its four items
 in `7c6853f`, `0c214ca`, `20fef4f` and `30f975b`: both assertion-free tests fixed
@@ -169,6 +200,13 @@ Read `sweep-report.md` in this session's scratchpad first — it labels every it
 demonstrated or inferred, and the inferred ones are inferred on purpose. Six
 readers looking for one shape find that shape and are silent about others, so
 treat the list as a lead sheet, not an inventory.
+
+If the flake appears again, **capture the full run before doing anything else** —
+`bun test > some.log 2>&1`, never through a pipe. The open question is whether the
+failures carry the teardown signature (`graph "labkit_t1" does not exist`,
+`Connection terminated`) or are genuine assertion failures; if the latter,
+contention is the wrong story and CLAUDE.md's account needs revisiting. One
+captured signature settles it and nothing else will.
 
 Nothing else is outstanding on either branch. The ledger is unchanged: **AF is the
 only open row**, unowned, and earns nothing under §5 by its own cell.
