@@ -61,17 +61,34 @@ export function buildServer(read: ReadSurface): McpServer {
         annotations: { readOnlyHint: true },
       },
       async (args: Record<string, unknown>) => {
-        const result = await definition.handler(read, args);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
+        inFlight++;
+        try {
+          const result = await definition.handler(read, args);
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+            structuredContent: result as Record<string, unknown>,
+          };
+        } finally {
+          inFlight--;
+        }
       },
     );
   }
 
   return server;
 }
+
+/**
+ * Tool calls currently being answered.
+ *
+ * Module state rather than a field because it exists for exactly one caller —
+ * `main()`'s shutdown, below — and a server built by a test has no shutdown to
+ * coordinate. It is here at all because the first version of that shutdown
+ * exited on stdin's `end` and dropped the response to a request already in
+ * hand: three requests in, two answers out. A shutdown that loses an answer it
+ * had computed is worse than one that never exits.
+ */
+let inFlight = 0;
 
 /**
  * Resolves one tenant, builds one read surface, serves over stdio.
@@ -84,7 +101,36 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   const connection = await connectDb();
   const ctx = await resolveTenantContext(connection.db, tenant);
   const server = buildServer(new ReadSurface(new TenantGraph(ctx, connection.db)));
-  await server.connect(new StdioServerTransport());
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+
+  // A client shuts an MCP stdio server down by closing its stdin, and nothing
+  // else does. `StdioServerTransport` subscribes to stdin's `data` and `error`
+  // only — never `end` — so its `onclose` fires when someone calls `close()`
+  // and at no other time, and the open database connection then keeps the
+  // event loop alive forever.
+  //
+  // The first attempt at this hung `transport.onclose` off the transport and
+  // was dead code. It was "verified" by a pipeline whose exit status came from
+  // `wc -l` rather than from the server -- the trap CLAUDE.md documents, walked
+  // straight into. Measured without the pipe, the process sat there for the
+  // full 15 seconds.
+  process.stdin.on("end", () => {
+    void drainThenExit(server, connection);
+  });
+}
+
+/** Waits for every request already in hand to be answered, then shuts down. */
+async function drainThenExit(server: McpServer, connection: { close(): Promise<void> }): Promise<void> {
+  // One tick before counting: a request that arrived in the same chunk as the
+  // EOF may not have reached its handler yet, so a count of zero right now
+  // proves nothing.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  while (inFlight > 0) await new Promise((resolve) => setTimeout(resolve, 5));
+  await server.close().catch(() => {});
+  await connection.close().catch(() => {});
+  process.exit(0);
 }
 
 if (import.meta.main) await main();

@@ -72,8 +72,13 @@ two more in the same hunk.
 024's one open item — row F's missing S-9 verdict — was closed the same day.
 **One row is `open` + unowned today: AF**, and it earns nothing under §5 by its
 own cell. **Row Z was closed on 2026-08-21** by the
-consumer probe (`docs/consumer-contract/025`, `026`) — one property,
-`Decision.decided_at`, no migration, after rung 1 was built and shown to fail.
+consumer probe (`docs/consumer-contract/025`, `026`) — `Decision.decided_at`,
+no migration, after rung 1 was built and shown to fail. It cost a **second**
+property the same day: an external review found `whatWasKnown()` reporting a
+question posed in April as `open` in March, since it began `MATCH (q:Question)`
+and had no way to know when a question was asked. `Question.posed_at` cleared it
+— demonstrated first (`tests/consumer/historical_survey.test.ts`), one writer,
+no migration, no new noun. Two properties, then, not one.
 
 **Row F reached `boundary` the same day** (`035`, `036`), after four bites that
 were all in *reporting* — `reproducibilityOf()`, `whySupported().restingOn`,
