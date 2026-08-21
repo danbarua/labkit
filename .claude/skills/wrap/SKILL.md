@@ -177,6 +177,31 @@ If the wrap turn also produced other changes worth committing — a fix the entr
 describes, say — commit those separately and first, so the wrap describes a
 range that already exists.
 
+## Closing an entry and starting the next one
+
+One session does not have to mean one entry. A session that wraps a piece of
+work and then moves on to something unrelated should **close** the entry and
+re-baseline, so the next Stop fire opens a fresh numbered one:
+
+```sh
+.claude/skills/wrap/close-entry.sh <state-file>
+```
+
+That rewrites `baseline` and `asked` to HEAD and clears `entry`. It is the
+supported way — those three fields belong to the hook and SKILL.md otherwise
+says not to hand-edit them. **Run it only when the entry being closed already
+covers everything up to HEAD**, or the range in between goes unwritten.
+
+Why it exists: without it, one long session rewrites a single growing document
+all day. Entry 004 reached **1,165 lines covering 115 commits** and a dozen
+unrelated pieces of work — config cleanup, a design exercise, a refactor, five
+ledger rows, a flake investigation, a CLI — because there was no way to say
+"that piece is finished". Five entries would have been five handovers; one was
+none. Backported from exo-ledger, 2026-08-21.
+
+Rule of thumb: close when you would struggle to write one `## Goal` line that
+covers what comes next.
+
 ## Notes
 
 - The Stop hook advances the recorded sha at the moment it fires, so a HEAD is

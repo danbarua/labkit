@@ -144,9 +144,33 @@ entry="$(read_state entry)"
 # because that work genuinely is unwritten -- which is why SKILL.md tells you to
 # commit such work SEPARATELY and first. Bundling it into the wrap commit is
 # what would hide it here.
-if git rev-parse --verify --quiet "$asked" >/dev/null 2>&1; then
-  touched="$(git diff --name-only "$asked..$head_sha" 2>/dev/null || true)"
-  if [ -n "$touched" ] && ! printf '%s\n' "$touched" | grep -qv "^$log_dir/"; then
+# The cut is the commit that last touched the ENTRY, not `asked`. `asked` lags
+# whenever HEAD moves during a `stop_hook_active` continuation -- the early exit
+# above records nothing -- and a stale `asked` compares against work the entry
+# already described. The entry's own commit is the honest cut: the entry
+# describes the repo as of the moment it was committed. Backported from
+# exo-ledger 2026-08-21, where it was observed firing over commits an entry
+# covered in full.
+#
+# When that commit BUNDLED real work, cut at its parent instead, so the bundled
+# work stays inside the range where it is visible -- preserving the property
+# above rather than quietly dropping it.
+ref="$asked"
+if [ -n "$entry" ] && [ -f "$root/$entry" ]; then
+  entry_sha="$(git log -1 --format=%H -- "$entry" 2>/dev/null || true)"
+  if [ -n "$entry_sha" ]; then
+    ref="$entry_sha"
+    if git diff --name-only "$entry_sha^..$entry_sha" 2>/dev/null | grep -qv "^$log_dir/"; then
+      ref="$(git rev-parse --verify --quiet "$entry_sha^" || echo "$entry_sha")"
+    fi
+  fi
+fi
+if git rev-parse --verify --quiet "$ref" >/dev/null 2>&1; then
+  touched="$(git diff --name-only "$ref..$head_sha" 2>/dev/null || true)"
+  # An EMPTY range is quiet too. With the entry committed at HEAD there is
+  # nothing to diff, and the old `[ -n "$touched" ]` fired on exactly that --
+  # asking to wrap a HEAD at which nothing had changed.
+  if [ -z "$touched" ] || ! printf '%s\n' "$touched" | grep -qv "^$log_dir/"; then
     write_state "$baseline" "$head_sha" "$entry"
     exit 0
   fi
