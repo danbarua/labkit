@@ -1,4 +1,4 @@
-# 004: config cruft cleared, the consumer probe run, session.ts split, rows Z and AD closed
+# 004: config cruft cleared, the consumer probe run, session.ts split, rows Z, AD and O closed
 
 **Session wrap, 2026-08-20 to 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -542,11 +542,55 @@ checkable**. Against work that has not, the same six rounds produce six
 arguments. That is the case for the predictions-first protocol, more than any
 single finding in this log.
 
+**Row O closed** (`8b6deb9`, `d33734a`, `17f21b4`). Deferred since PJ-008,
+taken up on an **external challenge** rather than a prediction of this project's
+own. `INVALIDATED_BY: Artefact → Review` — one edge label, one endpoint pair, no
+noun, no migration.
+
+*The wrong answer.* `replaceAnalysis()` validated `because: ReviewRef` and wrote
+it nowhere, so `whySupported()` reported a superseded finding's reason from any
+review of the unit. With a critical review and a confirming one on one analysis
+it reported *"numbers check out; independently recomputed the same values"* as a
+reason the work was retracted. Two worlds differing only in which review the
+researcher acted on were byte-identical to the whole read surface.
+
+*The cell was wrong about its own row.* It described **ambiguity** with several
+reviews; the defect was **absence** with one. Two reviews only make it visible.
+Every scenario before this had at most one review per analysis, so the read was
+right by coincidence in every world the corpus contained — which is how the
+deferral survived eleven scenarios.
+
+*The refuted prediction changed the design.* `031` predicted an existing label
+would take a new endpoint pair, and `BASED_ON` reads almost perfectly. Row **AA**
+is a live boundary recording that `BASED_ON` already carries two senses, so a
+third would have widened a boundary row while closing an open one — firing the
+nomination rule on the same commit. A general preference lost to a specific fact
+recorded four scenarios earlier by someone who would not be present for the
+build, which is PJ-025's thesis showing up in a build.
+
+*The challenge, scored as a prediction with a different author.* **Wrong about
+the experiment** — it proposed invalidating the causal review, and `invalidated`
+belongs to `Artefact` alone while `ReviewProps` is `{ verdict }`. **Right about
+the reasoning**, decisively: the cell deferred on grounds its own verified-state
+line contradicted. Recorded as a verdict, not a shrug.
+
+*Row T is orphaned*, predicted before the build. Its only named owner was O, and
+`INVALIDATED_BY` carries no properties — so T contributed nothing and has no
+owner. Not handed the event-sink phase as a substitute: an unbuilt phase is not
+a scenario.
+
+*A hazard I walked into.* The scenario file was built through a chain of
+scratchpad copies and string replacements, and a stale `expect(a).toEqual(b)`
+survived alongside its own replacement — so a passing fix read as a failure. The
+same string-replace hazard this session opened with.
+
 ## Verified
 
-Run on `8afdd39`, the final commit.
+Run on `17f21b4`, the final commit.
 
-- `bun test` → **208 pass, 0 fail**, 22 files.
+- `bun test` → **210 pass, 1 fail**, 23 files. The failure is
+  `tests/leader-election.test.ts`, which passed twice on isolated re-runs — the
+  known pglite-socket flake CLAUDE.md documents.
 - `bun run typecheck` → clean.
 - `npx depcruise src tests --output-type err` → **0 errors**, 2 orphan warnings
   (`src/index.ts`, `src/cli.ts`, both known stubs).
@@ -558,6 +602,9 @@ Run on `8afdd39`, the final commit.
 - `bun run check:migrations` → OK.
 - Deletion-verify on row AD's transaction: removed `inTransaction`, the negative
   test fails; restored byte-identical.
+- Deletion-verify on row O's edge: removed the `createEdge`, both S-11b tests
+  fail and the confirming verdict returns as a retraction reason; `write.ts`
+  restored byte-identical.
 
 **One run reported 199 pass / 1 fail and it was not a regression.** Reproduced by
 running `tests/leader-election.test.ts` alone three times: pass, pass, fail. That
@@ -707,14 +754,16 @@ worktrees make it easier to fall into.
 
 ## Next
 
-1. **Row O's discriminator**, with predictions recorded first the way row Z's,
-   row F's and row AD's were: an analysis retired on the strength of a review, that
-   review later invalidated — does the retirement still read as resting on valid
-   grounds? Needs no event sink. If the propagation query comes back *correct*,
-   that is a result and O's cell can finally say why it stays unowned in terms
-   of something that was run.
-2. **Row S last**, and deliberately: write-side, inexpressible rather than
-   unreadable, the most likely to need a real noun.
+1. **Row S**, the last of the three consumer-contract candidates and the only
+   row left with a live consumer requirement. Write-side, inexpressible rather
+   than unreadable, and the most likely of any open row to need a real noun —
+   which is why it was kept for last.
+2. **D2's open-world `unaffected`** — a reader acting on "unaffected" and being
+   wrong. Query semantics, tier 1.
+
+Rows **T** and **F** need new discriminators and have none: T because O's remedy
+orphaned it, F because its ladder waits on the adapter read rather than another
+probe.
 
 Row T is **orphaned** and its cell says so: its only named owner was row O, and
 if O is settled by a plain `Decision → Review` edge, T loses that owner. It is
