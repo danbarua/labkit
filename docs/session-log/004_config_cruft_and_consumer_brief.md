@@ -1,6 +1,6 @@
-# 004: config cruft cleared, the consumer probe run, session.ts split, and row Z closed
+# 004: config cruft cleared, the consumer probe run, session.ts split, rows Z and F probed
 
-**Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
+**Session wrap, 2026-08-20 to 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
 a consumer is the next probe, and `docs/consumer-contract/001_design_brief.md`
 for the protocol itself. First entry written from the `labkit-domain-consumer`
@@ -10,7 +10,8 @@ worktree.
 
 Clear "the old js .json config hell cruft" and the dead allow-install entries,
 then draft the brief for the cold-context designers PJ-023 called for — and act
-on the external review of that brief.
+on the external review of that brief. The session then ran the whole exercise,
+split `session.ts`, closed row Z, and probed row F.
 
 ## Changed
 
@@ -369,30 +370,98 @@ rather than a blob on every code commit. Recorded as the option not taken, since
 PJ-007 cites reading the SVG. Given the hook now commits it automatically, the
 size argument is stronger than it was.
 
+**The doc comments the split moved** (`456d013`, `1cbda1d`, `2ca30d7`). An
+earlier repair restored six comments someone noticed. A scan comparing every
+member's preceding doc block against `a449392:src/domain/session.ts` found the
+shift was **total**: the slicer took spans declaration-to-next-declaration, so
+every doc travelled with the member above it. `reverify()` carried
+`criteriaGoverning`'s, `acceptAsUnresolved()` carried `reproductionOf`'s S-10
+rationale, and the earlier repair had *duplicated* rather than moved —
+`whatIsKnown`'s doc existed twice.
+
+*The instrument was wrong before the code was.* The first scan missed one-line
+docs, because `doc_span` required `*/` on the line above; the first repair
+attempt then stranded a fresh comment on top of one it could not see, and was
+reverted. Restored verbatim rather than rewritten, on `labkit-review`'s
+argument that restoration has a checkable postcondition and rewriting has none.
+
+`scripts/check-doc-comments.ts` (`bun run check:doc-comments`) keeps the
+invariant, and it is narrower than "matches `a449392`", which expires the moment
+a doc is legitimately edited: **a doc block must be followed by something it can
+document.** It immediately found a third instance in `src/db/domain.ts` — the
+S-18 build inserted `PROMOTES` between `CHANGES` and its doc, so the edge meaning
+*a decision withdrew or replaced this* had been sitting under `REVERIFIES`'
+explanation since `a449392`. Three edits, three files, two of them this session's.
+
+**Row F probed** (`409b53d`, `46b87aa`, `fa3d2f6`, `c636533`, `6281aa3`).
+Predictions first, then `tests/scenarios/s9b_rebuild_or_fresh_work.test.ts`,
+seven tests. **Nothing in `src/` changed** — that is the result.
+
+Rung 2 held, against the prediction that it would not: `reverify()` already
+records a rebuild as an act with a target, and prevents the one wrong answer
+available (`whySupported()` reporting a proposition rebuilt once as resting on
+two independent findings — S-10's wrong answer at the artefact level). It then
+**refuses the case the contract requires**, a rebuild that concludes nothing,
+because it re-checks a *conclusion*. Ladder paused at rung 3.
+
+**A rule made checkable** (`e868aac`). `demonstrated` becomes a ledger status
+rather than a kind described only in the ownership legend, and
+`bun run check:ledger` fails when a second row carries it. CLAUDE.md's
+one-wrong-answer-at-a-time rule has had a precondition the ledger could not mark
+for eleven scenarios, so whether it was engaged could only be settled by reading
+prose — row K's failure mode, and row K's trigger sat fired through three
+external reviews. Verified by injection: marking row O `demonstrated` fails the
+check and names both rows; the ledger restored byte-identical.
+
+*The seam measurements that justified the split* are kept here because they are
+the reasoning rather than the outcome: 28% comments and 6% blank, so 1,927 code
+lines across 62 members, ~31 each; read/write partitions perfectly, 18 write
+verbs against 14 read verbs with **no member doing both**; the shared core is
+exactly five helpers; `emit` has 18 callers and every one is a write.
+dependency-cruiser could not find the seam (it saw one node) but can enforce one
+afterwards, which is the main argument for bothering.
+
 ## Verified
 
-Code verification ran on `1631f3c`, the last commit touching code. The four
-later commits are documentation only.
+Run on `6281aa3`, the final commit.
 
-- `bun test` → **188 pass, 0 fail**, 611 expect() calls, 20 files, 77.14s.
+- `bun test` → **207 pass, 0 fail**, 22 files.
 - `bun run typecheck` → clean.
 - `npx depcruise src tests --output-type err` → **0 errors**, 2 orphan warnings
   (`src/index.ts`, `src/cli.ts`, both known stubs).
+- `bun run check:doc-comments` → clean (the check added this session).
+- `bun run check:ledger` → row AD is the one demonstrated wrong answer.
 - `bun run check:migrations` → OK.
-- `node_modules/.bin/drizzle-kit --version` → v0.30.6, executes.
+
+**One run reported 199 pass / 1 fail and it was not a regression.** Reproduced by
+running `tests/leader-election.test.ts` alone three times: pass, pass, fail. That
+is the live pglite-socket concurrency flake CLAUDE.md documents, not the change
+under test. Recorded rather than re-run until green.
+
+**The doc-comment repair was verified as comment-only**, by filtering the diff
+for changed lines that are not comments — empty in all three commits. The
+postcondition for `456d013` is stronger and was checked with a script: every
+member's doc block byte-identical to `a449392:src/domain/session.ts`, sole
+exception `whatWasKnown`, which did not exist then.
+
+**Detector discipline on S-9b.** Injecting `rebuiltFrom` into `whatDependsOn`'s
+return fails the shape assertion in test 6; `read.ts` was restored
+byte-identical afterwards (empty `git diff`). Without that, the test would have
+stayed green after row F was closed — the defect external review found in the
+first draft of consumer probe 3.
+
+Earlier verification, on `1631f3c` (the last commit touching config):
+
 - Deletion-verify on `allowScripts`: removed the block, `bun install`, esbuild
   0.19.12 still present and its binary still runs.
-- Leak audit for the Stage A packet: grep over PJ-008 §1 for backticked and
-  ontology terms — 3 hits, all in glosses or the closing section, 0 in the
-  eighteen bold sentences. Audit of what designers actually received: 0 hits,
-  73 lines.
-- Leak audit of the synthesiser's prompt for provider and model strings: **0**.
+- `node_modules/.bin/drizzle-kit --version` → v0.30.6, executes.
+- Leak audit for the Stage A packet: 0 hits in the eighteen bold sentences, 0 in
+  what designers actually received. Leak audit of the synthesiser's prompt for
+  provider and model strings: 0.
 - Attribution gap checked against `src/db/domain.ts`, not recalled: thirteen node
-  labels, none denoting a person, agent or role; `EvidenceUnitRole` is a kind of
-  enquiry activity. Gate states confirmed as
-  `never-evaluated | incomplete | blocked | satisfied`.
+  labels, none denoting a person, agent or role.
 
-Not run: `bun examples/full-lifecycle.ts`.
+Not run at any point: `bun examples/full-lifecycle.ts`.
 
 **Why the combined code run mattered.** The two sessions had each verified one
 half against the other's stale side — the review session tested the new lockfile
@@ -403,22 +472,40 @@ worktrees make it easier to fall into.
 
 ## Open
 
+- **One confirmed wrong answer is now shipping green, and it is not row F's.**
+  Ledger row **AD**: `recordObservations()` mints no `EvidenceUnit`, so a
+  question worked on through observations alone reports itself `untested` —
+  *"one nothing has ever been run against"* — while a sibling question worked on
+  through `recordAnalysis()` reads `unresolved`. S-9b's seventh test asserts the
+  wrong answer on purpose, with the assertion it *should* make in a comment
+  beside it. Three cold reviewers flagged the missing unit and three scenarios
+  found no harm beyond a reader's; this is the fourth and the first to produce a
+  wrong answer. CLAUDE.md permits one such row and requires clearing it next.
+- **The ledger gained a fourth status**, `demonstrated`, for a row whose
+  discriminator is built, whose wrong answer is demonstrated, and whose **fix**
+  is what is unbuilt. `labkit-review` accepted it on a better argument than the
+  one offered — the deferral rule already referenced this state and the
+  vocabulary could not express it — with one condition, now met: something has
+  to count it, or a fourth label is just a second prose condition to re-read.
+- **Row F was nearly reclassified `boundary`, wrongly.** `027` predicted that
+  outcome *and framed it as "a bigger result than an edge"* — a thumb on the
+  scale in the document written to prevent editing results into hindsight. It
+  contradicts `023`'s strong contract-necessity score, and row Z is the
+  precedent against it. Recorded in `028` as considered and rejected, including
+  that it nearly happened.
+- **Row O's deferral was withdrawn on challenge.** `labkit-review` pointed out
+  its cell defers to the event model as a *why state changed* question while its
+  own verified-state line describes a *what is true now* one, and that
+  `replaceAnalysis` already closes half of it. Its discriminator is a hypothesis
+  to test with predictions recorded first, not a finding.
+- **Row T stays `open` + unowned.** Proposing to move O and T to "owned by a
+  named future build" was wrong: an unbuilt *phase* is not a scenario, and
+  naming one converts "we have no discriminator" into "it's handled". If O is
+  settled by a plain `Decision → Review` edge, T loses its only named owner.
 - **Both self-flagged doubts were correct, and a third was worse.** The review
   confirmed probe 2 was the wrong bar and probe 3 was tautological — the two
   things this session said it was unsure about. It also found the thing not
   suspected: probe 3's shared `contentHash` made its premise incoherent.
-- **A pinned clock cannot evaluate row Z's next step.** Whether ordering derives
-  from `closed_at` or event stamps is untestable in this harness; trying it here
-  returns a false negative. Recorded in `024`.
-- **193/0 carries almost no information about these claims.** Probes 2–4 pass
-  *by construction* — that is the finding. The detector-injection table is what
-  carries the weight.
-- **Nothing has been implemented, and no rung of the change bar has been
-  climbed.** Three gaps are now demonstrated rather than argued; that earns
-  investigation, not structure. Rows P and F are the cautionary pair — P looked
-  like missing structure across two builds and was resolved in the query, F
-  looked like a missing edge and was answered by a refusal. Do not open with
-  `Actor`, a timestamp, or a lineage edge.
 - **A flaw in my own packet, found by the designers.** All three over-refused
   telemetry at Stage A and had to narrow it at Stage B. The freshly written
   boundary statement drew the W&B/MLflow line hard enough that three independent
@@ -476,45 +563,24 @@ worktrees make it easier to fall into.
 
 ## Next
 
-**The refactor is done** (`bc2db7b`, above); the measurements that justified it
-are kept here because they are the reasoning, not the outcome.
+1. **`recordObservations()` must produce an `EvidenceUnit`** — row AD, mandated
+   rather than chosen. Start at `src/domain/write.ts:201`. **Invert** S-9b's
+   seventh test rather than deleting it, and re-run its shape detectors after.
+   It touches every read that walks the unit — `whatIsKnown`, `whySupported`,
+   `reproductionOf` — so it is a real build, not a one-line fix.
+2. **Row O's discriminator**, with predictions recorded first the way row Z's
+   and row F's were: an analysis retired on the strength of a review, that
+   review later invalidated — does the retirement still read as resting on valid
+   grounds? Needs no event sink. If the propagation query comes back *correct*,
+   that is a result and O's cell can finally say why it stays unowned in terms
+   of something that was run.
+3. **Row S last**, and deliberately: write-side, inexpressible rather than
+   unreadable, the most likely to need a real noun.
 
-- **Size is less alarming than the number.** 28% comments — load-bearing in this
-  repo — and 6% blank, so **1,927 code lines across 62 members**, ~31 each.
-  Nothing is individually bloated; the file is long because it does many things.
-- **Read/write partitions perfectly.** 18 write verbs (845 lines) against 14 read
-  verbs (1,051 lines), **no member doing both**. `emit` has 18 callers and every
-  one is a write — the temporal seam is already an invariant, just an unenforced
-  one. The reads are the *bigger* half, and are exactly what the consumer
-  contract and rows Z/F/S concern.
-- **The shared core is exactly five helpers**: `withinScope`, `scopeFor`,
-  `workGatedBy`, `confirmatoryResultsBehind`, `decidedOnTheStrengthOf`. Every
-  other private helper is one-sided.
-- **dependency-cruiser cannot find the seam** — it sees `session.ts` as one node
-  (`N 1, Ca 1, Ce 5`). It can enforce one afterwards, which is the main argument
-  for bothering: an unenforced shared core becomes a junk drawer.
-- **Still deferred, on the user's call:** whether `whySupported` (208 lines) plus
-  `checksFrom` (151) — 19% of the code, straddling claims and criteria — is one
-  concern deserving its own module inside `read.ts`.
-- **The SVG-versus-mermaid choice is settled: both.** They serve different
-  readers. What remains open is only whether the SVG earns its 134KB now that a
-  diffable form exists — a narrower question, and one the rendered comparison
-  (published as an artifact) is there to answer.
-- **A test of the hook was invalid and nearly reported as a pass.** Staleness was
-  faked by appending a marker; regeneration removed the marker, restoring the
-  file to its committed content, so there was nothing to stage and the hook
-  correctly did nothing. The flaw was the test. Re-run with a change that
-  genuinely alters the graph — a staged `tests/` file adding a node — it
-  regenerated, staged, and the node appeared.
+Row F needs no new probe — it needs the adapter phase's reconstruction-provenance
+read to fail against real state, per `023`'s own sequencing.
 
-Then take the three gaps in cost order, one rung at a time:
-
-1. ~~**Row Z**~~ — **closed**, see above. `open` + unowned drops to F, O, S, T.
-2. **Row F — an existing relationship before a new one.** Can a reconstruction be
-   recorded as an act with a target using verbs that already exist? That is what
-   S-9 declined to invent and what Designer 2 independently required.
-3. **Row S — last, and deliberately.** The only one of the three that is
-   inexpressible rather than unreadable, so the most likely to need a real noun
-   and the most expensive to get wrong. Also write-side, which a read-only
-   contract could never validate: the requirement is real, the shape is not yet
-   earned.
+**Still waiting on a decision, not on work:** whether the SVG earns its 134KB now
+that a diffable form exists (the rendered comparison is published as an
+artifact); whether `whySupported` + `checksFrom` want their own module inside
+`read.ts`; `package-lock.json` still tracked on `main`.
