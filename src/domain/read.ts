@@ -62,23 +62,11 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * Sharpens a question into a more precise one, recording the act rather than
-   * editing the original.
+   * Where a question came from, if it came from sharpening an earlier one.
    *
-   * The original keeps its words. A vague hunch that later turns out to have
-   * been the right instinct is worth being able to read back in the form it
-   * was actually held, and rewriting it in place would make every programme
-   * look as though it had known its final question from the start — which is
-   * S-1's whole complaint.
-   *
-   * Sharpening is not answering and not closing: the original stays open
-   * unless something later resolves it on evidence.
-   *
-   * `knowing` freezes what the act was taken in light of. It is captured here,
-   * at the moment of sharpening, because the alternative — reconstructing it
-   * later from what stands *now* — back-dates every subsequent result onto the
-   * decision. S-1 asks this question after more evidence has arrived, for
-   * exactly that reason.
+   * `null` for a question somebody simply asked — most questions have no
+   * origin beyond the person who thought of it, and inventing one would be
+   * worse than saying so.
    */
   async originOf(question: QuestionRef): Promise<QuestionOrigin | null> {
     const rows = await this.graph.query(
@@ -108,15 +96,6 @@ export class ReadSurface extends SessionCore {
     };
   }
 
-  /**
-   * What the programme knows: settled, unsettled, and never looked at.
-   *
-   * Three states rather than two, classified structurally — established is a
-   * question resolved on cited evidence, untested is one nothing has ever been
-   * run against, unresolved is the rest. Nothing here compares a question's
-   * words to a claim's; the buckets come from what is attached to each
-   * question, not from what it says.
-   */
   /**
    * What the record held at a stated moment. Row Z.
    *
@@ -257,12 +236,7 @@ export class ReadSurface extends SessionCore {
     return survey;
   }
 
-  /**
-   * Records raw observations — the durable measurements an analysis later
-   * interprets. Kept distinct from the conclusions drawn from them, which is
-   * the entire premise of S-11: an inference can be wrong while the
-   * observations it consumed remain fine.
-   */
+  /** Is this enquiry open, and if not, how did it close? */
   async enquiryStatus(enquiry: EnquiryRef): Promise<EnquiryStatus> {
     const named = await this.graph.query(
       `MATCH (loe:LineOfEnquiry {natural_id: $id}) RETURN loe`,
@@ -416,11 +390,7 @@ export class ReadSurface extends SessionCore {
     );
   }
 
-  /**
-   * Restricts a claim traversal to one line of enquiry, when the caller named
-   * one. Empty when they did not — a sentence asserted in a single scope needs
-   * no qualifier, and every scenario before S-5 relies on that.
-   */
+  /** What a planned task is permitted to touch, and whether anyone is enforcing it. */
   async contractFor(work: WorkRef): Promise<TaskContract> {
     const rows = await this.graph.query(
       `MATCH (t:Task {natural_id: $id}) RETURN t`,
@@ -453,7 +423,18 @@ export class ReadSurface extends SessionCore {
     };
   }
 
-  /** States a condition that must hold. Stating it is not evaluating it. */
+  /**
+   * Which criterion governs this gate?
+   *
+   * The reviewer in S-17 asks for evidence that the guard fails when the
+   * protected artefact is wrong. That is a question about the criterion, and
+   * answering it requires knowing which criterion a gate enforces.
+   *
+   * Answered via `GOVERNS`, which exists from the moment the gate is
+   * declared. Before that edge, the only route ran through a
+   * CriterionEvaluation and so returned null for exactly the gates S-17 is
+   * about — see EDGE_SCHEMA.GOVERNS.
+   */
   async criteriaGoverning(gate: GateRef): Promise<CriterionRef[]> {
     const rows = await this.graph.query(
       `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
@@ -467,20 +448,12 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * Records that a historical result was re-checked, without claiming its run
-   * was reproduced (S-10).
+   * What a re-run did and did not establish (S-10).
    *
-   * `recordAnalysis` plus one edge, and the edge is the whole point: recorded
-   * as an ordinary analysis the re-run becomes a second finding behind the same
-   * claim, and the record then says a proposition established once rests on two
-   * independent results. See `EDGE_SCHEMA.REVERIFIES`.
-   *
-   * `under` is what the *new* run consumed. It is normally non-empty precisely
-   * because the historical run's inputs were never recorded — that asymmetry is
-   * the situation, not an error, and `reproductionOf()` reads it back as
-   * `unrecorded-in-the-original` rather than as a difference.
-   *
-   * One event, not two: a researcher who re-verified a result did one thing.
+   * The execution verdict is derived from what each run recorded consuming, not
+   * from a stored flag: two runs are a reproduction when they read the same
+   * recorded inputs. Structure in the query rather than in the stored model, so
+   * there is no value anyone can set to "reproduced".
    */
   async reproductionOf(verification: AnalysisRef): Promise<ReproductionReport> {
     const link = await this.graph.query(
@@ -591,27 +564,12 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * Records that a question is being left open on purpose (S-14).
+   * A locked design and everything that has happened to it, oldest first.
    *
-   * Not closing it. `closeEnquiry()` with nothing cited reports the question
-   * **abandoned** — nobody worked on it, no result behind it — which is a
-   * confident misreading of a deliberate decision as neglect, and was the only
-   * thing a researcher could do here before this verb existed.
-   *
-   * `until` is the condition that would reopen it, and it lands on the
-   * decision's `invalidation_check`, which already meant exactly that: what
-   * would make this decision wrong. The bullet it answers insists the condition
-   * be about the world — new design, new data — rather than "run the analysis
-   * again", and nothing here can enforce that; what the model guarantees is
-   * that a condition was named at all, which is the difference between deciding
-   * to stop and drifting to a halt.
-   *
-   * **No `Task` is created**, and none may be needed to make any of this
-   * answerable. A to-do item nobody intends to action, minted so a survey can
-   * report it, is the ceremony PJ-001 forbids and the failure mode §2 names.
-   *
-   * Writes `DEFERS`, which is its first writer since PJ-004 declared it —
-   * CLAUDE.md's standing example of a reader with no writer, now walked.
+   * The order comes from the supersession chain alone — no decision carries a
+   * timestamp, nothing is read from the event log, and natural-id allocation
+   * order is never consulted. What that does *not* order is two amendments to
+   * different designs; see PJ-008 row Z.
    */
   async designHistory(gate: GateRef): Promise<DesignHistory> {
     const conditions = await this.graph.query(
@@ -992,14 +950,14 @@ export class ReadSurface extends SessionCore {
   // -------------------------------------------------------------------------
 
   /**
-   * "Replace the analysis, mark the prior inference superseded, and propagate
-   * whatever claims change." One instruction in the conversation, so one verb
-   * here — it invalidates the old analysis's output, records the replacement
-   * against the same observations, and returns what moved.
+   * An interpretation and every narrowing behind it, oldest first.
    *
-   * The observations are deliberately untouched: only the artefact holding
-   * the old analysis's OUTPUT is invalidated. That separation is the whole
-   * point of S-11.
+   * The chain walks claim-to-claim through the decisions that made it: each
+   * revision `CHANGES` the reading it withdrew and `MOTIVATES` the one that
+   * replaced it. No timestamps, nothing from the event log, and — unlike
+   * `designHistory` — no `SUPERSEDES` edge, because with both halves of each
+   * step recorded the order is already implied and a supersession edge would
+   * be a writer with no reader.
    */
   async interpretationHistory(
     proposition: string,
@@ -1060,7 +1018,13 @@ export class ReadSurface extends SessionCore {
     };
   }
 
-  /** Whether the record has stopped asserting a proposition, and what replaced it. */
+  /**
+   * Whether two findings actually conflict.
+   *
+   * Answered from what each claim is attached to — the question it answers and
+   * the way its evidence bears — never from comparing the two sentences. In
+   * S-5 the sentences are identical and the answer is "no".
+   */
   async doTheseConflict(
     a: ConclusionRef,
     b: ConclusionRef,

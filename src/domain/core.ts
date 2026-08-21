@@ -65,7 +65,11 @@ export class SessionCore {
     return rows.find((r) => r.sc !== null || r.cc !== null)?.e.natural_id;
   }
 
-  /** Is this enquiry open, and if not, how did it close? */
+  /**
+   * Restricts a claim traversal to one line of enquiry, when the caller named
+   * one. Empty when they did not — a sentence asserted in a single scope needs
+   * no qualifier, and every scenario before S-5 relies on that.
+   */
 
   protected withinScope(scope: { enquiry?: string }): string {
     return scope.enquiry

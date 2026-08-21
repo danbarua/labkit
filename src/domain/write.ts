@@ -124,7 +124,25 @@ export class WriteSurface extends SessionCore {
     return enquiry;
   }
 
-  /** Every line of enquiry pursuing this question. */
+  /**
+   * Sharpens a question into a more precise one, recording the act rather than
+   * editing the original.
+   *
+   * The original keeps its words. A vague hunch that later turns out to have
+   * been the right instinct is worth being able to read back in the form it
+   * was actually held, and rewriting it in place would make every programme
+   * look as though it had known its final question from the start — which is
+   * S-1's whole complaint.
+   *
+   * Sharpening is not answering and not closing: the original stays open
+   * unless something later resolves it on evidence.
+   *
+   * `knowing` freezes what the act was taken in light of. It is captured here,
+   * at the moment of sharpening, because the alternative — reconstructing it
+   * later from what stands *now* — back-dates every subsequent result onto the
+   * decision. S-1 asks this question after more evidence has arrived, for
+   * exactly that reason.
+   */
   async sharpen(input: {
     from: QuestionRef;
     into: string;
@@ -175,11 +193,10 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * Where a question came from, if it came from sharpening an earlier one.
-   *
-   * `null` for a question somebody simply asked — most questions have no
-   * origin beyond the person who thought of it, and inventing one would be
-   * worse than saying so.
+   * Records raw observations — the durable measurements an analysis later
+   * interprets. Kept distinct from the conclusions drawn from them, which is
+   * the entire premise of S-11: an inference can be wrong while the
+   * observations it consumed remain fine.
    */
   async recordObservations(input: {
     enquiry: EnquiryRef;
@@ -464,7 +481,6 @@ export class WriteSurface extends SessionCore {
     });
   }
 
-  /** The single finding by which an analysis concluded something about one proposition. */
   private async questionBehind(
     enquiry: EnquiryRef,
   ): Promise<string | undefined> {
@@ -506,7 +522,7 @@ export class WriteSurface extends SessionCore {
     return { kind: "work", id: task.natural_id };
   }
 
-  /** What a planned task is permitted to touch, and whether anyone is enforcing it. */
+  /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: string): Promise<CriterionRef> {
     const criterion = await this.graph.createNode("Criterion", { proposition });
     this.emit("stateCriterion", criterion.natural_id, { proposition });
@@ -628,16 +644,20 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * Which criterion governs this gate?
+   * Records that a historical result was re-checked, without claiming its run
+   * was reproduced (S-10).
    *
-   * The reviewer in S-17 asks for evidence that the guard fails when the
-   * protected artefact is wrong. That is a question about the criterion, and
-   * answering it requires knowing which criterion a gate enforces.
+   * `recordAnalysis` plus one edge, and the edge is the whole point: recorded
+   * as an ordinary analysis the re-run becomes a second finding behind the same
+   * claim, and the record then says a proposition established once rests on two
+   * independent results. See `EDGE_SCHEMA.REVERIFIES`.
    *
-   * Answered via `GOVERNS`, which exists from the moment the gate is
-   * declared. Before that edge, the only route ran through a
-   * CriterionEvaluation and so returned null for exactly the gates S-17 is
-   * about — see EDGE_SCHEMA.GOVERNS.
+   * `under` is what the *new* run consumed. It is normally non-empty precisely
+   * because the historical run's inputs were never recorded — that asymmetry is
+   * the situation, not an error, and `reproductionOf()` reads it back as
+   * `unrecorded-in-the-original` rather than as a difference.
+   *
+   * One event, not two: a researcher who re-verified a result did one thing.
    */
   async reverify(input: {
     historical: AnalysisRef;
@@ -686,12 +706,27 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * What a re-run did and did not establish (S-10).
+   * Records that a question is being left open on purpose (S-14).
    *
-   * The execution verdict is derived from what each run recorded consuming, not
-   * from a stored flag: two runs are a reproduction when they read the same
-   * recorded inputs. Structure in the query rather than in the stored model, so
-   * there is no value anyone can set to "reproduced".
+   * Not closing it. `closeEnquiry()` with nothing cited reports the question
+   * **abandoned** — nobody worked on it, no result behind it — which is a
+   * confident misreading of a deliberate decision as neglect, and was the only
+   * thing a researcher could do here before this verb existed.
+   *
+   * `until` is the condition that would reopen it, and it lands on the
+   * decision's `invalidation_check`, which already meant exactly that: what
+   * would make this decision wrong. The bullet it answers insists the condition
+   * be about the world — new design, new data — rather than "run the analysis
+   * again", and nothing here can enforce that; what the model guarantees is
+   * that a condition was named at all, which is the difference between deciding
+   * to stop and drifting to a halt.
+   *
+   * **No `Task` is created**, and none may be needed to make any of this
+   * answerable. A to-do item nobody intends to action, minted so a survey can
+   * report it, is the ceremony PJ-001 forbids and the failure mode §2 names.
+   *
+   * Writes `DEFERS`, which is its first writer since PJ-004 declared it —
+   * CLAUDE.md's standing example of a reader with no writer, now walked.
    */
   async acceptAsUnresolved(input: {
     enquiry: EnquiryRef;
@@ -930,14 +965,6 @@ export class WriteSurface extends SessionCore {
     };
   }
 
-  /**
-   * A locked design and everything that has happened to it, oldest first.
-   *
-   * The order comes from the supersession chain alone — no decision carries a
-   * timestamp, nothing is read from the event log, and natural-id allocation
-   * order is never consulted. What that does *not* order is two amendments to
-   * different designs; see PJ-008 row Z.
-   */
   private async gatesGovernedBy(criterionId: string): Promise<string[]> {
     const rows = await this.graph.query(
       `MATCH (:Criterion {natural_id: $id})-[:GOVERNS]->(g:Gate) RETURN g`,
@@ -973,7 +1000,16 @@ export class WriteSurface extends SessionCore {
     return undefined;
   }
 
-  /** Work these gates protect, and which therefore has to be run again when their condition changes. */
+  /**
+   * "Replace the analysis, mark the prior inference superseded, and propagate
+   * whatever claims change." One instruction in the conversation, so one verb
+   * here — it invalidates the old analysis's output, records the replacement
+   * against the same observations, and returns what moved.
+   *
+   * The observations are deliberately untouched: only the artefact holding
+   * the old analysis's OUTPUT is invalidated. That separation is the whole
+   * point of S-11.
+   */
   async replaceAnalysis(input: {
     supersedes: AnalysisRef;
     because: ReviewRef;
@@ -1178,16 +1214,6 @@ export class WriteSurface extends SessionCore {
     };
   }
 
-  /**
-   * An interpretation and every narrowing behind it, oldest first.
-   *
-   * The chain walks claim-to-claim through the decisions that made it: each
-   * revision `CHANGES` the reading it withdrew and `MOTIVATES` the one that
-   * replaced it. No timestamps, nothing from the event log, and — unlike
-   * `designHistory` — no `SUPERSEDES` edge, because with both halves of each
-   * step recorded the order is already implied and a supersession edge would
-   * be a writer with no reader.
-   */
   private emit(
     operation: string,
     subject: string,
