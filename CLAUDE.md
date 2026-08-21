@@ -37,8 +37,14 @@ and gave none, and the ledger records *that* as the verdict. Row K has since
 been settled outright by S-18 (023), which the same §4 condition had nominated
 and which three reviews walked past. **024 is a third external review**, of the
 completed arc: it verifies the corpus-exhaustion claim against §3's ownership
-table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
-zero migrations, fifteen scenarios). **025 through 028 are about the method
+table and records the arc totals **as they stood when it was written** — node
+labels 13 → 13, edge labels 19 → 24, zero migrations, fifteen scenarios. Read
+that as a dated measurement, not as current state: `024` is a review and its
+figures are frozen at its own date. Edge labels have since reached 25. **The
+live counts are `NODE_LABELS.length` and `EDGE_LABELS.length` in
+`src/db/domain.ts` and nowhere else** — this sentence said 24 for a while, which
+made it the eighth instance of `028`'s numeral pattern, in the paragraph
+introducing `028`. **025 through 028 are about the method
 rather than the model** — 025 on why a condition recorded where nobody re-reads
 it is not a mechanism (rows K, Z and P all fired unread); 026 on the one failure
 mode the predictions protocol cannot see from inside itself, that a predictions
