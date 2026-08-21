@@ -37,7 +37,7 @@ hook it flagged on the way out.
   (`bun test | tail` keeps the counts and discards every `(fail)` line, so a
   failing run cannot be diagnosed at all). It also claimed a run's test count
   was an **exact flake detector**, which was wrong; see the next commit.
-- `<this commit>` — **that detector is refuted and the claim withdrawn.**
+- `7afd9db` — **that detector is refuted and the claim withdrawn.**
   `labkit-minion` caught a natural flake within the hour: five tests lost to
   bun's ceiling, and the run reported the *normal* count. The derivation is
   right and one-directional — a count above it means a double report — but the
