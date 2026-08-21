@@ -1,4 +1,4 @@
-# 007: merging the sweep, a hook that answered about the wrong tree, and a detector that wasn't
+# 007: the sweep merged, a hook that answered about the wrong tree, and the flake's cascade fixed
 
 **Session wrap, 2026-08-21, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/028_a_test_that_does_not_test.md` for the reasoning
@@ -13,8 +13,14 @@ Entry `005` was closed at `d3f765b`, which is this entry's baseline.
 
 ## Goal
 
-Take `labkit-minion`'s finished sweep work onto this branch, and fix the wrap
-hook it flagged on the way out.
+Take `labkit-minion`'s finished sweep work onto this branch and fix the wrap
+hook it flagged; then, on Dan's instruction, hand the sweep's unverified
+findings to `labkit-minion` and pick up the suite flake.
+
+**This entry should have been closed between those two.** They are different
+goals and `close-entry.sh` exists for exactly that; it was not run, so the
+flake work landed here rather than in `008`. Recorded rather than tidied away —
+it is entry `004`'s failure at a much smaller scale.
 
 ## Changed
 
@@ -55,6 +61,17 @@ hook it flagged on the way out.
   paragraphs above it in the same file. A fifth instance, in the file
   documenting the defect, found by reading the other side of the operation.
 
+### The suite flake — the cascade, fixed
+
+- `d8f2515` — merged `origin/feat/minion`; branches level.
+- `2de1060` — **a timed-out test can no longer take the next one with it.**
+  bun's 5000ms ceiling does not cancel the test body, so an overrunning test's
+  late `scenario.end()` closed whatever a single mutable `db` pointed at — by
+  then, the *live* test's connection. Now FIFO connection ownership plus a
+  reset that only fires when nothing is outstanding.
+- `a94e668` — `docs/TASKS.md`, where **the version that failed is the useful
+  half**.
+
 Working tree clean apart from this entry.
 
 ## Verified
@@ -86,7 +103,18 @@ Working tree clean apart from this entry.
 - The hook fix was verified **from the tree that produced the bug**, by
   `labkit-minion` rather than by me: from its worktree, `--show-toplevel` names
   its own checkout, the state file it now reads carries its baseline and its
-  `entry=`, and that file exists there. All three were wrong before.
+  `entry=`, and that file exists there. All three were wrong before. **It also
+  found what I missed**: `close-entry.sh` and `collect.sh` carry the identical
+  line and I changed only `wrap-hook.sh`, then wrote the commit message as
+  though I had fixed the skill. Its `4d6b767`.
+- **After the flake fix: 264 pass / 0 fail in 92s**, the fastest run of the
+  session. typecheck clean, depcruise 0 violations, all four `check:*` green.
+- **The cascade fix is demonstrated deterministically, not statistically.** A
+  scratch file with a real six-second overrun reproduces it 100% in 7.5s:
+  before, the second test died with `Client was closed and is not queryable`
+  plus an unhandled `Connection terminated` (0 pass / 2 fail / 1 error); after,
+  it passes. `tests/scenario-harness.test.ts` pins the same ordering in
+  milliseconds without a sleep, and is injection-verified both ways.
 
 ## Open
 
@@ -126,11 +154,33 @@ the defect named and in front of them, which is what rules out "be more
 careful" as the remedy. Read that section before deciding this repo's checkers
 are over-engineered.
 
-**The sweep's inferred pile remains unverified**, and `006`'s Next names the
-right way in: demonstrate one verb (`sharpen` or `closeEnquiry`) against
-`write.ts`'s "every compound verb runs in `inTransaction()`", rather than
-sweeping. The list is a lead sheet, not an inventory — six readers looking for
-one shape find that shape and are silent about every other.
+**The suite flake is not fixed — only its amplification is.** Tests still cross
+bun's ceiling and still fail. The baseline flakes too (244 pass / 17 fail in one
+paired run), and two runs per arm cannot separate two things that both flake, so
+no claim is made that the suite is green.
+
+**The falsifiable prediction, recorded before the next flake rather than after:**
+a ceiling crossing should now produce roughly **one** failure, not a burst. That
+baseline run's 17 failures were spread across **nine** test groups; a post-fix
+failing run spread across nine groups refutes it outright. Record the count
+*and* the spread.
+
+**My first fix was wrong, and round 1 of the paired run would have shipped it.**
+Moving `reset()` into `begin()` gave BASE 261/0 and the fix 261/0, marginally
+faster. Round 2 gave the fix **245 pass / 18 fail in 386s at the lowest load of
+the four runs**. It had a mechanism: twenty-three of the twenty-nine files call
+`end()` from `afterEach`, which bun runs *outside* the per-test timeout, so the
+change put a graph drop and a truncate *inside* every test's 5000ms budget —
+trading the cascade for more crossings, which is what causes the cascade. Full
+table in `docs/TASKS.md`.
+
+**The sweep's inferred pile is `labkit-minion`'s**, handed over on Dan's
+instruction because it read those files and holds the context. One item is
+closed and came back **not a defect** — `sharpen` needs no transaction, because
+`originOf()` is the only reader of `NARROWS` and matches `MOTIVATES` first,
+which `sharpen` writes last. *The order of the writes was doing a transaction's
+work and nobody had written that down.* Base rate so far: one examined, one not
+a defect.
 
 **Ledger:** **AF** is the only `open` row, unowned, and its own cell says it
 earns nothing under §5.
@@ -147,5 +197,16 @@ with `bun test tests/scenarios/` and a single verb, not a sweep.
 Run the suite as `bun test > run.log 2>&1` — never through `tail`, which keeps
 the counts and discards every `(fail)` line. Judge it by `0 fail`. If a run
 flakes, the thing to compare is a second run of the **same tree**: wall clock
-and the `expect()` total both separated a flaking run from a clean one where
-the test count did not, and comparing two runs needs no constant.
+and the `expect()` total both separated a flaking run from a clean one where the
+test count did not, and comparing two runs needs no constant.
+
+**If a flake appears, record the failure count and how many test groups it
+spans** — that is what tests the prediction above, and it costs nothing beyond
+keeping the log.
+
+The remaining half of the flake is the ceiling crossings themselves, and the
+target the earlier investigation named still stands: `provisionTenantGraph()`
+runs on every `begin()` *and* every `current()`. It got 69% cheaper in `6eeeb92`
+and was never measured against the failure rate. Measure it **paired and
+interleaved**, on one tree in one session — this session produced two
+counter-examples to any other method.
