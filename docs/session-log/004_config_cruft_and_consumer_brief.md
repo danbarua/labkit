@@ -1,5 +1,4 @@
-# 004: config cruft cleared, the consumer-contract probe run, session.ts split,
-# the dependency graph made self-maintaining
+# 004: config cruft cleared, the consumer probe run, session.ts split, and row Z closed
 
 **Session wrap, 2026-08-20, on `feat/domain-consumer`.** Not a decision record —
 see `docs/project-journal/023_capture_cheaply_promote_before_citing.md` for why
@@ -15,7 +14,7 @@ on the external review of that brief.
 
 ## Changed
 
-Thirty-nine commits, range clean apart from `8299ecb` and `3b769c0` (dependency
+Forty-four commits, range clean apart from `8299ecb` and `3b769c0` (dependency
 graph regenerations, committed by the user) — no other session's work in it.
 
 ```
@@ -510,12 +509,7 @@ are kept here because they are the reasoning, not the outcome.
 
 Then take the three gaps in cost order, one rung at a time:
 
-1. **Row Z — narrowed, and the next rung is now specific.** Probe 5 established
-   that evaluations carry a durable instant and decisions carry none. `closed_at`
-   exists only on *closed* decisions and is guarded by a biconditional, so it
-   cannot order two open ones. The question is therefore whether belief-ordering
-   can be derived from `evaluated_at` plus edges alone, or whether `Decision`
-   needs an instant — a far smaller question than `024` originally posed.
+1. ~~**Row Z**~~ — **closed**, see above. `open` + unowned drops to F, O, S, T.
 2. **Row F — an existing relationship before a new one.** Can a reconstruction be
    recorded as an act with a target using verbs that already exist? That is what
    S-9 declined to invent and what Designer 2 independently required.
