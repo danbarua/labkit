@@ -555,6 +555,42 @@ export class WriteSurface extends SessionCore {
         `enquiry ${input.enquiry.id} has no motivating question to resolve`,
       );
 
+    // **Closing a closed question is refused, not recorded.** A second close
+    // writes a second `RESOLVES`, and `enquiryStatus()` picks between them with
+    // `.find()` over rows AGE returns in no defined order — so which close a
+    // reader sees is arbitrary. Demonstrated through the public API with no
+    // interruption at all: abandon an enquiry, later find a result and close it
+    // citing the evidence, and the record still reports `abandoned`,
+    // `answer: null`, `evidence: []`. The answer is erased, and `abandoned` is a
+    // positive classification, so PJ-011 §5 does not excuse it.
+    //
+    // This is a *different route* to the wrong answer `043` found by
+    // interruption, and it survives that fix untouched, because nothing here
+    // fails halfway. Two clean calls are enough.
+    //
+    // **Refused rather than resolved in the reader**, and the choice is not
+    // arbitrary: `closeEnquiry` is the only writer of `RESOLVES`, so with this
+    // guard two resolving decisions cannot exist, and a reader-side tie-break
+    // would be a branch nothing can reach — the `DEFERS` shape PJ-011 §6
+    // describes, where an unreachable branch was not merely dead but wrong.
+    //
+    // The refusal has something real to refuse (S-5, S-10): a caller closing a
+    // question that is already closed. Re-opening a settled question on new
+    // evidence is a *different research act* and has no verb; when a scenario
+    // needs one it gets built, rather than being smuggled in as a second close.
+    const alreadyResolved = await this.graph.query(
+      `MATCH (d:Decision)-[:RESOLVES]->(:Question {natural_id: $id}) RETURN d`,
+      { d: vertexProps<{ natural_id: string; reason: string }>() },
+      { id: question },
+    );
+    if (alreadyResolved.length > 0) {
+      throw new Error(
+        `enquiry ${input.enquiry.id} is already closed by decision ` +
+          `${alreadyResolved[0]!.d.natural_id} (${alreadyResolved[0]!.d.reason}); ` +
+          `closing it again would leave two decisions resolving one question`,
+      );
+    }
+
     let answerBearing: string | undefined;
     if (input.answeredBy) {
       const { analysis, proposition } = input.answeredBy;

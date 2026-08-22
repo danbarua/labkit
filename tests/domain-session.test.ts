@@ -502,3 +502,78 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
   expect(after.checks[0]?.evaluations[0]?.withdrawn).toBe(true);
   expect(after.state).not.toBe("blocked");
 });
+
+/**
+ * Closing a closed question is refused.
+ *
+ * A second `closeEnquiry` writes a second `RESOLVES`, and `enquiryStatus()`
+ * picks between them with `.find()` over rows AGE returns in no defined order.
+ * Which close a reader sees is then arbitrary — and this is reachable through
+ * the public API with **no interruption**, so it survives the transaction that
+ * `docs/consumer-contract/043` added for the interrupted-then-retried route.
+ *
+ * The wrong answer, demonstrated before the guard existed: abandon an enquiry,
+ * later find a result and close it citing the evidence, and the record still
+ * reports `closure: "abandoned"`, `answer: null`, `evidence: []`. The answer is
+ * erased. `abandoned` is a positive classification, not an empty result, so
+ * PJ-011 §5 does not excuse it.
+ */
+test("an enquiry cannot be closed twice, and the refusal names the existing close", async () => {
+  const s = session;
+
+  const enquiry = await s.openEnquiry("does pruning move convergence?");
+  const observations = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
+  const analysis = await s.recordAnalysis({
+    enquiry, method: "paired comparison", from: [observations],
+    concludes: [{ proposition: "pruning moves convergence", finding: "no effect", bearing: "challenges" }],
+  });
+
+  await s.closeEnquiry({ enquiry });
+  expect((await s.enquiryStatus(enquiry)).closure).toBe("abandoned");
+
+  await expect(
+    s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: "pruning moves convergence" } }),
+  ).rejects.toThrow(/already closed by decision DEC_\d+/);
+
+  // And the record is unchanged rather than half-updated: one close, the one
+  // that happened.
+  const after = await s.enquiryStatus(enquiry);
+  expect(after.closure).toBe("abandoned");
+  expect(after.answer).toBeNull();
+});
+
+/**
+ * The guard keys on `RESOLVES`, and that is load-bearing rather than incidental.
+ *
+ * `acceptAsUnresolved()` writes `DEFERS`, not `RESOLVES` — a question left open
+ * on purpose, with the condition that would reopen it recorded (S-14). If the
+ * "already closed" test treated that as closed, a question deliberately left
+ * open could **never afterwards be closed on evidence**, which is the one case
+ * S-14 exists to keep available. Asserted rather than argued from reading the
+ * query, because `labkit-minion` asked and reading is not evidence.
+ */
+test("a question accepted as unresolved can still be closed when evidence arrives", async () => {
+  const s = session;
+  const enquiry = await s.openEnquiry("does depth move convergence?");
+  const observations = await s.recordObservations({ enquiry, name: "sweep", finding: "runs" });
+  const analysis = await s.recordAnalysis({
+    enquiry, method: "paired comparison", from: [observations],
+    concludes: [{ proposition: "depth moves convergence", finding: "moves by ~2 steps" }],
+  });
+
+  await s.acceptAsUnresolved({
+    enquiry,
+    because: "the confirmatory set is spent",
+    until: "a data source other than the spent set",
+    inLightOf: { analysis, proposition: "depth moves convergence" },
+  });
+  const accepted = await s.enquiryStatus(enquiry);
+  expect(accepted.closure).toBe("accepted-as-unresolved");
+  expect(accepted.open).toBe(true);
+
+  // Evidence arrives. This must be allowed -- DEFERS is not RESOLVES.
+  await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: "depth moves convergence" } });
+  const closed = await s.enquiryStatus(enquiry);
+  expect(closed.closure).toBe("answered");
+  expect(closed.answer).toBe("yes");
+});
