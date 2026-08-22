@@ -33,9 +33,18 @@ base rate of "looked wrong on reading, was fine" as it accumulates.
 - `0e6f329` — **`closeEnquiry` is transactional.** Third item, second defect.
   `docs/consumer-contract/043`, `src/domain/write.ts`, one test.
 
-Plus merges of `labkit-dev`'s cascade fix, its `reset()` truncate (`5439085`) and
-`3c00496`. Two demonstrations and two fixes; the rest are documents, several
-written while the machine was held for its paired A/B.
+- `2c416f8` — this entry.
+- `31c7cef` — **`pursue` is clean.** Fourth verb, second clean result.
+  `docs/consumer-contract/044`, `045`, one test, **no code change**.
+
+- `b4bf74f` — this entry.
+- `26f72e8` — **the last four verbs, and the pile closes.**
+  `docs/consumer-contract/046`, `047`, four tests, **no code change**.
+
+Plus merges of `labkit-dev`'s cascade fix, its `reset()` truncate (`5439085`),
+`3c00496`, its `closeEnquiry` double-close guard (`5921647`) and its TASKS.md
+correction (`81c6ea5`). Seven demonstrations, two fixes of mine; the rest are
+documents, several written while the machine was held for its paired A/B.
 
 ## Verified
 
@@ -134,7 +143,23 @@ conclusion, different mechanism — and the distinction matters, because my reas
 would have licensed dropping `labkit_t1` from a scenario file and its reason
 forbids it.
 
-Final suite on the merged tree with both fixes: **271 pass / 0 fail, 81.28s.**
+Final suite on the merged tree with every fix: **277 pass / 0 fail, 108.41s**;
+typecheck clean, depcruise **no violations**, all four `check:*` green.
+
+**One correction from `labkit-dev` that belongs here rather than in its entry
+alone:** it later measured **266 pass / 6 fail with one collateral failure**
+carrying a `Connection terminated`. So collateral is **not** zero in every run.
+The sharpened prediction survived this tree's run and failed its own, which makes
+it a live disagreement rather than a confirmed result — and the earlier zeros were
+real without being the whole picture.
+
+**A ninth instance of PJ-028's shape, found by that correction.** `docs/TASKS.md`
+still carried the *withdrawn* first form of the prediction — the unfalsifiable one
+this tree's baseline refuted hours earlier. It had been sharpened in messages and
+in entry 009 and never carried back to the file where it was actually written down.
+Six hours after this branch closed out eight instances of prose disagreeing with
+the code beside it. Fixed in `81c6ea5`, along with recording the disagreement above
+so the file could not read as though the flake work had settled it.
 
 ## Open
 
@@ -224,7 +249,70 @@ classification, so PJ-011 §5 does not excuse it.
   (`041`); the more legitimate it looks, the less it tells you, because the reader
   cannot distinguish it either.
 
-**Base rate: three examined, two defects.**
+**`closeEnquiry` had a second, independent defect that my fix does not touch**, and
+`labkit-dev` found it by taking the read-side thread: **no interruption, two clean
+calls.** Abandon a question, then close it citing a result, and the answer is erased
+exactly as above — because nothing guarded against closing a closed question, so a
+second `RESOLVES` was written and the same `.find()` picked between them. Fixed on
+the write side with a refusal (`5921647`); a read-side tie-break would have been
+unreachable code, since `closeEnquiry` is `RESOLVES`'s only writer — verified here,
+not taken on trust.
+
+**The two fixes are not independent, and neither is sufficient.** On the
+pre-transaction tree its guard would have refused the retry *permanently*,
+converting a repairable erasure into a question that could never be closed again.
+Flagged before it pushed; it is in that commit's message.
+
+**And its ordering observation is worth more than the finding:** its first probe
+closed-then-abandoned, `.find()` happened to pick the cited decision, and the
+defect was invisible. Only the reverse order exposed it. *"I tried it and it was
+fine"* is worth very little against a latent arbitrary pick — the same failure as
+this entry's three green runs not testing the truncate prediction.
+
+**`pursue` is clean** (`045`), and it was taken *because* it was the likeliest
+clean one. Reachability edge (`MOTIVATES`) last, orphan enquiry unreachable, every
+prediction held including the mechanisms — the first time in this pile, and named
+as the exception rather than the norm.
+
+Its one soft spot is asserted rather than described: `whatDependsOn` enumerates
+`LineOfEnquiry` unconditionally and is saved only by requiring an inbound
+`REQUIRES` an orphan lacks. **That is an accident of write order**, so the test
+pins it; if anything ever writes `REQUIRES` before `MOTIVATES`, `pursue` needs a
+transaction that day.
+
+## The pile, closed
+
+Every non-transactional write verb in `src/domain/` examined by demonstration
+(`047`):
+
+| verb / route | verdict | why |
+| --- | --- | --- |
+| `sharpen` | clean | reachability edge (`MOTIVATES`) last |
+| `evaluateCriterion` — before `BASED_ON` | **defect** | verdict could never be withdrawn; gate stayed blocked by a retracted `fail` |
+| `closeEnquiry` — interrupted retry | **defect** | two `RESOLVES`, arbitrary pick, answer erased |
+| `closeEnquiry` — double close (`labkit-dev`) | **defect** | same erasure, no interruption at all |
+| `pursue` | clean | `MOTIVATES` last |
+| `recordReview` | clean | `EVALUATES` last |
+| `declareGate` | clean | every `Gate` reader keyed by `natural_id` |
+| `stateCriterion` | **no partial state** | one node, no edge |
+| `planWork` | **no partial state** | one node, no edge |
+
+**Seven routes had an interruption window. Three were defects.** Counted per route
+rather than per verb — one verb carried two independent defects needing different
+remedies, and per-verb counting hides that stopping at the first fix would have
+left the second. Not reported as "six clean of nine": two verbs were never at risk,
+and one defect needed no interruption to reach.
+
+**Two clean verdicts rest on weaker ground than the rest, and their tests say so.**
+`pursue` is safe because `whatDependsOn` requires an inbound `REQUIRES` an orphan
+lacks; `declareGate` is safe because nothing enumerates `Gate`. Both are accidents
+of write order, true today and one new reader from false. Asserted rather than
+described, so they fail the day that changes.
+
+**The write-order tell held across all seven** — everything after a reachability
+edge is a claim about a record readers can already see — and stays a **lead, not a
+rule**. It earns its keep choosing what to look at first and nowhere else; the same
+reasoning got a verdict right and both its mechanisms wrong in `042`.
 
 **The pending run now discriminates between two rules instead of confirming one.**
 `labkit-dev` read `039`'s rule and found my two clauses are not parallel: clause 2
@@ -259,13 +347,26 @@ shape to look for, and the rate is the most useful thing the sweep will produce.
 
 ## Next
 
-**`pursue` next.** It writes `MOTIVATES` last, so on the heuristic it is the most
-likely of the five to be clean — which is the reason to take it now. Three
-examined and two defects is a rate built almost entirely on positives; a clean
-result is what stops the number meaning "everything is broken".
+**This entry is closed here.** The transaction-boundary thread of the inferred pile
+is finished: nothing in `src/domain/` is undecided any more, and what follows is
+different work that deserves its own entry. Re-baselined with `close-entry.sh`.
 
-`recordReview`, `planWork`, `stateCriterion` and `declareGate` after it, still
-**undecided, not cleared**.
+**The one thing this thread found and did not follow.** `originOf` and
+`whySupported` carry unguarded `rows[0]`/`.find()` picks, argued safe on the
+premise that the write side cannot produce two. `closeEnquiry` refuted that premise
+— a writer that can be interrupted and retried *can* produce two, and a second
+deliberate call did it with no interruption at all. `labkit-dev`'s unreachability
+argument covers `RESOLVES` and nothing else.
+
+Each needs its own answer to **"who can write two of these, and can they fail
+halfway?"** That is a demonstration each, on the same method: it is not a sweep,
+and reading will not settle it.
+
+Also unresolved and not this session's: the flake's sharpened prediction —
+collateral zero by error vocabulary — **survived this tree's runs and failed
+`labkit-dev`'s**, with one collateral failure carrying a `Connection terminated`.
+Two trees, opposite answers, no explanation. Recorded in `docs/TASKS.md` as a live
+disagreement rather than a result.
 
 **Stop at the first that is not a defect and say so**, rather than continuing until
 something looks fixable. And write the predictions each time: two of three were

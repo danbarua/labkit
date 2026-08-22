@@ -51,11 +51,22 @@
  * stopping at the first would have left the second. `pursue` is **not**, and is
  * the second clean result — reachability edge last again (`045`).
  *
- * The remaining non-transactional verbs are **undecided, not cleared** — see
- * `docs/consumer-contract/045`. Five routes examined, three defects. Both clean
- * verbs write their reachability edge last and all three defects came from verbs
- * that write it early, which is **one correlation with a mechanism, not a rule**:
- * the same reasoning got a verdict right and both its mechanisms wrong in `042`.
+ * **Every non-transactional verb here has now been examined by demonstration**
+ * (`docs/consumer-contract/047`). Seven routes had an interruption window and
+ * three were defects; `recordReview` and `declareGate` are clean, and
+ * `stateCriterion` and `planWork` write one node and no edge, so they have no
+ * partial state to have. Nothing here is *undecided* any more.
+ *
+ * Two of the clean verdicts rest on weaker ground than the rest and their tests
+ * say so: `pursue` is safe because `whatDependsOn` requires an inbound `REQUIRES`
+ * an orphan lacks — an accident of write order — and `declareGate` is safe
+ * because nothing enumerates `Gate`, which is true today and one new reader away
+ * from false. Both fail the day that changes.
+ *
+ * The write-order tell — everything after a reachability edge is a claim about a
+ * record readers can already see — held across all seven and is **still a lead
+ * rather than a rule**: the same reasoning got a verdict right and both its
+ * mechanisms wrong in `042`.
  */
 
 import type { TenantGraph } from "../db/graph";

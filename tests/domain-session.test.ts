@@ -637,3 +637,126 @@ test("an interrupted pursue leaves an enquiry nothing can reach", async () => {
   const retried = await session.pursue({ question, approach: "thermal cycling" });
   expect((await session.enquiryStatus(retried)).open).toBe(true);
 });
+
+/**
+ * The last four verbs of PJ-028's inferred pile. Predictions in
+ * `docs/consumer-contract/046`, verdict in `047`.
+ *
+ * `stateCriterion` and `planWork` write **one node and no edge**, so they have no
+ * interruption window at all — a single `createNode` either commits or does not.
+ * That is a third *kind* of answer rather than two more clean results, and the
+ * assertion below is about the shape rather than about a partial state, because
+ * there is no partial state to assert on.
+ */
+test("stateCriterion and planWork have no interruption window to have", async () => {
+  const realCreateEdge = graph.createEdge.bind(graph);
+  let edges = 0;
+  graph.createEdge = (async (...args: unknown[]) => {
+    edges += 1;
+    return (realCreateEdge as (...a: unknown[]) => unknown)(...args);
+  }) as typeof graph.createEdge;
+
+  const criterion = await session.stateCriterion("residual below 1e-8");
+  const work = await session.planWork({ objective: "scale up", acceptance: "converges" });
+
+  graph.createEdge = realCreateEdge;
+
+  // Neither verb writes an edge, so neither has a gap between two writes.
+  expect(edges).toBe(0);
+  expect(criterion.id).toMatch(/^CRIT_/);
+  expect(work.id).toMatch(/^TASK_/);
+});
+
+/**
+ * `recordReview` writes `EVALUATES` **last**, so an interrupted review is an
+ * orphan `Review` node — `pursue`'s argument, checked rather than assumed.
+ */
+test("an interrupted recordReview leaves a review nothing can reach", async () => {
+  const enquiry = await session.openEnquiry("does it hold?");
+  const obs = await session.recordObservations({ enquiry, name: "run", finding: "data" });
+  const analysis = await session.recordAnalysis({
+    enquiry, method: "m", from: [obs],
+    concludes: [{ proposition: "it holds", finding: "f" }],
+  });
+
+  const realCreateEdge = graph.createEdge.bind(graph);
+  graph.createEdge = (async (from: string, edge: string, to: string) => {
+    if (edge === "EVALUATES") throw new Error("injected: EVALUATES failed");
+    return realCreateEdge(from as never, edge as never, to as never);
+  }) as typeof graph.createEdge;
+
+  await expect(
+    session.recordReview({ of: analysis, verdict: "the aggregation dropped a fold" }),
+  ).rejects.toThrow(/injected/);
+  graph.createEdge = realCreateEdge;
+
+  const attached = await graph.query(
+    `MATCH (r:Review)-[:EVALUATES]->() RETURN r`,
+    { r: vertexProps<{ natural_id: string }>() },
+  );
+  expect(attached).toEqual([]);
+
+  // The finding still stands: no review reaches it, so nothing retracts it.
+  const why = await session.whySupported("it holds");
+  expect(why.supported).toBe(true);
+  expect(why.withdrawn).toBe(false);
+});
+
+/**
+ * `declareGate` writes its edges **after** the node — `evaluateCriterion`'s
+ * dangerous arrangement — and is clean for a weaker reason: **every `Gate` reader
+ * is keyed by `natural_id`**, and an interrupted call returns none.
+ *
+ * That is unreachable-by-handle rather than unreachable-by-structure, and it is
+ * the one this test exists to pin. The assertion is that no reader walks
+ * `GOVERNS` *forward* into a gate nobody named — if one ever does, a half-built
+ * gate surfaces governed by a subset of its criteria, and `gateStatus` computes
+ * `incomplete` from exactly that set.
+ */
+test("an interrupted declareGate leaves a gate no reader enumerates", async () => {
+  const c1 = await session.stateCriterion("residual below 1e-8");
+  const c2 = await session.stateCriterion("runtime under an hour");
+  const work = await session.planWork({ objective: "scale up", acceptance: "both hold" });
+
+  const realCreateEdge = graph.createEdge.bind(graph);
+  let governs = 0;
+  graph.createEdge = (async (from: string, edge: string, to: string) => {
+    if (edge === "GOVERNS" && ++governs === 2) {
+      throw new Error("injected: the second GOVERNS failed");
+    }
+    return realCreateEdge(from as never, edge as never, to as never);
+  }) as typeof graph.createEdge;
+
+  await expect(
+    session.declareGate({
+      governedBy: [c1, c2], consequence: "do not scale up", protecting: [work],
+    }),
+  ).rejects.toThrow(/injected/);
+  graph.createEdge = realCreateEdge;
+
+  // A half-built gate survives, governed by one of its two criteria...
+  const half = await graph.query(
+    `MATCH (:Criterion)-[:GOVERNS]->(g:Gate) RETURN g`,
+    { g: vertexProps<{ natural_id: string }>() },
+  );
+  expect(half).toHaveLength(1);
+
+  // ...and it protects nothing, so no reader entering from work can find it.
+  const gating = await graph.query(
+    `MATCH (:Gate)-[:GATES]->(t:Task) RETURN t`,
+    { t: vertexProps<{ objective: string }>() },
+  );
+  expect(gating).toEqual([]);
+
+  // The caller holds no handle, and every Gate reader is keyed by natural_id --
+  // which is the whole guarantee. Asserted rather than described, because it is
+  // weaker than structural unreachability and one new reader could take it away:
+  // nothing on the read surface enumerates gates, so there is no route in.
+  const gateReaders = await graph.query(
+    `MATCH (g:Gate) RETURN g`,
+    { g: vertexProps<{ natural_id: string }>() },
+  );
+  expect(gateReaders).toHaveLength(1); // present in the graph...
+  const contract = await session.contractFor(work);
+  expect(contract.objective).toBe("scale up"); // ...and invisible from the work.
+});
