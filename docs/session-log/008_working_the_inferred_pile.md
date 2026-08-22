@@ -24,8 +24,13 @@ base rate of "looked wrong on reading, was fine" as it accumulates.
   pile, and the first that was a defect. `docs/consumer-contract/041`,
   `src/domain/write.ts`, four tests in `tests/domain-session.test.ts`.
 
-The first four commits are documents written while the machine was held for
-`labkit-dev`'s paired A/B. The fifth is the demonstration and the fix.
+- `08c6538` — this entry.
+- `f074ebd` — merge of `labkit-dev`'s cascade fix (`2de1060`) and its docs.
+- `3521853` — `docs/consumer-contract/042`: predictions for `closeEnquiry`, the
+  third item. Orientation only; no run.
+
+Most of these are documents written while the machine was held for `labkit-dev`'s
+paired A/B. `56a1f43` is the one demonstration and fix.
 
 ## Verified
 
@@ -67,6 +72,35 @@ than the ceiling. Log kept at `suite2.log` in this session's scratchpad.
 The count was **266 and correct** (262 plus the four tests added here) despite five
 crossings — another data point against the withdrawn count detector.
 
+**Then a confirmation run against `labkit-dev`'s cascade fix** (`2de1060`), which
+is the clean single-change test its own run could not be, since that carried a
+second uncommitted change:
+
+```
+256 pass / 14 fail / 11 errors, 270 tests, 301.46s
+all 14 failures at 5000.7–5022.1ms — every one a ceiling crossing
+COLLATERAL: 0
+```
+
+| | BASE (this tree) | with `2de1060` |
+| --- | --- | --- |
+| collateral failures | 4 | **0** |
+| `Connection terminated unexpectedly` | 7 | **0** |
+| `graph "labkit_t1" does not exist` | 4 | 6 |
+| `Client was closed and is not queryable` | 2 | 3 |
+
+**Its prediction holds on the metric it defined** — no failure whose cause is
+another test's teardown. **Two of the three signatures persist**, as unattached
+errors that no longer fail a test. So `labkit-dev`'s *"the entire teardown
+vocabulary is gone"* is a property of its two-change tree, not of the cascade fix;
+it accepted the correction.
+
+**My crossing count is not usable and I said so before it could be quoted.** 14
+against this tree's BASE of 5, measured while `labkit-dev` was running four
+suites. The collateral figure survives that because it is a vocabulary check
+rather than a count — which is exactly why the sharpened prediction is worth
+having, and this session's BASE data is what forced the sharpening.
+
 ## Open
 
 **`evaluateCriterion` was a defect, and it is fixed.**
@@ -101,6 +135,26 @@ answer to avoid, and that is why it was avoided.
 **Base rate: two examined, one defect.** Reading found both; demonstration
 separated them, and neither was settleable from the sweep report.
 
+**`closeEnquiry` is the third, predicted and not yet run.** `041`'s heuristic —
+order the writes, find the reachability edge, ask what a reader derives between it
+and the end — produced it on the first look, one grep per verb:
+
+```
+createNode(Decision) → RESOLVES → BASED_ON per cited finding
+```
+
+Reachability edge second, evidence links last, **nothing after the loop**. And
+`enquiryStatus()` derives `answer: challenges ? "no" : "yes"` from those edges, so
+an interrupted closure would let the surviving subset decide the polarity — **the
+recorded answer to a research question, inverted.** Window 3 corrupted a verdict's
+standing; this would corrupt a finding's content.
+
+**It stays a prediction.** `042` names the wrong answer to avoid, and it is about
+the heuristic itself: assuming this follows from `evaluateCriterion` because the
+shapes match. Two verbs sharing an arrangement is not evidence about the second —
+`sharpen` looked like a defect on that reasoning and was not. A heuristic that
+skips the demonstration has replaced the method.
+
 **The pending run now discriminates between two rules instead of confirming one.**
 `labkit-dev` read `039`'s rule and found my two clauses are not parallel: clause 2
 is about **answers** (an unreachable state produces none, so none can be false),
@@ -134,28 +188,25 @@ shape to look for, and the rate is the most useful thing the sweep will produce.
 
 ## Next
 
-**Owed immediately: the independent confirmation run of `labkit-dev`'s cascade
-fix**, pushed as `2de1060` as this entry was being written. Its own post-fix run
-carries a second uncommitted change, so **this tree's run is the clean test of the
-cascade fix alone.**
+Three things, all waiting on an idle machine. `labkit-dev` is mid-measurement and
+this session's runs have already confounded its numbers once, and its runs mine.
 
-Classify by the teardown vocabulary, not by the total. The number that matters is
-**collateral — failures whose cause is another test's teardown — and the sharpened
-prediction is that it should be zero, not "roughly one".** This entry's BASE run is
-the comparison: five crossings, thirteen teardown errors, four collateral. A
-post-fix run with five crossings and zero teardown errors confirms it; any
-`Connection terminated`, `graph … does not exist` or `Client was closed` refutes
-it. Load does not enter into it, which is why this form is falsifiable and the
-count-based one was not.
+1. **The `closeEnquiry` demonstration.** Predictions in `042`, unrun. Deterministic
+   injection in the `BASED_ON` loop, following `tests/domain-session.test.ts`'s
+   three existing negative tests. Look specifically at whether `answer` flips.
+2. **Verify `labkit-dev`'s `reset()` truncate**, once pushed — not yet on
+   `origin/feat/domain-consumer` at `bf7d0b4`. Its prediction is specific and has a
+   mechanism rather than a correlation: **`graph "labkit_t1" does not exist` should
+   be zero**, because truncating the label tables leaves the graph in place and
+   nothing else in the suite drops it. This tree measured **6** against the cascade
+   fix alone, so zero is a real result and non-zero refutes the mechanism.
+3. **A load-controlled crossing count.** The 14 above is unusable next to
+   `labkit-dev`'s 5 and must not be quoted as a comparison.
 
-Then the next verb. `pursue`, `recordReview`, `closeEnquiry`, `planWork`,
-`stateCriterion` and `declareGate` are **undecided, not cleared**. Under the
-reformulated rule the procedure is the same each time and now has a shortcut worth
-using first: **order the writes, find the reachability edge, and ask what a reader
-can derive from the state between it and the end.** A verb that writes its
-reachability edge last is very likely clean; one that writes it early is worth the
-demonstration.
+Then the remaining four. `pursue`, `recordReview`, `planWork`, `stateCriterion`
+and `declareGate` are **undecided, not cleared**. `pursue` writes its `MOTIVATES`
+last, so on the heuristic it is the most likely to be clean — worth doing early
+precisely because a clean result is what makes the base rate mean anything.
 
 **Stop at the first that is not a defect and say so**, rather than continuing until
-something looks fixable. Two examined, one defect — the number only means something
-if the clean ones keep getting reported.
+something looks fixable.
