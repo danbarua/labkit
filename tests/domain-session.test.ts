@@ -256,3 +256,249 @@ test("recordObservations writes the unit and the evidence together or not at all
   });
   expect(again.id).toMatch(/^ART_/);
 });
+
+/**
+ * `sharpen` is NOT transactional, and this test records that it does not need
+ * to be — the first item taken off PJ-028's *inferred* pile, and the first to
+ * come back "read wrong, was fine".
+ *
+ * `write.ts`'s header says a compound verb runs inside `inTransaction()`.
+ * `sharpen` writes five things and does not. On reading alone that looks like
+ * the defect `recordObservations` above was fixed for. It is not, and the
+ * discriminator is the one PJ-011 §5 already gives, applied to interruption:
+ *
+ *   **A partial state is acceptable exactly when some other verb could
+ *   legitimately have produced it, or when no reader can reach it at all.**
+ *
+ * Both of `sharpen`'s failure windows clear that bar, which is why the fix was
+ * to the sentence and not to the code:
+ *
+ * - Fail inside the `BASED_ON` loop and the decision keeps a *subset* of what
+ *   was standing — a confidently wrong answer if anything read it. Nothing can:
+ *   `originOf()` is the only reader of `NARROWS`, and it matches `MOTIVATES`
+ *   first, which `sharpen` writes last. The leftover is unreachable.
+ * - Fail on `MOTIVATES` and the sharper question survives with no origin —
+ *   exactly what `pose()` produces, reported as `untested`, which is true: it
+ *   is on the books and nothing has been run against it.
+ *
+ * A real property rather than an accident of today's code, so it is asserted
+ * rather than left in prose (PJ-028). **If someone adds a reader of `NARROWS`
+ * that does not require `MOTIVATES`, the first case stops being unreachable and
+ * `sharpen` becomes transactional.** This test is what says so.
+ */
+test("a partial sharpen leaves nothing a reader can reach", async () => {
+  const enquiry = await session.openEnquiry("does the coating hold?");
+  const obs = await session.recordObservations({
+    enquiry, name: "run A", finding: "no delamination",
+  });
+  await session.recordAnalysis({
+    enquiry, method: "cycling", from: [obs],
+    concludes: [
+      { proposition: "the coating survives cycling", finding: "no delamination at 200 cycles" },
+      { proposition: "the coating survives heat", finding: "no delamination at 200C" },
+    ],
+  });
+  const original = await session.pose("is the coating durable?");
+
+  // Fail on the second BASED_ON edge: the decision keeps one finding of three.
+  const realCreateEdge = graph.createEdge.bind(graph);
+  let basedOn = 0;
+  graph.createEdge = (async (from: string, edge: string, to: string) => {
+    if (edge === "BASED_ON" && ++basedOn === 2) {
+      throw new Error("injected: the second BASED_ON failed");
+    }
+    return realCreateEdge(from as never, edge as never, to as never);
+  }) as typeof graph.createEdge;
+
+  await expect(
+    session.sharpen({ from: original, into: "is it durable at 200C?", because: "too vague" }),
+  ).rejects.toThrow(/injected/);
+  graph.createEdge = realCreateEdge;
+
+  // The half-built decision survives...
+  const orphaned = await graph.query(
+    `MATCH (d:Decision)-[:NARROWS]->(:Question) RETURN d`,
+    { d: vertexProps<{ reason: string }>() },
+  );
+  expect(orphaned.map((r) => r.d.reason)).toEqual(["too vague"]);
+
+  // ...and no reader can reach it, because `originOf` needs the MOTIVATES that
+  // was never written. That is what makes the subset harmless rather than a
+  // wrong answer, and it is the whole argument for leaving sharpen alone.
+  const motivates = await graph.query(
+    `MATCH (:Decision)-[:MOTIVATES]->(q:Question) RETURN q`,
+    { q: vertexProps<{ name: string }>() },
+  );
+  expect(motivates).toEqual([]);
+  expect(await session.originOf(original)).toBeNull();
+
+  // The sharper question was never created, so the survey is simply correct.
+  const survey = await session.whatIsKnown();
+  expect(survey.untested.map((q) => q.asks)).toEqual(["is the coating durable?"]);
+});
+
+/**
+ * `evaluateCriterion`'s three interruption windows — the second item off
+ * PJ-028's inferred pile, and a real test of `039`'s rule rather than a repeat.
+ *
+ * `sharpen` cleared because its reachability edge (`MOTIVATES`) is written
+ * **last**, so an interruption leaves nothing to walk to. This verb writes
+ * `EVALUATED_AS` **second**, so from the third write onward the evaluation is
+ * reachable and the edges after it are the ones that say what it means.
+ *
+ * Predictions in `docs/consumer-contract/040`, including the competing rule the
+ * third window discriminates between. See `041` for the verdict.
+ */
+const aGatedCheck = async () => {
+  const enquiry = await session.openEnquiry("does the solver converge?");
+  const obs = await session.recordObservations({
+    enquiry, name: "sweep", finding: "residuals recorded",
+  });
+  const analysis = await session.recordAnalysis({
+    enquiry, method: "convergence", from: [obs],
+    concludes: [{ proposition: "the solver converges", finding: "residual 1e-9" }],
+  });
+  const work = await session.planWork({
+    objective: "scale to the full grid", acceptance: "convergence holds",
+  });
+  const criterion = await session.stateCriterion("residual below 1e-8");
+  const gate = await session.declareGate({
+    governedBy: [criterion], consequence: "do not scale up", protecting: [work],
+  });
+  return { enquiry, obs, analysis, criterion, gate };
+};
+
+/**
+ * All three edges, one test each, because the verb is now transactional and the
+ * assertion is the same at every window: nothing survives.
+ *
+ * Before the fix these behaved differently, and the difference is the finding.
+ * Window 1 (`EVALUATED_AS`) left an orphan node no reader could reach — an
+ * absence. Window 2 (`TRIGGERS`) left a state in which one gate reported the
+ * check `never-run` *and* `everFailed: true` from a single call — startling, and
+ * **not** a defect, because the no-gate S-3b path produces it legitimately and
+ * `everFailed`'s scope is documented as deliberately unfiltered by gate.
+ *
+ * Window 3 is the one that earned the transaction, and it is asserted below in
+ * the only form that stays true after the fix: the verdict does not exist, so it
+ * cannot stand. What it did before is in `041`.
+ */
+for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
+  test(`evaluateCriterion interrupted at ${edge} writes no verdict at all`, async () => {
+    const { analysis, criterion, gate } = await aGatedCheck();
+
+    const realCreateEdge = graph.createEdge.bind(graph);
+    graph.createEdge = (async (from: string, e: string, to: string) => {
+      if (e === edge) throw new Error(`injected: ${edge} failed`);
+      return realCreateEdge(from as never, e as never, to as never);
+    }) as typeof graph.createEdge;
+
+    await expect(
+      session.evaluateCriterion({
+        criterion, gate, value: "9e-9", outcome: "fail",
+        citing: { analysis, proposition: "the solver converges" },
+      }),
+    ).rejects.toThrow(/injected/);
+    graph.createEdge = realCreateEdge;
+
+    const left = await graph.query(
+      `MATCH (ev:CriterionEvaluation) RETURN ev`,
+      { ev: vertexProps<{ outcome: string }>() },
+    );
+    expect(left).toEqual([]);
+
+    const status = await session.gateStatus(gate);
+    expect(status.state).toBe("never-evaluated");
+    expect(status.everFailed).toBe(false);
+  });
+}
+
+/**
+ * `closeEnquiry`, third off the inferred pile. Predictions in `042` were wrong
+ * about the mechanism — it writes **one** `BASED_ON`, not one per finding — and
+ * wrong about the consequence: `enquiryStatus` guards the empty case explicitly
+ * (*"abandoned, not answered — absence of evidence is not a negative result"*),
+ * so there is no polarity inversion.
+ *
+ * What survives is the retry. The close writes `RESOLVES` before `BASED_ON`, so
+ * an interrupted close leaves a resolving decision behind and the caller, who
+ * saw a throw, retries. Two decisions then resolve one question, and
+ * `enquiryStatus` picks with `.find()` over unordered rows.
+ */
+test("a close interrupted before BASED_ON, then retried, leaves two resolving decisions", async () => {
+  const enquiry = await session.openEnquiry("does the coating fail under load?");
+  const obs = await session.recordObservations({
+    enquiry, name: "load runs", finding: "cracks at 40MPa",
+  });
+  const analysis = await session.recordAnalysis({
+    enquiry, method: "load-test", from: [obs],
+    concludes: [{
+      proposition: "the coating survives load",
+      finding: "cracks at 40MPa", bearing: "challenges",
+    }],
+  });
+  const answeredBy = { analysis, proposition: "the coating survives load" };
+
+  const realCreateEdge = graph.createEdge.bind(graph);
+  graph.createEdge = (async (from: string, edge: string, to: string) => {
+    if (edge === "BASED_ON") throw new Error("injected: BASED_ON failed");
+    return realCreateEdge(from as never, edge as never, to as never);
+  }) as typeof graph.createEdge;
+
+  await expect(session.closeEnquiry({ enquiry, answeredBy })).rejects.toThrow(/injected/);
+  graph.createEdge = realCreateEdge;
+
+  // The caller saw a throw, so it retries. This one succeeds.
+  await session.closeEnquiry({ enquiry, answeredBy });
+
+  const resolving = await graph.query(
+    `MATCH (d:Decision)-[:RESOLVES]->(:Question) RETURN d`,
+    { d: vertexProps<{ natural_id: string; reason: string }>() },
+  );
+  const status = await session.enquiryStatus(enquiry);
+  console.log("CLOSE resolving decisions:", resolving.length);
+  console.log("CLOSE closure:", status.closure, "answer:", status.answer);
+  console.log("CLOSE evidence:", JSON.stringify(status.evidence));
+
+  // The question was answered "no" on a challenging finding. Anything else is
+  // the interrupted close being reported as the researcher's act.
+  expect(status.closure).toBe("answered");
+  expect(status.answer).toBe("no");
+});
+
+/**
+ * The wrong answer the transaction exists to prevent, asserted from the other
+ * side: with the writes intact, retracting the evidence a verdict was reached
+ * against **does** withdraw it.
+ *
+ * Before the fix, an interruption before `BASED_ON` left `cited === 0`, and
+ * `isWithdrawn` is `cited > 0 && standing === 0` — so the verdict could never be
+ * withdrawn, and the gate stayed `blocked` by a `fail` the record insisted still
+ * stood. `basis: []` alone is an empty result and not a wrong answer (PJ-011 §5);
+ * *"this verdict still stands"* after its basis was retracted is a wrong answer,
+ * and that distinction is what `041` settles.
+ */
+test("a verdict is withdrawn when the evidence it was reached against is retracted", async () => {
+  const { enquiry, obs, analysis, criterion, gate } = await aGatedCheck();
+
+  await session.evaluateCriterion({
+    criterion, gate, value: "9e-9", outcome: "fail",
+    citing: { analysis, proposition: "the solver converges" },
+  });
+  const before = await session.gateStatus(gate);
+  expect(before.checks[0]?.evaluations[0]?.basis).toEqual(["residual 1e-9"]);
+  expect(before.state).toBe("blocked");
+
+  const review = await session.recordReview({
+    of: analysis, verdict: "the sweep dropped the last decade",
+  });
+  await session.replaceAnalysis({
+    supersedes: analysis, because: review, enquiry,
+    method: "convergence, all decades", from: [obs],
+    concludes: [{ proposition: "the solver converges", finding: "residual 4e-9" }],
+  });
+
+  const after = await session.gateStatus(gate);
+  expect(after.checks[0]?.evaluations[0]?.withdrawn).toBe(true);
+  expect(after.state).not.toBe("blocked");
+});

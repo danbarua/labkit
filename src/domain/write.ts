@@ -6,10 +6,46 @@
  * made structural: one event per research action, stamped from the injected
  * clock, at the single choke point below.
  *
- * A compound verb runs inside `graph.inTransaction()` — everything it writes
+ * Some verbs here run inside `graph.inTransaction()` — everything they write
  * commits together or none of it does. The `TenantGraph` is shared with the read
  * surface, so its re-entrancy depth is shared too, which is what a facade
  * composing both halves requires.
+ *
+ * **Which ones, and why it is not "the compound ones".** This header used to say
+ * a *compound* verb is transactional, and that word already means something else
+ * two paragraphs away in CLAUDE.md, where `openEnquiry` is the archetypal
+ * composed verb — and `openEnquiry` is not transactional. Writing more than once
+ * is not the test either. The rule (`039`, corrected in `041`):
+ *
+ *   **A partial state is acceptable exactly when every answer a reader can
+ *   derive from it is true.**
+ *
+ * Unreachability is the trivial case — no readers, no answers, nothing to be
+ * false. "Some other verb could legitimately have produced it" is *evidence*
+ * and not a test: it is worth something when the reachable state carries no
+ * claim about how it arose, and worthless when it does. That distinction is not
+ * academic; it is the whole of `evaluateCriterion` below, where a shape that
+ * another call produces legitimately is false when reached by interruption.
+ *
+ * Each verb is decided on its own by negative test, which is how the rule was
+ * earned in the first place (PJ-020, S-3c) — not by a category anyone can read
+ * off a signature. **Where the reachability edge sits in the write order is the
+ * useful tell**: everything written after it is a claim about a record readers
+ * can already see.
+ *
+ * Worked three ways, so the distinction is demonstrated rather than asserted:
+ * `recordObservations` is transactional because a failure between the evidence
+ * and its unit writes exactly the invariant the fix removed, indistinguishable
+ * from real history. `sharpen` is **not**, because it writes its reachability
+ * edge (`MOTIVATES`) last and its half-built decision is unreachable.
+ * `evaluateCriterion` **is**, because it writes `EVALUATED_AS` second and a
+ * verdict that lost its later `BASED_ON` can never be withdrawn — so the record
+ * insists a `fail` still stands after its basis was retracted. All three have
+ * negative tests in `tests/domain-session.test.ts`, and `sharpen`'s exists to
+ * fail if a `NARROWS` reader ever stops requiring `MOTIVATES`.
+ *
+ * The other non-transactional verbs here are **undecided, not cleared** — see
+ * `docs/consumer-contract/041`. Two examined, one defect.
  */
 
 import type { TenantGraph } from "../db/graph";
@@ -541,20 +577,32 @@ export class WriteSurface extends SessionCore {
       }
     }
 
-    const decision = await this.graph.createNode("Decision", {
-      decided_at: this.clock.now(),
-      reason: input.answeredBy
-        ? `answered on "${input.answeredBy.proposition}"`
-        : "closed without a cited result",
-      invalidation_check: "new evidence bearing on the question",
+    // Transactional, demonstrated — `docs/consumer-contract/043`.
+    //
+    // `RESOLVES` is written before `BASED_ON`, so an interrupted close leaves a
+    // resolving decision with nothing cited. That is *indistinguishable from a
+    // deliberate close without a cited result*, which is a legitimate call — and
+    // that shape-level similarity is exactly what made it look safe.
+    //
+    // What it is not safe from is the retry. The caller saw a throw and closes
+    // again; two decisions then resolve one question, `enquiryStatus` picks
+    // between them with `.find()` over unordered rows, and the orphan can win.
+    // The question then reports `closure: "abandoned"`, `answer: null` for a
+    // question that was answered "no" on cited evidence. The answer is not
+    // inverted — it is erased, and PJ-011 §5 does not cover it, because
+    // "abandoned" is a positive classification and not an empty result.
+    await this.graph.inTransaction(async () => {
+      const decision = await this.graph.createNode("Decision", {
+        decided_at: this.clock.now(),
+        reason: input.answeredBy
+          ? `answered on "${input.answeredBy.proposition}"`
+          : "closed without a cited result",
+        invalidation_check: "new evidence bearing on the question",
+      });
+      await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
+      if (answerBearing)
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
     });
-    await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
-    if (answerBearing)
-      await this.graph.createEdge(
-        decision.natural_id,
-        "BASED_ON",
-        answerBearing,
-      );
 
     this.emit("closeEnquiry", input.enquiry.id, {
       answeredBy: input.answeredBy?.analysis.id ?? null,
@@ -695,28 +743,39 @@ export class WriteSurface extends SessionCore {
       }
     }
     const at = this.clock.now();
-    const evaluation = await this.graph.createNode("CriterionEvaluation", {
-      value: input.value,
-      outcome: input.outcome,
-      evaluated_at: at,
+    // Transactional, demonstrated rather than assumed — `docs/consumer-contract/041`.
+    //
+    // The docstring above argues against exactly one durable state, and guards
+    // it on the caller-error path only. Interruption is the other side of the
+    // same operation, and it was open: `EVALUATED_AS` is written *second*, so
+    // from that point the evaluation is reachable and the edges after it are
+    // the ones that say what it means.
+    //
+    // The window that earned this is `BASED_ON`. A verdict that lost it reads
+    // as reached against nothing — `basis: []`, an empty result, which PJ-011
+    // §5 says is not a wrong answer. But `isWithdrawn` is
+    // `cited > 0 && standing === 0`, so a verdict that cited nothing can never
+    // be withdrawn. Retract the evidence it was actually reached against and
+    // the gate stays **blocked** by a `fail` the record insists still stands.
+    // That is a positively false answer, not an absence, and it is what
+    // separates this verb from `sharpen` (`039`), whose partial states no
+    // reader can reach.
+    const evaluation = await this.graph.inTransaction(async () => {
+      const ev = await this.graph.createNode("CriterionEvaluation", {
+        value: input.value,
+        outcome: input.outcome,
+        evaluated_at: at,
+      });
+      await this.graph.createEdge(input.criterion.id, "EVALUATED_AS", ev.natural_id);
+      if (input.gate)
+        await this.graph.createEdge(ev.natural_id, "TRIGGERS", input.gate.id);
+      // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
+      // Evidence` was declared in PJ-004 and never written until S-8; without
+      // it, a condition established by measurement and one asserted by an agent
+      // returned identical records. See PJ-008 row W.
+      if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
+      return ev;
     });
-    await this.graph.createEdge(
-      input.criterion.id,
-      "EVALUATED_AS",
-      evaluation.natural_id,
-    );
-    if (input.gate)
-      await this.graph.createEdge(
-        evaluation.natural_id,
-        "TRIGGERS",
-        input.gate.id,
-      );
-    // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
-    // Evidence` was declared in PJ-004 and never written until S-8; without
-    // it, a condition established by measurement and one asserted by an agent
-    // returned identical records. See PJ-008 row W.
-    if (basis)
-      await this.graph.createEdge(evaluation.natural_id, "BASED_ON", basis);
     this.emit("evaluateCriterion", evaluation.natural_id, {
       criterion: input.criterion.id,
       ...(input.gate ? { gate: input.gate.id } : {}),

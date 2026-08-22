@@ -158,9 +158,13 @@ of the three is a maintenance claim nobody agreed to keep.
 **And the defect fired during its own repair** — twice, in the edits making these
 very fixes. Both are below, with the two that bracket them.
 
-## Four times in one day, by people holding the answer
+## Four times on 2026-08-21, by people holding the answer
 
 This is the entry's real argument, and it is worth more than the seven counts.
+
+*The heading is dated rather than counted, per this entry's own third branch. Four
+is what 2026-08-21 produced; a fifth followed on the 22nd and is below. The number
+will keep moving and the date will not.*
 
 PJ-027 claimed its defect is not carelessness, and reasoned from three instances
 whose authors were not thinking about it at the time. The obvious objection is
@@ -192,7 +196,21 @@ every one was committed by someone who had the defect in front of them.
    hardcoded `261`: a numeral earning no assertion and carrying no date, three
    hours after this entry closed out the first eight of those.
 
-Two authors, four instances, all under the best conditions anyone is going to get:
+A fifth followed, in the fix for the fourth's neighbour, and it is recorded here
+only because its author's account of *how* is better than anything else in this
+entry. The wrap hook's worktree bug was fixed in `wrap-hook.sh`; the identical
+line stayed in `close-entry.sh` and `collect.sh`, and the commit message described
+the fix as a property of the *skill*. Asked how it happened:
+
+> **A passing check on the file I edited told me nothing about the two I didn't.**
+
+That is this entry's defect stated as a property of **verification** rather than
+of authorship, and it is the sharper form. The author did test the fix — ran the
+hook, read the output, got the right answer, stopped. The test was real and it was
+scoped to the half they were looking at, which is how a one-file fix becomes a
+three-file claim. Nothing about carelessness explains that; the check passed.
+
+Two authors, five instances, all under the best conditions anyone is going to get:
 the defect named, catalogued, and freshly in mind. **"Be more careful" is not
 available as a remedy**, because these are what being careful looks like. Each is
 a small asymmetry — the type and not the sentence above it, the code and not the
@@ -244,8 +262,14 @@ looking for something else. These were found while looking — but by six reader
 told what shape to look for, which finds that shape and is silent about others.
 A sweep is not a census.
 
-**The four self-instances are not irony.** They are the mechanism at the moment it
-is easiest to observe: in `918f420` the author was looking at the type and the
-code, and the sentence above them was somebody else's job. That is the same
-sentence one would write about all four, and it is why PJ-027's §"What this
-licenses" gives a direction to look rather than a resolution to try harder.
+**The self-instances are not irony.** They are the mechanism at the moment it is
+easiest to observe: in `918f420` the author was looking at the type and the code,
+and the sentence above them was somebody else's job. That is the same sentence one
+would write about every one of them, and it is why PJ-027's §"What this licenses"
+gives a direction to look rather than a resolution to try harder.
+
+**And one more, in this paragraph's own edit.** Adding the fifth instance above
+left the heading saying "four" and the text saying "five" — a numeral in prose
+going stale inside the entry that closed out seven of them, in the act of
+lengthening the list they belong to. Fixed by dating the heading rather than
+correcting the number, which is this entry's own third branch applied to itself.

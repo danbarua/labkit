@@ -62,6 +62,11 @@ them:**
   check that could not fail.
 - `b2047f4` — PJ-028's four self-instances, collected from three scattered
   sections into the entry's actual argument. See Open.
+- `a4b7898` — **the first item off the sweep's inferred pile, and it was not a
+  defect.** `docs/consumer-contract/038`/`039`, `write.ts`'s header, and one test.
+  No code change. See Open.
+- `4d6b767` — `close-entry.sh` and `collect.sh` got the worktree fix that only
+  `wrap-hook.sh` received.
 
 Merges `70817a2`, `2623d02`, `20fef4f`, `b451955` and `20cfcca`. Pushed to
 `origin/feat/minion`; `labkit-dev` merges it back as it goes.
@@ -115,6 +120,34 @@ comment, my `tail`, and the detector generalised from one observation inside the
 correction for my `tail` — support a conclusion one instance could not: *"be more
 careful" is not available as a remedy, because these are what being careful looks
 like*. Each is an asymmetry, and attention does not distribute evenly across one.
+
+**The inferred pile's first item was not a defect, and that is the result.**
+`write.ts`'s header said a *compound* verb runs inside `inTransaction()` and six
+multi-write verbs do not. Both readings on offer — the comment is wrong, or
+"compound" is narrower — assume one answer covers all six, and this project has
+never worked that way. The rule is PJ-011 §5 pointed at interruption:
+
+> A partial state is acceptable exactly when some other verb could legitimately
+> have produced it, or when no reader can reach it at all.
+
+I predicted `sharpen` needed a transaction and was **wrong**. Interrupt its
+`BASED_ON` loop and the decision keeps a subset of what was standing — which
+`originOf()` would report as complete and wrong, except it cannot see it:
+`originOf()` is the only reader of `NARROWS` and matches `MOTIVATES` first, which
+`sharpen` writes **last**. Interrupt at `MOTIVATES` instead and the sharper
+question survives with no origin, which is exactly what `pose()` produces.
+**The order of the writes was doing a transaction's work and nobody wrote it
+down.** No code changed; the header states the real rule, and a test now fails the
+day a `NARROWS` reader stops requiring `MOTIVATES`.
+
+Base rate so far: **one examined, one not a defect.** The five remaining verbs are
+`undecided, not cleared`. `evaluateCriterion` is next by its own comment.
+
+**A fifth self-instance, in the fix for the fourth.** `labkit-dev` fixed the wrap
+hook's worktree bug in `wrap-hook.sh` — and `close-entry.sh` and `collect.sh` kept
+the same wrong line. Running `close-entry.sh` from this worktree would have taken
+the *other* checkout's HEAD as this session's new baseline, silently skipping a
+range. Found by going to use the script. Fixed here, same one-line resolution.
 
 **Nothing from the sweep is left unowned.** `labkit-dev` cleared its four items
 in `7c6853f`, `0c214ca`, `20fef4f` and `30f975b`: both assertion-free tests fixed
@@ -188,18 +221,23 @@ fourth should earn it.
 
 ## Next
 
-**The sweep is closed. What is left is the inferred pile, and it needs
-demonstrations, not edits.**
+**This entry is closed here.** Row F, the sweep, its fixes and its first verified
+item are one arc and it is finished; the inferred pile is open-ended work that
+belongs in its own entry. Re-baselined with `close-entry.sh`, so the next fire
+opens **008**.
 
-Start with the one flagged above: take `sharpen` or `closeEnquiry`, show what an
-interruption between its writes actually leaves in the graph, and only then
-decide whether `write.ts:9` is wrong or its word "compound" is narrower than it
-reads. One verb, one demonstration. Do not sweep.
+Next item: **`evaluateCriterion`**, the strongest remaining candidate. Its own
+comment argues a malformed evaluation "sits in the graph as durable nonsense"
+because `gateStatus()` traverses from `GOVERNS` — then it writes a node and three
+edges untransacted. Under the rule above the question is whether that partial
+state is *reachable*; `sharpen`'s was not, and this one's comment claims it is.
+Demonstrate before touching it, and stop if it comes back clean.
 
 Read `sweep-report.md` in this session's scratchpad first — it labels every item
 demonstrated or inferred, and the inferred ones are inferred on purpose. Six
 readers looking for one shape find that shape and are silent about others, so
-treat the list as a lead sheet, not an inventory.
+treat the list as a lead sheet, not an inventory. One of one examined so far was
+not a defect.
 
 If the flake appears again, **capture the full run before doing anything else** —
 `bun test > some.log 2>&1`, never through a pipe. The open question is whether the

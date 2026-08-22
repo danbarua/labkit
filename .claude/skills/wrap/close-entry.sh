@@ -14,7 +14,14 @@
 
 set -euo pipefail
 state_file="${1:?state file}"
-root="${CLAUDE_PROJECT_DIR:-$PWD}"
+# Same resolution as wrap-hook.sh, and for the same reason: $CLAUDE_PROJECT_DIR
+# names the directory the session *started* in, so a session working in a git
+# worktree would `cd` to another checkout and write **that** tree's HEAD as this
+# session's new baseline — silently skipping or duplicating a range. The
+# worktree fix landed in wrap-hook.sh and not here or in collect.sh, which is
+# the asymmetry PJ-027 is about, inside the fix for an instance of it.
+root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+[ -d "$root" ] || root="${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$root"
 
 head_sha="$(git rev-parse HEAD)"
