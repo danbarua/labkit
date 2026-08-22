@@ -55,7 +55,21 @@ export async function provisionTenantGraph(db: LabKitDB, tenantId: number, graph
   }
 }
 
-/** Drops a tenant's graph and everything in it. Used by test teardown (tests/helpers/db.ts); there is no production caller yet. */
+/**
+ * Drops a tenant's graph and everything in it.
+ *
+ * **No production caller, and as of 2026-08-22 no test-teardown caller either.**
+ * `tests/helpers/db.ts` used to call it between every test; it now truncates the
+ * label tables instead, because dropping destroyed thirty-eight labels and
+ * thirty-eight indexes that the next `resolveTenantContext()` had to rebuild —
+ * about half the suite's wall time, measured.
+ *
+ * Kept rather than deleted, and given its own test rather than left dark. It is
+ * the only way to remove a tenant, which is a real operation a deploy will need;
+ * and an untested drop is the kind of thing that is discovered to be broken at
+ * the moment someone needs it most. `tests/reconciliation.test.ts` is its one
+ * reader.
+ */
 export async function dropTenantGraph(db: LabKitDB, graphName: string): Promise<void> {
   await db.query(`SELECT * FROM ag_catalog.drop_graph($1, true)`, [graphName]);
 }
