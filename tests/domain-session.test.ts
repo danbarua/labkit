@@ -414,6 +414,59 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
 }
 
 /**
+ * `closeEnquiry`, third off the inferred pile. Predictions in `042` were wrong
+ * about the mechanism — it writes **one** `BASED_ON`, not one per finding — and
+ * wrong about the consequence: `enquiryStatus` guards the empty case explicitly
+ * (*"abandoned, not answered — absence of evidence is not a negative result"*),
+ * so there is no polarity inversion.
+ *
+ * What survives is the retry. The close writes `RESOLVES` before `BASED_ON`, so
+ * an interrupted close leaves a resolving decision behind and the caller, who
+ * saw a throw, retries. Two decisions then resolve one question, and
+ * `enquiryStatus` picks with `.find()` over unordered rows.
+ */
+test("a close interrupted before BASED_ON, then retried, leaves two resolving decisions", async () => {
+  const enquiry = await session.openEnquiry("does the coating fail under load?");
+  const obs = await session.recordObservations({
+    enquiry, name: "load runs", finding: "cracks at 40MPa",
+  });
+  const analysis = await session.recordAnalysis({
+    enquiry, method: "load-test", from: [obs],
+    concludes: [{
+      proposition: "the coating survives load",
+      finding: "cracks at 40MPa", bearing: "challenges",
+    }],
+  });
+  const answeredBy = { analysis, proposition: "the coating survives load" };
+
+  const realCreateEdge = graph.createEdge.bind(graph);
+  graph.createEdge = (async (from: string, edge: string, to: string) => {
+    if (edge === "BASED_ON") throw new Error("injected: BASED_ON failed");
+    return realCreateEdge(from as never, edge as never, to as never);
+  }) as typeof graph.createEdge;
+
+  await expect(session.closeEnquiry({ enquiry, answeredBy })).rejects.toThrow(/injected/);
+  graph.createEdge = realCreateEdge;
+
+  // The caller saw a throw, so it retries. This one succeeds.
+  await session.closeEnquiry({ enquiry, answeredBy });
+
+  const resolving = await graph.query(
+    `MATCH (d:Decision)-[:RESOLVES]->(:Question) RETURN d`,
+    { d: vertexProps<{ natural_id: string; reason: string }>() },
+  );
+  const status = await session.enquiryStatus(enquiry);
+  console.log("CLOSE resolving decisions:", resolving.length);
+  console.log("CLOSE closure:", status.closure, "answer:", status.answer);
+  console.log("CLOSE evidence:", JSON.stringify(status.evidence));
+
+  // The question was answered "no" on a challenging finding. Anything else is
+  // the interrupted close being reported as the researcher's act.
+  expect(status.closure).toBe("answered");
+  expect(status.answer).toBe("no");
+});
+
+/**
  * The wrong answer the transaction exists to prevent, asserted from the other
  * side: with the writes intact, retracting the evidence a verdict was reached
  * against **does** withdraw it.

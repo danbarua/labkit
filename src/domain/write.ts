@@ -577,20 +577,32 @@ export class WriteSurface extends SessionCore {
       }
     }
 
-    const decision = await this.graph.createNode("Decision", {
-      decided_at: this.clock.now(),
-      reason: input.answeredBy
-        ? `answered on "${input.answeredBy.proposition}"`
-        : "closed without a cited result",
-      invalidation_check: "new evidence bearing on the question",
+    // Transactional, demonstrated — `docs/consumer-contract/043`.
+    //
+    // `RESOLVES` is written before `BASED_ON`, so an interrupted close leaves a
+    // resolving decision with nothing cited. That is *indistinguishable from a
+    // deliberate close without a cited result*, which is a legitimate call — and
+    // that shape-level similarity is exactly what made it look safe.
+    //
+    // What it is not safe from is the retry. The caller saw a throw and closes
+    // again; two decisions then resolve one question, `enquiryStatus` picks
+    // between them with `.find()` over unordered rows, and the orphan can win.
+    // The question then reports `closure: "abandoned"`, `answer: null` for a
+    // question that was answered "no" on cited evidence. The answer is not
+    // inverted — it is erased, and PJ-011 §5 does not cover it, because
+    // "abandoned" is a positive classification and not an empty result.
+    await this.graph.inTransaction(async () => {
+      const decision = await this.graph.createNode("Decision", {
+        decided_at: this.clock.now(),
+        reason: input.answeredBy
+          ? `answered on "${input.answeredBy.proposition}"`
+          : "closed without a cited result",
+        invalidation_check: "new evidence bearing on the question",
+      });
+      await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
+      if (answerBearing)
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
     });
-    await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
-    if (answerBearing)
-      await this.graph.createEdge(
-        decision.natural_id,
-        "BASED_ON",
-        answerBearing,
-      );
 
     this.emit("closeEnquiry", input.enquiry.id, {
       answeredBy: input.answeredBy?.analysis.id ?? null,
