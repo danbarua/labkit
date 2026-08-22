@@ -39,11 +39,14 @@ import { traced } from "../../src/db/trace";
  *
  * **This header has been read as explaining the suite's intermittent failures.
  * It does not, and that misattribution cost two investigations.** The
- * `graph "labkit_t1" does not exist` and `Connection terminated` bursts are a
+ * `graph "labkit_t1" does not exist` and `Connection terminated` bursts were a
  * teardown race, not Defect A: bun's 5000ms per-test timeout does not cancel
  * the test body, so an overrunning test keeps executing while the next one
- * starts, and its late `scenario.end()` resets the database and closes the next
- * test's connection. Instrumentation across a failing run tracked 59,086
+ * starts, and its late `scenario.end()` reset the database and closed the next
+ * test's connection. **That cascade was fixed on 2026-08-22** — see
+ * `tests/helpers/scenario.ts` and `tests/scenario-harness.test.ts`. Tests can
+ * still cross the ceiling and fail; what they can no longer do is take the
+ * next test with them. Instrumentation across a failing run tracked 59,086
  * queries with **zero** unfinished and found no desync signature at all. What
  * pushes a test to the ceiling is `provisionTenantGraph()` re-checking every
  * node and edge label on each `begin()` and `current()`. See `docs/TASKS.md`.
