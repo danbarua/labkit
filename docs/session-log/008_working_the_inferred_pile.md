@@ -29,8 +29,13 @@ base rate of "looked wrong on reading, was fine" as it accumulates.
 - `3521853` — `docs/consumer-contract/042`: predictions for `closeEnquiry`, the
   third item. Orientation only; no run.
 
-Most of these are documents written while the machine was held for `labkit-dev`'s
-paired A/B. `56a1f43` is the one demonstration and fix.
+- `e3390fa` — this entry.
+- `0e6f329` — **`closeEnquiry` is transactional.** Third item, second defect.
+  `docs/consumer-contract/043`, `src/domain/write.ts`, one test.
+
+Plus merges of `labkit-dev`'s cascade fix, its `reset()` truncate (`5439085`) and
+`3c00496`. Two demonstrations and two fixes; the rest are documents, several
+written while the machine was held for its paired A/B.
 
 ## Verified
 
@@ -101,6 +106,36 @@ suites. The collateral figure survives that because it is a vocabulary check
 rather than a count — which is exactly why the sharpened prediction is worth
 having, and this session's BASE data is what forced the sharpening.
 
+**Then `labkit-dev`'s `reset()` truncate (`5439085`), on an idle machine:**
+
+```
+270 pass / 0 fail   89.44s
+270 pass / 0 fail   82.13s
+270 pass / 0 fail  110.21s
+zero crossings, zero teardown vocabulary in all three
+```
+
+Against this tree's 220s BASE and 301s confounded run, so **the halving reproduces
+on a second tree** — the independent confirmation it wanted. That is also the
+load-controlled crossing count: **zero**, three times.
+
+**Those runs do not verify its prediction, and the entry says so.** Zero crossings
+means no teardown race could occur, so three greens are three times not testing
+it. What settles it is by construction: `reset()` drops nothing now, and `grep`
+gives `dropTenantGraph()` exactly one caller — a reconciliation test that drops and
+rebuilds inside a single test. No flake needed.
+
+**My stated reason for that being safe was wrong, and `labkit-dev` checked instead
+of accepting it.** I said the test targets a different graph because its tenant
+slug is `"drop-me"`. It is not: that is the first tenant resolved in its file,
+`tenants.id` restarts, so it *is* `labkit_t1`. The safety comes from
+`setupTestDb()` building a **separate PGlite instance per test file**. Same
+conclusion, different mechanism — and the distinction matters, because my reason
+would have licensed dropping `labkit_t1` from a scenario file and its reason
+forbids it.
+
+Final suite on the merged tree with both fixes: **271 pass / 0 fail, 81.28s.**
+
 ## Open
 
 **`evaluateCriterion` was a defect, and it is fixed.**
@@ -149,11 +184,47 @@ an interrupted closure would let the surviving subset decide the polarity — **
 recorded answer to a research question, inverted.** Window 3 corrupted a verdict's
 standing; this would corrupt a finding's content.
 
-**It stays a prediction.** `042` names the wrong answer to avoid, and it is about
-the heuristic itself: assuming this follows from `evaluateCriterion` because the
-shapes match. Two verbs sharing an arrangement is not evidence about the second —
-`sharpen` looked like a defect on that reasoning and was not. A heuristic that
-skips the demonstration has replaced the method.
+**Demonstrated, and it is a defect — with both specific predictions wrong.** It
+writes **one** `BASED_ON`, not one per finding, and the answer **cannot** be
+inverted: `enquiryStatus` guards the empty case explicitly (*"abandoned, not
+answered — absence of evidence is not a negative result"*). Someone had already
+thought about it.
+
+The verdict was right and the reasoning under it was wrong, which is the reason to
+demonstrate rather than fix on a prediction — otherwise the right function gets
+wrapped for a false reason.
+
+What is wrong is the **retry**. `RESOLVES` before `BASED_ON`, so an interrupted
+close leaves a resolving decision citing nothing — *indistinguishable from a
+deliberate close without a cited result*, a legitimate call. The caller saw a throw
+and closes again:
+
+```
+CLOSE resolving decisions: 2
+CLOSE closure: abandoned answer: null
+CLOSE evidence: []
+```
+
+`enquiryStatus` picks between them with `.find()` over unordered rows and the
+orphan won. **A question answered "no" on cited evidence reports itself abandoned,
+with no answer and no evidence.** Not inverted — erased. `abandoned` is a positive
+classification, so PJ-011 §5 does not excuse it.
+
+**Two findings that outlive the verb**, both in `043`:
+
+- **The arbitrary-`rows[0]` shape is reachable by interruption.** `read.ts` guards
+  three functions by cardinality check and leaves `originOf`, `enquiryStatus` and
+  `whySupported` unguarded, on the argument that the write side cannot produce
+  two. An interrupted write plus a retry does. **"The writer cannot make
+  multiples" is not safe when the writer can fail halfway** — worth looking at the
+  three unguarded picks independently of the transaction work.
+- **A legitimate-looking partial state is the dangerous case, not the safe one.**
+  This one is byte-identical to a supported call, which is why it survived the
+  sweep, my reading and `039`'s superseded rule. A shape has no truth value
+  (`041`); the more legitimate it looks, the less it tells you, because the reader
+  cannot distinguish it either.
+
+**Base rate: three examined, two defects.**
 
 **The pending run now discriminates between two rules instead of confirming one.**
 `labkit-dev` read `039`'s rule and found my two clauses are not parallel: clause 2
@@ -188,25 +259,21 @@ shape to look for, and the rate is the most useful thing the sweep will produce.
 
 ## Next
 
-Three things, all waiting on an idle machine. `labkit-dev` is mid-measurement and
-this session's runs have already confounded its numbers once, and its runs mine.
+**`pursue` next.** It writes `MOTIVATES` last, so on the heuristic it is the most
+likely of the five to be clean — which is the reason to take it now. Three
+examined and two defects is a rate built almost entirely on positives; a clean
+result is what stops the number meaning "everything is broken".
 
-1. **The `closeEnquiry` demonstration.** Predictions in `042`, unrun. Deterministic
-   injection in the `BASED_ON` loop, following `tests/domain-session.test.ts`'s
-   three existing negative tests. Look specifically at whether `answer` flips.
-2. **Verify `labkit-dev`'s `reset()` truncate**, once pushed — not yet on
-   `origin/feat/domain-consumer` at `bf7d0b4`. Its prediction is specific and has a
-   mechanism rather than a correlation: **`graph "labkit_t1" does not exist` should
-   be zero**, because truncating the label tables leaves the graph in place and
-   nothing else in the suite drops it. This tree measured **6** against the cascade
-   fix alone, so zero is a real result and non-zero refutes the mechanism.
-3. **A load-controlled crossing count.** The 14 above is unusable next to
-   `labkit-dev`'s 5 and must not be quoted as a comparison.
-
-Then the remaining four. `pursue`, `recordReview`, `planWork`, `stateCriterion`
-and `declareGate` are **undecided, not cleared**. `pursue` writes its `MOTIVATES`
-last, so on the heuristic it is the most likely to be clean — worth doing early
-precisely because a clean result is what makes the base rate mean anything.
+`recordReview`, `planWork`, `stateCriterion` and `declareGate` after it, still
+**undecided, not cleared**.
 
 **Stop at the first that is not a defect and say so**, rather than continuing until
-something looks fixable.
+something looks fixable. And write the predictions each time: two of three were
+wrong on `closeEnquiry` and the verb was still a defect, so the predictions are
+earning their keep by being wrong in public rather than by being right.
+
+**Separately, and not part of the pile:** `043` found that the arbitrary-`rows[0]`
+shape is reachable by interruption plus retry, which the three unguarded picks in
+`read.ts` were argued safe against. The transaction closes it for `closeEnquiry`;
+whether `originOf` and `whySupported` want cardinality checks of their own is a
+question the pile did not ask and nobody owns.
