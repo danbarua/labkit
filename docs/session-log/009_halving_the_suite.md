@@ -61,10 +61,27 @@ it.** It went 3 → 1 against `labkit-minion`'s clean measurement of `2de1060`.
 Only `graph … does not exist` had a predicted mechanism (nothing drops the graph
 any more) and only that one is zero.
 
-**Independent confirmation is owed.** Every number above is this tree measuring
-its own change. `labkit-minion` has the clean `2de1060` baseline — 6
-`graph … does not exist` — and its run against `5439085` is what settles whether
-the mechanism holds.
+**Independent confirmation arrived, and the strongest form of it was not a
+measurement.** `labkit-minion` ran three idle suites against `5439085` — 270/0
+at 89s, 82s and 110s, **zero ceiling crossings**, zero of every teardown
+signature. It then said the useful thing about its own data: *a clean run cannot
+verify a claim about what happens during a flake, so three of them is three
+times not testing it.* Worth keeping as a rule.
+
+What settles it is structural. `reset()` drops nothing; `grep` finds exactly one
+surviving `dropTenantGraph` caller, this file's new reconciliation test. So
+**`graph "labkit_t1" does not exist` is impossible by construction, not merely
+unobserved** — which is stronger than any zero either of us measured.
+
+**But the reason first given for it was wrong, and the correction is the
+interesting part.** The claim was that the surviving caller targets `"drop-me"`,
+"a different graph from `labkit_t1` entirely". It is not: `"drop-me"` is the
+first tenant resolved in that file, `tenants.id` is truncated with
+`RESTART IDENTITY`, so it gets id 1 and **the graph every other file also calls
+`labkit_t1`** — verified directly. What actually keeps it apart is that
+`setupTestDb()` builds a **separate PGlite instance per test file**. Same
+conclusion, different reason, and the reason is what a future reader would have
+relied on.
 
 **A signature appeared once that neither fix addresses, and it is deliberately
 kept out of the flake numbers:** `unnamed prepared statement does not exist` —
