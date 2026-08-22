@@ -1,4 +1,4 @@
-# 009: emptying the tenant graph instead of dropping it, and a closed question closed twice
+# 009: halving the suite, a closed question closed twice, and the branch opened for merge
 
 **Session wrap, 2026-08-22, on `feat/domain-consumer`.** Not a decision record —
 see `docs/TASKS.md` for the flake's evidence and the two fixes that failed.
@@ -45,6 +45,15 @@ The second half of the suite flake: the ceiling crossings themselves, after
   two clean calls wrote two resolving decisions and `enquiryStatus` picked
   between them arbitrarily: abandon an enquiry, later close it citing evidence,
   and it still reports abandoned with no answer. Refused on the write side.
+
+- `cd8adf0` — two queue items closed. `whySupported` stays in one file
+  (**decided, not deferred** — offered and declined, so it leaves the queue);
+  and `package-lock.json` on `main` **resolves itself**, verified by dry-run
+  merge rather than assumed.
+- `477204b` — **PJ-029**, on what a second agent turned out to be for. Not
+  throughput: every useful catch across the day was a conclusion that was
+  *right* with reasoning underneath it that was *wrong*, which no test detects
+  because the tests pass either way. CLAUDE.md gains the pointer.
 
 Working tree clean apart from this entry.
 
@@ -175,5 +184,12 @@ today. What remains open has no owner and no obvious next step —
 `unnamed prepared statement does not exist` seen once on this tree and never on
 the other. Both are recorded in **Open**; neither is worth a session on current
 evidence.
+
+**The branch is open for merge: [PR #1](https://github.com/danbarua/labkit/pull/1).**
+202 commits, and the merge is clean rather than hoped-clean — `main` has one
+commit since the merge base and it touches nothing this branch touches;
+`git merge-tree --write-tree main feat/domain-consumer` exits 0 with zero
+conflicts, tree `8f846ef`, checked independently by this session and by
+`labkit-review` to the same hash.
 
 Nothing else is queued.
