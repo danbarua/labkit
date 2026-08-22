@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { TenantGraph } from "../src/db/graph";
-import { edgeProps, optional, vertexProps } from "../src/db/cypher";
+import { agtypeValue, edgeProps, optional, scalar, vertexProps } from "../src/db/cypher";
 import {
   NODE_LABELS,
   NODE_TYPES,
@@ -61,7 +61,7 @@ afterEach(async () => {
 });
 
 async function seedResearchThread() {
-  const question = await graph.createNode("Question", { name: "does the accelerated ridge implementation match the reference?" });
+  const question = await graph.createNode("Question", { name: "does the accelerated ridge implementation match the reference?", posed_at: "2026-01-01T00:00:00.000Z" });
   const lineOfEnquiry = await graph.createNode("LineOfEnquiry", { name: "numerical equivalence of accelerated ridge" });
   const evidenceUnit = await graph.createNode("EvidenceUnit", { role: "verification" });
   const computation = await graph.createNode("Computation", { kind: "equivalence_check", status: "completed", backend: "wandb", external_run_id: "run-42" });
@@ -107,6 +107,7 @@ describe("invalidation propagation", () => {
     const decision = await graph.createNode("Decision", {
       reason: "promote accelerated ridge to production",
       invalidation_check: "equivalence within tolerance on held-out batch",
+      decided_at: "2026-01-01T00:00:00.000Z",
     });
     await graph.createEdge(decision.natural_id, "BASED_ON", evidence.natural_id);
 
@@ -160,6 +161,7 @@ describe("open lines of enquiry", () => {
     const decision = await graph.createNode("Decision", {
       reason: "accelerated ridge confirmed equivalent",
       invalidation_check: "n/a",
+      decided_at: "2026-01-01T00:00:00.000Z",
     });
     await graph.createEdge(decision.natural_id, "RESOLVES", question.natural_id);
 
@@ -200,8 +202,8 @@ describe("failed/planned inquiry provenance", () => {
 
 describe("decision amendments", () => {
   test("an amendment is a decision that supersedes an earlier one", async () => {
-    const d1 = await graph.createNode("Decision", { reason: "use float32 batching", invalidation_check: "n/a" });
-    const d2 = await graph.createNode("Decision", { reason: "switch to float64 for stability", invalidation_check: "n/a" });
+    const d1 = await graph.createNode("Decision", { reason: "use float32 batching", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d2 = await graph.createNode("Decision", { reason: "switch to float64 for stability", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
     const rows = await graph.query(
@@ -216,9 +218,9 @@ describe("decision amendments", () => {
   });
 
   test("walks the full amendment chain back to the original decision", async () => {
-    const d1 = await graph.createNode("Decision", { reason: "d1-original", invalidation_check: "n/a" });
-    const d2 = await graph.createNode("Decision", { reason: "d2-amendment", invalidation_check: "n/a" });
-    const d3 = await graph.createNode("Decision", { reason: "d3-amendment", invalidation_check: "n/a" });
+    const d1 = await graph.createNode("Decision", { reason: "d1-original", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d2 = await graph.createNode("Decision", { reason: "d2-amendment", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d3 = await graph.createNode("Decision", { reason: "d3-amendment", invalidation_check: "n/a", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.createEdge(d3.natural_id, "SUPERSEDES", d2.natural_id);
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
@@ -236,24 +238,24 @@ describe("decision amendments", () => {
 
 describe("decision lifecycle integrity", () => {
   test("createNode rejects a Decision created already-open with closed_at set", async () => {
-    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", is_open: true, closed_at: "2026-08-18T00:00:00Z" })).rejects.toThrow(
+    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z", is_open: true, closed_at: "2026-08-18T00:00:00Z" })).rejects.toThrow(
       /cannot have closed_at/,
     );
   });
 
   test("createNode rejects a Decision created already-closed without closed_at", async () => {
-    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", is_open: false })).rejects.toThrow(/requires closed_at/);
+    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z", is_open: false })).rejects.toThrow(/requires closed_at/);
   });
 
   test("createNode defaults is_open to true when omitted", async () => {
-    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x" });
+    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
     const props = d.properties as DecisionProps;
     expect(props.is_open).toBe(true);
     expect(props.closed_at).toBeUndefined();
   });
 
   test("closeDecision sets is_open and closed_at together", async () => {
-    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x" });
+    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.closeDecision(d.natural_id, "2026-08-18T12:00:00Z");
 
     const rows = await graph.query(`MATCH (n:Decision {natural_id: $id}) RETURN n`, { n: vertexProps<DecisionProps>() }, { id: d.natural_id });
@@ -279,12 +281,12 @@ describe("edge integrity", () => {
   });
 
   test("createEdge throws when the target natural id doesn't exist", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     await expect(graph.createEdge(question.natural_id, "MOTIVATES", "LOE_999")).rejects.toThrow(/not found/);
   });
 
   test("createEdge is idempotent — calling it twice creates exactly one edge", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
     await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
@@ -336,12 +338,12 @@ describe("all node labels", () => {
   // doesn't satisfy its label's *Props interface is now a compile error
   // here, not a runtime surprise inside AGE.
   const fixtures: { [L in NodeLabel]: NodePropsByLabel[L] } = {
-    Question: { name: "q" },
+    Question: { name: "q", posed_at: "2026-01-01T00:00:00.000Z" },
     LineOfEnquiry: { name: "loe" },
     EvidenceUnit: { role: "experiment" },
     Evidence: { statement: "e" },
     Claim: { name: "c" },
-    Decision: { reason: "r", invalidation_check: "x" },
+    Decision: { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" },
     Criterion: { proposition: "p" },
     CriterionEvaluation: { value: "v", outcome: "pass", evaluated_at: "2026-08-17T00:00:00Z" },
     Gate: { consequence: "c" },
@@ -401,7 +403,7 @@ describe("tenant isolation", () => {
     const graphA = new TenantGraph(ctxA, db);
     const graphB = new TenantGraph(ctxB, db);
 
-    const questionA = await graphA.createNode("Question", { name: "q-in-a" });
+    const questionA = await graphA.createNode("Question", { name: "q-in-a", posed_at: "2026-01-01T00:00:00.000Z" });
     const loeB = await graphB.createNode("LineOfEnquiry", { name: "loe-in-b" });
 
     await expect(graphA.createEdge(questionA.natural_id, "MOTIVATES", loeB.natural_id)).rejects.toThrow(/not found/);
@@ -452,7 +454,7 @@ describe("provisioning reconciliation", () => {
 
 describe("edge uniqueness is DB-enforced, not just app-checked", () => {
   test("a duplicate CREATE that bypasses the app-level check is still blocked at the database", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
     await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id);
 
@@ -486,7 +488,7 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
   // raise from a real conflict, without needing two connections to
   // actually collide to get there.
   test("createEdge treats a 23505 from the CREATE step as success, not a race failure", async () => {
-    const question = await graph.createNode("Question", { name: "q" });
+    const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
 
     let createAttempts = 0;
@@ -519,3 +521,166 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
   });
 });
 
+/**
+ * Row T says "edges cannot carry properties". They can, and this is the check
+ * that keeps the correction from being re-derived wrongly.
+ *
+ * Every AGE label is a real Postgres table, edge labels included, and an edge
+ * row has the same `properties` agtype column a vertex row has. So the
+ * constraint row T describes is not a storage limit at all — it is two narrower
+ * facts about this codebase:
+ *
+ *   1. `createEdge(from, edge, to)` takes no properties. An API choice.
+ *   2. Edge identity is `UNIQUE (start_id, end_id)`, so a property can annotate
+ *      a relationship but can never distinguish two of them. That one is real
+ *      and is the honest statement of the row.
+ *
+ * Written through `graph.query()` rather than `createEdge()` on purpose: the
+ * point is what the backend supports, not what the write surface exposes.
+ */
+test("an edge carries properties, in Cypher and in the table underneath it", async () => {
+  const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
+  const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+
+  await graph.query(
+    `MATCH (a:Question {natural_id: $from}), (b:LineOfEnquiry {natural_id: $to})
+     CREATE (a)-[e:MOTIVATES {why: $why}]->(b) RETURN e`,
+    { e: agtypeValue() },
+    { from: question.natural_id, to: loe.natural_id, why: "the reviewer asked for it" },
+  );
+
+  const read = await graph.query(
+    `MATCH (:Question)-[e:MOTIVATES]->(:LineOfEnquiry) RETURN e.why AS why`,
+    { why: scalar<string>() },
+  );
+  expect(read.map((r) => r.why)).toEqual(["the reviewer asked for it"]);
+
+  // And from plain SQL, because the edge label is a table like any other --
+  // which is how natural-id uniqueness and edge uniqueness already work.
+  const rows = await db.query(
+    `SELECT properties::text AS props FROM ${ctx.graphName}."MOTIVATES"`,
+  );
+  expect(rows.rows[0]?.props).toContain("the reviewer asked for it");
+});
+
+/**
+ * `createEdge()` writes properties, and the idempotency contract decides what
+ * happens on the second call. Row T again, from the write surface this time.
+ *
+ * Create-if-absent means a repeat call is a no-op, so properties it carries are
+ * dropped. Asserted rather than left to be discovered: an upsert would let two
+ * callers race to overwrite each other under a contract that promises retries
+ * are free, and a property that needs to change later wants its own verb, the
+ * way `closeDecision()` is the only sanctioned way to set `is_open`.
+ */
+test("createEdge writes edge properties, and a repeat call does not change them", async () => {
+  const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
+  const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+
+  await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {
+    why: "the reviewer asked for it",
+    ordinal: 1,
+  });
+  const written = await graph.query(
+    `MATCH (:Question)-[e:MOTIVATES]->(:LineOfEnquiry) RETURN e.why AS why, e.ordinal AS ordinal`,
+    { why: scalar<string>(), ordinal: scalar<number>() },
+  );
+  expect(written).toEqual([{ why: "the reviewer asked for it", ordinal: 1 }]);
+
+  // The second call is the same no-op it has always been. Properties are not
+  // part of edge identity -- UNIQUE (start_id, end_id) is -- so this neither
+  // creates a parallel edge nor overwrites the first one's properties.
+  await graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {
+    why: "something else entirely",
+  });
+  const after = await graph.query(
+    `MATCH (:Question)-[e:MOTIVATES]->(:LineOfEnquiry) RETURN e.why AS why`,
+    { why: scalar<string>() },
+  );
+  expect(after).toEqual([{ why: "the reviewer asked for it" }]);
+});
+
+/** A property key cannot smuggle clause text into the CREATE. */
+test("createEdge refuses a property key that is not an identifier", async () => {
+  const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
+  const loe = await graph.createNode("LineOfEnquiry", { name: "loe" });
+  await expect(
+    graph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id, {
+      "why}]->(:X) CREATE (a)-[:MOTIVATES": "injected",
+    }),
+  ).rejects.toThrow();
+});
+
+/**
+ * `inTransaction()`'s depth counter must survive a failing COMMIT, and a
+ * failing ROLLBACK must not replace the error that caused it.
+ *
+ * Found incidentally while investigating the suite flake, and it was never
+ * observed to fire in a real run — every capture had COMMIT succeed. It is a
+ * latent defect rather than a live one, which is why it gets a demonstration
+ * before a fix: the old code decremented `depth` before COMMIT *and* again in
+ * the catch, so a throwing COMMIT left `depth` at **-1**. Re-entrancy is
+ * keyed on `depth > 0`, so the next compound verb would open a transaction
+ * that read as depth 0, and a verb nested inside it would issue a **second
+ * BEGIN** rather than joining the outer one. That is the re-entrancy contract
+ * silently inverted, and it survives for the life of the TenantGraph.
+ */
+test("a failing COMMIT does not corrupt the transaction depth", async () => {
+  const issued: string[] = [];
+  let failCommit = true;
+  const brittleDb: LabKitDB = {
+    async query(sql: string, params?: unknown[]) {
+      if (typeof sql === "string" && /^(BEGIN|COMMIT|ROLLBACK)$/.test(sql.trim())) {
+        issued.push(sql.trim());
+        if (sql.trim() === "COMMIT" && failCommit) {
+          failCommit = false;
+          throw new Error("injected: COMMIT failed");
+        }
+      }
+      return db.query(sql, params);
+    },
+  };
+  const brittle = new TenantGraph(ctx, brittleDb);
+
+  await expect(
+    brittle.inTransaction(async () => "done"),
+  ).rejects.toThrow(/injected/);
+
+  // The depth is not observable directly, so observe what it controls: a
+  // nested call must join the outer transaction rather than opening its own.
+  issued.length = 0;
+  await brittle.inTransaction(async () => {
+    await brittle.inTransaction(async () => "nested");
+  });
+  expect(issued.filter((s) => s === "BEGIN")).toEqual(["BEGIN"]);
+  expect(issued.filter((s) => s === "COMMIT")).toEqual(["COMMIT"]);
+});
+
+/**
+ * A failing ROLLBACK must not mask the error that triggered it.
+ *
+ * Fully mocked rather than wrapping the real connection: injecting a ROLLBACK
+ * failure into a live session leaves it in an aborted transaction, and the
+ * teardown that follows then stalls for five seconds — which is the very
+ * failure mode this test file is helping to characterise. A test that
+ * reproduces the bug it is adjacent to is not a useful test.
+ */
+test("a failing ROLLBACK does not replace the original error", async () => {
+  const issued: string[] = [];
+  const brittleDb: LabKitDB = {
+    async query(sql: unknown) {
+      const text = String(sql).trim();
+      issued.push(text);
+      if (text === "ROLLBACK") throw new Error("injected: ROLLBACK failed");
+      return { rows: [] } as never;
+    },
+  } as LabKitDB;
+  const brittle = new TenantGraph(ctx, brittleDb);
+
+  await expect(
+    brittle.inTransaction(async () => {
+      throw new Error("the real problem");
+    }),
+  ).rejects.toThrow(/the real problem/);
+  expect(issued).toEqual(["BEGIN", "ROLLBACK"]);
+});

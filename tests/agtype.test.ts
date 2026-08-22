@@ -178,7 +178,7 @@ describe("parseAgtype — against live pglite-age", () => {
     const ctx = await resolveTenantContext(db, "labkit");
     const graph = new TenantGraph(ctx, db);
 
-    const a = await graph.createNode("Question", { name: "q" });
+    const a = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
     const b = await graph.createNode("LineOfEnquiry", { name: "loe" });
     await graph.createEdge(a.natural_id, "MOTIVATES", b.natural_id);
 
@@ -207,18 +207,26 @@ describe("parseAgtype — against live pglite-age", () => {
     expect(parsedPath.elements.map((el) => el.kind)).toEqual(["vertex", "edge", "vertex"]);
   });
 
-  // The headline case this rewrite exists for: LabKit provisions 13 node +
-  // 19 edge labels per tenant (src/db/domain.ts's NODE_LABELS/EDGE_LABELS),
-  // and graphid = label_id * 2^48 + entry_id — confirmed empirically that
-  // SUPERSEDES (a late edge label in provisioning order) already produces
-  // a graphid past Number.MAX_SAFE_INTEGER on its very first edge, in
-  // every tenant, today — not a hypothetical.
+  // The headline case this rewrite exists for. graphid = label_id * 2^48 +
+  // entry_id, so the label count is what puts SUPERSEDES — a late edge label in
+  // provisioning order — past Number.MAX_SAFE_INTEGER on its very first edge,
+  // in every tenant, today, not hypothetically.
+  //
+  // No counts here. This comment carried "13 node + 19 edge labels" and was
+  // wrong by six, because a number in a comment is a maintenance claim nobody
+  // agreed to keep (PJ-028).
+  //
+  // Nor are they asserted, which was the first instinct and is wrong: the
+  // property that matters is asserted empirically below — `Number.isSafeInteger`
+  // on the real graphid — and that guard tightens as labels are added, where
+  // `expect(EDGE_LABELS.length).toBe(n)` would merely break. An assertion that
+  // protects nothing an existing assertion does not is a change-detector.
   test("a SUPERSEDES edge's internal id, past Number.MAX_SAFE_INTEGER, round-trips exactly via bigint", async () => {
     const ctx = await resolveTenantContext(db, "labkit");
     const graph = new TenantGraph(ctx, db);
 
-    const d1 = await graph.createNode("Decision", { reason: "r1", invalidation_check: "x" });
-    const d2 = await graph.createNode("Decision", { reason: "r2", invalidation_check: "x" });
+    const d1 = await graph.createNode("Decision", { reason: "r1", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d2 = await graph.createNode("Decision", { reason: "r2", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
     const rawIdRows = await db.query<{ id: string }>(`SELECT id::text FROM "${ctx.graphName}"."SUPERSEDES"`);

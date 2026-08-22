@@ -50,6 +50,7 @@ export const EDGE_LABELS = [
   "DEFERS", // Decision -> Question
   "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
   "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
+  "INVALIDATED_BY", // Artefact -> Review (which review the retraction rested on)
   "IMPLEMENTS", // Task -> EvidenceUnit
 ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
@@ -177,18 +178,6 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   TRIGGERS: [["CriterionEvaluation", "Gate"]],
   GATES: [["Gate", "Task"], ["Gate", "Computation"]],
   /**
-   * What a decision withdrew or replaced. A design condition (S-7), an
-   * interpretation (S-12).
-   *
-   * The `Claim` pair is earned by S-12. With only a `Review` recording that an
-   * interpretation had been criticised, `whySupported()` went on reporting the
-   * retracted sentence as supported — the record confidently asserting
-   * something the reviewer had just withdrawn, which is the worst thing a
-   * provenance system can do. A review is not a retraction: reviews also
-   * confirm, and telling the two apart from a free-text verdict would be
-   * text-matching.
-   */
-  /**
    * "Re-checked that finding, without reproducing the run behind it." Earned
    * by S-10.
    *
@@ -234,6 +223,18 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * happened.
    */
   PROMOTES: [["Decision", "Claim"]],
+  /**
+   * What a decision withdrew or replaced. A design condition (S-7), an
+   * interpretation (S-12).
+   *
+   * The `Claim` pair is earned by S-12. With only a `Review` recording that an
+   * interpretation had been criticised, `whySupported()` went on reporting the
+   * retracted sentence as supported — the record confidently asserting
+   * something the reviewer had just withdrawn, which is the worst thing a
+   * provenance system can do. A review is not a retraction: reviews also
+   * confirm, and telling the two apart from a free-text verdict would be
+   * text-matching.
+   */
   CHANGES: [["Decision", "Criterion"], ["Decision", "Claim"]],
   BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
   RESOLVES: [["Decision", "Question"]],
@@ -255,6 +256,39 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * scenario reviewing an execution, but S-11 did not earn it.
    */
   EVALUATES: [["Review", "Claim"], ["Review", "Decision"], ["Review", "Evidence"], ["Review", "EvidenceUnit"]],
+  /**
+   * Which review a retraction actually rested on. Earned by S-11b, row O.
+   *
+   * `replaceAnalysis()` took a `because: ReviewRef`, checked it reviewed the
+   * analysis being replaced, and then wrote it nowhere — the reference reached
+   * the event stream and stopped. So `whySupported()` reported a superseded
+   * finding's reason from `OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)`, any
+   * review of the unit. With a critical review and a confirming one on the same
+   * analysis — which is what a programme with two reviewers produces
+   * constantly — it reported *"numbers check out; independently recomputed the
+   * same values"* as a reason the work was retracted. An approval presented as
+   * a retraction, demonstrated in two worlds that differ only in which review
+   * the researcher acted on and that the read surface could not tell apart.
+   *
+   * **Not `EVALUATES`.** `Review -> Evidence` already exists and means *this
+   * was reviewed*; using it for *this caused the retraction* is one edge with
+   * two readings, which CLAUDE.md names as the failure shape behind every
+   * expensive mistake here. `PROMOTES` was split from `CHANGES` for exactly
+   * this reason.
+   *
+   * **Not `BASED_ON`.** Semantically it fits — the invalidation rested on this
+   * review — and that is the trap. Row AA is a live `boundary` recording that
+   * `BASED_ON` already carries two senses, and a third would widen a row while
+   * closing this one. Its sources are also judgments (`Decision`,
+   * `CriterionEvaluation`); an `Artefact` is not one.
+   *
+   * The endpoint is the invalidated `Artefact` because that is the thing whose
+   * standing changed and the thing a reader is holding when the question
+   * arises: *why is this no longer valid?* The direction is passive, like
+   * `BASED_ON` and `RECORDED_IN`, because a review does not retract anything —
+   * a researcher does, on the strength of it.
+   */
+  INVALIDATED_BY: [["Artefact", "Review"]],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
 };
 
@@ -274,6 +308,28 @@ export type EvidenceUnitRole =
 
 export interface QuestionProps {
   name: string;
+  /**
+   * When the question entered the record, from the injected clock.
+   *
+   * Earned the way `Decision.decided_at` was, and by the same kind of
+   * demonstration: without it `whatWasKnown()` began `MATCH (q:Question)` —
+   * every question that exists *now* — and reported a question posed in April
+   * as `open` in March. `open` is an assertion, not an absence: it says the
+   * question was on the record and nothing had settled it. Applied to a
+   * question nobody had asked yet it back-dates the programme's own agenda,
+   * which is the mirror of the failure that method already guarded against for
+   * promotion. See tests/consumer/historical_survey.test.ts, which demonstrates
+   * it rather than arguing it.
+   *
+   * **Record time, not the moment the researcher first wondered.** Same reading
+   * as `decided_at`, and named here for the same reason: a bare timestamp looks
+   * like a fix while silently choosing a side.
+   *
+   * Required, not optional. A question whose instant is unknown cannot be
+   * placed in time at all, and a survey that quietly includes the unplaceable
+   * is the wrong answer this property exists to stop.
+   */
+  posed_at: string;
 }
 
 export interface LineOfEnquiryProps {
@@ -304,6 +360,25 @@ export interface ClaimProps {
 export interface DecisionProps {
   reason: string;
   invalidation_check: string;
+  /**
+   * When the act was recorded, from the injected clock. Earned by row Z.
+   *
+   * **Record time, not belief time**, and the distinction is load-bearing rather
+   * than pedantic. This says when the decision entered the record; it does not
+   * say when the researcher came to hold it, and nothing here can. A designer in
+   * the consumer exercise required both readings separately — *"recorded by 3
+   * March"* against *"asserted as held on 3 March but written down later"* — and
+   * `023` demoted that to a candidate extension because no source obligation
+   * requires it. Naming the reading here is what stops the next reader assuming
+   * the other one: a single timestamp otherwise looks like a fix while silently
+   * choosing a side.
+   *
+   * Required, not optional. A decision whose instant is unknown cannot be
+   * ordered, and an ordering with holes is the thing row Z already had —
+   * `CriterionEvaluation.evaluated_at` bounded some closures and left the rest
+   * unplaceable, which is why deriving the order from evidence failed.
+   */
+  decided_at: string;
   is_open?: boolean;
   closed_at?: string;
 }

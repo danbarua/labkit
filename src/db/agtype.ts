@@ -347,21 +347,33 @@ export function parseAgtype<T = Record<string, AgtypeJSON>>(raw: string): Agtype
 // Ported from Apache AGE's driver (VALID_GRAPH_NAME / VALID_LABEL_NAME /
 // VALID_SQL_IDENTIFIER, index.ts:31-63) as understood, in-house logic — not
 // imported. Reused here for the gap that review actually surfaced for
-// LabKit: property KEYS (propPattern in graph.ts), not just graph/label
-// names — createNode<T extends Record<string, unknown>>() accepts
-// arbitrary keys at runtime, and LabKit's primary use case is a
-// per-project MCP server where an external agent supplies props.
+// LabKit: property KEYS, not just graph/label names — LabKit's primary use
+// case is a per-project MCP server where an external agent supplies props.
+//
+// The two things this paragraph used to name are gone: `propPattern` in
+// graph.ts, and `createNode<T extends Record<string, unknown>>()` accepting
+// arbitrary keys at runtime. `createNode` is `<L extends NodeLabel>(label: L,
+// props: NodePropsByLabel[L])` now, and the key validation happens in
+// `buildPropertyClause()` below.
 // ---------------------------------------------------------------------------
 
 /** AGE graph names: dots/hyphens allowed in the middle, not at the ends. */
 const VALID_GRAPH_NAME = /^[A-Za-z_][A-Za-z0-9_.-]*[A-Za-z0-9_]$/;
 
 /**
- * Everything else this file validates — vertex/edge labels, property keys,
- * `cypher()`'s result-column names — follows plain Postgres bare-identifier
- * rules: no dots or hyphens anywhere. One regex, three call sites, rather
- * than upstream's three near-duplicate ones, since (unlike graph names)
- * none of these have a reason to differ from each other for LabKit.
+ * Everything else this file validates follows plain Postgres bare-identifier
+ * rules: no dots or hyphens anywhere. One regex rather than upstream's three
+ * near-duplicate ones, since (unlike graph names) none of these has a reason to
+ * differ from the others for LabKit.
+ *
+ * What it actually guards, checked rather than listed from memory: property
+ * keys, `cypher()` column names and column types, and edge property keys in
+ * `graph.ts`. **Not** vertex or edge labels, which an earlier version of this
+ * comment advertised — those are interpolated raw, and are safe because
+ * `createNode`/`createEdge` dereference a label-keyed map (`NODE_TYPES`,
+ * `EDGE_SCHEMA`) before the label reaches query text, so an unknown label
+ * throws on the lookup. Incidental, not designed; worth knowing before anyone
+ * adds a path that interpolates a label without that deref.
  */
 const VALID_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -371,7 +383,7 @@ export function validateGraphName(name: string): void {
   }
 }
 
-/** Used for vertex/edge labels, property keys, and cypher() column names. */
+/** Used for property keys and cypher() column names — see `VALID_IDENTIFIER`. */
 export function validateIdentifier(name: string, context: string): void {
   if (name.length > 63 || !VALID_IDENTIFIER.test(name)) {
     throw new Error(`invalid ${context}: "${name}"`);
@@ -379,9 +391,9 @@ export function validateIdentifier(name: string, context: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Cypher clause construction — typed replacements for graph.ts's raw-string
-// propPattern() and TenantGraph.cypher()'s asClause parameter, both of
-// which currently interpolate unvalidated strings into query text.
+// Cypher clause construction — typed replacements for the raw-string property
+// patterns and hand-written AS clauses that used to interpolate unvalidated
+// strings into query text. Those are gone; this is what replaced them.
 // ---------------------------------------------------------------------------
 
 export interface CypherColumn {
@@ -417,9 +429,13 @@ export function buildAsClause(columns: CypherColumn[]): string {
 }
 
 /**
- * Replaces graph.ts's propPattern(): validates every key before it reaches
- * query text (the actual gap this file exists to close), returns the same
- * `{k: $k, ...}` clause shape createNode()/createEdge() already build on.
+ * Validates every key before it reaches query text — the actual gap this file
+ * exists to close — and returns a `{k: $k, ...}` clause.
+ *
+ * **`createNode()` uses this; `createEdge()` deliberately does not**, and says
+ * why at its call site: it binds its parameters under a `p_` prefix, because an
+ * edge property called `from` would otherwise rebind the source node's natural
+ * id. This docstring used to name both as callers.
  */
 export function buildPropertyClause(props: Record<string, unknown>): string {
   return Object.keys(props)

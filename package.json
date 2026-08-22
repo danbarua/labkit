@@ -10,14 +10,18 @@
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "dev:dependency-cruiser": "npx depcruise tests --output-type dot | dot -T svg > docs/dependency-graph.svg",
+    "mcp": "bun run src/mcp/server.ts",
+    "dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
     "build": "bun build --compile --outfile bin/labkit src/cli.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "check:doc-comments": "bun scripts/check-doc-comments.ts",
+    "check:ledger": "bun scripts/check-ledger.ts",
     "check:migrations": "bun scripts/check-migrations.ts",
     "check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
-    "check:progress": "bash scripts/check-progress-to-stdout.sh",
+    "check:stdout": "bash scripts/check-stdout.sh",
     "check:pglite-concurrency": "bash scripts/check-pglite-concurrency.sh",
+    "check:tests-assert": "bun scripts/check-tests-assert.ts",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom"
   },
@@ -44,10 +48,5 @@
     "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0",
     "zod": "^4.4.3"
-  },
-  "allowScripts": {
-    "es5-ext@0.10.64": true,
-    "esbuild@0.18.20": true,
-    "esbuild@0.19.12": true
   }
 }

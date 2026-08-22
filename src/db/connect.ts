@@ -1,3 +1,4 @@
+import { traced } from "./trace";
 import { join } from "node:path";
 import { directPostgresBackend, pgliteLeaderElectionBackend, type LabKitDBConnection } from "./backend";
 
@@ -24,14 +25,27 @@ function derivePort(projectRoot: string): number {
 export async function connectDb(projectRoot = process.cwd()): Promise<LabKitDBConnection> {
   const url = process.env.LABKIT_DB_URL;
   if (url) {
-    return directPostgresBackend({ connectionString: url }).connect();
+    return withTrace(await directPostgresBackend({ connectionString: url }).connect(), "postgres");
   }
 
   const labkitDir = join(projectRoot, ".labkit");
-  return pgliteLeaderElectionBackend({
+  const connection = await pgliteLeaderElectionBackend({
     dataDir: join(labkitDir, "pglite"),
     lockPath: join(labkitDir, "pglite.lock"),
     port: derivePort(projectRoot),
     host: "127.0.0.1",
   }).connect();
+  return withTrace(connection, "pglite");
+}
+
+/**
+ * Threads the connection through `traced()` while keeping whatever else the
+ * backend hung off it (`close`, role, and so on).
+ *
+ * A no-op unless `LABKIT_TRACE` is set — `traced()` returns the same object it
+ * was given, so the spread below copies a connection that was never wrapped.
+ */
+function withTrace(connection: LabKitDBConnection, label: string): LabKitDBConnection {
+  const db = traced(connection.db, label);
+  return db === connection.db ? connection : { ...connection, db };
 }

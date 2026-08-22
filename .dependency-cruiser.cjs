@@ -13,6 +13,39 @@ module.exports = {
       to: { path: '^src/db' }
     },
     {
+      name: 'consumer-probe-no-persistence',
+      severity: 'error',
+      comment:
+        "The consumer vertical slice asks whether the *public read surface* can tell two " +
+        "research worlds apart. Reaching into src/db would let a probe answer from the " +
+        "graph directly and report a distinction no consumer could ever make, which is " +
+        "the one result the exercise must not be able to fake. tests/helpers/ is exempt.",
+      from: { path: '^tests/consumer' },
+      to: { path: '^src/db' }
+    },
+    {
+      name: 'reads-and-writes-do-not-mix',
+      severity: 'error',
+      comment:
+        "src/domain/session.ts was split on a seam the domain already asserts: events explain " +
+        "how state changed, the graph explains what the state is. Measured, that seam was exact " +
+        "-- 18 write verbs, 14 read verbs, no member doing both, and all 18 callers of emit on " +
+        "the write side. Either half importing the other would let a read emit or a write answer, " +
+        "and the seam would rot back into one file. Shared helpers go in core.ts, which is small " +
+        "and enumerated on purpose so it cannot become a junk drawer.",
+      from: { path: '^src/domain/(read|write)\\.ts$' },
+      to: { path: '^src/domain/(read|write)\\.ts$', pathNot: '$1' }
+    },
+    {
+      name: 'core-knows-no-verbs',
+      severity: 'error',
+      comment:
+        "SessionCore holds the graph, the clock, the sink and the nine helpers both halves need. " +
+        "If it reaches back to a surface the layering inverts and the split buys nothing.",
+      from: { path: '^src/domain/core\\.ts$' },
+      to: { path: '^src/domain/(read|write|session)\\.ts$' }
+    },
+    {
       name: 'persistence-knows-no-domain',
       severity: 'error',
       comment:

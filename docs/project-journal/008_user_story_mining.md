@@ -674,7 +674,7 @@ this document's original analysis are marked as such.
 | C | A claim has no endpoint or scope | S-5, S-13° | resolved |
 | D | No question-to-question lineage | **S-1**, S-13° | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
-| F | No artefact-to-artefact lineage | **S-9** | open |
+| F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c**, **S-9d**, **S-10c** | boundary |
 | G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
 | I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
@@ -683,27 +683,34 @@ this document's original analysis are marked as such.
 | L | No execution input lineage | S-11 | resolved |
 | M | A review has no analysis to point at | S-11 | resolved |
 | N | Claim identity is undefined | S-5, S-12 | resolved |
-| O | Withdrawal reason is under-determined | S-3, S-7 | open |
+| O | Withdrawal reason is under-determined | S-3, S-7, **S-11b** | resolved |
 | P | `Evidence` carries two senses | **S-9**, S-10, S-12 | resolved |
 | Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, **S-18** | resolved |
-| S | No agent, person or role exists in the model | S-8 | open |
-| T | Edges cannot carry properties | S-7, row O | open |
+| S | No agent, person or role exists in the model | S-8, **S-8b** | refuted |
+| T | Edges cannot carry properties | S-7, ~~row O~~, **S-10b** | refuted |
 | U | A gate records no condition until it is evaluated | S-17 | resolved |
 | V | Criteria gate work but do not qualify findings | S-3, S-8, **S-3b** | resolved (argued) |
 | W | An evaluation record is not evidence of evaluation | S-17, S-3, S-8 | resolved |
 | X | "Failure sticks" is S-3 policy applied to every gate | S-3, S-17, S-3b, **S-3c** | resolved |
 | Y | Closure without a cited result is classified by whether anyone worked on it | **S-1**, **S-14** | boundary |
-| Z | Chronology exists for evidence but not for status | **S-1**, S-7 | open |
+| Z | Chronology exists for evidence but not for status | **S-1**, S-7, consumer probe | resolved |
 | AA | `BASED_ON` carries two senses | **S-1**, S-7, S-12 | boundary |
 | AB | A consequential act records what it acted **on**, not what it brought into existence | **S-1**, **S-7**, S-12, **S-3c** | resolved |
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
+| AD | Observation-only work on a question reads as no work at all | **S-9b** | resolved |
+| AE | An analysis cannot read another analysis's output | **S-11c**, **S-11d** | resolved |
+| AF | Execution input order is not recorded | **S-10b** | open |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
 be one. `resolved (argued)` — settled, but the closing move was an argument
 rather than a demonstrated wrong answer; weaker, and scannable as such rather
-than distinguished only in the prose below. `deferred` — real, deliberately not
+than distinguished only in the prose below. `demonstrated` — a wrong answer is
+on the record and the **fix** is what is unbuilt; CLAUDE.md permits at most one
+of these at a time and requires clearing it next, and
+`bun run check:ledger` fails when a second appears, so the rule is an
+invariant rather than an intention. `deferred` — real, deliberately not
 acted on, **and with a scenario named that would settle it**. `boundary` — a
 known limit of the current model, recorded rather than fixed.
 
@@ -718,10 +725,26 @@ to be that well informed:
 | Kind | Means | Rows today |
 | --- | --- | --- |
 | `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
-| `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T, Z |
-| `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA |
+| `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T |
+| `demonstrated` | a wrong answer is on the record and the fix is what is unbuilt | **none** — AD was the first and was cleared the day it opened |
+| `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA, **F** |
 
-Only the middle kind is a gap in the *method* — CLAUDE.md's deferral rule says
+The **demonstrated** kind is new with row AD and is the only one with a
+deadline: CLAUDE.md permits at most one confirmed wrong answer shipping green
+and requires that clearing it be the next thing built. A second row of this kind
+appearing before AD is cleared is a rule violation on its face, not a judgment
+call. It is distinguished from `open` + unowned because nothing about it is
+waiting for a discriminator — S-9b's seventh test is the discriminator, and what
+is unbuilt is the fix.
+
+It exists because the deferral rule **already referenced this state and the
+vocabulary could not express it**. "At most one confirmed wrong answer ships
+green" has a precondition the ledger had no way to mark, so whether the rule was
+engaged could only be established by reading prose — which is row K's failure
+mode exactly, a condition recorded where nobody re-reads it. A fourth label that
+nothing counts would repeat that, so `bun run check:ledger` counts it.
+
+Only the second kind is a gap in the *method* — CLAUDE.md's deferral rule says
 a row that cannot name a scenario is unresolved and unowned rather than
 `deferred`, and those rows say so in their own section. The first kind is
 ordinary backlog. Keeping the three apart is what stops "we haven't decided"
@@ -816,7 +839,7 @@ something that could not be true
 
 ### Row F — No artefact-to-artefact lineage
 
-**Scenarios:** S-9 · **Status:** open
+**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d**, **S-10c** · **Status:** boundary
 
 **Current state (verified):** no `Artefact`→`Artefact` edge
 
@@ -861,8 +884,149 @@ far only an absence.
 
 *The discriminator, named as the deferral rule requires:* a scenario in which a
 reader must **recover** what a reconstruction was reconstructing, and gets a
-confidently wrong answer without it. Nothing named would settle it, which is
-what the marker above records. See PJ-021 and PJ-024 §5.
+confidently wrong answer without it. See PJ-021 and PJ-024 §5.
+
+**S-9b (2026-08-21): the discriminator was built, and rung 2 held.** No longer a
+named probe waiting to exist — see `docs/consumer-contract/027` and `028`.
+
+*What it established.* A reconstruction and independent fresh work leave records
+identical in every field a reader can ask for, so the row clears bar 4 and still
+does **not** clear PJ-011 §5. The one wrong answer available — `whySupported()`
+reporting a proposition rebuilt once as resting on two independent findings — is
+S-10's wrong answer at the artefact level, and **`reverify()` already prevents
+it**. Two entries in `support` is correct in one world and wrong in the other,
+and nothing but the researcher's choice of verb distinguishes them; the record
+cannot check the choice, which is a real limit and is not a missing relationship.
+
+*Where rung 2 stops, and why the row stays open.* `reverify()` re-checks a
+*conclusion*, so it refuses a rebuild that concluded nothing — which is exactly
+Designer 2's case, an input regenerated so later work could proceed. Rung 2
+holds for the case that could produce a wrong answer and refuses the case the
+contract requires. The ladder is **paused at rung 3**, gated on the adapter
+phase's reconstruction-provenance read, per `023`'s own sequencing.
+
+**S-9d (2026-08-21): the same shape again, in the most-used read, and this one
+is not fixed.** `whySupported().restingOn` is
+`[...new Set(rows.map((r) => r.a.logical_name))]` — deduplicated **by name**.
+
+An analysis resting on a surviving fragment *and* its regeneration reports
+`restingOn: ["control series"]`: one entry for two inputs. The record states a
+conclusion rests on a single thing when it rests on two, and the input that
+disappears is indistinguishable from the one that remains — so a reader auditing
+the basis of a claim cannot see that a regeneration with inferred provenance is
+underneath it. Populated, confident, short; `restingOn` answers, and answers
+wrongly.
+
+Demonstrated against durable state, twice: `reproducibilityOf()` reports both
+parts from the same graph (it was taught identity in S-9c), and
+`whatDependsOn()` **refuses** the shared name. So the surface already knows the
+name is ambiguous in two places and collapses on it in a third.
+
+*Predicted before the test* (`docs/consumer-contract/033`), including that the
+remedy would be rung 1 again and that the row would still not close.
+
+**VERDICT 2026-08-21: `boundary`** — see `docs/consumer-contract/035`, `036`.
+
+*The row's first half is false.* Artefacts have `natural_id`. What four bites
+showed is that the **reads were not using it**: `reproducibilityOf()` put one
+name in `exact` and `differing` at once (S-9c), `whySupported().restingOn`
+deduplicated two inputs into one (S-9d), and `reproductionOf().differs` reported
+two contradicting entries under one label (S-10c). Each was fixed by carrying
+identity **that already existed**. A version-of relationship would have fixed
+none of them, so they are evidence *against* the row.
+
+*And no read needs one.* Every read on `ReadSurface` touching an artefact either
+takes a **reference**, or takes a name and **refuses** when ambiguous, or
+**returns** identity — enumerated, and asserted in S-10c rather than left as
+prose. The model was never missing identity.
+
+*What would reopen it:* "show me the history of this control series" — versions
+as an ordered sequence, asked of a name rather than of one artefact. No verb asks
+it, and under PJ-011 §5 a question never asked earns nothing. That would be the
+first read needing identity its caller does not hold, which is exactly what the
+enumeration above rules out today.
+
+*Row F was the only candidate in this project's history that would have required
+the first new noun.* It did not.
+
+**Fixed the same day, at rung 1.** `restingOn` deduplicates by identity and
+carries `{ part, name }` — `IdentifiedArtefact`, the shape S-9c introduced for
+`reproducibilityOf()` and renamed here because a second read needed it and
+`ReproducedPart` stopped being accurate. One field, no noun, no edge, no
+property, no migration. Deletion-verified: keying the dedupe on name again fails
+both assertions.
+
+**Row F stays `open`.** This was the third *report* to lack identity, not the
+model. Whether two artefacts can be two versions of one thing is still
+untouched, and still unbitten.
+
+**Three reporting bites, no model bite.** S-9c and S-9d are one defect in two
+functions: a rule enforced on the way *in* and dropped on the way *out*.
+`reproducibilityOf()` took parts by reference and argued for it in a comment,
+then reported bare names; `restingOn` never took identity at all. That is
+evidence about where row F's defect lives — in what the reads *say*, not in what
+the model *holds* — and it is the strongest argument yet that the row is a
+`boundary` rather than an open model gap. Not concluded here: a fourth
+instance would settle it, and three is a pattern rather than a proof.
+
+**S-9c (2026-08-21): the row bit, in the reporting rather than the model.**
+S-9 took parts by *reference* on the way into `reproducibilityOf()`, with a
+comment that a name-keyed map "would merge exactly the two things this scenario
+exists to keep apart" — and then reported bare **names** on the way out. With an
+original and its regeneration under one name, that put the same string in
+`exact` **and** `differing` at once: the record stating a part had reproduced
+exactly and come back different, with no way to tell which was which. A reader
+working from `exact` would conclude the control reproduced.
+
+Fixed at rung 1, in the query: the report now carries `{ part, name }` —
+identity and label — so a shared name cannot merge two parts. No model change,
+and the row stays **open**, because this was the *report* lacking identity, not
+the artefact. The versioned-entity question below is untouched.
+
+The instructive part: the guard existed, was argued for in a comment, and was
+applied to one direction only. Six regions had decided identity-is-never-wording
+before this; the seventh was inside a function written to respect the rule.
+
+**Reframed 2026-08-21, and the reframe is the discriminator the row never had.**
+*"What you're describing is a versioned domain entity."*
+
+Row F has been asking "where is the `Artefact → Artefact` edge?" for the whole
+arc, and S-9b showed the missing thing is not lineage between two artefacts. It
+is that **an artefact has no identity apart from its content.** `logical_name`
+is wording, which S-9 correctly refused to treat as identity, and `content_hash`
+is the bytes — so there is nothing in the model that two artefacts can be two
+versions *of*. That is why "is this a rebuild of that, or independent work?" has
+no answer: both readings need an entity neither has.
+
+This resolves the tension S-9 and S-9b left standing. S-9 said two artefacts may
+share a name without being the same thing; S-9b's designer required a
+reconstruction to remember its historical target. Both are right, and the thing
+that reconciles them is a **versioned entity**: the name is not identity, the
+bytes are not identity, and the entity the versions belong to is what the
+researcher knows at write time and is never asked for.
+
+Which makes the shape identical to row **O**, closed the same day: information
+the writer holds, that the verb does not request, that the reader then infers
+wrongly or not at all. `recordObservations()` never asks *what is this a new
+version of* — not once, not optionally. That is row **AB** asked of an argument
+list rather than of a return type.
+
+**Not built.** It is a genuine noun (rung 4), it is the most expensive change
+anyone has proposed to this model, and the demonstration standard is unchanged:
+S-9b established bar 4 and did **not** clear §5. What the reframe buys is that
+the row finally has a discriminator that names a shape rather than an edge —
+*a scenario in which the record must distinguish a new version of a thing from a
+new thing, and gets it wrong* — where before it named the remedy and called it
+the problem.
+
+*A reclassification considered and rejected.* `027` predicted this build would
+end with F moved to `boundary` and called that the bigger result. It would
+contradict `023`, which scores F's contract necessity **strong** — a row cannot
+be both a requirement of the frozen contract and a limit nobody claims should be
+fixed. Row Z is the precedent against it too: Z never cleared §5 either and
+earned its property on bar 4 plus a demonstrated rung-1 failure. Recorded
+because a prediction that frames one outcome as impressive is a thumb on the
+scale, and it nearly worked.
 
 ### Row G — "Locked" is not distinct from "decision record still active"
 
@@ -984,7 +1148,7 @@ PJ-023.
 
 ### Row O — Withdrawal reason is under-determined
 
-**Scenarios:** S-3, S-7 · **Status:** open
+**Scenarios:** S-3, S-7, **S-11b** · **Status:** resolved
 
 **Current state (verified):** `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation
 
@@ -999,9 +1163,82 @@ PJ-023.
 
 **S-12: still does not bite.** A reinterpretation mints both the review and the decision that acted on it, so which review caused the change is recorded rather than inferred. Note what this establishes in passing: a review is *not* a retraction — reviews also confirm, and distinguishing them from a free-text verdict would be text-matching. That is why the `Decision` exists at all here
 
+### Row AF — Execution input order is not recorded
+
+**Scenarios:** **S-10b** · **Status:** open
+
+**Current state (verified):** `CONSUMES` records which artefacts a computation read, never in what sequence
+
+**NEW, from S-10b, and it earns nothing yet.** `recordAnalysis({ from })` takes
+an ordered list and the record keeps a set. Two runs of an order-sensitive
+method — an alignment computing *first minus second*, where reversing flips the
+sign — are indistinguishable in durable state, so `reproducibilityOf()` reports
+the reversed rebuild `reproducible: true` and `reverify()` accepts it as a
+re-verification of the original finding.
+
+*Why that is an absence and not a wrong answer.* The reports claim the two runs
+consumed the same inputs, and they did. What a reader *infers* — same inputs,
+same computation — is the wrong part, and the record never asserted it. Under
+PJ-011 §5 an unanswerable question earns nothing, and the model has no concept
+of an ordered input list to be wrong within.
+
+*What would move it:* a reader acting on "reproduced" for a reversed run and
+being wrong in a way the record states rather than implies. Not built, and no
+scenario currently named would settle it — unresolved and unowned, recorded here
+rather than left to look like a decision.
+
+**S-11b (2026-08-21): resolved, and the row's own description of itself was
+wrong.** See `docs/consumer-contract/031`, `032`.
+
+*The gap was absence, not ambiguity.* This cell says the causal review is
+ambiguous when several review one unit. In fact `replaceAnalysis()` took
+`because`, checked it reviewed the analysis being replaced, and wrote it
+**nowhere** — the reference reached the event stream and stopped. The causal
+review was absent with *one* review. Two reviews are only what makes the absence
+visible, because with one the arbitrary pick happens to be right. Every scenario
+before this had at most one review per analysis, so the read was correct by
+coincidence in every world the corpus contained — which is how the deferral
+survived eleven scenarios.
+
+*The wrong answer.* `whySupported()` reported a superseded finding's reason from
+`OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)` — any review of the unit. With a
+critical review and a confirming one on one analysis, it reported *"numbers check
+out; independently recomputed the same values"* as a reason the work was
+retracted: an approval presented as a retraction. Two worlds differing only in
+which review the researcher acted on were byte-identical to every read on the
+surface. A second defect in the same line reported one supersession twice, with
+contradictory reasons.
+
+*The remedy, with rung 1 built and shown insufficient.* Dedupe plus dropping the
+verdict attribution removes the wrong answer and leaves both worlds saying *"its
+analysis was replaced"* — honest and uninformative. What earns the edge is not an
+ugly query but that `because` was supplied, validated and discarded, which is row
+AB's shape. `INVALIDATED_BY: Artefact → Review`, one label, one pair, no noun, no
+migration.
+
+*The prediction that was refuted is the useful one.* `031` predicted a new
+endpoint pair on an **existing** label. `BASED_ON` reads almost perfectly — and
+row **AA** is a live boundary recording that it already carries two senses, so a
+third would have widened a boundary row while closing an open one, firing
+CLAUDE.md's nomination rule on the same commit. The general preference for an
+existing label is subordinate to a specific fact recorded four scenarios earlier
+by someone who would not be present for this build. `EVALUATES` failed
+next door: `Review → Evidence` means *this was reviewed*, and reusing it for
+*this caused the retraction* is one edge with two readings.
+
+*What the challenge got wrong.* The row was taken up on an external challenge,
+and a challenge is a prediction with a different author. Its **discriminator
+cannot be built**: it proposed invalidating the causal review, and `invalidated`
+is a property of `Artefact` alone while `ReviewProps` is `{ verdict }` — nothing
+can invalidate a review. Its **reasoning was right and decisive**: the cell
+deferred to the event model on the grounds that this describes *why state
+changed*, while its own verified-state line describes a present-tense question.
+Wrong about the experiment, right about the reasoning, and the reasoning is the
+part no amount of running things would have recovered
+
 ### Row P — `Evidence` carries two senses
 
-**Scenarios:** S-9, S-10, S-12 · **Status:** open
+**Scenarios:** **S-9**, S-10, S-12 · **Status:** resolved
 
 **Current state (verified):** one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position
 
@@ -1044,6 +1281,22 @@ that independently and it remains true. What has changed is that it is no longer
 a reader's, not a structure's. If it is a defect, something else will have to
 demonstrate it
 
+**S-9b demonstrated it, and this paragraph is the condition that fired.** A
+question worked on through observations alone reports itself `untested` —
+*"one nothing has ever been run against"* — because `whatIsKnown()`'s `worked`
+test walks the `EvidenceUnit` that was never minted. That is row **AD**, and it
+belongs there rather than here: P is about `Evidence` carrying two senses and was
+resolved in the query, while AD is about a unit that is never created at all.
+Same sentence in this cell, different row, and the cause-or-fix test separates
+them — minting the unit clears AD and changes nothing about the two senses.
+
+**Third time a condition recorded deep in a document has fired and had to be
+noticed by someone re-reading it** — row K was the first, row Z the second. All
+three read *"if X, then this row moves"*, and in all three X happened while the
+sentence sat unread. That is what `bun run check:ledger` cannot do anything
+about: it checks that a status agrees with itself, not that a condition written
+four scenarios ago has quietly come true
+
 ### Row Q — Question and LineOfEnquiry are collapsed by the service layer
 
 **Scenarios:** S-1, S-2, S-13, **S-4** · **Status:** resolved
@@ -1075,7 +1328,7 @@ not a winner.
 
 ### Row S — No agent, person or role exists in the model
 
-**Scenarios:** S-8 · **Status:** open
+**Scenarios:** S-8, **S-8b** · **Status:** refuted
 
 **Current state (verified):** no node label, no property, anywhere
 
@@ -1093,11 +1346,51 @@ to our own corpus. The *other* half of the same bullet — "on what projected
 cost" — needed nothing new: a cost projection is a finding with provenance like
 any other. This row therefore has no owner again until identity work begins.
 
+**S-8b (2026-08-21): refuted, and the consumer requirement is refuted with it.**
+
+`023` scored attribution the **strongest** consumer finding of the whole
+exercise — all three cold designers required authority to persist, across four
+unanimous clusters, and `021` framed it as *"World A: Alice took the decision;
+World B: Bob took it"*. That framing is the error, and no amount of care inside
+it would have found the error, because **the designers were designing for a
+population of actors this system does not have.**
+
+*There is no "who".* An analysis here is run by an agent, not by a person with
+tenure and accountability. An agent invocation does not persist between runs,
+accrues no standing, and cannot be held to anything. Asking it to sign work
+imports a governance model from human organisations into a record of
+computations. `Alice` and `Bob` are not two values of a missing property; they
+are two instances of a kind of entity the domain does not contain.
+
+*What the question was reaching for is provenance, and the model already carries
+it.* **What ran, on what inputs, under what configuration** — and a
+configuration is an input artefact like any other, with a content hash.
+Demonstrated rather than argued: two analyses differing only in the agent
+configuration they consumed are distinguished by `reproducibilityOf()`, which
+reports the configuration `differing` when the wrong one is offered against it,
+and the configuration carries its dependants through `whatDependsOn()` like any
+other input. That is row **L**'s `CONSUMES` lineage doing the job S-11 earned it
+for, with nothing added.
+
+*The other half of S-8's Afterward was never the hard half.* "On what projected
+cost" is a finding with provenance; and **approval is a decision taken on
+evidence against a stated condition** — `whySupported()` returns the finding, the
+criterion it was held to, and whether that criterion was met, with no signer
+anywhere in the answer. Both halves were expressible when S-8 ran.
+
+*What this costs.* `023`'s H1 count drops from three to two. Attribution was
+scored strong on **contract necessity** — bar 4 asks whether losing the
+distinction corrupts a read the frozen contract requires, and it never asks
+whether the contract was right to require it. This is the first case of a
+consumer requirement being refuted **below** bar 4, and it is worth naming as a
+limit of the instrument: three independent designers agreeing is strong evidence
+about what designers expect and weaker evidence about what the domain contains
+
 ### Row T — Edges cannot carry properties
 
-**Scenarios:** S-7, row O · **Status:** open
+**Scenarios:** S-7, ~~row O~~ · **Status:** refuted
 
-**Current state (verified):** `createEdge(from, edge, to)` is the whole write API; idempotency is `UNIQUE (start_id, end_id)`
+**Current state (verified):** an AGE edge carries properties like any vertex; `createEdge(from, edge, to)` does not expose them, and edge identity is `UNIQUE (start_id, end_id)`
 
 > **No scenario currently named would settle this.** Every scenario in
 > its row has been built. Under CLAUDE.md's deferral rule that makes it
@@ -1107,6 +1400,67 @@ any other. This row therefore has no owner again until identity work begins.
 **NEW, from cold review.** "When was this drawn", "by whom", "which review caused this" have no home and cannot be added without reifying to a node or breaking the uniqueness contract. An early commitment made for a good reason (the pglite-age `MERGE` defect) whose cost was never separately weighed
 
 **S-7: prediction held — no pressure.** The amendment `Decision` is the reification; reason, evidence and order all have a node to live on. Untested still
+
+**S-11b (2026-08-21): orphaned.** Row O was this row's only named owner and is
+now resolved — by `INVALIDATED_BY`, a plain edge with **no properties**. So T
+contributed nothing to the remedy and has no named owner at all. Predicted
+before the build (`031`) rather than noticed after it.
+
+Recorded here rather than handed the durable-event-sink phase as a substitute:
+an unbuilt *phase* is not a scenario, and naming one turns "we have no
+discriminator" into "it's handled", which is the failure the ownership taxonomy
+exists to prevent.
+
+**S-10b (2026-08-21): a fourth candidate, and it went the same way — four for
+four against the row.** Input order on `CONSUMES` is the best shape row T could
+hope for: intrinsic to the relationship, unchanging, incapable of recurring
+between one pair, and badly served by a node, since reifying "the second input"
+as an entity is worse than a number on an edge.
+
+It is genuinely lost, and a reversed rebuild does report itself reproducible.
+**But an ordinal on the edge would not fix it**, which is the result. Nothing
+compares the orders, because the record does not know the method is
+order-sensitive. Row T would be taking credit for an absence that belongs to
+row **AF** — the model has no concept of an ordered input list at all, and where
+the ordinal could live is not the question.
+
+Predicted before the test (`docs/consumer-contract/034`), including that this
+exact confusion was the trap to avoid.
+
+**Refuted the same day, and the row's title was simply false.** Every AGE label
+is a real Postgres table, edge labels included, and an edge row has the same
+`properties` agtype column a vertex row has. Verified twice in
+`tests/domain-graph.test.ts`: a property written through Cypher reads back
+through Cypher, and reads back from plain SQL against the edge label's own
+table. This was **already stated in CLAUDE.md's AGE gotchas** — *"every AGE label
+(vertex or edge) is a real Postgres table"* — and the row survived four cold
+reviewers and eleven scenarios next to a document saying it was wrong.
+
+The honest statement was two narrower facts, and only one of them survived the
+day:
+
+1. `createEdge(from, edge, to)` took no properties. An **API choice**, and
+   reversible whenever something needed it — *"well, what's stopping you from
+   just adding a parameter?"* Nothing was. `createEdge()` now takes optional
+   properties, and `buildPropertyClause()`'s own comment had described itself
+   as the shape "createNode()/createEdge() already build on" the whole time.
+2. Edge identity is `UNIQUE (start_id, end_id)`, so a property can annotate a
+   relationship but can never **distinguish** two of them. That one is real, and
+   it is what the row should have said.
+
+Adding the parameter surfaced the fact the row was groping for. `createEdge()`
+is **create-if-absent**, so a second call against an existing edge is a no-op and
+any properties it carries are dropped. Making it an upsert would let two callers
+race to overwrite each other under a contract that promises retries are free.
+Both behaviours are now asserted, along with a refusal for a property key that is
+not an identifier. So the residue is not "edges cannot carry properties" but
+**"an edge property cannot be part of edge identity, and cannot be changed by
+re-calling the verb that created it"** — which is a design consequence, recorded,
+rather than a gap.
+
+The row was added by a cold review, which is the right way to add rows and is
+also how a plausible-sounding claim enters the record without anyone running it.
+Rows P–T all arrived that way and this is the first to be refuted outright
 
 ### Row U — A gate records no condition until it is evaluated
 
@@ -1271,7 +1625,7 @@ answering it
 
 ### Row Y — Closure without a cited result is classified by whether anyone worked on it
 
-**Scenarios:** **S-1**, **S-14** · **Status:** boundary (accepted half settled)
+**Scenarios:** **S-1**, **S-14** · **Status:** boundary
 
 **Current state (verified):** `whatIsKnown()` buckets an abandoned question under `unresolved` if anything ever addressed it, and a deferred one under `untested` if nothing did
 
@@ -1294,7 +1648,7 @@ staleness the legend above warns about, happening to the person who wrote it.)*
 
 ### Row Z — Chronology exists for evidence but not for status
 
-**Scenarios:** **S-1**, S-7 · **Status:** open
+**Scenarios:** **S-1**, S-7, the consumer probe · **Status:** resolved
 
 **Current state (verified):** `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only
 
@@ -1306,6 +1660,58 @@ staleness the legend above warns about, happening to the person who wrote it.)*
 **NEW, CHARACTERISED, no change earned.** S-1's hardest Afterward question — what was known when this question was sharpened, asked after later evidence arrived — is answered from durable state, with an empty event log open beside it, because `sharpen()` freezes the standing findings onto the decision when the act is recorded. What that cannot reconstruct is the *survey*: whether a given question was established at that moment needs an ordering between two `Decision`s, and there is none. Natural ids happen to be allocated in order, which is an accident of the sequence and not a modelled fact — CLAUDE.md already forbids reading meaning into their values. So the temporal seam took real pressure and held at the level S-1 asked about; the level above it is a real gap that S-7 (post-lock amendment) is better placed to price, and neither a durable event sink nor a `decided_at` property is earned by a question nobody has yet been unable to answer
 
 **S-7: narrowed, as predicted, and the distinction is the result.** In-chain order is structural — `SUPERSEDES` alone orders two amendments to one design, with no timestamp, an empty event log, and natural-id order never consulted. Two decisions on *different* designs remain unordered, and S-7 includes an unrelated sharpening precisely to show that the answer covers one class of history and not chronology in general. Not a partial fix: a smaller true claim
+
+**RESOLVED by the consumer probe (2026-08-21), on this row's own stated
+condition.** The entry above ended *"neither a durable event sink nor a
+`decided_at` property is earned by a question nobody has yet been unable to
+answer."* Someone was then unable to answer it: three cold designers required
+historical ordering independently (cluster 21, in three vocabularies), and the
+vertical slice demonstrated it against running code. The second time a condition
+recorded deep in a document has fired and had to be noticed by a re-reader; row K
+was the first.
+
+The change bar was walked rather than skipped. **Rung 1 was built and shown to
+fail twice** — a closure with no prespecified check has no temporal anchor at all,
+and even with checks on both, two programmes closing sixty days apart in opposite
+orders produce identical bounds, because the bound records when the evidence was
+*checked* rather than when the question was *settled*. **Rung 2 was declined by
+argument** — sequence is a property of each act, not a relation between two — and
+that is the weaker move, recorded as such. **Rung 3 is one property**:
+`Decision.decided_at`, required, six creation sites, no migration.
+
+It is **record time, not belief time**, and the property says so — a single
+timestamp otherwise looks like a fix while silently choosing a reading, which
+PJ-024's successor documents warned about. Bitemporality stays a candidate
+extension: real, unrepresentable, and required by no source obligation.
+
+What is **not** closed, and is now precisely stated: `EvidenceUnit` carries no
+instant, so worked-on and untouched cannot be told apart as-of. `whatWasKnown()`
+collapses them into `open` rather than splitting them by reading today's evidence
+units. If that split is ever needed, `EvidenceUnit` is where the instant goes,
+and it should be earned the same way. See `docs/consumer-contract/025` and `026`.
+
+**A second dated property, the same day, from an external review.** `whatWasKnown()`
+began `MATCH (q:Question)` — every question that exists *now* — and classified each
+by dated `Decision`s. A question posed after the stated instant has none, so it fell
+into `open`, which is an assertion rather than an absence: it says the question was
+on the record and nothing had settled it. Reported for a question nobody had asked
+yet, it back-dates the programme's agenda. Demonstrated before anything was changed
+(`tests/consumer/historical_survey.test.ts`), cleared by `Question.posed_at` — one
+property, one writer (`posed()`, which `pose`, `openEnquiry` and `sharpen` all route
+through), no migration, no new noun. So this row's rung 3 cost **two** properties in
+the end, not one, and the second was found by someone reading the code rather than by
+a scenario.
+
+The same review found a second defect in the same method: `at` was validated with
+`Date.parse()` and then compared as text against stamps a `Clock` always writes as
+UTC, so `2026-03-01T09:00:00-05:00` — 14:00Z — sorted before 10:00Z and the survey
+reported a question unresolved four hours after it was resolved. Validating a string
+is not the same as being able to order it; it is canonicalised once now.
+
+The test that pinned the first defect had **asserted it**: "before anything was
+decided, everything is open" passed because the assertion and the bug agreed with
+each other. That is PJ-027's shape one level up — a second copy of the code's
+opinion, mistaken for a check on it.
 
 ### Row AA — `BASED_ON` carries two senses
 
@@ -1355,6 +1761,112 @@ replacement into the graph correctly; what it withheld was the reference
 
 **NEW, from review of the finished scenario, and a real wrong answer before it was guarded.** `withdrawalOf()` reports a sentence withdrawn only when *every* node asserting it has been changed, so a colleague who had not read the review could record an analysis concluding it again and the record would silently un-retract itself — objection still standing, `withdrawn` back to `false`, `replacedBy` gone. Demonstrated before fixing. Now refused, on the same principle as S-7's design fork: a command that declines beats state that reads back wrong. What that leaves missing is the legitimate case — new evidence genuinely re-opening a settled reading — which needs a **deliberate** verb rather than a side effect of recording work. Not built, because S-12 does not contain one **S-5 found this guard had the same defect it was fixing.** `recordAnalysis()`'s withdrawal check was unscoped, so a sentence withdrawn in one line of enquiry would have blocked legitimate work concluding the same words in another. Now scoped to the enquiry being recorded
 
+
+### Row AE — An analysis cannot read another analysis's output
+
+**Scenarios:** **S-11c**, **S-11d** · **Status:** resolved
+
+**Current state (verified):** `recordAnalysis({ from })` accepts only `ObservationsRef`, and `recordObservations()` is the only thing that produces one
+
+**NEW, from S-11c, and it clears §5 in S-11d.** A two-stage pipeline — raw
+data, calibration, then an analysis reading the calibrated series — has one way
+to be recorded: re-enter the intermediate as if it were fresh measurement. That
+is not misuse, it is the only thing the surface permits. Fifteen scenarios never
+needed a second stage, which is why the verb does not exist.
+
+*The wrong answer.* Raw series with no content hash, so stage one correctly
+reports `reproducible: false` and names the raw series `unverifiable`. Stage two
+consumes the re-entered intermediate, which has a hash of its own, and reports
+**`reproducible: true`** — a positive claim of reproducibility for work resting
+on data the record itself calls unrecoverable. `reproducible` is the field
+CLAUDE.md says "must not quietly say otherwise", and it says otherwise.
+
+*And no route out.* Nothing connects the intermediate to the analysis that
+produced it, so a reader cannot walk from stage two to the thing that makes its
+answer wrong.
+
+*Related but distinct from row F.* F is about an artefact having no identity
+apart from its content; this is about the **write surface** having no way to say
+one analysis read another. F would not fix this on its own — a versioned
+artefact still could not be passed to `recordAnalysis({ from })`.
+
+**Resolved the same day, at rung 2 — no new edge, no new noun, no migration.**
+`recordAnalysis({ from })` now accepts an `AnalysisRef` alongside observations,
+and `CONSUMES: Computation → Artefact` carries it: that edge already existed and
+already meant *this run read that*, and an analysis output is an `Artefact` like
+any other. The cheaper of the two candidates was enough, and the more obvious one
+— a new verb for "stage two reads stage one" — was not needed.
+
+Stage two now reports `unverifiable: ["calibrate output"]` and
+`reproducible: false`, because what it reads is a computed artefact carrying no
+content hash. That is the honest answer: a computed intermediate cannot be
+checked by hash unless somebody recorded one.
+
+*What this does not fix, asserted in the same scenario:* `whatDependsOn()` is
+one hop, so it still stops at the stage-one claim. S-11c's omission had two
+causes stacked — a severed chain **and** a short traversal. This fixed the
+first. The second is query semantics, and `DependencyReport.routesWalked` and
+`complete: false` already stop the short answer reading as a complete one.
+
+### Row AD — Observation-only work on a question reads as no work at all
+
+**Scenarios:** **S-9b** · **Status:** resolved
+
+**Current state (verified):** `recordObservations()` creates `Evidence` with no producing `EvidenceUnit`; `whatIsKnown()`'s `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`
+
+**NEW, from S-9b, and the only confirmed wrong answer currently shipping green.**
+A researcher opens a question and works on it — three candidate algorithms tried,
+none reproduces the recorded series, which is a negative result and therefore a
+result. `whatIsKnown()` reports the question **`untested`**: *"one nothing has
+ever been run against"*. Populated, confident and false. The same survey in the
+same test classifies a sibling question `unresolved`, because that one was worked
+on through `recordAnalysis()`, which does mint a unit — that contrast is what
+isolates the cause rather than alleging it.
+
+The missing unit is not new. PJ-001 defines `Evidence` without a producing
+`EvidenceUnit` as impossible; three cold reviewers flagged it independently
+(PJ-021) and **three scenarios were pointed at it without finding harm beyond a
+reader's**. The deferral was right each of those three times, which is what makes
+the fourth mean something: this is the first to produce a wrong answer rather
+than an untidy one.
+
+*The discriminator is already built* — S-9b's seventh test, which asserts the
+wrong answer on purpose with the assertion it *should* make left in a comment
+beside it. When this is fixed the test is **inverted, not deleted**.
+
+Under CLAUDE.md's rule that at most one confirmed wrong answer ships green at a
+time and clearing it is the next thing built, this was that one.
+
+**Resolved 2026-08-21, `17b9976`** — see `docs/consumer-contract/029`, `030`.
+`recordObservations()` mints the unit, `ADDRESSES` to the enquiry and `PRODUCES`
+to the evidence. One node, two edges, **no migration**, no new label or edge
+type.
+
+*The fear that it touched every read that walks the unit was wrong, and why is
+the useful part.* Every other query reaching an `EvidenceUnit` gets there either
+through `Evidence -SUPPORTS|CHALLENGES-> Claim` — which observation evidence has
+neither of, S-11's premise expressed structurally — or through a required
+`USES -> Computation`, which an observation unit does not have because LabKit
+did not run the instrument. `whatIsKnown()`'s `worked` test is the only one
+reaching a unit by `ADDRESSES` alone, which is exactly why it was the only wrong
+read and the only one that changed. **One read changed; exactly one test broke,
+the one asserting the wrong answer on purpose**, and it was inverted rather than
+deleted.
+
+*What was not demonstrated, and was still built.* The verb became transactional
+in the same change, because the fix **creates** the hazard: after it, a failure
+between the evidence and the unit writes precisely the invariant being removed,
+durably and indistinguishable from the eighteen scenarios of records that
+predate the fix. A defect disguised as history is the worst case available.
+Argued rather than demonstrated, and then given a negative test that was
+deletion-verified.
+
+*A finding on the way out.* `EvidenceUnitRole` has nine values, and until this
+build one writer and no readers. Adding `"observation"` was declined —
+vocabulary with no consumer is the dead shape PJ-007 found in `buildAsClause`,
+and the no-cull policy protects labels and edges rather than property values,
+which is the line the CQRS views were removed on. Left as a finding; what would
+settle it is a reader, and the adapter phase is where one would appear.
 
 Two observations across the table. Most rows are *missing relationships*
 rather than missing entities — which is mild evidence the entity set from

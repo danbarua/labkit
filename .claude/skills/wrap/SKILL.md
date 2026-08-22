@@ -177,6 +177,69 @@ If the wrap turn also produced other changes worth committing — a fix the entr
 describes, say — commit those separately and first, so the wrap describes a
 range that already exists.
 
+## Forking, and forking into a worktree
+
+**A fork re-issues the session id** (demonstrated 2026-08-21: a fork of
+`be5374e7` came up as `74f9b207`, with its own transcript directory). Compaction
+does not — that was tested separately and the id survives.
+
+A fork into the **same** tree is handled: SessionStart inherits the predecessor's
+`baseline` when its recorded HEAD is an ancestor of ours.
+
+A fork into a **new worktree is not**, and fails quietly. `.claude/.wrap-state/`
+is untracked, so the new tree has no state dir and nothing to inherit; the first
+Stop finds no `baseline`, self-baselines at whatever HEAD is then, and **exits
+without asking**. The first fire is swallowed *and* the baseline lands after the
+work it should have covered.
+
+**A second worktree bug, fixed 2026-08-21.** The hook resolved `state_dir` from
+`$CLAUDE_PROJECT_DIR`, which is the directory the session *started* in — so a
+session working in a worktree read the **other** checkout's state: another
+session's baseline, and an `entry=` naming a file that does not exist on its
+side. It reported "no entry yet" indefinitely, lying about whether the session
+had wrapped, until an unrelated merge made the file appear. It now resolves from
+`git rev-parse --show-toplevel`, which names the same directory for a session
+that is not in a worktree, so there is no special case beside a normal one.
+
+That fix does **not** remove the need to seed. It puts the state file in the
+right tree; the tree still starts empty.
+
+Seed it before the first stop:
+
+```sh
+mkdir -p .claude/.wrap-state
+printf 'baseline=%s\nasked=%s\nentry=\n' <start-sha> <start-sha> \
+  > .claude/.wrap-state/<session-id>
+```
+
+Pick `<start-sha>` as the commit your work begins *after* — not the fork point,
+if the fork point includes commits from the session you forked from.
+
+## Closing an entry and starting the next one
+
+One session does not have to mean one entry. A session that wraps a piece of
+work and then moves on to something unrelated should **close** the entry and
+re-baseline, so the next Stop fire opens a fresh numbered one:
+
+```sh
+.claude/skills/wrap/close-entry.sh <state-file>
+```
+
+That rewrites `baseline` and `asked` to HEAD and clears `entry`. It is the
+supported way — those three fields belong to the hook and SKILL.md otherwise
+says not to hand-edit them. **Run it only when the entry being closed already
+covers everything up to HEAD**, or the range in between goes unwritten.
+
+Why it exists: without it, one long session rewrites a single growing document
+all day. Entry 004 reached **1,165 lines covering 115 commits** and a dozen
+unrelated pieces of work — config cleanup, a design exercise, a refactor, five
+ledger rows, a flake investigation, a CLI — because there was no way to say
+"that piece is finished". Five entries would have been five handovers; one was
+none. Backported from exo-ledger, 2026-08-21.
+
+Rule of thumb: close when you would struggle to write one `## Goal` line that
+covers what comes next.
+
 ## Notes
 
 - The Stop hook advances the recorded sha at the moment it fires, so a HEAD is
@@ -199,8 +262,10 @@ range that already exists.
   id — which was then tested, on 2026-08-20, and is **false in this build for
   both triggers**: manual `/compact`, and auto-compaction on context
   exhaustion (one session compacted twice). The id is preserved, the state file
-  survives untouched, and the branch is never reached. What it would have cost
-  had the premise held: a session's second half opening a second numbered entry
+  survives untouched, and the branch is not reached *by compaction*. It **is**
+  reached by a fork, which does re-issue the id -- see §Forking above, added
+  after this bullet and leaving it saying "never" for a while. What it would
+  have cost had the compaction premise held: a session's second half opening a second numbered entry
   while its first half sits in one nobody updates again.
 - **`collect.sh` warns when the range is wider than the session.** `baseline`
   is pinned at session start and never moves, which is right until a session is

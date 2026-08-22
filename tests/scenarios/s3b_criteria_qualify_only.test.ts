@@ -105,7 +105,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     expect(why.support).toEqual([{ finding: "p = 0.002, Holm-corrected", via: "holm-pairwise" }]);
     expect(why.withdrawn).toBe(false);
     expect(why.challenged).toBe(false);
-    expect(why.restingOn).toEqual(["per-image results"]);
+    expect(why.restingOn.map((a) => a.name)).toEqual(["per-image results"]);
   });
 
   /**

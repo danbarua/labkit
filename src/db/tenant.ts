@@ -2,7 +2,7 @@
  * Tenant identity: resolving a slug to the `TenantContext` everything below
  * the CLI/MCP boundary is scoped by (PJ-003 §5).
  *
- * The graph *schema* side of a tenant — creating labels, indexes, and views —
+ * The graph *schema* side of a tenant — creating labels and indexes —
  * lives in src/db/provisioning.ts; this file only decides which tenant we're
  * talking about, then hands off.
  */

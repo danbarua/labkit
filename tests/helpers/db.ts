@@ -5,7 +5,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { Client } from "pg";
 import { runMigrations } from "../../src/db/migrate";
 import { bootstrapSession, type LabKitDB } from "../../src/db/client";
-import { dropTenantGraph } from "../../src/db/provisioning";
+import { traced } from "../../src/db/trace";
 
 /**
  * Application-code tests should exercise `LabKitDB` the same way production
@@ -35,10 +35,24 @@ import { dropTenantGraph } from "../../src/db/provisioning";
  * connection for an entire test file means one bad interaction anywhere in
  * that file can cascade into failing every test after it, at an
  * unpredictable point — which is exactly the flakiness this design avoids.
+ *
+ * **This header has been read as explaining the suite's intermittent failures.
+ * It does not, and that misattribution cost two investigations.** The
+ * `graph "labkit_t1" does not exist` and `Connection terminated` bursts were a
+ * teardown race, not Defect A: bun's 5000ms per-test timeout does not cancel
+ * the test body, so an overrunning test keeps executing while the next one
+ * starts, and its late `scenario.end()` reset the database and closed the next
+ * test's connection. **That cascade was fixed on 2026-08-22** — see
+ * `tests/helpers/scenario.ts` and `tests/scenario-harness.test.ts`. Tests can
+ * still cross the ceiling and fail; what they can no longer do is take the
+ * next test with them. Instrumentation across a failing run tracked 59,086
+ * queries with **zero** unfinished and found no desync signature at all. What
+ * pushes a test to the ceiling is `provisionTenantGraph()` re-checking every
+ * node and edge label on each `begin()` and `current()`. See `docs/TASKS.md`.
  */
 export interface TestDb {
   /** Opens a fresh, independently-bootstrapped connection — call in `beforeEach`, not once for the whole file. See the file-level comment. */
-  openClient(): Promise<LabKitDB & { close(): Promise<void> }>;
+  openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }>;
   /** Drops every AGE graph and truncates every LabKit-owned table — call in `afterEach`, before closing that test's client. */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -60,27 +74,51 @@ export async function setupTestDb(): Promise<TestDb> {
   const [host, portStr] = server.getServerConn().split(":");
   const port = Number(portStr);
 
-  async function openClient(): Promise<LabKitDB & { close(): Promise<void> }> {
+  let opened = 0;
+  async function openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }> {
     const c = new Client({ host, port, database: "postgres", user: "postgres" });
     await c.connect();
     await bootstrapSession(c);
-    return { query: c.query.bind(c), close: () => c.end() };
+    // Traced only when LABKIT_TRACE is set; otherwise `traced()` hands back the
+    // same object and this costs nothing. Labelled per connection because
+    // telling two connections apart is most of what a trace is for -- the
+    // teardown race described above is invisible without it.
+    const db = traced({ query: c.query.bind(c) }, label ?? `conn-${++opened}`);
+    return { query: db.query, close: () => c.end() };
   }
 
   // Dedicated to reset()/teardown, deliberately separate from whatever
   // connection each test opens for itself via openClient() — reset() runs
   // every test, so it's the one connection worth keeping simple and
   // unlikely to ever see an errored query itself.
-  const admin = await openClient();
+  const admin = await openClient("admin");
 
   return {
     openClient,
+    /**
+     * Empties every tenant graph **without dropping it**.
+     *
+     * Dropping was the obvious way and it was expensive in a way nothing was
+     * measuring: an AGE graph is a Postgres schema and every label in it is a
+     * real table, so dropping one destroys thirteen node labels, twenty-five
+     * edge labels and thirty-eight indexes that the next `resolveTenantContext()`
+     * then has to build again — about seventy-seven DDL round trips per test.
+     * Traced over one scenario file (`LABKIT_TRACE=all`), that was **24% of
+     * every query the file issued**, and almost all of it was *creating*, not
+     * checking. `6eeeb92` made the checking cheap; nothing had made the
+     * rebuilding cheap, because nothing had noticed it was happening.
+     *
+     * Truncating leaves the graph, its labels and its indexes in place, so
+     * provisioning finds everything present and settles for three round trips.
+     * That matters beyond speed: what pushes a test over bun's 5000ms ceiling
+     * is exactly this cost, and a test that crosses the ceiling is how the
+     * suite flakes (see `tests/helpers/scenario.ts`).
+     *
+     * The truncate below already covered these tables — a graph's schema is not
+     * one of the four exclusions — so the drop was doing nothing the truncate
+     * did not, at seventy-seven times the price.
+     */
     async reset() {
-      const graphs = await admin.query<{ name: string }>(`SELECT name FROM ag_catalog.ag_graph`);
-      for (const { name } of graphs.rows) {
-        await dropTenantGraph(admin, name);
-      }
-
       const tables = await admin.query<{ table_schema: string; table_name: string }>(`
         select table_schema, table_name
         from information_schema.tables

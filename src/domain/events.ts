@@ -65,9 +65,18 @@ export interface EventSink {
 }
 
 /**
- * Non-durable sink, and the only one — see this file's header. Eight scenarios
- * have exercised the seam and none has needed the log to answer anything;
- * every historical question so far is answered from the graph.
+ * Non-durable sink, and the only one — see this file's header. Every scenario
+ * exercises the seam and none has needed the log to answer anything; every
+ * historical question so far is answered from the graph.
+ *
+ * Stronger than it sounds, and asserted rather than asserted-about: the
+ * scenarios that touch the log at all check that it is **empty** at the moment
+ * a historical answer is read (S-1, S-7, S-11, S-12), which is what makes the
+ * answer durable rather than replayed.
+ *
+ * No count here on purpose. It said "eight scenarios" through sixteen more —
+ * a number in a comment is a maintenance claim nobody checks, and the argument
+ * never needed one (PJ-028).
  */
 export function inMemoryEventLog(): EventSink {
   const events: DomainEvent[] = [];

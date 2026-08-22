@@ -15,6 +15,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { setupTestDb, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
+import { dropTenantGraph } from "../src/db/provisioning";
 import { TenantGraph } from "../src/db/graph";
 import { scalar } from "../src/db/cypher";
 
@@ -51,5 +52,54 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
   const n = await graph.query(`MATCH (:Computation)-[e:CONSUMES]->(:Artefact) RETURN count(e)`,
     { count: scalar<number>() });
   expect(n[0]!.count).toBe(1);
+  await db.close();
+});
+
+/**
+ * `dropTenantGraph()`'s only reader.
+ *
+ * It had none until this test. `tests/helpers/db.ts` called it between every
+ * test until 2026-08-22, when teardown switched to truncating the label tables
+ * — dropping was rebuilding thirty-eight labels and thirty-eight indexes per
+ * test, about half the suite's wall time. That left the repo's only way to
+ * remove a tenant with a writer and no reader, which is the dead-code shape
+ * PJ-007 found in `buildAsClause`.
+ *
+ * Tested rather than deleted, because unlike a query convenience this is a real
+ * operation a deploy will need, and an untested drop gets discovered to be
+ * broken at the moment someone needs it most.
+ *
+ * **It drops `labkit_t1`, not some safely-named other graph.** `"drop-me"` is
+ * the first tenant resolved in this file, `tenants.id` is truncated with
+ * `RESTART IDENTITY`, so it gets id 1 and the graph every other file also calls
+ * `labkit_t1` — verified, after a reading that assumed the name kept it apart.
+ * What keeps it apart is that `setupTestDb()` builds a **separate PGlite
+ * instance per test file**, so this file's `labkit_t1` is not any other file's.
+ * That, and not the tenant slug, is why dropping here is safe.
+ */
+test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", async () => {
+  const db = await testDb.openClient();
+  const ctx = await resolveTenantContext(db, "drop-me");
+
+  const present = async () =>
+    (await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM ag_catalog.ag_graph WHERE name = $1`,
+      [ctx.graphName],
+    )).rows[0]!.n;
+
+  expect(await present()).toBe("1");
+  await dropTenantGraph(db, ctx.graphName);
+  expect(await present()).toBe("0");
+
+  // And reconciliation puts it back, labels and all -- the same self-healing
+  // path the rest of this file exercises.
+  await resolveTenantContext(db, "drop-me");
+  expect(await present()).toBe("1");
+  const labels = await db.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM ag_catalog.ag_label
+     WHERE graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
+    [ctx.graphName],
+  );
+  expect(Number(labels.rows[0]!.n)).toBeGreaterThan(30);
   await db.close();
 });

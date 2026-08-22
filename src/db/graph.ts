@@ -13,7 +13,7 @@
  */
 
 import { LABKIT_SCHEMA } from "./schema";
-import { buildPropertyClause } from "./agtype";
+import { buildPropertyClause, validateIdentifier } from "./agtype";
 import { CypherRunner, edge as edgeColumn, vertex as vertexColumn, type DecodedRow, type RowSpec } from "./cypher";
 import {
   EDGE_SCHEMA,
@@ -84,13 +84,28 @@ export class TenantGraph {
     this.depth += 1;
     try {
       const result = await work();
-      this.depth -= 1;
       await this.db.query("COMMIT");
       return result;
     } catch (err) {
-      this.depth -= 1;
-      await this.db.query("ROLLBACK");
+      // A failed ROLLBACK must not become the error the caller sees. The
+      // original is why we are here; the rollback failure is a consequence of
+      // it, and reporting the consequence loses the cause.
+      try {
+        await this.db.query("ROLLBACK");
+      } catch {
+        // deliberately swallowed -- see above
+      }
       throw err;
+    } finally {
+      // In `finally`, so it happens exactly once on every path. It used to be
+      // decremented before COMMIT *and* again in the catch, so a throwing
+      // COMMIT left `depth` at -1 -- and since re-entrancy is keyed on
+      // `depth > 0`, the next compound verb would run at an apparent depth of
+      // 0 and a verb nested inside it would issue a second BEGIN instead of
+      // joining. The re-entrancy contract silently inverted, for the life of
+      // the TenantGraph. Never observed firing; found while investigating the
+      // suite flake and demonstrated in tests/domain-graph.test.ts.
+      this.depth -= 1;
     }
   }
 
@@ -169,8 +184,38 @@ export class TenantGraph {
    * successful no-op the fast-path check would have produced. The
    * uniqueness guarantee is real regardless of backend; the pre-check is
    * purely an optimization to avoid a wasted round trip in the common case.
+   *
+   * **`props` are set on creation only, and that is a consequence of the
+   * idempotency above rather than a separate decision.** This verb is
+   * create-if-absent, so a second call against an existing edge is a no-op and
+   * any properties it carries are dropped, silently. Making it an upsert would
+   * mean two callers with different properties racing to overwrite each other
+   * under a contract that currently promises retries are free. If a property
+   * ever needs to change after the fact, that wants its own verb and its own
+   * argument, the way `closeDecision()` is the only sanctioned way to set
+   * `is_open`.
+   *
+   * Ledger row **T** claimed edges cannot carry properties. They can — every
+   * AGE label is a real Postgres table and an edge row has the same
+   * `properties` agtype column a vertex row has, verified in
+   * `tests/domain-graph.test.ts` through Cypher and through plain SQL. Nothing
+   * was stopping this parameter existing except that no caller had wanted one.
+   * What survives of the row is narrower and real: **`UNIQUE (start_id, end_id)`
+   * means a property can annotate a relationship but never distinguish two of
+   * them.** Two edges of the same label between the same pair are one edge, and
+   * no property changes that.
+   *
+   * Untyped per label, deliberately. `EDGE_SCHEMA` declares endpoint pairs and
+   * no property shapes, so there is nothing to key a `NodePropsByLabel`
+   * equivalent off. When an edge earns a declared shape, type it the way node
+   * props are typed rather than widening this signature further.
    */
-  async createEdge(fromId: string, edge: EdgeLabel, toId: string): Promise<void> {
+  async createEdge(
+    fromId: string,
+    edge: EdgeLabel,
+    toId: string,
+    props?: Record<string, string | number | boolean>,
+  ): Promise<void> {
     const fromLabel = labelForNaturalId(fromId);
     const toLabel = labelForNaturalId(toId);
 
@@ -192,10 +237,28 @@ export class TenantGraph {
     );
     if (existing.length > 0) return;
 
+    // Expanded per key rather than passed as a map: AGE rejects a whole-map
+    // `CREATE (a)-[e:LABEL $props]->(b)`, the same limitation createNode()
+    // works around.
+    //
+    // Not `buildPropertyClause()`, whose own comment says it is the shape this
+    // method builds on -- it names each parameter after its key, and this query
+    // already binds `$from` and `$to`. A property called `from` would silently
+    // rebind the source node's natural id. Same validator, prefixed parameters.
+    const entries = Object.entries(props ?? {});
+    for (const [key] of entries) validateIdentifier(key, "edge property key");
+    const assignment = entries.length
+      ? ` {${entries.map(([k]) => `${k}: $p_${k}`).join(", ")}}`
+      : "";
+
     try {
       await this.runner.execute(
-        `MATCH (a:${fromLabel} {natural_id: $from}), (b:${toLabel} {natural_id: $to}) CREATE (a)-[:${edge}]->(b)`,
-        { from: fromId, to: toId },
+        `MATCH (a:${fromLabel} {natural_id: $from}), (b:${toLabel} {natural_id: $to}) CREATE (a)-[:${edge}${assignment}]->(b)`,
+        {
+          from: fromId,
+          to: toId,
+          ...Object.fromEntries(entries.map(([k, v]) => [`p_${k}`, v])),
+        },
       );
     } catch (err) {
       if ((err as { code?: string }).code === "23505") return; // lost the race to a concurrent caller — same edge now exists, which is the desired end state

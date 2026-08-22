@@ -6,9 +6,11 @@
 #   wrap-hook.sh stop    Stop: ask Claude to write the session log entry,
 #                        but only if HEAD has moved since the last time we asked.
 #
-# Wired from .claude/settings.json, which is personal (gitignored) -- the
-# mechanism is shared, the wiring is not. Reads the hook payload as JSON on
-# stdin and writes its decision as JSON on stdout.
+# Wired from .claude/settings.json, which is CHECKED IN -- it was gitignored
+# until 2026-08-20, so a clone got this skill without the hook that runs it.
+# What stays out of the repo is .claude/settings.local.json and
+# .claude/.wrap-state/. Reads the hook payload as JSON on stdin and writes its
+# decision as JSON on stdout.
 #
 # The loop this is built to avoid: Stop fires on every turn, and a hook that
 # blocks unconditionally blocks forever. Three things stop that here --
@@ -20,7 +22,22 @@
 set -euo pipefail
 
 mode="${1:-stop}"
-root="${CLAUDE_PROJECT_DIR:-$PWD}"
+
+# The tree we are actually working in, which is NOT always
+# $CLAUDE_PROJECT_DIR. That variable holds the directory the session was
+# *started* in, so a session working in a git worktree -- which is how parallel
+# sessions run here -- got the other checkout's `.claude/.wrap-state/`, and
+# therefore another session's baseline and an `entry=` naming a file that does
+# not exist on its side. The hook then reported "no entry yet" indefinitely: it
+# lied about whether the session had wrapped, three times in one afternoon,
+# until an unrelated merge made the file appear.
+#
+# `git rev-parse --show-toplevel` from $PWD names the worktree, and for a
+# session that is not in one it names the same directory $CLAUDE_PROJECT_DIR
+# does, so this is not a special case with a normal case beside it. The
+# fallbacks are for running outside a repo at all.
+root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+[ -d "$root" ] || root="${CLAUDE_PROJECT_DIR:-$PWD}"
 state_dir="$root/.claude/.wrap-state"
 # Kept in step with collect.sh's own `log_dir` -- see SKILL.md's Notes.
 log_dir="docs/session-log"
@@ -72,14 +89,22 @@ if [ "$mode" = "start" ]; then
     # numbered entry describing half a session, while the first half is left
     # covered by an entry nobody will update again.
     #
-    # THIS IS NOT WHAT COMPACTION DOES. The branch was written on the premise
-    # that compaction re-issues the session id. That premise was then tested
-    # and is false in this build, for both triggers: manual /compact (session
-    # 49e462ec, one boundary, id preserved) and auto-compaction on context
-    # exhaustion (session be5374e7, compacted twice, state file intact both
-    # times). The id survives, the state file exists, and this branch is never
-    # reached. Kept as insurance against a build that behaves differently --
-    # if you are debugging state that went missing, this is not the cause.
+    # NOT COMPACTION -- that was tested and does not re-issue the id, for
+    # either trigger: manual /compact (session 49e462ec, one boundary, id
+    # preserved) and auto-compaction on context exhaustion (session be5374e7,
+    # compacted twice, state file intact both times).
+    #
+    # FORKING DOES. Demonstrated 2026-08-21: a fork of session be5374e7 came up
+    # as 74f9b207 with its own transcript directory. This branch was written as
+    # insurance against a case its own comment then called unreachable, and the
+    # case exists -- it just arrives through a fork rather than a compaction.
+    # The comment was wrong for as long as it was confident.
+    #
+    # It still did not help there, because the fork ran in a different WORKTREE
+    # and `.claude/.wrap-state/` is untracked, so SessionStart never fired in
+    # that tree at all and there was no state dir to inherit from. A fork into
+    # the SAME tree is the case this branch would actually catch. Seed the state
+    # file by hand when forking into a fresh worktree -- see SKILL.md.
     #
     # Gated on `source` deliberately. `startup` and `clear` are genuinely new
     # sessions and must re-baseline. `resume` is the weaker half: resuming may
@@ -144,9 +169,33 @@ entry="$(read_state entry)"
 # because that work genuinely is unwritten -- which is why SKILL.md tells you to
 # commit such work SEPARATELY and first. Bundling it into the wrap commit is
 # what would hide it here.
-if git rev-parse --verify --quiet "$asked" >/dev/null 2>&1; then
-  touched="$(git diff --name-only "$asked..$head_sha" 2>/dev/null || true)"
-  if [ -n "$touched" ] && ! printf '%s\n' "$touched" | grep -qv "^$log_dir/"; then
+# The cut is the commit that last touched the ENTRY, not `asked`. `asked` lags
+# whenever HEAD moves during a `stop_hook_active` continuation -- the early exit
+# above records nothing -- and a stale `asked` compares against work the entry
+# already described. The entry's own commit is the honest cut: the entry
+# describes the repo as of the moment it was committed. Backported from
+# exo-ledger 2026-08-21, where it was observed firing over commits an entry
+# covered in full.
+#
+# When that commit BUNDLED real work, cut at its parent instead, so the bundled
+# work stays inside the range where it is visible -- preserving the property
+# above rather than quietly dropping it.
+ref="$asked"
+if [ -n "$entry" ] && [ -f "$root/$entry" ]; then
+  entry_sha="$(git log -1 --format=%H -- "$entry" 2>/dev/null || true)"
+  if [ -n "$entry_sha" ]; then
+    ref="$entry_sha"
+    if git diff --name-only "$entry_sha^..$entry_sha" 2>/dev/null | grep -qv "^$log_dir/"; then
+      ref="$(git rev-parse --verify --quiet "$entry_sha^" || echo "$entry_sha")"
+    fi
+  fi
+fi
+if git rev-parse --verify --quiet "$ref" >/dev/null 2>&1; then
+  touched="$(git diff --name-only "$ref..$head_sha" 2>/dev/null || true)"
+  # An EMPTY range is quiet too. With the entry committed at HEAD there is
+  # nothing to diff, and the old `[ -n "$touched" ]` fired on exactly that --
+  # asking to wrap a HEAD at which nothing had changed.
+  if [ -z "$touched" ] || ! printf '%s\n' "$touched" | grep -qv "^$log_dir/"; then
     write_state "$baseline" "$head_sha" "$entry"
     exit 0
   fi

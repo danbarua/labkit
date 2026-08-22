@@ -55,7 +55,21 @@ export async function provisionTenantGraph(db: LabKitDB, tenantId: number, graph
   }
 }
 
-/** Drops a tenant's graph and everything in it. Used by test teardown (tests/helpers/db.ts); there is no production caller yet. */
+/**
+ * Drops a tenant's graph and everything in it.
+ *
+ * **No production caller, and as of 2026-08-22 no test-teardown caller either.**
+ * `tests/helpers/db.ts` used to call it between every test; it now truncates the
+ * label tables instead, because dropping destroyed thirty-eight labels and
+ * thirty-eight indexes that the next `resolveTenantContext()` had to rebuild —
+ * about half the suite's wall time, measured.
+ *
+ * Kept rather than deleted, and given its own test rather than left dark. It is
+ * the only way to remove a tenant, which is a real operation a deploy will need;
+ * and an untested drop is the kind of thing that is discovered to be broken at
+ * the moment someone needs it most. `tests/reconciliation.test.ts` is its one
+ * reader.
+ */
 export async function dropTenantGraph(db: LabKitDB, graphName: string): Promise<void> {
   await db.query(`SELECT * FROM ag_catalog.drop_graph($1, true)`, [graphName]);
 }
@@ -87,18 +101,54 @@ class TenantGraphProvisioner {
    * brand-new tenants.
    *
    * Deliberately not a claim of full structural reconciliation: indexes are
-   * checked by name (`IF NOT EXISTS`), not compared by definition, and
-   * labels are checked for existence, not arbitrary structural equivalence.
-   * A change that isn't purely additive — renaming a label, reshaping a
-   * property that already has data — has no story here; see
+   * checked by name, not compared by definition, and labels are checked for
+   * existence, not arbitrary structural equivalence. A change that isn't
+   * purely additive — renaming a label, reshaping a property that already has
+   * data — has no story here; see
    * docs/project-journal/005_provisioning_reconciliation.md.
+   *
+   * **Asked once, not seventy-eight times.** Every label and every index this
+   * tenant already has is read in two queries up front, and the loops below
+   * then issue DDL only for what is genuinely missing. In the steady state —
+   * which is every call after the first, for the life of a tenant — that is
+   * three round trips instead of about eighty.
+   *
+   * Measured before it was changed, as PJ-005 asked: query tracing
+   * (`LABKIT_TRACE=all`, see src/db/trace.ts) over a single scenario file
+   * counted **2,448 queries, of which 1,086 — 44% — were this bookkeeping**,
+   * repeated across fourteen reconciliations that each found nothing to do.
+   * It is also the cost behind the suite's intermittent 5-second timeouts: a
+   * test doing 311 sequential queries is mostly doing these.
+   *
+   * **This is not the `schema_version` gate PJ-005 reverted, and the
+   * difference is the whole point.** That gate skipped reconciliation when a
+   * stored version matched, so drift stopped being repaired the moment the
+   * number agreed. This reads the *actual* catalog every single time and
+   * reconciles against what is really there — it just asks in one question
+   * rather than seventy-eight. Self-healing is preserved exactly; nothing is
+   * remembered between calls.
+   *
+   * Reading AGE's own catalog tables directly is the sanctioned move — every
+   * label is a real Postgres table registered in `ag_catalog.ag_label`, which
+   * is the same fact that makes natural-id and edge-uniqueness indexes
+   * possible at all. **Writing** to them is a different proposition and is not
+   * done here: `create_vlabel` does catalog bookkeeping *and* creates a table,
+   * and hand-rolling that would couple us to AGE's internals for a cost paid
+   * once per tenant.
    */
   async reconcile(): Promise<void> {
     await this.ensureGraph();
-    for (const label of NODE_LABELS) await this.ensureVertexLabel(label);
-    for (const edge of EDGE_LABELS) await this.ensureEdgeLabel(edge);
-    for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label);
-    for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge);
+    const labels = await this.existingLabels();
+    const indexes = await this.existingIndexes();
+
+    for (const label of NODE_LABELS) {
+      if (!labels.has(label)) await this.db.query(`SELECT ag_catalog.create_vlabel($1, $2)`, [this.graphName, label]);
+    }
+    for (const edge of EDGE_LABELS) {
+      if (!labels.has(edge)) await this.db.query(`SELECT ag_catalog.create_elabel($1, $2)`, [this.graphName, edge]);
+    }
+    for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label, indexes);
+    for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
   }
 
   private async ensureGraph(): Promise<void> {
@@ -108,24 +158,31 @@ class TenantGraphProvisioner {
     }
   }
 
-  private async labelExists(label: string): Promise<boolean> {
-    const rows = await this.db.query(
-      `SELECT 1 FROM ag_catalog.ag_label WHERE name = $2 AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
-      [this.graphName, label],
+  /** Every label this graph has, in one read of AGE's catalog. */
+  private async existingLabels(): Promise<Set<string>> {
+    const rows = await this.db.query<{ name: string }>(
+      `SELECT l.name FROM ag_catalog.ag_label l
+       JOIN ag_catalog.ag_graph g ON l.graph = g.graphid
+       WHERE g.name = $1`,
+      [this.graphName],
     );
-    return rows.rows.length > 0;
+    return new Set(rows.rows.map((r) => r.name));
   }
 
-  private async ensureVertexLabel(label: NodeLabel): Promise<void> {
-    if (!(await this.labelExists(label))) {
-      await this.db.query(`SELECT ag_catalog.create_vlabel($1, $2)`, [this.graphName, label]);
-    }
-  }
-
-  private async ensureEdgeLabel(edge: EdgeLabel): Promise<void> {
-    if (!(await this.labelExists(edge))) {
-      await this.db.query(`SELECT ag_catalog.create_elabel($1, $2)`, [this.graphName, edge]);
-    }
+  /**
+   * Every index in this graph's schema, in one read.
+   *
+   * A tenant's graph is a Postgres schema named after it, so `pg_indexes`
+   * scoped to that schema is the whole picture. Names only: this checks
+   * existence by name exactly as `IF NOT EXISTS` did, and claims no more than
+   * that — see the note above on what reconciliation deliberately is not.
+   */
+  private async existingIndexes(): Promise<Set<string>> {
+    const rows = await this.db.query<{ indexname: string }>(
+      `SELECT indexname FROM pg_indexes WHERE schemaname = $1`,
+      [this.graphName],
+    );
+    return new Set(rows.rows.map((r) => r.indexname));
   }
 
   /**
@@ -134,8 +191,9 @@ class TenantGraphProvisioner {
    * explicitly (rather than left to Postgres's auto-naming) so `IF NOT EXISTS`
    * has something to key its idempotency check on.
    */
-  private async ensureNaturalIdIndex(label: NodeLabel): Promise<void> {
+  private async ensureNaturalIdIndex(label: NodeLabel, existing: Set<string>): Promise<void> {
     const indexName = `${label.toLowerCase()}_natural_id_idx`;
+    if (existing.has(indexName)) return;
     await this.db.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${label}" ((ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)))`,
     );
@@ -150,8 +208,9 @@ class TenantGraphProvisioner {
    * the concurrent-create race `TenantGraph.createEdge()`'s check-then-create
    * fast path alone can't (see that method's docstring).
    */
-  private async ensureEdgeUniqueIndex(edge: EdgeLabel): Promise<void> {
+  private async ensureEdgeUniqueIndex(edge: EdgeLabel, existing: Set<string>): Promise<void> {
     const indexName = `${edge.toLowerCase()}_start_end_idx`;
+    if (existing.has(indexName)) return;
     await this.db.query(`CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${edge}" (start_id, end_id)`);
   }
 

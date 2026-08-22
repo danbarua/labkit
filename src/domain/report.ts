@@ -289,7 +289,19 @@ export interface ReproductionReport {
    * known to agree. Row I's distinction, asked of execution instead of evidence.
    */
   differs: Array<{
-    what: string;
+    /**
+     * The input, identified. Not a bare name: two artefacts legitimately share
+     * a `logical_name` — a regeneration carries the name of the part it
+     * replaces — and a re-run that swapped one for the other reported **two**
+     * entries reading "control series", one `changed` and one
+     * `not-used-by-the-re-run`, contradicting each other under one label with
+     * nothing to tell them apart (S-10c).
+     *
+     * Fourth read caught doing this, after `reproducibilityOf()` (S-9c) and
+     * `whySupported().restingOn` (S-9d). Each decided by `natural_id` and
+     * reported the name, which is the shape rather than the incident.
+     */
+    what: IdentifiedArtefact;
     standing: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run";
   }>;
   /** Which way the re-run cuts for the historical claim. */
@@ -308,6 +320,39 @@ export interface ReproductionReport {
 }
 
 /**
+ * An artefact in a report: what it is, and what it is called.
+ *
+ * `part` is identity; `name` is what a person reads. Keeping both is row F's
+ * lesson applied to the **output** side of a read — S-9 already took parts by
+ * *reference* on the way in, with a comment that a name-keyed map "would merge
+ * exactly the two things this scenario exists to keep apart", and then reported
+ * bare names on the way out.
+ *
+ * Two reads have now been caught doing that, which is why this is a shared
+ * shape rather than one report's private type. `reproducibilityOf()` put a
+ * single name in `exact` and `differing` at once (S-9c), and
+ * `whySupported().restingOn` deduplicated two distinct inputs into one entry
+ * (S-9d) — hiding, in that case, that a regeneration with inferred provenance
+ * was underneath a conclusion.
+ *
+ * Named for what it is rather than for either caller: this was `ReproducedPart`
+ * until a second read needed it, at which point the name described one caller's
+ * use of it rather than the thing.
+ *
+ * The sentence above said `IdentifiedArtefact` — the **new** name — as though it
+ * were the old one, directly over the declaration. Written in the same hunk as
+ * the rename, in the commit that was itself fixing a comment that disagreed with
+ * its code. That is PJ-028's headline: the fix went where the author was
+ * looking, and the prose one line up did not.
+ */
+export interface IdentifiedArtefact {
+  /** The observations handle — identity, and the only thing that is. */
+  part: string;
+  /** Its `logical_name`. Two parts may legitimately share one. */
+  name: string;
+}
+
+/**
  * How much of a past construction can be rebuilt (S-9).
  *
  * Four outcomes per part, and only two of them are comparisons. `exact` and
@@ -318,12 +363,12 @@ export interface ReproductionReport {
  * artefact, and got wrong twice before it was got right.
  */
 export interface ReproducibilityReport {
-  /** Parts whose recorded hash matches the one offered, by name. */
-  exact: string[];
+  /** Parts whose recorded hash matches the one offered. */
+  exact: IdentifiedArtefact[];
   /** Parts whose recorded hash disagrees with the one offered. */
-  differing: string[];
+  differing: IdentifiedArtefact[];
   /** Parts with no recorded hash — unanswerable, not unequal. */
-  unverifiable: string[];
+  unverifiable: IdentifiedArtefact[];
   /**
    * Parts this attempt did not rebuild.
    *
@@ -336,12 +381,18 @@ export interface ReproducibilityReport {
    * `unverifiable` is a permanent property of the record; `notRebuilt` is a
    * property of *this attempt* and says nothing about the artefact.
    */
-  notRebuilt: string[];
+  notRebuilt: IdentifiedArtefact[];
   /**
    * Whether the whole construction reproduces. False unless every part was
    * rebuilt and matched: anything differing, unverifiable or not attempted
    * leaves the construction unshown, and this is the field that must not
    * quietly say otherwise.
+   *
+   * **And false when there were no parts at all** — the sentence above was
+   * satisfied vacuously by an analysis that consumed nothing, so this reported
+   * that a construction with nothing in it reproduces (S-9e). At least one part
+   * must be in `exact`. An analysis whose subject does not exist is refused
+   * rather than reported on; absent and empty are different states.
    */
   reproducible: boolean;
 }
@@ -353,6 +404,54 @@ export interface VerificationReport {
   verification: AnalysisRef;
   /** The historical analysis it re-checked. */
   of: AnalysisRef;
+}
+
+/**
+ * What is affected if this record turns out to be wrong — and, deliberately, a
+ * statement that the answer is a **lower bound**.
+ *
+ * Designer 2 required that *"no dependency found"* never read as
+ * *"independent"*. `docs/consumer-contract/022` §4 classified it as query
+ * semantics rather than missing structure and declined to act until someone
+ * demonstrated a reader acting on the gap and being wrong. S-11c is that
+ * demonstration, and this shape is the whole remedy: no new durable state, no
+ * new edge, just an answer that stops overstating itself.
+ *
+ * The fourth catch on this one verb. PJ-021 found it returning `claims: []` for
+ * an input while still naming the enquiry.
+ */
+export interface DependencyReport {
+  /** Claims found to rest on the subject, supporting or challenging. */
+  claims: string[];
+  /** Lines of enquiry found to reach it. */
+  enquiries: string[];
+  /**
+   * The routes actually walked, named so a reader knows what was considered.
+   *
+   * Anything connected by a route not listed here is absent from `claims` and
+   * `enquiries` and is **not thereby independent**. The known gap, demonstrated
+   * in S-11c: `recordAnalysis({ from })` accepts only observations handles, so
+   * an analysis cannot read another analysis's output, and a multi-stage
+   * pipeline is recorded as disconnected stages. Everything downstream of such
+   * a break is unreachable from here.
+   */
+  routesWalked: string[];
+  /**
+   * Always `false`, and it is a type-level statement rather than a flag.
+   *
+   * Traversal here is **open-world**: this reports what was found, never that
+   * nothing else exists. A caller cannot write `if (report.complete)` and have
+   * it mean anything, which is the point — the alternative is a reader
+   * inferring completeness from a populated-looking list, which is what S-11c
+   * shows going wrong.
+   *
+   * **Do not widen this to `boolean`.** Asserting completeness needs to know
+   * the relevant dependency set *is* complete, which is durable coverage state
+   * this model does not have; `023` §4 preserves that as a discriminator for
+   * later and says explicitly not to build it. Widening the type here would
+   * ship the assertion without the state behind it.
+   */
+  complete: false;
 }
 
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */
@@ -402,13 +501,21 @@ export interface SupportExplanation {
    */
   unmet: string[];
   /**
-   * Observations the supporting findings ultimately rest on, by the **name**
-   * they were recorded under — `recordObservations({ name })`, not the
-   * `finding` text. Two different strings describe an observation set, and
-   * asserting on the wrong one is a mistake this project has already made
-   * once.
+   * Observations the supporting findings ultimately rest on — **identified**,
+   * not named.
+   *
+   * `name` is `recordObservations({ name })` and never the `finding` text; two
+   * different strings describe an observation set and asserting on the wrong
+   * one is a mistake this project has already made. But the name is not the
+   * identity: `part` is, and `IdentifiedArtefact` says in its own docstring
+   * that *"two parts may legitimately share"* a name. Keying on the name
+   * collapsed two same-named inputs into one entry (S-9d).
+   *
+   * This field was `string[]` and this docstring told the reader to key on the
+   * name. The commit that widened the type left the instruction standing, so
+   * it went on recommending exactly the mistake it had just fixed.
    */
-  restingOn: string[];
+  restingOn: IdentifiedArtefact[];
   /** Findings withdrawn because their analysis was replaced — bullet 5. Either bearing. */
   superseded: Array<{ finding: string; via: string; reason: string; bearing: "supports" | "challenges" }>;
   /**
@@ -436,6 +543,41 @@ export interface SupportExplanation {
 }
 
 /**
+ * What the record held at a stated moment — the as-of view (row Z).
+ *
+ * Deliberately a **narrower shape** than `KnowledgeSurvey`, and the narrowing is
+ * the honest part. `Decision` now carries `decided_at`, so resolution,
+ * acceptance and promotion can all be placed in time. `EvidenceUnit` carries no
+ * instant, so *whether anyone had yet worked on a question* cannot be. The
+ * present-tense survey splits that into `unresolved` and `untested`; this one
+ * cannot, and collapses them into `open` rather than reporting a split it would
+ * have to infer from current state.
+ *
+ * That collapse is the finding, not a shortcut. Reporting `untested` as-of by
+ * reading today's evidence units would answer a question about March with facts
+ * from August — the same current-state leak that makes a survey say a question
+ * was `established` before the promotion that established it.
+ */
+export interface HistoricalSurvey {
+  /** The instant asked about, echoed back so an answer cannot be mistaken for the present. */
+  at: string;
+  /** Resolved by then, on a finding promoted by then. */
+  established: QuestionStanding[];
+  /** Resolved by then, on a finding nothing had promoted yet. */
+  provisional: QuestionStanding[];
+  /** Accepted as unresolved by then (S-14). */
+  accepted: QuestionStanding[];
+  /**
+   * Neither resolved nor accepted by then.
+   *
+   * Not split into worked-on and untouched, because nothing durable records when
+   * work began. If that split is ever needed as-of, `EvidenceUnit` is where the
+   * instant would have to go, and it should be earned the way this one was.
+   */
+  open: QuestionStanding[];
+}
+
+/**
  * A question on the record. `question` is its identity; `asks` is what it
  * says. The two are kept apart deliberately: S-1 pursues one question two
  * ways and poses two identically-worded questions, and neither may be
@@ -447,7 +589,10 @@ export interface QuestionStanding {
 }
 
 /**
- * What the programme knows, in three states rather than two.
+ * What the programme knows, in more states than settled-or-not. The buckets are
+ * the fields below; they have been added one scenario at a time and the count
+ * is deliberately not written here, because it was wrong for every scenario
+ * after the third (PJ-028).
  *
  * `untested` is not a weak form of `unresolved`: one is a question nothing has
  * ever been run against, the other is a question something has been run
@@ -470,7 +615,7 @@ export interface KnowledgeSurvey {
   /**
    * Answered, but on a finding nobody has promoted (S-18).
    *
-   * A fourth-and-a-half state, and the distinction the story exists for: a
+   * Its own bucket, and the distinction the story exists for: a
    * result is being relied on and the question is settled *as far as anyone has
    * taken it*, but what settles it is scratch. Kept out of `established` so
    * that reading the survey for "what do we actually know" cannot silently
@@ -481,7 +626,7 @@ export interface KnowledgeSurvey {
    * Open on purpose (S-14). Worked on, not settled, and deliberately left —
    * with the condition that would reopen it recorded on the deciding act.
    *
-   * A fourth bucket rather than a flag on `unresolved`, because a reader
+   * Its own bucket rather than a flag on `unresolved`, because a reader
    * scanning for what still needs doing must not find it there. That is the
    * whole of PJ-001's "should not accumulate ceremony" bullet: the alternative
    * is a to-do list that can never be emptied and is therefore never read.

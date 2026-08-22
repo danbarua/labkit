@@ -26,7 +26,7 @@ check stops counting: S-3c), 019 (re-verification is not reproduction: S-10),
 regenerated part is not the part: S-9), 022 (leaving a question open on
 purpose: S-14) and **023 (capture cheaply, promote before citing: S-18, and the
 Bonsai corpus exhausted)** — those are the current state of the domain model,
-and 023 is the newest decision in the chain. 012 is the implementing agent's own perspective after S-3, opinion
+and 023 is the newest decision about the **model**; 027 is the newest entry in the chain, and is about the method. 012 is the implementing agent's own perspective after S-3, opinion
 rather than decision and now largely superseded by 014/015. 013 is an external
 read-only review of the whole arc, written by a different reviewer; its
 improvement list is what 014/015 and the surrounding cleanup address. **017 is
@@ -37,11 +37,166 @@ and gave none, and the ledger records *that* as the verdict. Row K has since
 been settled outright by S-18 (023), which the same §4 condition had nominated
 and which three reviews walked past. **024 is a third external review**, of the
 completed arc: it verifies the corpus-exhaustion claim against §3's ownership
-table and records the arc totals (node labels 13 → 13, edge labels 19 → 24,
-zero migrations, fifteen scenarios). Its one open item — row F's missing S-9
-verdict — was closed the same day, and **no item on the ledger's index is now
-known-open**. Five rows are still `open` + unowned, which is the better kind:
-every named probe has been built.
+table and records the arc totals **as they stood when it was written** — node
+labels 13 → 13, edge labels 19 → 24, zero migrations, fifteen scenarios. Read
+that as a dated measurement, not as current state: `024` is a review and its
+figures are frozen at its own date. Edge labels have since reached 25. **The
+live counts are `NODE_LABELS.length` and `EDGE_LABELS.length` in
+`src/db/domain.ts` and nowhere else** — this sentence said 24 for a while, which
+made it the eighth instance of `028`'s numeral pattern, in the paragraph
+introducing `028`. **025 through 028 are about the method
+rather than the model** — 025 on why a condition recorded where nobody re-reads
+it is not a mechanism (rows K, Z and P all fired unread); 026 on the one failure
+mode the predictions protocol cannot see from inside itself, that a predictions
+document may state what will happen and what would refute it and may **not**
+rank the outcomes by how impressive they would be; 027 on why **prose
+agreeing with itself is not evidence that the code agrees with the prose** —
+three unrelated places held a rule in a comment and code that ignored it, each
+an asymmetry where the rule was applied where the author happened to be looking;
+and **028**, which is 027 tested rather than argued. All four are one shape: a
+document doing the work of a check.
+
+**028 is the first deliberate sweep for 027's defect**, six read-only readers
+over ~19,000 lines, and it answers a question 027 left open: *can any of this be
+machine-checked?* Mostly no, now measured rather than asserted. Of two proposed
+comment-shaped checks, one found only stale prose and the other found **nothing**
+— every real instance was cross-file and needed its own lookup. What generalised
+was not about prose at all: **a test that asserts nothing**, two forms, two hits,
+two findings, zero false positives (`bun run check:tests-assert`). It was landed
+**red on purpose**, naming the two tests it was written from — the demonstration
+first, in the same order every other fix here is made. Both are now fixed
+(`7c6853f`) and it is green; a red one means a test has stopped testing. A test's name
+is a claim and its body is the check on that claim, so 027's mechanism opens there
+too — and wider, because a green tick reads as evidence. The runner-up, a numeral
+in a comment next to something countable, was **seven for seven wrong** and is
+deliberately *not* one check: each has a different denominator, and a generic
+warning would fire on every past-tense measurement this repo keeps on purpose.
+Fixing all seven then corrected 028 itself: **a numeral in prose must earn an
+assertion, be deleted, or be explicitly dated**, and **zero of the seven earned
+an assertion** — six were decoration on an argument that survives without them,
+and the seventh was already asserted empirically one line below, by a guard that
+*tightens* as labels are added where a count assertion would merely break. An
+assertion protecting nothing an existing assertion does not is a change-detector.
+The third branch is what the arc-totals figures above are doing: a review's
+numbers are a dated measurement, and those are fine as long as they say so.
+
+**029 is about the method's *social* half** — what a second agent turned out to
+be for, which was not throughput. Every useful catch in a two-session day was a
+conclusion that was **right** with reasoning underneath it that was **wrong**,
+which no test detects because the tests pass either way. Its sharpest line is
+027's asymmetry restated as a property of verification rather than authorship:
+**a passing check on the file I edited told me nothing about the two I didn't.**
+It also carries the measurement disciplines each failure forced — paired and
+interleaved, one variable, *round one is not the result*, and **a negative
+result is not evidence unless it could have been positive** — plus the rule that
+where two fixes are order-dependent, *both* commit messages must say so.
+
+**028's real argument is its last section, and it is the one to read.** Four
+instances of this defect were committed *in one day, by two authors who had it
+in front of them* — including the commit that fixed one, a comment promising an
+assertion nobody had written, a failure signature piped away ten minutes after
+its author agreed in writing that this was the mistake worth recording, and a
+rule generalised from a single observation inside the correction for that.
+Under the best conditions anyone gets — the defect named, catalogued, freshly in
+mind — **"be more careful" is not available as a remedy, because these are what
+being careful looks like.** Each is a small asymmetry, and attention is exactly
+what does not distribute evenly across one. What worked: checking the *other
+side* of the operation you are looking at (three of the four), and a disagreeing
+measurement (the fourth). That is the argument for a checker, not for resolving
+to concentrate harder.
+
+024's one open item — row F's missing S-9 verdict — was closed the same day.
+**One row is `open` + unowned today: AF**, and it earns nothing under §5 by its
+own cell. **Row Z was closed on 2026-08-21** by the
+consumer probe (`docs/consumer-contract/025`, `026`) — `Decision.decided_at`,
+no migration, after rung 1 was built and shown to fail. It cost a **second**
+property the same day: an external review found `whatWasKnown()` reporting a
+question posed in April as `open` in March, since it began `MATCH (q:Question)`
+and had no way to know when a question was asked. `Question.posed_at` cleared it
+— demonstrated first (`tests/consumer/historical_survey.test.ts`), one writer,
+no migration, no new noun. Two properties, then, not one.
+
+**Row F reached `boundary` the same day** (`035`, `036`), after four bites that
+were all in *reporting* — `reproducibilityOf()`, `whySupported().restingOn`,
+`reproductionOf().differs` — and all fixed by carrying `natural_id`, which
+already existed. A version-of relationship would have fixed none of them, so
+they are evidence against the row. **Row F was the only candidate in this
+project's history that would have required a first new noun, and it did not.**
+It reopens if anyone asks for versions as an ordered sequence.
+
+That arc also produced **row AD**, carrying a fourth status and the only one with
+a deadline: `demonstrated`, where the wrong answer is on the record and what is
+unbuilt is the fix. **AD was opened and closed the same day** (`029`, `030`) —
+`recordObservations()` now mints the `EvidenceUnit` PJ-001 says must exist.
+**Row O closed too** (`031`, `032`), on an external challenge rather than a
+prediction of this project's own: `INVALIDATED_BY: Artefact → Review` records
+which review a retraction rested on. **Rows S and T are `refuted`** — there is no
+*who* to attribute work to when agents run the analyses, and edges do carry
+properties. Read §3's legend before treating the statuses as one pile.
+
+**This file is a third copy of the ledger's state, and only a reader can
+reconcile it.** §3 records every row's status twice — index table and the row's
+own cell — and `bun run check:ledger` holds those two to each other. It cannot
+see this file, and it deliberately will not: CLAUDE.md's claims are narrative,
+and a checker over prose would be wrong more often than the prose is. So a green
+`check:ledger` means *the ledger agrees with itself*, never *these paragraphs
+are current*. The sentence above said no row was known-open for a day after row
+AD made it false, in the file every agent reads first.
+
+`docs/dependency-graph.mmd` is the module dependency graph, as text.
+`bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
+
+It was briefly self-maintaining, via a `.githooks/pre-commit` that regenerated on
+every commit touching `src/` or `tests/`, alongside a 134KB SVG. Both were
+removed on 2026-08-21. The graph is documentation, and documentation that
+rewrites itself inside someone else's commit buys less than it costs: it put a
+generated artefact in the diff of every code commit, and the byte-stability that
+made "the graph changed" mean "the module structure changed" was there to stop
+that being noise rather than to make it useful. The SVG went for its own reasons
+— 1,444 generated lines in which a moved edge is invisible, against 3KB of
+mermaid that renders on GitHub and diffs line by line. PJ-007 records a design
+change prompted by *reading* the SVG, which is the case for having had one; it is
+not a case for regenerating it forever. `npx depcruise-fmt -T dot` over the
+cruise JSON recovers one if a person wants it.
+
+It is **not a gate** and never was: `npx depcruise src tests --output-type err`
+is. Generation lives in `scripts/update-dependency-graph.sh` rather than a
+`package.json` one-liner because the one-liner was a pipeline, and `$?` after a
+pipeline reports the last command's status — a crashed `depcruise` used to yield
+an empty SVG and a success code.
+
+**Do not use this repo's shorthand when reporting to the user.** `§5`, `bar 4`,
+`D2`, "the rungs", the ledger status words and the row letters are compression
+that pays between documents and costs on sight. Say *"we showed it gives a wrong
+answer"*, not *"it clears §5"*. A glossary makes documents readable and does
+nothing for a sentence in a reply — the user hit unexplained shorthand three
+times in one session, twice after it was noticed and once in the same message
+that announced the glossary.
+
+`docs/GLOSSARY.md` is a pointer table for the shorthand this repo uses across
+documents — `D2`, `§5`, `bar 4`, the rungs, the ledger status words. It defines
+nothing itself; every entry names where the real definition lives, because a
+second copy is a second thing to go stale. Read it if a token in a journal entry
+means nothing to you; `D1`/`D2` in particular mean two unrelated things
+depending on the document.
+
+`docs/TASKS.md` is the **work queue** — what is ready to build, what needs a
+discriminator first, what waits on a decision, and what is deliberately not being
+done. It is not a record: PJ-008 §3's ledger stays authoritative on what the
+model knows, and TASKS.md points at it rather than restating verdicts. Where the
+two disagree, the ledger is right and TASKS.md is stale.
+
+**Never suggest `git reset --hard` to another session.** You cannot see its
+working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
+commit; it had **five uncommitted files** at that moment, including a fix and a
+predictions document, and the command would have destroyed all of them silently.
+It rebased instead and said so. `rebase` reaches the same place and refuses when
+the tree is dirty, which is the property that matters across a boundary you
+cannot see through. The advice was right in shape and wrong in verb.
+
+More generally: a parallel session's **worktree state is invisible to you** in a
+way its branch state is not. `git log` tells you where it is; nothing tells you
+what it is holding.
 
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
@@ -60,9 +215,13 @@ bun test                       # run all tests
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
-bun run dev:dependency-cruiser  # regenerate dependency-graph.svg
+bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
 bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
+bun run check:doc-comments     # finds doc comments detached from what they document
+bun run check:ledger           # fails if two PJ-008 rows are `demonstrated` at once
+bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
+bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
@@ -70,16 +229,43 @@ bun examples/full-lifecycle.ts # runnable end-to-end smoke test of the persisten
 ```
 
 There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
-binary — `src/cli.ts`/`src/index.ts` are currently stubs, not a working CLI.
+binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is four
+read-only commands over `ReadSurface` (`known`, `why`, `affects`, `enquiry`),
+and `src/mcp/server.ts` is the same reads for an agent caller, seven tools over
+stdio (`bun run mcp`).
 
 `bun test` exits with a non-zero code even when every test passes — this is
 a known `bun test` + PGlite WASM teardown interaction, not a failure signal.
 Read the actual pass/fail counts in the output, don't trust the exit code.
-`bun examples/full-lifecycle.ts` does the same: it exits **99** on a completely
-successful run, and has since long before anyone noticed. Judge it by whether
-the output ends with `closed connection cleanly` and contains no raw graphids.
+`bun examples/full-lifecycle.ts` **used to do the same and no longer does.** It
+exited 99 on a success, so this file told everyone to ignore its exit code and
+read the output instead — and the script had been dead since `af5a1d2` deleted
+the views it read back through, dying at `relation "labkit_t1.claim" does not
+exist` for 221 commits. The rule was added *the same day, after the break*, by
+the commit whose subject was closing out the last verification step. Declaring
+the exit code meaningless left the genuine failure with no watcher either. It
+now ends with an explicit `process.exit(0)`, so **0 means it worked** and
+anything else means it did not; it also asserts the provenance chain it walks
+and refuses any id that is not a natural id, rather than leaving that to a
+reader's eye.
+
+The general lesson, which cost more than the script did: **a rule that tells
+readers to ignore a signal removes the only watcher that signal had.** If a
+signal is unreliable, fix it or delete it — do not annotate it.
+
 Note also that `$?` after a pipeline reports the *last* command's status, so
-`bun ... | tail` will happily report success that isn't there.
+`bun ... | tail` will happily report success that isn't there. This has now
+caught someone twice: the second time with `${PIPESTATUS[1]:-$?}`, which is
+**bash** — this shell is zsh, where it is lowercase `pipestatus` — so the
+expression fell through to `$?` and reported `wc -l`, passing a fix that was
+dead code.
+
+**The pipe costs the diagnosis as well as the status, and that half is easier to
+walk into.** `bun test | tail -5` keeps the pass/fail counts and throws away
+every `(fail)` line, so a run reporting 23 failures leaves you unable to name a
+single failing test — or to tell a real regression from a teardown cascade.
+Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
+about the pipe, not about that incident.
 
 ## Architecture: two persistence halves, deliberately not one
 
@@ -94,9 +280,9 @@ forcing them into FK tables would just reimplement graph traversal as
 recursive CTEs.
 
 `src/db/` is layered, not a hub — each module has one job, and the
-dependency direction is enforced by `bun run dev:dependency-cruiser`
-(renders `dependency-graph.svg`; `npx depcruise src tests --output-type err`
-for violations only):
+dependency direction is enforced by `npx depcruise src tests --output-type err`
+(violations only; `bun run dev:dependency-cruiser` redraws
+`docs/dependency-graph.mmd`):
 
 | module | job |
 | --- | --- |
@@ -300,11 +486,28 @@ free to be wrong and re-run.
 **Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
 Every label is provisioned into every tenant up front, so declared-but-never-
 walked structure is a computable map of where the model has untested claims —
-**There is currently no such example.** As of S-18 every label in
+**There is no such example at label granularity.** As of S-18 every label in
 `EDGE_SCHEMA` has both a writer and a reader, and every node label is created
 by some verb — `DEFERS` was the last unwalked edge, and `CHALLENGES` before it;
 `PROMOTES` arrived with both. That is the outcome the policy exists to allow,
 twice over.
+
+**There is one at endpoint-pair granularity, and the distinction was not being
+made until row AD's review found it.** `PRODUCES` has readers in abundance, and
+every one of them ends at an `Evidence`; the single traversal reaching an
+`Artefact` starts at a `Computation` (`write.ts`'s `outputArtefactOf`). So
+`PRODUCES: ["EvidenceUnit", "Artefact"]` — written by `recorded()`, carried
+through every tenant — **has a writer and no reader**. A label's entry in
+`EDGE_SCHEMA` is a list of endpoint pairs and each pair is a separate claim
+about the domain, so "the label is walked" is the wrong unit to check.
+
+Named rather than culled, which is the policy working: an unwalked pair is a
+computable map of where the model has an untested claim, and an *unnamed* one is
+a map nobody has. Contrast it with `EvidenceUnitRole` — nine values, one writer,
+no readers — which was **not** given the same protection and had a tenth value
+declined, because that policy covers labels and edges as claims about the domain
+and a property value is not one. The two are the same shape at different levels
+and the policy's answer differs; that contrast is the informative part.
 
 Keep the policy anyway, for what it caught on the way out. `DEFERS` had a
 reader that could report `closure: "deferred"` and no writer, so the branch was
@@ -337,12 +540,18 @@ Two rules, so this is checkable rather than remembered:
    cleared another row is nominated too, demonstrated or not** — otherwise
    clearing one row can quietly make a second worse while the rule that would
    have caught it stops applying, which is exactly what happened to row X when
-   S-3b cleared row V (PJ-017 §3). **No row is currently that one.** Row V was
-   cleared by S-3b (PJ-016) and row X — nominated under exactly that widening
-   rule, then demonstrated and cleared by S-3c (PJ-018) — was the last. The
-   nomination rule worked end to end: a row made worse by another row's fix was
-   named, built and closed, and the four scenarios X spent unowned are the
-   measure of what the rule is for.
+   S-3b cleared row V (PJ-017 §3). **No row is currently that one, and this is
+   now checked rather than asserted** — `bun run check:ledger` fails when two
+   §3 rows carry the `demonstrated` status. Row AD held it for a few hours on
+   2026-08-21: `recordObservations()` minted no `EvidenceUnit`, so a question
+   worked on through observations alone reported itself as one nothing had ever
+   been run against. It was found by S-9b and cleared the same day, which is the
+   rule working at the speed it was written for. Before AD, row V was cleared by
+   S-3b (PJ-016) and row X — nominated under
+   exactly that widening rule, then demonstrated and cleared by S-3c (PJ-018) —
+   was the last. The nomination rule worked end to end: a row made worse by
+   another row's fix was named, built and closed, and the four scenarios X spent
+   unowned are the measure of what the rule is for.
 2. **Every deferred row names the scenario that would settle it.** A row that
    cannot name one is not deferred, it is unresolved and unowned, and it should
    say so in its own cell. "Record both and pick neither" is a decision about
@@ -424,6 +633,7 @@ changes, migrations get edited/regenerated *in place* rather than stacked —
 see the "License to rewrite history" note in
 `docs/project-journal/004_tenancy_implementation_plan.md`. Once a real
 database exists, that stops being true and this note should be updated.
+
 
 ## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
 
@@ -545,3 +755,15 @@ election/socket-sharing actually works. It's a live, unresolved instance of
 the pglite-socket bug above (see PJ-006) — flaky, and not fixable the way
 the other tests were, since it deliberately needs genuine concurrent
 connections to prove what it proves.
+
+**The suite's *other* flakiness is not that bug, and attributing it there cost
+two investigations.** Intermittent `graph "labkit_t1" does not exist` and
+`Connection terminated unexpectedly` bursts look like the socket defect and are
+not: a test's legitimate work crosses bun's fixed **5000ms** ceiling, bun's
+timeout **does not cancel the test body**, and the abandoned test's late
+`scenario.end()` then resets the database and closes the *next* test's
+connection. Nothing hangs — 59,086 queries were tracked across a failing run
+with zero unfinished. The cost that pushes a test to the ceiling is
+`provisionTenantGraph()` running full reconciliation on every `begin()` and
+every `current()`. See `docs/TASKS.md` for the evidence and for the fix that was
+tried and refuted.
