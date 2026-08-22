@@ -51,11 +51,26 @@ Someone could start these today.
   checking.
 
   **What was not fixed:** tests still cross the ceiling and still fail. Only
-  the amplification is gone. **The falsifiable prediction, recorded before the
-  next flake rather than after it: a crossing should now produce roughly one
-  failure, not a burst.** The 17 failures in the baseline run below were spread
-  across **nine** test groups; a post-fix failing run spread across nine groups
-  refutes this outright. Record the count *and* the spread.
+  the amplification is gone.
+
+  **The prediction, and it is NOT confirmed.** The first form — *"a crossing
+  should now produce roughly one failure, not a burst"* — was withdrawn as
+  unfalsifiable: `labkit-minion`'s **unpatched** baseline produced 5 crossings
+  and 4 collateral, roughly one-to-one, so a post-fix run at one-to-one would
+  have "confirmed" behaviour the baseline already showed. Burst size is
+  load-dependent.
+
+  The form that can be tested is about the **error vocabulary**, not the count:
+  **collateral should be zero** — no failure whose cause is another test's
+  teardown. That is checkable per run and does not move with load.
+
+  **It currently disagrees with itself across two trees.** On `labkit-minion`'s:
+  14 failures, every one a crossing, **0 collateral**. On this one, a later run:
+  266 pass / 6 fail — five crossings and **1 collateral**, carrying a
+  `Connection terminated`. So it survived one tree and failed the other. That is
+  a live disagreement, not a settled result, and it should not be written up as
+  a success anywhere. **Record the count, the spread, and the error vocabulary**
+  on any failing run; the vocabulary is the part that decides it.
 
   **The version that failed is the useful half.** The first attempt moved
   `testDb.reset()` into `begin()` so every test isolated itself. Paired,

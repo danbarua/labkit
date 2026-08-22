@@ -76,6 +76,10 @@ Working tree clean apart from this entry.
   crossings and ONE collateral failure** carrying a `Connection terminated`. So
   collateral is not zero in every run. The earlier zeros were real and are not
   the whole picture; recorded here rather than left standing alone.
+- **So the sharpened prediction is a live disagreement, not a confirmation.** It
+  held on `labkit-minion`'s tree (14 failures, all crossings, zero collateral)
+  and failed on this one. Two trees, opposite answers, no explanation for the
+  difference. `docs/TASKS.md` says so where the prediction is recorded.
 
 ## Open
 
