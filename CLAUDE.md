@@ -116,9 +116,9 @@ and had no way to know when a question was asked. `Question.posed_at` cleared it
 — demonstrated first (`tests/consumer/historical_survey.test.ts`), one writer,
 no migration, no new noun. Two properties, then, not one.
 
-**Row F reached `boundary` the same day** (`035`, `036`), after four bites that
-were all in *reporting* — `reproducibilityOf()`, `whySupported().restingOn`,
-`reproductionOf().differs` — and all fixed by carrying `natural_id`, which
+**Row F reached `boundary` the same day** (`docs/consumer-contract/035`,
+`036`), after four bites that were all in *reporting* —
+`reproducibilityOf()`, `whySupported().restingOn`, `reproductionOf().differs` — and all fixed by carrying `natural_id`, which
 already existed. A version-of relationship would have fixed none of them, so
 they are evidence against the row. **Row F was the only candidate in this
 project's history that would have required a first new noun, and it did not.**
@@ -126,9 +126,10 @@ It reopens if anyone asks for versions as an ordered sequence.
 
 That arc also produced **row AD**, carrying a fourth status and the only one with
 a deadline: `demonstrated`, where the wrong answer is on the record and what is
-unbuilt is the fix. **AD was opened and closed the same day** (`029`, `030`) —
-`recordObservations()` now mints the `EvidenceUnit` PJ-001 says must exist.
-**Row O closed too** (`031`, `032`), on an external challenge rather than a
+unbuilt is the fix. **AD was opened and closed the same day**
+(`docs/consumer-contract/029`, `030`) — `recordObservations()` now mints the
+`EvidenceUnit` PJ-001 says must exist. **Row O closed too**
+(`docs/consumer-contract/031`, `032`), on an external challenge rather than a
 prediction of this project's own: `INVALIDATED_BY: Artefact → Review` records
 which review a retraction rested on. **Rows S and T are `refuted`** — there is no
 *who* to attribute work to when agents run the analyses, and edges do carry
@@ -198,6 +199,13 @@ More generally: a parallel session's **worktree state is invisible to you** in a
 way its branch state is not. `git log` tells you where it is; nothing tells you
 what it is holding.
 
+`docs/consumer-contract/` holds the **predictions-and-verdict pairs** — an
+odd-numbered file states what a probe will show and what would refute it, the
+next records what happened. Bare numerals elsewhere in this file mean
+`docs/project-journal/`; consumer-contract files are always named with their
+directory, because both chains have an `029`. The pile closed with the
+inferred-verb corpus.
+
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
 independently; see its README. The Stop/SessionStart wiring lives in
@@ -222,10 +230,13 @@ bun run check:doc-comments     # finds doc comments detached from what they docu
 bun run check:ledger           # fails if two PJ-008 rows are `demonstrated` at once
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
+bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun examples/full-lifecycle.ts # runnable end-to-end smoke test of the persistence layer
+bun run dev                    # the CLI (src/cli.ts)
+bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
 There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
@@ -266,6 +277,13 @@ every `(fail)` line, so a run reporting 23 failures leaves you unable to name a
 single failing test — or to tell a real regression from a teardown cascade.
 Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
 about the pipe, not about that incident.
+
+**Nothing runs these for you** — there is no CI workflow and no git hook. Before
+committing, run `bun test`, `bun run typecheck` and
+`npx depcruise src tests --output-type err`; add `check:migrations` if you
+touched `drizzle/`, `check:ledger` if you touched PJ-008 §3, and
+`check:tests-assert` if you touched tests. Read `bun test`'s pass/fail counts,
+not its exit code, and do not pipe it — both traps are above.
 
 ## Architecture: two persistence halves, deliberately not one
 
