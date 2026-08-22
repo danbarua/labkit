@@ -1,4 +1,4 @@
-# 009: emptying the tenant graph instead of dropping it
+# 009: emptying the tenant graph instead of dropping it, and a closed question closed twice
 
 **Session wrap, 2026-08-22, on `feat/domain-consumer`.** Not a decision record —
 see `docs/TASKS.md` for the flake's evidence and the two fixes that failed.
@@ -33,6 +33,13 @@ The second half of the suite flake: the ceiling crossings themselves, after
   `dropTenantGraph` caller is harmless. Corrected in that test's docstring, in
   this entry, and in `docs/TASKS.md`, which also gains the methodological note
   its confirmation runs produced.
+- `771e6b7` — merged `labkit-minion` through `0e6f329`: `sharpen` cleared,
+  `evaluateCriterion` fixed, `closeEnquiry`'s interrupted-retry route fixed.
+- `5921647` — **a second route to `closeEnquiry`'s wrong answer, needing no
+  interruption.** Nothing guarded against closing an already-closed question, so
+  two clean calls wrote two resolving decisions and `enquiryStatus` picked
+  between them arbitrarily: abandon an enquiry, later close it citing evidence,
+  and it still reports abandoned with no answer. Refused on the write side.
 
 Working tree clean apart from this entry.
 
@@ -60,6 +67,15 @@ Working tree clean apart from this entry.
   `Client was closed` **1**, ceiling crossings 7, **collateral 0**.
 - `bun run typecheck`, `npx depcruise src tests --output-type err` (0 violations),
   and all four `check:*` — green.
+- The double-close guard is injection-verified (disable it, the test fails), and
+  **S-14 is asserted rather than argued**: a question accepted as unresolved can
+  still be closed when evidence arrives, because the guard keys on `RESOLVES`
+  and `acceptAsUnresolved` writes `DEFERS`. That is the case the guard could
+  have broken silently, and `labkit-minion` asked for it.
+- **A later full run on a loaded machine: 266 pass / 6 fail — five ceiling
+  crossings and ONE collateral failure** carrying a `Connection terminated`. So
+  collateral is not zero in every run. The earlier zeros were real and are not
+  the whole picture; recorded here rather than left standing alone.
 
 ## Open
 
@@ -96,6 +112,18 @@ kept out of the flake numbers:** `unnamed prepared statement does not exist` —
 describes, seen for the first time this session. If it recurs, that header's
 misattribution warning has a live instance behind it for the first time.
 
+**The two `closeEnquiry` fixes are order-dependent and neither is sufficient
+alone** — caught by `labkit-minion` before mine landed, and not derivable from
+either commit alone. On the pre-transaction tree an interrupted close left an
+orphan resolving decision; my guard would then have refused the retry
+**permanently**, locking the question at `abandoned` forever. That converts a
+repairable erasure into a lockout. Reverting either fix alone reintroduces a
+defect the other's message does not describe.
+
+**One verb, two independent defects, different remedies.** Worth counting the
+pile per *route* rather than per verb: four routes examined, three defects.
+Stopping at the first fix in a function would have left the second.
+
 **Crossings are not fixed, and no claim is made that they are reduced.** All
 four paired arms had zero, so that data cannot speak to it. The argument is
 mechanical rather than measured: crossings are what the 5000ms budget buys, and
@@ -103,11 +131,21 @@ the work inside it halved.
 
 ## Next
 
-`labkit-minion` holds the sweep's inferred pile and is on `closeEnquiry`, whose
-predicted defect would be the worst in the pile — `enquiryStatus()` derives
-`answer: challenges ? "no" : "yes"` from exactly the edges written last, so a
-partial write could invert the recorded answer to a research question. **It is
-a prediction.** Base rate stays two examined, one defect until it is run.
+`labkit-minion` holds the sweep's inferred pile and is on `pursue`. Its
+`closeEnquiry` prediction came back a defect **with both specific predictions
+wrong** — it writes one `BASED_ON` not one per finding, and the answer cannot be
+inverted because the empty case is guarded explicitly. Right verdict, wrong
+reasoning underneath, which is the outcome worth knowing: fixing on the
+prediction would have wrapped the right function while believing something
+false about why.
+
+**Its open question, which my fix does not answer:** three picks in `read.ts`
+(`originOf`, `enquiryStatus`, `whySupported`) are unguarded on the argument that
+the write side cannot produce two. That premise is unsafe wherever a writer can
+fail halfway. I argued it *is* safe for `RESOLVES` — one writer, now refusing —
+so a reader-side tie-break there would be unreachable. **That argument covers
+`RESOLVES` only.** The other two each need their own answer to "who can write
+two of these, and can they fail halfway?" Neither has been examined.
 
 For the crossings: `labkit-minion`'s three idle runs give **zero crossings** at
 82–110s, so the load-controlled count is in and there is nothing to chase there
