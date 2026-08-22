@@ -722,12 +722,19 @@ unowned in a review handoff, by an agent that had just read this table; an
 external reviewer caught it. The marker exists so the next reader does not have
 to be that well informed:
 
-| Kind | Means | Rows today |
-| --- | --- | --- |
-| `open` + owned | an unbuilt discriminator is named (`°` present) | **none** — K was the last, built as S-18 |
-| `open` + unowned | every named probe is built; a **new** discriminator is needed | F, O, S, T |
-| `demonstrated` | a wrong answer is on the record and the fix is what is unbuilt | **none** — AD was the first and was cleared the day it opened |
-| `boundary` | a limit characterised on purpose; no claim it should be fixed | Y, AA, **F** |
+| Kind | Means |
+| --- | --- |
+| `open` + owned | an unbuilt discriminator is named (`°` present) |
+| `open` + unowned | every named probe is built; a **new** discriminator is needed |
+| `demonstrated` | a wrong answer is on the record and the fix is what is unbuilt |
+| `resolved` / `resolved (argued)` | settled — the second by argument rather than a demonstrated wrong answer |
+| `refuted` | the predicted gap turned out not to be one |
+| `boundary` | a limit characterised on purpose; no claim it should be fixed |
+
+**Which rows are which is the index table above, and nowhere else.** A
+"rows today" column stood here and was wrong in four places, listing three
+settled rows as needing a discriminator and omitting the only open one — under
+the paragraph that warns about a reader misreading this very table.
 
 The **demonstrated** kind is new with row AD and is the only one with a
 deadline: CLAUDE.md permits at most one confirmed wrong answer shipping green
@@ -767,7 +774,7 @@ a prediction that failed is a result about the model.
 
 ### Row A — A criterion evaluation has no inconclusive outcome
 
-**Scenarios:** S-3, S-17 · **Status:** refuted
+**Scenarios:** S-3, S-17
 
 **Current state (verified):** `outcome: "pass" \| "fail"`
 
@@ -775,7 +782,7 @@ The checks genuinely did pass/fail individually; inconclusiveness belongs to the
 
 ### Row B — Supersession is decision-only
 
-**Scenarios:** ~~S-11~~, S-12 · **Status:** resolved
+**Scenarios:** ~~S-11~~, S-12
 
 **Current state (verified):** `SUPERSEDES: [["Decision","Decision"]]`
 
@@ -787,7 +794,7 @@ The checks genuinely did pass/fail individually; inconclusiveness belongs to the
 
 ### Row C — A claim has no endpoint or scope
 
-**Scenarios:** S-5, S-13 · **Status:** resolved
+**Scenarios:** S-5, S-13
 
 **Current state (verified):** `ClaimProps = { name, kind? }`
 
@@ -797,7 +804,7 @@ Scope is carried by the line of enquiry the claim answers, reached by traversal
 
 ### Row D — No question-to-question lineage
 
-**Scenarios:** **S-1**, S-13 · **Status:** resolved
+**Scenarios:** **S-1**, S-13
 
 **Current state (verified):** ~~no `Question`→`Question` edge~~ → `MOTIVATES: Decision → Question`
 
@@ -805,7 +812,7 @@ Scope is carried by the line of enquiry the claim answers, reached by traversal
 
 ### Row E — No evidence-to-evidence lineage
 
-**Scenarios:** **S-10** · **Status:** resolved
+**Scenarios:** **S-10**
 
 **Current state (verified):** `Evidence -[:REVERIFIES]-> Evidence`, written by `reverify()`, read by `reproductionOf()` and `whySupported()`
 
@@ -839,7 +846,7 @@ something that could not be true
 
 ### Row F — No artefact-to-artefact lineage
 
-**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d**, **S-10c** · **Status:** boundary
+**Scenarios:** **S-9**, **S-9b**, **S-9c**, **S-9d**, **S-10c**
 
 **Current state (verified):** no `Artefact`→`Artefact` edge
 
@@ -1030,7 +1037,7 @@ scale, and it nearly worked.
 
 ### Row G — "Locked" is not distinct from "decision record still active"
 
-**Scenarios:** S-7, S-13 · **Status:** resolved
+**Scenarios:** S-7, S-13
 
 **Current state (verified):** `Decision.is_open` (PJ-004 #2)
 
@@ -1040,7 +1047,7 @@ A gate expresses the confirmatory boundary; `is_open` was always meant to carry 
 
 ### Row H — Closure carries no polarity
 
-**Scenarios:** S-4 · **Status:** refuted
+**Scenarios:** S-4
 
 **Current state (verified):** `RESOLVES` edge, no outcome field
 
@@ -1048,7 +1055,7 @@ A gate expresses the confirmatory boundary; `is_open` was always meant to carry 
 
 ### Row I — Absence of evidence vs inconclusive evidence
 
-**Scenarios:** S-1, S-2, S-3, **S-4** · **Status:** resolved
+**Scenarios:** S-1, S-2, S-3, **S-4**
 
 **Current state (verified):** `whySupported().challenged`/`against`; `whatIsKnown()`'s three lists
 
@@ -1056,7 +1063,7 @@ A gate expresses the confirmatory boundary; `is_open` was always meant to carry 
 
 ### Row J — Deferred vs accepted-as-unresolved
 
-**Scenarios:** **S-14** · **Status:** resolved
+**Scenarios:** **S-14**
 
 **Current state (verified):** `acceptAsUnresolved()` writes `DEFERS`; `enquiryStatus()` reports `accepted-as-unresolved`, open, with reason and reopening condition
 
@@ -1087,7 +1094,7 @@ distinction gets earned then
 
 ### Row K — No provisional/scratch standing
 
-**Scenarios:** S-8, S-18 · **Status:** resolved
+**Scenarios:** S-8, S-18
 
 **Current state (verified):** `Claim.kind: exploratory \| confirmatory`
 
@@ -1120,7 +1127,7 @@ PJ-023.
 
 ### Row L — No execution input lineage
 
-**Scenarios:** S-11 · **Status:** resolved
+**Scenarios:** S-11
 
 **Current state (verified):** no `Computation`→`Artefact` "read" edge
 
@@ -1128,7 +1135,7 @@ PJ-023.
 
 ### Row M — A review has no analysis to point at
 
-**Scenarios:** S-11 · **Status:** resolved
+**Scenarios:** S-11
 
 **Current state (verified):** `EVALUATES: Review→Claim\|Decision\|Evidence`
 
@@ -1136,7 +1143,7 @@ PJ-023.
 
 ### Row N — Claim identity is undefined
 
-**Scenarios:** S-5, S-12 · **Status:** resolved
+**Scenarios:** S-5, S-12
 
 **Current state (verified):** one `Claim` created per analysis conclusion; queried by `name`
 
@@ -1148,7 +1155,7 @@ PJ-023.
 
 ### Row O — Withdrawal reason is under-determined
 
-**Scenarios:** S-3, S-7, **S-11b** · **Status:** resolved
+**Scenarios:** S-3, S-7, **S-11b**
 
 **Current state (verified):** `Review→EvidenceUnit` says *who reviewed*, not *which review caused* an invalidation
 
@@ -1165,7 +1172,7 @@ PJ-023.
 
 ### Row AF — Execution input order is not recorded
 
-**Scenarios:** **S-10b** · **Status:** open
+**Scenarios:** **S-10b**
 
 **Current state (verified):** `CONSUMES` records which artefacts a computation read, never in what sequence
 
@@ -1238,7 +1245,7 @@ part no amount of running things would have recovered
 
 ### Row P — `Evidence` carries two senses
 
-**Scenarios:** **S-9**, S-10, S-12 · **Status:** resolved
+**Scenarios:** **S-9**, S-10, S-12
 
 **Current state (verified):** one `EvidenceProps {statement}` for raw measurements and for inferential findings; distinguished only by graph position
 
@@ -1299,7 +1306,7 @@ four scenarios ago has quietly come true
 
 ### Row Q — Question and LineOfEnquiry are collapsed by the service layer
 
-**Scenarios:** S-1, S-2, S-13, **S-4** · **Status:** resolved
+**Scenarios:** S-1, S-2, S-13, **S-4**
 
 **Current state (verified):** `pose`/`pursue`/`openEnquiry`; `MOTIVATES` walked in both directions
 
@@ -1307,7 +1314,7 @@ four scenarios ago has quietly come true
 
 ### Row R — Standing is a birth property, not a transition
 
-**Scenarios:** S-8, S-7, S-18 · **Status:** resolved
+**Scenarios:** S-8, S-7, S-18
 
 **Current state (verified):** `Claim.kind` is hardcoded `"confirmatory"` by the only writer; `exploratory` unreachable through research verbs
 
@@ -1328,7 +1335,7 @@ not a winner.
 
 ### Row S — No agent, person or role exists in the model
 
-**Scenarios:** S-8, **S-8b** · **Status:** refuted
+**Scenarios:** S-8, **S-8b**
 
 **Current state (verified):** no node label, no property, anywhere
 
@@ -1388,7 +1395,7 @@ about what designers expect and weaker evidence about what the domain contains
 
 ### Row T — Edges cannot carry properties
 
-**Scenarios:** S-7, ~~row O~~ · **Status:** refuted
+**Scenarios:** S-7, ~~row O~~
 
 **Current state (verified):** an AGE edge carries properties like any vertex; `createEdge(from, edge, to)` does not expose them, and edge identity is `UNIQUE (start_id, end_id)`
 
@@ -1464,7 +1471,7 @@ Rows P–T all arrived that way and this is the first to be refuted outright
 
 ### Row U — A gate records no condition until it is evaluated
 
-**Scenarios:** S-17 · **Status:** resolved
+**Scenarios:** S-17
 
 **Current state (verified):** only path `Criterion`→`Gate` ran via `CriterionEvaluation`; `GateProps` is `{consequence}`
 
@@ -1472,7 +1479,7 @@ Rows P–T all arrived that way and this is the first to be refuted outright
 
 ### Row V — Criteria gate work but do not qualify findings
 
-**Scenarios:** S-3, S-8, S-3b · **Status:** resolved (argued)
+**Scenarios:** S-3, S-8, S-3b
 
 **Current state (verified):** `Criterion -GOVERNS-> Gate -GATES-> Task\|Computation`; nothing connects a criterion to the analysis it qualifies
 
@@ -1517,7 +1524,7 @@ though it were the same thing.
 
 ### Row W — An evaluation record is not evidence of evaluation
 
-**Scenarios:** S-17, S-3, S-8 · **Status:** resolved
+**Scenarios:** S-17, S-3, S-8
 
 **Current state (verified):** `CriterionEvaluation {value, outcome}` can be minted directly; `BASED_ON: CriterionEvaluation → Evidence` exists and is never written
 
@@ -1539,7 +1546,7 @@ checked by inspection — the point is that the record says which happened.
 
 ### Row X — "Failure sticks" is S-3 policy applied to every gate
 
-**Scenarios:** S-3, S-17, S-3b, **S-3c** · **Status:** resolved
+**Scenarios:** S-3, S-17, S-3b, **S-3c**
 
 **Current state (verified):** `gateStatus()` treats any failing evaluation as permanently decisive
 
@@ -1625,7 +1632,7 @@ answering it
 
 ### Row Y — Closure without a cited result is classified by whether anyone worked on it
 
-**Scenarios:** **S-1**, **S-14** · **Status:** boundary
+**Scenarios:** **S-1**, **S-14**
 
 **Current state (verified):** `whatIsKnown()` buckets an abandoned question under `unresolved` if anything ever addressed it, and a deferred one under `untested` if nothing did
 
@@ -1648,7 +1655,7 @@ staleness the legend above warns about, happening to the person who wrote it.)*
 
 ### Row Z — Chronology exists for evidence but not for status
 
-**Scenarios:** **S-1**, S-7, the consumer probe · **Status:** resolved
+**Scenarios:** **S-1**, S-7, the consumer probe
 
 **Current state (verified):** `Decision` has no time property; the sharpening snapshot (`BASED_ON`) freezes *findings* only
 
@@ -1715,7 +1722,7 @@ opinion, mistaken for a check on it.
 
 ### Row AA — `BASED_ON` carries two senses
 
-**Scenarios:** **S-1**, S-7, S-12 · **Status:** boundary
+**Scenarios:** **S-1**, S-7, S-12
 
 **Current state (verified):** `closeEnquiry()` writes the one cited finding; `sharpen()` writes every standing finding
 
@@ -1730,7 +1737,7 @@ opinion, mistaken for a check on it.
 
 ### Row AB — A consequential act records what it acted **on**, not what it brought into existence
 
-**Scenarios:** **S-1**, **S-7**, S-12, **S-3c** · **Status:** resolved
+**Scenarios:** **S-1**, **S-7**, S-12, **S-3c**
 
 **Current state (verified):** `sharpen()` wrote `NARROWS` to the original question; `amendDesign()` wrote `CHANGES` to the replaced condition
 
@@ -1755,7 +1762,7 @@ replacement into the graph correctly; what it withheld was the reference
 
 ### Row AC — A withdrawn interpretation has no way back
 
-**Scenarios:** **S-12** · **Status:** resolved
+**Scenarios:** **S-12**
 
 **Current state (verified):** `recordAnalysis()` refuses to conclude a proposition the record has withdrawn
 
@@ -1764,7 +1771,7 @@ replacement into the graph correctly; what it withheld was the reference
 
 ### Row AE — An analysis cannot read another analysis's output
 
-**Scenarios:** **S-11c**, **S-11d** · **Status:** resolved
+**Scenarios:** **S-11c**, **S-11d**
 
 **Current state (verified):** `recordAnalysis({ from })` accepts only `ObservationsRef`, and `recordObservations()` is the only thing that produces one
 
@@ -1810,7 +1817,7 @@ first. The second is query semantics, and `DependencyReport.routesWalked` and
 
 ### Row AD — Observation-only work on a question reads as no work at all
 
-**Scenarios:** **S-9b** · **Status:** resolved
+**Scenarios:** **S-9b**
 
 **Current state (verified):** `recordObservations()` creates `Evidence` with no producing `EvidenceUnit`; `whatIsKnown()`'s `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`
 

@@ -12,6 +12,9 @@ one week: a doc comment on the wrong function, a ledger status disagreeing with
 itself, a CLAUDE.md sentence outliving its truth, and a row whose title
 contradicted a document in the same repository.
 
+This file glosses **shorthand**, which is stable. It carries no statuses, counts
+or ranges — see CLAUDE.md, "The one rule about documents".
+
 ## Sources
 
 | Term | Means | Defined in |
@@ -19,7 +22,7 @@ contradicted a document in the same repository.
 | **PJ-NNN** | A project-journal entry — a decision and its reasoning | `docs/project-journal/` |
 | **the ledger** | PJ-008 §3's table of design pressure on the model. Authoritative on what the model knows | `docs/project-journal/008_user_story_mining.md` §3 |
 | **S-N** (S-3, S-9b…) | A scenario from PJ-008's corpus, built as an executable conversation. Letters mark variants built later | PJ-008 §2, `tests/scenarios/` |
-| **row A–AD** | One row of the ledger — one predicted or found gap in the model | PJ-008 §3 |
+| **row X** | One row of the ledger — one predicted or found gap in the model | PJ-008 §3 |
 | **D1 / D2 / D3** | **Designer 1/2/3** — the three cold-context designers of the consumer-contract exercise. 1 = `claude-opus-5`, 2 = `gpt-5.6-sol`, 3 = `grok-4.6`. **Beware:** `D1`/`D2` also appear in PJ-001 and PJ-003 as *Decision* nodes in ASCII diagrams. Different thing entirely | `docs/consumer-contract/020_synthesis_blinded.md` |
 | **H1** | The consumer-contract exercise's main hypothesis, and the count of candidate distinctions surviving it | `docs/consumer-contract/021`, rescored in `023` |
 
@@ -37,17 +40,12 @@ it).
 
 ## Ledger status vocabulary
 
-| Term | Means |
-| --- | --- |
-| `open` + **owned** | An unbuilt discriminator is named, marked `°` |
-| `open` + **unowned** | Every named probe was built; a **new** discriminator is needed |
-| `demonstrated` | A wrong answer is on the record and the **fix** is what is unbuilt. At most one at a time — `bun run check:ledger` enforces it |
-| `resolved` | Settled, with or without a model change |
-| `resolved (argued)` | Settled, but by argument rather than a demonstrated wrong answer. Weaker, and scannable as such |
-| `refuted` | The predicted gap turned out not to be one |
-| `boundary` | A characterised limit, recorded on purpose, with no claim it should be fixed |
+`open` + owned / `open` + unowned / `demonstrated` / `resolved` /
+`resolved (argued)` / `refuted` / `boundary`.
 
-Full legend, including why the distinctions matter: PJ-008 §3.
+**Defined in PJ-008 §3's Kind table, and which row is which is in §3's index
+table.** Neither is copied here; a status written in two places is what
+CLAUDE.md's document rule exists to stop.
 
 ## Method
 
