@@ -5,7 +5,6 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { Client } from "pg";
 import { runMigrations } from "../../src/db/migrate";
 import { bootstrapSession, type LabKitDB } from "../../src/db/client";
-import { dropTenantGraph } from "../../src/db/provisioning";
 import { traced } from "../../src/db/trace";
 
 /**
@@ -96,12 +95,30 @@ export async function setupTestDb(): Promise<TestDb> {
 
   return {
     openClient,
+    /**
+     * Empties every tenant graph **without dropping it**.
+     *
+     * Dropping was the obvious way and it was expensive in a way nothing was
+     * measuring: an AGE graph is a Postgres schema and every label in it is a
+     * real table, so dropping one destroys thirteen node labels, twenty-five
+     * edge labels and thirty-eight indexes that the next `resolveTenantContext()`
+     * then has to build again — about seventy-seven DDL round trips per test.
+     * Traced over one scenario file (`LABKIT_TRACE=all`), that was **24% of
+     * every query the file issued**, and almost all of it was *creating*, not
+     * checking. `6eeeb92` made the checking cheap; nothing had made the
+     * rebuilding cheap, because nothing had noticed it was happening.
+     *
+     * Truncating leaves the graph, its labels and its indexes in place, so
+     * provisioning finds everything present and settles for three round trips.
+     * That matters beyond speed: what pushes a test over bun's 5000ms ceiling
+     * is exactly this cost, and a test that crosses the ceiling is how the
+     * suite flakes (see `tests/helpers/scenario.ts`).
+     *
+     * The truncate below already covered these tables — a graph's schema is not
+     * one of the four exclusions — so the drop was doing nothing the truncate
+     * did not, at seventy-seven times the price.
+     */
     async reset() {
-      const graphs = await admin.query<{ name: string }>(`SELECT name FROM ag_catalog.ag_graph`);
-      for (const { name } of graphs.rows) {
-        await dropTenantGraph(admin, name);
-      }
-
       const tables = await admin.query<{ table_schema: string; table_name: string }>(`
         select table_schema, table_name
         from information_schema.tables
