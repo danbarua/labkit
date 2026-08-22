@@ -35,6 +35,11 @@ The second half of the suite flake: the ceiling crossings themselves, after
   its confirmation runs produced.
 - `771e6b7` — merged `labkit-minion` through `0e6f329`: `sharpen` cleared,
   `evaluateCriterion` fixed, `closeEnquiry`'s interrupted-retry route fixed.
+- `81c6ea5` — **`docs/TASKS.md` still carried the withdrawn form of the
+  collateral prediction.** I sharpened it in messages and in this entry and
+  never went back to the file it was written down in — six hours after this
+  branch closed out eight instances of exactly that. It now states the testable
+  form and records the disagreement.
 - `5921647` — **a second route to `closeEnquiry`'s wrong answer, needing no
   interruption.** Nothing guarded against closing an already-closed question, so
   two clean calls wrote two resolving decisions and `enquiryStatus` picked
@@ -135,9 +140,21 @@ the work inside it halved.
 
 ## Next
 
-`labkit-minion` holds the sweep's inferred pile and is on `pursue`. Its
-`closeEnquiry` prediction came back a defect **with both specific predictions
-wrong** — it writes one `BASED_ON` not one per finding, and the answer cannot be
+`labkit-minion` holds the sweep's inferred pile. **`pursue` came back clean**,
+and the useful part is not the verdict: `whatDependsOn` turned out to be
+protected by an *accident of write order*, and it asserted the invariant rather
+than describing it, so the accident now fails loudly the day it stops holding.
+Remaining and undecided rather than cleared: `recordReview`, `planWork`,
+`stateCriterion`, `declareGate`.
+
+**Five routes, three defects.** Both clean verbs write their reachability edge
+last; all three defects write it early. That has a mechanism behind it and is
+still **not a rule** — the same shape of reasoning produced two wrong mechanisms
+in `042` and my own unfalsifiable first prediction. It is useful for choosing
+what to look at first and nowhere else.
+
+Its `closeEnquiry` prediction came back a defect **with both specific
+predictions wrong** — it writes one `BASED_ON` not one per finding, and the answer cannot be
 inverted because the empty case is guarded explicitly. Right verdict, wrong
 reasoning underneath, which is the outcome worth knowing: fixing on the
 prediction would have wrapped the right function while believing something
