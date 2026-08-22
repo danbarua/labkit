@@ -29,15 +29,23 @@ adapter landed through the `feat/domain-consumer` merge (`6d83a92`), not here.
 
 - `bun run check:ledger` — **green**: *"no known bug is waiting to be fixed, and
   every row's status matches in both places it is written."*
-- `bun run typecheck` — **could not run**: `TS2688: Cannot find type definition
-  file for 'bun'`.
-- `npx depcruise src tests --output-type err` — **could not run**, same cause.
+- `bun run typecheck` — **green**, exit 0, no diagnostics.
+- `npx depcruise src tests --output-type err` — **green**: *"no dependency
+  violations found (82 modules, 240 dependencies cruised)."*
 - `bun test` — **not run**. The range changes no source, only Markdown.
 
-**This worktree has no `node_modules`.** That is the cause of both failures
-above, not a regression. `docs/TASKS.md`'s "Setup a new clone or worktree needs"
-section does not mention `bun install`, and it is the first thing a worktree
-needs.
+**Both type checks first failed with `TS2688: Cannot find type definition file
+for 'bun'`, because this worktree had no `node_modules`.** Dan ran `bun install`
+(183 packages) and both then passed. Not a regression — but
+`docs/TASKS.md`'s "Setup a new clone or worktree needs" section lists hooks and
+untracked `.claude/` files and **does not mention `bun install`**, which is the
+first thing a fresh worktree needs and the only one that silently disables two
+of the three gates.
+
+One self-inflicted instance of a documented trap, recorded because the document
+warning about it is in this repo: the first re-run reported `exit=$?` after
+`bun run typecheck | tail -5`, which is `tail`'s status, not the check's.
+Re-run redirected to a file. CLAUDE.md says exactly this and it still happened.
 
 ## Open
 
