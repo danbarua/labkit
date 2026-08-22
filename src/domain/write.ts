@@ -44,8 +44,18 @@
  * negative tests in `tests/domain-session.test.ts`, and `sharpen`'s exists to
  * fail if a `NARROWS` reader ever stops requiring `MOTIVATES`.
  *
- * The other non-transactional verbs here are **undecided, not cleared** — see
- * `docs/consumer-contract/041`. Two examined, one defect.
+ * `closeEnquiry` **is**, for two independent reasons with different remedies —
+ * an interrupted close plus a retry left two `RESOLVES` and erased the answer
+ * (`043`), and a *deliberate* second close did the same with no interruption at
+ * all, which a guard rather than a transaction fixes. One verb, two defects;
+ * stopping at the first would have left the second. `pursue` is **not**, and is
+ * the second clean result — reachability edge last again (`045`).
+ *
+ * The remaining non-transactional verbs are **undecided, not cleared** — see
+ * `docs/consumer-contract/045`. Five routes examined, three defects. Both clean
+ * verbs write their reachability edge last and all three defects came from verbs
+ * that write it early, which is **one correlation with a mechanism, not a rule**:
+ * the same reasoning got a verdict right and both its mechanisms wrong in `042`.
  */
 
 import type { TenantGraph } from "../db/graph";

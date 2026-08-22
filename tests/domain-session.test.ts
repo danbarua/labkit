@@ -577,3 +577,63 @@ test("a question accepted as unresolved can still be closed when evidence arrive
   expect(closed.closure).toBe("answered");
   expect(closed.answer).toBe("yes");
 });
+
+/**
+ * `pursue` is NOT transactional and does not need to be — fourth verb off
+ * PJ-028's inferred pile, and the second to come back clean. Predictions in
+ * `docs/consumer-contract/044`, verdict in `045`.
+ *
+ * It writes the `LineOfEnquiry` node and then `MOTIVATES`: **reachability edge
+ * last**, `sharpen`'s arrangement rather than `evaluateCriterion`'s. An
+ * interruption leaves an orphan enquiry, and no reader can derive an answer from
+ * it — `enquiryStatus` matches by `natural_id` and the caller never got one,
+ * every survey traversal enters through `Question -[:MOTIVATES]->`, and
+ * `whatDependsOn`'s bare `OPTIONAL MATCH (loe:LineOfEnquiry)` is saved only by
+ * requiring an inbound `REQUIRES` that an orphan has none of.
+ *
+ * **That last one is the tripwire**, which is why it is asserted rather than
+ * described: if anything ever writes `REQUIRES` before `MOTIVATES`, the orphan
+ * becomes reachable and `pursue` needs the transaction.
+ */
+test("an interrupted pursue leaves an enquiry nothing can reach", async () => {
+  const question = await session.pose("does the coating hold at temperature?");
+
+  const realCreateEdge = graph.createEdge.bind(graph);
+  graph.createEdge = (async (from: string, edge: string, to: string) => {
+    if (edge === "MOTIVATES") throw new Error("injected: MOTIVATES failed");
+    return realCreateEdge(from as never, edge as never, to as never);
+  }) as typeof graph.createEdge;
+
+  await expect(
+    session.pursue({ question, approach: "thermal cycling" }),
+  ).rejects.toThrow(/injected/);
+  graph.createEdge = realCreateEdge;
+
+  // The orphan is there...
+  const orphans = await graph.query(
+    `MATCH (loe:LineOfEnquiry) RETURN loe`,
+    { loe: vertexProps<{ natural_id: string; name: string }>() },
+  );
+  expect(orphans.map((r) => r.loe.name)).toEqual(["thermal cycling"]);
+
+  // ...and carries no inbound edge, which is what makes it unreachable rather
+  // than merely unreferenced. `whatDependsOn` would surface it otherwise.
+  const attached = await graph.query(
+    `MATCH (:Question)-[:MOTIVATES]->(loe:LineOfEnquiry) RETURN loe`,
+    { loe: vertexProps<{ natural_id: string }>() },
+  );
+  expect(attached).toEqual([]);
+
+  // The question is reported untested, which is true: it is on the books and
+  // nothing has been run against it. Same answer `pose()` alone would give.
+  const survey = await session.whatIsKnown();
+  expect(survey.untested.map((q) => q.asks)).toEqual([
+    "does the coating hold at temperature?",
+  ]);
+  expect(survey.unresolved).toEqual([]);
+
+  // And pursuing again works — no phantom blocks it, and two enquiries on one
+  // question would be legitimate anyway.
+  const retried = await session.pursue({ question, approach: "thermal cycling" });
+  expect((await session.enquiryStatus(retried)).open).toBe(true);
+});
