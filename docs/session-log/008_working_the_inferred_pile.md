@@ -19,52 +19,87 @@ base rate of "looked wrong on reading, was fine" as it accumulates.
 - `421f58c` — this entry.
 - `37728a8` — `040`'s addendum (a competing rule, below) and PJ-028's fifth and
   sixth self-instances.
+- `6c77cf7` — this entry.
+- `56a1f43` — **`evaluateCriterion` is transactional.** The second item off the
+  pile, and the first that was a defect. `docs/consumer-contract/041`,
+  `src/domain/write.ts`, four tests in `tests/domain-session.test.ts`.
 
-**No code, no test, no run.** Three commits, all documents.
+The first four commits are documents written while the machine was held for
+`labkit-dev`'s paired A/B. The fifth is the demonstration and the fix.
 
 ## Verified
 
-**Nothing was run, deliberately.** `labkit-dev` asked for a quiet machine for an
-interleaved paired A/B of a flake fix — its earlier 238 pass / 29 fail / 24 errors
-was measured under this session's load and it will not attribute that to its own
-change until the confound is gone. Running `bun test` here would have been the
-confound.
+**Nothing was run for the first four commits, deliberately** — `labkit-dev` needed
+a quiet machine for an interleaved paired A/B, and running `bun test` here would
+have been the confound it was trying to remove.
 
-The last verified state, from 006's range at `a4b7898`: **262 pass / 0 fail**,
-typecheck clean, depcruise no violations, four checks green.
+After it released the machine:
+
+- `bun test ./tests/domain-session.test.ts` — **9 pass, 0 fail.** Pre-fix, the
+  window-3 test failed with `withdrawn: undefined`; that failure is the
+  demonstration and it is quoted in `041`.
+- `bun run typecheck` — clean. `npx depcruise` — **no violations**.
+  `check:doc-comments`, `check:tests-assert` — green.
+- `bun test` (full) — **257 pass / 9 fail / 11 errors, 266 tests, 220.16s.** A
+  flake, and **captured this time**, which is the thing lost in 006's range.
+
+**The captured signature, because it is the first one this project has kept:**
+
+```
+ 5  timed out after 5000ms          <- ceiling crossings
+ 7  Connection terminated unexpectedly
+ 4  graph "labkit_t1" does not exist
+ 2  Client was closed and is not queryable
+ 0  assertion failures
+```
+
+Not one genuine assertion failure — every failure is a timeout or a teardown
+artefact. That is CLAUDE.md's documented mechanism, confirmed rather than assumed,
+and it rules out reading the run as a regression. Nine failures across **two files
+and six probe groups**; timings split cleanly into five at ~5000ms and four at
+905–2956ms. **Five crossings, four collateral.**
+
+`labkit-dev`'s patch was **not** on this tree, so this is a clean BASE measurement
+from a second worktree. Its own BASE burst was 17 across nine groups, so burst size
+is load-dependent and "roughly one failure per crossing" looks closer to the floor
+than the ceiling. Log kept at `suite2.log` in this session's scratchpad.
+
+The count was **266 and correct** (262 plus the four tests added here) despite five
+crossings — another data point against the withdrawn count detector.
 
 ## Open
 
-**`evaluateCriterion` is orientated but not demonstrated.** What reading alone
-established, and what it cannot settle:
+**`evaluateCriterion` was a defect, and it is fixed.**
 
-It writes `EVALUATED_AS` **second**, where `sharpen` writes its reachability edge
-(`MOTIVATES`) **last**. So from the third write onward the evaluation is reachable
-and the edges after it are what give it meaning — the opposite arrangement, which
-makes this a real test of `039`'s rule rather than a repeat of it.
+The tell was the write order. It writes `EVALUATED_AS` **second**, where `sharpen`
+writes its reachability edge (`MOTIVATES`) **last** — so from the third write
+onward the evaluation is reachable and everything after it is a claim about a
+record readers can already see. That is the opposite arrangement, which is what
+made this a test of `039`'s rule rather than a repeat of it. Every prediction in `040` held except the one
+that mattered: I said window 3 was acceptable under my rule, and it is not
+acceptable at all. Interrupt before `BASED_ON` and `isWithdrawn`'s
+`cited > 0 && standing === 0` means the verdict can **never** be withdrawn — so
+retracting the evidence it was reached against leaves the gate `blocked` by a
+`fail` the record insists still stands. `evaluateCriterion` is now transactional.
 
-Its two readers disagree about what reaches a gate:
+**`labkit-dev`'s rule won and mine was refuted**, which is what the run was set up
+to decide:
 
-| reader | traversal | needs `TRIGGERS`? |
-| --- | --- | --- |
-| `checks` / `state` / `unmet` | `(c)-[:EVALUATED_AS]->(ev)-[:TRIGGERS]->(g)` | yes |
-| `everFailed` | `(c)-[:EVALUATED_AS]->(ev)` | no |
+> A partial state is acceptable exactly when every answer a reader can derive from
+> it is true.
 
-So an interruption between those two edges makes one gate report a check
-`never-run` **and** `everFailed: true`. Predicted **not** a defect: the no-gate
-S-3b path produces the identical state legitimately, and `everFailed`'s unfiltered
-scope is documented as deliberate.
+`basis: []` is an empty result and PJ-011 §5 forgives it — which is why my
+shape-based clause called the state acceptable. *"This verdict still stands"* is a
+positive claim derived from the same state, and it is false. A shape has no truth
+value; an answer does.
 
-**The prediction that matters is that the rule is what breaks, not the code.**
-Interrupted before `BASED_ON`, a verdict reads as *asserted* rather than
-*measured* (row W) and can never be withdrawn, since `isWithdrawn` is
-`cited > 0 && standing === 0`. That state is legitimately reachable — call without
-`citing` — so `039`'s rule says acceptable, while the record now says something
-false about how the verdict was reached. **"Legitimately reachable" and "says
-something true" are not the same test.** If that holds, the output is a third
-clause on the rule, not a transaction.
+**Window 2 was startling and is not a defect**, as predicted: one gate, one call,
+check `never-run` *and* `everFailed: true`. The readers disagree by design and both
+answers are individually true. `040` had named calling it a defect as the wrong
+answer to avoid, and that is why it was avoided.
 
-All of it is prediction. None of it is evidence, which is the entry's whole point.
+**Base rate: two examined, one defect.** Reading found both; demonstration
+separated them, and neither was settleable from the sweep report.
 
 **The pending run now discriminates between two rules instead of confirming one.**
 `labkit-dev` read `039`'s rule and found my two clauses are not parallel: clause 2
@@ -99,18 +134,28 @@ shape to look for, and the rate is the most useful thing the sweep will produce.
 
 ## Next
 
-Wait for `labkit-dev` to release the machine. Then, in this order:
+**Owed immediately: the independent confirmation run of `labkit-dev`'s cascade
+fix**, pushed as `2de1060` as this entry was being written. Its own post-fix run
+carries a second uncommitted change, so **this tree's run is the clean test of the
+cascade fix alone.**
 
-1. **An independent confirmation run of its flake patch on this worktree** — its
-   238 pass / 29 fail / 24 errors was measured under this session's load, and a
-   clean run from a second tree is worth more than a second run of its own. Owed
-   before my own work, so its measurement is not waiting on mine.
-2. **The `evaluateCriterion` demonstration** — deterministic injection at each of
-   the three windows, following `tests/domain-session.test.ts`'s two existing
-   negative tests.
+Classify by the teardown vocabulary, not by the total. The number that matters is
+**collateral — failures whose cause is another test's teardown — and the sharpened
+prediction is that it should be zero, not "roughly one".** This entry's BASE run is
+the comparison: five crossings, thirteen teardown errors, four collateral. A
+post-fix run with five crossings and zero teardown errors confirms it; any
+`Connection terminated`, `graph … does not exist` or `Client was closed` refutes
+it. Load does not enter into it, which is why this form is falsifiable and the
+count-based one was not.
 
-**Stop at the first window that is not a defect and say so**, rather than
-continuing until something looks fixable. The verdict goes in `041`, and it has
-three possible shapes now rather than two: a defect, or not a defect, or **not a
-defect under my rule and a defect under `labkit-dev`'s** — which is the outcome
-that settles which rule the project keeps.
+Then the next verb. `pursue`, `recordReview`, `closeEnquiry`, `planWork`,
+`stateCriterion` and `declareGate` are **undecided, not cleared**. Under the
+reformulated rule the procedure is the same each time and now has a shortcut worth
+using first: **order the writes, find the reachability edge, and ask what a reader
+can derive from the state between it and the end.** A verb that writes its
+reachability edge last is very likely clean; one that writes it early is worth the
+demonstration.
+
+**Stop at the first that is not a defect and say so**, rather than continuing until
+something looks fixable. Two examined, one defect — the number only means something
+if the clean ones keep getting reported.
