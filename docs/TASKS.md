@@ -30,6 +30,26 @@ Someone could start these today.
   six-second overrun reproduces the cascade 100% in 7.5s, and
   `tests/scenario-harness.test.ts` pins the same ordering in milliseconds.
 
+  **Also fixed** (`5439085`): `reset()` truncates the label tables instead of
+  dropping the graph. Dropping destroyed thirty-eight labels and thirty-eight
+  indexes that the next `resolveTenantContext()` rebuilt — **24% of every query
+  in a traced scenario file**, almost all of it *creating*. Paired and
+  interleaved with one variable: **167s mean → 81s**. It is also a correctness
+  fix: `graph "labkit_t1" does not exist` needs something to *drop* the graph,
+  and after this nothing in the suite does. That is checkable by `grep` rather
+  than by waiting for a flake — **impossible by construction, not merely
+  unobserved** — which is a stronger result than the zeros measured on either
+  tree.
+
+  **Two methodological notes from confirming it**, both worth more than the
+  numbers. A clean run cannot verify a claim about what happens during a flake,
+  so three green suites are three times *not* testing it. And the first reason
+  given for the by-construction argument was wrong — the surviving
+  `dropTenantGraph` caller was said to target a different graph, when
+  `"drop-me"` resolves to `labkit_t1` like everything else; what isolates it is
+  one PGlite instance per test file. Right conclusion, wrong reason, caught by
+  checking.
+
   **What was not fixed:** tests still cross the ceiling and still fail. Only
   the amplification is gone. **The falsifiable prediction, recorded before the
   next flake rather than after it: a crossing should now produce roughly one

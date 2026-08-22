@@ -68,6 +68,14 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
  * Tested rather than deleted, because unlike a query convenience this is a real
  * operation a deploy will need, and an untested drop gets discovered to be
  * broken at the moment someone needs it most.
+ *
+ * **It drops `labkit_t1`, not some safely-named other graph.** `"drop-me"` is
+ * the first tenant resolved in this file, `tenants.id` is truncated with
+ * `RESTART IDENTITY`, so it gets id 1 and the graph every other file also calls
+ * `labkit_t1` — verified, after a reading that assumed the name kept it apart.
+ * What keeps it apart is that `setupTestDb()` builds a **separate PGlite
+ * instance per test file**, so this file's `labkit_t1` is not any other file's.
+ * That, and not the tenant slug, is why dropping here is safe.
  */
 test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", async () => {
   const db = await testDb.openClient();
