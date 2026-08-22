@@ -80,6 +80,17 @@ assertion protecting nothing an existing assertion does not is a change-detector
 The third branch is what the arc-totals figures above are doing: a review's
 numbers are a dated measurement, and those are fine as long as they say so.
 
+**029 is about the method's *social* half** — what a second agent turned out to
+be for, which was not throughput. Every useful catch in a two-session day was a
+conclusion that was **right** with reasoning underneath it that was **wrong**,
+which no test detects because the tests pass either way. Its sharpest line is
+027's asymmetry restated as a property of verification rather than authorship:
+**a passing check on the file I edited told me nothing about the two I didn't.**
+It also carries the measurement disciplines each failure forced — paired and
+interleaved, one variable, *round one is not the result*, and **a negative
+result is not evidence unless it could have been positive** — plus the rule that
+where two fixes are order-dependent, *both* commit messages must say so.
+
 **028's real argument is its last section, and it is the one to read.** Four
 instances of this defect were committed *in one day, by two authors who had it
 in front of them* — including the commit that fixed one, a comment promising an
