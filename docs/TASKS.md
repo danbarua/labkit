@@ -254,12 +254,17 @@ row AF's absence. Four for four against: S-7, S-12, row O, and this.
 
 ## Waiting on a decision, not on work
 
-- [ ] **Should `whySupported` + `checksFrom` be their own module?** 359 lines,
-  19% of the pre-split code, straddling claims and criteria. Deferred by the user
-  during the read/write split; nothing depends on it.
-- [ ] **`package-lock.json` is still tracked on `main`** and arrives there when
-  this branch merges. Correct under the docs-on-`main` / code-on-branch split —
-  noted so it is not a surprise.
+- [x] ~~**Should `whySupported` + `checksFrom` be their own module?**~~ —
+  **decided 2026-08-22: no.** Keep them in one file for now. Not a deferral this
+  time: the split was offered and declined, so it stops being a queue item until
+  something depends on it.
+- [x] ~~**`package-lock.json` is still tracked on `main`**~~ — **resolves
+  itself**, verified rather than assumed. `main` has one commit since the merge
+  base (`3c44e01`) and it touches none of `package.json`, `bun.lock` or
+  `package-lock.json`. `git merge-tree --write-tree main feat/domain-consumer`
+  exits 0 with zero conflicts, and the merged tree has the file *deleted* — what
+  arrives on `main` is the removal, which is what was wanted. Checked
+  independently by `labkit-review` and by this session, same tree hash.
 
 ## Recorded, deliberately not being done
 
