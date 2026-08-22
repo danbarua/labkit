@@ -50,6 +50,8 @@ The second half of the suite flake: the ceiling crossings themselves, after
   (**decided, not deferred** — offered and declined, so it leaves the queue);
   and `package-lock.json` on `main` **resolves itself**, verified by dry-run
   merge rather than assumed.
+- `6ed5baf` — merged `labkit-minion` through `5089728`: **the inferred pile is
+  closed.** Its work, not mine, except `closeEnquiry`'s double-close route.
 - `477204b` — **PJ-029**, on what a second agent turned out to be for. Not
   throughput: every useful catch across the day was a conclusion that was
   *right* with reasoning underneath it that was *wrong*, which no test detects
@@ -86,6 +88,8 @@ Working tree clean apart from this entry.
   still be closed when evidence arrives, because the guard keys on `RESOLVES`
   and `acceptAsUnresolved` writes `DEFERS`. That is the case the guard could
   have broken silently, and `labkit-minion` asked for it.
+- **After the final merge: 277 pass / 0 fail in 91.7s**, zero ceiling crossings
+  and zero teardown errors of any kind.
 - **A later full run on a loaded machine: 266 pass / 6 fail — five ceiling
   crossings and ONE collateral failure** carrying a `Connection terminated`. So
   collateral is not zero in every run. The earlier zeros were real and are not
@@ -149,14 +153,27 @@ the work inside it halved.
 
 ## Next
 
-`labkit-minion` holds the sweep's inferred pile. **`pursue` came back clean**,
+**The inferred pile is closed** (`docs/consumer-contract/047`). Every
+non-transactional write verb in `src/domain/` examined by demonstration: **seven
+routes had an interruption window and three were defects.** Reported that way
+rather than "six clean of nine", because two verbs write one node and no edge so
+were never at risk, and one of the three defects needed no interruption at all.
+That is the honest denominator.
+
+The rule that survived, after one correction: **a partial state is acceptable
+exactly when every answer a reader can derive from it is true.** The earlier
+version tested the *shape* of the leftover state, and a shape has no truth
+value — two identical shapes differ in truth depending on the history that
+produced them.
+
+Historical, from when this entry was written: **`pursue` came back clean**,
 and the useful part is not the verdict: `whatDependsOn` turned out to be
 protected by an *accident of write order*, and it asserted the invariant rather
 than describing it, so the accident now fails loudly the day it stops holding.
-Remaining and undecided rather than cleared: `recordReview`, `planWork`,
-`stateCriterion`, `declareGate`.
+All four have since been examined and all four are clean or not-at-risk.
 
-**Five routes, three defects.** Both clean verbs write their reachability edge
+**Five routes, three defects** — as it stood then; nine verbs and three defects
+at close. Both clean verbs write their reachability edge
 last; all three defects write it early. That has a mechanism behind it and is
 still **not a rule** — the same shape of reasoning produced two wrong mechanisms
 in `042` and my own unfalsifiable first prediction. It is useful for choosing
