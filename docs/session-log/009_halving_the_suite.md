@@ -26,6 +26,13 @@ The second half of the suite flake: the ceiling crossings themselves, after
   - `src/db/provisioning.ts` — `dropTenantGraph()` lost its only caller; kept,
     with a docstring saying where the caller went.
   - `tests/reconciliation.test.ts` — that function's new and only reader.
+- `3c00496` — **the surviving drop is safe by file isolation, not by tenant
+  name.** `labkit-minion` argued the truncate's correctness claim is checkable
+  by `grep` rather than by waiting for a flake — correct, and stronger than any
+  measurement — but gave the wrong reason for why the one remaining
+  `dropTenantGraph` caller is harmless. Corrected in that test's docstring, in
+  this entry, and in `docs/TASKS.md`, which also gains the methodological note
+  its confirmation runs produced.
 
 Working tree clean apart from this entry.
 
@@ -102,5 +109,12 @@ predicted defect would be the worst in the pile — `enquiryStatus()` derives
 partial write could invert the recorded answer to a research question. **It is
 a prediction.** Base rate stays two examined, one defect until it is run.
 
-For the crossings: a load-controlled count on an idle machine, from both trees.
+For the crossings: `labkit-minion`'s three idle runs give **zero crossings** at
+82–110s, so the load-controlled count is in and there is nothing to chase there
+today. What remains open has no owner and no obvious next step —
+`Client was closed` at 3 → 1 with no claimed mechanism, and
+`unnamed prepared statement does not exist` seen once on this tree and never on
+the other. Both are recorded in **Open**; neither is worth a session on current
+evidence.
+
 Nothing else is queued.
