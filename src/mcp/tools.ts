@@ -20,6 +20,14 @@
 
 import { z } from "zod";
 import type { ReadSurface } from "../domain";
+import {
+  dependencyReportSchema,
+  designHistorySchema,
+  enquiryStatusSchema,
+  interpretationHistorySchema,
+  reproductionReportSchema,
+  supportExplanationSchema,
+} from "./schemas";
 
 /**
  * One tool. `Shape` is a Zod **raw shape** — `{ at: z.string().optional() }`,
@@ -31,6 +39,15 @@ export interface ToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly title: string;
   readonly description: string;
   readonly inputSchema: Shape;
+  /**
+   * The shape of what the handler returns, mirrored from `src/domain/report.ts`
+   * and held to it at compile time — see `./schemas`. The SDK validates
+   * `structuredContent` against this and errors when it does not match, so a
+   * schema here is a claim about the handler, not documentation of it.
+   *
+   * Optional for one tool only, and for a measured reason — see `known`.
+   */
+  readonly outputSchema?: z.ZodType;
   handler(read: ReadSurface, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
 }
 
@@ -58,6 +75,20 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "rather than a log — but the historical form cannot split `open` into worked-on and " +
       "untouched, because nothing records when work began.",
     inputSchema: { at: z.string().optional().describe("ISO instant, e.g. 2026-08-21T09:00:00.000Z") },
+    // **No `outputSchema`, and this is the one tool without one.** It returns
+    // `KnowledgeSurvey | HistoricalSurvey` — genuinely two reports, not one
+    // with an extra field: the as-of answer has `open` where the present-day
+    // one has `unresolved` and `untested`, and cannot split them (S-1). The SDK
+    // cannot carry that: `normalizeObjectSchema` returns **undefined** for a
+    // union rather than throwing, so declaring one makes every call to this
+    // tool fail validation. Measured against the installed
+    // `@modelcontextprotocol/sdk@1.30.0`, not inferred from the spec.
+    //
+    // The schemas exist either way (`knowledgeSurveySchema`,
+    // `historicalSurveySchema`) and `tests/mcp.test.ts` parses this tool's
+    // output against them, so the shapes are still checked — just not by the
+    // SDK. Splitting this into two tools would give both an `outputSchema`;
+    // that is a wire change, so it is not being made on the way past.
     handler: (read, { at }) => (at ? read.whatWasKnown(at) : read.whatIsKnown()),
   }),
 
@@ -81,6 +112,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("id of the analysis that concluded it — needed only when the wording is ambiguous"),
     },
+    outputSchema: supportExplanationSchema,
     handler: (read, { proposition, analysis }) =>
       read.whySupported(
         analysis ? { analysis: { kind: "analysis", id: analysis }, proposition } : proposition,
@@ -97,6 +129,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "than one. The answer is a lower bound and says so: anything connected by a route not " +
       "listed is absent from the lists, not thereby unaffected.",
     inputSchema: { artefact: z.string().describe(`logical name, or an ${ARTEFACT_PREFIX}… id`) },
+    outputSchema: dependencyReportSchema,
     handler: (read, { artefact }) =>
       read.whatDependsOn(
         artefact.startsWith(ARTEFACT_PREFIX) ? { kind: "observations", id: artefact } : artefact,
@@ -110,6 +143,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "Whether a line of enquiry is still open, and if not how it closed — answered, " +
       "abandoned, or deliberately left open — with the answer and the evidence behind it.",
     inputSchema: { enquiry: z.string().describe("enquiry id") },
+    outputSchema: enquiryStatusSchema,
     handler: (read, { enquiry }) => read.enquiryStatus({ kind: "enquiry", id: enquiry }),
   }),
 
@@ -122,6 +156,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "rather than from timestamps. Takes the gate's id — the conditions belong to the gate, " +
       "so that is the handle, not the design's name.",
     inputSchema: { gate: z.string().describe("gate id") },
+    outputSchema: designHistorySchema,
     handler: (read, { gate }) => read.designHistory({ kind: "gate", id: gate }),
   }),
 
@@ -132,6 +167,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "How a claim's current reading was arrived at: each earlier wording, the decision that " +
       "narrowed it and why. Takes the proposition as currently worded and walks backwards.",
     inputSchema: { proposition: z.string().describe("the claim's current proposition") },
+    outputSchema: interpretationHistorySchema,
     handler: (read, { proposition }) => read.interpretationHistory(proposition),
   }),
 
@@ -144,6 +180,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "anyone can set to `reproduced`. Takes the id of the analysis that did the verifying, " +
       "not the one being verified.",
     inputSchema: { analysis: z.string().describe("id of the verifying analysis") },
+    outputSchema: reproductionReportSchema,
     handler: (read, { analysis }) => read.reproductionOf({ kind: "analysis", id: analysis }),
   }),
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;

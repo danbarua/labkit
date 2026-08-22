@@ -36,11 +36,13 @@ import { TOOLS } from "./tools";
  * Registers the seven tools against a read surface. Transport-free, so a test
  * can drive it over `InMemoryTransport` without a subprocess.
  *
- * No `outputSchema` is declared. Declaring one makes `structuredContent`
- * mandatory *and* validated, which would mean hand-writing a Zod mirror of
- * seven report interfaces whose only job is to go stale against them. The
- * structured result is returned regardless, alongside the JSON text an older
- * client reads.
+ * Every tool declares an `outputSchema`. This reverses what this comment said
+ * until 2026-08-22 — that a mirror of the report interfaces would exist only to
+ * go stale against them. The objection was to an *unchecked* mirror; the ones in
+ * `./schemas` are held to their interfaces by `tsc`, which is a gate that
+ * already runs. What the compiler cannot see — a dropped optional field —
+ * `tests/mcp.test.ts` parses for. The structured result is still returned
+ * alongside the JSON text an older client reads.
  *
  * Errors are not caught. `whySupported()` refuses an ambiguous proposition by
  * throwing, and the SDK turns a throw into `isError: true` carrying the
@@ -58,6 +60,7 @@ export function buildServer(read: ReadSurface): McpServer {
         title: definition.title,
         description: definition.description,
         inputSchema: definition.inputSchema,
+        outputSchema: definition.outputSchema,
         annotations: { readOnlyHint: true },
       },
       async (args: Record<string, unknown>) => {

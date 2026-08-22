@@ -8,10 +8,13 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Ready to build
 
-- [ ] **`outputSchema` on the MCP tools.** `src/mcp/tools.ts` declares
-  `inputSchema` per tool and no `outputSchema`. Adding it types the read model
-  the server actually returns, which is the DTO set an agent caller codes
-  against.
+- [x] ~~**`outputSchema` on the MCP tools.**~~ — done. `src/mcp/schemas.ts`
+  mirrors the report types and `tsc` holds each mirror to its interface. Six of
+  seven tools declare one; `known` cannot, because the SDK's
+  `normalizeObjectSchema` returns `undefined` for a union rather than throwing.
+  **Residual gap, measured:** an optional field that no test data produces can
+  be dropped from a schema and neither `tsc` nor the parse test notices.
+  Widening the seed in `tests/mcp.test.ts` is what narrows it.
 - [ ] **Typed write commands.** `src/domain/write.ts`'s verbs take untyped
   object arguments. A named type per command gives the write half the same
   shape the read half is about to get, and is the precondition for exposing any

@@ -24,6 +24,7 @@ import { ReadSurface, ResearchSession, inMemoryEventLog, type Clock } from "../s
 import { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
 import { TOOLS } from "../src/mcp/tools";
+import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schemas";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { writeVerbNames, writeVerbsCalledIn } from "./helpers/read-only";
 
@@ -167,6 +168,51 @@ describe("behaviour — the same answers, over the wire", () => {
     } finally {
       await scenario.end();
     }
+  });
+
+  test("every tool's real output parses against its declared schema", async () => {
+    // The compile-time gate in src/mcp/schemas.ts is two-way assignability, and
+    // it has one measured hole: a schema that DROPS an optional field is still
+    // assignable both ways, so tsc passes.
+    //
+    // This narrows that hole and does not close it. The schemas are strict, so
+    // an output carrying a key the schema has forgotten fails to parse here --
+    // but only if this session produces that key. Demonstrated both ways:
+    // deleting `restsOn` from enquiryStatusSchema fails this test; deleting
+    // `replacedBy` from supportExplanationSchema passes it, because nothing
+    // below withdraws a claim. An optional field no test data produces is
+    // still unguarded.
+    const { client, enquiry } = await seeded();
+    try {
+      const parsed = async (name: string, args: Record<string, unknown>) => {
+        const schema = TOOLS.find((t) => t.name === name)?.outputSchema;
+        if (!schema) throw new Error(`${name} declares no outputSchema`);
+        const result = await schema.safeParseAsync(await structured(client, name, args));
+        if (!result.success) throw new Error(`${name}: ${JSON.stringify(result.error.issues)}`);
+      };
+
+      await parsed("why_supported", { proposition: PROP });
+      await parsed("what_depends_on", { artefact: "sweep readings" });
+      await parsed("enquiry_status", { enquiry: enquiry.id });
+
+      // `known` is the one tool with no declared schema -- the SDK cannot carry
+      // a union (see src/mcp/tools.ts). Its two shapes are still checked, here.
+      expect(knowledgeSurveySchema.safeParse(await structured(client, "known", {})).success).toBe(true);
+      expect(
+        historicalSurveySchema.safeParse(
+          await structured(client, "known", { at: "2026-04-01T00:00:00.000Z" }),
+        ).success,
+      ).toBe(true);
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("every tool but `known` declares an output schema", () => {
+    // Derived, not listed: a tool added later without one fails here rather
+    // than shipping unvalidated.
+    expect(TOOLS.filter((t) => !t.outputSchema).map((t) => t.name)).toEqual(["known"]);
   });
 
   test("a domain refusal arrives as an error, never as an empty success", async () => {
