@@ -1,4 +1,4 @@
-# 016: Report handles are Refs, not strings
+# 016: Handles, not strings — reports, then the verbs
 
 **Session wrap, 2026-08-23, on `feat/mcp-server`.** Not a decision record — the
 diagnosis is `docs/project-journal/030_which_record_is_this_about.md`, and the
@@ -6,11 +6,14 @@ one thing still wrong is named under Open.
 
 ## Goal
 
-Stop collapsing domain entities to strings in the read models.
+Stop collapsing domain entities to strings — first in the read models, then in
+the verbs, until nothing has to search for what the caller meant.
 
 ## Changed
 
-One commit, `9c1e8f7`. Every report handle is now its `Ref` type.
+Two commits, and a **dirty tree** described under Open.
+
+**`9c1e8f7` — every report handle is its `Ref` type.**
 
 - `src/domain/report.ts` — **`ClaimRef`, `EvidenceRef`, `EvaluationRef`,
   `DecisionRef`** added; claims had **no handle at all**. Every `: string`
@@ -22,6 +25,12 @@ One commit, `9c1e8f7`. Every report handle is now its `Ref` type.
 - `src/mcp/schemas.ts` — schemas mirror the refs; the `Exact<>` gates hold.
 - `src/cli.ts` — every `${x.handle}` interpolation takes `.id`.
 - `docs/mcp-tools.md` regenerated (+300 lines: the wire shapes changed).
+
+**`dc07629` — `recordAnalysis` returns the claims it mints.**
+
+`{ analysis: AnalysisRef; claims: ConcludedClaim[] }`. A caller holds a
+`ClaimRef` the moment the claim exists, so nothing downstream has to describe
+one by wording. 217 tsc errors, all binding sites, mechanically destructured.
 
 ## Verified
 
@@ -46,9 +55,43 @@ hand and missed most of them.
 
 ## Open
 
-**`ConclusionRef` is still a claim identified by wording**, and I defended it as
-"a legitimate convenience" before Dan asked how that could be legitimate. It is
-not:
+**The tree is dirty and does not pass.** `typecheck`, `depcruise` and the three
+static checks are green; **`bun test` is 247/53** — of which roughly 24 are
+real and ~18 are the flake (that run was 338s). It is not committable as it
+stands.
+
+What the uncommitted work does — **retiring wording as identity from the verbs**:
+
+- `recordAnalysis` → `{analysis, claims}` (committed above); `promote`,
+  `closeEnquiry`, `evaluateCriterion`, `acceptAsUnresolved`, `amendDesign`,
+  `reinterpret`, `whySupported`, `doTheseConflict` and `interpretationHistory`
+  all take a **`ClaimRef`**.
+- **`scopeFor` and `enquiriesClaiming` are deleted** — the machinery that took a
+  sentence and searched for which claim was meant. `scopeOf(claim)` replaces
+  them: the scope comes *from the named claim*.
+- Wording is resolved in exactly **one** place: a new `claimsAsserting` verb,
+  exposed as `claims_asserting`, which returns every match and **refuses to
+  pick**. The CLI and the tests both go through it.
+- The MCP write tools lost their paired `*_analysis` / `*_proposition` fields
+  and the both-or-neither validation that went with them; each takes one claim
+  id.
+
+**One thing I got wrong and the tests caught.** I first made `reinterpret`
+operate on a single claim node. S-12 failed, correctly: a reinterpretation
+narrows a **reading**, and two analyses in one enquiry asserting the same
+sentence share it, so both must stop standing. It now takes a `ClaimRef` and
+derives (proposition, enquiry) from that claim — semantics preserved, nothing
+guessed.
+
+**The remaining ~24 failures are the change working.** They fail with
+*"X is claimed 2 times; name one"* — in scenarios where the sentence genuinely
+is asserted twice (a replacement analysis re-asserting its predecessor's
+proposition; S-5's two-enquiry case). Each needs the test to say which claim it
+means, which is what the model has always said is required.
+
+**`ConclusionRef` is no longer an identity anywhere in the verbs.** I had
+defended it as "a legitimate convenience" before Dan asked how that could be
+legitimate. It was not:
 
 > `ConclusionRef {analysis: AnalysisRef, proposition: string}` exists because
 > `recordAnalysis` mints one claim per conclusion and **returns only the
@@ -59,18 +102,17 @@ only what it acted on?* — failing for the **fifth** time, after S-1, S-7, S-12
 and S-3c. The workaround was built around the gap instead of the gap being
 closed.
 
-**The fix:** `recordAnalysis` returns the `ClaimRef`s it minted, and
-`ConclusionRef` stops being an identity type. Not done.
+Still wording-only in the *reports*: `InterpretationHistory.originally` /
+`.nowClaims`, `Revision.previously` / `.nowClaims`,
+`ReinterpretationReport.previously` / `.nowClaims`, and
+`ReplacementReport.affected` / `.unchanged`. Now unblocked — a `ClaimRef` is
+available at each of them.
 
-Also still wording-only: `InterpretationHistory.originally` / `.nowClaims`,
-`Revision.previously` / `.nowClaims`, `ReinterpretationReport.previously` /
-`.nowClaims`, and `ReplacementReport.affected` / `.unchanged`. All four are
-claim propositions, and all four are downstream of the same thing — nothing
-hands a caller a `ClaimRef`, because the verb that mints claims does not
-return them.
+`interpretationHistory` still **walks** by wording internally; only its entry
+point is a handle. Walking by id wants the chain to carry an edge a caller can
+follow, which is a separate change.
 
 ## Next
 
-`recordAnalysis` returns its claims. That is one change, and it unblocks the
-four remaining wording-only fields and retires `ConclusionRef` as an identity
-in the same move.
+Finish the ~24 test call-sites, each naming which claim it means. Then the four
+report fields above.
