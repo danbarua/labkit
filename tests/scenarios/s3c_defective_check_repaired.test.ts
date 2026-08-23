@@ -23,6 +23,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -70,14 +71,14 @@ async function aResultHeldToARobustnessCheck() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const { analysis: analysis } = await session.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "holm-pairwise",
     from: [observations],
     concludes: [{ proposition: PROPOSITION, finding: "p = 0.002, Holm-corrected" }],
     heldTo: [robustness],
   });
-  return { robustness, enquiry, observations, analysis };
+  return { robustness, enquiry, observations, analysis, analysisClaims };
 }
 
 /**
@@ -91,7 +92,7 @@ async function theCheckIsRun(
   method: string,
   concludes: { proposition: string; finding: string },
 ) {
-  return (await session.recordAnalysis({ enquiry, method, from: [observations], concludes: [concludes] })).analysis;
+  return await session.recordAnalysis({ enquiry, method, from: [observations], concludes: [concludes] });
 }
 
 describe("S-3c: the check was wrong, not the result", () => {
@@ -102,9 +103,9 @@ describe("S-3c: the check was wrong, not the result", () => {
    * stand, and none of what follows may weaken it.
    */
   test("re-running the same check until it comes back green does not clear the failure", async () => {
-    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
+    const { robustness, enquiry, observations, analysis, analysisClaims } = await aResultHeldToARobustnessCheck();
 
-    const firstRun = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { analysis: firstRun, claims: firstRunClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: DISAGREES,
       finding: "median p = 0.21",
     });
@@ -112,12 +113,12 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: { analysis: firstRun, proposition: DISAGREES },
+      citing: claimOf(firstRunClaims, DISAGREES),
     });
 
     // Same check, run again, unchanged. Nobody found anything wrong with the
     // first run — they just ran it a second time.
-    const secondRun = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { analysis: secondRun, claims: secondRunClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: AGREES,
       finding: "median p = 0.04",
     });
@@ -125,11 +126,11 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: { analysis: secondRun, proposition: AGREES },
+      citing: claimOf(secondRunClaims, AGREES),
     });
 
-    const why = await session.whySupported({ analysis, proposition: PROPOSITION });
-    expect(await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION })).toEqual(why);
+    const why = await session.whySupported(claimOf(analysisClaims, PROPOSITION));
+    expect(await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).toEqual(why);
 
     expect(why.supported).toBe(false);
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
@@ -154,9 +155,9 @@ describe("S-3c: the check was wrong, not the result", () => {
    * old.
    */
   test("a check that was itself defective, corrected and re-run, no longer disqualifies the finding", async () => {
-    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
+    const { robustness, enquiry, observations, analysis, analysisClaims } = await aResultHeldToARobustnessCheck();
 
-    const defective = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: DISAGREES,
       finding: "median p = 0.21",
     });
@@ -164,9 +165,9 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: { analysis: defective, proposition: DISAGREES },
+      citing: claimOf(defectiveClaims, DISAGREES),
     });
-    expect((await session.whySupported({ analysis, proposition: PROPOSITION })).supported).toBe(false);
+    expect((await session.whySupported(claimOf(analysisClaims, PROPOSITION))).supported).toBe(false);
 
     // The fault is found in the check, and the check is replaced -- the same
     // act S-11 established for an analysis that was wrong, aimed at a piece of
@@ -187,11 +188,11 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: { analysis: corrected.replacement, proposition: AGREES },
+      citing: await claimNamed(session, AGREES),
     });
 
-    const why = await session.whySupported({ analysis, proposition: PROPOSITION });
-    expect(await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION })).toEqual(why);
+    const why = await session.whySupported(claimOf(analysisClaims, PROPOSITION));
+    expect(await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).toEqual(why);
 
     expect(why.supported).toBe(true);
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
@@ -223,7 +224,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       protecting: [tertiary],
     });
 
-    const defective = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: DISAGREES,
       finding: "median p = 0.21",
     });
@@ -232,7 +233,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       gate,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: { analysis: defective, proposition: DISAGREES },
+      citing: claimOf(defectiveClaims, DISAGREES),
     });
     expect((await session.gateStatus(gate)).state).toBe("blocked");
 
@@ -250,7 +251,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       gate,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: { analysis: corrected.replacement, proposition: AGREES },
+      citing: await claimNamed(session, AGREES),
     });
 
     const status = await (await afterwards()).gateStatus(gate);
@@ -269,8 +270,8 @@ describe("S-3c: the check was wrong, not the result", () => {
    * order, same clock.
    */
   test("what separates the two cases is whether the failed verdict's basis was withdrawn", async () => {
-    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
-    const failed = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { robustness, enquiry, observations, analysis, analysisClaims } = await aResultHeldToARobustnessCheck();
+    const { analysis: failed, claims: failedClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: DISAGREES,
       finding: "median p = 0.21",
     });
@@ -278,9 +279,9 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: { analysis: failed, proposition: DISAGREES },
+      citing: claimOf(failedClaims, DISAGREES),
     });
-    const rerun = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { analysis: rerun, claims: rerunClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: AGREES,
       finding: "median p = 0.04",
     });
@@ -288,11 +289,11 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: { analysis: rerun, proposition: AGREES },
+      citing: claimOf(rerunClaims, AGREES),
     });
 
     const reader = await afterwards();
-    expect((await reader.whySupported({ analysis, proposition: PROPOSITION })).supported).toBe(false);
+    expect((await reader.whySupported(claimOf(analysisClaims, PROPOSITION))).supported).toBe(false);
 
     // Now, and only now, is the first run found to have been faulty. Nothing
     // else about the record changes -- no new evaluation, no new check.
@@ -306,7 +307,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       concludes: [{ proposition: AGREES, finding: "median p = 0.04" }],
     });
 
-    expect((await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION })).supported).toBe(true);
+    expect((await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).supported).toBe(true);
   });
 
   /**
@@ -316,10 +317,10 @@ describe("S-3c: the check was wrong, not the result", () => {
    * because one of them can now be retired.
    */
   test("a failure that cited nothing cannot be cleared by withdrawing something else", async () => {
-    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
+    const { robustness, enquiry, observations, analysis, analysisClaims } = await aResultHeldToARobustnessCheck();
     await session.evaluateCriterion({ criterion: robustness, value: "looked wrong to me", outcome: "fail" });
 
-    const unrelated = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { analysis: unrelated, claims: unrelatedClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: AGREES,
       finding: "median p = 0.04",
     });
@@ -333,7 +334,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       concludes: [{ proposition: AGREES, finding: "median p = 0.05" }],
     });
 
-    const why = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
+    const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
     expect(why.supported).toBe(false);
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
   });
@@ -349,8 +350,8 @@ describe("S-3c: the check was wrong, not the result", () => {
    * failure. The check certainly ran; what it has is no verdict that stands.
    */
   test("a check whose every verdict has been withdrawn has no standing verdict, and did not never-run", async () => {
-    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
-    const defective = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { robustness, enquiry, observations, analysis, analysisClaims } = await aResultHeldToARobustnessCheck();
+    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: DISAGREES,
       finding: "median p = 0.21",
     });
@@ -358,7 +359,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: { analysis: defective, proposition: DISAGREES },
+      citing: claimOf(defectiveClaims, DISAGREES),
     });
 
     // The check is found faulty and retired. Nobody has re-run it yet.
@@ -372,7 +373,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       concludes: [{ proposition: AGREES, finding: "median p = 0.04" }],
     });
 
-    const why = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
+    const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("no-standing-verdict");
     expect(check?.decidedBy).toBeUndefined();
@@ -399,8 +400,8 @@ describe("S-3c: the check was wrong, not the result", () => {
    * `recordAnalysis()` refuses to re-assert a withdrawn proposition.
    */
   test("a replacement that cannot be completed leaves the earlier failure standing", async () => {
-    const { robustness, enquiry, observations, analysis } = await aResultHeldToARobustnessCheck();
-    const defective = await theCheckIsRun(enquiry, observations, "median-aggregation", {
+    const { robustness, enquiry, observations, analysis, analysisClaims } = await aResultHeldToARobustnessCheck();
+    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(enquiry, observations, "median-aggregation", {
       proposition: DISAGREES,
       finding: "median p = 0.21",
     });
@@ -408,18 +409,18 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: { analysis: defective, proposition: DISAGREES },
+      citing: claimOf(defectiveClaims, DISAGREES),
     });
 
     // Retire the proposition the replacement is going to try to re-assert, so
     // the second half of the compound action is guaranteed to be refused.
     await session.reinterpret({
-      of: { analysis: defective, proposition: DISAGREES },
+      of: claimOf(defectiveClaims, DISAGREES),
       as: "the median aggregation was never computed correctly",
       because: "the fold handling was wrong throughout",
     });
 
-    const before = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
+    const before = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
     const review = await session.recordReview({ of: defective, verdict: "the aggregation dropped the last fold" });
     await expect(
       session.replaceAnalysis({
@@ -433,7 +434,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     ).rejects.toThrow();
 
     // Nothing moved. The command failed whole.
-    const after = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
+    const after = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
     expect(after).toEqual(before);
   });
 });

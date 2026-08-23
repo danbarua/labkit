@@ -19,6 +19,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimOf, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -57,11 +58,11 @@ async function anAlignmentRunInOneOrder(
     enquiry, name: "series B", finding: "comparison trace", contentHash: "sha256:B",
   });
   const inputs = order === "first-then-second" ? [first, second] : [second, first];
-  const { analysis: analysis } = await s.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry, method: "pairwise-alignment", from: inputs,
     concludes: [{ proposition: SHIFTED, finding: "offset of +4.1 units" }],
   });
-  return { enquiry, first, second, analysis };
+  return { enquiry, first, second, analysis, analysisClaims };
 }
 
 describe("S-10b: the same inputs, in a different order", () => {
@@ -119,7 +120,7 @@ describe("S-10b: the same inputs, in a different order", () => {
    * internals: two genuinely different executions, one verdict of `reproduced`.
    */
   test("re-verification treats the reversed run as a reproduction", async () => {
-    const { enquiry, first, second, analysis } = await anAlignmentRunInOneOrder(
+    const { enquiry, first, second, analysis, analysisClaims } = await anAlignmentRunInOneOrder(
       session,
       "first-then-second",
     );
@@ -132,7 +133,7 @@ describe("S-10b: the same inputs, in a different order", () => {
       concludes: { proposition: SHIFTED, finding: "offset of +4.1 units" },
     });
 
-    const verification = await (await afterwards()).whySupported(SHIFTED);
+    const verification = await (await afterwards()).whySupported(claimOf(analysisClaims, SHIFTED));
     expect(verification.reverifiedBy.map((r) => r.method)).toEqual(["pairwise-alignment"]);
     expect(verification.support).toHaveLength(1);
 

@@ -22,6 +22,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -100,7 +101,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       name: "feasibility slice timings",
       finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
     });
-    const { analysis: measured } = await session.recordAnalysis({
+    const { analysis: measured, claims: measuredClaims } = await session.recordAnalysis({
       enquiry: programme.enquiry,
       method: "throughput-and-convergence",
       implementing: programme.feasibility,
@@ -118,7 +119,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: { analysis: measured, proposition: THROUGHPUT },
+      citing: claimOf(measuredClaims, THROUGHPUT),
     });
 
     const status = await session.gateStatus(programme.advancement);
@@ -135,14 +136,14 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("the condition blocking the expensive run is named, and 'some checked' is not 'all passed'", async () => {
     const programme = await aStagedProgramme();
-    const measured = await aPassingFeasibilityStep(programme);
+    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     await session.evaluateCriterion({
       criterion: programme.throughput,
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: { analysis: measured, proposition: THROUGHPUT },
+      citing: claimOf(measuredClaims, THROUGHPUT),
     });
 
     const status = await session.gateStatus(programme.advancement);
@@ -168,14 +169,14 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("an evidence-backed evaluation is distinguishable from a bare assertion", async () => {
     const programme = await aStagedProgramme();
-    const measured = await aPassingFeasibilityStep(programme);
+    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     await session.evaluateCriterion({
       criterion: programme.throughput,
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: { analysis: measured, proposition: THROUGHPUT },
+      citing: claimOf(measuredClaims, THROUGHPUT),
     });
     // The same verdict, asserted rather than measured.
     await session.evaluateCriterion({
@@ -230,10 +231,10 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("the projected cost is a finding with provenance, not a number in a comment", async () => {
     const programme = await aStagedProgramme();
-    const measured = await aPassingFeasibilityStep(programme);
+    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     const later = await afterwards();
-    const why = await later.whySupported({ analysis: measured, proposition: COST });
+    const why = await later.whySupported(claimOf(measuredClaims, COST));
     expect(why.supported).toBe(true);
     expect(why.support.map((s) => s.finding)).toEqual(["9,100 GPU-hours projected from the measured rate"]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["feasibility slice timings"]);
@@ -249,20 +250,20 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("gating work does not change the standing of the findings involved", async () => {
     const programme = await aStagedProgramme();
-    const measured = await aPassingFeasibilityStep(programme);
+    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
-    const before = await session.whySupported({ analysis: measured, proposition: THROUGHPUT });
+    const before = await session.whySupported(claimOf(measuredClaims, THROUGHPUT));
 
     await session.evaluateCriterion({
       criterion: programme.throughput,
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: { analysis: measured, proposition: THROUGHPUT },
+      citing: claimOf(measuredClaims, THROUGHPUT),
     });
 
     const later = await afterwards();
-    const after = await later.whySupported({ analysis: measured, proposition: THROUGHPUT });
+    const after = await later.whySupported(claimOf(measuredClaims, THROUGHPUT));
     expect(after).toEqual(before);
 
     // ...and the gate knows nothing about claims either. What it protects is
@@ -272,9 +273,9 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
   });
 
   /** A citation must be one the cited analysis actually reached. */
-  test("an evaluation cannot cite a conclusion the analysis never drew", async () => {
+  test("an evaluation cannot cite a claim that does not exist", async () => {
     const programme = await aStagedProgramme();
-    const measured = await aPassingFeasibilityStep(programme);
+    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     await expect(
       session.evaluateCriterion({
@@ -282,9 +283,9 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
         gate: programme.advancement,
         value: "44 images per second",
         outcome: "pass",
-        citing: { analysis: measured, proposition: "a conclusion nobody drew" },
+        citing: { kind: "claim", id: "CLM_99999" },
       }),
-    ).rejects.toThrow(/concluded nothing about "a conclusion nobody drew"/);
+    ).rejects.toThrow(/no finding bears on claim CLM_99999/);
 
     const later = await afterwards();
     expect((await later.gateStatus(programme.advancement)).state).toBe("never-evaluated");
@@ -298,7 +299,7 @@ async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aSta
     name: "feasibility slice timings",
     finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
   });
-  return (await session.recordAnalysis({
+  return await session.recordAnalysis({
     enquiry: programme.enquiry,
     method: "throughput-and-convergence",
     implementing: programme.feasibility,
@@ -307,5 +308,5 @@ async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aSta
       { proposition: THROUGHPUT, finding: "sustained 44 images per second across the slice" },
       { proposition: COST, finding: "9,100 GPU-hours projected from the measured rate" },
     ],
-  })).analysis;
+  });
 }

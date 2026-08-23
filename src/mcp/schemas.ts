@@ -78,6 +78,11 @@ import type {
 /** `Ref<K>` — the natural-id handle the domain passes around. */
 const ref = <K extends string>(kind: K) => z.strictObject({ kind: z.literal(kind), id: z.string() });
 
+/** `claims_asserting` — an array, wrapped because structuredContent must be an object. */
+export const claimsAssertingSchema = z.strictObject({
+  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+});
+
 const questionStanding = z.strictObject({
   question: ref("question"),
   asks: z.string(),
@@ -353,6 +358,7 @@ export const verificationReportSchema = z.strictObject({
   at: z.string(),
   verification: analysisRefSchema,
   of: analysisRefSchema,
+  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
 });
 
 export const amendmentReportSchema = z.strictObject({
@@ -368,6 +374,7 @@ export const amendmentReportSchema = z.strictObject({
 export const replacementReportSchema = z.strictObject({
   at: z.string(),
   replacement: ref("analysis"),
+  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
   affected: z.array(z.string()),
   unaffected: z.array(unaffectedRecord),
   changed: z.array(changedConclusion),

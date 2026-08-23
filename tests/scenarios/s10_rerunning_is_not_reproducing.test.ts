@@ -20,6 +20,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimOf, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -54,13 +55,13 @@ const PROPOSITION = "the annealed protocol converges below tolerance";
  */
 async function aHistoricalResultWithNoRecordedInputs() {
   const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
-  const { analysis: historical } = await session.recordAnalysis({
+  const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
     enquiry,
     method: "annealing-v1",
     from: [],
     concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
   });
-  return { enquiry, historical };
+  return { enquiry, historical, historicalClaims };
 }
 
 describe("S-10: rerunning is not reproducing", () => {
@@ -83,7 +84,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * different answer; that difference is the whole finding.
    */
   test("recorded as two analyses, the re-run reads as independent confirmation", async () => {
-    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
 
     const conditions = await session.recordObservations({
       enquiry,
@@ -97,7 +98,7 @@ describe("S-10: rerunning is not reproducing", () => {
       concludes: [{ proposition: PROPOSITION, finding: "converged, residual 2.9e-4" }],
     });
 
-    const why = await (await afterwards()).whySupported({ analysis: historical, proposition: PROPOSITION });
+    const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));
     expect(why.supported).toBe(true);
     // Two findings, presented alike, with nothing saying one re-checked the
     // other or that their executions differ.
@@ -111,7 +112,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * boolean is the mistake the scenario is named after.
    */
   test("Afterward 1: the conclusion may be reproduced; the execution is not", async () => {
-    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
@@ -137,7 +138,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * of execution instead of evidence.
    */
   test("Afterward 2: the difference is named as unrecorded, not as equal", async () => {
-    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
@@ -164,7 +165,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * take the first for the second.
    */
   test("Afterward 3: bearing on the historical claim is answerable and is not confirmation", async () => {
-    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
@@ -189,7 +190,7 @@ describe("S-10: rerunning is not reproducing", () => {
 
     // And the claim itself now reads as re-verified rather than as twice
     // independently established.
-    const why = await (await afterwards()).whySupported({ analysis: historical, proposition: PROPOSITION });
+    const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));
     expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);
     expect(why.reverifiedBy.map((r) => r.method)).toEqual(["annealing-v1, re-run"]);
   });
@@ -205,7 +206,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * to travel with the report a reader already asks for.
    */
   test("Afterward 4: the two are reported as not numerically comparable, with the reason", async () => {
-    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
@@ -236,7 +237,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const { analysis: first } = await session.recordAnalysis({
+    const { analysis: first, claims: firstClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [conditions],
@@ -276,7 +277,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 91, tolerance 1e-3, 64 steps",
     });
-    const { analysis: historical } = await session.recordAnalysis({
+    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [theirs],
@@ -321,7 +322,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * provenance was never captured, not that the run consumed nothing.
    */
   test("two runs that both recorded no inputs have not reproduced anything", async () => {
-    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
     const rerun = await session.reverify({
       historical,
       enquiry,
@@ -345,7 +346,7 @@ describe("S-10: rerunning is not reproducing", () => {
     const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
     const a = await session.recordObservations({ enquiry, name: "conditions A", finding: "seed 4" });
     const b = await session.recordObservations({ enquiry, name: "conditions B", finding: "warm start" });
-    const { analysis: historical } = await session.recordAnalysis({
+    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [a, b],
@@ -373,7 +374,7 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("two runs that both find against the proposition agree with each other", async () => {
     const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
-    const { analysis: historical } = await session.recordAnalysis({
+    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [],
@@ -408,7 +409,7 @@ describe("S-10: rerunning is not reproducing", () => {
   test("the claim does not rest on the re-run's inputs", async () => {
     const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
     const original = await session.recordObservations({ enquiry, name: "original conditions", finding: "seed 1" });
-    const { analysis: historical } = await session.recordAnalysis({
+    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [original],
@@ -427,7 +428,7 @@ describe("S-10: rerunning is not reproducing", () => {
       concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
     });
 
-    const why = await (await afterwards()).whySupported({ analysis: historical, proposition: PROPOSITION });
+    const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));
     expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);
     expect(why.reverifiedBy.map((r) => r.method)).toEqual(["annealing-v1, re-run"]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["original conditions"]);

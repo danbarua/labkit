@@ -19,6 +19,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -82,7 +83,7 @@ async function lockedProgramme() {
     name: "held-out comparison readings",
     finding: "evolved and rewired conditions measured on the held-out split",
   });
-  const { analysis: confirmatory } = await session.recordAnalysis({
+  const { analysis: confirmatory, claims: confirmatoryClaims } = await session.recordAnalysis({
     enquiry,
     method: "prespecified-comparison",
     implementing: confirmatoryWork,
@@ -109,14 +110,14 @@ async function diagnose(enquiry: Awaited<ReturnType<typeof lockedProgramme>>["en
     name: "non-convergence traces",
     finding: "solver hits the iteration cap on 9 of 10 sweeps",
   });
-  const { analysis: analysis } = await session.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "convergence-diagnosis",
     implementing: work,
     from: [traces],
     concludes: [{ proposition: MULTICOLLINEAR, finding: "condition number rises with feature count; enlarging the sample does not reduce it" }],
   });
-  return { analysis, cites: { analysis, proposition: MULTICOLLINEAR } };
+  return { analysis, analysisClaims, cites: claimOf(analysisClaims, MULTICOLLINEAR) };
 }
 
 describe("S-7 — locked design, then feasibility finds a mechanical defect", () => {
@@ -198,7 +199,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
     // ...and the cited diagnosis is a finding with a chain behind it, not an
     // assertion attached to the amendment.
-    const why = await later.whySupported(MULTICOLLINEAR);
+    const why = await later.whySupported(await claimNamed(later, MULTICOLLINEAR));
     expect(why.supported).toBe(true);
     expect(why.restingOn.map((a) => a.name)).toContain("non-convergence traces");
   });
@@ -228,7 +229,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // The confirmatory result is on the record, and is not in the blast radius.
     expect(report.confirmatoryAffected).toEqual([]);
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const standing = await later.whySupported(BEATS_CONTROL);
+    const standing = await later.whySupported(await claimNamed(later, BEATS_CONTROL));
     expect(standing.supported).toBe(true);
     expect(standing.superseded).toEqual([]);
   });

@@ -29,6 +29,7 @@ import { z } from "zod";
 import type { ReadSurface, WriteSurface } from "../domain";
 import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
+  claimsAssertingSchema,
   conflictVerdictSchema,
   criteriaGoverningSchema,
   gateStatusSchema,
@@ -113,6 +114,7 @@ function writeTool<Shape extends z.ZodRawShape>(
  */
 const ARTEFACT_PREFIX = "ART_";
 const ANALYSIS_PREFIX = "COMP_";
+const CLAIM_PREFIX = "CLM_";
 const QUESTION_PREFIX = "Q_";
 const ENQUIRY_PREFIX = "LOE_";
 const CRITERION_PREFIX = "CRIT_";
@@ -162,17 +164,10 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "retrying the bare proposition. A claim is identified by its proposition within an " +
       "enquiry, never by wording alone.",
     inputSchema: {
-      proposition: z.string().describe("the claim's proposition, as worded"),
-      analysis: z
-        .string()
-        .optional()
-        .describe(`analysis id, e.g. ${ANALYSIS_PREFIX}3 — needed only when the wording is ambiguous`),
+      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
     },
     outputSchema: supportExplanationSchema,
-    handler: (read, { proposition, analysis }) =>
-      read.whySupported(
-        analysis ? { analysis: { kind: "analysis", id: analysis }, proposition } : proposition,
-      ),
+    handler: (read, { claim }) => read.whySupported({ kind: "claim", id: claim }),
   }),
 
   tool({
@@ -222,9 +217,9 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     description:
       "How a claim's current reading was arrived at: each earlier wording, the decision that " +
       "narrowed it and why. Takes the proposition as currently worded and walks backwards.",
-    inputSchema: { proposition: z.string().describe("the claim's current proposition") },
+    inputSchema: { claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4`) },
     outputSchema: interpretationHistorySchema,
-    handler: (read, { proposition }) => read.interpretationHistory(proposition),
+    handler: (read, { claim }) => read.interpretationHistory({ kind: "claim", id: claim }),
   }),
 
   tool({
@@ -238,6 +233,22 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: { analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`) },
     outputSchema: reproductionReportSchema,
     handler: (read, { analysis }) => read.reproductionOf({ kind: "analysis", id: analysis }),
+  }),
+
+  tool({
+    name: "claims_asserting",
+    title: "Which claims assert a proposition",
+    description:
+      "The claims asserting a sentence. **The one place wording is resolved**: every other " +
+      "tool takes a claim id, and this is how a caller holding only text finds one. Returns " +
+      "all matches rather than picking — two lines of enquiry can assert the same sentence " +
+      "about different endpoints, and they are two claims (S-5). `record_analysis` hands back " +
+      "claim ids directly, so an agent that recorded the work never needs this.",
+    inputSchema: { proposition: z.string().describe("the sentence, as worded") },
+    outputSchema: claimsAssertingSchema,
+    handler: async (read, { proposition }) => ({
+      claims: await read.claimsAsserting(proposition),
+    }),
   }),
 
   tool({
@@ -318,17 +329,12 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "apart. Each side is named by its analysis and proposition, because a claim is " +
       "identified by its proposition within a line of enquiry and never by wording alone.",
     inputSchema: {
-      a_analysis: z.string().describe(`id of the first conclusion's analysis, e.g. ${ANALYSIS_PREFIX}1`),
-      a_proposition: z.string().describe("the first conclusion's proposition"),
-      b_analysis: z.string().describe(`id of the second conclusion's analysis, e.g. ${ANALYSIS_PREFIX}2`),
-      b_proposition: z.string().describe("the second conclusion's proposition"),
+      a: z.string().describe(`the first claim's id, e.g. ${CLAIM_PREFIX}4`),
+      b: z.string().describe(`the second claim's id, e.g. ${CLAIM_PREFIX}7`),
     },
     outputSchema: conflictVerdictSchema,
-    handler: (read, { a_analysis, a_proposition, b_analysis, b_proposition }) =>
-      read.doTheseConflict(
-        { analysis: { kind: "analysis", id: a_analysis }, proposition: a_proposition },
-        { analysis: { kind: "analysis", id: b_analysis }, proposition: b_proposition },
-      ),
+    handler: (read, { a, b }) =>
+      read.doTheseConflict({ kind: "claim", id: a }, { kind: "claim", id: b }),
   }),
 
   tool({
@@ -516,32 +522,18 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "already-closed enquiry is refused rather than recorded twice.",
     inputSchema: {
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
-      answered_by_analysis: z
+      answered_by: z
         .string()
         .optional()
-        .describe(`id of the analysis that answered it, e.g. ${ANALYSIS_PREFIX}3`),
-      answered_by_proposition: z
-        .string()
-        .optional()
-        .describe("the proposition that analysis concluded"),
+        .describe(`id of the claim that answers it, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
     },
     outputSchema: acknowledgementSchema,
-    handler: async (write, { enquiry, answered_by_analysis, answered_by_proposition }) => {
-      if ((answered_by_analysis === undefined) !== (answered_by_proposition === undefined)) {
-        throw new Error(
-          "answered_by_analysis and answered_by_proposition go together: give both to close as answered, or neither to abandon",
-        );
-      }
+    handler: async (write, { enquiry, answered_by }) => {
       await write.closeEnquiry({
         enquiry: { kind: "enquiry", id: enquiry },
-        ...(answered_by_analysis === undefined || answered_by_proposition === undefined
+        ...(answered_by === undefined
           ? {}
-          : {
-              answeredBy: {
-                analysis: { kind: "analysis", id: answered_by_analysis },
-                proposition: answered_by_proposition,
-              },
-            }),
+          : { answeredBy: { kind: "claim" as const, id: answered_by } }),
       });
       return { ok: true as const, acted: enquiry };
     },
@@ -651,29 +643,19 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       value: z.string().describe("what the check gave, in the checker's words"),
       outcome: z.enum(["pass", "fail"]).describe("whether the condition was met"),
       gate: z.string().optional().describe(`gate id this evaluation is for, e.g. ${GATE_PREFIX}1`),
-      citing_analysis: z.string().optional().describe("id of the analysis the verdict rests on"),
-      citing_proposition: z.string().optional().describe("the proposition that analysis concluded"),
+      citing: z
+        .string()
+        .optional()
+        .describe(`id of the claim the verdict rests on, e.g. ${CLAIM_PREFIX}4`),
     },
     outputSchema: acknowledgementSchema,
-    handler: async (write, { criterion, value, outcome, gate, citing_analysis, citing_proposition }) => {
-      if ((citing_analysis === undefined) !== (citing_proposition === undefined)) {
-        throw new Error(
-          "citing_analysis and citing_proposition go together: give both, or neither",
-        );
-      }
+    handler: async (write, { criterion, value, outcome, gate, citing }) => {
       await write.evaluateCriterion({
         criterion: { kind: "criterion", id: criterion },
         value,
         outcome: outcome as "pass" | "fail",
         ...(gate === undefined ? {} : { gate: { kind: "gate" as const, id: gate } }),
-        ...(citing_analysis === undefined || citing_proposition === undefined
-          ? {}
-          : {
-              citing: {
-                analysis: { kind: "analysis" as const, id: citing_analysis },
-                proposition: citing_proposition,
-              },
-            }),
+        ...(citing === undefined ? {} : { citing: { kind: "claim" as const, id: citing } }),
       });
       return { ok: true as const, acted: criterion };
     },
@@ -724,19 +706,15 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
       because: z.string().describe("why it is being left"),
       until: z.string().describe("what would reopen it"),
-      in_light_of_analysis: z.string().describe("id of the analysis this rests on"),
-      in_light_of_proposition: z.string().describe("the proposition that analysis concluded"),
+      in_light_of: z.string().describe(`id of the claim this rests on, e.g. ${CLAIM_PREFIX}4`),
     },
     outputSchema: acknowledgementSchema,
-    handler: async (write, { enquiry, because, until, in_light_of_analysis, in_light_of_proposition }) => {
+    handler: async (write, { enquiry, because, until, in_light_of }) => {
       await write.acceptAsUnresolved({
         enquiry: { kind: "enquiry", id: enquiry },
         because,
         until,
-        inLightOf: {
-          analysis: { kind: "analysis", id: in_light_of_analysis },
-          proposition: in_light_of_proposition,
-        },
+        inLightOf: { kind: "claim", id: in_light_of },
       });
       return { ok: true as const, acted: enquiry };
     },
@@ -751,17 +729,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "`established` — settled as far as anyone has taken it, but resting on something " +
       "nobody has vouched for. Capture cheaply; promote before citing.",
     inputSchema: {
-      analysis: z.string().describe(`id of the analysis that concluded it, e.g. ${ANALYSIS_PREFIX}3`),
-      proposition: z.string().describe("the proposition being promoted"),
+      claim: z.string().describe(`id of the claim being promoted, e.g. ${CLAIM_PREFIX}4`),
       because: z.string().describe("what justifies promoting it"),
     },
     outputSchema: acknowledgementSchema,
-    handler: async (write, { analysis, proposition, because }) => {
-      await write.promote({
-        claim: { analysis: { kind: "analysis", id: analysis }, proposition },
-        because,
-      });
-      return { ok: true as const, acted: proposition };
+    handler: async (write, { claim, because }) => {
+      await write.promote({ claim: { kind: "claim", id: claim }, because });
+      return { ok: true as const, acted: claim };
     },
   }),
 
@@ -778,19 +752,15 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       criterion: z.string().describe(`criterion id, e.g. ${CRITERION_PREFIX}1`),
       now_requires: z.string().describe("the new wording"),
       because: z.string().describe("why it is being amended"),
-      citing_analysis: z.string().describe("id of the analysis prompting the amendment"),
-      citing_proposition: z.string().describe("the proposition that analysis concluded"),
+      citing: z.string().describe(`id of the claim prompting the amendment, e.g. ${CLAIM_PREFIX}4`),
     },
     outputSchema: amendmentReportSchema,
-    handler: (write, { criterion, now_requires, because, citing_analysis, citing_proposition }) =>
+    handler: (write, { criterion, now_requires, because, citing }) =>
       write.amendDesign({
         criterion: { kind: "criterion", id: criterion },
         nowRequires: now_requires,
         because,
-        citing: {
-          analysis: { kind: "analysis", id: citing_analysis },
-          proposition: citing_proposition,
-        },
+        citing: { kind: "claim", id: citing },
       }),
   }),
 
@@ -836,24 +806,17 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     description:
       "Record that a claim's reading has been narrowed — the evidence is unchanged, what it " +
       "is taken to show is not. The answer says whether anything resting on the old reading " +
-      "needs recomputing. Identify the claim by its proposition; pass `analysis` as well when " +
-      "the same sentence is asserted in more than one line of enquiry, because a claim is " +
-      "identified by its proposition within an enquiry and never by wording alone.",
+      "needs recomputing. Takes the claim's id, so there is nothing to disambiguate: two " +
+      "lines of enquiry asserting the same sentence are two claims and this names one.",
     inputSchema: {
-      proposition: z.string().describe("the claim's current proposition"),
-      analysis: z
-        .string()
-        .optional()
-        .describe("id of the analysis that concluded it — needed only when the wording is ambiguous"),
+      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
       as: z.string().describe("the narrower reading"),
       because: z.string().describe("why it is being narrowed"),
     },
     outputSchema: reinterpretationReportSchema,
-    handler: (write, { proposition, analysis, as: narrower, because }) =>
+    handler: (write, { claim, as: narrower, because }) =>
       write.reinterpret({
-        of: analysis
-          ? { analysis: { kind: "analysis" as const, id: analysis }, proposition }
-          : proposition,
+        of: { kind: "claim", id: claim },
         as: narrower,
         because,
       }),

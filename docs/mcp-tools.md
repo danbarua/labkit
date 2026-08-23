@@ -43,6 +43,7 @@ These change nothing.
 - [`design_history`](#design-history) — How a gate's conditions were amended
 - [`interpretation_history`](#interpretation-history) — How a claim's reading was narrowed
 - [`reproduction_of`](#reproduction-of) — Whether a re-run reproduced its original
+- [`claims_asserting`](#claims-asserting) — Which claims assert a proposition
 - [`pursuits_of`](#pursuits-of) — The lines of enquiry under a question
 - [`origin_of`](#origin-of) — Where a question came from
 - [`contract_for`](#contract-for) — What a piece of planned work is for
@@ -127,8 +128,7 @@ Why a proposition counts as supported (or does not): the findings resting under 
 
 **Takes**
 
-- `proposition`: string — the claim's proposition, as worded
-- `analysis?`: string — analysis id, e.g. COMP_3 — needed only when the wording is ambiguous
+- `claim`: string — the claim's id, e.g. CLM_4 — from record_analysis
 
 **Returns**
 
@@ -356,7 +356,7 @@ How a claim's current reading was arrived at: each earlier wording, the decision
 
 **Takes**
 
-- `proposition`: string — the claim's current proposition
+- `claim`: string — the claim's id, e.g. CLM_4
 
 **Returns**
 
@@ -409,6 +409,26 @@ What a verifying analysis re-checked and whether it reproduced the original — 
 - `bearing`: "raises" | "lowers"
 - `comparable`: boolean
 - `incomparableBecause?`: string
+
+---
+
+## claims_asserting
+
+*Which claims assert a proposition* — read-only
+
+The claims asserting a sentence. **The one place wording is resolved**: every other tool takes a claim id, and this is how a caller holding only text finds one. Returns all matches rather than picking — two lines of enquiry can assert the same sentence about different endpoints, and they are two claims (S-5). `record_analysis` hands back claim ids directly, so an agent that recorded the work never needs this.
+
+**Takes**
+
+- `proposition`: string — the sentence, as worded
+
+**Returns**
+
+- `claims`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 
 ---
 
@@ -573,10 +593,8 @@ Whether two conclusions contradict each other, are about different things (`diss
 
 **Takes**
 
-- `a_analysis`: string — id of the first conclusion's analysis, e.g. COMP_1
-- `a_proposition`: string — the first conclusion's proposition
-- `b_analysis`: string — id of the second conclusion's analysis, e.g. COMP_2
-- `b_proposition`: string — the second conclusion's proposition
+- `a`: string — the first claim's id, e.g. CLM_4
+- `b`: string — the second claim's id, e.g. CLM_7
 
 **Returns**
 
@@ -757,8 +775,7 @@ Close an enquiry, answered or abandoned. Give `answered_by` — the analysis and
 **Takes**
 
 - `enquiry`: string — enquiry id, e.g. LOE_7
-- `answered_by_analysis?`: string — id of the analysis that answered it, e.g. COMP_3
-- `answered_by_proposition?`: string — the proposition that analysis concluded
+- `answered_by?`: string — id of the claim that answers it, e.g. CLM_4 — from record_analysis
 
 **Returns**
 
@@ -871,8 +888,7 @@ Record that a prespecified condition was checked and what it gave. Cite the anal
 - `value`: string — what the check gave, in the checker's words
 - `outcome`: "pass" | "fail" — whether the condition was met
 - `gate?`: string — gate id this evaluation is for, e.g. GATE_1
-- `citing_analysis?`: string — id of the analysis the verdict rests on
-- `citing_proposition?`: string — the proposition that analysis concluded
+- `citing?`: string — id of the claim the verdict rests on, e.g. CLM_4
 
 **Returns**
 
@@ -908,6 +924,11 @@ Record that an earlier analysis was checked again against observations available
 - `of`: object
   - `kind`: "analysis"
   - `id`: string
+- `claims`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 
 ---
 
@@ -922,8 +943,7 @@ Close a line of enquiry as deliberately unresolved: worked on, not settled, and 
 - `enquiry`: string — enquiry id, e.g. LOE_7
 - `because`: string — why it is being left
 - `until`: string — what would reopen it
-- `in_light_of_analysis`: string — id of the analysis this rests on
-- `in_light_of_proposition`: string — the proposition that analysis concluded
+- `in_light_of`: string — id of the claim this rests on, e.g. CLM_4
 
 **Returns**
 
@@ -940,8 +960,7 @@ Move a finding from scratch to citable, recording why it was promoted. Until thi
 
 **Takes**
 
-- `analysis`: string — id of the analysis that concluded it, e.g. COMP_3
-- `proposition`: string — the proposition being promoted
+- `claim`: string — id of the claim being promoted, e.g. CLM_4
 - `because`: string — what justifies promoting it
 
 **Returns**
@@ -962,8 +981,7 @@ Reword a prespecified criterion after work has begun, citing what prompted it. T
 - `criterion`: string — criterion id, e.g. CRIT_1
 - `now_requires`: string — the new wording
 - `because`: string — why it is being amended
-- `citing_analysis`: string — id of the analysis prompting the amendment
-- `citing_proposition`: string — the proposition that analysis concluded
+- `citing`: string — id of the claim prompting the amendment, e.g. CLM_4
 
 **Returns**
 
@@ -1020,6 +1038,11 @@ Record a corrected analysis in place of a defective one, citing the review that 
 - `replacement`: object
   - `kind`: "analysis"
   - `id`: string
+- `claims`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 - `affected`: string[]
 - `unaffected`: object[]
   - `what`: object
@@ -1039,12 +1062,11 @@ Record a corrected analysis in place of a defective one, citing the review that 
 
 *Narrow what a claim is taken to mean* — **changes the record**
 
-Record that a claim's reading has been narrowed — the evidence is unchanged, what it is taken to show is not. The answer says whether anything resting on the old reading needs recomputing. Identify the claim by its proposition; pass `analysis` as well when the same sentence is asserted in more than one line of enquiry, because a claim is identified by its proposition within an enquiry and never by wording alone.
+Record that a claim's reading has been narrowed — the evidence is unchanged, what it is taken to show is not. The answer says whether anything resting on the old reading needs recomputing. Takes the claim's id, so there is nothing to disambiguate: two lines of enquiry asserting the same sentence are two claims and this names one.
 
 **Takes**
 
-- `proposition`: string — the claim's current proposition
-- `analysis?`: string — id of the analysis that concluded it — needed only when the wording is ambiguous
+- `claim`: string — the claim's id, e.g. CLM_4 — from record_analysis
 - `as`: string — the narrower reading
 - `because`: string — why it is being narrowed
 

@@ -21,6 +21,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink, type QuestionRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -60,7 +61,7 @@ async function priorState() {
     name: "curvature sweep readings",
     finding: "response departs from the linear fit across the sweep",
   });
-  const { analysis: nlAnalysis } = await session.recordAnalysis({
+  const { analysis: nlAnalysis, claims: nlAnalysisClaims } = await session.recordAnalysis({
     enquiry: nlEnquiry,
     method: "curvature-fit",
     from: [nlObs],
@@ -80,7 +81,7 @@ async function priorState() {
   });
   await session.closeEnquiry({
     enquiry: nlEnquiry,
-    answeredBy: { analysis: nlAnalysis, proposition: NONLINEAR },
+    answeredBy: claimOf(nlAnalysisClaims, NONLINEAR),
   });
 
   const smear = await session.pose("does the encoding do anything beyond a nonlinear smear?");
@@ -159,10 +160,12 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // above is what carries that; this pins the weaker companion claim -- that
     // posing a question mints nothing that could later be read as a finding
     // against it. It would hold for any string, and is here to stay holding.
-    const untestedProposition = await session.whySupported("does the learned topology help on an external task?");
-    expect(untestedProposition.challenged).toBe(false);
-    expect(untestedProposition.against).toEqual([]);
-    expect(untestedProposition.supported).toBe(false);
+    // Posing a question mints no claim, so there is nothing to ask about --
+    // which is the same statement the old assertion made (`supported: false`,
+    // `against: []`) and a stronger one: no record exists at all.
+    expect(
+      await session.claimsAsserting("does the learned topology help on an external task?"),
+    ).toEqual([]);
 
     // Afterward, from a second reader over the same graph.
     const later = new ResearchSession(await scenario.current(), { clock });
@@ -179,7 +182,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
   test("an established weaker result does not discharge the stronger open question", async () => {
     const prior = await priorState();
 
-    const nonlinear = await session.whySupported(NONLINEAR);
+    const nonlinear = await session.whySupported(await claimNamed(session, NONLINEAR));
     expect(nonlinear.supported).toBe(true);
 
     const stronger = await session.enquiryStatus(prior.smearEnquiry);

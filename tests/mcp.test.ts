@@ -29,6 +29,7 @@ import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { NOT_EXPOSED, publicVerbsOf, verbsReachedIn } from "./helpers/surface-coverage";
 import { readFileSync } from "node:fs";
+import { claimNamed, claimOf } from "./helpers/claims";
 
 /**
  * The composition `src/domain/session.ts` specifies for an adapter needing both
@@ -127,6 +128,14 @@ describe("an agent can track work through the tools alone", () => {
     return c;
   }
 
+  /** The one place a test resolves wording, through the tool that exists for it. */
+  const claimIdFor = async (c: Client, proposition: string) => {
+    const found = (await call(c, "claims_asserting", { proposition })).claims as Array<{
+      claim: { id: string };
+    }>;
+    return found[0]!.claim.id;
+  };
+
   const call = async (c: Client, name: string, args: Record<string, unknown>) => {
     const result = await c.callTool({ name, arguments: args });
     expect(result.isError ?? false).toBe(false);
@@ -155,18 +164,16 @@ describe("an agent can track work through the tools alone", () => {
         concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
       });
 
-      await call(c, "close_enquiry", {
-        enquiry: enquiry.id,
-        answered_by_analysis: (analysis.analysis as { id: string }).id,
-        answered_by_proposition: PROP,
-      });
+      const claimId = (analysis.claims as Array<{ claim: { id: string }; asserts: string }>)
+        .find((x) => x.asserts === PROP)!.claim.id;
+      await call(c, "close_enquiry", { enquiry: enquiry.id, answered_by: claimId });
 
       // Now the reads, which had nothing to say before any of the above.
       const status = await call(c, "enquiry_status", { enquiry: enquiry.id });
       expect((status.question as {open:boolean}).open).toBe(false);
       expect((status.question as {closure:string}).closure).toBe("answered");
 
-      const why = await call(c, "why_supported", { proposition: PROP });
+      const why = await call(c, "why_supported", { claim: await claimIdFor(c, PROP) });
       expect(why.supported).toBe(true);
 
       // **`provisional` before promotion, `established` after** — the whole of
@@ -180,11 +187,7 @@ describe("an agent can track work through the tools alone", () => {
       expect(asks(before.provisional)).toContain("does the pruning schedule move convergence?");
       expect(asks(before.established)).toEqual([]);
 
-      await call(c, "promote", {
-        analysis: (analysis.analysis as { id: string }).id,
-        proposition: PROP,
-        because: "checked against the held-out split",
-      });
+      await call(c, "promote", { claim: claimId, because: "checked against the held-out split" });
 
       const after = await call(c, "known", {});
       expect(asks(after.established)).toContain("does the pruning schedule move convergence?");
@@ -250,7 +253,7 @@ describe("an agent can track work through the tools alone", () => {
 
       // Unmet before the check is run -- an unrun check counts against the
       // finding it qualifies, which is why the criterion is stated up front.
-      const beforeCheck = await call(c, "why_supported", { proposition: HOLDS });
+      const beforeCheck = await call(c, "why_supported", { claim: await claimIdFor(c, HOLDS) });
       expect(beforeCheck.unmet).not.toEqual([]);
 
       await call(c, "evaluate_criterion", {
@@ -260,7 +263,7 @@ describe("an agent can track work through the tools alone", () => {
         outcome: "pass",
       });
 
-      const afterCheck = await call(c, "why_supported", { proposition: HOLDS });
+      const afterCheck = await call(c, "why_supported", { claim: await claimIdFor(c, HOLDS) });
       expect(afterCheck.unmet).toEqual([]);
       await c.close();
     } finally {
@@ -283,7 +286,7 @@ describe("an agent can track work through the tools alone", () => {
       expect((analysis.analysis as { kind: string }).kind).toBe("analysis");
 
       const report = await call(c, "reinterpret", {
-        proposition: GENERAL,
+        claim: await claimIdFor(c, GENERAL),
         as: "the method is faster on this benchmark suite",
         because: "the suite is not representative of the general case",
       });
@@ -291,7 +294,7 @@ describe("an agent can track work through the tools alone", () => {
       expect(report.nowClaims).toBe("the method is faster on this benchmark suite");
 
       const history = await call(c, "interpretation_history", {
-        proposition: "the method is faster on this benchmark suite",
+        claim: await claimIdFor(c, "the method is faster on this benchmark suite"),
       });
       expect(history.originally).toBe(GENERAL);
       await c.close();
@@ -317,23 +320,6 @@ describe("an agent can track work through the tools alone", () => {
     }
   });
 
-  test("a half-given answer is refused rather than silently abandoning the enquiry", async () => {
-    // The two `answered_by_*` fields are one argument split across the wire.
-    // Accepting half of it would close as abandoned an enquiry the caller
-    // believed it was answering.
-    const c = await client();
-    try {
-      const enquiry = await call(c, "open_enquiry", { question: "does seed count matter?" });
-      const result = await c.callTool({
-        name: "close_enquiry",
-        arguments: { enquiry: enquiry.id, answered_by_proposition: "it does" },
-      });
-      expect(result.isError).toBe(true);
-      await c.close();
-    } finally {
-      await scenario.end();
-    }
-  });
 
   const PROP = "the pruning schedule moves convergence";
   const HOLDS = "the effect holds at five seeds";
@@ -467,11 +453,11 @@ describe("behaviour — the same answers, over the wire", () => {
     const observations = await s.recordObservations({
       enquiry, name: "sweep readings", finding: "twelve runs at five seeds",
     });
-    const { analysis: analysis } = await s.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
       enquiry, method: "paired comparison", from: [observations],
       concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
     });
-    await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: PROP } });
+    await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, PROP) });
 
     const current = await scenario.current();
     const read = new ReadSurface(current);
@@ -479,7 +465,7 @@ describe("behaviour — the same answers, over the wire", () => {
     await connectServer(current, serverSide);
     const client = new Client({ name: "test", version: "0" });
     await client.connect(clientSide);
-    return { client, read, enquiry, analysis, observations };
+    return { client, read, enquiry, analysis, analysisClaims, observations };
   }
 
   const PROP = "the pruning schedule moves convergence";
@@ -496,8 +482,9 @@ describe("behaviour — the same answers, over the wire", () => {
       expect(await structured(client, "known", {})).toEqual(
         JSON.parse(JSON.stringify(await read.whatIsKnown())),
       );
-      expect(await structured(client, "why_supported", { proposition: PROP })).toEqual(
-        JSON.parse(JSON.stringify(await read.whySupported(PROP))),
+      const claim = await claimNamed(read, PROP);
+      expect(await structured(client, "why_supported", { claim: claim.id })).toEqual(
+        JSON.parse(JSON.stringify(await read.whySupported(claim))),
       );
       expect(await structured(client, "what_depends_on", { artefact: "sweep readings" })).toEqual(
         JSON.parse(JSON.stringify(await read.whatDependsOn("sweep readings"))),
@@ -536,8 +523,9 @@ describe("behaviour — the same answers, over the wire", () => {
     // added. Nothing here names a field, so nothing can.
     const { client, read } = await seeded();
     try {
-      const direct = JSON.parse(JSON.stringify(await read.whySupported(PROP)));
-      const overWire = await structured(client, "why_supported", { proposition: PROP });
+      const claim = await claimNamed(read, PROP);
+      const direct = JSON.parse(JSON.stringify(await read.whySupported(claim)));
+      const overWire = await structured(client, "why_supported", { claim: claim.id });
       expect(Object.keys(overWire).sort()).toEqual(Object.keys(direct).sort());
       await client.close();
     } finally {
@@ -557,7 +545,7 @@ describe("behaviour — the same answers, over the wire", () => {
     // `replacedBy` from supportExplanationSchema passes it, because nothing
     // below withdraws a claim. An optional field no test data produces is
     // still unguarded.
-    const { client, enquiry } = await seeded();
+    const { client, read, enquiry } = await seeded();
     try {
       const parsed = async (name: string, args: Record<string, unknown>) => {
         const schema = TOOLS.find((t) => t.name === name)?.outputSchema;
@@ -566,7 +554,7 @@ describe("behaviour — the same answers, over the wire", () => {
         if (!result.success) throw new Error(`${name}: ${JSON.stringify(result.error.issues)}`);
       };
 
-      await parsed("why_supported", { proposition: PROP });
+      await parsed("why_supported", { claim: (await read.claimsAsserting(PROP))[0]!.claim.id });
       await parsed("what_depends_on", { artefact: "sweep readings" });
       await parsed("enquiry_status", { enquiry: enquiry.id });
 

@@ -47,7 +47,7 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
   const original = await s.recordObservations({
     enquiry, name: NAME, finding: "the original series", contentHash: "sha256:original",
   });
-  const { analysis: analysis } = await s.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry, method: "effect-test", from: [original],
     concludes: [{ proposition: HOLDS, finding: "effect survives the control" }],
   });
@@ -61,7 +61,7 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
     under: [regenerated],
     concludes: { proposition: HOLDS, finding: "effect survives the control" },
   });
-  return { enquiry, original, regenerated, analysis, verification };
+  return { enquiry, original, regenerated, analysis, analysisClaims, verification };
 }
 
 describe("S-10c: which input changed?", () => {

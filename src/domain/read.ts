@@ -26,6 +26,8 @@ import type {
   AmendmentRecord,
   TaskContract,
   ClaimSubject,
+  ClaimRef,
+  ConcludedClaim,
   ConflictSide,
   ConflictVerdict,
   AnalysisRef,
@@ -1109,9 +1111,13 @@ export class ReadSurface extends SessionCore {
    * step recorded the order is already implied and a supersession edge would
    * be a writer with no reader.
    */
-  async interpretationHistory(
-    proposition: string,
-  ): Promise<InterpretationHistory> {
+  async interpretationHistory(claim: ClaimRef): Promise<InterpretationHistory> {
+    // The walk is by wording -- CHANGES links claims and each step is found by
+    // the name of the one before it -- but the STARTING point is a handle, so
+    // the caller is not guessed at. Walking by id is a separate change and
+    // wants the chain to carry an edge a caller can follow.
+    const proposition = await this.assertedBy(claim);
+    if (proposition === undefined) throw new Error(`no claim ${claim.id}`);
     const steps: Revision[] = [];
     let current = proposition;
 
@@ -1184,8 +1190,8 @@ export class ReadSurface extends SessionCore {
    * S-5 the sentences are identical and the answer is "no".
    */
   async doTheseConflict(
-    a: ConclusionRef,
-    b: ConclusionRef,
+    a: ClaimRef,
+    b: ClaimRef,
   ): Promise<ConflictVerdict> {
     const sides = [await this.sideOf(a), await this.sideOf(b)];
     const [left, right] = sides;
@@ -1214,9 +1220,9 @@ export class ReadSurface extends SessionCore {
     };
   }
   private async sideOf(
-    conclusion: ConclusionRef,
+    conclusion: ClaimRef,
   ): Promise<ConflictSide & { enquiry: string }> {
-    const resolved = await this.scopeFor(conclusion);
+    const resolved = await this.scopeOf(conclusion);
     const enquiry = resolved.enquiry!;
 
     const asked = await this.graph.query(
@@ -1239,12 +1245,12 @@ export class ReadSurface extends SessionCore {
         (f) => f.evidence.id,
       ).sort((a, b) => a.evidence.id.localeCompare(b.evidence.id));
 
-    const claim = await this.claimFor(conclusion);
+    const claim = conclusion;
 
     return {
-      claim: ref("claim", claim),
+      claim,
       question: ref("question", asked[0]?.q.natural_id ?? ""),
-      proposition: conclusion.proposition,
+      proposition: resolved.proposition,
       asks: asked[0]?.q.name ?? "",
       supportedBy: await findings("SUPPORTS"),
       challengedBy: await findings("CHALLENGES"),
@@ -1252,9 +1258,30 @@ export class ReadSurface extends SessionCore {
     };
   }
 
+  /**
+   * Claims asserting a proposition — the **one** place wording is resolved.
+   *
+   * Every verb takes a handle; a person types a sentence. This is the seam
+   * between the two, and it is a verb of its own rather than a guess buried in
+   * each read: it returns *all* matches and lets the caller refuse, instead of
+   * picking one and being wrong when a sentence is asserted in two lines of
+   * enquiry (S-5).
+   */
+  async claimsAsserting(proposition: string): Promise<ConcludedClaim[]> {
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {name: $name}) RETURN c`,
+      { c: vertexProps<{ name: string } & Identified>() },
+      { name: proposition },
+    );
+    return rows.map((r) => ({
+      claim: ref("claim", r.c.natural_id),
+      asserts: r.c.name,
+    }));
+  }
+
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */
-  async whySupported(subject: ClaimSubject): Promise<SupportExplanation> {
-    const scope = await this.scopeFor(subject);
+  async whySupported(claim: ClaimRef): Promise<SupportExplanation> {
+    const scope = await this.scopeOf(claim);
     const proposition = scope.proposition;
     // Both bearings, each partitioned by whether its analysis output was
     // later invalidated. A withdrawn challenge is as historical as a

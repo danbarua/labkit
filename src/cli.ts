@@ -26,7 +26,7 @@ import { resolveTenantContext } from "./db/tenant";
 import { TenantGraph } from "./db/graph";
 import { ReadSurface } from "./domain";
 import type {
-  ClaimSubject,
+  ClaimRef,
   EnquiryStatus,
   HistoricalSurvey,
   KnowledgeSurvey,
@@ -327,17 +327,27 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
       }
 
       case "why": {
-        const proposition = positionals[0];
-        if (!proposition) return usageError("why needs a proposition");
-        // A claim is identified by its proposition *within a line of enquiry*,
-        // never by wording alone (S-5), and `whySupported()` refuses rather
-        // than guessing when a sentence is asserted in more than one. Without
-        // `--analysis` the CLI had no way to answer that refusal, so a correct
-        // refusal became a dead end at the transport boundary.
-        const subject: ClaimSubject = flags.analysis
-          ? { analysis: { kind: "analysis", id: flags.analysis }, proposition }
-          : proposition;
-        const why = await read.whySupported(subject);
+        const subject = positionals[0];
+        if (!subject) return usageError("why needs a claim id or a proposition");
+        // A person types a sentence; the domain takes a handle. Resolving one
+        // to the other happens HERE, at the human boundary, and refuses rather
+        // than picking when a sentence is asserted in more than one line of
+        // enquiry (S-5). No read verb guesses any more.
+        let claim: ClaimRef;
+        if (subject.startsWith("CLM_")) {
+          claim = { kind: "claim", id: subject };
+        } else {
+          const found = await read.claimsAsserting(subject);
+          if (found.length === 0) return usageError(`nothing on the record claims "${subject}"`);
+          if (found.length > 1)
+            return usageError(
+              `"${subject}" is claimed ${found.length} times; name one: ${found
+                .map((c) => c.claim.id)
+                .join(", ")}`,
+            );
+          claim = found[0]!.claim;
+        }
+        const why = await read.whySupported(claim);
         return show(json, why, () => renderWhy(why)), 0;
       }
 

@@ -29,8 +29,10 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type AnalysisRef, type Clock, type EnquiryRef } from "../../src/domain";
+import type { ClaimRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, minutes, days, type WindableClock } from "../helpers/clock";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 
@@ -67,7 +69,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       const observations = await s.recordObservations({
         enquiry, name: "sweep readings", finding: "twelve runs",
       });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "convergence-fit", from: [observations],
         concludes: [{ proposition: CONVERGES, finding: "moves by ~3 steps" }],
         heldTo: [check],
@@ -77,13 +79,13 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       const whenEvaluated = winding.peek();
       await s.evaluateCriterion({
         criterion: check, value: "spread 0.4 steps", outcome: "pass",
-        citing: { analysis, proposition: CONVERGES },
+        citing: claimOf(analysisClaims, CONVERGES),
       });
 
       // A month later the question is closed -- a Decision, and the act that
       // changes what the programme believes.
       winding.wind(days(30));
-      await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: CONVERGES } });
+      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, CONVERGES) });
 
       const reader = new ResearchSession(await scenario.current(), {
         clock: winding, events: inMemoryEventLog(),
@@ -91,7 +93,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
 
       // The evaluation kept its instant, and it is the wound one rather than
       // the start -- so the clock genuinely drives durable state here.
-      const why = await reader.whySupported({ analysis, proposition: CONVERGES });
+      const why = await reader.whySupported(claimOf(analysisClaims, CONVERGES));
       expect(why.standard[0]?.evaluations[0]?.at).toBe(whenEvaluated);
       expect(why.standard[0]?.evaluations[0]?.at).not.toBe("2026-03-01T09:00:00.000Z");
 
@@ -140,9 +142,9 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
   /** A lower bound on when a question was settled, from evidence alone. Null when none exists. */
   async function settledNoEarlierThan(
     s: ResearchSession,
-    ref: { analysis: AnalysisRef; proposition: string },
+    claim: ClaimRef,
   ): Promise<string | null> {
-    const why = await s.whySupported(ref);
+    const why = await s.whySupported(claim);
     const stamps = why.standard.flatMap((c) => c.evaluations.map((e) => e.at)).sort();
     return stamps.at(-1) ?? null;
   }
@@ -155,12 +157,12 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
 
       const enquiry = await s.openEnquiry(FIRST.asks);
       const obs = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
       c.wind(days(40));
-      await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: FIRST.prop } });
+      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, FIRST.prop) });
 
       const reader = new ResearchSession(await scenario.current(), {
         clock: c, events: inMemoryEventLog(),
@@ -169,7 +171,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
       // Forty days passed between the analysis and the closure. Nothing recorded
       // either instant, and this is the ordinary case: a question answered on a
       // finding nobody held to a prespecified condition.
-      expect(await settledNoEarlierThan(reader, { analysis, proposition: FIRST.prop })).toBeNull();
+      expect(await settledNoEarlierThan(reader, await claimNamed(reader, FIRST.prop))).toBeNull();
     } finally {
       await scenario.end();
     }
@@ -194,16 +196,16 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
       const enquiry = await s.openEnquiry(asks);
       const check = await s.stateCriterion(`prespecified check for ${prop}`);
       const obs = await s.recordObservations({ enquiry, name: `${prop} readings`, finding: `runs for ${prop}` });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [obs],
         concludes: [{ proposition: prop, finding: `result for ${prop}` }],
         heldTo: [check],
       });
       await s.evaluateCriterion({
         criterion: check, value: "within tolerance", outcome: "pass",
-        citing: { analysis, proposition: prop },
+        citing: claimOf(analysisClaims, prop),
       });
-      return { enquiry, analysis, prop };
+      return { enquiry, analysis, analysisClaims, prop };
     };
 
     const world = async (closeFirstThenSecond: boolean) => {
@@ -220,16 +222,16 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         // The only difference: which of them the programme settles first.
         c.wind(days(30));
         const [early, late] = closeFirstThenSecond ? [a, b] : [b, a];
-        await s.closeEnquiry({ enquiry: early.enquiry, answeredBy: { analysis: early.analysis, proposition: early.prop } });
+        await s.closeEnquiry({ enquiry: early.enquiry, answeredBy: await claimNamed(s, early.prop) });
         c.wind(days(60));
-        await s.closeEnquiry({ enquiry: late.enquiry, answeredBy: { analysis: late.analysis, proposition: late.prop } });
+        await s.closeEnquiry({ enquiry: late.enquiry, answeredBy: await claimNamed(s, late.prop) });
 
         const reader = new ResearchSession(await scenario.current(), {
           clock: c, events: inMemoryEventLog(),
         });
         return {
-          first: await settledNoEarlierThan(reader, { analysis: a.analysis, proposition: a.prop }),
-          second: await settledNoEarlierThan(reader, { analysis: b.analysis, proposition: b.prop }),
+          first: await settledNoEarlierThan(reader, await claimNamed(reader, a.prop)),
+          second: await settledNoEarlierThan(reader, await claimNamed(reader, b.prop)),
         };
       } finally {
         await scenario.end();
@@ -280,7 +282,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       for (const q of [FIRST, SECOND]) {
         const enquiry = await s.openEnquiry(q.asks);
         const obs = await s.recordObservations({ enquiry, name: `${q.prop} readings`, finding: `runs for ${q.prop}` });
-        const { analysis: analysis } = await s.recordAnalysis({
+        const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
           enquiry, method: "paired-comparison", from: [obs],
           concludes: [{ proposition: q.prop, finding: `result for ${q.prop}` }],
         });
@@ -291,10 +293,10 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       // Thirty days in, the first of them is settled. Sixty days in, the other.
       c.wind(days(30));
       const early = find(order[0]);
-      await s.closeEnquiry({ enquiry: early.enquiry, answeredBy: { analysis: early.analysis, proposition: early.prop } });
+      await s.closeEnquiry({ enquiry: early.enquiry, answeredBy: await claimNamed(s, early.prop) });
       c.wind(days(30));
       const late = find(order[1]);
-      await s.closeEnquiry({ enquiry: late.enquiry, answeredBy: { analysis: late.analysis, proposition: late.prop } });
+      await s.closeEnquiry({ enquiry: late.enquiry, answeredBy: await claimNamed(s, late.prop) });
 
       // A second reader over the same graph, and an empty event log: whatever it
       // answers is reconstructed from what was written down.
@@ -342,14 +344,14 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
 
       const enquiry = await s.openEnquiry(FIRST.asks);
       const obs = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
       c.wind(days(10));
-      await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: FIRST.prop } });
+      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, FIRST.prop) });
       c.wind(days(40));
-      await s.promote({ claim: { analysis, proposition: FIRST.prop }, because: "replicated under seed control" });
+      await s.promote({ claim: claimOf(analysisClaims, FIRST.prop), because: "replicated under seed control" });
 
       const reader = new ResearchSession(await scenario.current(), {
         clock: c, events: inMemoryEventLog(),
@@ -398,12 +400,12 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       const s = new ResearchSession(graph, { clock: c, events: inMemoryEventLog() });
       const enquiry = await s.openEnquiry(FIRST.asks);
       const obs = await s.recordObservations({ enquiry, name: "readings", finding: "runs" });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "pc", from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "a result" }],
       });
       c.wind(days(10));
-      await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: FIRST.prop } });
+      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, FIRST.prop) });
 
       const reader = new ResearchSession(await scenario.current(), { clock: c, events: inMemoryEventLog() });
 

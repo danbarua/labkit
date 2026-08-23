@@ -575,25 +575,34 @@ export class WriteSurface extends SessionCore {
     }
 
     let answerBearing: string | undefined;
+    let answeredProposition: string | undefined;
     if (input.answeredBy) {
-      const { analysis, proposition } = input.answeredBy;
-      const addresses = await this.graph.query(
-        `MATCH (:Computation {natural_id: $analysis})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
-         RETURN 1`,
-        { ok: scalar<number>() },
-        { analysis: analysis.id, enquiry: input.enquiry.id },
-      );
+      // The claim identifies itself; what still has to be checked is that it
+      // belongs to THIS enquiry. One hop from the claim rather than a search
+      // for a proposition.
+      // BOTH bearings. A question answered "no" is answered on a finding that
+      // CHALLENGES its proposition -- S-4's whole case -- and checking only
+      // SUPPORTS rejected exactly the closure the scenario exists for.
+      const addresses: unknown[] = [];
+      for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+        addresses.push(
+          ...(await this.graph.query(
+            `MATCH (:Claim {natural_id: $claim})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
+             RETURN 1`,
+            { ok: scalar<number>() },
+            { claim: input.answeredBy.id, enquiry: input.enquiry.id },
+          )),
+        );
+      }
       if (addresses.length === 0) {
         throw new Error(
-          `analysis ${analysis.id} does not address enquiry ${input.enquiry.id}; it cannot answer its question`,
+          `claim ${input.answeredBy.id} does not belong to enquiry ${input.enquiry.id}; it cannot answer its question`,
         );
       }
-      answerBearing = await this.findingFor(analysis, proposition);
-      if (!answerBearing) {
-        throw new Error(
-          `analysis ${analysis.id} concluded nothing about "${proposition}"`,
-        );
-      }
+      const found = await this.findingOn(input.answeredBy);
+      if (!found) throw new Error(`no finding bears on claim ${input.answeredBy.id}`);
+      answerBearing = found.evidence;
+      answeredProposition = found.asserts;
     }
 
     // Transactional, demonstrated — `docs/consumer-contract/043`.
@@ -613,8 +622,8 @@ export class WriteSurface extends SessionCore {
     await this.graph.inTransaction(async () => {
       const decision = await this.graph.createNode("Decision", {
         decided_at: this.clock.now(),
-        reason: input.answeredBy
-          ? `answered on "${input.answeredBy.proposition}"`
+        reason: answeredProposition
+          ? `answered on "${answeredProposition}"`
           : "closed without a cited result",
         invalidation_check: "new evidence bearing on the question",
       });
@@ -624,8 +633,8 @@ export class WriteSurface extends SessionCore {
     });
 
     this.emit("closeEnquiry", input.enquiry.id, {
-      answeredBy: input.answeredBy?.analysis.id ?? null,
-      proposition: input.answeredBy?.proposition ?? null,
+      answeredBy: input.answeredBy?.id ?? null,
+      proposition: answeredProposition ?? null,
     });
   }
 
@@ -721,15 +730,9 @@ export class WriteSurface extends SessionCore {
     else await this.assertCriterionQualifiesSomething(input.criterion);
     let basis: string | undefined;
     if (input.citing) {
-      basis = await this.findingFor(
-        input.citing.analysis,
-        input.citing.proposition,
-      );
-      if (!basis) {
-        throw new Error(
-          `analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`,
-        );
-      }
+      const found = await this.findingOn(input.citing);
+      if (!found) throw new Error(`no finding bears on claim ${input.citing.id}`);
+      basis = found.evidence;
     }
     const at = this.clock.now();
     // Transactional, demonstrated rather than assumed — `docs/consumer-contract/041`.
@@ -825,7 +828,12 @@ export class WriteSurface extends SessionCore {
       of: input.historical.id,
       proposition: input.concludes.proposition,
     });
-    return { at, verification: verification.analysis, of: input.historical };
+    return {
+      at,
+      verification: verification.analysis,
+      of: input.historical,
+      claims: verification.claims,
+    };
   }
 
   /**
@@ -857,12 +865,9 @@ export class WriteSurface extends SessionCore {
       const question = await this.questionBehind(input.enquiry);
       if (!question) throw new Error(`enquiry ${input.enquiry.id} pursues no question`);
 
-      const basis = await this.findingFor(input.inLightOf.analysis, input.inLightOf.proposition);
-      if (!basis) {
-        throw new Error(
-          `analysis ${input.inLightOf.analysis.id} concluded nothing about "${input.inLightOf.proposition}"`,
-        );
-      }
+      const found = await this.findingOn(input.inLightOf);
+      if (!found) throw new Error(`no finding bears on claim ${input.inLightOf.id}`);
+      const basis = found.evidence;
 
       const decision = await this.graph.createNode("Decision", {
       decided_at: this.clock.now(),
@@ -907,7 +912,7 @@ export class WriteSurface extends SessionCore {
    */
   async promote(input: PromoteCommand): Promise<void> {
     await this.graph.inTransaction(async () => {
-      const claim = await this.claimFor(input.claim);
+      const claim = input.claim.id;
       // `invalidation_check` is the verb's own sentence about what would make a
       // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
       // `amendDesign` and `reinterpret`. S-14 is the one place the researcher
@@ -925,7 +930,7 @@ export class WriteSurface extends SessionCore {
         { id: claim },
       );
     });
-    this.emit("promote", input.claim.analysis.id, { proposition: input.claim.proposition });
+    this.emit("promote", input.claim.id, { proposition: await this.assertedBy(input.claim) });
   }
 
   /**
@@ -963,15 +968,9 @@ export class WriteSurface extends SessionCore {
     if (!replaced)
       throw new Error(`no condition ${input.criterion.id} to amend`);
 
-    const diagnosis = await this.findingFor(
-      input.citing.analysis,
-      input.citing.proposition,
-    );
-    if (!diagnosis) {
-      throw new Error(
-        `analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`,
-      );
-    }
+    const cited = await this.findingOn(input.citing);
+    if (!cited) throw new Error(`no finding bears on claim ${input.citing.id}`);
+    const diagnosis = cited.evidence;
 
     const gates = await this.gatesGovernedBy(input.criterion.id);
     if (gates.length === 0) {
@@ -1194,6 +1193,7 @@ export class WriteSurface extends SessionCore {
     const report: ReplacementReport = {
       at,
       replacement: replacement.analysis,
+      claims: replacement.claims,
       affected: before.map((b) => b.proposition),
       unaffected,
       changed,
@@ -1223,7 +1223,14 @@ export class WriteSurface extends SessionCore {
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
     const at = this.clock.now();
 
-    const scope = await this.scopeFor(input.of);
+    // A reinterpretation narrows a READING, not one node. Two analyses in one
+    // line of enquiry concluding the same sentence share a reading, and S-12
+    // requires both to stop standing -- so the scope is still (proposition,
+    // enquiry). What changed is that both now come FROM THE NAMED CLAIM
+    // instead of being searched for, so nothing is guessed and the caller
+    // cannot be surprised about which reading was narrowed.
+    const scope = await this.scopeOf(input.of);
+    const previously = scope.proposition;
     const claims = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
@@ -1235,7 +1242,7 @@ export class WriteSurface extends SessionCore {
       },
     );
     if (claims.length === 0)
-      throw new Error(`nothing on the record claims "${scope.proposition}"`);
+      throw new Error(`no claim ${input.of.id} to reinterpret`);
 
     // Atomic. Interrupted between withdrawing the original and carrying its
     // evidence across, this retracts a finding and puts nothing in its place.
@@ -1302,13 +1309,13 @@ export class WriteSurface extends SessionCore {
     const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
     this.emit("reinterpret", narrower.natural_id, {
-      previously: scope.proposition,
+      previously,
       because: input.because,
     });
 
     return {
       at,
-      previously: scope.proposition,
+      previously,
       nowClaims: input.as,
       evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
       restingOnTheOldReading,

@@ -27,6 +27,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 
@@ -92,11 +93,11 @@ async function theCachedConstruction(s: ResearchSession) {
   const control = await s.recordObservations({
     enquiry, name: CONTROL, finding: "randomised control series",
   });
-  const { analysis: analysis } = await s.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry, method: "stage2-construction", from: [control],
     concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
   });
-  return { enquiry, control, analysis };
+  return { enquiry, control, analysis, analysisClaims };
 }
 
 /** Replaces every natural-id counter with `N`, so two worlds compare on structure. */
@@ -126,7 +127,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         enquiry, name: "second control", finding: "control series, second pass",
         contentHash: recorded,
       });
-      const { analysis: rebuilt } = await s.recordAnalysis({
+      const { analysis: rebuilt, claims: rebuiltClaims } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, second control", from: [second],
         concludes: [{ proposition: "the second control agrees", finding: "agreement within 1e-6" }],
       });
@@ -166,13 +167,13 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       const second = await s.recordObservations({
         enquiry, name: CONTROL, finding, contentHash: "sha256:second",
       });
-      const { analysis: rebuilt } = await s.recordAnalysis({
+      const { analysis: rebuilt, claims: rebuiltClaims } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, second control", from: [second],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
       const reader = await afterwards();
       return {
-        why: await reader.whySupported(MATCHES),
+        why: await reader.whySupported(claimOf(rebuiltClaims, MATCHES)),
         known: (await reader.whatIsKnown()).provisional.map((q) => q.asks).sort(),
         // Identity normalised, the way `rebuilt` below already is. Natural ids
         // are global sequences, so two paired worlds legitimately draw
@@ -218,11 +219,11 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         enquiry, name: CONTROL, contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
-      await s.recordAnalysis({
+      const { claims: secondClaims } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, rebuilt", from: [regenerated],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
-      return (await afterwards()).whySupported(MATCHES);
+      return (await afterwards()).whySupported(claimOf(secondClaims, MATCHES));
     });
     // Recorded, not asserted-as-correct. Whether two entries here is a wrong
     // answer or an accurate report of what the researcher recorded is the
@@ -249,12 +250,12 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         enquiry, name: CONTROL, contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
-      await s.reverify({
+      const verified = await s.reverify({
         historical: analysis, enquiry, method: "stage2-construction, rebuilt",
         under: [regenerated],
         concludes: { proposition: MATCHES, finding: "agreement within 1e-6" },
       });
-      return (await afterwards()).whySupported(MATCHES);
+      return (await afterwards()).whySupported(claimOf(verified.claims, MATCHES));
     });
     expect(why.support.length).toBe(1);
     expect(why.reverifiedBy.map((r) => r.method)).toEqual(["stage2-construction, rebuilt"]);

@@ -39,6 +39,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ReadSurface, ResearchSession, WriteSurface, inMemoryEventLog, type Clock } from "../src/domain";
 import { buildServer } from "../src/mcp/server";
 import { openScenario, type Scenario } from "./helpers/scenario";
+import { claimNamed, claimOf } from "./helpers/claims";
 
 let scenario: Scenario;
 beforeAll(async () => { scenario = await openScenario(); });
@@ -90,11 +91,11 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       const readings = await s.recordObservations({
         enquiry: anasSweep, name: "seed sweep readings", finding: "five seeds, consistent",
       });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry: anasSweep, method: "paired comparison", from: [readings],
         concludes: [{ proposition: MOVES, finding: "about three steps" }],
       });
-      await s.closeEnquiry({ enquiry: anasSweep, answeredBy: { analysis, proposition: MOVES } });
+      await s.closeEnquiry({ enquiry: anasSweep, answeredBy: claimOf(analysisClaims, MOVES) });
 
       const later = new ResearchSession(await scenario.current(), { clock });
       const ana = await later.enquiryStatus(anasSweep);
@@ -143,11 +144,11 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       const readings = await s.recordObservations({
         enquiry: worked, name: "width readings", finding: "it does",
       });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry: worked, method: "sweep", from: [readings],
         concludes: [{ proposition: WIDTH, finding: "it does" }],
       });
-      await s.closeEnquiry({ enquiry: worked, answeredBy: { analysis, proposition: WIDTH } });
+      await s.closeEnquiry({ enquiry: worked, answeredBy: claimOf(analysisClaims, WIDTH) });
 
       const later = new ResearchSession(await scenario.current(), { clock });
       const status = await later.enquiryStatus(untouched);
@@ -178,7 +179,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const observations = await s.recordObservations({
         enquiry, name: "raw readings", finding: "twelve runs",
       });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "stage one", from: [observations],
         concludes: [{ proposition: HOLDS, finding: "it holds" }],
       });
@@ -208,11 +209,11 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
     try {
       const enquiry = await s.openEnquiry("two stage?");
       const raw = await s.recordObservations({ enquiry, name: "raw", finding: "f" });
-      const { analysis: stageOne } = await s.recordAnalysis({
+      const { analysis: stageOne, claims: stageOneClaims } = await s.recordAnalysis({
         enquiry, method: "stage one", from: [raw],
         concludes: [{ proposition: "p1", finding: "f1" }],
       });
-      const { analysis: viaAnalysis } = await s.recordAnalysis({
+      const { analysis: viaAnalysis, claims: viaAnalysisClaims } = await s.recordAnalysis({
         enquiry, method: "stage two, by analysis ref", from: [stageOne],
         concludes: [{ proposition: "p2a", finding: "f2" }],
       });
@@ -222,7 +223,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
       expect(outputOfStageOne?.id.startsWith("ART_")).toBe(true);
 
-      const { analysis: viaArtefact } = await s.recordAnalysis({
+      const { analysis: viaArtefact, claims: viaArtefactClaims } = await s.recordAnalysis({
         enquiry,
         method: "stage two, by artefact id",
         from: [outputOfStageOne!],
@@ -267,22 +268,22 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     const observations = await s.recordObservations({
       enquiry, name: "sweep readings", finding: "five seeds, consistent",
     });
-    const { analysis: analysis } = await s.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
       enquiry, method: "paired comparison", from: [observations],
       concludes: [{ proposition: MOVES, finding: "about three steps", standing: "confirmatory" }],
       implementing: work, heldTo: [criterion],
     });
     await s.evaluateCriterion({
       criterion, gate, value: "5/5 seeds", outcome: "pass",
-      citing: { analysis, proposition: MOVES },
+      citing: claimOf(analysisClaims, MOVES),
     });
-    await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: MOVES } });
-    return { read: new ReadSurface(await scenario.current()), question, enquiry, gate, work, analysis };
+    await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, MOVES) });
+    return { read: new ReadSurface(await scenario.current()), question, enquiry, gate, work, analysis, analysisClaims };
   }
 
   test("the template: an id beside the wording, in the three reports that do it", async () => {
     try {
-      const { read, analysis } = await programme();
+      const { read, analysis, analysisClaims } = await programme();
 
       // whatIsKnown: `question` is the id, `asks` is the text.
       const known = await read.whatIsKnown();
@@ -341,7 +342,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
   test("whySupported identifies the analysis it cites — FIXED, PJ-030 §5 step 2", async () => {
     try {
       const { read } = await programme();
-      const why = await read.whySupported(MOVES);
+      const why = await read.whySupported(await claimNamed(read, MOVES));
 
       expect(why.support.length).toBeGreaterThan(0);
       // Was a bare `via` holding the computation's METHOD text, so two runs of
@@ -394,10 +395,13 @@ describe("3. the ambiguity is only harmless where you hold both handles", () => 
         enquiry: enquiry.id, method: "stage one", from: [raw.id],
         concludes: [{ proposition: "p1", finding: "f1" }],
       })).body.analysis) as { kind: string; id: string };
-      const stageTwo = ((await call(client, "record_analysis", {
+      const stageTwoResult = (await call(client, "record_analysis", {
         enquiry: enquiry.id, method: "stage two", from: [stageOne.id],
         concludes: [{ proposition: "p2", finding: "f2" }],
-      })).body.analysis) as { kind: string; id: string };
+      })).body;
+      const stageTwo = stageTwoResult.analysis as { kind: string; id: string };
+      const p2 = (stageTwoResult.claims as Array<{ claim: { id: string }; asserts: string }>)
+        .find((c) => c.asserts === "p2")!.claim.id;
       const review = (await call(client, "record_review", {
         of: stageTwo.id, verdict: "stage two mis-specified",
       })).body;
@@ -416,7 +420,8 @@ describe("3. the ambiguity is only harmless where you hold both handles", () => 
 
       // The artefact id that would work is reachable, by asking why a claim is
       // supported in order to learn what a computation read.
-      const why = (await call(client, "why_supported", { proposition: "p2" })).body;
+      // The claim id came back from `record_analysis`; no lookup needed.
+      const why = (await call(client, "why_supported", { claim: p2 })).body;
       const restingOn = why.restingOn as Array<{ part: { id: string }; name: string }>;
       expect(restingOn.some((p) => p.part.id.startsWith("ART_"))).toBe(true);
 

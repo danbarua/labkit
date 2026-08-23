@@ -49,7 +49,7 @@ async function anAnalysisComparingBothControls(s: ResearchSession) {
   const regenerated = await s.recordObservations({
     enquiry, name: NAME, finding: "regenerated from an inferred algorithm", contentHash: "sha256:regen",
   });
-  const { analysis: comparison } = await s.recordAnalysis({
+  const { analysis: comparison, claims: comparisonClaims } = await s.recordAnalysis({
     enquiry, method: "compare-controls", from: [original, regenerated],
     concludes: [{ proposition: "the controls agree", finding: "within tolerance" }],
   });
@@ -92,7 +92,7 @@ describe("S-9c: two parts, one name", () => {
     const noHash = await session.recordObservations({
       enquiry, name: NAME, finding: "a third copy, no hash recorded",
     });
-    const { analysis: analysis } = await session.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
       enquiry, method: "second-look", from: [noHash],
       concludes: [{ proposition: "the third copy is unrecoverable", finding: "no hash" }],
     });

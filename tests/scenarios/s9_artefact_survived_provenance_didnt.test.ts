@@ -62,13 +62,13 @@ async function aCachedConstructionWithOneUnrecordedPart() {
     await session.recordObservations({ enquiry, name: "priors", finding: "prior draws", contentHash: "sha256:ccc" }),
     await session.recordObservations({ enquiry, name: CONTROL, finding: "randomised control series" }),
   ];
-  const { analysis: analysis } = await session.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "stage2-construction",
     from: parts,
     concludes: [{ proposition: PROPOSITION, finding: "agreement within 1e-6" }],
   });
-  return { enquiry, parts, analysis };
+  return { enquiry, parts, analysis, analysisClaims };
 }
 
 describe("S-9: the artefact survived; its provenance didn't", () => {
@@ -79,7 +79,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
    * Row I's distinction, asked of an artefact.
    */
   test("Afterward 1: three parts reproduce exactly, one cannot be checked at all", async () => {
-    const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
+    const { parts, analysis, analysisClaims } = await aCachedConstructionWithOneUnrecordedPart();
 
     // Offered by part, not by name. Keying these by `logical_name` would have
     // reintroduced, one function away, the identity defect this scenario is
@@ -132,7 +132,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       finding: "randomised control series, regenerated from an inferred algorithm",
       contentHash: "sha256:regenerated",
     });
-    const { analysis: downstream } = await session.recordAnalysis({
+    const { analysis: downstream, claims: downstreamClaims } = await session.recordAnalysis({
       enquiry,
       method: "stage2-construction, rebuilt",
       from: [regenerated],
@@ -218,7 +218,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
    * second is a property of this attempt and says nothing about the artefact.
    */
   test("a part that was not rebuilt is not a part that differs", async () => {
-    const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
+    const { parts, analysis, analysisClaims } = await aCachedConstructionWithOneUnrecordedPart();
 
     // Only two of the three hashed parts were rebuilt.
     const report = await (await afterwards()).reproducibilityOf(analysis, [
@@ -239,7 +239,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
    * mismatch into "you did not rebuild it".
    */
   test("a part that was rebuilt and differs still reports as differing", async () => {
-    const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
+    const { parts, analysis, analysisClaims } = await aCachedConstructionWithOneUnrecordedPart();
 
     const report = await (await afterwards()).reproducibilityOf(analysis, [
       { part: parts[0]!, hash: "sha256:aaa" },

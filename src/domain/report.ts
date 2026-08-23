@@ -234,6 +234,16 @@ export interface ReplacementReport {
    * point of the heuristic — it says look, not what to do.
    */
   replacement: AnalysisRef;
+  /**
+   * The claims the replacement minted.
+   *
+   * Same reason `recordAnalysis` returns its own (PJ-030): a replacement
+   * asserts its predecessor's propositions afresh, so after one there are two
+   * claims saying each sentence and a caller holding only the analysis has no
+   * way to name either. The sixth time CLAUDE.md's *"does the act record what
+   * it produced?"* has caught something.
+   */
+  claims: ConcludedClaim[];
   /** Propositions whose support ran through the replaced analysis — enumerable, not "everything downstream". */
   affected: string[];
   /** Still valid, and still cited by the replacement. */
@@ -504,6 +514,14 @@ export interface VerificationReport {
   verification: AnalysisRef;
   /** The historical analysis it re-checked. */
   of: AnalysisRef;
+  /**
+   * The claim the re-verification minted.
+   *
+   * Third instance of the same thing (`recordAnalysis`, `replaceAnalysis`):
+   * re-verifying asserts the proposition afresh, so afterwards two claims say
+   * it and a caller holding only the refs can name neither.
+   */
+  claims: ConcludedClaim[];
 }
 
 /**

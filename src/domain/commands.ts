@@ -29,7 +29,7 @@ import type {
   QuestionRef,
   ReviewRef,
   WorkRef,
-  ClaimSubject,
+  ClaimRef,
 } from "./report";
 
 
@@ -107,7 +107,7 @@ export interface RecordReviewCommand {
 /** `closeEnquiry` — answered, or abandoned when `answeredBy` is absent. */
 export interface CloseEnquiryCommand {
   enquiry: EnquiryRef;
-  answeredBy?: ConclusionRef;
+  answeredBy?: ClaimRef;
 }
 
 /** `planWork` — state an objective and what would count as meeting it. */
@@ -146,7 +146,7 @@ export interface EvaluateCriterionCommand {
   value: string;
   outcome: "pass" | "fail";
   /** The finding this verdict was reached against, if it was reached against one. */
-  citing?: ConclusionRef;
+  citing?: ClaimRef;
 }
 
 /** `reverify` — re-run a historical analysis under current observations. Not reproduction (S-10). */
@@ -166,7 +166,7 @@ export interface AcceptAsUnresolvedCommand {
   /** What would reopen it. About the world, not about re-running the same analysis. */
   until: string;
   /** The finding it is being accepted in light of — what was known at the time. */
-  inLightOf: ConclusionRef;
+  inLightOf: ClaimRef;
 }
 
 /** `amendDesign` — change a locked criterion's wording, and report whether the change was mechanical or scientific. */
@@ -174,7 +174,7 @@ export interface AmendDesignCommand {
   criterion: CriterionRef;
   nowRequires: string;
   because: string;
-  citing: ConclusionRef;
+  citing: ClaimRef;
 }
 
 /** `replaceAnalysis` — supersede a defective analysis, invalidating its output and withdrawing what cited it. */
@@ -194,13 +194,13 @@ export interface ReinterpretCommand {
    * naming the analysis that concluded it when it is not — S-5, where
    * withdrawing by wording alone retracted an unrelated line of work.
    */
-  of: ClaimSubject;
+  of: ClaimRef;
   as: string;
   because: string;
 }
 
 /** `promote` — move a finding from scratch to citable (S-18). */
 export interface PromoteCommand {
-  claim: ConclusionRef;
+  claim: ClaimRef;
   because: string;
 }

@@ -26,6 +26,7 @@ import {
   type CloseEnquiryCommand,
 } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
+import { claimNamed, claimOf } from "./helpers/claims";
 
 let scenario: Scenario;
 beforeAll(async () => { scenario = await openScenario(); });
@@ -55,7 +56,7 @@ describe("commands are values a caller can hold", () => {
       };
       const observations = await s.recordObservations(observing);
 
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry,
         method: "paired comparison",
         from: [observations],
@@ -65,19 +66,19 @@ describe("commands are values a caller can hold", () => {
       // A command assembled from a previous act's return value -- the shape an
       // adapter is in when it has just answered one call and is making the next.
       const promoting: PromoteCommand = {
-        claim: { analysis, proposition: PROP },
+        claim: claimOf(analysisClaims, PROP),
         because: "checked against the held-out split",
       };
       await s.promote(promoting);
 
       const closing: CloseEnquiryCommand = {
         enquiry,
-        answeredBy: { analysis, proposition: PROP },
+        answeredBy: claimOf(analysisClaims, PROP),
       };
       await s.closeEnquiry(closing);
 
       const read = new ReadSurface(await scenario.current());
-      const why = await read.whySupported(PROP);
+      const why = await read.whySupported(await claimNamed(read, PROP));
       expect(why.supported).toBe(true);
       expect(why.promotedBecause).toBe("checked against the held-out split");
 

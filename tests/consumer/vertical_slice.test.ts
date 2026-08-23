@@ -33,6 +33,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ReadSurface, ResearchSession, inMemoryEventLog, type AnalysisRef, type Clock, type EnquiryRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 
@@ -97,7 +98,7 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
       const observations = await s.recordObservations({
         enquiry, name: "sweep readings", finding: "twelve runs across the schedule",
       });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "convergence-fit", from: [observations],
         concludes: [{ proposition: CONVERGES, finding: "convergence moves by ~3 steps" }],
         heldTo: [seedStability],
@@ -106,9 +107,9 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
         criterion: seedStability,
         value: outcome === "pass" ? "spread 0.4 steps across five seeds" : "spread 11 steps across five seeds",
         outcome,
-        citing: { analysis, proposition: CONVERGES },
+        citing: claimOf(analysisClaims, CONVERGES),
       });
-      return s.whySupported({ analysis, proposition: CONVERGES });
+      return s.whySupported(claimOf(analysisClaims, CONVERGES));
     };
 
     const { a: passed, b: failed } = await inTwoWorlds(build("pass"), build("fail"));
@@ -148,12 +149,12 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     const observations = await s.recordObservations({
       enquiry, name: `${proposition} readings`, finding: `measurements for ${proposition}`,
     });
-    const { analysis: analysis } = await s.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
       enquiry, method: "paired-comparison", from: [observations],
       concludes: [{ proposition, finding: `result for ${proposition}` }],
     });
-    await s.promote({ claim: { analysis, proposition }, because: "re-run under seed control" });
-    await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition } });
+    await s.promote({ claim: await claimNamed(s, proposition), because: "re-run under seed control" });
+    await s.closeEnquiry({ enquiry, answeredBy: await claimNamed(s, proposition) });
   };
 
   const inOrder = (first: typeof FIRST, second: typeof FIRST) => async (s: ResearchSession) => {
@@ -259,7 +260,7 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
         enquiry, name: "random control", finding: "the 2024 control, as archived",
         contentHash: "sha256:1111",
       });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [historical],
         concludes: [{ proposition: "the encoding beats the control", finding: "difference 2.1%" }],
       });
@@ -322,12 +323,12 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
         // The only place a name can go. It is evidence prose, not attribution.
         finding: `difference 2.1%, CI excludes zero (adjudicated by ${closer})`,
       });
-      const { analysis: analysis } = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [observations],
         concludes: [{ proposition: "the difference is real", finding: `difference 2.1% (${closer})` }],
       });
       // No actor may be supplied here. That is the whole finding.
-      await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: "the difference is real" } });
+      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, "the difference is real") });
       return s.enquiryStatus(enquiry);
     };
 

@@ -16,6 +16,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -171,7 +172,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
     });
-    const { analysis: analysis } = await session.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
       enquiry,
       method: "holm-pairwise",
       from: [observations],
@@ -195,8 +196,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     // It was left asserting the wrong answer on purpose, as ledger row V, to
     // be updated by whoever fixed it rather than drifting silently. Fixed by
     // `QUALIFIES`; see tests/scenarios/s3b_criteria_qualify_only.test.ts.
-    const why = await session.whySupported("T differs from rewired");
-    expect(await (await afterwards()).whySupported("T differs from rewired")).toEqual(why);
+    const why = await session.whySupported(await claimNamed(session, "T differs from rewired"));
+    expect(await whyOf(await afterwards(), "T differs from rewired")).toEqual(why);
     expect(why.supported).toBe(false);
     expect([...why.unmet.map((u) => u.requires)].sort()).toEqual([MEDIAN, SEED].sort());
     // Disqualified, not withdrawn: the numbers are exactly as they were.

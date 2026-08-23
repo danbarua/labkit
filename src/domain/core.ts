@@ -28,6 +28,7 @@ import {
 } from "./events";
 import type {
   ClaimSubject,
+  ClaimRef,
   AnalysisRef,
   ConclusionRef,
   ConfirmatoryResult,
@@ -52,6 +53,42 @@ export class SessionCore {
   ) {
     this.clock = options.clock ?? systemClock;
     this.events = options.events ?? inMemoryEventLog();
+  }
+
+  /**
+   * The finding that bears on a claim, and what the claim asserts.
+   *
+   * The direct replacement for `findingFor(analysis, proposition)`: with a
+   * `ClaimRef` there is nothing to search for, so this matches the claim by id
+   * and walks one edge back. No wording crosses the query.
+   */
+  protected async findingOn(
+    claim: ClaimRef,
+  ): Promise<{ evidence: string; asserts: string } | undefined> {
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (c:Claim {natural_id: $id})<-[:${bearing}]-(e:Evidence)
+         RETURN c, e`,
+        {
+          c: vertexProps<{ name: string }>(),
+          e: vertexProps<{ natural_id: string }>(),
+        },
+        { id: claim.id },
+      );
+      const found = rows[0];
+      if (found) return { evidence: found.e.natural_id, asserts: found.c.name };
+    }
+    return undefined;
+  }
+
+  /** What a claim asserts. */
+  protected async assertedBy(claim: ClaimRef): Promise<string | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ name: string }>() },
+      { id: claim.id },
+    );
+    return rows[0]?.c.name;
   }
 
   /** The single finding by which an analysis concluded something about one proposition. */
@@ -234,57 +271,34 @@ export class SessionCore {
     return [...asked.values()].sort((a, b) => a.question.id.localeCompare(b.question.id));
   }
 
-  /**
-   * Works out which claim a caller meant.
-   *
-   * Proposition text identifies a claim only while a sentence is asserted in
-   * one line of enquiry. S-5 is the case where it is asserted in two — the
-   * same words about different endpoints — and there text identifies nothing.
-   * Rather than picking one, this refuses and says how many there are. The
-   * wrong answer available here is not "no result": before this existed,
-   * `whySupported()` merged both into a single claim that was simultaneously
-   * supported and challenged, and `reinterpret()` withdrew an unrelated line
-   * of work's claim with no decision saying so.
-   *
-   * Scope is the line of enquiry, reached by traversal. Nothing is stored on
-   * the claim — see PJ-008 row C.
-   */
-
-  protected async scopeFor(
-    subject: ClaimSubject,
+  protected async scopeOf(
+    claim: ClaimRef,
   ): Promise<{ proposition: string; enquiry?: string }> {
-    if (typeof subject !== "string") {
-      // A citation has to be one the cited analysis actually made. Without
-      // this, naming a proposition it never concluded still resolves to its
-      // line of enquiry, and the answer comes back about whatever *other*
-      // analysis in that scope said -- so `reinterpret()` would withdraw a
-      // claim the cited analysis never asserted. Same check `closeEnquiry()`
-      // and `amendDesign()` already make of their citations.
-      const concluded = await this.findingFor(
-        subject.analysis,
-        subject.proposition,
+    // BOTH bearings. A conclusion that challenges its proposition reaches its
+    // line of enquiry the same way one that supports it does, and walking only
+    // SUPPORTS lost the enquiry for every challenging claim -- which S-5's
+    // second stage is, and which is how this was caught.
+    let name: string | undefined;
+    let enquiry: string | undefined;
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (c:Claim {natural_id: $id})
+         OPTIONAL MATCH (c)<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry)
+         RETURN c, loe`,
+        {
+          c: vertexProps<{ name: string }>(),
+          loe: optional(vertexProps<{ natural_id: string }>()),
+        },
+        { id: claim.id },
       );
-      if (!concluded) {
-        throw new Error(
-          `analysis ${subject.analysis.id} concluded nothing about "${subject.proposition}"`,
-        );
-      }
-      const enquiry = await this.enquiryAddressedBy(subject.analysis);
-      if (!enquiry)
-        throw new Error(
-          `analysis ${subject.analysis.id} addresses no line of enquiry`,
-        );
-      return { proposition: subject.proposition, enquiry };
+      if (rows[0]) name = rows[0].c.name;
+      enquiry ??= rows.find((r) => r.loe)?.loe?.natural_id;
     }
-
-    const scopes = await this.enquiriesClaiming(subject);
-    if (scopes.length > 1) {
-      throw new Error(
-        `"${subject}" is claimed in ${scopes.length} lines of enquiry; name which, by the analysis that concluded it`,
-      );
-    }
-    return { proposition: subject };
+    if (name === undefined) throw new Error(`no claim ${claim.id}`);
+    return { proposition: name, ...(enquiry ? { enquiry } : {}) };
   }
+
+
 
   /** Lines of enquiry in which some claim of this wording is asserted. */
 
