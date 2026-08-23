@@ -420,8 +420,15 @@ qualifies, so `QUALIFIES` is written when the analysis is recorded and not when
 the check is evaluated — the same edge minted at the later moment cannot
 express the case the scenario exists for (S-3b, PJ-016).
 
-**Identity is never wording.** Six unrelated regions have now had to decide
-this — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
+**Identity is never wording** — and its other half, **which record is this
+answer about?** The second is PJ-030: a reference denoting one record while the
+verb answers about another (an enquiry's status is the question's status; an
+artefact id does not say what kind of artefact it is; an analysis ref used as an
+input means that analysis's *output*). `tests/subject-identity.test.ts`
+demonstrates all three in one file and is **green while they are present** —
+fixing the first turns it red on purpose.
+
+Six unrelated regions have had to decide the first form — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
 (S-3c), execution inputs (S-10, caught by review after shipping wrong) and
 artefacts (S-9, where a regenerated part carries the name of what it replaces).
 Three of the six got it right first time because someone asked at the time, so

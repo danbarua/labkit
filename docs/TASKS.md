@@ -87,7 +87,9 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 ## Needs a discriminator
 
 - [ ] **Closing one pursuit closes every pursuit of the same question, and the
-  untouched one reports evidence it never produced.** External review (ChatGPT,
+  untouched one reports evidence it never produced.** **Scenario, diagnosis and
+  what is still undecided: `docs/project-journal/030_which_record_is_this_about.md`.
+  Demonstrated in `tests/subject-identity.test.ts`.** External review (ChatGPT,
   on PR #2) proposed the discriminator; run over MCP only, it fires:
 
   ```
