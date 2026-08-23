@@ -124,7 +124,7 @@ What this research programme currently knows, partitioned by how well each answe
 
 *Why a conclusion counts as supported* — read-only
 
-Why a proposition counts as supported (or does not): the findings resting under it, the findings bearing against it, the prespecified standard it is held to and which checks are unmet, what re-checked it, and what has been superseded. Three states share `supported: false` and the answer keeps them apart — nothing has examined it, evidence bears against it (`challenged`), or the record no longer asserts this wording (`withdrawn`, with `replacedBy`). Refuses when the same sentence is asserted in more than one line of enquiry: pass `analysis` to say which one, rather than retrying the bare proposition. A claim is identified by its proposition within an enquiry, never by wording alone.
+Why a proposition counts as supported (or does not): the findings resting under it, the findings bearing against it, the prespecified standard it is held to and which checks are unmet, what re-checked it, and what has been superseded. Three states share `supported: false` and the answer keeps them apart — nothing has examined it, evidence bears against it (`challenged`), or the record no longer asserts this wording (`withdrawn`, with `replacedBy`). Takes the claim's id, so there is nothing to disambiguate: two lines of enquiry asserting the same sentence are two claims and this answers about one of them. `record_analysis` hands the id back; `claims_asserting` finds one from text.
 
 **Takes**
 
@@ -595,9 +595,21 @@ A gate's state, itemised per condition: which checks passed, which failed, which
     - `id`: string
   - `requires`: string
 - `evaluations`: object[]
+  - `evaluation`: object
+    - `kind`: "evaluation"
+    - `id`: string
+  - `criterion`: object
+    - `kind`: "criterion"
+    - `id`: string
   - `value`: string
   - `outcome`: "pass" | "fail"
   - `at`: string
+  - `withdrawn?`: true
+  - `basis`: object[]
+    - `evidence`: object
+      - `kind`: "evidence"
+      - `id`: string
+    - `states`: string
 - `gating`: object[]
   - `work`: object
     - `kind`: "work"
@@ -611,7 +623,7 @@ A gate's state, itemised per condition: which checks passed, which failed, which
 
 *Whether two conclusions actually disagree* — read-only
 
-Whether two conclusions contradict each other, are about different things (`dissociation`), or agree. Two analyses reaching opposite-sounding results are not in conflict if they asked about different endpoints, and this is what tells them apart. Each side is named by its analysis and proposition, because a claim is identified by its proposition within a line of enquiry and never by wording alone.
+Whether two conclusions contradict each other, are about different things (`dissociation`), or agree. Two analyses reaching opposite-sounding results are not in conflict if they asked about different endpoints, and this is what tells them apart. Each side is named by its claim id — two claims can assert the same sentence about different endpoints, which is exactly the case this tool exists to report on.
 
 **Takes**
 
@@ -795,7 +807,7 @@ The compound act: a computation, what it read, and one claim per conclusion. `fr
 
 *Close a line of enquiry* — **changes the record**
 
-Close an enquiry, answered or abandoned. Give `answered_by` — the analysis and the proposition it concluded — to close it as answered; omit it to abandon. Closing an already-closed enquiry is refused rather than recorded twice.
+Close an enquiry, answered or abandoned. Give `answered_by` — the id of the claim that answers it — to close it as answered; omit it to abandon. The claim carries the polarity, so a question answered *no* closes as answered, not abandoned. Closing an already-closed enquiry is refused rather than recorded twice.
 
 **Takes**
 

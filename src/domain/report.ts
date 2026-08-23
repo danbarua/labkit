@@ -330,8 +330,21 @@ export interface GateStatus {
   checks: CheckStatus[];
   /** Conditions not currently passing — what would have to change. Named before anyone spends the compute. */
   unmet: UnmetCheck[];
-  /** Evaluations of this gate's criteria. Empty is an answer, not an absence. */
-  evaluations: Array<{ value: string; outcome: "pass" | "fail"; at: string }>;
+  /**
+   * Evaluations of this gate's criteria, flattened from `checks`. Empty is an
+   * answer, not an absence.
+   *
+   * `EvaluationRecord`, which is what the code has always put here — the
+   * declared type said `{value, outcome, at}` and structural typing let a
+   * wider object through, because excess-property checking only applies to
+   * object literals. Nothing failed: `tsc` was satisfied, the `Exact<>` gate
+   * in `src/mcp/schemas.ts` compared two agreeing *declarations*, and the
+   * strict output schema then rejected the real payload at run time — so
+   * `gate_status` errored over MCP for any gate that had been evaluated, and
+   * no test called it. See `EvaluationRecord.criterion`, whose own comment
+   * says this flattened list loses the criterion otherwise.
+   */
+  evaluations: EvaluationRecord[];
   /** What is currently relying on this gate — the blast radius of a fake guard. */
   gating: GatedWork[];
   /**

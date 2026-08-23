@@ -9,11 +9,16 @@
  *
  * Two properties, and they are different:
  *
- *   - **structural**: no write verb is reachable, and every tool declares
- *     itself read-only. Derived from both surfaces the server holds, never
- *     listed — see tests/helpers/read-only.ts.
- *   - **behavioural**: the seven tools answer, over the wire, what the read
+ *   - **structural**: every public verb on either surface is exposed as a tool
+ *     or listed in `NOT_EXPOSED` with a reason, and each tool's `readOnlyHint`
+ *     matches the list it came from. Derived from both surfaces the server
+ *     holds, never restated — see tests/helpers/surface-coverage.ts.
+ *   - **behavioural**: specific answers, over the wire, matching what the read
  *     surface answers directly.
+ *
+ * `tests/mcp-smoke.test.ts` is the third property and a different one again:
+ * every tool is *called* at least once. Exposed is not the same as working,
+ * and this file only ever exercised the tools its own scenarios needed.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";

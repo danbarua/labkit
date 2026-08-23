@@ -279,19 +279,13 @@ export const criteriaGoverningSchema = z.strictObject({
   criteria: z.array(ref("criterion")),
 });
 
-const evaluationSummary = z.strictObject({
-  value: z.string(),
-  outcome: z.enum(["pass", "fail"]),
-  at: z.string(),
-});
-
 export const gateStatusSchema = z.strictObject({
   gate: ref("gate"),
   consequence: z.string(),
   state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
   checks: z.array(checkStatus),
   unmet: z.array(unmetCheck),
-  evaluations: z.array(evaluationSummary),
+  evaluations: z.array(evaluationRecord),
   gating: z.array(gatedWork),
   everFailed: z.boolean(),
 });
