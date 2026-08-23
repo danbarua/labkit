@@ -164,6 +164,7 @@ export const historicalSurveySchema = z.strictObject({
 });
 
 export const supportExplanationSchema = z.strictObject({
+  claim: ref("claim"),
   proposition: z.string(),
   supported: z.boolean(),
   standing: z.enum(["exploratory", "confirmatory"]),
@@ -186,6 +187,7 @@ export const supportExplanationSchema = z.strictObject({
 });
 
 export const dependencyReportSchema = z.strictObject({
+  subject: ref("observations"),
   claims: z.array(concludedClaim),
   enquiries: z.array(z.strictObject({ enquiry: ref("enquiry"), pursuing: z.string() })),
   routesWalked: z.array(z.string()),
@@ -311,6 +313,7 @@ export const conflictVerdictSchema = z.strictObject({
 });
 
 export const reproducibilityReportSchema = z.strictObject({
+  analysis: ref("analysis"),
   exact: z.array(identifiedArtefact),
   differing: z.array(identifiedArtefact),
   unverifiable: z.array(identifiedArtefact),

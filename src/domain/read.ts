@@ -1481,6 +1481,9 @@ export class ReadSurface extends SessionCore {
     const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
 
     return {
+      // The handle the caller asked with, echoed so the answer names its own
+      // subject once it is stored or sent.
+      claim,
       proposition,
       // Three ways to not be supported, and they are different states: no
       // evidence at all, the interpretation withdrawn, and -- since S-3b --
@@ -1584,6 +1587,7 @@ export class ReadSurface extends SessionCore {
     const byName = (a: IdentifiedArtefact, b: IdentifiedArtefact) =>
       a.name.localeCompare(b.name) || a.part.id.localeCompare(b.part.id);
     return {
+      analysis,
       exact: exact.sort(byName),
       differing: differing.sort(byName),
       unverifiable: unverifiable.sort(byName),
@@ -1686,6 +1690,9 @@ export class ReadSurface extends SessionCore {
     }
 
     return {
+      // Which record the answer is about -- and when a name was passed, which
+      // record that name resolved to.
+      subject: ref("observations", start),
       claims: [...claims.values()],
       enquiries: [...enquiries.values()],
       routesWalked: [

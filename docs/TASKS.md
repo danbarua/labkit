@@ -16,12 +16,6 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   Walking by id wants the revision chain to carry an edge a caller can follow,
   which is a model question rather than a projection.
 
-- [ ] **A report does not say which record it is about.**
-  `whySupported(claim)` answers with `proposition: string` and no `claim` on
-  the report, so a consumer holding the response — over MCP it is a bare JSON
-  blob — cannot tie it back without keeping the request. Audit every report
-  type for the same shape before fixing one: the subject handle is an echo of
-  an argument the verb already has, so it is cheap everywhere it is missing.
 
 ## Needs a discriminator
 

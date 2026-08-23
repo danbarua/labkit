@@ -492,6 +492,8 @@ export interface IdentifiedArtefact {
  * artefact, and got wrong twice before it was got right.
  */
 export interface ReproducibilityReport {
+  /** The construction this answer is about. */
+  analysis: AnalysisRef;
   /** Parts whose recorded hash matches the one offered. */
   exact: IdentifiedArtefact[];
   /** Parts whose recorded hash disagrees with the one offered. */
@@ -652,6 +654,17 @@ export interface AffectedEnquiry {
  * an input while still naming the enquiry.
  */
 export interface DependencyReport {
+  /**
+   * The artefact this answer is about.
+   *
+   * Echoed because the verb also accepts a logical **name**, and a caller who
+   * passed one otherwise cannot tell which record the name resolved to — the
+   * report described a record it never identified. `kind` is `observations`
+   * for the same reason the argument's is: the `ART_` prefix does not
+   * distinguish a raw input from an analysis output, which is an open item in
+   * `docs/TASKS.md` and not a claim being made here.
+   */
+  subject: ObservationsRef;
   /** Claims found to rest on the subject, supporting or challenging. */
   claims: AffectedClaim[];
   /** Lines of enquiry found to reach it. */
@@ -687,6 +700,15 @@ export interface DependencyReport {
 
 /** The answer to "why does this conclusion count as supported?" — bullet 4. */
 export interface SupportExplanation {
+  /**
+   * The claim this answer is about.
+   *
+   * The caller passes a handle in and the report gave back only a sentence, so
+   * the answer stopped identifying its own subject the moment it was stored or
+   * sent — and over MCP it is exactly a stored blob. Two claims can assert the
+   * same sentence (S-5), which is when the omission stops being cosmetic.
+   */
+  claim: ClaimRef;
   proposition: string;
   /**
    * Whether the record currently stands behind this proposition: evidence

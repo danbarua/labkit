@@ -132,6 +132,9 @@ Why a proposition counts as supported (or does not): the findings resting under 
 
 **Returns**
 
+- `claim`: object
+  - `kind`: "claim"
+  - `id`: string
 - `proposition`: string
 - `supported`: boolean
 - `standing`: "exploratory" | "confirmatory"
@@ -236,6 +239,9 @@ What would be affected if a record turned out to be wrong: the claims and lines 
 
 **Returns**
 
+- `subject`: object
+  - `kind`: "observations"
+  - `id`: string
 - `claims`: object[]
   - `claim`: object
     - `kind`: "claim"
@@ -654,6 +660,9 @@ Whether an analysis's inputs can be accounted for, given hashes of whatever you 
 
 **Returns**
 
+- `analysis`: object
+  - `kind`: "analysis"
+  - `id`: string
 - `exact`: object[]
   - `part`: object
     - `kind`: "observations"

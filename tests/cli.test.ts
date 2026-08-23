@@ -118,6 +118,7 @@ test("an answered enquiry says whether its closure rests on promoted work", () =
 
 test("withdrawn, challenged and never-examined render apart", () => {
   const base: SupportExplanation = {
+    claim: { kind: "claim" as const, id: "CLM_9" },
     proposition: "the schedule moves convergence",
     supported: false, standing: "exploratory",
     support: [{ finding: "moves by ~3 steps", evidence: { kind: "evidence" as const, id: "EV_1" }, method: "paired comparison", analysis: { kind: "analysis" as const, id: "COMP_1" } }],

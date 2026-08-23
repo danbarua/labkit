@@ -392,15 +392,18 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // of consumer probe 3. Give any read on this path a field naming what
       // was rebuilt and this line fails.
       //
-      // It has already fired once, correctly, on a change that had nothing to
-      // do with row F: S-11c added `routesWalked` and `complete` to this
-      // report. The detector cannot tell which field arrived, only that the
-      // shape moved -- which is what it is for, and why the list is updated
-      // rather than loosened.
+      // It has now fired twice, correctly, on changes that had nothing to do
+      // with row F: S-11c added `routesWalked` and `complete`, and PJ-030
+      // added `subject` -- the handle of the artefact ASKED ABOUT, which is
+      // not the artefact it was an attempt to rebuild. The detector cannot
+      // tell which field arrived, only that the shape moved, which is what it
+      // is for and why the list is updated rather than loosened.
       const exact = await reader.whatDependsOn(regenerated);
       expect(Object.keys(exact).sort()).toEqual([
-        "claims", "complete", "enquiries", "routesWalked",
+        "claims", "complete", "enquiries", "routesWalked", "subject",
       ]);
+      // And the echo is of the record asked about, not merely of its wording.
+      expect(exact.subject).toEqual(regenerated);
       expect(exact.claims.map((c) => c.asserts)).toEqual([MATCHES]);
 
       // Same detector on the other read a consumer would reach for. The
@@ -409,9 +412,12 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       const report = await reader.reproducibilityOf(analysis, [
         { part: regenerated, hash: "sha256:second" },
       ]);
+      // `analysis` here is likewise the construction handed in, not an answer
+      // to what any part was rebuilding.
       expect(Object.keys(report).sort()).toEqual([
-        "differing", "exact", "notRebuilt", "reproducible", "unverifiable",
+        "analysis", "differing", "exact", "notRebuilt", "reproducible", "unverifiable",
       ]);
+      expect(report.analysis).toEqual(analysis);
     });
   });
 });

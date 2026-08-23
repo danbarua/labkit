@@ -377,6 +377,37 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
+  /**
+   * The same question asked of the report as a whole rather than of its rows.
+   *
+   * `enquiryStatus`, `gateStatus`, `designHistory` and `contractFor` all named
+   * their subject already. Three did not: they took a handle, answered about
+   * it, and gave back only wording — so the answer stopped identifying itself
+   * the moment it was stored or sent, which over MCP is exactly what happens
+   * to it. The subject is an echo of an argument the verb already holds, which
+   * is why the whole remedy is one field each.
+   */
+  test("every report names the record it is about — FIXED, PJ-030 §5 step 2", async () => {
+    try {
+      const { read, gate, enquiry } = await programme();
+      const claim = await claimNamed(read, MOVES);
+
+      expect((await read.whySupported(claim)).claim).toEqual(claim);
+      expect((await read.gateStatus(gate)).gate).toEqual(gate);
+      expect((await read.enquiryStatus(enquiry)).enquiry).toEqual(enquiry);
+      expect((await read.designHistory(gate)).gate).toEqual(gate);
+
+      // whatDependsOn also accepts a logical NAME, and its echo is the record
+      // that name resolved to -- the one thing a caller passing a name cannot
+      // otherwise learn about the answer they got back.
+      const byName = await read.whatDependsOn("sweep readings");
+      expect(looksLikeAnId(byName.subject.id)).toBe(true);
+      expect(await read.whatDependsOn(byName.subject)).toEqual(byName);
+    } finally {
+      await scenario.end();
+    }
+  });
+
   const MOVES = "depth moves convergence";
 });
 
