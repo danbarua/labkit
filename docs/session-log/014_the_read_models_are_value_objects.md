@@ -1,4 +1,4 @@
-# 014: The read models are value objects — diagnosis, plan, first two fixes
+# 014: The read models are value objects — diagnosed, planned, fixed
 
 **Session wrap, 2026-08-23, on `feat/mcp-server`.** Not a decision record — the
 diagnosis and the plan are `docs/project-journal/030_which_record_is_this_about.md`
@@ -7,11 +7,11 @@ diagnosis and the plan are `docs/project-journal/030_which_record_is_this_about.
 ## Goal
 
 Answer Dan's question — *is the domain API presenting entities as value
-objects?* — audit which reads drop identifiers, draft the fix, then start it.
+objects?* — audit which reads drop identifiers, draft the fix, and carry it out.
 
 ## Changed
 
-Two commits plus this entry.
+Three commits plus this entry.
 
 **`34e8a29` — the diagnosis, audit and plan.** No production code.
 
@@ -29,16 +29,41 @@ Two commits plus this entry.
 - `src/cli.ts`, `src/mcp/schemas.ts`, `docs/mcp-tools.md`, nine scenario files
   and the demonstration updated with them.
 
-**A defect nobody had noticed, fixed on the way:** `whatDependsOn` deduplicated
-claims with a `Set` of **names**, so two claims asserting the same sentence in
-different lines of enquiry merged into one. S-5 says those are two claims. Now
-deduplicated by id.
+**`cb58d1d` — the remaining eight rows.**
+
+```
+EnquiryStatus.evidence[]        -> {evidence, states}
+SupportExplanation.support[]    -> {finding, evidence, method, analysis}
+  superseded[], against[]          same
+  reverifiedBy[]                -> {analysis, method}
+  unmet[], GateStatus.unmet[]   -> {criterion, requires}
+GateStatus.gating[]             -> {work, objective}
+CheckStatus.evaluations[].basis -> {evidence, states}
+```
+
+**All ten rows of §4 are closed, and the audit was re-run by the same method
+afterwards** rather than assumed: every entity-naming field in the four reports
+now carries an id beside its wording, and what remains bare text is text — enum
+values, instants, and the wording half of each pair.
+
+**Two dedup defects nobody had noticed**, one per commit. `whatDependsOn`
+deduplicated claims with a `Set` of **names**, and `CheckStatus.basis` did the
+same with findings — so two records asserting the same sentence merged into one.
+S-5 says those are two records. Both now dedupe by id, through a shared helper
+whose doc block says why it is not a `Set` of strings.
 
 ## Verified
 
 - After `34e8a29`: **299 pass, 0 fail, 101.8s** at load **6.65**.
-- After `1865b29`: **299 pass, 0 fail, 132.2s** at load **7.55**. All five gates
+- After `1865b29`: **299 pass, 0 fail, 132.2s** at load **7.55**.
+- After `cb58d1d`: **299 pass, 0 fail, 140.8s** at load **7.57**. All five gates
   green.
+
+**An intermediate run had three *genuine* failures** — two assertion sites the
+change had missed, plus the documented leader-election flake — and all three
+were fast rather than timeouts. They were fixed, not attributed. With a suite
+that has a known flake, *"probably the flake"* is always available and is
+usually wrong when the failure is fast; the timings are what separate them.
 
 `check:doc-comments` caught a real one: the new interfaces were inserted between
 `DependencyReport`'s doc block and its declaration.
@@ -70,22 +95,24 @@ changes. And the two behaved oppositely:
   readers.
 
 **A field that changes meaning without changing type is the dangerous half of
-this plan**, and most of §4's remaining rows are that shape. PJ-030 §5 now says
-so, struck through rather than quietly rewritten.
+this plan.** PJ-030 §5 now says so, struck through rather than quietly
+rewritten — and the second commit is the controlled comparison: **four renames
+made `tsc` name every one of ~40 call sites**, while the one field that kept its
+name and changed meaning had `tsc` name none. **Rename when the meaning
+changes**; it is the difference between a compiler-assisted edit and a grep you
+have to be right about.
 
 ## Open
 
 - **Ten fields carry wording where an identity exists.** `whatDependsOn` is the
   clearest — it exists to say *what would be affected if this were wrong* and
   answers with prose no follow-up verb accepts.
-- **Eight of the ten rows in §4 remain**, and they are mostly the dangerous
-  shape above: `EnquiryStatus.evidence[]`, `SupportExplanation.support[].via`
-  and its siblings, `GateStatus.gating[]`, `evaluations[].basis[]`, both
-  `unmet[]`. Grep the readers; `tsc` will not help.
-- **The multi-pursuit wrong answer is half fixed**, which is what §5 step 4
-  predicted. Bruno can now reach the question by id; `enquiryStatus` still
-  answers about the question under his enquiry's name. The test says that rather
-  than claiming a fix.
+- **§5 step 4 is the only step left, and it needs a decision rather than work.**
+  The multi-pursuit wrong answer is half fixed: Bruno can now reach the question
+  by id, but `enquiryStatus` still answers about the question under his
+  enquiry's name. Whether his second fact wants its own verb is now a question
+  about convenience rather than expressibility, which is what §5 predicted would
+  happen once the reference existed.
 - **Paired-world scenario tests break when ids enter a report.** Natural ids are
   global sequences, so two worlds legitimately draw different ones — `s9b`
   already normalised ids for one field and now does for another. Not a defect on
@@ -101,8 +128,10 @@ so, struck through rather than quietly rewritten.
 
 ## Next
 
-Continue §5 step 2 through the remaining rows of §4, then step 4 — re-ask the
-multi-pursuit question now that `EnquiryStatus` can refer to its question.
+**PJ-030 §5 step 4, and it is Dan's call, not a build.** Re-ask the multi-pursuit
+question now that `EnquiryStatus` can refer to the question it pursues.
+
+This entry is closed. The next piece of work opens 015.
 
 **One thing worth not repeating.** The first version of this session's template
 test was a garbled expression that passed through a `catch` — a test that tested
