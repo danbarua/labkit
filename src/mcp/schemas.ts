@@ -90,6 +90,8 @@ const identifiedArtefact = z.strictObject({
 const citedFinding = z.strictObject({ evidence: z.string(), states: z.string() });
 
 const evaluationRecord = z.strictObject({
+  evaluation: z.string(),
+  criterion: z.string(),
   value: z.string(),
   outcome: z.enum(["pass", "fail"]),
   at: z.string(),
@@ -170,7 +172,7 @@ export const supportExplanationSchema = z.strictObject({
   challenged: z.boolean(),
   against: z.array(bearingFinding),
   withdrawn: z.boolean(),
-  replacedBy: z.string().optional(),
+  replacedBy: z.strictObject({ claim: z.string(), asserts: z.string() }).optional(),
 });
 
 export const dependencyReportSchema = z.strictObject({
@@ -250,6 +252,7 @@ export const questionOriginSchema = z.strictObject({
 export const originOfSchema = z.strictObject({ origin: questionOriginSchema.nullable() });
 
 export const taskContractSchema = z.strictObject({
+  work: z.string(),
   objective: z.string(),
   acceptance: z.string(),
   mayRead: z.array(z.string()),
@@ -329,6 +332,7 @@ const changedConclusion = z.strictObject({
 
 const unaffectedRecord = z.strictObject({
   what: z.string(),
+  named: z.string(),
   why: z.string(),
 });
 

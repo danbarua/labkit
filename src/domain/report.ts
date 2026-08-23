@@ -198,7 +198,10 @@ export interface ReplacementReport {
 }
 
 export interface UnaffectedRecord {
+  /** The record's handle. */
   what: string;
+  /** What it is, in the researcher's words — the wording half this used to lack. */
+  named: string;
   why: string;
 }
 
@@ -275,6 +278,16 @@ export interface CheckStatus {
 }
 
 export interface EvaluationRecord {
+  /**
+   * This evaluation's handle.
+   *
+   * It was computed and then discarded on the way out, so two evaluations of
+   * different criteria sharing a value, outcome and instant were
+   * indistinguishable once `GateStatus.evaluations` flattened them (PJ-030 §7).
+   */
+  evaluation: string;
+  /** The criterion this evaluated — the flattened list loses it otherwise. */
+  criterion: string;
   value: string;
   outcome: "pass" | "fail";
   at: string;
@@ -506,6 +519,12 @@ export interface GatedWork {
   objective: string;
 }
 
+/** The claim that replaced a withdrawn one: its handle, and what it now asserts. */
+export interface ReplacementClaim {
+  claim: string;
+  asserts: string;
+}
+
 /** An unmet check: the criterion's handle, and what it requires. */
 export interface UnmetCheck {
   criterion: string;
@@ -657,7 +676,7 @@ export interface SupportExplanation {
    */
   withdrawn: boolean;
   /** The interpretation that replaced it, if one did. */
-  replacedBy?: string;
+  replacedBy?: ReplacementClaim;
 }
 
 /**
@@ -920,6 +939,8 @@ export interface ConflictVerdict {
  * the system cannot give — S-8's own expressibility note concedes this.
  */
 export interface TaskContract {
+  /** The work's handle. `GateStatus.gating` names the same entity as `{work, objective}`. */
+  work: string;
   objective: string;
   acceptance: string;
   mayRead: string[];

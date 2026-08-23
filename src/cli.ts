@@ -203,7 +203,7 @@ export function renderWhy(why: SupportExplanation): string {
     `"${why.proposition}"`,
     `  ${verdict}, ${why.standing}`,
     why.promotedBecause ? `  promoted because: ${why.promotedBecause}` : "",
-    why.replacedBy ? `  replaced by: "${why.replacedBy}"` : "",
+    why.replacedBy ? `  replaced by: "${why.replacedBy.asserts}"  (${why.replacedBy.claim})` : "",
     "",
     "Resting on",
     bullets(why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis})`), "nothing"),

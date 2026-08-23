@@ -131,6 +131,8 @@ Why a proposition counts as supported (or does not): the findings resting under 
   - `proposition`: string
   - `state`: "passed" | "failed" | "never-run" | "no-standing-verdict"
   - `evaluations`: object[]
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
@@ -139,6 +141,8 @@ Why a proposition counts as supported (or does not): the findings resting under 
       - `evidence`: string
       - `states`: string
   - `decidedBy?`: object
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
@@ -166,7 +170,9 @@ Why a proposition counts as supported (or does not): the findings resting under 
   - `method`: string
   - `analysis`: string
 - `withdrawn`: boolean
-- `replacedBy?`: string
+- `replacedBy?`: object
+  - `claim`: string
+  - `asserts`: string
 
 ---
 
@@ -364,6 +370,7 @@ A planned piece of work's objective, what would count as meeting it, and what it
 
 **Returns**
 
+- `work`: string
 - `objective`: string
 - `acceptance`: string
 - `mayRead`: string[]
@@ -409,6 +416,8 @@ A gate's state, itemised per condition: which checks passed, which failed, which
   - `proposition`: string
   - `state`: "passed" | "failed" | "never-run" | "no-standing-verdict"
   - `evaluations`: object[]
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
@@ -417,6 +426,8 @@ A gate's state, itemised per condition: which checks passed, which failed, which
       - `evidence`: string
       - `states`: string
   - `decidedBy?`: object
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
@@ -860,6 +871,7 @@ Record a corrected analysis in place of a defective one, citing the review that 
 - `affected`: string[]
 - `unaffected`: object[]
   - `what`: string
+  - `named`: string
   - `why`: string
 - `changed`: object[]
   - `proposition`: string

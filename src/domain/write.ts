@@ -1160,8 +1160,21 @@ export class WriteSurface extends SessionCore {
         });
     }
 
+    // The wording half. `what` was a naked id -- the inverse of the convention
+    // every other pair follows, and unreadable without a second lookup.
+    const inputNames = new Map<string, string>();
+    for (const o of input.from) {
+      const rows = await this.graph.query(
+        `MATCH (a:Artefact {natural_id: $id}) RETURN a`,
+        { a: vertexProps<{ name: string }>() },
+        { id: o.id },
+      );
+      if (rows[0]) inputNames.set(o.id, rows[0].a.name);
+    }
+
     const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
       what: o.id,
+      named: inputNames.get(o.id) ?? o.id,
       why: "observations were not produced by the replaced analysis, and the replacement rests on them",
     }));
 

@@ -252,3 +252,37 @@ asking why a claim is supported in order to learn what a computation read.
 That correction came from an external review of PR #2 (ChatGPT), which caught
 that the equivalence had been checked at the wrong boundary. Right check, wrong
 side of the adapter.
+
+## 8. What a cold review found afterwards, and what is left
+
+A cold-context agent was asked whether the identifier work had made the read
+layer **simpler with fewer bugs**. It answered **no**, with numbers: **+222 /
+−72** across the read layer, nothing deleted, and `dedupeById` with two callers
+while five sites open-coded the same thing.
+
+**The fix had stopped exactly at §4's table boundary.** Six more
+dedup-by-wording defects survived, three of them in `src/domain/core.ts`
+helpers shared by both halves. All are now fixed. The sharpest was
+`workGatedBy`: the *same* `Gate -GATES-> Task` traversal `gateStatus` already
+reported as `{work, objective}`, left as a `Set<string>` of objective text one
+file over.
+
+`decidedOnTheStrengthOf` was the most embarrassing — it deduplicated questions
+by wording, contradicting a sentence in `report.ts` saying S-1 "poses two
+identically-worded questions, and neither may be resolved by comparing text".
+
+**One finding refuted rather than fixed.** The review flagged `enquiryStatus`
+deriving `answer: "no"` from an unscoped `CHALLENGES` match. It is unreachable:
+`CHALLENGES` has exactly one writer on an exclusive branch, so one `Evidence`
+carries one bearing edge ever, and `closeEnquiry` cites the evidence for the
+closing proposition. Probed with an analysis concluding both ways — the answer
+came back `yes`, correctly. **A static read inferred a path no writer can
+produce**, which is the failure mode a cold reviewer is most prone to and worth
+recording as the counterweight to everything else it got right.
+
+**Still carrying wording where an id exists** — recorded, not fixed:
+`ReplacementReport.affected` / `unchanged` / `changed[].proposition`,
+`AmendmentRecord.replaced` / `nowRequires`, and `Revision` /
+`InterpretationHistory`'s claim wording. `interpretationHistory` also *walks* by
+name — its loop guard is keyed by id now, so the false "loops at" is gone, but
+the traversal itself still resolves claims by text.

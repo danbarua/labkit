@@ -518,6 +518,7 @@ export class ReadSurface extends SessionCore {
       // unparseable contract is an empty one, not a crash.
     }
     return {
+      work: work.id,
       objective: task.objective,
       acceptance: task.acceptance,
       mayRead,
@@ -918,9 +919,12 @@ export class ReadSurface extends SessionCore {
       checks,
       unmet,
       evaluations,
+      // `?? g.w.kind ?? "unknown"` used to sit here. Dead now: `work` carries
+      // the handle, so a caller with an odd objective can go and look rather
+      // than being handed a placeholder.
       gating: gating.map((g) => ({
         work: g.w.natural_id,
-        objective: g.w.objective ?? g.w.kind ?? "unknown",
+        objective: g.w.objective ?? "",
       })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
@@ -962,8 +966,10 @@ export class ReadSurface extends SessionCore {
     // `standing` counts the cited findings that have NOT been withdrawn. It
     // is kept alongside `basis` rather than derived from it because `basis`
     // is display text, and two withdrawn findings can share a sentence.
+    // `id` used to live here separately and be discarded by `strip`. It is
+    // `EvaluationRecord.evaluation` now, so there is one field rather than two
+    // and nothing to drop on the way out.
     type TimedEvaluation = EvaluationRecord & {
-      id: string;
       cited: number;
       standing: number;
     };
@@ -980,9 +986,10 @@ export class ReadSurface extends SessionCore {
       if (row.ev) {
         // One row per (evaluation, basis) pair, so an evaluation citing several
         // findings arrives more than once. Accumulate rather than push.
-        const seen = entry.evaluations.find((e) => e.id === row.ev!.natural_id);
+        const seen = entry.evaluations.find((e) => e.evaluation === row.ev!.natural_id);
         const record = seen ?? {
-          id: row.ev.natural_id,
+          evaluation: row.ev.natural_id,
+          criterion: id,
           value: row.ev.value,
           outcome: row.ev.outcome,
           at: row.ev.evaluated_at,
@@ -1012,6 +1019,8 @@ export class ReadSurface extends SessionCore {
       e.cited > 0 && e.standing === 0;
 
     const strip = (e: TimedEvaluation): EvaluationRecord => ({
+      evaluation: e.evaluation,
+      criterion: e.criterion,
       value: e.value,
       outcome: e.outcome,
       at: e.at,
@@ -1027,7 +1036,7 @@ export class ReadSurface extends SessionCore {
       // identity. Without this, which evaluation gets reported as "the" value
       // of a check is not a stable contract between runs.
       const ordered = entry.evaluations.sort(
-        (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id),
+        (a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation),
       );
 
       // A failure sticks -- among verdicts that still stand. One failing
@@ -1095,7 +1104,10 @@ export class ReadSurface extends SessionCore {
 
     // Walk backwards from the current reading. Bounded by the number of
     // revisions actually recorded, so a cycle cannot spin.
-    const seen = new Set<string>([current]);
+    // Empty, not seeded with `current`: the set holds claim ids now and
+    // `current` is wording, so seeding it would have added a value nothing can
+    // match. A self-loop is still caught, one step later.
+    const seen = new Set<string>();
     for (;;) {
       const rows = await this.graph.query(
         `MATCH (d:Decision)-[:MOTIVATES]->(:Claim {name: $name})
@@ -1103,7 +1115,7 @@ export class ReadSurface extends SessionCore {
          RETURN d, was`,
         {
           d: vertexProps<{ natural_id: string; reason: string }>(),
-          was: vertexProps<{ name: string }>(),
+          was: vertexProps<{ name: string } & Identified>(),
         },
         { name: current },
       );
@@ -1121,11 +1133,16 @@ export class ReadSurface extends SessionCore {
       }
       const step = rows[0];
       if (!step) break;
-      if (seen.has(step.was.name))
+      // Keyed by the claim's id, not its wording. Two distinct claims worded
+      // alike at different points in one chain used to raise `loops at`
+      // falsely. The *traversal* is still by name -- `interpretationHistory`
+      // takes bare text -- which is a narrower remaining gap, recorded in
+      // PJ-030 §7 rather than fixed here.
+      if (seen.has(step.was.natural_id))
         throw new Error(
           `interpretation history for "${proposition}" loops at "${step.was.name}"`,
         );
-      seen.add(step.was.name);
+      seen.add(step.was.natural_id);
 
       steps.unshift({
         revision: step.d.natural_id,

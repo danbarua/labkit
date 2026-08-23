@@ -130,7 +130,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // contradicted anything here, the reading of it changed.
     expect(withdrawn.withdrawn).toBe(true);
     expect(withdrawn.challenged).toBe(false);
-    expect(withdrawn.replacedBy).toBe(NARROWER);
+    expect(withdrawn.replacedBy?.asserts).toBe(NARROWER);
     // Its findings are still there, and still say what they said.
     expect(withdrawn.support).toHaveLength(2);
 
@@ -307,7 +307,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const still = await later.whySupported(PREFERENTIAL);
     expect(still.withdrawn).toBe(true);
-    expect(still.replacedBy).toBe(NARROWER);
+    expect(still.replacedBy?.asserts).toBe(NARROWER);
     expect(still.supported).toBe(false);
   });
 

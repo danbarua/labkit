@@ -31,6 +31,7 @@ import type {
   AnalysisRef,
   ConclusionRef,
   ConfirmatoryResult,
+  ReplacementClaim,
   DecidedQuestion,
   GatedWork,
 } from "./report";
@@ -139,7 +140,7 @@ export class SessionCore {
   protected async withdrawalOf(scope: {
     proposition: string;
     enquiry?: string;
-  }): Promise<{ withdrawn: boolean; replacedBy?: string }> {
+  }): Promise<{ withdrawn: boolean; replacedBy?: ReplacementClaim }> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
@@ -149,7 +150,7 @@ export class SessionCore {
       {
         c: vertexProps<{ natural_id: string }>(),
         d: optional(vertexProps<{ natural_id: string }>()),
-        now: optional(vertexProps<{ name: string }>()),
+        now: optional(vertexProps<{ name: string; natural_id: string }>()),
       },
       {
         name: scope.proposition,
@@ -166,8 +167,14 @@ export class SessionCore {
     );
     if (standing.size > 0) return { withdrawn: false };
 
-    const replacedBy = rows.find((r) => r.now)?.now?.name;
-    return { withdrawn: true, ...(replacedBy ? { replacedBy } : {}) };
+    // Identity as well as wording. This was the claim's NAME, picked from
+    // whichever row happened to carry one -- arbitrary row and arbitrary text,
+    // in the field that says what the record asserts instead (PJ-030 §7).
+    const now = rows.find((r) => r.now)?.now;
+    return {
+      withdrawn: true,
+      ...(now ? { replacedBy: { claim: now.natural_id, asserts: now.name } } : {}),
+    };
   }
 
   /**

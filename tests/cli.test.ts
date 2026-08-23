@@ -141,7 +141,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
   // Nobody asserts this wording any more -- and the findings underneath are
   // untouched, which is exactly why the old rendering was misleading.
   const withdrawn = renderWhy({
-    ...base, withdrawn: true, replacedBy: "the schedule moves convergence at depth 8",
+    ...base, withdrawn: true, replacedBy: { claim: "CLM_9", asserts: "the schedule moves convergence at depth 8" },
   });
   expect(withdrawn).toContain("withdrawn");
   expect(withdrawn).toContain("the schedule moves convergence at depth 8");
