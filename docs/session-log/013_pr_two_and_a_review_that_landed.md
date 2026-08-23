@@ -1,19 +1,31 @@
-# 013: PR #2 opened, and a review that landed two hits
+# 013: PR #2, a review that landed, and the identity question behind it
 
 **Session wrap, 2026-08-23, on `feat/mcp-server`.** Not a decision record. The
 multi-pursuit finding below needs a decision that has not been made.
 
 ## Goal
 
-Open a PR for the MCP work, then act on the external review it drew.
+Open a PR for the MCP work, act on the external review it drew, then write down
+the scenario behind its sharpest finding and demonstrate it.
 
 ## Changed
 
-One commit, `92f726e` — `docs/TASKS.md` only, +61 lines. **No code changed.**
+Two commits plus this entry.
 
-Off-tree: `feat/mcp-server` pushed and **PR #2 opened**
-(`danbarua/labkit#2`, 18 commits, 19 files, +2843/−853), plus a comment on it
-carrying the results below.
+**`92f726e`** — `docs/TASKS.md`, +61 lines, the three findings below. No code.
+
+**`ed71481`** — the scenario and its demonstration:
+
+- **`docs/project-journal/030_which_record_is_this_about.md`** (new) — the
+  scenario in PJ-008's conversation form, although that corpus is closed; this
+  one came from exposing the whole domain over MCP.
+- **`tests/subject-identity.test.ts`** (new) — five tests, one file, all three
+  ambiguities.
+- `CLAUDE.md` — one paragraph: *identity is never wording* now names its other
+  half and points at both files.
+
+Off-tree: `feat/mcp-server` pushed and **PR #2 opened** (`danbarua/labkit#2`,
+18 commits, +2843/−853), plus a comment carrying the corrections below.
 
 ## Verified
 
@@ -60,16 +72,51 @@ read.
 `criteriaGoverning`, `gateStatus`, `doTheseConflict`, `reproducibilityOf`. Nine
 of fifteen are reachable.
 
-No gates re-run: the commit is Markdown.
+**After `ed71481`: `bun test` 292 pass, 0 fail, 39 files, 107.4s**; typecheck,
+depcruise, `check:doc-comments`, `check:tests-assert` green. The first
+background run of the suite was **killed before producing output** and was
+re-run rather than reported — a killed run is not a passing one.
+
+**The scenario Dan asked for**, and it decided something by being written:
+
+> Two teams on one question. Ana's seed sweep is conclusive and gets closed.
+> Next morning Bruno asks where his ablation is up to, and LabKit says
+> "answered", offering Ana's evidence as his.
+
+Writing it out **ruled out both options previously put to Dan.** Both assumed
+`enquiryStatus` reports one state; the conversation says Bruno needs two facts —
+the question is answered, and his line produced nothing — and collapsing them is
+what produces the wrong answer. That is the same shape as S-1 refusing to
+collapse `untested` into `unresolved`.
+
+**Dan's reframing is the substance of the entry.** This is *identity*, asked
+from the other end. The six previous instances all ask *are these two records
+the same one?*; this asks *which record is this answer about?* — a reference
+denoting one record while the verb answers about another:
+
+| reference | the id denotes | what the verb takes it to mean |
+| --- | --- | --- |
+| `EnquiryRef` into `enquiryStatus` | a line of enquiry | the **question** it pursues |
+| `ObservationsRef` | an artefact of either kind | "observations", asserted by `kind` |
+| `AnalysisRef` as an input | a computation | that computation's **output artefact** |
+
+The sharpest assertion in the new file: Ana's and Bruno's reports differ in
+**exactly one field** — the id of the thing they claim to be about — proved by
+stripping it and comparing the rest.
 
 ## Open
 
-- **Multi-pursuit closure needs a decision, not a probe**, because the status
-  quo already answers wrongly. Either closure belongs to the Question and the
-  verb is named at the wrong level (`resolve_question(via_enquiry=A)`, with
-  `enquiry_status` reporting B as *pursuing an answered question*), or it
-  belongs to the LineOfEnquiry, which then needs lifecycle semantics the model
-  does not have.
+- **Multi-pursuit closure is still undecided**, and PJ-030 says so rather than
+  deciding. The likely direction — two reads, each answering about what it was
+  given — is a guess from **one** conversation, and one conversation is not a
+  corpus. Whether two verbs earn their place where one stands needs a reader;
+  Bruno is that reader if the conversation is right.
+- **One diagnosis, possibly three remedies.** Rows 2 and 3 may not want row 1's
+  fix: the `AnalysisRef` dereference is convenient and writes the correct edge,
+  and making it honest would mean callers naming artefacts they do not hold.
+- **`tests/subject-identity.test.ts` is green while the ambiguities are
+  present.** Its header says so, because a green tick otherwise reads as
+  approval. Fixing row 1 turns it red on purpose.
 - **The three recording verbs want one `InputRef`.** No graph change: the edge
   is `Computation -CONSUMES-> Artefact` whichever alias is passed.
 - **Six unexposed reads**, wanting a mechanical coverage assertion rather than a
@@ -84,6 +131,19 @@ No gates re-run: the commit is Markdown.
 
 ## Next
 
-Dan's call on multi-pursuit closure. Everything else is buildable without it:
-expose the six reads behind a derived coverage assertion, then re-run the two
-discriminators that were blocked on them.
+Two pieces agreed and not yet built:
+
+1. **Expose the six unreachable reads behind a derived coverage assertion** —
+   every public `ReadSurface` method exposed or explicitly excluded with a
+   reason, derived from the prototype the way `tests/helpers/read-only.ts`
+   derives write verbs. Dan: *"doesn't make sense to build a read layer and not
+   ship it."*
+2. **Check the generated tool documentation into the repo**, kept fresh by a
+   single assertion in `tests/mcp.test.ts` — the file equals what the generator
+   produces — rather than a hook or a new script. The cost, stated: a commit
+   touching `tools.ts` will also touch the document, which is the thing the
+   dependency-graph decision disliked.
+
+Then re-run the review's two remaining discriminators, which were blocked on the
+read coverage: cold task resumption, and whether `AnalysisRef` assumes one
+canonical output.
