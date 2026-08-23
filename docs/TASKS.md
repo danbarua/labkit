@@ -15,10 +15,12 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   **Residual gap, measured:** an optional field that no test data produces can
   be dropped from a schema and neither `tsc` nor the parse test notices.
   Widening the seed in `tests/mcp.test.ts` is what narrows it.
-- [ ] **Typed write commands.** `src/domain/write.ts`'s verbs take untyped
-  object arguments. A named type per command gives the write half the same
-  shape the read half is about to get, and is the precondition for exposing any
-  write tool over MCP.
+- [x] ~~**Typed write commands.**~~ — done. `src/domain/commands.ts` names the
+  fifteen command shapes `write.ts` declared inline, exported from the barrel so
+  an adapter can hold one before issuing it. Extraction only — every shape is
+  the one its verb already had, so no call site changed and `tsc` proves it.
+  Verbs taking a single scalar (`pose`, `openEnquiry`, `stateCriterion`) are
+  deliberately not wrapped.
 - [ ] **Gap analysis: what an agent needs to track work in LabKit rather than in
   Markdown.** Read the corpus for the minimum domain surface that has to reach
   MCP for that to be true. This is the one that decides how much of the write

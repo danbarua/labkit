@@ -92,6 +92,23 @@ import type {
   ReviewRef,
   UnaffectedRecord,
 } from "./report";
+import type {
+  AcceptAsUnresolvedCommand,
+  AmendDesignCommand,
+  CloseEnquiryCommand,
+  DeclareGateCommand,
+  EvaluateCriterionCommand,
+  PlanWorkCommand,
+  PromoteCommand,
+  PursueCommand,
+  RecordAnalysisCommand,
+  RecordObservationsCommand,
+  RecordReviewCommand,
+  ReinterpretCommand,
+  ReplaceAnalysisCommand,
+  ReverifyCommand,
+  SharpenCommand,
+} from "./commands";
 import { SessionCore } from "./core";
 
 export class WriteSurface extends SessionCore {
@@ -135,10 +152,7 @@ export class WriteSurface extends SessionCore {
    * pursuit, not the question, and carrying similar words to another pursuit
    * of the same question has no effect on identity either way.
    */
-  async pursue(input: {
-    question: QuestionRef;
-    approach: string;
-  }): Promise<EnquiryRef> {
+  async pursue(input: PursueCommand): Promise<EnquiryRef> {
     const enquiry = await this.pursued(input);
     this.emit("pursue", enquiry.id, {
       question: input.question.id,
@@ -148,10 +162,7 @@ export class WriteSurface extends SessionCore {
   }
 
   /** The write, without the event — see `posed`. */
-  private async pursued(input: {
-    question: QuestionRef;
-    approach: string;
-  }): Promise<EnquiryRef> {
+  private async pursued(input: PursueCommand): Promise<EnquiryRef> {
     const enquiry = await this.graph.createNode("LineOfEnquiry", {
       name: input.approach,
     });
@@ -200,11 +211,7 @@ export class WriteSurface extends SessionCore {
    * decision. S-1 asks this question after more evidence has arrived, for
    * exactly that reason.
    */
-  async sharpen(input: {
-    from: QuestionRef;
-    into: string;
-    because: string;
-  }): Promise<QuestionRef> {
+  async sharpen(input: SharpenCommand): Promise<QuestionRef> {
     const original = await this.graph.query(
       `MATCH (q:Question {natural_id: $id}) RETURN q`,
       { q: vertexProps<{ name: string }>() },
@@ -278,12 +285,7 @@ export class WriteSurface extends SessionCore {
    * `Evidence -SUPPORTS|CHALLENGES-> Claim`, which observation evidence has
    * neither of, or through a required `USES -> Computation`.
    */
-  async recordObservations(input: {
-    enquiry: EnquiryRef;
-    name: string;
-    finding: string;
-    contentHash?: string;
-  }): Promise<ObservationsRef> {
+  async recordObservations(input: RecordObservationsCommand): Promise<ObservationsRef> {
     // Atomic, and this is the sharper half of row AD's fix. Before the unit
     // existed there was nothing an interrupted call could leave behind that the
     // model called impossible; now a failure between the evidence and the unit
@@ -356,9 +358,7 @@ export class WriteSurface extends SessionCore {
    * back — which answered a different question and produced a genuine false
    * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
    */
-  async recordAnalysis(
-    input: Parameters<WriteSurface["recorded"]>[0],
-  ): Promise<AnalysisRef> {
+  async recordAnalysis(input: RecordAnalysisCommand): Promise<AnalysisRef> {
     const analysis = await this.graph.inTransaction(() => this.recorded(input));
     this.emit("recordAnalysis", analysis.id, {
       enquiry: input.enquiry.id,
@@ -377,48 +377,7 @@ export class WriteSurface extends SessionCore {
    * external review found it had lapsed: `reverify()` and `replaceAnalysis()`
    * were each emitting two events while their journals claimed one.
    */
-  private async recorded(input: {
-    enquiry: EnquiryRef;
-    method: string;
-    /**
-     * What this analysis read: recorded observations, or **another analysis's
-     * output**. Earned by S-11d, row AE.
-     *
-     * Until it accepted an `AnalysisRef`, a two-stage pipeline had one
-     * recordable form — re-enter the intermediate as if it were fresh
-     * measurement — and that produced a confidently wrong answer: stage two
-     * reported `reproducible: true` while resting on data the record itself
-     * called unverifiable, because the re-entered intermediate carried a hash
-     * of its own and the chain to the real input was severed.
-     *
-     * No new edge. `CONSUMES: Computation -> Artefact` already existed and
-     * already meant "this run read that"; an analysis output is an `Artefact`
-     * like any other, so the second rung of the change bar was enough and
-     * nothing was added to the model.
-     */
-    from: Array<ObservationsRef | AnalysisRef>;
-    concludes: Conclusion[];
-    /**
-     * The planned work this analysis carries out, if it carries out any.
-     *
-     * Earned by S-7: a gate protects work, and until an analysis said which
-     * work it was, the blast radius of amending a gated condition reached the
-     * *work* and stopped there — so "was any confirmatory result affected?"
-     * could only be answered by asserting it. `IMPLEMENTS` already existed
-     * for this and had never been written.
-     */
-    implementing?: WorkRef;
-    /**
-     * The prespecified conditions this analysis's conclusions are held to.
-     *
-     * Earned by S-3b: criteria that qualify a finding and gate nothing. The
-     * checks are agreed before the run, so they are stated separately and
-     * named here; recording them at evaluation time cannot work, because a
-     * check nobody ran must still count against the finding. See
-     * EDGE_SCHEMA.QUALIFIES.
-     */
-    heldTo?: CriterionRef[];
-  }): Promise<AnalysisRef> {
+  private async recorded(input: RecordAnalysisCommand): Promise<AnalysisRef> {
     // Checked before anything is written. A proposition the record has
     // withdrawn cannot be re-asserted as a side effect of recording an
     // analysis: a fresh claim node would restore it while the objection that
@@ -533,10 +492,7 @@ export class WriteSurface extends SessionCore {
    * to the execution that ran it — what gets criticized in S-11 is the
    * method, and nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
-  async recordReview(input: {
-    of: AnalysisRef;
-    verdict: string;
-  }): Promise<ReviewRef> {
+  async recordReview(input: RecordReviewCommand): Promise<ReviewRef> {
     const review = await this.graph.createNode("Review", {
       verdict: input.verdict,
     });
@@ -563,10 +519,7 @@ export class WriteSurface extends SessionCore {
    * closing with nothing cited is a real and different act, and the two must
    * not read alike.
    */
-  async closeEnquiry(input: {
-    enquiry: EnquiryRef;
-    answeredBy?: ConclusionRef;
-  }): Promise<void> {
+  async closeEnquiry(input: CloseEnquiryCommand): Promise<void> {
     // Everything is validated before anything is written. A rejected close
     // must leave no Decision behind, and an analysis from some other enquiry
     // must not become the stated basis for resolving this question.
@@ -683,20 +636,7 @@ export class WriteSurface extends SessionCore {
   // -------------------------------------------------------------------------
 
   /** Records a piece of work whose start a gate may protect. */
-  async planWork(input: {
-    objective: string;
-    acceptance: string;
-    /**
-     * What this work is permitted to read. Closed-world — see `TaskContract`.
-     *
-     * Earned by S-8, and the first walk of `TaskProps.inputs`, which
-     * `planWork()` had hardcoded to `""` since it was written. Stored as JSON
-     * rather than a delimited string so an entry containing punctuation cannot
-     * silently split; if a scenario ever needs to query *by element*, that is
-     * when it becomes a real list property rather than a serialised one.
-     */
-    mayRead?: string[];
-  }): Promise<WorkRef> {
+  async planWork(input: PlanWorkCommand): Promise<WorkRef> {
     const task = await this.graph.createNode("Task", {
       objective: input.objective,
       inputs: JSON.stringify(input.mayRead ?? []),
@@ -720,11 +660,7 @@ export class WriteSurface extends SessionCore {
    * work. Declaring a gate must not make it satisfied — that is the entire
    * subject of S-17.
    */
-  async declareGate(input: {
-    governedBy: CriterionRef[];
-    consequence: string;
-    protecting: WorkRef[];
-  }): Promise<GateRef> {
+  async declareGate(input: DeclareGateCommand): Promise<GateRef> {
     if (input.governedBy.length === 0)
       throw new Error("a gate governed by no condition is not a gate");
     // And a gate protecting nothing is not a gate either. Before S-3b there
@@ -767,20 +703,7 @@ export class WriteSurface extends SessionCore {
    * Same invariant class as `assertReviewOf`, and both are checked before
    * anything is written so a rejected command leaves no partial state.
    */
-  async evaluateCriterion(input: {
-    criterion: CriterionRef;
-    /**
-     * The gate this verdict is being reached for, if it is being reached for
-     * one. Omitted when the condition qualifies a finding and gates no work —
-     * S-3b, where requiring a gate forced the caller to mint one that
-     * protected nothing.
-     */
-    gate?: GateRef;
-    value: string;
-    outcome: "pass" | "fail";
-    /** The finding this verdict was reached against, if it was reached against one. */
-    citing?: ConclusionRef;
-  }): Promise<void> {
+  async evaluateCriterion(input: EvaluateCriterionCommand): Promise<void> {
     if (input.gate)
       await this.assertCriterionGovernsGate(input.criterion, input.gate);
     // Same invariant class as `assertCriterionGovernsGate`, for the other job
@@ -856,13 +779,7 @@ export class WriteSurface extends SessionCore {
    *
    * One event, not two: a researcher who re-verified a result did one thing.
    */
-  async reverify(input: {
-    historical: AnalysisRef;
-    enquiry: EnquiryRef;
-    method: string;
-    under: ObservationsRef[];
-    concludes: Conclusion;
-  }): Promise<VerificationReport> {
+  async reverify(input: ReverifyCommand): Promise<VerificationReport> {
     const at = this.clock.now();
     // Atomic: without the second write the durable state is precisely S-10's
     // demonstrated wrong answer -- a second independent support standing where
@@ -925,15 +842,7 @@ export class WriteSurface extends SessionCore {
    * Writes `DEFERS`, which is its first writer since PJ-004 declared it —
    * CLAUDE.md's standing example of a reader with no writer, now walked.
    */
-  async acceptAsUnresolved(input: {
-    enquiry: EnquiryRef;
-    /** Why it is being accepted rather than pursued. */
-    because: string;
-    /** What would reopen it. About the world, not about re-running the same analysis. */
-    until: string;
-    /** The finding it is being accepted in light of — what was known at the time. */
-    inLightOf: ConclusionRef;
-  }): Promise<void> {
+  async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<void> {
     const at = this.clock.now();
     await this.graph.inTransaction(async () => {
       const question = await this.questionBehind(input.enquiry);
@@ -987,7 +896,7 @@ export class WriteSurface extends SessionCore {
    * unevaluated confirmatory gate reading exploratory, and S-7's amendment
    * check would miss a scientific change. Promotion is an act with a reason.
    */
-  async promote(input: { claim: ConclusionRef; because: string }): Promise<void> {
+  async promote(input: PromoteCommand): Promise<void> {
     await this.graph.inTransaction(async () => {
       const claim = await this.claimFor(input.claim);
       // `invalidation_check` is the verb's own sentence about what would make a
@@ -1044,12 +953,7 @@ export class WriteSurface extends SessionCore {
    * found rather than supplied: an ordering that depends on the caller
    * remembering to pass the right handle is not an ordering.
    */
-  async amendDesign(input: {
-    criterion: CriterionRef;
-    nowRequires: string;
-    because: string;
-    citing: ConclusionRef;
-  }): Promise<AmendmentReport> {
+  async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
     const at = this.clock.now();
 
     // Everything validated before anything is written -- a rejected amendment
@@ -1199,14 +1103,7 @@ export class WriteSurface extends SessionCore {
    * the old analysis's OUTPUT is invalidated. That separation is the whole
    * point of S-11.
    */
-  async replaceAnalysis(input: {
-    supersedes: AnalysisRef;
-    because: ReviewRef;
-    enquiry: EnquiryRef;
-    method: string;
-    from: ObservationsRef[];
-    concludes: Conclusion[];
-  }): Promise<ReplacementReport> {
+  async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
     const at = this.clock.now();
     // Atomic, and this is the one that made transactions necessary rather than
     // tidy. Invalidating the superseded output is not an isolated write: since
@@ -1309,16 +1206,7 @@ export class WriteSurface extends SessionCore {
    * express that, its whole mechanism being invalidation of the output. Here
    * the numbers were right and only the sentence about them was wrong.
    */
-  async reinterpret(input: {
-    /**
-     * Which claim. A bare proposition while the sentence is asserted once;
-     * naming the analysis that concluded it when it is not — S-5, where
-     * withdrawing by wording alone retracted an unrelated line of work.
-     */
-    of: ClaimSubject;
-    as: string;
-    because: string;
-  }): Promise<ReinterpretationReport> {
+  async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
     const at = this.clock.now();
 
     const scope = await this.scopeFor(input.of);
