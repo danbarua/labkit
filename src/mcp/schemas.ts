@@ -236,7 +236,7 @@ export const reproductionReportSchema = z.strictObject({
   of: ref("analysis"),
   ofMethod: z.string(),
   conclusion: z.enum(["agrees", "disagrees"]),
-  execution: z.enum(["reproduced", "not-reproduced"]),
+  execution: z.enum(["reproduced", "not-reproduced", "inputs-unordered"]),
   differs: z.array(
     z.strictObject({
       what: identifiedArtefact,

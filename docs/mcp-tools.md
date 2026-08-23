@@ -421,7 +421,7 @@ What a verifying analysis re-checked and whether it reproduced the original — 
   - `id`: string
 - `ofMethod`: string
 - `conclusion`: "agrees" | "disagrees"
-- `execution`: "reproduced" | "not-reproduced"
+- `execution`: "reproduced" | "not-reproduced" | "inputs-unordered"
 - `differs`: object[]
   - `what`: object
     - `part`: object

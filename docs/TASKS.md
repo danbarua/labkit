@@ -26,14 +26,6 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   now names *the analysis*, not its output artefact, and never sees the `ART_`
   id at all.
 
-- [ ] **Row AF — execution input order is not recorded.** `CONSUMES` says which
-  artefacts a computation read, never in what sequence, so two runs of an
-  order-sensitive method are indistinguishable (S-10b). Earns nothing under the
-  wrong-answer bar: the reports claim the two runs consumed the same inputs, and
-  they did — what a reader *infers* is the wrong part. Needs a reader acting on
-  "reproduced" for a reversed run and being wrong in a way the record **states**
-  rather than implies. Unowned.
-
 ## Deprioritised
 
 - [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**

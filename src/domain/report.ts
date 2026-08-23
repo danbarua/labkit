@@ -453,8 +453,25 @@ export interface ReproductionReport {
    * merely the same protocol. `not-reproduced` covers "the original never
    * recorded what it consumed", which is absence rather than difference; see
    * `differs`.
+   *
+   * **`inputs-unordered` is a third answer and not a soft no**, the same
+   * distinction `ReproducibilityReport.unverifiable` draws: the record cannot
+   * say, which is different from saying the runs differ. `CONSUMES` keeps a
+   * *set*, so two runs that read the same artefacts in opposite orders are
+   * indistinguishable here — and `recordAnalysis` accepts an **ordered array**,
+   * so the command promised something the store does not keep. For a method
+   * that is order-sensitive those are different executions: S-10d runs
+   * "first input minus second" twice with the inputs swapped and the report
+   * used to call it `reproduced`, which is a positive wrong answer rather than
+   * an inference a reader chose to make (row AF, found by external review).
+   *
+   * LabKit cannot tell an order-sensitive method from an order-insensitive
+   * one, so it says so for **every** run with more than one input rather than
+   * guessing. That cost is deliberate and visible: if it becomes intolerable,
+   * the remedy is to make ordering part of execution identity — a position on
+   * `CONSUMES` — which is a stored-model change this one does not foreclose.
    */
-  execution: "reproduced" | "not-reproduced";
+  execution: "reproduced" | "not-reproduced" | "inputs-unordered";
   /**
    * What the two runs did not share. `unrecorded-in-the-original` is the case
    * S-10 exists for and is **not** the same as `changed`: nobody wrote the
