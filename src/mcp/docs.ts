@@ -65,6 +65,9 @@ const toJson = (schema: z.ZodType): JsonSchema => z.toJSONSchema(schema) as Json
 function typeName(s: JsonSchema): string {
   if (s.const !== undefined) return JSON.stringify(s.const);
   if (s.enum) return s.enum.map((v) => JSON.stringify(v)).join(" | ");
+  // A union of object branches is still "object" -- `object | object` said
+  // nothing, and the branches are expanded underneath by `fieldsOf`.
+  if (s.anyOf?.every((b) => b.properties)) return "object";
   if (s.anyOf) return s.anyOf.map(typeName).join(" | ");
   if (s.type === "null") return "null";
   if (s.type === "array") return `${s.items ? typeName(s.items) : "unknown"}[]`;
@@ -72,12 +75,52 @@ function typeName(s: JsonSchema): string {
   return Array.isArray(s.type) ? s.type.join(" | ") : (s.type ?? "unknown");
 }
 
-/** True when a schema has named fields worth expanding under their parent. */
+/**
+ * True when a schema has named fields worth expanding under their parent.
+ *
+ * A union of objects sharing one field set is **merged**, per field, rather
+ * than rendered from whichever branch came first. `InputRef` is two branches
+ * differing only in a `kind` literal, and taking branch one rendered
+ * `kind?: "observations"` — the wrong literal, and marked optional because the
+ * parent `anyOf` carries no `required`. A document whose whole job is being
+ * reviewable cannot say that.
+ *
+ * Branches with differing field sets fall back to the first, which is what
+ * this did for all unions before. No such case exists on this surface today.
+ */
 function fieldsOf(s: JsonSchema): Record<string, JsonSchema> | undefined {
   if (s.properties) return s.properties;
   if (s.type === "array" && s.items?.properties) return s.items.properties;
-  for (const branch of s.anyOf ?? []) if (branch.properties) return branch.properties;
-  return undefined;
+  const branches = s.anyOf?.filter((b) => b.properties) ?? [];
+  const first = branches[0];
+  if (!first?.properties) return undefined;
+  const keys = Object.keys(first.properties);
+  const alike = branches.every(
+    (b) =>
+      Object.keys(b.properties!).length === keys.length &&
+      keys.every((k) => k in b.properties!),
+  );
+  if (!alike) return first.properties;
+  return Object.fromEntries(
+    keys.map((k) => {
+      const variants = branches.map((b) => b.properties![k]!);
+      const distinct = [...new Map(variants.map((v) => [JSON.stringify(v), v])).values()];
+      return [k, distinct.length === 1 ? distinct[0]! : { anyOf: distinct }];
+    }),
+  );
+}
+
+/** The `required` set that goes with {@link fieldsOf}'s answer. */
+function requiredOf(s: JsonSchema): string[] {
+  if (s.required) return s.required;
+  if (s.items?.required) return s.items.required;
+  const branches = s.anyOf?.filter((b) => b.properties) ?? [];
+  if (branches.length === 0) return [];
+  // Required in every branch, or the document would promise a field one branch
+  // may omit.
+  return (branches[0]!.required ?? []).filter((k) =>
+    branches.every((b) => (b.required ?? []).includes(k)),
+  );
 }
 
 /** One field per bullet, nested structure indented under it. */
@@ -87,7 +130,7 @@ function renderFields(s: JsonSchema, depth = 0): string[] {
   // An absent `required` means nothing is required, not that we cannot tell:
   // zod emits the array whenever any field is required. `known`'s only input
   // is optional, and without this it rendered as though it were mandatory.
-  const required = new Set(s.required ?? s.items?.required ?? []);
+  const required = new Set(requiredOf(s));
   const pad = "  ".repeat(depth);
   return Object.entries(fields).flatMap(([name, field]) => {
     const optional = required.has(name) ? "" : "?";

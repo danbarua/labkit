@@ -30,6 +30,25 @@ export interface ConclusionRef {
   analysis: AnalysisRef;
   proposition: string;
 }
+/**
+ * What a computation read: recorded observations, or **another analysis's
+ * output**.
+ *
+ * One type for all three verbs that record a run. They disagreed: only
+ * `recordAnalysis` took the union, while `replaceAnalysis` and `reverify` took
+ * observations alone — and all three write the same `Computation -CONSUMES->
+ * Artefact` edge, so the narrower two were refusing something the model
+ * represents. An agent that recorded stage two holds its `COMP_` id and never
+ * the `ART_` id underneath it, so replacing that stage over MCP failed with
+ * `CONSUMES does not allow Computation -> Computation`; the workaround was to
+ * ask why a claim was supported in order to learn what a computation had read.
+ *
+ * No new edge, for the reason `recordAnalysis` did not need one either: an
+ * analysis output is an `Artefact` like any other, and the dereference from
+ * computation to its output is one hop the write side already makes.
+ */
+export type InputRef = ObservationsRef | AnalysisRef;
+
 export type GateRef = Ref<"gate">;
 export type WorkRef = Ref<"work">;
 export type AnalysisRef = Ref<"analysis">;
@@ -272,8 +291,8 @@ export interface ReplacementReport {
 }
 
 export interface UnaffectedRecord {
-  /** The record's handle. */
-  what: ObservationsRef;
+  /** The record's handle, as the caller named it — observations, or an earlier analysis. */
+  what: InputRef;
   /** What it is, in the researcher's words — the wording half this used to lack. */
   named: string;
   why: string;

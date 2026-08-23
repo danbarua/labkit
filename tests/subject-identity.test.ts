@@ -20,17 +20,24 @@
  * | `AnalysisRef` as an input | a computation | that computation's **output artefact** |
  *
  * **These tests assert what the model does today, including where that is
- * wrong.** Section 1 pins a confidently incorrect answer on purpose: a line of
- * enquiry nobody worked on reporting itself answered, carrying another line's
- * evidence. When that is fixed this file goes red, which is the intent — a
- * green run here means the ambiguities are still present, not that they are
- * acceptable.
+ * wrong.** They are written so that fixing a defect turns this file red rather
+ * than leaving it quietly green, and that has now happened three times: rows 1
+ * and 3 of the table above, and every report that named its subject only in
+ * prose. Each section says in its own title which state it is pinning.
+ *
+ * What is left is row 2, and it is the one nobody has shown to give a wrong
+ * answer. Section 2 measures the two routes as equivalent *inside the
+ * process*. Row 3's consumer failure was the same measurement taken on the
+ * wrong side of the adapter — it looked equivalent until a consumer that held
+ * only computation ids tried it — so row 2 needs a read that is wrong, not an
+ * argument that the naming is untidy.
  *
  * One diagnosis does not imply one remedy. CLAUDE.md records four scenarios
  * asking *does the act record what it produced?* that needed four different
- * fixes; this may go the same way. Section 2's dereference is convenient and
- * writes the correct edge, and making it "honest" would mean callers naming
- * artefacts they do not hold.
+ * fixes. Section 2's dereference is one of them: it is convenient, it writes
+ * the correct edge, and making it "honest" would mean callers naming artefacts
+ * they do not hold — which is precisely what row 3 was fixed by *not* making
+ * them do.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -411,8 +418,24 @@ describe("4. the read models drop identifiers the graph already minted", () => {
   const MOVES = "depth moves convergence";
 });
 
-describe("3. the ambiguity is only harmless where you hold both handles", () => {
-  test("a consumer with only its own handles cannot repair a two-stage pipeline", async () => {
+describe("3. a consumer can now repair a two-stage pipeline with its own handles — FIXED", () => {
+  /**
+   * What this test used to assert, and why it is worth reading the diff.
+   *
+   * `replace_analysis(supersedes=A2, from=[A1])` came back
+   * `CONSUMES does not allow Computation -> Computation`, because
+   * `record_analysis` took an analysis id and the other two recording verbs
+   * took observations alone — while all three write the same edge. The
+   * reachable workaround was to call `why_supported` on a claim in order to
+   * learn what a computation had read, then pass the `ART_` id that surfaced.
+   *
+   * Section 2's measurement said the two routes were *equivalent*, and that
+   * was measured inside the process holding an artefact id the domain had
+   * handed back. A consumer over the wire holds what the tools returned, which
+   * for an analysis is a computation id — so the equivalence was checked on
+   * the wrong side of the adapter, which is what PJ-030 §7 records.
+   */
+  test("the repair takes the handle the consumer holds, with no detour", async () => {
     // Section 2 showed the two routes equivalent -- measured inside the process,
     // holding an artefact id the domain handed back. A consumer over the wire
     // holds what the tools returned, which for an analysis is a computation id.
@@ -437,31 +460,27 @@ describe("3. the ambiguity is only harmless where you hold both handles", () => 
         of: stageTwo.id, verdict: "stage two mis-specified",
       })).body;
 
-      // Recording stage two on stage one was accepted.
+      // Recording stage two on stage one was accepted all along.
       expect(String(stageOne.id).startsWith("COMP_")).toBe(true);
 
-      // Repairing it, on the same input, is not.
+      // Repairing it, on the same input, is now accepted too.
       const repair = await call(client, "replace_analysis", {
         supersedes: stageTwo.id, because: review.id, enquiry: enquiry.id,
         method: "stage two, corrected", from: [stageOne.id],
         concludes: [{ proposition: "p2", finding: "f2 corrected" }],
       });
-      expect(repair.failed).toBe(true);
-      expect(repair.message).toContain("CONSUMES does not allow Computation -> Computation");
+      expect(repair.failed).toBe(false);
+      // And the report names the input as the caller named it, rather than as
+      // an artefact relabelled "observations".
+      expect((repair.body.unaffected as Array<{ what: { kind: string; id: string } }>)[0]!.what)
+        .toEqual({ kind: "analysis", id: stageOne.id });
 
-      // The artefact id that would work is reachable, by asking why a claim is
-      // supported in order to learn what a computation read.
-      // The claim id came back from `record_analysis`; no lookup needed.
+      // The detour still works and is no longer the only route. It is what a
+      // consumer had to do: ask why a claim was supported in order to learn
+      // what a computation read.
       const why = (await call(client, "why_supported", { claim: p2 })).body;
       const restingOn = why.restingOn as Array<{ part: { id: string }; name: string }>;
       expect(restingOn.some((p) => p.part.id.startsWith("ART_"))).toBe(true);
-
-      const viaTheDetour = await call(client, "replace_analysis", {
-        supersedes: stageTwo.id, because: review.id, enquiry: enquiry.id,
-        method: "stage two, corrected", from: [restingOn[0]!.part.id],
-        concludes: [{ proposition: "p2", finding: "f2 corrected" }],
-      });
-      expect(viaTheDetour.failed).toBe(false);
       await client.close();
     } finally {
       await scenario.end();

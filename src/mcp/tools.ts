@@ -670,14 +670,15 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "Record that an earlier analysis was checked again against observations available now. " +
       "This is **not** reproduction: reproduction asks whether the same inputs give the same " +
       "answer, and this asks whether the finding still holds under different ones. Use " +
-      "`reproduction_of` to ask the other question.",
+      "`reproduction_of` to ask the other question. `under` takes observation ids or the ids " +
+      "of earlier analyses whose output was read this time.",
     inputSchema: {
       historical: z.string().describe(`id of the analysis being re-verified, e.g. ${ANALYSIS_PREFIX}1`),
       enquiry: z.string().describe(`enquiry id this re-verification belongs to, e.g. ${ENQUIRY_PREFIX}7`),
       method: z.string().describe("what was done this time"),
       under: z
         .array(z.string())
-        .describe(`observations read this time, ${ARTEFACT_PREFIX}\u2026 ids`),
+        .describe(`ids read this time — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`),
       concludes: conclusionShape.describe("the single conclusion this re-verification reached"),
     },
     outputSchema: verificationReportSchema,
@@ -686,7 +687,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         historical: { kind: "analysis", id: historical },
         enquiry: { kind: "enquiry", id: enquiry },
         method,
-        under: (under as string[]).map((id) => ({ kind: "observations" as const, id })),
+        under: (under as string[]).map(inputRef),
         concludes: concludes as {
           proposition: string;
           finding: string;
@@ -774,7 +775,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "justified the retraction. The superseded output is invalidated and the checks that " +
       "cited it are withdrawn, in one transaction with the replacement — a failure between " +
       "the halves would leave an earlier failure no longer deciding its check and no " +
-      "corrected check in existence. The answer says what changed and what did not.",
+      "corrected check in existence. The answer says what changed and what did not. `from` " +
+      "takes observation ids or the ids of earlier analyses whose output the replacement " +
+      "read, exactly as `record_analysis` does.",
     inputSchema: {
       supersedes: z.string().describe(`id of the analysis being replaced, e.g. ${ANALYSIS_PREFIX}2`),
       because: z.string().describe(`id of the review justifying it, e.g. ${REVIEW_PREFIX}1`),
@@ -782,7 +785,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       method: z.string().describe("what the replacement did"),
       from: z
         .array(z.string())
-        .describe(`observations the replacement read, ${ARTEFACT_PREFIX}\u2026 ids`),
+        .describe(`ids the replacement read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`),
       concludes: z.array(conclusionShape).describe("one entry per conclusion"),
     },
     outputSchema: replacementReportSchema,
@@ -792,7 +795,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         because: { kind: "review", id: because },
         enquiry: { kind: "enquiry", id: enquiry },
         method,
-        from: (from as string[]).map((id) => ({ kind: "observations" as const, id })),
+        from: (from as string[]).map(inputRef),
         concludes: concludes as Array<{
           proposition: string;
           finding: string;

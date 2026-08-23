@@ -138,7 +138,10 @@ describe("an agent can track work through the tools alone", () => {
 
   const call = async (c: Client, name: string, args: Record<string, unknown>) => {
     const result = await c.callTool({ name, arguments: args });
-    expect(result.isError ?? false).toBe(false);
+    // The message, not just `true`. `expect(isError).toBe(false)` reported
+    // "Expected: false / Received: true" and nothing about which tool or why,
+    // which is a failing test that cannot name its own failure.
+    if (result.isError) throw new Error(`${name} failed: ${JSON.stringify(result.content)}`);
     return result.structuredContent as Record<string, unknown>;
   };
 
@@ -311,6 +314,86 @@ describe("an agent can track work through the tools alone", () => {
     }
   });
 
+  /**
+   * The demonstrated consumer failure, from the other side.
+   *
+   * `replace_analysis(supersedes=A2, from=[A1])` used to come back
+   * `CONSUMES does not allow Computation -> Computation`. `record_analysis`
+   * accepted an analysis id and the other two recording verbs did not, so an
+   * agent that had recorded stage two held its `COMP_` id and never the `ART_`
+   * id underneath it. The reachable workaround was to call `why_supported` in
+   * order to learn what a computation had read, which is a database search to
+   * use a command.
+   */
+  test("a replacement can read an earlier analysis's output, by that analysis's id", async () => {
+    const c = await client();
+    try {
+      const enquiry = await call(c, "open_enquiry", { question: "does the calibration hold?" });
+      const raw = await call(c, "record_observations", {
+        enquiry: enquiry.id, name: "raw series", finding: "uncalibrated instrument output",
+      });
+      const calibration = await call(c, "record_analysis", {
+        enquiry: enquiry.id, method: "calibrate", from: [raw.id],
+        concludes: [{ proposition: "the series is calibrated", finding: "offset removed" }],
+      });
+      const trend = await call(c, "record_analysis", {
+        enquiry: enquiry.id, method: "trend", from: [(calibration.analysis as { id: string }).id],
+        concludes: [{ proposition: TRENDS, finding: "slope 0.4" }],
+      });
+      const review = await call(c, "record_review", {
+        of: (trend.analysis as { id: string }).id, verdict: "the slope test was one-sided",
+      });
+
+      const stageOne = (calibration.analysis as { id: string }).id;
+      const report = await call(c, "replace_analysis", {
+        supersedes: (trend.analysis as { id: string }).id,
+        because: review.id,
+        enquiry: enquiry.id,
+        method: "trend, two-sided",
+        from: [stageOne],
+        concludes: [{ proposition: TRENDS, finding: "slope 0.4, two-sided" }],
+      });
+
+      // The handle comes back as the caller named it -- an analysis, not an
+      // artefact relabelled "observations" -- and `named` is the output's own
+      // name, which needed the same dereference the CONSUMES edge needs.
+      const unaffected = report.unaffected as Array<{
+        what: { kind: string; id: string }; named: string; why: string;
+      }>;
+      expect(unaffected).toHaveLength(1);
+      expect(unaffected[0]!.what).toEqual({ kind: "analysis", id: stageOne });
+      expect(unaffected[0]!.named).toBe("calibrate output");
+
+      // The observations branch of the same field, which had never been
+      // asserted either and was returning its id too.
+      const other = await call(c, "replace_analysis", {
+        supersedes: (calibration.analysis as { id: string }).id,
+        because: (await call(c, "record_review", {
+          of: (calibration.analysis as { id: string }).id, verdict: "offset table was stale",
+        })).id,
+        enquiry: enquiry.id,
+        method: "calibrate, current offsets",
+        from: [raw.id],
+        concludes: [{ proposition: "the series is calibrated", finding: "offset removed, current table" }],
+      });
+      expect((other.unaffected as Array<{ named: string }>)[0]!.named).toBe("raw series");
+
+      // And the same id is accepted by the third verb, which also took
+      // observations alone.
+      const verified = await call(c, "reverify", {
+        historical: (trend.analysis as { id: string }).id,
+        enquiry: enquiry.id,
+        method: "trend, held-out split",
+        under: [stageOne],
+        concludes: { proposition: TRENDS, finding: "slope 0.38 on the held-out split" },
+      });
+      expect(String((verified.verification as { id: string }).id).startsWith("COMP_")).toBe(true);
+      await c.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
   test("closing an enquiry twice is refused, not recorded twice", async () => {
     const c = await client();
     try {
@@ -332,6 +415,7 @@ describe("an agent can track work through the tools alone", () => {
   const PROP = "the pruning schedule moves convergence";
   const HOLDS = "the effect holds at five seeds";
   const GENERAL = "the method is faster";
+  const TRENDS = "the response trends upward with dose";
 });
 
 describe("the tool documentation resource", () => {

@@ -16,7 +16,6 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   Walking by id wants the revision chain to carry an edge a caller can follow,
   which is a model question rather than a projection.
 
-
 ## Needs a discriminator
 
 - [ ] **`ART_` does not say what kind of artefact it is.** `ObservationsRef`'s
@@ -30,26 +29,11 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   edge, same `{part, name}` from `reproducibilityOf`.
 
   Needs a read that gives a **wrong answer** because the two are
-  indistinguishable.
-
-- [ ] **The three verbs that record a computation disagree about their inputs.**
-  `RecordAnalysisCommand.from` is `Array<ObservationsRef | AnalysisRef>`;
-  `ReplaceAnalysisCommand.from` and `ReverifyCommand.under` are
-  `ObservationsRef[]`. All three write the same `Computation -CONSUMES->
-  Artefact` edge.
-
-  **The consumer half is demonstrated**, over MCP only:
-
-  ```
-  replace_analysis(supersedes=A2, from=[A1])
-    -> isError: CONSUMES does not allow Computation -> Computation
-  ```
-
-  An agent that recorded stage two holds `COMP_2` and never the `ART_` id
-  underneath it. The workaround is reachable — the id surfaces in
-  `whySupported().restingOn` — but only by asking why a claim is supported in
-  order to learn what a computation read. Likely fix: one `InputRef` accepted by
-  all three. Same root as the `ART_` item above.
+  indistinguishable. The nearest thing to one was the three recording verbs
+  disagreeing about their inputs, and that turned out to be a separate defect:
+  fixing it (all three take `InputRef`) left this untouched, because the caller
+  now names *the analysis*, not its output artefact, and never sees the `ART_`
+  id at all.
 
 - [ ] **Row AF — execution input order is not recorded.** `CONSUMES` says which
   artefacts a computation read, never in what sequence, so two runs of an

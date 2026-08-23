@@ -279,17 +279,17 @@ Whether a line of enquiry is still open, and if not how it closed — answered, 
     - `id`: string
   - `states`: string
 - `question`: object | null
-  - `question?`: object
+  - `question`: object
     - `kind`: "question"
     - `id`: string
-  - `asks?`: string
-  - `open?`: boolean
-  - `closure?`: "answered" | "abandoned" | "accepted-as-unresolved" | null
-  - `answer?`: "yes" | "no" | null
+  - `asks`: string
+  - `open`: boolean
+  - `closure`: "answered" | "abandoned" | "accepted-as-unresolved" | null
+  - `answer`: "yes" | "no" | null
   - `reopensIf?`: string
   - `acceptedBecause?`: string
   - `restsOn?`: "exploratory" | "confirmatory"
-  - `evidence?`: object[]
+  - `evidence`: object[]
     - `evidence`: object
       - `kind`: "evidence"
       - `id`: string
@@ -485,12 +485,12 @@ Where a question came from, when it came from sharpening an earlier one — the 
 **Returns**
 
 - `origin`: object | null
-  - `from?`: object
+  - `from`: object
     - `kind`: "question"
     - `id`: string
-  - `fromAsks?`: string
-  - `reason?`: string
-  - `knownAtTheTime?`: object[]
+  - `fromAsks`: string
+  - `reason`: string
+  - `knownAtTheTime`: object[]
     - `evidence`: object
       - `kind`: "evidence"
       - `id`: string
@@ -926,14 +926,14 @@ Record that a prespecified condition was checked and what it gave. Cite the anal
 
 *Re-run a historical analysis under current observations* — **changes the record**
 
-Record that an earlier analysis was checked again against observations available now. This is **not** reproduction: reproduction asks whether the same inputs give the same answer, and this asks whether the finding still holds under different ones. Use `reproduction_of` to ask the other question.
+Record that an earlier analysis was checked again against observations available now. This is **not** reproduction: reproduction asks whether the same inputs give the same answer, and this asks whether the finding still holds under different ones. Use `reproduction_of` to ask the other question. `under` takes observation ids or the ids of earlier analyses whose output was read this time.
 
 **Takes**
 
 - `historical`: string — id of the analysis being re-verified, e.g. COMP_1
 - `enquiry`: string — enquiry id this re-verification belongs to, e.g. LOE_7
 - `method`: string — what was done this time
-- `under`: string[] — observations read this time, ART_… ids
+- `under`: string[] — ids read this time — ART_… or COMP_…
 - `concludes`: object — the single conclusion this re-verification reached
   - `proposition`: string — the claim, as a sentence
   - `finding`: string — what was found, in this analysis's own words
@@ -1042,7 +1042,7 @@ Reword a prespecified criterion after work has begun, citing what prompted it. T
 
 *Supersede a defective analysis* — **changes the record**
 
-Record a corrected analysis in place of a defective one, citing the review that justified the retraction. The superseded output is invalidated and the checks that cited it are withdrawn, in one transaction with the replacement — a failure between the halves would leave an earlier failure no longer deciding its check and no corrected check in existence. The answer says what changed and what did not.
+Record a corrected analysis in place of a defective one, citing the review that justified the retraction. The superseded output is invalidated and the checks that cited it are withdrawn, in one transaction with the replacement — a failure between the halves would leave an earlier failure no longer deciding its check and no corrected check in existence. The answer says what changed and what did not. `from` takes observation ids or the ids of earlier analyses whose output the replacement read, exactly as `record_analysis` does.
 
 **Takes**
 
@@ -1050,7 +1050,7 @@ Record a corrected analysis in place of a defective one, citing the review that 
 - `because`: string — id of the review justifying it, e.g. REV_1
 - `enquiry`: string — enquiry id, e.g. LOE_7
 - `method`: string — what the replacement did
-- `from`: string[] — observations the replacement read, ART_… ids
+- `from`: string[] — ids the replacement read — ART_… or COMP_…
 - `concludes`: object[] — one entry per conclusion
   - `proposition`: string — the claim, as a sentence
   - `finding`: string — what was found, in this analysis's own words
@@ -1075,7 +1075,7 @@ Record a corrected analysis in place of a defective one, citing the review that 
   - `asserts`: string
 - `unaffected`: object[]
   - `what`: object
-    - `kind`: "observations"
+    - `kind`: "observations" | "analysis"
     - `id`: string
   - `named`: string
   - `why`: string

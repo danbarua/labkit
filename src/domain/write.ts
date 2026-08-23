@@ -1205,14 +1205,25 @@ export class WriteSurface extends SessionCore {
 
     // The wording half. `what` was a naked id -- the inverse of the convention
     // every other pair follows, and unreadable without a second lookup.
+    //
+    // An analysis handle has to be dereferenced to its output artefact first:
+    // the id is a `COMP_`, and looking THAT up as an artefact matches nothing
+    // and silently fell back to printing the id. Same one hop `recorded()`
+    // makes to write the CONSUMES edge.
     const inputNames = new Map<string, string>();
     for (const o of input.from) {
+      const artefact = o.kind === "analysis" ? await this.outputArtefactOf(o) : o.id;
       const rows = await this.graph.query(
         `MATCH (a:Artefact {natural_id: $id}) RETURN a`,
-        { a: vertexProps<{ name: string }>() },
-        { id: o.id },
+        // `logical_name`, which is what an Artefact actually carries. This read
+        // `.name` -- a property no Artefact has -- so it set `undefined` and the
+        // `?? o.id` below printed the id. The field exists BECAUSE `what` was a
+        // naked id, and it had been a second naked id since the day it landed;
+        // nothing asserted on it until an MCP test did.
+        { a: vertexProps<ArtefactProps>() },
+        { id: artefact },
       );
-      if (rows[0]) inputNames.set(o.id, rows[0].a.name);
+      if (rows[0]) inputNames.set(o.id, rows[0].a.logical_name);
     }
 
     const unaffected: UnaffectedRecord[] = input.from.map((o) => ({

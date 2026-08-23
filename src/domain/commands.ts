@@ -25,7 +25,7 @@ import type {
   CriterionRef,
   EnquiryRef,
   GateRef,
-  ObservationsRef,
+  InputRef,
   QuestionRef,
   ReviewRef,
   WorkRef,
@@ -59,8 +59,7 @@ export interface RecordAnalysisCommand {
   enquiry: EnquiryRef;
   method: string;
   /**
-   * What this analysis read: recorded observations, or **another analysis's
-   * output**. Earned by S-11d, row AE.
+   * What this analysis read. Earned by S-11d, row AE.
    *
    * Until it accepted an `AnalysisRef`, a two-stage pipeline had one
    * recordable form — re-enter the intermediate as if it were fresh
@@ -69,12 +68,10 @@ export interface RecordAnalysisCommand {
    * called unverifiable, because the re-entered intermediate carried a hash
    * of its own and the chain to the real input was severed.
    *
-   * No new edge. `CONSUMES: Computation -> Artefact` already existed and
-   * already meant "this run read that"; an analysis output is an `Artefact`
-   * like any other, so the second rung of the change bar was enough and
-   * nothing was added to the model.
+   * See {@link InputRef} for why the other two recording verbs now take the
+   * same type.
    */
-  from: Array<ObservationsRef | AnalysisRef>;
+  from: InputRef[];
   concludes: Conclusion[];
   /**
    * The planned work this analysis carries out, if it carries out any.
@@ -154,7 +151,8 @@ export interface ReverifyCommand {
   historical: AnalysisRef;
   enquiry: EnquiryRef;
   method: string;
-  under: ObservationsRef[];
+  /** What the re-verification read this time. {@link InputRef} — an earlier analysis's output counts. */
+  under: InputRef[];
   concludes: Conclusion;
 }
 
@@ -183,7 +181,8 @@ export interface ReplaceAnalysisCommand {
   because: ReviewRef;
   enquiry: EnquiryRef;
   method: string;
-  from: ObservationsRef[];
+  /** What the replacement read. {@link InputRef} — an earlier analysis's output counts. */
+  from: InputRef[];
   concludes: Conclusion[];
 }
 

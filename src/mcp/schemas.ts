@@ -356,8 +356,18 @@ const changedConclusion = z.strictObject({
   after: z.string(),
 });
 
+/**
+ * A handle to what a run read — observations, or an earlier analysis.
+ *
+ * A union in an OUTPUT schema, which is the only one on this surface. It
+ * survives `normalizeObjectSchema` because the union is nested inside an
+ * object rather than being the tool's whole return shape; a top-level union
+ * normalises to `undefined` and would silently drop validation.
+ */
+const inputRefSchema = z.union([ref("observations"), ref("analysis")]);
+
 const unaffectedRecord = z.strictObject({
-  what: ref("observations"),
+  what: inputRefSchema,
   named: z.string(),
   why: z.string(),
 });
