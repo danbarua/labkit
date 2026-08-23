@@ -93,6 +93,7 @@ import type {
   ReviewRef,
   UnaffectedRecord,
 } from "./report";
+import { ref } from "./report";
 import type {
   AcceptAsUnresolvedCommand,
   AmendDesignCommand,
@@ -1019,7 +1020,6 @@ export class WriteSurface extends SessionCore {
         return { replacement, decision };
       },
     );
-    void replacement;
 
     const rerun = await this.workGatedBy(gates);
     const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
@@ -1033,9 +1033,15 @@ export class WriteSurface extends SessionCore {
 
     return {
       at,
-      amendment: decision.natural_id,
-      replaced,
-      nowRequires: input.nowRequires,
+      amendment: ref("decision", decision.natural_id),
+      // `void replacement;` stood here: the amended criterion was created and
+      // its handle thrown away, so the report named both conditions by wording
+      // and a caller could reach neither.
+      replaced: { criterion: input.criterion, requires: replaced ?? "" },
+      nowRequires: {
+        criterion: ref("criterion", replacement.natural_id),
+        requires: input.nowRequires,
+      },
       rerun,
       confirmatoryAffected,
       // Derived, never declared. An amendment is scientific exactly when
@@ -1173,7 +1179,7 @@ export class WriteSurface extends SessionCore {
     }
 
     const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
-      what: o.id,
+      what: o,
       named: inputNames.get(o.id) ?? o.id,
       why: "observations were not produced by the replaced analysis, and the replacement rests on them",
     }));
@@ -1279,7 +1285,7 @@ export class WriteSurface extends SessionCore {
             "SUPPORTS",
             narrower.natural_id,
           );
-          carried.set(row.e.natural_id, { evidence: row.e.natural_id, states: row.e.statement });
+          carried.set(row.e.natural_id, { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
         }
       }
 
@@ -1297,7 +1303,7 @@ export class WriteSurface extends SessionCore {
       at,
       previously: scope.proposition,
       nowClaims: input.as,
-      evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
+      evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
       restingOnTheOldReading,
       requiresRecomputation: false,
     };

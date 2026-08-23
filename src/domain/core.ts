@@ -35,6 +35,7 @@ import type {
   DecidedQuestion,
   GatedWork,
 } from "./report";
+import { ref } from "./report";
 
 export interface ResearchSessionOptions {
   clock?: Clock;
@@ -99,9 +100,9 @@ export class SessionCore {
         { id: gate },
       );
       for (const row of rows)
-        found.set(row.t.natural_id, { work: row.t.natural_id, objective: row.t.objective });
+        found.set(row.t.natural_id, { work: ref("work", row.t.natural_id), objective: row.t.objective });
     }
-    return [...found.values()].sort((a, b) => a.work.localeCompare(b.work));
+    return [...found.values()].sort((a, b) => a.work.id.localeCompare(b.work.id));
   }
 
   /**
@@ -130,10 +131,10 @@ export class SessionCore {
         );
         for (const row of rows)
           if (row.c.kind === "confirmatory")
-            affected.set(row.c.natural_id, { claim: row.c.natural_id, asserts: row.c.name });
+            affected.set(row.c.natural_id, { claim: ref("claim", row.c.natural_id), asserts: row.c.name });
       }
     }
-    return [...affected.values()].sort((a, b) => a.claim.localeCompare(b.claim));
+    return [...affected.values()].sort((a, b) => a.claim.id.localeCompare(b.claim.id));
   }
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */
@@ -173,7 +174,7 @@ export class SessionCore {
     const now = rows.find((r) => r.now)?.now;
     return {
       withdrawn: true,
-      ...(now ? { replacedBy: { claim: now.natural_id, asserts: now.name } } : {}),
+      ...(now ? { replacedBy: { claim: ref("claim", now.natural_id), asserts: now.name } } : {}),
     };
   }
 
@@ -228,9 +229,9 @@ export class SessionCore {
         },
       );
       for (const row of rows)
-        asked.set(row.q.natural_id, { question: row.q.natural_id, asks: row.q.name });
+        asked.set(row.q.natural_id, { question: ref("question", row.q.natural_id), asks: row.q.name });
     }
-    return [...asked.values()].sort((a, b) => a.question.localeCompare(b.question));
+    return [...asked.values()].sort((a, b) => a.question.id.localeCompare(b.question.id));
   }
 
   /**

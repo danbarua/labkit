@@ -205,7 +205,7 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
   test("the ordering survives only as a natural-id artefact, which is not a modelled read", async () => {
     const { a, b } = await inTwoWorlds(inOrder(FIRST, SECOND), inOrder(SECOND, FIRST));
     const bySequence = (rows: typeof a) =>
-      [...rows].sort((x, y) => Number(x.question.slice(2)) - Number(y.question.slice(2))).map((q) => q.asks);
+      [...rows].sort((x, y) => Number(x.question.id.slice(2)) - Number(y.question.id.slice(2))).map((q) => q.asks);
 
     // The two histories ARE recoverable -- from id order, which tracks
     // allocation. Recorded because the earlier claim that they were not was

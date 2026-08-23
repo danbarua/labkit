@@ -117,9 +117,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // LabKit:     nonlinearity is established; the smear question is
     //             unresolved; external task utility has not been tested.
     const known = await session.whatIsKnown();
-    expect(known.established.map((q) => q.question)).toEqual([prior.nonlinearity.id]);
-    expect(known.unresolved.map((q) => q.question)).toContain(prior.smear.id);
-    expect(known.untested.map((q) => q.question)).toContain(prior.utility.id);
+    expect(known.established.map((q) => q.question.id)).toEqual([prior.nonlinearity.id]);
+    expect(known.unresolved.map((q) => q.question.id)).toContain(prior.smear.id);
+    expect(known.untested.map((q) => q.question.id)).toContain(prior.utility.id);
 
     // Researcher: fine. Let's pursue whether different inputs map to
     //             reproducibly different internal responses.
@@ -143,7 +143,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const prior = await priorState();
 
     const known = await session.whatIsKnown();
-    const ids = (qs: Array<{ question: string }>) => qs.map((q) => q.question);
+    const ids = (qs: Array<{ question: { id: string } }>) => qs.map((q) => q.question.id);
 
     expect(ids(known.established)).toContain(prior.nonlinearity.id);
     expect(ids(known.unresolved)).toContain(prior.smear.id);
@@ -187,7 +187,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(stronger.question!.closure).toBeNull();
 
     const known = await session.whatIsKnown();
-    expect(known.unresolved.map((q) => q.question)).toContain(prior.smear.id);
+    expect(known.unresolved.map((q) => q.question.id)).toContain(prior.smear.id);
   });
 
   /**
@@ -206,20 +206,20 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     });
 
     const origin = await session.originOf(sharper);
-    expect(origin?.from).toBe(hunch.id);
+    expect(origin?.from.id).toBe(hunch.id);
     expect(origin?.reason).toContain("not testable");
 
     // From a second reader: the original still asks what it originally asked.
     const later = new ResearchSession(await scenario.current(), { clock });
     const durable = await later.originOf(sharper);
-    expect(durable?.from).toBe(hunch.id);
+    expect(durable?.from.id).toBe(hunch.id);
     expect(durable?.fromAsks).toBe("is the learned topology doing something computationally interesting?");
 
     // Narrowing is not answering. Nothing has been shown about the hunch, so
     // it is still on the books untested -- not established, and not a failure.
     const known = await later.whatIsKnown();
-    expect(known.established.map((q) => q.question)).not.toContain(hunch.id);
-    expect(known.untested.map((q) => q.question)).toContain(hunch.id);
+    expect(known.established.map((q) => q.question.id)).not.toContain(hunch.id);
+    expect(known.untested.map((q) => q.question.id)).toContain(hunch.id);
     expect(known.untested.map((q) => q.asks)).toContain("is the learned topology doing something computationally interesting?");
   });
 
@@ -309,7 +309,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const later = new ResearchSession(await scenario.current(), { clock });
     const after = await later.whatIsKnown();
     const census = (k: Awaited<ReturnType<typeof later.whatIsKnown>>) =>
-      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question).sort();
+      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question.id).sort();
     expect(census(after)).toEqual(census(before));
 
     // Nothing on the record cites the sharpening that never happened.
@@ -340,7 +340,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // One question on the books, not two.
     const known = await later.whatIsKnown();
     const all = [...known.established, ...known.unresolved, ...known.untested];
-    expect(all.filter((q) => q.question === question.id)).toHaveLength(1);
+    expect(all.filter((q) => q.question.id === question.id)).toHaveLength(1);
   });
 
   test("two questions worded identically are two questions", async () => {

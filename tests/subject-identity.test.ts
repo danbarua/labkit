@@ -103,7 +103,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       // One question, pursued twice. Its state is the same in both reports --
       // correctly, because it is nested under `question` where neither pursuit
       // can be read as owning it.
-      expect(ana.question!.question).toBe(bruno.question!.question);
+      expect(ana.question!.question.id).toBe(bruno.question!.question.id);
       expect(ana.question!.closure).toBe("answered");
       expect(bruno.question!.closure).toBe("answered");
 
@@ -114,8 +114,8 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       // Ana's pursuit produced the observations AND the analysis; the closure
       // cites only the latter. Two different sets, deliberately -- "what this
       // pursuit produced" is not "what the answer rests on".
-      const anasFindings = ana.contributed.map((e) => e.evidence);
-      const closingEvidence = ana.question!.evidence.map((e) => e.evidence);
+      const anasFindings = ana.contributed.map((e) => e.evidence.id);
+      const closingEvidence = ana.question!.evidence.map((e) => e.evidence.id);
       expect(closingEvidence.every((id) => anasFindings.includes(id))).toBe(true);
       expect(anasFindings.length).toBeGreaterThan(closingEvidence.length);
 
@@ -123,7 +123,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       expect(bruno.pursuing).not.toBe(ana.pursuing);
 
       // The reader that used to be wrong: sum findings over every pursuit.
-      const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence));
+      const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence.id));
       expect(counted.length).toBe(new Set(counted).size);
     } finally {
       await scenario.end();
@@ -190,7 +190,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       // Raw measurement is an artefact.
       expect(observations.id.startsWith("ART_")).toBe(true);
       // So is what the analysis produced -- same prefix, same space.
-      const output = consumed.map((p) => p.part);
+      const output = consumed.map((p) => p.part.id);
       expect(output.every((id) => id.startsWith("ART_"))).toBe(true);
 
       // And the ref asserts a kind the id cannot support: `observations.kind`
@@ -220,12 +220,12 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const read = new ReadSurface(await scenario.current());
       const consumedByA = await read.reproducibilityOf(viaAnalysis, []);
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
-      expect(outputOfStageOne?.startsWith("ART_")).toBe(true);
+      expect(outputOfStageOne?.id.startsWith("ART_")).toBe(true);
 
       const viaArtefact = await s.recordAnalysis({
         enquiry,
         method: "stage two, by artefact id",
-        from: [{ kind: "observations", id: outputOfStageOne! }],
+        from: [outputOfStageOne!],
         concludes: [{ proposition: "p2b", finding: "f2" }],
       });
       const consumedByB = await read.reproducibilityOf(viaArtefact, []);
@@ -287,14 +287,14 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       // whatIsKnown: `question` is the id, `asks` is the text.
       const known = await read.whatIsKnown();
       const standing = [...known.established, ...known.provisional][0]!;
-      expect(looksLikeAnId(standing.question)).toBe(true);
+      expect(looksLikeAnId(standing.question.id)).toBe(true);
       expect(looksLikeAnId(standing.asks)).toBe(false);
 
       // reproducibilityOf: `part` is the id, `name` is the text.
       const parts = await read.reproducibilityOf(analysis, []);
       const inputs = [...parts.exact, ...parts.differing, ...parts.unverifiable, ...parts.notRebuilt];
       expect(inputs.length).toBeGreaterThan(0);
-      expect(inputs.every((p) => looksLikeAnId(p.part))).toBe(true);
+      expect(inputs.every((p) => looksLikeAnId(p.part.id))).toBe(true);
       expect(inputs.every((p) => looksLikeAnId(p.name))).toBe(false);
     } finally {
       await scenario.end();
@@ -306,15 +306,15 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       const { read, enquiry, question } = await programme();
       const status = await read.enquiryStatus(enquiry);
 
-      expect(looksLikeAnId(status.enquiry)).toBe(true);
+      expect(looksLikeAnId(status.enquiry.id)).toBe(true);
       // The question it pursues, by identity -- and it is the RIGHT question,
       // not merely an id-shaped string.
-      expect(status.question!.question).toBe(question.id);
+      expect(status.question!.question.id).toBe(question.id);
       expect(looksLikeAnId(status.question!.asks)).toBe(false);
 
       // Evidence too, as of PJ-030 §5: identity beside the statement.
       expect(status.question!.evidence.length).toBeGreaterThan(0);
-      expect(status.question!.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
+      expect(status.question!.evidence.every((e) => looksLikeAnId(e.evidence.id))).toBe(true);
       expect(status.question!.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
     } finally {
       await scenario.end();
@@ -329,9 +329,9 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       const affected = await read.whatDependsOn("sweep readings");
 
       expect(affected.claims.length + affected.enquiries.length).toBeGreaterThan(0);
-      expect(affected.claims.every((c) => looksLikeAnId(c.claim))).toBe(true);
+      expect(affected.claims.every((c) => looksLikeAnId(c.claim.id))).toBe(true);
       expect(affected.claims.every((c) => looksLikeAnId(c.asserts))).toBe(false);
-      expect(affected.enquiries.every((e) => looksLikeAnId(e.enquiry))).toBe(true);
+      expect(affected.enquiries.every((e) => looksLikeAnId(e.enquiry.id))).toBe(true);
       expect(affected.enquiries.every((e) => looksLikeAnId(e.pursuing))).toBe(false);
     } finally {
       await scenario.end();
@@ -347,12 +347,12 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       // Was a bare `via` holding the computation's METHOD text, so two runs of
       // one method were indistinguishable -- the same wording-as-identity
       // failure whySupported REFUSES to make when resolving its own argument.
-      expect(why.support.every((s) => looksLikeAnId(s.analysis))).toBe(true);
-      expect(why.support.every((s) => looksLikeAnId(s.evidence))).toBe(true);
+      expect(why.support.every((s) => looksLikeAnId(s.analysis.id))).toBe(true);
+      expect(why.support.every((s) => looksLikeAnId(s.evidence.id))).toBe(true);
       expect(why.support.every((s) => looksLikeAnId(s.method))).toBe(false);
-      expect(why.unmet.every((u) => looksLikeAnId(u.criterion))).toBe(true);
+      expect(why.unmet.every((u) => looksLikeAnId(u.criterion.id))).toBe(true);
       // The template, in the same report: restingOn carries both.
-      expect(why.restingOn.every((p) => looksLikeAnId(p.part))).toBe(true);
+      expect(why.restingOn.every((p) => looksLikeAnId(p.part.id))).toBe(true);
       expect(why.restingOn.every((p) => looksLikeAnId(p.name))).toBe(false);
     } finally {
       await scenario.end();
@@ -364,13 +364,13 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       const { read, gate } = await programme();
       const status = await read.gateStatus(gate);
 
-      expect(looksLikeAnId(status.gate)).toBe(true);
+      expect(looksLikeAnId(status.gate.id)).toBe(true);
       expect(status.gating.length).toBeGreaterThan(0);
-      expect(status.gating.every((g) => looksLikeAnId(g.work))).toBe(true);
+      expect(status.gating.every((g) => looksLikeAnId(g.work.id))).toBe(true);
       expect(status.gating.every((g) => looksLikeAnId(g.objective))).toBe(false);
-      expect(status.unmet.every((u) => looksLikeAnId(u.criterion))).toBe(true);
+      expect(status.unmet.every((u) => looksLikeAnId(u.criterion.id))).toBe(true);
       // The template again, one field over.
-      expect(status.checks.every((c) => looksLikeAnId(c.criterion))).toBe(true);
+      expect(status.checks.every((c) => looksLikeAnId(c.criterion.id))).toBe(true);
     } finally {
       await scenario.end();
     }
@@ -417,12 +417,12 @@ describe("3. the ambiguity is only harmless where you hold both handles", () => 
       // The artefact id that would work is reachable, by asking why a claim is
       // supported in order to learn what a computation read.
       const why = (await call(client, "why_supported", { proposition: "p2" })).body;
-      const restingOn = why.restingOn as Array<{ part: string; name: string }>;
-      expect(restingOn.some((p) => p.part.startsWith("ART_"))).toBe(true);
+      const restingOn = why.restingOn as Array<{ part: { id: string }; name: string }>;
+      expect(restingOn.some((p) => p.part.id.startsWith("ART_"))).toBe(true);
 
       const viaTheDetour = await call(client, "replace_analysis", {
         supersedes: stageTwo.id, because: review.id, enquiry: enquiry.id,
-        method: "stage two, corrected", from: [restingOn[0]!.part],
+        method: "stage two, corrected", from: [restingOn[0]!.part.id],
         concludes: [{ proposition: "p2", finding: "f2 corrected" }],
       });
       expect(viaTheDetour.failed).toBe(false);

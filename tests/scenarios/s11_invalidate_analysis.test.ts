@@ -164,7 +164,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    expect(report.unaffected.map((u) => u.what)).toContain(observations.id);
+    expect(report.unaffected.map((u) => u.what.id)).toContain(observations.id);
 
     // Durable check: the replacement conclusion still rests on the same
     // observations, and those observations were never invalidated.

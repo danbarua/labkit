@@ -78,20 +78,20 @@ import type {
 const ref = <K extends string>(kind: K) => z.strictObject({ kind: z.literal(kind), id: z.string() });
 
 const questionStanding = z.strictObject({
-  question: z.string(),
+  question: ref("question"),
   asks: z.string(),
 });
 
 const identifiedArtefact = z.strictObject({
-  part: z.string(),
+  part: ref("observations"),
   name: z.string(),
 });
 
-const citedFinding = z.strictObject({ evidence: z.string(), states: z.string() });
+const citedFinding = z.strictObject({ evidence: ref("evidence"), states: z.string() });
 
 const evaluationRecord = z.strictObject({
-  evaluation: z.string(),
-  criterion: z.string(),
+  evaluation: ref("evaluation"),
+  criterion: ref("criterion"),
   value: z.string(),
   outcome: z.enum(["pass", "fail"]),
   at: z.string(),
@@ -101,16 +101,17 @@ const evaluationRecord = z.strictObject({
 
 const bearingFinding = z.strictObject({
   finding: z.string(),
-  evidence: z.string(),
+  evidence: ref("evidence"),
   method: z.string(),
-  analysis: z.string(),
+  analysis: ref("analysis"),
 });
 
-const unmetCheck = z.strictObject({ criterion: z.string(), requires: z.string() });
-const gatedWork = z.strictObject({ work: z.string(), objective: z.string() });
+const unmetCheck = z.strictObject({ criterion: ref("criterion"), requires: z.string() });
+const condition = unmetCheck;
+const gatedWork = z.strictObject({ work: ref("work"), objective: z.string() });
 
 const checkStatus = z.strictObject({
-  criterion: z.string(),
+  criterion: ref("criterion"),
   proposition: z.string(),
   state: z.enum(["passed", "failed", "never-run", "no-standing-verdict"]),
   evaluations: z.array(evaluationRecord),
@@ -118,9 +119,9 @@ const checkStatus = z.strictObject({
 });
 
 const amendmentRecord = z.strictObject({
-  amendment: z.string(),
-  replaced: z.string(),
-  nowRequires: z.string(),
+  amendment: ref("decision"),
+  replaced: condition,
+  nowRequires: condition,
   reason: z.string(),
   citing: z.array(citedFinding),
   rerun: z.array(gatedWork),
@@ -128,11 +129,11 @@ const amendmentRecord = z.strictObject({
 });
 
 const revision = z.strictObject({
-  revision: z.string(),
+  revision: ref("decision"),
   previously: z.string(),
   nowClaims: z.string(),
   reason: z.string(),
-  restingOnTheOldReading: z.array(z.strictObject({ question: z.string(), asks: z.string() })),
+  restingOnTheOldReading: z.array(z.strictObject({ question: ref("question"), asks: z.string() })),
 });
 
 /* -- the seven tools' return shapes -------------------------------------- */
@@ -159,7 +160,7 @@ export const supportExplanationSchema = z.strictObject({
   standing: z.enum(["exploratory", "confirmatory"]),
   promotedBecause: z.string().optional(),
   support: z.array(bearingFinding),
-  reverifiedBy: z.array(z.strictObject({ analysis: z.string(), method: z.string() })),
+  reverifiedBy: z.array(z.strictObject({ analysis: ref("analysis"), method: z.string() })),
   standard: z.array(checkStatus),
   unmet: z.array(unmetCheck),
   restingOn: z.array(identifiedArtefact),
@@ -172,12 +173,12 @@ export const supportExplanationSchema = z.strictObject({
   challenged: z.boolean(),
   against: z.array(bearingFinding),
   withdrawn: z.boolean(),
-  replacedBy: z.strictObject({ claim: z.string(), asserts: z.string() }).optional(),
+  replacedBy: z.strictObject({ claim: ref("claim"), asserts: z.string() }).optional(),
 });
 
 export const dependencyReportSchema = z.strictObject({
-  claims: z.array(z.strictObject({ claim: z.string(), asserts: z.string() })),
-  enquiries: z.array(z.strictObject({ enquiry: z.string(), pursuing: z.string() })),
+  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+  enquiries: z.array(z.strictObject({ enquiry: ref("enquiry"), pursuing: z.string() })),
   routesWalked: z.array(z.string()),
   // Literal `false`, not `boolean`. The report is a lower bound and says so in
   // its type; a caller must not be able to read `complete: true` from it.
@@ -185,7 +186,7 @@ export const dependencyReportSchema = z.strictObject({
 });
 
 export const questionClosureSchema = z.strictObject({
-  question: z.string(),
+  question: ref("question"),
   asks: z.string(),
   open: z.boolean(),
   closure: z.enum(["answered", "abandoned", "accepted-as-unresolved"]).nullable(),
@@ -197,16 +198,16 @@ export const questionClosureSchema = z.strictObject({
 });
 
 export const enquiryStatusSchema = z.strictObject({
-  enquiry: z.string(),
+  enquiry: ref("enquiry"),
   pursuing: z.string(),
   contributed: z.array(citedFinding),
   question: questionClosureSchema.nullable(),
 });
 
 export const designHistorySchema = z.strictObject({
-  gate: z.string(),
-  originally: z.string(),
-  nowRequires: z.string(),
+  gate: ref("gate"),
+  originally: condition,
+  nowRequires: condition,
   criterion: ref("criterion"),
   amendments: z.array(amendmentRecord),
 });
@@ -218,9 +219,9 @@ export const interpretationHistorySchema = z.strictObject({
 });
 
 export const reproductionReportSchema = z.strictObject({
-  verification: z.string(),
+  verification: ref("analysis"),
   verificationMethod: z.string(),
-  of: z.string(),
+  of: ref("analysis"),
   ofMethod: z.string(),
   conclusion: z.enum(["agrees", "disagrees"]),
   execution: z.enum(["reproduced", "not-reproduced"]),
@@ -244,7 +245,7 @@ export const reproductionReportSchema = z.strictObject({
  * answer available".
  */
 export const questionOriginSchema = z.strictObject({
-  from: z.string(),
+  from: ref("question"),
   fromAsks: z.string(),
   reason: z.string(),
   knownAtTheTime: z.array(citedFinding),
@@ -252,7 +253,7 @@ export const questionOriginSchema = z.strictObject({
 export const originOfSchema = z.strictObject({ origin: questionOriginSchema.nullable() });
 
 export const taskContractSchema = z.strictObject({
-  work: z.string(),
+  work: ref("work"),
   objective: z.string(),
   acceptance: z.string(),
   mayRead: z.array(z.string()),
@@ -274,7 +275,7 @@ const evaluationSummary = z.strictObject({
 });
 
 export const gateStatusSchema = z.strictObject({
-  gate: z.string(),
+  gate: ref("gate"),
   consequence: z.string(),
   state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
   checks: z.array(checkStatus),
@@ -285,8 +286,8 @@ export const gateStatusSchema = z.strictObject({
 });
 
 const conflictSide = z.strictObject({
-  claim: z.string(),
-  question: z.string(),
+  claim: ref("claim"),
+  question: ref("question"),
   proposition: z.string(),
   asks: z.string(),
   supportedBy: z.array(citedFinding),
@@ -331,7 +332,7 @@ const changedConclusion = z.strictObject({
 });
 
 const unaffectedRecord = z.strictObject({
-  what: z.string(),
+  what: ref("observations"),
   named: z.string(),
   why: z.string(),
 });
@@ -344,17 +345,17 @@ export const verificationReportSchema = z.strictObject({
 
 export const amendmentReportSchema = z.strictObject({
   at: z.string(),
-  amendment: z.string(),
-  replaced: z.string(),
-  nowRequires: z.string(),
+  amendment: ref("decision"),
+  replaced: condition,
+  nowRequires: condition,
   rerun: z.array(gatedWork),
-  confirmatoryAffected: z.array(z.strictObject({ claim: z.string(), asserts: z.string() })),
+  confirmatoryAffected: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
   nature: z.enum(["mechanical", "scientific"]),
 });
 
 export const replacementReportSchema = z.strictObject({
   at: z.string(),
-  replacement: analysisRefSchema,
+  replacement: ref("analysis"),
   affected: z.array(z.string()),
   unaffected: z.array(unaffectedRecord),
   changed: z.array(changedConclusion),
@@ -366,7 +367,7 @@ export const reinterpretationReportSchema = z.strictObject({
   previously: z.string(),
   nowClaims: z.string(),
   evidenceStanding: z.array(citedFinding),
-  restingOnTheOldReading: z.array(z.strictObject({ question: z.string(), asks: z.string() })),
+  restingOnTheOldReading: z.array(z.strictObject({ question: ref("question"), asks: z.string() })),
   requiresRecomputation: z.boolean(),
 });
 

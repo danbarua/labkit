@@ -97,14 +97,14 @@ describe("S-10c: which input changed?", () => {
     const report = await (await afterwards()).reproductionOf(verification);
 
     expect(report.differs.map((d) => d.what.name)).toEqual([NAME, NAME]);
-    expect(report.differs.map((d) => d.what.part).sort()).toEqual(
+    expect(report.differs.map((d) => d.what.part.id).sort()).toEqual(
       [original.id, regenerated.id].sort(),
     );
 
     // And each is paired with the standing that belongs to it: the regenerated
     // series is what the re-run introduced, the original is what it stopped
     // using.
-    const byPart = new Map(report.differs.map((d) => [d.what.part, d.standing]));
+    const byPart = new Map(report.differs.map((d) => [d.what.part.id, d.standing]));
     expect(byPart.get(regenerated.id)).toBe("changed");
     expect(byPart.get(original.id)).toBe("not-used-by-the-re-run");
   });

@@ -13,6 +13,9 @@ export interface Ref<K extends string> {
   readonly id: string;
 }
 
+/** Builds a handle. Terser than the literal at the ~40 sites that mint one. */
+export const ref = <K extends string>(kind: K, id: string): Ref<K> => ({ kind, id });
+
 export type ObservationsRef = Ref<"observations">;
 export type QuestionRef = Ref<"question">;
 export type CriterionRef = Ref<"criterion">;
@@ -32,6 +35,27 @@ export type WorkRef = Ref<"work">;
 export type AnalysisRef = Ref<"analysis">;
 export type ReviewRef = Ref<"review">;
 export type EnquiryRef = Ref<"enquiry">;
+
+/**
+ * A claim, by identity.
+ *
+ * Claims had no handle: they were addressed only as a {@link ConclusionRef},
+ * which is an analysis id plus **wording**, and reported as bare propositions.
+ * That is the collapse PJ-030 is about, at the one entity the model is most
+ * about. `ConclusionRef` stays as an *input* convenience for a caller who has
+ * just run an analysis and does not hold the claim id yet; every report hands
+ * back one of these.
+ */
+export type ClaimRef = Ref<"claim">;
+
+/** A finding, by identity. */
+export type EvidenceRef = Ref<"evidence">;
+
+/** An evaluation of a criterion, by identity. */
+export type EvaluationRef = Ref<"evaluation">;
+
+/** A decision, by identity. */
+export type DecisionRef = Ref<"decision">;
 
 /** One proposition an analysis concluded, and the finding that bears on it. */
 export interface Conclusion {
@@ -84,7 +108,7 @@ export interface Conclusion {
  */
 export interface QuestionClosure {
   /** The question's identity, matching `QuestionStanding.question`. */
-  question: string;
+  question: QuestionRef;
   /** What it asks, in its own words. */
   asks: string;
   open: boolean;
@@ -134,7 +158,7 @@ export interface QuestionClosure {
  */
 export interface EnquiryStatus {
   /** This line of enquiry. */
-  enquiry: string;
+  enquiry: EnquiryRef;
   /** Its approach, in the researcher's words — what distinguishes it from a sibling pursuit. */
   pursuing: string;
   /**
@@ -199,7 +223,7 @@ export interface ReplacementReport {
 
 export interface UnaffectedRecord {
   /** The record's handle. */
-  what: string;
+  what: ObservationsRef;
   /** What it is, in the researcher's words — the wording half this used to lack. */
   named: string;
   why: string;
@@ -216,7 +240,7 @@ export interface UnaffectedRecord {
  * conditions checked, none failing, others never run.
  */
 export interface GateStatus {
-  gate: string;
+  gate: GateRef;
   consequence: string;
   /**
    * Four states, because a gate can be governed by several conditions and
@@ -253,7 +277,7 @@ export interface GateStatus {
 
 export interface CheckStatus {
   /** Stable identity. Two criteria worded identically are two criteria. */
-  criterion: string;
+  criterion: CriterionRef;
   /** Display text. Not an identity — see `criterion`. */
   proposition: string;
   /**
@@ -285,9 +309,9 @@ export interface EvaluationRecord {
    * different criteria sharing a value, outcome and instant were
    * indistinguishable once `GateStatus.evaluations` flattened them (PJ-030 §7).
    */
-  evaluation: string;
+  evaluation: EvaluationRef;
   /** The criterion this evaluated — the flattened list loses it otherwise. */
-  criterion: string;
+  criterion: CriterionRef;
   value: string;
   outcome: "pass" | "fail";
   at: string;
@@ -321,11 +345,11 @@ export interface EvaluationRecord {
  */
 export interface ReproductionReport {
   /** The verifying analysis's handle. */
-  verification: string;
+  verification: AnalysisRef;
   /** What it did. */
   verificationMethod: string;
   /** The analysis it re-checked, by handle. */
-  of: string;
+  of: AnalysisRef;
   /** What that one did. */
   ofMethod: string;
   /** Whether the re-run reached the same conclusion. Says nothing about how. */
@@ -402,7 +426,7 @@ export interface ReproductionReport {
  */
 export interface IdentifiedArtefact {
   /** The observations handle — identity, and the only thing that is. */
-  part: string;
+  part: ObservationsRef;
   /** Its `logical_name`. Two parts may legitimately share one. */
   name: string;
 }
@@ -471,7 +495,7 @@ export interface VerificationReport {
  * `IdentifiedArtefact` already use (PJ-030 §4).
  */
 export interface AffectedClaim {
-  claim: string;
+  claim: ClaimRef;
   asserts: string;
 }
 
@@ -482,7 +506,7 @@ export interface AffectedClaim {
  * findings a conclusion or a decision rests on — PJ-030 §4.
  */
 export interface CitedFinding {
-  evidence: string;
+  evidence: EvidenceRef;
   states: string;
 }
 
@@ -496,50 +520,62 @@ export interface CitedFinding {
  */
 export interface BearingFinding {
   finding: string;
-  evidence: string;
+  evidence: EvidenceRef;
   method: string;
-  analysis: string;
+  analysis: AnalysisRef;
 }
 
 /** A confirmatory result behind a gate: the claim's handle, and what it asserts. */
 export interface ConfirmatoryResult {
-  claim: string;
+  claim: ClaimRef;
   asserts: string;
 }
 
 /** A question closed on the strength of a reading: its handle, and what it asks. */
 export interface DecidedQuestion {
-  question: string;
+  question: QuestionRef;
   asks: string;
 }
 
 /** Work a gate protects: the task's handle, and its objective. */
 export interface GatedWork {
-  work: string;
+  work: WorkRef;
   objective: string;
 }
 
 /** The claim that replaced a withdrawn one: its handle, and what it now asserts. */
 export interface ReplacementClaim {
-  claim: string;
+  claim: ClaimRef;
   asserts: string;
 }
 
 /** An unmet check: the criterion's handle, and what it requires. */
 export interface UnmetCheck {
-  criterion: string;
+  criterion: CriterionRef;
+  requires: string;
+}
+
+/**
+ * A prespecified condition, by handle and by wording.
+ *
+ * The same shape as {@link UnmetCheck}, used wherever a report names a
+ * criterion — amendment history reported these as bare propositions, so two
+ * criteria worded alike were one and no caller could reach either.
+ */
+export interface Condition {
+  criterion: CriterionRef;
   requires: string;
 }
 
 /** An analysis that re-verified a finding. */
 export interface Reverification {
-  analysis: string;
+  analysis: AnalysisRef;
   method: string;
 }
 
 /** A line of enquiry reached by `whatDependsOn`. `enquiry` is the handle, `pursuing` its approach. */
 export interface AffectedEnquiry {
-  enquiry: string;
+  enquiry: EnquiryRef;
   pursuing: string;
 }
 
@@ -721,7 +757,7 @@ export interface HistoricalSurvey {
  * resolved by comparing text.
  */
 export interface QuestionStanding {
-  question: string;
+  question: QuestionRef;
   asks: string;
 }
 
@@ -782,7 +818,7 @@ export interface KnowledgeSurvey {
  */
 export interface QuestionOrigin {
   /** Identity of the question this one was sharpened from. */
-  from: string;
+  from: QuestionRef;
   /** What that question asked — still in its original words. */
   fromAsks: string;
   /** Why it was sharpened. */
@@ -801,10 +837,10 @@ export interface QuestionOrigin {
  */
 export interface AmendmentReport {
   at: string;
-  amendment: string;
+  amendment: DecisionRef;
   /** The setting as it stood, in its own words. Still readable afterwards — amending is not editing. */
-  replaced: string;
-  nowRequires: string;
+  replaced: Condition;
+  nowRequires: Condition;
   /** Work the amended condition protected, and which therefore has to be run again. Enumerated, not "everything downstream". */
   rerun: GatedWork[];
   /** Confirmatory results in the blast radius. Empty is the claim "none", and it is computed rather than assumed. */
@@ -814,9 +850,9 @@ export interface AmendmentReport {
 
 /** One amendment in a design's history, as read back long afterwards. */
 export interface AmendmentRecord {
-  amendment: string;
-  replaced: string;
-  nowRequires: string;
+  amendment: DecisionRef;
+  replaced: Condition;
+  nowRequires: Condition;
   reason: string;
   /** The findings the amendment was actually taken on — cited specifically, not a snapshot of everything known. */
   citing: CitedFinding[];
@@ -833,10 +869,10 @@ export interface AmendmentRecord {
  * settle about chronology.
  */
 export interface DesignHistory {
-  gate: string;
+  gate: GateRef;
   /** What the design said before anyone amended it. */
-  originally: string;
-  nowRequires: string;
+  originally: Condition;
+  nowRequires: Condition;
   /** The condition currently in force, for amending again. */
   criterion: CriterionRef;
   amendments: AmendmentRecord[];
@@ -863,7 +899,7 @@ export interface ReinterpretationReport {
 
 /** One revision of an interpretation, read back long afterwards. */
 export interface Revision {
-  revision: string;
+  revision: DecisionRef;
   previously: string;
   nowClaims: string;
   reason: string;
@@ -895,9 +931,9 @@ export type ClaimSubject = string | ConclusionRef;
 /** One side of a comparison between two findings. */
 export interface ConflictSide {
   /** The claim's handle. Two sides can assert the same sentence about different endpoints (S-5). */
-  claim: string;
+  claim: ClaimRef;
   /** The question this side's line of enquiry pursues. */
-  question: string;
+  question: QuestionRef;
   proposition: string;
   /** The question this claim answers. Where its scope lives — derived, not stored on the claim. */
   asks: string;
@@ -940,7 +976,7 @@ export interface ConflictVerdict {
  */
 export interface TaskContract {
   /** The work's handle. `GateStatus.gating` names the same entity as `{work, objective}`. */
-  work: string;
+  work: WorkRef;
   objective: string;
   acceptance: string;
   mayRead: string[];

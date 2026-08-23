@@ -163,13 +163,13 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
 
     const history = await session.designHistory(programme.feasibilityBoundary);
-    expect(history.originally).toBe(LOCKED_LIMIT);
-    expect(history.nowRequires).toBe(RAISED_LIMIT);
+    expect(history.originally.requires).toBe(LOCKED_LIMIT);
+    expect(history.nowRequires.requires).toBe(RAISED_LIMIT);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const durable = await later.designHistory(programme.feasibilityBoundary);
-    expect(durable.originally).toBe(LOCKED_LIMIT);
-    expect(durable.nowRequires).toBe(RAISED_LIMIT);
+    expect(durable.originally.requires).toBe(LOCKED_LIMIT);
+    expect(durable.nowRequires.requires).toBe(RAISED_LIMIT);
   });
 
   /**
@@ -290,7 +290,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
 
     const current = await session.designHistory(programme.feasibilityBoundary);
-    const raised = current.nowRequires;
+    const raised = current.nowRequires.requires;
     expect(raised).toBe(RAISED_LIMIT);
 
     await session.amendDesign({
@@ -309,13 +309,13 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     expect(later.events.all()).toHaveLength(0);
 
     const history = await later.designHistory(programme.feasibilityBoundary);
-    expect(history.originally).toBe(LOCKED_LIMIT);
-    expect(history.nowRequires).toBe("the solver converges within 50,000 iterations");
-    expect(history.amendments.map((a) => a.nowRequires)).toEqual([
+    expect(history.originally.requires).toBe(LOCKED_LIMIT);
+    expect(history.nowRequires.requires).toBe("the solver converges within 50,000 iterations");
+    expect(history.amendments.map((a) => a.nowRequires.requires)).toEqual([
       RAISED_LIMIT,
       "the solver converges within 50,000 iterations",
     ]);
-    expect(history.amendments.map((a) => a.replaced)).toEqual([LOCKED_LIMIT, RAISED_LIMIT]);
+    expect(history.amendments.map((a) => a.replaced.requires)).toEqual([LOCKED_LIMIT, RAISED_LIMIT]);
   });
 
   /**

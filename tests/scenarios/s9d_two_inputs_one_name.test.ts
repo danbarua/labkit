@@ -81,7 +81,7 @@ describe("S-9d: resting on one thing, or two?", () => {
       { part: regenerated, hash: "sha256:regenerated" },
     ]);
 
-    expect(parts.exact.map((p) => p.part).sort()).toEqual([surviving.id, regenerated.id].sort());
+    expect(parts.exact.map((p) => p.part.id).sort()).toEqual([surviving.id, regenerated.id].sort());
     expect(parts.exact.map((p) => p.name)).toEqual([NAME, NAME]);
   });
 
@@ -106,7 +106,7 @@ describe("S-9d: resting on one thing, or two?", () => {
     const why = await (await afterwards()).whySupported(DIVERGE);
 
     expect(why.restingOn).toHaveLength(2);
-    expect(why.restingOn.map((a) => a.part).sort()).toEqual(
+    expect(why.restingOn.map((a) => a.part.id).sort()).toEqual(
       [surviving.id, regenerated.id].sort(),
     );
     expect(why.restingOn.map((a) => a.name)).toEqual([NAME, NAME]);
@@ -136,6 +136,6 @@ describe("S-9d: resting on one thing, or two?", () => {
     await expect(reader.whatDependsOn(NAME)).rejects.toThrow(/2 artefacts are named/);
 
     const restingOn = (await reader.whySupported(DIVERGE)).restingOn;
-    expect(restingOn.map((a) => a.part).sort()).toEqual([surviving.id, regenerated.id].sort());
+    expect(restingOn.map((a) => a.part.id).sort()).toEqual([surviving.id, regenerated.id].sort());
   });
 });

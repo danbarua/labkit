@@ -54,6 +54,7 @@ import type {
   IdentifiedArtefact,
   SupportExplanation,
 } from "./report";
+import { ref } from "./report";
 import { SessionCore } from "./core";
 
 /** Every node carries a natural id; this is how a projection asks for it. */
@@ -112,13 +113,13 @@ export class ReadSurface extends SessionCore {
     );
 
     return {
-      from: row.origin.natural_id,
+      from: ref("question", row.origin.natural_id),
       fromAsks: row.origin.name,
       reason: row.d.reason,
       knownAtTheTime: dedupeById(
-        knew.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
-        (f) => f.evidence,
-      ).sort((a, b) => a.evidence.localeCompare(b.evidence)),
+        knew.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+        (f) => f.evidence.id,
+      ).sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
     };
   }
 
@@ -208,7 +209,7 @@ export class ReadSurface extends SessionCore {
     // describe an answer nobody computed.
     const survey: HistoricalSurvey = { at: asOf, established: [], provisional: [], accepted: [], open: [] };
     for (const [question, e] of by) {
-      const standing: QuestionStanding = { question, asks: e.asks };
+      const standing: QuestionStanding = { question: ref("question", question), asks: e.asks };
       if (e.resolved && e.promoted) survey.established.push(standing);
       else if (e.resolved) survey.provisional.push(standing);
       else if (e.accepted) survey.accepted.push(standing);
@@ -273,7 +274,7 @@ export class ReadSurface extends SessionCore {
       accepted: [],
     };
     for (const [question, entry] of byQuestion) {
-      const standing: QuestionStanding = { question, asks: entry.asks };
+      const standing: QuestionStanding = { question: ref("question", question), asks: entry.asks };
       // Settled beats accepted: a question answered after being accepted is
       // answered. Accepted beats worked, because a reader scanning for what
       // still needs doing must not find a deliberately-parked question there.
@@ -328,8 +329,8 @@ export class ReadSurface extends SessionCore {
       { id: enquiry.id },
     );
     const contributed = dedupeById(
-      mine.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
-      (f) => f.evidence,
+      mine.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+      (f) => f.evidence.id,
     );
 
     // Identity and wording, kept apart. The old line was
@@ -344,11 +345,11 @@ export class ReadSurface extends SessionCore {
 
     if (!resolving && !deferred) {
       return {
-        enquiry: enquiry.id,
+        enquiry,
         pursuing: loe.loe.name,
         contributed,
         question: behind && {
-          question: behind.natural_id,
+          question: ref("question", behind.natural_id),
           asks: behind.name,
           open: true,
           closure: null,
@@ -370,18 +371,18 @@ export class ReadSurface extends SessionCore {
         { id: accepting.natural_id },
       );
       return {
-        enquiry: enquiry.id,
+        enquiry,
         pursuing: loe.loe.name,
         contributed,
         question: behind && {
-          question: behind.natural_id,
+          question: ref("question", behind.natural_id),
           asks: behind.name,
           open: true,
           closure: "accepted-as-unresolved",
           answer: null,
           evidence: dedupeById(
-            inLightOf.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
-            (f) => f.evidence,
+            inLightOf.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+            (f) => f.evidence.id,
           ),
           acceptedBecause: accepting.reason,
           reopensIf: accepting.invalidation_check,
@@ -411,11 +412,11 @@ export class ReadSurface extends SessionCore {
 
     if (cited.length === 0) {
       return {
-        enquiry: enquiry.id,
+        enquiry,
         pursuing: loe.loe.name,
         contributed,
         question: behind && {
-          question: behind.natural_id,
+          question: ref("question", behind.natural_id),
           asks: behind.name,
           open: false,
           closure: "abandoned",
@@ -441,18 +442,18 @@ export class ReadSurface extends SessionCore {
       { id: resolving!.natural_id },
     );
     return {
-      enquiry: enquiry.id,
+      enquiry,
       pursuing: loe.loe.name,
       contributed,
       question: behind && {
-        question: behind.natural_id,
+        question: ref("question", behind.natural_id),
         asks: behind.name,
         open: false,
         closure: "answered",
         answer: challenges ? "no" : "yes",
         evidence: dedupeById(
-          cited.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
-          (f) => f.evidence,
+          cited.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+          (f) => f.evidence.id,
         ),
         restsOn: promoted.some((r) => r.c.kind === "confirmatory") ? "confirmatory" : "exploratory",
       },
@@ -518,7 +519,7 @@ export class ReadSurface extends SessionCore {
       // unparseable contract is an empty one, not a crash.
     }
     return {
-      work: work.id,
+      work,
       objective: task.objective,
       acceptance: task.acceptance,
       mayRead,
@@ -596,7 +597,7 @@ export class ReadSurface extends SessionCore {
       return new Map(
         rows.map((r) => [
           r.a.natural_id,
-          { part: r.a.natural_id, name: r.a.logical_name },
+          { part: ref("observations", r.a.natural_id), name: r.a.logical_name },
         ]),
       );
     };
@@ -631,7 +632,7 @@ export class ReadSurface extends SessionCore {
     // Sorted by name then identity: the name is what a reader scans, and the
     // identity is what breaks the tie when two inputs share one (S-10c).
     differs.sort(
-      (a, b) => a.what.name.localeCompare(b.what.name) || a.what.part.localeCompare(b.what.part),
+      (a, b) => a.what.name.localeCompare(b.what.name) || a.what.part.id.localeCompare(b.what.part.id),
     );
 
     const reproduced = !provenanceMissing && differs.length === 0;
@@ -656,9 +657,9 @@ export class ReadSurface extends SessionCore {
       // Identity and wording both. These were the computations' METHOD text
       // only, so two runs of one method were indistinguishable -- the same
       // `via` defect PJ-030 §4 caught one function away.
-      verification: verification.id,
+      verification,
       verificationMethod: method[0]!.c.kind,
-      of: found.oldcomp.natural_id,
+      of: ref("analysis", found.oldcomp.natural_id),
       ofMethod: found.oldcomp.kind,
       conclusion: agrees ? "agrees" : "disagrees",
       execution: reproduced ? "reproduced" : "not-reproduced",
@@ -735,9 +736,15 @@ export class ReadSurface extends SessionCore {
           ? changedBy.get(chain[i + 1]!.decision)
           : inForce[0];
       return {
-        amendment: step.decision,
-        replaced: (wasCriterion && propositionOf.get(wasCriterion)) ?? "",
-        nowRequires: (nextCriterion && propositionOf.get(nextCriterion)) ?? "",
+        amendment: ref("decision", step.decision),
+        replaced: {
+          criterion: ref("criterion", wasCriterion ?? ""),
+          requires: (wasCriterion && propositionOf.get(wasCriterion)) ?? "",
+        },
+        nowRequires: {
+          criterion: ref("criterion", nextCriterion ?? ""),
+          requires: (nextCriterion && propositionOf.get(nextCriterion)) ?? "",
+        },
         reason: step.reason,
         citing: step.citing,
         rerun,
@@ -747,10 +754,16 @@ export class ReadSurface extends SessionCore {
 
     const firstReplaced = amendments[0]?.replaced;
     return {
-      gate: gate.id,
-      originally: firstReplaced ?? propositionOf.get(inForce[0]!)!,
-      nowRequires: propositionOf.get(inForce[0]!)!,
-      criterion: { kind: "criterion", id: inForce[0]! },
+      gate,
+      originally: firstReplaced ?? {
+        criterion: ref("criterion", inForce[0]!),
+        requires: propositionOf.get(inForce[0]!)!,
+      },
+      nowRequires: {
+        criterion: ref("criterion", inForce[0]!),
+        requires: propositionOf.get(inForce[0]!)!,
+      },
+      criterion: ref("criterion", inForce[0]!),
       amendments,
     };
   }
@@ -784,7 +797,7 @@ export class ReadSurface extends SessionCore {
       };
       if (row.older) node.older = row.older.natural_id;
       // By id: two citations can say the same sentence and be two findings.
-      if (row.e) node.citing.set(row.e.natural_id, { evidence: row.e.natural_id, states: row.e.statement });
+      if (row.e) node.citing.set(row.e.natural_id, { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
       nodes.set(row.d.natural_id, node);
     }
 
@@ -806,7 +819,7 @@ export class ReadSurface extends SessionCore {
       ordered.push({
         decision: cursor,
         reason: node.reason,
-        citing: [...node.citing.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
+        citing: [...node.citing.values()].sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
       });
       cursor = followedBy.get(cursor);
     }
@@ -913,7 +926,7 @@ export class ReadSurface extends SessionCore {
     );
 
     return {
-      gate: gate.id,
+      gate,
       consequence: found.g.consequence,
       state,
       checks,
@@ -923,7 +936,7 @@ export class ReadSurface extends SessionCore {
       // the handle, so a caller with an odd objective can go and look rather
       // than being handed a placeholder.
       gating: gating.map((g) => ({
-        work: g.w.natural_id,
+        work: ref("work", g.w.natural_id),
         objective: g.w.objective ?? "",
       })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
@@ -986,10 +999,10 @@ export class ReadSurface extends SessionCore {
       if (row.ev) {
         // One row per (evaluation, basis) pair, so an evaluation citing several
         // findings arrives more than once. Accumulate rather than push.
-        const seen = entry.evaluations.find((e) => e.evaluation === row.ev!.natural_id);
+        const seen = entry.evaluations.find((e) => e.evaluation.id === row.ev!.natural_id);
         const record = seen ?? {
-          evaluation: row.ev.natural_id,
-          criterion: id,
+          evaluation: ref("evaluation", row.ev.natural_id),
+          criterion: ref("criterion", id),
           value: row.ev.value,
           outcome: row.ev.outcome,
           at: row.ev.evaluated_at,
@@ -999,8 +1012,8 @@ export class ReadSurface extends SessionCore {
         };
         if (row.basis) {
           // By id, not by statement: two findings can say the same sentence.
-          if (!record.basis.some((b) => b.evidence === row.basis!.natural_id))
-            record.basis.push({ evidence: row.basis.natural_id, states: row.basis.statement });
+          if (!record.basis.some((b) => b.evidence.id === row.basis!.natural_id))
+            record.basis.push({ evidence: ref("evidence", row.basis.natural_id), states: row.basis.statement });
           record.cited += 1;
           if (!row.basisout?.invalidated) record.standing += 1;
         }
@@ -1024,7 +1037,7 @@ export class ReadSurface extends SessionCore {
       value: e.value,
       outcome: e.outcome,
       at: e.at,
-      basis: [...e.basis].sort((x, y) => x.evidence.localeCompare(y.evidence)),
+      basis: [...e.basis].sort((x, y) => x.evidence.id.localeCompare(y.evidence.id)),
       // Present only when true, so a record that stands is byte-identical to
       // what it was before this field existed.
       ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
@@ -1036,7 +1049,7 @@ export class ReadSurface extends SessionCore {
       // identity. Without this, which evaluation gets reported as "the" value
       // of a check is not a stable contract between runs.
       const ordered = entry.evaluations.sort(
-        (a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation),
+        (a, b) => a.at.localeCompare(b.at) || a.evaluation.id.localeCompare(b.evaluation.id),
       );
 
       // A failure sticks -- among verdicts that still stand. One failing
@@ -1071,7 +1084,7 @@ export class ReadSurface extends SessionCore {
             ? "no-standing-verdict"
             : "never-run";
       checks.push({
-        criterion: id,
+        criterion: ref("criterion", id),
         proposition: entry.proposition,
         state,
         evaluations: ordered.map(strip),
@@ -1145,7 +1158,7 @@ export class ReadSurface extends SessionCore {
       seen.add(step.was.natural_id);
 
       steps.unshift({
-        revision: step.d.natural_id,
+        revision: ref("decision", step.d.natural_id),
         previously: step.was.name,
         nowClaims: current,
         reason: step.d.reason,
@@ -1220,17 +1233,17 @@ export class ReadSurface extends SessionCore {
     const findings = async (bearing: "SUPPORTS" | "CHALLENGES") =>
       dedupeById(
         (await this.findingsBearing(scope, bearing)).map((r) => ({
-          evidence: r.e.natural_id,
+          evidence: ref("evidence", r.e.natural_id),
           states: r.e.statement,
         })),
-        (f) => f.evidence,
-      ).sort((a, b) => a.evidence.localeCompare(b.evidence));
+        (f) => f.evidence.id,
+      ).sort((a, b) => a.evidence.id.localeCompare(b.evidence.id));
 
     const claim = await this.claimFor(conclusion);
 
     return {
-      claim,
-      question: asked[0]?.q.natural_id ?? "",
+      claim: ref("claim", claim),
+      question: ref("question", asked[0]?.q.natural_id ?? ""),
       proposition: conclusion.proposition,
       asks: asked[0]?.q.name ?? "",
       supportedBy: await findings("SUPPORTS"),
@@ -1288,9 +1301,9 @@ export class ReadSurface extends SessionCore {
       for (const row of rows) {
         const entry = {
           finding: row.e.statement,
-          evidence: row.e.natural_id,
+          evidence: ref("evidence", row.e.natural_id),
           method: row.comp.kind,
-          analysis: row.comp.natural_id,
+          analysis: ref("analysis", row.comp.natural_id),
         };
         if (row.a?.invalidated) {
           // Deduped, and the reason comes from INVALIDATED_BY rather than from
@@ -1298,7 +1311,7 @@ export class ReadSurface extends SessionCore {
           // in one line before row O: a finding superseded once was reported
           // once per review of its unit, each with a different reason, and the
           // reasons contradicted each other.
-          if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
+          if (!superseded.some((x) => x.evidence.id === entry.evidence.id && x.bearing === bearing))
             superseded.push({
               ...entry,
               bearing,
@@ -1311,8 +1324,8 @@ export class ReadSurface extends SessionCore {
           // A re-verification is not a second independent finding. Counting it
           // as one reported a proposition established once as corroborated
           // twice -- S-10, and the reason `REVERIFIES` exists.
-          if (!reverifiedBy.some((r) => r.analysis === row.comp.natural_id))
-            reverifiedBy.push({ analysis: row.comp.natural_id, method: row.comp.kind });
+          if (!reverifiedBy.some((r) => r.analysis.id === row.comp.natural_id))
+            reverifiedBy.push({ analysis: ref("analysis", row.comp.natural_id), method: row.comp.kind });
         } else {
           live.push(entry);
         }
@@ -1448,7 +1461,7 @@ export class ReadSurface extends SessionCore {
         ...new Map(
           resting
             .filter((r) => !reverifying.has(r.e.natural_id))
-            .map((r) => [r.a.natural_id, { part: r.a.natural_id, name: r.a.logical_name }]),
+            .map((r) => [r.a.natural_id, { part: ref("observations", r.a.natural_id), name: r.a.logical_name }]),
         ).values(),
       ],
       superseded,
@@ -1512,7 +1525,7 @@ export class ReadSurface extends SessionCore {
       // Keyed by natural id, never by name. An original and its regeneration
       // legitimately share a `logical_name` (S-9), and reporting bare names put
       // that one string in `exact` and `differing` at once -- see S-9c.
-      const entry = { part: a.natural_id, name: a.logical_name };
+      const entry = { part: ref("observations", a.natural_id), name: a.logical_name };
       if (!a.content_hash) unverifiable.push(entry);
       else if (candidate === undefined) notRebuilt.push(entry);
       else if (candidate === a.content_hash) exact.push(entry);
@@ -1520,7 +1533,7 @@ export class ReadSurface extends SessionCore {
     }
 
     const byName = (a: IdentifiedArtefact, b: IdentifiedArtefact) =>
-      a.name.localeCompare(b.name) || a.part.localeCompare(b.part);
+      a.name.localeCompare(b.name) || a.part.id.localeCompare(b.part.id);
     return {
       exact: exact.sort(byName),
       differing: differing.sort(byName),
@@ -1619,8 +1632,8 @@ export class ReadSurface extends SessionCore {
     const enquiries = new Map<string, AffectedEnquiry>();
     for (const artefact of reached) {
       const { claims: c, enquiries: e } = await this.restingOnArtefact(artefact);
-      for (const found of c) claims.set(found.claim, found);
-      for (const found of e) enquiries.set(found.enquiry, found);
+      for (const found of c) claims.set(found.claim.id, found);
+      for (const found of e) enquiries.set(found.enquiry.id, found);
     }
 
     return {
@@ -1679,10 +1692,10 @@ export class ReadSurface extends SessionCore {
       claims: all.flatMap((r) =>
         [r.claim, r.challenged]
           .filter((c): c is ClaimProps & Identified => !!c)
-          .map((c) => ({ claim: c.natural_id, asserts: c.name })),
+          .map((c) => ({ claim: ref("claim", c.natural_id), asserts: c.name })),
       ),
       enquiries: all.flatMap((r) =>
-        r.loe ? [{ enquiry: r.loe.natural_id, pursuing: r.loe.name }] : [],
+        r.loe ? [{ enquiry: ref("enquiry", r.loe.natural_id), pursuing: r.loe.name }] : [],
       ),
     };
   }

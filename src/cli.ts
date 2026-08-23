@@ -125,7 +125,7 @@ function bullets(items: string[], empty: string): string {
 function questionLines(questions: QuestionStanding[], all: QuestionStanding[]): string[] {
   const counts = new Map<string, number>();
   for (const q of all) counts.set(q.asks, (counts.get(q.asks) ?? 0) + 1);
-  return questions.map((q) => (counts.get(q.asks)! > 1 ? `${q.asks}  [${q.question}]` : q.asks));
+  return questions.map((q) => (counts.get(q.asks)! > 1 ? `${q.asks}  [${q.question.id}]` : q.asks));
 }
 
 /** Every question in a survey, whichever bucket it landed in — the collision set. */
@@ -206,21 +206,21 @@ export function renderWhy(why: SupportExplanation): string {
     why.replacedBy ? `  replaced by: "${why.replacedBy.asserts}"  (${why.replacedBy.claim})` : "",
     "",
     "Resting on",
-    bullets(why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis})`), "nothing"),
+    bullets(why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis.id})`), "nothing"),
     why.against.length
-      ? `\nBearing against\n${bullets(why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis})`), "")}`
+      ? `\nBearing against\n${bullets(why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis.id})`), "")}`
       : "",
     why.reverifiedBy.length
-      ? `\nRe-checked by\n${bullets(why.reverifiedBy.map((r) => `${r.method}  (${r.analysis})`), "")}`
+      ? `\nRe-checked by\n${bullets(why.reverifiedBy.map((r) => `${r.method}  (${r.analysis.id})`), "")}`
       : "",
     why.standard.length
       ? `\nHeld to\n${bullets(why.standard.map((c) => `${c.proposition} — ${c.state}`), "")}`
       : "\nHeld to no prespecified standard.",
     why.unmet.length
-      ? `\nNot currently met\n${bullets(why.unmet.map((u) => `${u.requires}  (${u.criterion})`), "")}`
+      ? `\nNot currently met\n${bullets(why.unmet.map((u) => `${u.requires}  (${u.criterion.id})`), "")}`
       : "",
     why.restingOn.length
-      ? `\nUltimately resting on\n${bullets(why.restingOn.map((a) => `${a.name}  [${a.part}]`), "")}`
+      ? `\nUltimately resting on\n${bullets(why.restingOn.map((a) => `${a.name}  [${a.part.id}]`), "")}`
       : "",
     why.superseded.length
       ? `\nSuperseded\n${bullets(why.superseded.map((s) => `${s.finding} — ${s.reason}`), "")}`
@@ -235,10 +235,10 @@ export function renderAffects(report: DependencyReport): string {
     "Claims that would be affected",
     // Id and wording both. A person reading this needs the sentence; a person
     // acting on it needs the handle every other command takes.
-    bullets(report.claims.map((c) => `${c.asserts}  (${c.claim})`), "none found"),
+    bullets(report.claims.map((c) => `${c.asserts}  (${c.claim.id})`), "none found"),
     "",
     "Lines of enquiry",
-    bullets(report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry})`), "none found"),
+    bullets(report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry.id})`), "none found"),
     "",
     "Routes walked",
     bullets(report.routesWalked, ""),
@@ -276,22 +276,22 @@ export function renderEnquiry(status: EnquiryStatus): string {
     // The enquiry first, because that is what was asked about. The question's
     // state is printed as the question's, not as this pursuit's -- PJ-030 §6:
     // flattened, every pursuit of an answered question read as answered itself.
-    `${status.pursuing}  (${status.enquiry})`,
+    `${status.pursuing}  (${status.enquiry.id})`,
     status.contributed.length
       ? `  produced ${status.contributed.length} finding${status.contributed.length === 1 ? "" : "s"}`
       : "  has produced nothing yet",
     "",
-    q ? `Pursuing "${q.asks}"  (${q.question})` : "Pursuing nothing on the record",
+    q ? `Pursuing "${q.asks}"  (${q.question.id})` : "Pursuing nothing on the record",
     `  ${standing}`,
     q?.acceptedBecause ? `  accepted because: ${q.acceptedBecause}` : "",
     q?.reopensIf ? `  reopens if: ${q.reopensIf}` : "",
     q?.answer ? `  answer: ${q.answer}` : "",
     q?.restsOn ? `  resting on ${q.restsOn} work` : "",
     status.contributed.length
-      ? `\nThis enquiry's findings\n${bullets(status.contributed.map((e) => `${e.states}  (${e.evidence})`), "")}`
+      ? `\nThis enquiry's findings\n${bullets(status.contributed.map((e) => `${e.states}  (${e.evidence.id})`), "")}`
       : "",
     q?.evidence.length
-      ? `\nThe question's answer rests on\n${bullets(q.evidence.map((e) => `${e.states}  (${e.evidence})`), "")}`
+      ? `\nThe question's answer rests on\n${bullets(q.evidence.map((e) => `${e.states}  (${e.evidence.id})`), "")}`
       : "",
   ]
     .filter(Boolean)

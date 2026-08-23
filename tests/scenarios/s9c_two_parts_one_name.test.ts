@@ -76,8 +76,8 @@ describe("S-9c: two parts, one name", () => {
       { part: regenerated, hash: "sha256:something-else" },
     ]);
 
-    expect(report.exact).toEqual([{ part: original.id, name: NAME }]);
-    expect(report.differing).toEqual([{ part: regenerated.id, name: NAME }]);
+    expect(report.exact).toEqual([{ part: original, name: NAME }]);
+    expect(report.differing).toEqual([{ part: regenerated, name: NAME }]);
     expect(report.reproducible).toBe(false);
 
     // The names alone are identical, which is the whole point: identity is the
@@ -98,7 +98,7 @@ describe("S-9c: two parts, one name", () => {
     });
 
     const report = await (await afterwards()).reproducibilityOf(analysis, []);
-    expect(report.unverifiable).toEqual([{ part: noHash.id, name: NAME }]);
+    expect(report.unverifiable).toEqual([{ part: noHash, name: NAME }]);
     expect(report.notRebuilt).toEqual([]);
   });
 });
