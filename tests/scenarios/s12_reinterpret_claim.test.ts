@@ -94,7 +94,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     expect(report.nowClaims).toBe(NARROWER);
     expect(report.previously).toBe(PREFERENTIAL);
     expect(report.requiresRecomputation).toBe(false);
-    expect(report.evidenceStanding.sort()).toEqual([
+    expect(report.evidenceStanding.map((f) => f.states).sort()).toEqual([
       "discriminative amplitude ratio 0.79, non-discriminative 0.41",
       "discriminative amplitude ratio 0.81, non-discriminative 0.44",
     ]);
@@ -203,13 +203,13 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       because: "both types attenuate",
     });
 
-    expect(report.restingOnTheOldReading).toEqual([
+    expect(report.restingOnTheOldReading.map((q) => q.asks)).toEqual([
       "does the encoding preferentially preserve discriminative signal?",
     ]);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const history = await later.interpretationHistory(NARROWER);
-    expect(history.revisions[0]!.restingOnTheOldReading).toEqual([
+    expect(history.revisions[0]!.restingOnTheOldReading.map((q) => q.asks)).toEqual([
       "does the encoding preferentially preserve discriminative signal?",
     ]);
   });

@@ -107,7 +107,7 @@ export class ReadSurface extends SessionCore {
     const row = rows[0]!;
     const knew = await this.graph.query(
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence) RETURN e`,
-      { e: vertexProps<{ statement: string }>() },
+      { e: vertexProps<{ statement: string } & Identified>() },
       { id: row.d.natural_id },
     );
 
@@ -115,7 +115,10 @@ export class ReadSurface extends SessionCore {
       from: row.origin.natural_id,
       fromAsks: row.origin.name,
       reason: row.d.reason,
-      knownAtTheTime: knew.map((r) => r.e.statement).sort(),
+      knownAtTheTime: dedupeById(
+        knew.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
+        (f) => f.evidence,
+      ).sort((a, b) => a.evidence.localeCompare(b.evidence)),
     };
   }
 
@@ -649,8 +652,13 @@ export class ReadSurface extends SessionCore {
     const agrees = newChallenges === oldChallenges;
 
     return {
-      verification: method[0]?.c.kind ?? "unknown",
-      of: found.oldcomp.kind,
+      // Identity and wording both. These were the computations' METHOD text
+      // only, so two runs of one method were indistinguishable -- the same
+      // `via` defect PJ-030 §4 caught one function away.
+      verification: verification.id,
+      verificationMethod: method[0]!.c.kind,
+      of: found.oldcomp.natural_id,
+      ofMethod: found.oldcomp.kind,
       conclusion: agrees ? "agrees" : "disagrees",
       execution: reproduced ? "reproduced" : "not-reproduced",
       differs,
@@ -749,7 +757,7 @@ export class ReadSurface extends SessionCore {
   /** Amendments to one design, ordered oldest-first by following supersession back to its root. */
   private async amendmentChain(
     gateId: string,
-  ): Promise<Array<{ decision: string; reason: string; citing: string[] }>> {
+  ): Promise<Array<{ decision: string; reason: string; citing: CitedFinding[] }>> {
     const rows = await this.graph.query(
       `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
        OPTIONAL MATCH (d)-[:SUPERSEDES]->(older:Decision)
@@ -758,23 +766,24 @@ export class ReadSurface extends SessionCore {
       {
         d: vertexProps<{ natural_id: string; reason: string }>(),
         older: optional(vertexProps<{ natural_id: string }>()),
-        e: optional(vertexProps<{ statement: string }>()),
+        e: optional(vertexProps<{ statement: string } & Identified>()),
       },
       { id: gateId },
     );
 
     const nodes = new Map<
       string,
-      { reason: string; older: string | null; citing: Set<string> }
+      { reason: string; older: string | null; citing: Map<string, CitedFinding> }
     >();
     for (const row of rows) {
       const node = nodes.get(row.d.natural_id) ?? {
         reason: row.d.reason,
         older: null,
-        citing: new Set<string>(),
+        citing: new Map<string, CitedFinding>(),
       };
       if (row.older) node.older = row.older.natural_id;
-      if (row.e) node.citing.add(row.e.statement);
+      // By id: two citations can say the same sentence and be two findings.
+      if (row.e) node.citing.set(row.e.natural_id, { evidence: row.e.natural_id, states: row.e.statement });
       nodes.set(row.d.natural_id, node);
     }
 
@@ -788,7 +797,7 @@ export class ReadSurface extends SessionCore {
     const ordered: Array<{
       decision: string;
       reason: string;
-      citing: string[];
+      citing: CitedFinding[];
     }> = [];
     let cursor = root;
     while (cursor) {
@@ -796,7 +805,7 @@ export class ReadSurface extends SessionCore {
       ordered.push({
         decision: cursor,
         reason: node.reason,
-        citing: [...node.citing].sort(),
+        citing: [...node.citing.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
       });
       cursor = followedBy.get(cursor);
     }
@@ -1182,23 +1191,33 @@ export class ReadSurface extends SessionCore {
 
     const asked = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
-      { q: vertexProps<{ name: string }>() },
+      { q: vertexProps<{ name: string } & Identified>() },
       { id: enquiry },
     );
 
     const scope = resolved;
-    const supportedBy = (await this.findingsBearing(scope, "SUPPORTS")).map(
-      (r) => r.e.statement,
-    );
-    const challengedBy = (await this.findingsBearing(scope, "CHALLENGES")).map(
-      (r) => r.e.statement,
-    );
+    // Deduped by id. `findingsBearing` already selects natural_id and it was
+    // being discarded on the mapping line, so two independent findings phrased
+    // alike counted as one corroboration -- and `doTheseConflict` decides from
+    // these arrays' lengths.
+    const findings = async (bearing: "SUPPORTS" | "CHALLENGES") =>
+      dedupeById(
+        (await this.findingsBearing(scope, bearing)).map((r) => ({
+          evidence: r.e.natural_id,
+          states: r.e.statement,
+        })),
+        (f) => f.evidence,
+      ).sort((a, b) => a.evidence.localeCompare(b.evidence));
+
+    const claim = await this.claimFor(conclusion);
 
     return {
+      claim,
+      question: asked[0]?.q.natural_id ?? "",
       proposition: conclusion.proposition,
       asks: asked[0]?.q.name ?? "",
-      supportedBy: [...new Set(supportedBy)].sort(),
-      challengedBy: [...new Set(challengedBy)].sort(),
+      supportedBy: await findings("SUPPORTS"),
+      challengedBy: await findings("CHALLENGES"),
       enquiry,
     };
   }

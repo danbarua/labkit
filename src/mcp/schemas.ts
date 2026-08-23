@@ -105,6 +105,7 @@ const bearingFinding = z.strictObject({
 });
 
 const unmetCheck = z.strictObject({ criterion: z.string(), requires: z.string() });
+const gatedWork = z.strictObject({ work: z.string(), objective: z.string() });
 
 const checkStatus = z.strictObject({
   criterion: z.string(),
@@ -119,8 +120,8 @@ const amendmentRecord = z.strictObject({
   replaced: z.string(),
   nowRequires: z.string(),
   reason: z.string(),
-  citing: z.array(z.string()),
-  rerun: z.array(z.string()),
+  citing: z.array(citedFinding),
+  rerun: z.array(gatedWork),
   nature: z.enum(["mechanical", "scientific"]),
 });
 
@@ -129,7 +130,7 @@ const revision = z.strictObject({
   previously: z.string(),
   nowClaims: z.string(),
   reason: z.string(),
-  restingOnTheOldReading: z.array(z.string()),
+  restingOnTheOldReading: z.array(z.strictObject({ question: z.string(), asks: z.string() })),
 });
 
 /* -- the seven tools' return shapes -------------------------------------- */
@@ -216,7 +217,9 @@ export const interpretationHistorySchema = z.strictObject({
 
 export const reproductionReportSchema = z.strictObject({
   verification: z.string(),
+  verificationMethod: z.string(),
   of: z.string(),
+  ofMethod: z.string(),
   conclusion: z.enum(["agrees", "disagrees"]),
   execution: z.enum(["reproduced", "not-reproduced"]),
   differs: z.array(
@@ -242,7 +245,7 @@ export const questionOriginSchema = z.strictObject({
   from: z.string(),
   fromAsks: z.string(),
   reason: z.string(),
-  knownAtTheTime: z.array(z.string()),
+  knownAtTheTime: z.array(citedFinding),
 });
 export const originOfSchema = z.strictObject({ origin: questionOriginSchema.nullable() });
 
@@ -274,15 +277,17 @@ export const gateStatusSchema = z.strictObject({
   checks: z.array(checkStatus),
   unmet: z.array(unmetCheck),
   evaluations: z.array(evaluationSummary),
-  gating: z.array(z.strictObject({ work: z.string(), objective: z.string() })),
+  gating: z.array(gatedWork),
   everFailed: z.boolean(),
 });
 
 const conflictSide = z.strictObject({
+  claim: z.string(),
+  question: z.string(),
   proposition: z.string(),
   asks: z.string(),
-  supportedBy: z.array(z.string()),
-  challengedBy: z.array(z.string()),
+  supportedBy: z.array(citedFinding),
+  challengedBy: z.array(citedFinding),
 });
 
 export const conflictVerdictSchema = z.strictObject({
@@ -338,8 +343,8 @@ export const amendmentReportSchema = z.strictObject({
   amendment: z.string(),
   replaced: z.string(),
   nowRequires: z.string(),
-  rerun: z.array(z.string()),
-  confirmatoryAffected: z.array(z.string()),
+  rerun: z.array(gatedWork),
+  confirmatoryAffected: z.array(z.strictObject({ claim: z.string(), asserts: z.string() })),
   nature: z.enum(["mechanical", "scientific"]),
 });
 
@@ -356,8 +361,8 @@ export const reinterpretationReportSchema = z.strictObject({
   at: z.string(),
   previously: z.string(),
   nowClaims: z.string(),
-  evidenceStanding: z.array(z.string()),
-  restingOnTheOldReading: z.array(z.string()),
+  evidenceStanding: z.array(citedFinding),
+  restingOnTheOldReading: z.array(z.strictObject({ question: z.string(), asks: z.string() })),
   requiresRecomputation: z.boolean(),
 });
 

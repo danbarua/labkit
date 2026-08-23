@@ -82,6 +82,7 @@ import type {
   GateRef,
   WorkRef,
   ChangedConclusion,
+  CitedFinding,
   Conclusion,
   ConclusionRef,
   EnquiryRef,
@@ -919,19 +920,6 @@ export class WriteSurface extends SessionCore {
     this.emit("promote", input.claim.analysis.id, { proposition: input.claim.proposition });
   }
 
-  /** The Claim node a conclusion asserts, within its own line of enquiry. */
-  private async claimFor(ref: ConclusionRef): Promise<string> {
-    const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(:Evidence)-[:SUPPORTS]->(c:Claim {name: $name})
-       RETURN c`,
-      { c: vertexProps<{ natural_id: string }>() },
-      { id: ref.analysis.id, name: ref.proposition },
-    );
-    const found = rows[0];
-    if (!found) throw new Error(`analysis ${ref.analysis.id} concluded nothing about "${ref.proposition}"`);
-    return found.c.natural_id;
-  }
-
   /**
    * Amends a locked design: replaces one condition with another, recording the
    * act rather than editing the setting.
@@ -1251,7 +1239,10 @@ export class WriteSurface extends SessionCore {
         narrower.natural_id,
       );
 
-      const carried = new Set<string>();
+      // Keyed by id. The query below selects natural_id AND statement and only
+      // the statement was kept, so two findings phrased alike merged -- in the
+      // field whose whole job is showing the findings survived unchanged.
+      const carried = new Map<string, CitedFinding>();
       for (const id of new Set(claims.map((c) => c.c.natural_id))) {
         const claim = { c: { natural_id: id } };
         await this.graph.createEdge(
@@ -1275,7 +1266,7 @@ export class WriteSurface extends SessionCore {
             "SUPPORTS",
             narrower.natural_id,
           );
-          carried.add(row.e.statement);
+          carried.set(row.e.natural_id, { evidence: row.e.natural_id, states: row.e.statement });
         }
       }
 
@@ -1293,7 +1284,7 @@ export class WriteSurface extends SessionCore {
       at,
       previously: scope.proposition,
       nowClaims: input.as,
-      evidenceStanding: [...carried].sort(),
+      evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
       restingOnTheOldReading,
       requiresRecomputation: false,
     };

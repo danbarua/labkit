@@ -307,10 +307,14 @@ export interface EvaluationRecord {
  * boolean is the mistake the scenario is named after.
  */
 export interface ReproductionReport {
-  /** The re-verifying analysis, by method. */
+  /** The verifying analysis's handle. */
   verification: string;
-  /** The historical analysis it re-checked, by method. */
+  /** What it did. */
+  verificationMethod: string;
+  /** The analysis it re-checked, by handle. */
   of: string;
+  /** What that one did. */
+  ofMethod: string;
   /** Whether the re-run reached the same conclusion. Says nothing about how. */
   conclusion: "agrees" | "disagrees";
   /**
@@ -482,6 +486,18 @@ export interface BearingFinding {
   evidence: string;
   method: string;
   analysis: string;
+}
+
+/** A confirmatory result behind a gate: the claim's handle, and what it asserts. */
+export interface ConfirmatoryResult {
+  claim: string;
+  asserts: string;
+}
+
+/** A question closed on the strength of a reading: its handle, and what it asks. */
+export interface DecidedQuestion {
+  question: string;
+  asks: string;
 }
 
 /** Work a gate protects: the task's handle, and its objective. */
@@ -752,7 +768,7 @@ export interface QuestionOrigin {
   fromAsks: string;
   /** Why it was sharpened. */
   reason: string;
-  knownAtTheTime: string[];
+  knownAtTheTime: CitedFinding[];
 }
 
 /**
@@ -771,9 +787,9 @@ export interface AmendmentReport {
   replaced: string;
   nowRequires: string;
   /** Work the amended condition protected, and which therefore has to be run again. Enumerated, not "everything downstream". */
-  rerun: string[];
+  rerun: GatedWork[];
   /** Confirmatory results in the blast radius. Empty is the claim "none", and it is computed rather than assumed. */
-  confirmatoryAffected: string[];
+  confirmatoryAffected: ConfirmatoryResult[];
   nature: "mechanical" | "scientific";
 }
 
@@ -784,8 +800,8 @@ export interface AmendmentRecord {
   nowRequires: string;
   reason: string;
   /** The findings the amendment was actually taken on — cited specifically, not a snapshot of everything known. */
-  citing: string[];
-  rerun: string[];
+  citing: CitedFinding[];
+  rerun: GatedWork[];
   nature: "mechanical" | "scientific";
 }
 
@@ -820,9 +836,9 @@ export interface ReinterpretationReport {
   previously: string;
   nowClaims: string;
   /** Findings that carried the old reading and carry the new one. Unchanged, and demonstrably so. */
-  evidenceStanding: string[];
+  evidenceStanding: CitedFinding[];
   /** Things decided on the strength of the old sentence — not things computed from the numbers. */
-  restingOnTheOldReading: string[];
+  restingOnTheOldReading: DecidedQuestion[];
   requiresRecomputation: boolean;
 }
 
@@ -832,7 +848,7 @@ export interface Revision {
   previously: string;
   nowClaims: string;
   reason: string;
-  restingOnTheOldReading: string[];
+  restingOnTheOldReading: DecidedQuestion[];
 }
 
 /**
@@ -859,11 +875,15 @@ export type ClaimSubject = string | ConclusionRef;
 
 /** One side of a comparison between two findings. */
 export interface ConflictSide {
+  /** The claim's handle. Two sides can assert the same sentence about different endpoints (S-5). */
+  claim: string;
+  /** The question this side's line of enquiry pursues. */
+  question: string;
   proposition: string;
   /** The question this claim answers. Where its scope lives — derived, not stored on the claim. */
   asks: string;
-  supportedBy: string[];
-  challengedBy: string[];
+  supportedBy: CitedFinding[];
+  challengedBy: CitedFinding[];
 }
 
 /**

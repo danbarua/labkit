@@ -248,8 +248,12 @@ How the conditions on a gate reached their current wording: each amendment, its 
   - `replaced`: string
   - `nowRequires`: string
   - `reason`: string
-  - `citing`: string[]
-  - `rerun`: string[]
+  - `citing`: object[]
+    - `evidence`: string
+    - `states`: string
+  - `rerun`: object[]
+    - `work`: string
+    - `objective`: string
   - `nature`: "mechanical" | "scientific"
 
 ---
@@ -273,7 +277,9 @@ How a claim's current reading was arrived at: each earlier wording, the decision
   - `previously`: string
   - `nowClaims`: string
   - `reason`: string
-  - `restingOnTheOldReading`: string[]
+  - `restingOnTheOldReading`: object[]
+    - `question`: string
+    - `asks`: string
 
 ---
 
@@ -290,7 +296,9 @@ What a verifying analysis re-checked and whether it reproduced the original — 
 **Returns**
 
 - `verification`: string
+- `verificationMethod`: string
 - `of`: string
+- `ofMethod`: string
 - `conclusion`: "agrees" | "disagrees"
 - `execution`: "reproduced" | "not-reproduced"
 - `differs`: object[]
@@ -338,7 +346,9 @@ Where a question came from, when it came from sharpening an earlier one — the 
   - `from?`: string
   - `fromAsks?`: string
   - `reason?`: string
-  - `knownAtTheTime?`: string[]
+  - `knownAtTheTime?`: object[]
+    - `evidence`: string
+    - `states`: string
 
 ---
 
@@ -447,10 +457,16 @@ Whether two conclusions contradict each other, are about different things (`diss
 - `relation`: "contradiction" | "dissociation" | "corroboration"
 - `differsBy`: "scope" | null
 - `sides`: object[]
+  - `claim`: string
+  - `question`: string
   - `proposition`: string
   - `asks`: string
-  - `supportedBy`: string[]
-  - `challengedBy`: string[]
+  - `supportedBy`: object[]
+    - `evidence`: string
+    - `states`: string
+  - `challengedBy`: object[]
+    - `evidence`: string
+    - `states`: string
 
 ---
 
@@ -806,8 +822,12 @@ Reword a prespecified criterion after work has begun, citing what prompted it. T
 - `amendment`: string
 - `replaced`: string
 - `nowRequires`: string
-- `rerun`: string[]
-- `confirmatoryAffected`: string[]
+- `rerun`: object[]
+  - `work`: string
+  - `objective`: string
+- `confirmatoryAffected`: object[]
+  - `claim`: string
+  - `asserts`: string
 - `nature`: "mechanical" | "scientific"
 
 ---
@@ -867,6 +887,10 @@ Record that a claim's reading has been narrowed — the evidence is unchanged, w
 - `at`: string
 - `previously`: string
 - `nowClaims`: string
-- `evidenceStanding`: string[]
-- `restingOnTheOldReading`: string[]
+- `evidenceStanding`: object[]
+  - `evidence`: string
+  - `states`: string
+- `restingOnTheOldReading`: object[]
+  - `question`: string
+  - `asks`: string
 - `requiresRecomputation`: boolean

@@ -133,10 +133,10 @@ describe("S-5 — contradiction or dissociation?", () => {
     expect(first!.asks).toBe(INTERNAL);
     expect(second!.asks).toBe(EXTERNAL);
 
-    expect(first!.supportedBy).toEqual(["all five constructions within 0.02 of each other on mapping strength"]);
+    expect(first!.supportedBy.map((f) => f.states)).toEqual(["all five constructions within 0.02 of each other on mapping strength"]);
     expect(first!.challengedBy).toEqual([]);
     expect(second!.supportedBy).toEqual([]);
-    expect(second!.challengedBy).toEqual(["constructions separate by 11 points of held-out accuracy"]);
+    expect(second!.challengedBy.map((f) => f.states)).toEqual(["constructions separate by 11 points of held-out accuracy"]);
   });
 
   /**

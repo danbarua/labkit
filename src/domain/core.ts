@@ -26,7 +26,14 @@ import {
   inMemoryEventLog,
   systemClock,
 } from "./events";
-import type { ClaimSubject, AnalysisRef } from "./report";
+import type {
+  ClaimSubject,
+  AnalysisRef,
+  ConclusionRef,
+  ConfirmatoryResult,
+  DecidedQuestion,
+  GatedWork,
+} from "./report";
 
 export interface ResearchSessionOptions {
   clock?: Clock;
@@ -78,17 +85,22 @@ export class SessionCore {
   }
 
   /** Work these gates protect, and which therefore has to be run again when their condition changes. */
-  protected async workGatedBy(gates: string[]): Promise<string[]> {
-    const objectives = new Set<string>();
+  protected async workGatedBy(gates: string[]): Promise<GatedWork[]> {
+    // Keyed by id, not by objective. Two tasks can share an objective and be
+    // two tasks; deduping on the text reported one piece of work to re-run
+    // where there were two. Same traversal `gateStatus` reports as
+    // `{work, objective}` -- one was converted and this was not (PJ-030 §7).
+    const found = new Map<string, GatedWork>();
     for (const gate of gates) {
       const rows = await this.graph.query(
         `MATCH (:Gate {natural_id: $id})-[:GATES]->(t:Task) RETURN t`,
-        { t: vertexProps<{ objective: string }>() },
+        { t: vertexProps<{ objective: string; natural_id: string }>() },
         { id: gate },
       );
-      for (const row of rows) objectives.add(row.t.objective);
+      for (const row of rows)
+        found.set(row.t.natural_id, { work: row.t.natural_id, objective: row.t.objective });
     }
-    return [...objectives].sort();
+    return [...found.values()].sort((a, b) => a.work.localeCompare(b.work));
   }
 
   /**
@@ -101,22 +113,26 @@ export class SessionCore {
    * gives — see S-4 on absence of evidence reading as a negative.
    */
 
-  protected async confirmatoryResultsBehind(gates: string[]): Promise<string[]> {
-    const affected = new Set<string>();
+  protected async confirmatoryResultsBehind(gates: string[]): Promise<ConfirmatoryResult[]> {
+    // Keyed by id. S-5's literal case: one sentence asserted in two lines of
+    // enquiry is two claims, and merging them understated the blast radius of
+    // a scientific amendment.
+    const affected = new Map<string, ConfirmatoryResult>();
     for (const gate of gates) {
       for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
         const rows = await this.graph.query(
           `MATCH (:Gate {natural_id: $id})-[:GATES]->(:Task)-[:IMPLEMENTS]->(u:EvidenceUnit)
            MATCH (u)-[:PRODUCES]->(e:Evidence)-[:${bearing}]->(c:Claim)
            RETURN c`,
-          { c: vertexProps<{ name: string; kind?: string }>() },
+          { c: vertexProps<{ name: string; kind?: string; natural_id: string }>() },
           { id: gate },
         );
         for (const row of rows)
-          if (row.c.kind === "confirmatory") affected.add(row.c.name);
+          if (row.c.kind === "confirmatory")
+            affected.set(row.c.natural_id, { claim: row.c.natural_id, asserts: row.c.name });
       }
     }
-    return [...affected].sort();
+    return [...affected.values()].sort((a, b) => a.claim.localeCompare(b.claim));
   }
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */
@@ -154,13 +170,40 @@ export class SessionCore {
     return { withdrawn: true, ...(replacedBy ? { replacedBy } : {}) };
   }
 
+  /**
+   * The claim a conclusion refers to, by id.
+   *
+   * Both bearings, because a conclusion may challenge rather than support and
+   * `doTheseConflict` needs the handle either way. Two queries rather than
+   * `[:SUPPORTS|CHALLENGES]`, which pglite-age rejects outright.
+   *
+   * Lifted here from `WriteSurface` when `sideOf` needed it: `ConflictSide`
+   * carried four entity-naming fields and not one identifier (PJ-030 §7).
+   */
+  protected async claimFor(ref: ConclusionRef): Promise<string> {
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(:Evidence)-[:${bearing}]->(c:Claim {name: $name})
+         RETURN c`,
+        { c: vertexProps<{ natural_id: string }>() },
+        { id: ref.analysis.id, name: ref.proposition },
+      );
+      const found = rows[0];
+      if (found) return found.c.natural_id;
+    }
+    throw new Error(`analysis ${ref.analysis.id} concluded nothing about "${ref.proposition}"`);
+  }
+
   /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
 
   protected async decidedOnTheStrengthOf(scope: {
     proposition: string;
     enquiry?: string;
-  }): Promise<string[]> {
-    const asked = new Set<string>();
+  }): Promise<DecidedQuestion[]> {
+    // Keyed by id. Two identically-worded questions are two questions -- S-1
+    // poses exactly that pair, and `report.ts` says neither may be resolved by
+    // comparing text. This helper was doing it anyway.
+    const asked = new Map<string, DecidedQuestion>();
     // Both bearings: a question can be settled "no" on a finding that
     // challenges the proposition, and that closure rests on this reading just
     // as much as a supporting one does.
@@ -171,15 +214,16 @@ export class SessionCore {
          ${this.withinScope(scope)}
          MATCH (d)-[:RESOLVES]->(q:Question)
          RETURN q`,
-        { q: vertexProps<{ name: string }>() },
+        { q: vertexProps<{ name: string; natural_id: string }>() },
         {
           name: scope.proposition,
           ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
         },
       );
-      for (const row of rows) asked.add(row.q.name);
+      for (const row of rows)
+        asked.set(row.q.natural_id, { question: row.q.natural_id, asks: row.q.name });
     }
-    return [...asked].sort();
+    return [...asked.values()].sort((a, b) => a.question.localeCompare(b.question));
   }
 
   /**

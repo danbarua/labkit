@@ -268,7 +268,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // The finding that arrived after the first sharpening must not appear
     // behind it, and must appear behind the second.
     const LATE = "family separation survives when initial conditions are held fixed";
-    expect(behindSecond?.knownAtTheTime).toContain(LATE);
+    expect(behindSecond?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
     expect(behindFirst?.knownAtTheTime).not.toContain(LATE);
 
     // ...and the two sharpenings are told apart at all.
@@ -280,7 +280,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     expect(later.events.all()).toHaveLength(0);
     expect((await later.originOf(first))?.knownAtTheTime).not.toContain(LATE);
-    expect((await later.originOf(second))?.knownAtTheTime).toContain(LATE);
+    expect((await later.originOf(second))?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
   });
 
   /**

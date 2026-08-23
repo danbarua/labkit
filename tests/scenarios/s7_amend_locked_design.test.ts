@@ -143,7 +143,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // LabKit:     amendment recorded; the confirmatory boundary is untouched.
     expect(report.nature).toBe("mechanical");
     expect(report.confirmatoryAffected).toEqual([]);
-    expect(report.rerun).toEqual(["feasibility sweep of the evolved condition"]);
+    expect(report.rerun.map((w) => w.objective)).toEqual(["feasibility sweep of the evolved condition"]);
   });
 
   /**
@@ -192,7 +192,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     const history = await later.designHistory(programme.feasibilityBoundary);
     expect(history.amendments).toHaveLength(1);
     expect(history.amendments[0]!.reason).toContain("unrelated to the effect under test");
-    expect(history.amendments[0]!.citing).toEqual([
+    expect(history.amendments[0]!.citing.map((f) => f.states)).toEqual([
       "condition number rises with feature count; enlarging the sample does not reduce it",
     ]);
 
@@ -262,7 +262,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       citing: cites,
     });
     expect(scientific.nature).toBe("scientific");
-    expect(scientific.confirmatoryAffected).toEqual([BEATS_CONTROL]);
+    expect(scientific.confirmatoryAffected.map((c) => c.asserts)).toEqual([BEATS_CONTROL]);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const feasibility = await later.designHistory(programme.feasibilityBoundary);
@@ -335,12 +335,12 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       citing: cites,
     });
 
-    expect(report.rerun).toEqual(["feasibility sweep of the evolved condition"]);
+    expect(report.rerun.map((w) => w.objective)).toEqual(["feasibility sweep of the evolved condition"]);
     expect(report.rerun).not.toContain("the prespecified comparison against the rewired control");
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const history = await later.designHistory(programme.feasibilityBoundary);
-    expect(history.amendments[0]!.rerun).toEqual(["feasibility sweep of the evolved condition"]);
+    expect(history.amendments[0]!.rerun.map((w) => w.objective)).toEqual(["feasibility sweep of the evolved condition"]);
   });
 
   /**
