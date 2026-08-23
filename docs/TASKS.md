@@ -8,6 +8,20 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Ready to build
 
+- [ ] **Carry identifiers through the read models.** The plan is
+  `docs/project-journal/030_which_record_is_this_about.md` §5; the audit of
+  which reports drop which ids is §4; the demonstration is in
+  `tests/subject-identity.test.ts` §4 and is **red-to-green in reverse** — it
+  asserts the defect, so a row fails as its report is fixed, and the row is then
+  deleted.
+
+  `DependencyReport` first (its answer is unusable without ids), `EnquiryStatus`
+  second (it is the one shipping a wrong answer). Additive: the reference goes
+  *beside* the wording, which is the shape `whatIsKnown`, `originOf` and
+  `reproducibilityOf` already use, so no caller breaks and it is not a new
+  convention. **No graph change** — every id already exists and is already
+  reachable from the query that builds the report.
+
 - [x] ~~**`outputSchema` on the MCP tools.**~~ — done. `src/mcp/schemas.ts`
   mirrors the report types and `tsc` holds each mirror to its interface. Six of
   seven tools declare one; `known` cannot, because the SDK's

@@ -235,6 +235,134 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
   const HOLDS = "it holds";
 });
 
+describe("4. the read models drop identifiers the graph already minted", () => {
+  /**
+   * PJ-030 §4. Every entity here has a natural id, minted in the same round
+   * trip that created it. Three reports carry one **beside** the wording, which
+   * is the template; the rest emit wording alone and the caller cannot follow
+   * it anywhere.
+   *
+   * This is the demonstration step of that plan. It asserts the defect, so it
+   * goes **red** as each report is fixed — which is the point. When a row here
+   * fails, delete the row.
+   */
+  const looksLikeAnId = (v: string) =>
+    /^(Q|LOE|EU|EV|CLM|DEC|CRIT|CEVAL|GATE|REV|ART|COMP|TASK)_\d+$/.test(v);
+
+  async function programme() {
+    const s = await session();
+    const question = await s.pose("does depth move convergence?");
+    const enquiry = await s.pursue({ question, approach: "seed sweep" });
+    const criterion = await s.stateCriterion("holds at five seeds");
+    const work = await s.planWork({ objective: "publish the result", acceptance: "the check passes" });
+    const gate = await s.declareGate({
+      governedBy: [criterion], consequence: "may it be published?", protecting: [work],
+    });
+    const observations = await s.recordObservations({
+      enquiry, name: "sweep readings", finding: "five seeds, consistent",
+    });
+    const analysis = await s.recordAnalysis({
+      enquiry, method: "paired comparison", from: [observations],
+      concludes: [{ proposition: MOVES, finding: "about three steps", standing: "confirmatory" }],
+      implementing: work, heldTo: [criterion],
+    });
+    await s.evaluateCriterion({
+      criterion, gate, value: "5/5 seeds", outcome: "pass",
+      citing: { analysis, proposition: MOVES },
+    });
+    await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: MOVES } });
+    return { read: new ReadSurface(await scenario.current()), question, enquiry, gate, work, analysis };
+  }
+
+  test("the template: an id beside the wording, in the three reports that do it", async () => {
+    try {
+      const { read, analysis } = await programme();
+
+      // whatIsKnown: `question` is the id, `asks` is the text.
+      const known = await read.whatIsKnown();
+      const standing = [...known.established, ...known.provisional][0]!;
+      expect(looksLikeAnId(standing.question)).toBe(true);
+      expect(looksLikeAnId(standing.asks)).toBe(false);
+
+      // reproducibilityOf: `part` is the id, `name` is the text.
+      const parts = await read.reproducibilityOf(analysis, []);
+      const inputs = [...parts.exact, ...parts.differing, ...parts.unverifiable, ...parts.notRebuilt];
+      expect(inputs.length).toBeGreaterThan(0);
+      expect(inputs.every((p) => looksLikeAnId(p.part))).toBe(true);
+      expect(inputs.every((p) => looksLikeAnId(p.name))).toBe(false);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("EnquiryStatus names a question and a body of evidence, and identifies neither", async () => {
+    try {
+      const { read, enquiry } = await programme();
+      const status = await read.enquiryStatus(enquiry);
+
+      expect(looksLikeAnId(status.enquiry)).toBe(true);
+      // The question it pursues -- wording only. This is the field the
+      // multi-pursuit wrong answer is built on.
+      expect(looksLikeAnId(status.question)).toBe(false);
+      // The evidence the closure rests on -- statements, not references.
+      expect(status.evidence.length).toBeGreaterThan(0);
+      expect(status.evidence.every(looksLikeAnId)).toBe(false);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("whatDependsOn answers what is affected with prose nobody can act on", async () => {
+    // The clearest of them. This report exists to say *go and look at these*,
+    // and every follow-up verb takes a reference.
+    try {
+      const { read } = await programme();
+      const affected = await read.whatDependsOn("sweep readings");
+
+      expect(affected.claims.length + affected.enquiries.length).toBeGreaterThan(0);
+      expect(affected.claims.every(looksLikeAnId)).toBe(false);
+      expect(affected.enquiries.every(looksLikeAnId)).toBe(false);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("whySupported cites the computation by method name, not by id", async () => {
+    try {
+      const { read } = await programme();
+      const why = await read.whySupported(MOVES);
+
+      expect(why.support.length).toBeGreaterThan(0);
+      // `via` is the computation's method text. Two runs of one method are
+      // indistinguishable here, which is the same wording-as-identity failure
+      // whySupported itself REFUSES to make when resolving its argument.
+      expect(why.support.every((s) => looksLikeAnId(s.via))).toBe(false);
+      // The template, in the same report: restingOn carries both.
+      expect(why.restingOn.every((p) => looksLikeAnId(p.part))).toBe(true);
+      expect(why.restingOn.every((p) => looksLikeAnId(p.name))).toBe(false);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("gateStatus names the work it gates by objective, not by id", async () => {
+    try {
+      const { read, gate } = await programme();
+      const status = await read.gateStatus(gate);
+
+      expect(looksLikeAnId(status.gate)).toBe(true);
+      expect(status.gating.length).toBeGreaterThan(0);
+      expect(status.gating.every(looksLikeAnId)).toBe(false);
+      // The template again, one field over.
+      expect(status.checks.every((c) => looksLikeAnId(c.criterion))).toBe(true);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  const MOVES = "depth moves convergence";
+});
+
 describe("3. the ambiguity is only harmless where you hold both handles", () => {
   test("a consumer with only its own handles cannot repair a two-stage pipeline", async () => {
     // Section 2 showed the two routes equivalent -- measured inside the process,

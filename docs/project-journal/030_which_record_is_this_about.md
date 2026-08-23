@@ -68,7 +68,122 @@ what the model does today **including where that is wrong** — a green run mean
 the ambiguities are still present, not that they are acceptable, and fixing
 row 1 turns the file red on purpose.
 
-## 3. What the scenario decides, and what it does not
+## 3. The actual problem: the read models are value objects
+
+Dan's question — *two pursuits = two records = two IDs; is the domain API
+presenting entities as value objects?* — is the diagnosis, and it is upstream of
+§2's table rather than beside it.
+
+`enquiryStatus` binds its `question` field like this:
+
+```ts
+const question = rows[0]?.q.name ?? loe.loe.name;   // src/domain/read.ts
+```
+
+That is **wording**, and where no question stands behind the enquiry it falls
+back to the *line of enquiry's own name* — one field, two different entities'
+text, neither an identity. Compare the same word one report over:
+
+| report | field | holds |
+| --- | --- | --- |
+| `EnquiryStatus` | `enquiry` | an **id** |
+| `EnquiryStatus` | `question` | the question's **wording** |
+| `QuestionStanding` | `question` | an **id** |
+| `QuestionStanding` | `asks` | the **wording** |
+
+`question` means the id in one report and the text in another.
+
+**This is why the multi-pursuit bug was inevitable rather than careless.**
+`EnquiryStatus` carries no `QuestionRef` — nothing a caller can follow. So when
+Bruno asks about his ablation there is no way to hand him the question's
+identity and let him ask a second question about it. One report had to answer
+both facts, and answering both from one shape means collapsing them.
+
+It also unifies §2's three rows into one. They are not three ambiguities:
+**the reference layer is unreliable, so the reports gave up on it and flattened
+to strings.** `ObservationsRef` and `AnalysisRef` are references that do not
+denote what they name; `EnquiryStatus` is a report that declined to carry a
+reference at all. Same cause, opposite symptom.
+
+Every entity in this model has a natural id, minted in the same round trip that
+creates it, for exactly this. The read side drops them on the floor.
+
+## 4. Which reads drop identifiers — the audit
+
+Measured, not read off the source: a scenario exercising every verb, then every
+string leaf of every report classified as an id or as prose. **Three reports
+already do it right**, and they are the template:
+
+```
+whatIsKnown[].question    ID    +  .asks     TEXT
+originOf.from             ID    +  .fromAsks TEXT
+reproducibilityOf[].part  ID    +  .name     TEXT
+```
+
+Identity and wording, side by side, neither standing in for the other. Also
+correct: `gateStatus.checks[].criterion` and `designHistory.criterion`, which
+carry a ref beside the criterion's text.
+
+**The fields that carry wording where an identity exists:**
+
+| report | field | carries | the id it drops |
+| --- | --- | --- | --- |
+| `EnquiryStatus` | `question` | the question's text | `Q_n` |
+| `EnquiryStatus` | `evidence[]` | evidence statements | `EV_n` |
+| `DependencyReport` | `claims[]` | propositions | `CLM_n` |
+| `DependencyReport` | `enquiries[]` | enquiry **names** | `LOE_n` |
+| `SupportExplanation` | `support[].via` | the computation's *method* | `COMP_n` |
+| `SupportExplanation` | `superseded[].via`, `against[].via` | same | `COMP_n` |
+| `SupportExplanation` | `reverifiedBy[]` | analysis methods | `COMP_n` |
+| `GateStatus` | `gating[]` | task objectives | `TASK_n` |
+| `GateStatus` / `CheckStatus` | `evaluations[].basis[]` | evidence statements | `EV_n` |
+| `GateStatus`, `SupportExplanation` | `unmet[]` | criterion propositions | `CRIT_n` |
+
+**`whatDependsOn` is the worst of these and the clearest argument.** Its entire
+purpose is *what would be affected if this turned out to be wrong*, and it
+answers with prose:
+
+```
+claims:    ["depth moves convergence"]
+enquiries: ["focused sweep"]
+```
+
+A caller cannot act on either. Every follow-up verb takes a reference, and the
+report that exists to say *go and look at these* hands back text you would have
+to search for by name — which is precisely the ambiguity `whySupported` already
+**refuses** to guess at when two claims share a wording. One read refuses to
+resolve wording; another emits it as the answer.
+
+## 5. The plan
+
+Not started. In order, each step shippable on its own:
+
+1. **A demonstration first.** Extend `tests/subject-identity.test.ts` with the
+   audit as an assertion: for each row of §4's table, the field is prose and the
+   entity it names has an id the report does not carry. Red-to-green target for
+   everything below, and it fails honestly today.
+2. **Fix the pattern where it is already established**, one report at a time,
+   adding the reference *beside* the wording rather than replacing it —
+   `{question: QuestionRef, asks: string}` is the shape three reports already
+   use, so this is not a new convention. Additive: no caller breaks.
+3. **`DependencyReport` first**, because it is the one whose answer is
+   unusable without it, and `EnquiryStatus` second, because it is the one
+   shipping a wrong answer.
+4. **Then re-ask the multi-pursuit question.** Once `EnquiryStatus` carries a
+   `QuestionRef`, "is the question answered?" is a read Bruno can *reach*, and
+   whether it wants its own verb becomes a question about convenience rather
+   than about expressibility. §6 below may answer itself.
+5. **`ObservationsRef` and `AnalysisRef` last**, because they are the two rows
+   where the current behaviour is convenient and correct, and the remedy is
+   least clear.
+
+**What this plan does not do.** No graph change, no new node label, no new edge.
+Every id in §4's table already exists and is already reachable from the query
+that builds the report; the work is carrying it through the projection instead
+of discarding it. If a step turns out to need a model change, that is a finding
+and belongs in the ledger, not in this plan.
+
+## 6. What the scenario decides, and what it does not
 
 Writing the conversation out ruled out both options first put to Dan. Both
 assumed `enquiryStatus` reports *one* state, and the conversation says Bruno
@@ -89,7 +204,7 @@ fixes. Rows 2 and 3 above may go the same way: the `AnalysisRef` dereference is
 convenient and writes the correct edge, and making it honest would mean callers
 naming artefacts they do not hold.
 
-## 4. What is already known to cost something
+## 7. What is already known to cost something
 
 Row 1 gives a **confidently incorrect answer** — a line of enquiry nobody worked
 on reporting itself answered with another line's evidence. That clears PJ-011
