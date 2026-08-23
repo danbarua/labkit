@@ -53,7 +53,7 @@ async function assertedTwice() {
     name: "attenuation readings, cohort A",
     finding: "signal amplitude before and after encoding, both signal types, cohort A",
   });
-  const first = await session.recordAnalysis({
+  const { analysis: first } = await session.recordAnalysis({
     enquiry,
     method: "attenuation-ratio",
     from: [firstReadings],
@@ -65,7 +65,7 @@ async function assertedTwice() {
     name: "attenuation readings, cohort B",
     finding: "signal amplitude before and after encoding, both signal types, cohort B",
   });
-  const second = await session.recordAnalysis({
+  const { analysis: second } = await session.recordAnalysis({
     enquiry,
     method: "attenuation-ratio",
     from: [secondReadings],

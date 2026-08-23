@@ -67,7 +67,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       const observations = await s.recordObservations({
         enquiry, name: "sweep readings", finding: "twelve runs",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "convergence-fit", from: [observations],
         concludes: [{ proposition: CONVERGES, finding: "moves by ~3 steps" }],
         heldTo: [check],
@@ -155,7 +155,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
 
       const enquiry = await s.openEnquiry(FIRST.asks);
       const obs = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
@@ -194,7 +194,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
       const enquiry = await s.openEnquiry(asks);
       const check = await s.stateCriterion(`prespecified check for ${prop}`);
       const obs = await s.recordObservations({ enquiry, name: `${prop} readings`, finding: `runs for ${prop}` });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [obs],
         concludes: [{ proposition: prop, finding: `result for ${prop}` }],
         heldTo: [check],
@@ -280,7 +280,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       for (const q of [FIRST, SECOND]) {
         const enquiry = await s.openEnquiry(q.asks);
         const obs = await s.recordObservations({ enquiry, name: `${q.prop} readings`, finding: `runs for ${q.prop}` });
-        const analysis = await s.recordAnalysis({
+        const { analysis: analysis } = await s.recordAnalysis({
           enquiry, method: "paired-comparison", from: [obs],
           concludes: [{ proposition: q.prop, finding: `result for ${q.prop}` }],
         });
@@ -342,7 +342,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
 
       const enquiry = await s.openEnquiry(FIRST.asks);
       const obs = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
@@ -398,7 +398,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       const s = new ResearchSession(graph, { clock: c, events: inMemoryEventLog() });
       const enquiry = await s.openEnquiry(FIRST.asks);
       const obs = await s.recordObservations({ enquiry, name: "readings", finding: "runs" });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "pc", from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "a result" }],
       });

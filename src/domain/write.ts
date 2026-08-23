@@ -82,6 +82,8 @@ import type {
   GateRef,
   WorkRef,
   ChangedConclusion,
+  ConcludedClaim,
+  RecordedAnalysis,
   CitedFinding,
   Conclusion,
   ConclusionRef,
@@ -360,9 +362,9 @@ export class WriteSurface extends SessionCore {
    * back — which answered a different question and produced a genuine false
    * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
    */
-  async recordAnalysis(input: RecordAnalysisCommand): Promise<AnalysisRef> {
+  async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     const analysis = await this.graph.inTransaction(() => this.recorded(input));
-    this.emit("recordAnalysis", analysis.id, {
+    this.emit("recordAnalysis", analysis.analysis.id, {
       enquiry: input.enquiry.id,
       method: input.method,
       concludes: input.concludes.map((c) => c.proposition),
@@ -379,7 +381,7 @@ export class WriteSurface extends SessionCore {
    * external review found it had lapsed: `reverify()` and `replaceAnalysis()`
    * were each emitting two events while their journals claimed one.
    */
-  private async recorded(input: RecordAnalysisCommand): Promise<AnalysisRef> {
+  private async recorded(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     // Checked before anything is written. A proposition the record has
     // withdrawn cannot be re-asserted as a side effect of recording an
     // analysis: a fresh claim node would restore it while the objection that
@@ -455,6 +457,7 @@ export class WriteSurface extends SessionCore {
       await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact);
     }
 
+    const minted: ConcludedClaim[] = [];
     for (const conclusion of input.concludes) {
       const evidence = await this.graph.createNode("Evidence", {
         statement: conclusion.finding,
@@ -482,9 +485,13 @@ export class WriteSurface extends SessionCore {
         bearing,
         claim.natural_id,
       );
+      minted.push({
+        claim: ref("claim", claim.natural_id),
+        asserts: conclusion.proposition,
+      });
     }
 
-    return { kind: "analysis", id: computation.natural_id };
+    return { analysis: ref("analysis", computation.natural_id), claims: minted };
   }
 
   /**
@@ -803,7 +810,7 @@ export class WriteSurface extends SessionCore {
         concludes: [input.concludes],
       });
       const restated = await this.findingFor(
-        recorded,
+        recorded.analysis,
         input.concludes.proposition,
       );
       if (!restated)
@@ -814,11 +821,11 @@ export class WriteSurface extends SessionCore {
       return recorded;
     });
 
-    this.emit("reverify", verification.id, {
+    this.emit("reverify", verification.analysis.id, {
       of: input.historical.id,
       proposition: input.concludes.proposition,
     });
-    return { at, verification, of: input.historical };
+    return { at, verification: verification.analysis, of: input.historical };
   }
 
   /**
@@ -1186,13 +1193,13 @@ export class WriteSurface extends SessionCore {
 
     const report: ReplacementReport = {
       at,
-      replacement,
+      replacement: replacement.analysis,
       affected: before.map((b) => b.proposition),
       unaffected,
       changed,
       unchanged,
     };
-    this.emit("replaceAnalysis", replacement.id, {
+    this.emit("replaceAnalysis", replacement.analysis.id, {
       supersedes: input.supersedes.id,
       because: input.because.id,
       affected: report.affected,

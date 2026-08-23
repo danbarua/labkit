@@ -57,7 +57,7 @@ async function scratchExploration() {
     name: "lunchtime sweep",
     finding: "twelve runs, no seed control",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "notebook-sweep",
     from: [observations],
@@ -181,7 +181,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       name: "small-model sweep",
       finding: "eight runs, small model",
     });
-    const otherAnalysis = await session.recordAnalysis({
+    const { analysis: otherAnalysis } = await session.recordAnalysis({
       enquiry: other,
       method: "notebook-sweep",
       from: [otherObservations],

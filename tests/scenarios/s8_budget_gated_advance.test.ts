@@ -100,7 +100,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       name: "feasibility slice timings",
       finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
     });
-    const measured = await session.recordAnalysis({
+    const { analysis: measured } = await session.recordAnalysis({
       enquiry: programme.enquiry,
       method: "throughput-and-convergence",
       implementing: programme.feasibility,
@@ -298,7 +298,7 @@ async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aSta
     name: "feasibility slice timings",
     finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
   });
-  return session.recordAnalysis({
+  return (await session.recordAnalysis({
     enquiry: programme.enquiry,
     method: "throughput-and-convergence",
     implementing: programme.feasibility,
@@ -307,5 +307,5 @@ async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aSta
       { proposition: THROUGHPUT, finding: "sustained 44 images per second across the slice" },
       { proposition: COST, finding: "9,100 GPU-hours projected from the measured rate" },
     ],
-  });
+  })).analysis;
 }

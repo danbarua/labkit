@@ -60,7 +60,7 @@ async function priorState() {
     name: "curvature sweep readings",
     finding: "response departs from the linear fit across the sweep",
   });
-  const nlAnalysis = await session.recordAnalysis({
+  const { analysis: nlAnalysis } = await session.recordAnalysis({
     enquiry: nlEnquiry,
     method: "curvature-fit",
     from: [nlObs],

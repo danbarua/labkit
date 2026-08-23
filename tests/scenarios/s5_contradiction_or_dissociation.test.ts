@@ -60,7 +60,7 @@ async function twoStages() {
     name: "mapping-strength readings across constructions",
     finding: "mapping strength measured for five graph constructions",
   });
-  const earlier = await session.recordAnalysis({
+  const { analysis: earlier } = await session.recordAnalysis({
     enquiry: internalWork,
     method: "mapping-strength-comparison",
     from: [internalReadings],
@@ -74,7 +74,7 @@ async function twoStages() {
     name: "downstream classification readings",
     finding: "held-out classification accuracy measured for the same five constructions",
   });
-  const later = await session.recordAnalysis({
+  const { analysis: later } = await session.recordAnalysis({
     enquiry: externalWork,
     method: "downstream-classification",
     from: [externalReadings],
@@ -153,7 +153,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "mapping-strength readings, wider construction set",
       finding: "mapping strength measured for twelve graph constructions",
     });
-    const dissenting = await session.recordAnalysis({
+    const { analysis: dissenting } = await session.recordAnalysis({
       enquiry: programme.internalWork,
       method: "mapping-strength-comparison",
       from: [rerun],
@@ -231,7 +231,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured for the same five constructions",
     });
-    const settled = await session.recordAnalysis({
+    const { analysis: settled } = await session.recordAnalysis({
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
@@ -278,7 +278,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured across constructions",
     });
-    const fresh = await session.recordAnalysis({
+    const { analysis: fresh } = await session.recordAnalysis({
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],

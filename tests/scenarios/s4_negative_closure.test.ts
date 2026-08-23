@@ -71,7 +71,7 @@ describe("S-4: a negative result that closes the question", () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
 
     // Agent: no detectable evidence of that. All five form a tight cluster.
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -94,7 +94,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 1 & 2: closed, and specifically ANSWERED — not abandoned, not deferred", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -113,7 +113,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 2, polarity: answered NEGATIVELY, and that is queryable", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -128,7 +128,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 3: the neighbouring supported claim is untouched, and LabKit says so", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -148,7 +148,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 4: the null result is cited AS evidence, not as an absence of it", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -226,7 +226,7 @@ describe("S-4: a negative result that closes the question", () => {
       name: "unrelated measurements",
       finding: "unrelated",
     });
-    const unrelated = await session.recordAnalysis({
+    const { analysis: unrelated } = await session.recordAnalysis({
       enquiry: established,
       method: "unrelated-analysis",
       from: [elsewhere],
@@ -247,7 +247,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("a question cannot be answered on a proposition the analysis never concluded", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const analysis = await session.recordAnalysis({
+    const { analysis: analysis } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -270,7 +270,7 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("polarity comes from the answering finding, not from any finding in the analysis", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const mixed = await session.recordAnalysis({
+    const { analysis: mixed } = await session.recordAnalysis({
       enquiry: specificity,
       method: "mixed-analysis",
       from: [observations],
@@ -297,7 +297,7 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("a withdrawn challenge is historical, and propagates as an affected claim", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const refutation = await session.recordAnalysis({
+    const { analysis: refutation } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],

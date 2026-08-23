@@ -62,7 +62,7 @@ async function aCachedConstructionWithOneUnrecordedPart() {
     await session.recordObservations({ enquiry, name: "priors", finding: "prior draws", contentHash: "sha256:ccc" }),
     await session.recordObservations({ enquiry, name: CONTROL, finding: "randomised control series" }),
   ];
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "stage2-construction",
     from: parts,
@@ -132,7 +132,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       finding: "randomised control series, regenerated from an inferred algorithm",
       contentHash: "sha256:regenerated",
     });
-    const downstream = await session.recordAnalysis({
+    const { analysis: downstream } = await session.recordAnalysis({
       enquiry,
       method: "stage2-construction, rebuilt",
       from: [regenerated],

@@ -45,6 +45,7 @@ import {
   verificationReportSchema,
   workRefSchema,
   analysisRefSchema,
+  recordedAnalysisSchema,
   enquiryRefSchema,
   observationsRefSchema,
   pursuitsSchema,
@@ -487,7 +488,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("ids of prespecified criteria the conclusions are held to"),
     },
-    outputSchema: analysisRefSchema,
+    outputSchema: recordedAnalysisSchema,
     handler: (write, { enquiry, method, from, concludes, implementing, held_to }) =>
       write.recordAnalysis({
         enquiry: { kind: "enquiry", id: enquiry },

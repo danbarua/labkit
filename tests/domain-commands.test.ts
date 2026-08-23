@@ -55,7 +55,7 @@ describe("commands are values a caller can hold", () => {
       };
       const observations = await s.recordObservations(observing);
 
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry,
         method: "paired comparison",
         from: [observations],

@@ -63,7 +63,7 @@ async function aFindingHeldToAgreedChecks() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -279,7 +279,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       name: "held-out results",
       finding: "per-image accuracy, held-out split",
     });
-    const otherAnalysis = await session.recordAnalysis({
+    const { analysis: otherAnalysis } = await session.recordAnalysis({
       enquiry: other,
       method: "holm-pairwise",
       from: [otherObservations],

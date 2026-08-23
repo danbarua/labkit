@@ -65,7 +65,7 @@ async function anAnalysisWithTwoReviews(s: ResearchSession) {
   const readings = await s.recordObservations({
     enquiry, name: "onset sweep", finding: "onset across twelve coatings",
   });
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis } = await s.recordAnalysis({
     enquiry, method: "linear-onset-fit", from: [readings],
     concludes: [{ proposition: SHIFTS, finding: "onset moves by 4.2 K" }],
   });

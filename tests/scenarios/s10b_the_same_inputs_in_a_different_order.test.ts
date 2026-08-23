@@ -57,7 +57,7 @@ async function anAlignmentRunInOneOrder(
     enquiry, name: "series B", finding: "comparison trace", contentHash: "sha256:B",
   });
   const inputs = order === "first-then-second" ? [first, second] : [second, first];
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis } = await s.recordAnalysis({
     enquiry, method: "pairwise-alignment", from: inputs,
     concludes: [{ proposition: SHIFTED, finding: "offset of +4.1 units" }],
   });

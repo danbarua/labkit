@@ -82,7 +82,7 @@ async function lockedProgramme() {
     name: "held-out comparison readings",
     finding: "evolved and rewired conditions measured on the held-out split",
   });
-  const confirmatory = await session.recordAnalysis({
+  const { analysis: confirmatory } = await session.recordAnalysis({
     enquiry,
     method: "prespecified-comparison",
     implementing: confirmatoryWork,
@@ -109,7 +109,7 @@ async function diagnose(enquiry: Awaited<ReturnType<typeof lockedProgramme>>["en
     name: "non-convergence traces",
     finding: "solver hits the iteration cap on 9 of 10 sweeps",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "convergence-diagnosis",
     implementing: work,

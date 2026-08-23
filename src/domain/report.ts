@@ -57,6 +57,27 @@ export type EvaluationRef = Ref<"evaluation">;
 /** A decision, by identity. */
 export type DecisionRef = Ref<"decision">;
 
+/**
+ * What `recordAnalysis` produced — the analysis, and **the claims it minted**.
+ *
+ * The claims are here because CLAUDE.md asks of every minting verb: *does the
+ * act record what it produced, or only what it acted on?* This one returned
+ * only the analysis, so every later reference to one of its claims had to
+ * re-identify it **by wording** — which is what {@link ConclusionRef} was, and
+ * why it existed. A caller now holds a {@link ClaimRef} the moment the claim
+ * exists and never has to describe it again.
+ */
+export interface RecordedAnalysis {
+  analysis: AnalysisRef;
+  claims: ConcludedClaim[];
+}
+
+/** One claim an analysis minted: its handle, and the proposition it asserts. */
+export interface ConcludedClaim {
+  claim: ClaimRef;
+  asserts: string;
+}
+
 /** One proposition an analysis concluded, and the finding that bears on it. */
 export interface Conclusion {
   proposition: string;

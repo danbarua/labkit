@@ -737,8 +737,14 @@ The compound act: a computation, what it read, and one claim per conclusion. `fr
 
 **Returns**
 
-- `kind`: "analysis"
-- `id`: string
+- `analysis`: object
+  - `kind`: "analysis"
+  - `id`: string
+- `claims`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 
 ---
 

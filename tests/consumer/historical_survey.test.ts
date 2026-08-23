@@ -85,7 +85,7 @@ describe("what was known, as of an instant", () => {
     const observations = await s.recordObservations({
       enquiry, name: "sweep readings", finding: "twelve runs",
     });
-    const analysis = await s.recordAnalysis({
+    const { analysis: analysis } = await s.recordAnalysis({
       enquiry, from: [observations], method: "paired comparison",
       concludes: [{ proposition: "the schedule moves convergence", finding: "moves by ~3 steps" }],
     });

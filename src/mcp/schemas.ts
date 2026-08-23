@@ -37,6 +37,7 @@
 
 import { z } from "zod";
 import type {
+  RecordedAnalysis,
   QuestionClosure,
   ConflictSide,
   ConflictVerdict,
@@ -320,6 +321,17 @@ export const questionRefSchema = ref("question");
 export const enquiryRefSchema = ref("enquiry");
 export const observationsRefSchema = ref("observations");
 export const analysisRefSchema = ref("analysis");
+
+/**
+ * What `record_analysis` returns: the analysis, and **the claims it minted**.
+ *
+ * A caller holds a handle to every claim the moment it exists, so nothing
+ * downstream has to name one by wording.
+ */
+export const recordedAnalysisSchema = z.strictObject({
+  analysis: analysisRefSchema,
+  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+});
 export const reviewRefSchema = ref("review");
 export const workRefSchema = ref("work");
 export const criterionRefSchema = ref("criterion");
@@ -424,6 +436,7 @@ export type _ReproductionReport = Assert<Exact<z.infer<typeof reproductionReport
 export type _QuestionRef = Assert<Exact<z.infer<typeof questionRefSchema>, QuestionRef>>;
 export type _EnquiryRef = Assert<Exact<z.infer<typeof enquiryRefSchema>, EnquiryRef>>;
 export type _ObservationsRef = Assert<Exact<z.infer<typeof observationsRefSchema>, ObservationsRef>>;
+export type _RecordedAnalysis = Assert<Exact<z.infer<typeof recordedAnalysisSchema>, RecordedAnalysis>>;
 export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, AnalysisRef>>;
 export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;
 export type _QuestionOrigin = Assert<Exact<z.infer<typeof questionOriginSchema>, QuestionOrigin>>;

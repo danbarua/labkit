@@ -73,7 +73,7 @@ describe("S-8b: there is no who, only what ran", () => {
         enquiry, name: CONFIG, finding: "opus-5, temperature 0, prompt v3",
         contentHash: "sha256:cfg-v3",
       });
-      const first = await s.recordAnalysis({
+      const { analysis: first } = await s.recordAnalysis({
         enquiry, method: "convergence-fit", from: [readings, older],
         concludes: [{ proposition: MOVES, finding: "convergence moves by ~3 steps" }],
       });
@@ -132,7 +132,7 @@ describe("S-8b: there is no who, only what ran", () => {
       const readings = await s.recordObservations({
         enquiry, name: "cost projection", finding: "projected 31 GPU-hours at target scale",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "cost-projection", from: [readings],
         concludes: [{ proposition: "the scale-up fits the budget", finding: "31 GPU-hours projected" }],
         heldTo: [budget],

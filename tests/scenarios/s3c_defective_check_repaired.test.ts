@@ -70,7 +70,7 @@ async function aResultHeldToARobustnessCheck() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -91,7 +91,7 @@ async function theCheckIsRun(
   method: string,
   concludes: { proposition: string; finding: string },
 ) {
-  return session.recordAnalysis({ enquiry, method, from: [observations], concludes: [concludes] });
+  return (await session.recordAnalysis({ enquiry, method, from: [observations], concludes: [concludes] })).analysis;
 }
 
 describe("S-3c: the check was wrong, not the result", () => {

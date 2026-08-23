@@ -90,7 +90,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       const readings = await s.recordObservations({
         enquiry: anasSweep, name: "seed sweep readings", finding: "five seeds, consistent",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry: anasSweep, method: "paired comparison", from: [readings],
         concludes: [{ proposition: MOVES, finding: "about three steps" }],
       });
@@ -143,7 +143,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       const readings = await s.recordObservations({
         enquiry: worked, name: "width readings", finding: "it does",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry: worked, method: "sweep", from: [readings],
         concludes: [{ proposition: WIDTH, finding: "it does" }],
       });
@@ -178,7 +178,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const observations = await s.recordObservations({
         enquiry, name: "raw readings", finding: "twelve runs",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "stage one", from: [observations],
         concludes: [{ proposition: HOLDS, finding: "it holds" }],
       });
@@ -208,11 +208,11 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
     try {
       const enquiry = await s.openEnquiry("two stage?");
       const raw = await s.recordObservations({ enquiry, name: "raw", finding: "f" });
-      const stageOne = await s.recordAnalysis({
+      const { analysis: stageOne } = await s.recordAnalysis({
         enquiry, method: "stage one", from: [raw],
         concludes: [{ proposition: "p1", finding: "f1" }],
       });
-      const viaAnalysis = await s.recordAnalysis({
+      const { analysis: viaAnalysis } = await s.recordAnalysis({
         enquiry, method: "stage two, by analysis ref", from: [stageOne],
         concludes: [{ proposition: "p2a", finding: "f2" }],
       });
@@ -222,7 +222,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
       expect(outputOfStageOne?.id.startsWith("ART_")).toBe(true);
 
-      const viaArtefact = await s.recordAnalysis({
+      const { analysis: viaArtefact } = await s.recordAnalysis({
         enquiry,
         method: "stage two, by artefact id",
         from: [outputOfStageOne!],
@@ -267,7 +267,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     const observations = await s.recordObservations({
       enquiry, name: "sweep readings", finding: "five seeds, consistent",
     });
-    const analysis = await s.recordAnalysis({
+    const { analysis: analysis } = await s.recordAnalysis({
       enquiry, method: "paired comparison", from: [observations],
       concludes: [{ proposition: MOVES, finding: "about three steps", standing: "confirmatory" }],
       implementing: work, heldTo: [criterion],
@@ -390,14 +390,14 @@ describe("3. the ambiguity is only harmless where you hold both handles", () => 
       const raw = (await call(client, "record_observations", {
         enquiry: enquiry.id, name: "raw", finding: "f",
       })).body;
-      const stageOne = (await call(client, "record_analysis", {
+      const stageOne = ((await call(client, "record_analysis", {
         enquiry: enquiry.id, method: "stage one", from: [raw.id],
         concludes: [{ proposition: "p1", finding: "f1" }],
-      })).body;
-      const stageTwo = (await call(client, "record_analysis", {
+      })).body.analysis) as { kind: string; id: string };
+      const stageTwo = ((await call(client, "record_analysis", {
         enquiry: enquiry.id, method: "stage two", from: [stageOne.id],
         concludes: [{ proposition: "p2", finding: "f2" }],
-      })).body;
+      })).body.analysis) as { kind: string; id: string };
       const review = (await call(client, "record_review", {
         of: stageTwo.id, verdict: "stage two mis-specified",
       })).body;

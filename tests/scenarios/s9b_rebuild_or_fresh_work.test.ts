@@ -92,7 +92,7 @@ async function theCachedConstruction(s: ResearchSession) {
   const control = await s.recordObservations({
     enquiry, name: CONTROL, finding: "randomised control series",
   });
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis } = await s.recordAnalysis({
     enquiry, method: "stage2-construction", from: [control],
     concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
   });
@@ -126,7 +126,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         enquiry, name: "second control", finding: "control series, second pass",
         contentHash: recorded,
       });
-      const rebuilt = await s.recordAnalysis({
+      const { analysis: rebuilt } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, second control", from: [second],
         concludes: [{ proposition: "the second control agrees", finding: "agreement within 1e-6" }],
       });
@@ -166,7 +166,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       const second = await s.recordObservations({
         enquiry, name: CONTROL, finding, contentHash: "sha256:second",
       });
-      const rebuilt = await s.recordAnalysis({
+      const { analysis: rebuilt } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, second control", from: [second],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });

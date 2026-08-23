@@ -58,7 +58,7 @@ async function aMarginalComparisonWithNothingLeftToRunIt() {
     name: "marginal split results",
     finding: "per-image accuracy on the marginal split",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "paired-comparison",
     from: [observations],
@@ -208,7 +208,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
       name: "external replication cohort",
       finding: "per-image accuracy, independent cohort",
     });
-    const settled = await session.recordAnalysis({
+    const { analysis: settled } = await session.recordAnalysis({
       enquiry,
       method: "paired-comparison, external cohort",
       from: [fresh],

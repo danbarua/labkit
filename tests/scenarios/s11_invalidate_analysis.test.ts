@@ -65,7 +65,7 @@ async function bootstrapAnalysisAsShipped() {
     finding: "per-image accuracy for all five constructions, 10,000 images",
     contentHash: "sha256:obs",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "bootstrap-pairwise",
     from: [observations],
@@ -289,13 +289,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     const enquiry = await session.openEnquiry("which construction classifies best?");
     const observations = await session.recordObservations({ enquiry, name: "obs", finding: "raw" });
 
-    const target = await session.recordAnalysis({
+    const { analysis: target } = await session.recordAnalysis({
       enquiry,
       method: "bootstrap-pairwise",
       from: [observations],
       concludes: [{ proposition: "T beats rewired", finding: "p = 0.002 (bootstrap)" }],
     });
-    const unrelated = await session.recordAnalysis({
+    const { analysis: unrelated } = await session.recordAnalysis({
       enquiry,
       method: "unrelated-analysis",
       from: [observations],

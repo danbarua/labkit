@@ -171,7 +171,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
     });
-    const analysis = await session.recordAnalysis({
+    const { analysis: analysis } = await session.recordAnalysis({
       enquiry,
       method: "holm-pairwise",
       from: [observations],

@@ -54,7 +54,7 @@ const PROPOSITION = "the annealed protocol converges below tolerance";
  */
 async function aHistoricalResultWithNoRecordedInputs() {
   const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
-  const historical = await session.recordAnalysis({
+  const { analysis: historical } = await session.recordAnalysis({
     enquiry,
     method: "annealing-v1",
     from: [],
@@ -236,7 +236,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const first = await session.recordAnalysis({
+    const { analysis: first } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [conditions],
@@ -276,7 +276,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 91, tolerance 1e-3, 64 steps",
     });
-    const historical = await session.recordAnalysis({
+    const { analysis: historical } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [theirs],
@@ -345,7 +345,7 @@ describe("S-10: rerunning is not reproducing", () => {
     const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
     const a = await session.recordObservations({ enquiry, name: "conditions A", finding: "seed 4" });
     const b = await session.recordObservations({ enquiry, name: "conditions B", finding: "warm start" });
-    const historical = await session.recordAnalysis({
+    const { analysis: historical } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [a, b],
@@ -373,7 +373,7 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("two runs that both find against the proposition agree with each other", async () => {
     const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
-    const historical = await session.recordAnalysis({
+    const { analysis: historical } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [],
@@ -408,7 +408,7 @@ describe("S-10: rerunning is not reproducing", () => {
   test("the claim does not rest on the re-run's inputs", async () => {
     const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
     const original = await session.recordObservations({ enquiry, name: "original conditions", finding: "seed 1" });
-    const historical = await session.recordAnalysis({
+    const { analysis: historical } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [original],

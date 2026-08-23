@@ -115,7 +115,7 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
     name: "per-image results",
     finding: "per-image accuracy",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -162,7 +162,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
   });
   const enquiry = await session.openEnquiry("does the solver converge?");
   const observations = await session.recordObservations({ enquiry, name: "solver traces", finding: "iteration counts" });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry,
     method: "feasibility",
     from: [observations],
@@ -354,7 +354,7 @@ const aGatedCheck = async () => {
   const obs = await session.recordObservations({
     enquiry, name: "sweep", finding: "residuals recorded",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry, method: "convergence", from: [obs],
     concludes: [{ proposition: "the solver converges", finding: "residual 1e-9" }],
   });
@@ -430,7 +430,7 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
   const obs = await session.recordObservations({
     enquiry, name: "load runs", finding: "cracks at 40MPa",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry, method: "load-test", from: [obs],
     concludes: [{
       proposition: "the coating survives load",
@@ -523,7 +523,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
 
   const enquiry = await s.openEnquiry("does pruning move convergence?");
   const observations = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis } = await s.recordAnalysis({
     enquiry, method: "paired comparison", from: [observations],
     concludes: [{ proposition: "pruning moves convergence", finding: "no effect", bearing: "challenges" }],
   });
@@ -556,7 +556,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
   const s = session;
   const enquiry = await s.openEnquiry("does depth move convergence?");
   const observations = await s.recordObservations({ enquiry, name: "sweep", finding: "runs" });
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis } = await s.recordAnalysis({
     enquiry, method: "paired comparison", from: [observations],
     concludes: [{ proposition: "depth moves convergence", finding: "moves by ~2 steps" }],
   });
@@ -674,7 +674,7 @@ test("stateCriterion and planWork have no interruption window to have", async ()
 test("an interrupted recordReview leaves a review nothing can reach", async () => {
   const enquiry = await session.openEnquiry("does it hold?");
   const obs = await session.recordObservations({ enquiry, name: "run", finding: "data" });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis } = await session.recordAnalysis({
     enquiry, method: "m", from: [obs],
     concludes: [{ proposition: "it holds", finding: "f" }],
   });

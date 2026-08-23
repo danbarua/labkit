@@ -157,7 +157,7 @@ describe("an agent can track work through the tools alone", () => {
 
       await call(c, "close_enquiry", {
         enquiry: enquiry.id,
-        answered_by_analysis: analysis.id,
+        answered_by_analysis: (analysis.analysis as { id: string }).id,
         answered_by_proposition: PROP,
       });
 
@@ -181,7 +181,7 @@ describe("an agent can track work through the tools alone", () => {
       expect(asks(before.established)).toEqual([]);
 
       await call(c, "promote", {
-        analysis: analysis.id,
+        analysis: (analysis.analysis as { id: string }).id,
         proposition: PROP,
         because: "checked against the held-out split",
       });
@@ -280,7 +280,7 @@ describe("an agent can track work through the tools alone", () => {
         from: [observations.id],
         concludes: [{ proposition: GENERAL, finding: "12% faster overall" }],
       });
-      expect(analysis.kind).toBe("analysis");
+      expect((analysis.analysis as { kind: string }).kind).toBe("analysis");
 
       const report = await call(c, "reinterpret", {
         proposition: GENERAL,
@@ -467,7 +467,7 @@ describe("behaviour — the same answers, over the wire", () => {
     const observations = await s.recordObservations({
       enquiry, name: "sweep readings", finding: "twelve runs at five seeds",
     });
-    const analysis = await s.recordAnalysis({
+    const { analysis: analysis } = await s.recordAnalysis({
       enquiry, method: "paired comparison", from: [observations],
       concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
     });

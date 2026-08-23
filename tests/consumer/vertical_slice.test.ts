@@ -97,7 +97,7 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
       const observations = await s.recordObservations({
         enquiry, name: "sweep readings", finding: "twelve runs across the schedule",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "convergence-fit", from: [observations],
         concludes: [{ proposition: CONVERGES, finding: "convergence moves by ~3 steps" }],
         heldTo: [seedStability],
@@ -148,7 +148,7 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     const observations = await s.recordObservations({
       enquiry, name: `${proposition} readings`, finding: `measurements for ${proposition}`,
     });
-    const analysis = await s.recordAnalysis({
+    const { analysis: analysis } = await s.recordAnalysis({
       enquiry, method: "paired-comparison", from: [observations],
       concludes: [{ proposition, finding: `result for ${proposition}` }],
     });
@@ -259,7 +259,7 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
         enquiry, name: "random control", finding: "the 2024 control, as archived",
         contentHash: "sha256:1111",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [historical],
         concludes: [{ proposition: "the encoding beats the control", finding: "difference 2.1%" }],
       });
@@ -322,7 +322,7 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
         // The only place a name can go. It is evidence prose, not attribution.
         finding: `difference 2.1%, CI excludes zero (adjudicated by ${closer})`,
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis } = await s.recordAnalysis({
         enquiry, method: "paired-comparison", from: [observations],
         concludes: [{ proposition: "the difference is real", finding: `difference 2.1% (${closer})` }],
       });
