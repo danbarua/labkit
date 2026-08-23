@@ -1229,7 +1229,10 @@ export class WriteSurface extends SessionCore {
     const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
       what: o,
       named: inputNames.get(o.id) ?? o.id,
-      why: "observations were not produced by the replaced analysis, and the replacement rests on them",
+      // Neutral about what kind of record this is. It said "observations were
+      // not produced by ..." while `what` now reports `kind: "analysis"` for an
+      // analysis input -- the same report contradicting itself one field over.
+      why: "not produced by the replaced analysis, and the replacement rests on it",
     }));
 
     const report: ReplacementReport = {

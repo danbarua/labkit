@@ -35,6 +35,15 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   now names *the analysis*, not its output artefact, and never sees the `ART_`
   id at all.
 
+- [ ] **A replacement may consume the output it just invalidated.**
+  `replaceAnalysis` invalidates `supersedes`'s output and then records the
+  replacement; nothing stops `from` naming `supersedes`, or the artefact under
+  it. Reachable before the `InputRef` change too — passing the `ART_` id did
+  the same thing — so this is not new, just newly easy to write. Needs a read
+  that gives a **wrong answer** because of it: today the record says plainly
+  that the input is invalidated, which is unhelpful rather than incorrect.
+  Adding a refusal without that is manufacturing one, which PJ-019 forbids.
+
 - [ ] **Row AF — execution input order is not recorded.** `CONSUMES` says which
   artefacts a computation read, never in what sequence, so two runs of an
   order-sensitive method are indistinguishable (S-10b). Earns nothing under the
