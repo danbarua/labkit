@@ -30,6 +30,24 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   enquiry ids, so a reconnecting agent could not find an enquiry to work in.
   Both are closed.
 
+- [ ] **`ART_` does not say what kind of artefact it is.** `ObservationsRef`'s
+  `kind` is `"observations"` and its id is an **Artefact** id — the same prefix
+  an analysis's *output* carries. So a caller holding an `ART_` id cannot tell
+  raw measurement from a computed result, and `what_depends_on` takes either.
+
+  **Measured, not argued: this is naming, not behaviour.** Recording an analysis
+  with `from: [analysisRef]` and with `from: [{kind:"observations", id: <that
+  analysis's output artefact>}]` produce an *identical* record — both write the
+  same `CONSUMES` edge, and `reproducibilityOf` reports the same
+  `{part, name}` for both. Nothing is wrong today; what is wrong is that the
+  type's `kind` says "observations" about something that is not, and an agent
+  reasoning from the prefix has no way to know.
+
+  Surfaced by writing `inputRef()` in `src/mcp/tools.ts`, which had to guess a
+  ref kind from a prefix and guessed a plausible wrong one first (`EU_`). Needs
+  a discriminator before it is worth changing anything: a read that gives a
+  confidently wrong answer because the two are indistinguishable.
+
 - [ ] **The other nine write tools.** Six are exposed — `pose`, `pursue`,
   `open_enquiry`, `record_observations`, `record_analysis`, `close_enquiry` —
   which is the loop that makes a programme exist. The rest of
@@ -58,6 +76,15 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   earlier fix passed round one on both arms and failed at the lowest load of
   four; shipping on round one would have shipped a regression. A clean run
   cannot verify a claim about what happens during a flake.
+
+- [ ] **Read the generated documentation as a diagnostic, once the write tools
+  are complete.** `labkit://docs/tools` renders every tool's inputs and outputs
+  into one document from the declarations themselves. With all fifteen commands
+  exposed, that document puts every id parameter, every ref kind and every
+  prefix side by side on one page — which is where an inconsistency like the
+  `ART_` one above is visible as an inconsistency rather than as a single
+  puzzling field. Nobody has read it that way yet, because six tools is not
+  enough of the surface for a discrepancy to stand out.
 
 ## Needs a discriminator
 

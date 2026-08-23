@@ -136,9 +136,11 @@ checkable this way.
   `promote` lands. It is first in the next pass.
 - **Nine of the fifteen commands are still unexposed**, all following the
   identical pattern.
-- **Write events do not survive the process.** `main()` uses the default
-  in-memory sink. The graph is the durable record and always was; nothing
-  persists the event stream, and no caller has asked for one.
+- **The event sink is in-memory on purpose, not by omission.** `read.ts` never
+  touches `events`; the scenarios that mention the log assert it is *empty* when
+  a historical answer is read. A durable sink is a SQL table and a reader, and
+  what it waits on is a consumer — an audit log, MCP notifications, or a
+  projection to another view model.
 - The gap-analysis queue item was **deleted, not done** — a corpus review
   standing in front of obvious work. Both gaps it would have looked for (no
   write tools at all; no way to discover an enquiry id) were found by building.

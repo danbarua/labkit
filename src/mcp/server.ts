@@ -166,11 +166,16 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   // stream. This is the composition `src/domain/session.ts` specifies for an
   // adapter that needs both.
   //
-  // The sink is the default in-memory one, so **write events do not survive the
-  // process**. The graph is the durable record and always was — events explain
-  // how state changed, the graph says what the state is — but nothing here
-  // persists the former, and a durable sink has not been earned by a caller
-  // asking for one.
+  // The sink is the default in-memory one, and that is the design rather than a
+  // shortfall. The graph is the record: `src/domain/read.ts` never touches
+  // `events`, and the scenarios that mention the log assert it is **empty** at
+  // the moment a historical answer is read, which is what proves the answer is
+  // durable rather than replayed.
+  //
+  // A durable sink is a SQL table and a reader — not difficult, just unearned.
+  // What would earn it is a consumer: an audit log, notifications pushed to an
+  // MCP client, or a projection into a different view model. None exists yet, so
+  // building one now would be a feature nothing asks for.
   const graph = new TenantGraph(ctx, connection.db);
   const writes = new WriteSurface(graph);
   const server = buildServer(new ReadSurface(graph, { events: writes.events }), writes);
