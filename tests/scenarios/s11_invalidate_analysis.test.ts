@@ -121,6 +121,18 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       before: "p = 0.002 (bootstrap)",
       after: "p = 0.049 (sign-flip permutation)",
     });
+
+    // Which records these are about. `unchanged` and `changed.claim` name the
+    // REPLACEMENT's claims -- everything in `affected` was withdrawn by this
+    // act, so reporting those as unchanged would call a withdrawn record
+    // current. `changed.was` names the superseded one, and the two sets are
+    // disjoint even though every sentence appears in both.
+    const minted = new Set(report.claims.map((c) => c.claim.id));
+    const superseded = new Set(report.affected.map((a) => a.claim.id));
+    for (const u of report.unchanged) expect(minted.has(u.claim.id)).toBe(true);
+    expect(minted.has(report.changed[0]!.claim.id)).toBe(true);
+    expect(superseded.has(report.changed[0]!.was.id)).toBe(true);
+    expect([...minted].some((id) => superseded.has(id))).toBe(false);
   });
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
@@ -136,7 +148,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    expect(report.affected.sort()).toEqual(
+    expect(report.affected.map((a) => a.asserts).sort()).toEqual(
       [
         "T beats lattice",
         "T beats rewired",
@@ -147,9 +159,14 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       ].sort(),
     );
 
-    // ...and the same answer from a fresh query, not just from the report.
+    // ...and the same answer from a fresh query, not just from the report --
+    // matched by id now that both sides carry one. By sentence this passed
+    // even if the query had returned the replacement's claims instead of the
+    // superseded ones, which after a replacement assert every one of these.
     const downstream = await session.whatDependsOn("bootstrap-pairwise output");
-    expect(downstream.claims.map((c) => c.asserts).sort()).toEqual(report.affected.sort());
+    expect(downstream.claims.map((c) => c.claim.id).sort()).toEqual(
+      report.affected.map((a) => a.claim.id).sort(),
+    );
   });
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {

@@ -323,7 +323,12 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // conclusionsOf() saw nothing at all when an analysis only challenged.
-    expect(report.affected).toEqual([SPECIFICITY]);
+    // By handle, not by sentence: after the replacement two records assert
+    // these words, and this names the refutation's own claim -- the one that
+    // was withdrawn.
+    expect(report.affected).toEqual([
+      { claim: claimOf(refutationClaims, SPECIFICITY), asserts: SPECIFICITY },
+    ]);
     expect(report.changed).toHaveLength(1);
 
     // After the replacement the sentence is claimed twice; this asks about

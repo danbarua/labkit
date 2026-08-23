@@ -290,13 +290,21 @@ describe("an agent can track work through the tools alone", () => {
         as: "the method is faster on this benchmark suite",
         because: "the suite is not representative of the general case",
       });
-      expect(report.previously).toBe(GENERAL);
-      expect(report.nowClaims).toBe("the method is faster on this benchmark suite");
+      // Over the wire the pairs survive as objects, not sentences -- the
+      // schema mirror in src/mcp/schemas.ts is held to the report interface at
+      // compile time, and this checks the same thing at run time.
+      const previously = report.previously as Array<{ claim: { id: string }; asserts: string }>;
+      const nowClaims = report.nowClaims as { claim: { id: string }; asserts: string };
+      expect(previously.map((c) => c.asserts)).toEqual([GENERAL]);
+      expect(nowClaims.asserts).toBe("the method is faster on this benchmark suite");
+      expect(nowClaims.claim.id.startsWith("CLM_")).toBe(true);
 
-      const history = await call(c, "interpretation_history", {
-        claim: await claimIdFor(c, "the method is faster on this benchmark suite"),
-      });
-      expect(history.originally).toBe(GENERAL);
+      // Asked with the handle `reinterpret` just returned, not by looking the
+      // sentence back up.
+      const history = await call(c, "interpretation_history", { claim: nowClaims.claim.id });
+      expect((history.originally as Array<{ asserts: string }>).map((c) => c.asserts)).toEqual([
+        GENERAL,
+      ]);
       await c.close();
     } finally {
       await scenario.end();

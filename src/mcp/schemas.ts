@@ -78,9 +78,12 @@ import type {
 /** `Ref<K>` — the natural-id handle the domain passes around. */
 const ref = <K extends string>(kind: K) => z.strictObject({ kind: z.literal(kind), id: z.string() });
 
+/** `{claim, asserts}` — the report convention's pair for a claim, in one place. */
+const concludedClaim = z.strictObject({ claim: ref("claim"), asserts: z.string() });
+
 /** `claims_asserting` — an array, wrapped because structuredContent must be an object. */
 export const claimsAssertingSchema = z.strictObject({
-  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+  claims: z.array(concludedClaim),
 });
 
 const questionStanding = z.strictObject({
@@ -136,8 +139,8 @@ const amendmentRecord = z.strictObject({
 
 const revision = z.strictObject({
   revision: ref("decision"),
-  previously: z.string(),
-  nowClaims: z.string(),
+  previously: z.array(concludedClaim),
+  nowClaims: concludedClaim,
   reason: z.string(),
   restingOnTheOldReading: z.array(z.strictObject({ question: ref("question"), asks: z.string() })),
 });
@@ -183,7 +186,7 @@ export const supportExplanationSchema = z.strictObject({
 });
 
 export const dependencyReportSchema = z.strictObject({
-  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+  claims: z.array(concludedClaim),
   enquiries: z.array(z.strictObject({ enquiry: ref("enquiry"), pursuing: z.string() })),
   routesWalked: z.array(z.string()),
   // Literal `false`, not `boolean`. The report is a lower bound and says so in
@@ -219,8 +222,8 @@ export const designHistorySchema = z.strictObject({
 });
 
 export const interpretationHistorySchema = z.strictObject({
-  originally: z.string(),
-  nowClaims: z.string(),
+  originally: z.array(concludedClaim),
+  nowClaims: concludedClaim,
   revisions: z.array(revision),
 });
 
@@ -335,7 +338,7 @@ export const analysisRefSchema = ref("analysis");
  */
 export const recordedAnalysisSchema = z.strictObject({
   analysis: analysisRefSchema,
-  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+  claims: z.array(concludedClaim),
 });
 export const reviewRefSchema = ref("review");
 export const workRefSchema = ref("work");
@@ -344,7 +347,9 @@ export const gateRefSchema = ref("gate");
 
 const changedConclusion = z.strictObject({
   proposition: z.string(),
+  was: ref("claim"),
   before: z.string(),
+  claim: ref("claim"),
   after: z.string(),
 });
 
@@ -358,7 +363,7 @@ export const verificationReportSchema = z.strictObject({
   at: z.string(),
   verification: analysisRefSchema,
   of: analysisRefSchema,
-  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+  claims: z.array(concludedClaim),
 });
 
 export const amendmentReportSchema = z.strictObject({
@@ -367,24 +372,24 @@ export const amendmentReportSchema = z.strictObject({
   replaced: condition,
   nowRequires: condition,
   rerun: z.array(gatedWork),
-  confirmatoryAffected: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
+  confirmatoryAffected: z.array(concludedClaim),
   nature: z.enum(["mechanical", "scientific"]),
 });
 
 export const replacementReportSchema = z.strictObject({
   at: z.string(),
   replacement: ref("analysis"),
-  claims: z.array(z.strictObject({ claim: ref("claim"), asserts: z.string() })),
-  affected: z.array(z.string()),
+  claims: z.array(concludedClaim),
+  affected: z.array(concludedClaim),
   unaffected: z.array(unaffectedRecord),
   changed: z.array(changedConclusion),
-  unchanged: z.array(z.string()),
+  unchanged: z.array(concludedClaim),
 });
 
 export const reinterpretationReportSchema = z.strictObject({
   at: z.string(),
-  previously: z.string(),
-  nowClaims: z.string(),
+  previously: z.array(concludedClaim),
+  nowClaims: concludedClaim,
   evidenceStanding: z.array(citedFinding),
   restingOnTheOldReading: z.array(z.strictObject({ question: ref("question"), asks: z.string() })),
   requiresRecomputation: z.boolean(),

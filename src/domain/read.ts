@@ -1129,12 +1129,16 @@ export class ReadSurface extends SessionCore {
     const seen = new Set<string>();
     for (;;) {
       const rows = await this.graph.query(
-        `MATCH (d:Decision)-[:MOTIVATES]->(:Claim {name: $name})
+        // `nxt` is bound rather than anonymous so the step can report WHICH
+        // record the decision motivated, not just what it says. Lower-case on
+        // purpose: a camelCase RETURN name decodes as null (CLAUDE.md).
+        `MATCH (d:Decision)-[:MOTIVATES]->(nxt:Claim {name: $name})
          MATCH (d)-[:CHANGES]->(was:Claim)
-         RETURN d, was`,
+         RETURN d, was, nxt`,
         {
           d: vertexProps<{ natural_id: string; reason: string }>(),
           was: vertexProps<{ name: string } & Identified>(),
+          nxt: vertexProps<{ name: string } & Identified>(),
         },
         { name: current },
       );
@@ -1145,28 +1149,45 @@ export class ReadSurface extends SessionCore {
       // withdraws every node asserting the sentence it replaced.
       const decisions = new Set(rows.map((r) => r.d.natural_id));
       const replaced = new Set(rows.map((r) => r.was.name));
-      if (decisions.size > 1 || replaced.size > 1) {
+      // `motivated` joins the guard for the same reason the other two are
+      // there: several records asserting the step's new reading would make
+      // `nowClaims` an arbitrary pick between them.
+      const motivated = new Set(rows.map((r) => r.nxt.natural_id));
+      if (decisions.size > 1 || replaced.size > 1 || motivated.size > 1) {
         throw new Error(
           `interpretation history for "${proposition}" is not a single line at "${current}"`,
         );
       }
       const step = rows[0];
       if (!step) break;
+      // Every record the decision withdrew, not the one that came back first.
+      // One decision withdraws every node asserting the sentence it replaced,
+      // so this step is plural by construction -- S-12's two analyses reaching
+      // one reading are withdrawn together, and naming one of them would be
+      // the arbitrary pick PJ-030 exists to remove.
+      const withdrew: ConcludedClaim[] = [
+        ...new Map(
+          rows.map((r) => [r.was.natural_id, r.was] as const),
+        ).values(),
+      ].map((was) => ({ claim: ref("claim", was.natural_id), asserts: was.name }));
+
       // Keyed by the claim's id, not its wording. Two distinct claims worded
       // alike at different points in one chain used to raise `loops at`
-      // falsely. The *traversal* is still by name -- `interpretationHistory`
-      // takes bare text -- which is a narrower remaining gap, recorded in
-      // PJ-030 §7 rather than fixed here.
-      if (seen.has(step.was.natural_id))
-        throw new Error(
-          `interpretation history for "${proposition}" loops at "${step.was.name}"`,
-        );
-      seen.add(step.was.natural_id);
+      // falsely. Every withdrawn record is marked, not just the first row's --
+      // the guard watched one of N. The *traversal* is still by name, which is
+      // the narrower remaining gap recorded in PJ-030 §7 and in docs/TASKS.md.
+      for (const w of withdrew) {
+        if (seen.has(w.claim.id))
+          throw new Error(
+            `interpretation history for "${proposition}" loops at "${w.asserts}"`,
+          );
+        seen.add(w.claim.id);
+      }
 
       steps.unshift({
         revision: ref("decision", step.d.natural_id),
-        previously: step.was.name,
-        nowClaims: current,
+        previously: withdrew,
+        nowClaims: { claim: ref("claim", step.nxt.natural_id), asserts: step.nxt.name },
         reason: step.d.reason,
         restingOnTheOldReading: await this.decidedOnTheStrengthOf({
           proposition: step.was.name,
@@ -1176,8 +1197,9 @@ export class ReadSurface extends SessionCore {
     }
 
     return {
-      originally: steps[0]?.previously ?? proposition,
-      nowClaims: proposition,
+      originally: steps[0]?.previously ?? [{ claim, asserts: proposition }],
+      // The handle the caller asked about, not one re-found by its wording.
+      nowClaims: { claim, asserts: proposition },
       revisions: steps,
     };
   }

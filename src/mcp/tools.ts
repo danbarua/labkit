@@ -215,8 +215,10 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     name: "interpretation_history",
     title: "How a claim's reading was narrowed",
     description:
-      "How a claim's current reading was arrived at: each earlier wording, the decision that " +
-      "narrowed it and why. Takes the proposition as currently worded and walks backwards.",
+      "How a claim's current reading was arrived at: the claims each step withdrew, the " +
+      "decision that narrowed them and why. Takes the claim's id and walks backwards. One " +
+      "step can withdraw several claims — two analyses reaching one reading are withdrawn " +
+      "together — so every step names records, not a sentence.",
     inputSchema: { claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4`) },
     outputSchema: interpretationHistorySchema,
     handler: (read, { claim }) => read.interpretationHistory({ kind: "claim", id: claim }),

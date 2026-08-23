@@ -208,7 +208,15 @@ export interface EnquiryStatus {
  */
 export interface ChangedConclusion {
   proposition: string;
+  /**
+   * The claim that asserted this before, now withdrawn — the same record
+   * `affected` names. Its wording is `proposition`; two records assert that
+   * sentence after a replacement and only the handles tell them apart.
+   */
+  was: ClaimRef;
   before: string;
+  /** The claim the replacement asserts in its place. */
+  claim: ClaimRef;
   after: string;
 }
 
@@ -244,12 +252,23 @@ export interface ReplacementReport {
    * it produced?"* has caught something.
    */
   claims: ConcludedClaim[];
-  /** Propositions whose support ran through the replaced analysis — enumerable, not "everything downstream". */
-  affected: string[];
+  /**
+   * The claims whose support ran through the replaced analysis — enumerable,
+   * not "everything downstream". These are the **superseded** records: each is
+   * withdrawn by this act, and the replacement's claim asserting the same
+   * sentence is in `claims`.
+   */
+  affected: ConcludedClaim[];
   /** Still valid, and still cited by the replacement. */
   unaffected: UnaffectedRecord[];
   changed: ChangedConclusion[];
-  unchanged: string[];
+  /**
+   * The **replacement's** claims whose supporting finding is the same as
+   * before. Deliberately the new records and not the superseded ones: every
+   * claim in `affected` is withdrawn by this act, so naming those here would
+   * report a withdrawn record as unchanged.
+   */
+  unchanged: ConcludedClaim[];
 }
 
 export interface UnaffectedRecord {
@@ -927,8 +946,16 @@ export interface DesignHistory {
  */
 export interface ReinterpretationReport {
   at: string;
-  previously: string;
-  nowClaims: string;
+  /**
+   * The claims that stopped standing — **plural**, and that is the point.
+   * A reinterpretation narrows a *reading*, and two analyses in one line of
+   * enquiry concluding the same sentence share one (S-12), so a single handle
+   * here would be an arbitrary pick between records this act withdrew
+   * together. They all assert the same `asserts`; the handles are what differ.
+   */
+  previously: ConcludedClaim[];
+  /** The narrower claim this act minted. It had no handle until PJ-030. */
+  nowClaims: ConcludedClaim;
   /** Findings that carried the old reading and carry the new one. Unchanged, and demonstrably so. */
   evidenceStanding: CitedFinding[];
   /** Things decided on the strength of the old sentence — not things computed from the numbers. */
@@ -939,8 +966,10 @@ export interface ReinterpretationReport {
 /** One revision of an interpretation, read back long afterwards. */
 export interface Revision {
   revision: DecisionRef;
-  previously: string;
-  nowClaims: string;
+  /** Every claim this decision withdrew — plural for the reason {@link ReinterpretationReport.previously} is. */
+  previously: ConcludedClaim[];
+  /** What the decision put in their place. */
+  nowClaims: ConcludedClaim;
   reason: string;
   restingOnTheOldReading: DecidedQuestion[];
 }
@@ -952,8 +981,10 @@ export interface Revision {
  * no timestamps, nothing read from the event log.
  */
 export interface InterpretationHistory {
-  originally: string;
-  nowClaims: string;
+  /** The earliest reading, as the records that asserted it — the first revision's `previously`. */
+  originally: ConcludedClaim[];
+  /** The claim asked about. */
+  nowClaims: ConcludedClaim;
   revisions: Revision[];
 }
 

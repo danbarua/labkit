@@ -82,6 +82,7 @@ import type {
   GateRef,
   WorkRef,
   ChangedConclusion,
+  ClaimRef,
   ConcludedClaim,
   RecordedAnalysis,
   CitedFinding,
@@ -114,6 +115,20 @@ import type {
   SharpenCommand,
 } from "./commands";
 import { SessionCore } from "./core";
+
+/**
+ * A conclusion **already on the record**, as read back from the graph.
+ *
+ * Deliberately not {@link Conclusion}, which is the *command* shape: a caller
+ * recording conclusions holds no claim id yet, so widening the input to carry
+ * one would demand a handle for a record that does not exist. Reading them
+ * back is the other direction and the id is right there.
+ */
+interface RecordedConclusion {
+  claim: ClaimRef;
+  proposition: string;
+  finding: string;
+}
 
 export class WriteSurface extends SessionCore {
   /**
@@ -1158,16 +1173,32 @@ export class WriteSurface extends SessionCore {
       return { before, replacement };
     });
 
+    // Both sides carry a handle. After a replacement two records assert each
+    // sentence -- the withdrawn one and the fresh one -- so a report naming
+    // only the wording leaves a reader unable to say which it means. `was`
+    // comes from the superseded analysis, `claim` from the replacement, and
+    // the replacement's claims are taken BY INDEX: `recorded()` mints one per
+    // conclusion in order, so position is identity and a lookup keyed by the
+    // sentence would collapse two conclusions phrased alike.
+    //
+    // The `before` match is by wording because it has to be -- the superseded
+    // analysis's claims and the replacement's share no handle, and "the same
+    // proposition, re-derived" is precisely what the caller asserts by passing
+    // them.
     const changed: ChangedConclusion[] = [];
-    const unchanged: string[] = [];
-    for (const now of input.concludes) {
+    const unchanged: ConcludedClaim[] = [];
+    for (const [i, now] of input.concludes.entries()) {
       const was = before.find((b) => b.proposition === now.proposition);
-      if (!was) continue;
-      if (was.finding === now.finding) unchanged.push(now.proposition);
+      const claim = replacement.claims[i]?.claim;
+      if (!was || !claim) continue;
+      if (was.finding === now.finding)
+        unchanged.push({ claim, asserts: now.proposition });
       else
         changed.push({
           proposition: now.proposition,
+          was: was.claim,
           before: was.finding,
+          claim,
           after: now.finding,
         });
     }
@@ -1194,7 +1225,7 @@ export class WriteSurface extends SessionCore {
       at,
       replacement: replacement.analysis,
       claims: replacement.claims,
-      affected: before.map((b) => b.proposition),
+      affected: before.map((b) => ({ claim: b.claim, asserts: b.proposition })),
       unaffected,
       changed,
       unchanged,
@@ -1202,7 +1233,10 @@ export class WriteSurface extends SessionCore {
     this.emit("replaceAnalysis", replacement.analysis.id, {
       supersedes: input.supersedes.id,
       because: input.because.id,
-      affected: report.affected,
+      // Sentences, not handles. `detail` is Record<string, unknown>, so
+      // nothing would have complained had this silently become objects when
+      // `affected` grew handles -- the one shape PJ-030 §5 warns tsc misses.
+      affected: report.affected.map((a) => a.asserts),
       changed: report.changed.map((c) => c.proposition),
     });
     return report;
@@ -1241,6 +1275,13 @@ export class WriteSurface extends SessionCore {
         ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
       },
     );
+    // Every record this act withdraws, by handle. The reading is one sentence
+    // and the records asserting it are several -- reporting the sentence alone
+    // left a caller unable to name which claims stopped standing, and reporting
+    // one handle would have picked between them arbitrarily.
+    const withdrawn: ConcludedClaim[] = [
+      ...new Set(claims.map((c) => c.c.natural_id)),
+    ].map((id) => ({ claim: ref("claim", id), asserts: previously }));
     if (claims.length === 0)
       throw new Error(`no claim ${input.of.id} to reinterpret`);
 
@@ -1315,8 +1356,12 @@ export class WriteSurface extends SessionCore {
 
     return {
       at,
-      previously,
-      nowClaims: input.as,
+      previously: withdrawn,
+      // The narrower claim was minted here and its handle discarded -- the
+      // eighth thing CLAUDE.md's "does the act record what it produced, or
+      // only what it acted on?" has caught. A caller had to go back through
+      // `claimsAsserting` to name what this very call had just created.
+      nowClaims: { claim: ref("claim", narrower.natural_id), asserts: input.as },
       evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
       restingOnTheOldReading,
       requiresRecomputation: false,
@@ -1330,7 +1375,7 @@ export class WriteSurface extends SessionCore {
   ): void {
     this.events.record({ at: this.clock.now(), operation, subject, detail });
   }
-  private async conclusionsOf(analysis: AnalysisRef): Promise<Conclusion[]> {
+  private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(
       // Either bearing: an analysis whose findings all CHALLENGE returned no
       // conclusions at all, so replacing one reported nothing as affected.
@@ -1340,14 +1385,22 @@ export class WriteSurface extends SessionCore {
        RETURN e, sc, cc`,
       {
         e: vertexProps<EvidenceProps>(),
-        sc: optional(vertexProps<ClaimProps>()),
-        cc: optional(vertexProps<ClaimProps>()),
+        sc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
+        cc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
       },
       { id: analysis.id },
     );
     return rows.flatMap((r) => {
       const claim = r.sc ?? r.cc;
-      return claim ? [{ proposition: claim.name, finding: r.e.statement }] : [];
+      return claim
+        ? [
+            {
+              claim: ref("claim", claim.natural_id),
+              proposition: claim.name,
+              finding: r.e.statement,
+            },
+          ]
+        : [];
     });
   }
   private async outputArtefactOf(analysis: AnalysisRef): Promise<string> {

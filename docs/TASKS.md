@@ -9,19 +9,19 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Ready to build
 
-- [ ] **Four report fields still carry claim wording with no handle.**
-  `InterpretationHistory.originally` / `.nowClaims`, `Revision.previously` /
-  `.nowClaims`, `ReinterpretationReport.previously` / `.nowClaims`, and
-  `ReplacementReport.affected` / `.unchanged`. A `ClaimRef` is available at
-  every one now, so each is a projection change of the kind PJ-030 §5
-  describes. Change the type, let `tsc` name the sites.
+- [ ] **`interpretationHistory` walks by wording.** Its entry point is a
+  handle, its loop guard is keyed by claim id, and every step now *reports*
+  handles — but the traversal still finds each step by the *name* of the one
+  before it (`MATCH (d:Decision)-[:MOTIVATES]->(nxt:Claim {name: $name})`).
+  Walking by id wants the revision chain to carry an edge a caller can follow,
+  which is a model question rather than a projection.
 
-- [ ] **`interpretationHistory` walks by wording.** Its entry point is a handle
-  and its loop guard is keyed by claim id, but the traversal still finds each
-  step by the *name* of the one before it
-  (`MATCH (d:Decision)-[:MOTIVATES]->(:Claim {name: $name})`). Walking by id
-  wants the revision chain to carry an edge a caller can follow, which is a
-  model question rather than a projection.
+- [ ] **A report does not say which record it is about.**
+  `whySupported(claim)` answers with `proposition: string` and no `claim` on
+  the report, so a consumer holding the response — over MCP it is a bare JSON
+  blob — cannot tie it back without keeping the request. Audit every report
+  type for the same shape before fixing one: the subject handle is an echo of
+  an argument the verb already has, so it is cheap everywhere it is missing.
 
 ## Needs a discriminator
 

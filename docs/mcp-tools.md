@@ -352,7 +352,7 @@ How the conditions on a gate reached their current wording: each amendment, its 
 
 *How a claim's reading was narrowed* — read-only
 
-How a claim's current reading was arrived at: each earlier wording, the decision that narrowed it and why. Takes the proposition as currently worded and walks backwards.
+How a claim's current reading was arrived at: the claims each step withdrew, the decision that narrowed them and why. Takes the claim's id and walks backwards. One step can withdraw several claims — two analyses reaching one reading are withdrawn together — so every step names records, not a sentence.
 
 **Takes**
 
@@ -360,14 +360,30 @@ How a claim's current reading was arrived at: each earlier wording, the decision
 
 **Returns**
 
-- `originally`: string
-- `nowClaims`: string
+- `originally`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
+- `nowClaims`: object
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 - `revisions`: object[]
   - `revision`: object
     - `kind`: "decision"
     - `id`: string
-  - `previously`: string
-  - `nowClaims`: string
+  - `previously`: object[]
+    - `claim`: object
+      - `kind`: "claim"
+      - `id`: string
+    - `asserts`: string
+  - `nowClaims`: object
+    - `claim`: object
+      - `kind`: "claim"
+      - `id`: string
+    - `asserts`: string
   - `reason`: string
   - `restingOnTheOldReading`: object[]
     - `question`: object
@@ -1043,7 +1059,11 @@ Record a corrected analysis in place of a defective one, citing the review that 
     - `kind`: "claim"
     - `id`: string
   - `asserts`: string
-- `affected`: string[]
+- `affected`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 - `unaffected`: object[]
   - `what`: object
     - `kind`: "observations"
@@ -1052,9 +1072,19 @@ Record a corrected analysis in place of a defective one, citing the review that 
   - `why`: string
 - `changed`: object[]
   - `proposition`: string
+  - `was`: object
+    - `kind`: "claim"
+    - `id`: string
   - `before`: string
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
   - `after`: string
-- `unchanged`: string[]
+- `unchanged`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 
 ---
 
@@ -1073,8 +1103,16 @@ Record that a claim's reading has been narrowed — the evidence is unchanged, w
 **Returns**
 
 - `at`: string
-- `previously`: string
-- `nowClaims`: string
+- `previously`: object[]
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
+- `nowClaims`: object
+  - `claim`: object
+    - `kind`: "claim"
+    - `id`: string
+  - `asserts`: string
 - `evidenceStanding`: object[]
   - `evidence`: object
     - `kind`: "evidence"

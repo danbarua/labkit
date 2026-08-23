@@ -144,7 +144,7 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
   expect(after.supported).toBe(true);
   // And no half-made revision is readable.
   const history = await session.interpretationHistory(await claimNamed(session, "T beats rewired"));
-  expect(history.nowClaims).toBe("T beats rewired");
+  expect(history.nowClaims.asserts).toBe("T beats rewired");
   expect(history.revisions).toEqual([]);
 });
 

@@ -93,8 +93,18 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
     // LabKit:     evidence stands; the claim is superseded by a narrower
     //             interpretation.
-    expect(report.nowClaims).toBe(NARROWER);
-    expect(report.previously).toBe(PREFERENTIAL);
+    expect(report.nowClaims.asserts).toBe(NARROWER);
+    // Both records that asserted the old reading, by handle. The report said
+    // the sentence and nothing else, so a caller could not name either claim
+    // this withdrew -- and a single handle here would have picked between two
+    // records arbitrarily, which is the whole of PJ-030.
+    expect(report.previously.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
+    expect(report.previously.map((c) => c.claim.id).sort()).toEqual(
+      [
+        claimOf(programme.firstClaims, PREFERENTIAL).id,
+        claimOf(programme.secondClaims, PREFERENTIAL).id,
+      ].sort(),
+    );
     expect(report.requiresRecomputation).toBe(false);
     expect(report.evidenceStanding.map((f) => f.states).sort()).toEqual([
       "discriminative amplitude ratio 0.79, non-discriminative 0.41",
@@ -117,7 +127,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     expect(beforehand.supported).toBe(true);
     expect(beforehand.support).toHaveLength(2);
 
-    await session.reinterpret({
+    const narrowing = await session.reinterpret({
       of: claimOf(programme.firstClaims, PREFERENTIAL),
       as: NARROWER,
       because: "both types attenuate",
@@ -132,15 +142,20 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // contradicted anything here, the reading of it changed.
     expect(withdrawn.withdrawn).toBe(true);
     expect(withdrawn.challenged).toBe(false);
+    // The same record the verb said it minted, not merely something worded
+    // like it. Matching on the sentence would not have noticed either way.
+    expect(withdrawn.replacedBy?.claim).toEqual(narrowing.nowClaims.claim);
     expect(withdrawn.replacedBy?.asserts).toBe(NARROWER);
     // Its findings are still there, and still say what they said.
     expect(withdrawn.support).toHaveLength(2);
 
     // Still readable, and readable as history rather than as something that
     // never happened.
-    const history = await later.interpretationHistory(await claimNamed(later, NARROWER));
-    expect(history.originally).toBe(PREFERENTIAL);
-    expect(history.nowClaims).toBe(NARROWER);
+    // Asked with the handle the verb returned -- no round trip back through
+    // the wording to re-find the record this very call created.
+    const history = await later.interpretationHistory(narrowing.nowClaims.claim);
+    expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
+    expect(history.nowClaims.asserts).toBe(NARROWER);
     expect(history.revisions).toHaveLength(1);
     expect(history.revisions[0]!.reason).toContain("both types attenuate");
   });
@@ -233,10 +248,16 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     expect(later.events.all()).toHaveLength(0);
 
     const history = await later.interpretationHistory(await claimNamed(later, EVEN_NARROWER));
-    expect(history.originally).toBe(PREFERENTIAL);
-    expect(history.nowClaims).toBe(EVEN_NARROWER);
-    expect(history.revisions.map((r) => r.nowClaims)).toEqual([NARROWER, EVEN_NARROWER]);
-    expect(history.revisions.map((r) => r.previously)).toEqual([PREFERENTIAL, NARROWER]);
+    expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
+    expect(history.nowClaims.asserts).toBe(EVEN_NARROWER);
+    expect(history.revisions.map((r) => r.nowClaims.asserts)).toEqual([NARROWER, EVEN_NARROWER]);
+    // Plural per step, and the counts differ: the first reinterpretation
+    // withdrew the two claims that had reached the same reading, the second
+    // withdrew the one narrower claim that replaced them.
+    expect(history.revisions.map((r) => r.previously.map((c) => c.asserts))).toEqual([
+      [PREFERENTIAL, PREFERENTIAL],
+      [NARROWER],
+    ]);
   });
 
   /**
