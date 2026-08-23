@@ -196,10 +196,18 @@ bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
 There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
-binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is four
-read-only commands over `ReadSurface` (`known`, `why`, `affects`, `enquiry`),
-and `src/mcp/server.ts` is the same reads for an agent caller, seven tools over
-stdio (`bun run mcp`).
+binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is
+**read-only by construction**: it builds a `ReadSurface` and never a
+`WriteSurface`, so it cannot write, which `tests/cli.test.ts` checks by deriving
+the forbidden verb list from the prototype.
+
+**`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
+one batch of work and that is not a design position: a record nothing can write
+to has nothing in it. Read and write handlers are handed different surfaces, so
+neither can reach the other's verbs, and
+`tests/mcp.test.ts` asserts every public verb on either surface is exposed or
+listed in `NOT_EXPOSED` with a reason. **`docs/mcp-tools.md` is the tool list**;
+this paragraph deliberately does not count them.
 
 `bun test` exits with a non-zero code even when every test passes — this is
 a known `bun test` + PGlite WASM teardown interaction, not a failure signal.
@@ -328,7 +336,7 @@ shapes. `src/domain/` is the domain *as it matters to a researcher*:
 ```
 src/db/        knows nodes and edges
 src/domain/    knows research actions
-(MCP, later)   knows researcher/agent language
+src/mcp/       knows researcher/agent language
 ```
 
 `ResearchSession` (`src/domain/session.ts`) is **verb-first**. There is
@@ -435,11 +443,22 @@ express the case the scenario exists for (S-3b, PJ-016).
 
 **Identity is never wording** — and its other half, **which record is this
 answer about?** The second is PJ-030: a reference denoting one record while the
-verb answers about another (an enquiry's status is the question's status; an
-artefact id does not say what kind of artefact it is; an analysis ref used as an
-input means that analysis's *output*). `tests/subject-identity.test.ts`
-demonstrates all three in one file and is **green while they are present** —
-fixing the first turns it red on purpose.
+verb answers about another. `tests/subject-identity.test.ts` holds the whole
+argument in one file and is worth reading before touching a report or a verb
+signature.
+
+**Every handle in a report is a `Ref`, and every verb takes one.** A value read
+out of a report goes straight back into a verb — `gateStatus().gate` into
+`designHistory()` — with no re-wrapping. Reports carry `{handle, wording}` pairs
+where a reader needs the text (`{claim, asserts}`, `{criterion, requires}`,
+`{work, objective}`, `{evidence, states}`); the handle is never a bare string
+and the wording never stands in for it.
+
+**A verb that mints something returns what it minted.** `recordAnalysis`,
+`replaceAnalysis` and `reverify` all return their claims. This is the
+`does the act record what it produced, or only what it acted on?` heuristic, and
+it has now caught seven things — the last three because a caller could not name
+a claim without describing it.
 
 Six unrelated regions have had to decide the first form — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
 (S-3c), execution inputs (S-10, caught by review after shipping wrong) and
@@ -449,13 +468,17 @@ the rule is not "we keep failing at this" but **every new comparison is a fresh
 chance to fail at it**: when you write an equality test between two records, say
 out loud which field carries identity.
 
-A claim is identified by its **proposition within a line of enquiry**, never by
-its wording alone. Two stages of one programme can assert the same sentence
-about different endpoints, and merging them reports a claim that is
-simultaneously supported and challenged when each separately has a clean
-answer (S-5). Verbs take a `ClaimSubject` — bare text while a sentence is
-asserted once, a `ConclusionRef` naming the analysis when it is not — and
-**refuse** rather than guess when text is ambiguous.
+A claim has its own handle, `ClaimRef`. Two stages of one programme can assert
+the same sentence about different endpoints, and merging them reports a claim
+that is simultaneously supported and challenged when each separately has a clean
+answer (S-5).
+
+**No verb resolves wording.** They take handles; `claimsAsserting` is the one
+place text becomes a handle, it returns *every* match, and it refuses to pick.
+The CLI resolves there and so do the tests (`tests/helpers/claims.ts`). One
+consequence worth knowing: `whySupported` can no longer answer about a
+proposition nobody has claimed — there is no handle for one — so *"has anyone
+claimed this?"* is `claimsAsserting` returning empty, which S-4 and S-1 assert.
 
 Prefer structure in the **query** over structure in the **stored model**.
 S-3's four gate states and per-criterion itemisation are computed, not
@@ -563,10 +586,10 @@ resolution, plus a standing non-additive migration problem (a view's columns
 can't be removed or reordered in place) held open for no consumer. This is not
 a reversal of the no-cull policy: that policy protects unused *labels and
 edges*, because a declared-but-unwalked edge is a claim about the domain. A view
-claims nothing. What would bring them back is the MCP/CLI read layer, where a
-relational projection actually pays;
-`git show 51b70d6:src/db/provisioning.ts` has the implementation.
-
+claims nothing. The MCP/CLI read layer was the case for bringing them back and
+it has since been built without them — every read goes through `cypher()` and
+none wanted a relational projection. `git show 51b70d6:src/db/provisioning.ts`
+has the implementation if one is ever earned;
 `provisionTenantGraph()` and `dropTenantGraph()` (`src/db/provisioning.ts`)
 are the only exports there. The class that does the work,
 `TenantGraphProvisioner`, is **module-private** on purpose — it takes no lock

@@ -222,12 +222,13 @@ needs **two facts**: the question is answered, and his line has produced
 nothing. Collapsing them is what produces the wrong answer — the same shape as
 S-1 refusing to collapse `untested` into `unresolved`.
 
-So the likely direction is that `enquiryStatus(enquiry)` should answer about the
-enquiry, and *"has this question been answered?"* is a different read taking a
-`QuestionRef`. That is a guess from one conversation and is **not decided**.
-Whether two verbs earn their place where one stands needs the third bar: a
-reader. Bruno is that reader if the conversation is right, and one conversation
-is not a corpus.
+**Settled, and by neither of the two options.** `EnquiryStatus` is now
+`{enquiry, pursuing, contributed, question}` — everything at the top level is
+true of the *enquiry*, and the question's state is nested where it cannot be
+read as a pursuit's own. `contributed` is what this pursuit produced, which is
+the fact Bruno asked for and which the flattened shape had no field able to
+hold. No second verb was needed: the collapse, not the verb count, was the
+defect.
 
 **One diagnosis does not imply one remedy.** CLAUDE.md records four scenarios
 asking *does the act record what it produced?* which needed four different

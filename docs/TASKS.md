@@ -1,6 +1,7 @@
 # Outstanding work
 
-**A queue, not a record.** Only actionable items live here. What the model knows
+**A queue, not a record.** Only actionable items live here — a finished item is
+**deleted**, not struck through; git history is the record. What the model knows
 lives in PJ-008 §3's index table; standing facts and gates live in CLAUDE.md.
 Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
@@ -8,169 +9,53 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Ready to build
 
-- [x] ~~**Carry identifiers through the read models.**~~ — done, all ten rows. The plan is
-  `docs/project-journal/030_which_record_is_this_about.md` §5; the audit of
-  which reports drop which ids is §4; the demonstration is in
-  `tests/subject-identity.test.ts` §4 and is **red-to-green in reverse** — it
-  asserts the defect, so a row fails as its report is fixed, and the row is then
-  deleted.
+- [ ] **Four report fields still carry claim wording with no handle.**
+  `InterpretationHistory.originally` / `.nowClaims`, `Revision.previously` /
+  `.nowClaims`, `ReinterpretationReport.previously` / `.nowClaims`, and
+  `ReplacementReport.affected` / `.unchanged`. A `ClaimRef` is available at
+  every one now, so each is a projection change of the kind PJ-030 §5
+  describes. Change the type, let `tsc` name the sites.
 
-  `DependencyReport` first (its answer is unusable without ids), `EnquiryStatus`
-  second (it is the one shipping a wrong answer). Additive: the reference goes
-  *beside* the wording, which is the shape `whatIsKnown`, `originOf` and
-  `reproducibilityOf` already use, so no caller breaks and it is not a new
-  convention. **No graph change** — every id already exists and is already
-  reachable from the query that builds the report.
-
-- [x] ~~**`outputSchema` on the MCP tools.**~~ — done. `src/mcp/schemas.ts`
-  mirrors the report types and `tsc` holds each mirror to its interface. Six of
-  seven tools declare one; `known` cannot, because the SDK's
-  `normalizeObjectSchema` returns `undefined` for a union rather than throwing.
-  **Residual gap, measured:** an optional field that no test data produces can
-  be dropped from a schema and neither `tsc` nor the parse test notices.
-  Widening the seed in `tests/mcp.test.ts` is what narrows it.
-- [x] ~~**Typed write commands.**~~ — done. `src/domain/commands.ts` names the
-  fifteen command shapes `write.ts` declared inline, exported from the barrel so
-  an adapter can hold one before issuing it. Extraction only — every shape is
-  the one its verb already had, so no call site changed and `tsc` proves it.
-  Verbs taking a single scalar (`pose`, `openEnquiry`, `stateCriterion`) are
-  deliberately not wrapped.
-- [x] ~~**Gap analysis: what an agent needs to track work in LabKit rather than
-  in Markdown.**~~ — **deleted, not done.** It was a corpus review standing in
-  front of obvious work. The verbs exist because scenarios earned them one at a
-  time, so "which should be exposed" defaults to all of them, and a review would
-  have been looking for reasons to exclude. The two real gaps were found by
-  building instead: no write tool existed at all, and no read tool returned
-  enquiry ids, so a reconnecting agent could not find an enquiry to work in.
-  Both are closed.
-
-- [ ] **`ART_` does not say what kind of artefact it is.** `ObservationsRef`'s
-  `kind` is `"observations"` and its id is an **Artefact** id — the same prefix
-  an analysis's *output* carries. So a caller holding an `ART_` id cannot tell
-  raw measurement from a computed result, and `what_depends_on` takes either.
-
-  **Measured, not argued: this is naming, not behaviour.** Recording an analysis
-  with `from: [analysisRef]` and with `from: [{kind:"observations", id: <that
-  analysis's output artefact>}]` produce an *identical* record — both write the
-  same `CONSUMES` edge, and `reproducibilityOf` reports the same
-  `{part, name}` for both. Nothing is wrong today; what is wrong is that the
-  type's `kind` says "observations" about something that is not, and an agent
-  reasoning from the prefix has no way to know.
-
-  Surfaced by writing `inputRef()` in `src/mcp/tools.ts`, which had to guess a
-  ref kind from a prefix and guessed a plausible wrong one first (`EU_`). Needs
-  a discriminator before it is worth changing anything: a read that gives a
-  confidently wrong answer because the two are indistinguishable.
-
-- [x] ~~**The other write tools.**~~ — done. **Every verb on `WriteSurface` is
-  now an MCP tool**, and every command shape in `src/domain/commands.ts` is
-  reachable. `bun run mcp` exposes the reads, `pursuits_of`, and the writes.
-
-- [x] ~~**Read the generated documentation as a diagnostic.**~~ — **done, and
-  it worked.** With every verb exposed, `labkit://docs/tools` renders to one
-  page, and reading the id-bearing fields down that page surfaced three things
-  no single tool showed on its own:
-
-  1. **The read tools' id descriptions had no prefix examples and the write
-     tools' did**, because the reads were written first. Visible immediately as
-     a ragged column. **Fixed** — every id parameter now names its prefix.
-  2. **`from` means two unrelated things.** `record_analysis.from` is a list of
-     sources; `sharpen.from` is the question being sharpened. Not a defect, but
-     nobody would choose it, and only the one-page view shows it.
-  3. **The asymmetry below**, which is the real find.
-
-- [ ] **Only one of the three verbs that record a computation can consume
-  another analysis's output.** `RecordAnalysisCommand.from` is
-  `Array<ObservationsRef | AnalysisRef>`; `ReplaceAnalysisCommand.from` and
-  `ReverifyCommand.under` are both `ObservationsRef[]`. So a second-stage
-  analysis can be recorded but, by the types, not replaced or re-verified in
-  terms of the stage it consumed.
-
-  **Measured before being written down, and it is not a functional gap.**
-  Passing an analysis's *output artefact* id as an `ObservationsRef` produces an
-  identical record to passing the `AnalysisRef` — same `CONSUMES` edge, same
-  `{part, name}` from `reproducibilityOf` (see the `ART_` item below). So the
-  workaround exists and is indistinguishable in the graph. What is wrong is the
-  types disagreeing about what these three verbs accept, when all three write
-  the same edge.
-
-  Needs a discriminator: a case where the workaround gives a **wrong answer**,
-  not merely an inelegant call. Related to the `ART_` item — both are the same
-  root, that an artefact id does not say what kind of artefact it is.
+- [ ] **`interpretationHistory` walks by wording.** Its entry point is a handle
+  and its loop guard is keyed by claim id, but the traversal still finds each
+  step by the *name* of the one before it
+  (`MATCH (d:Decision)-[:MOTIVATES]->(:Claim {name: $name})`). Walking by id
+  wants the revision chain to carry an edge a caller can follow, which is a
+  model question rather than a projection.
 
 ## Needs a discriminator
 
-- [ ] **Closing one pursuit closes every pursuit of the same question, and the
-  untouched one reports evidence it never produced.** **Scenario, diagnosis and
-  what is still undecided: `docs/project-journal/030_which_record_is_this_about.md`.
-  Demonstrated in `tests/subject-identity.test.ts`.** External review (ChatGPT,
-  on PR #2) proposed the discriminator; run over MCP only, it fires:
+- [ ] **`ART_` does not say what kind of artefact it is.** `ObservationsRef`'s
+  `kind` is `"observations"`; its id is an **Artefact** id, the same prefix an
+  analysis's *output* carries. A caller holding one cannot tell raw measurement
+  from a computed result, and `what_depends_on` takes either.
+
+  **Measured, not argued: naming, not behaviour.** Recording an analysis with
+  `from: [analysisRef]` and with `from: [{kind:"observations", id: <that
+  analysis's output artefact>}]` produce an identical record — same `CONSUMES`
+  edge, same `{part, name}` from `reproducibilityOf`.
+
+  Needs a read that gives a **wrong answer** because the two are
+  indistinguishable.
+
+- [ ] **The three verbs that record a computation disagree about their inputs.**
+  `RecordAnalysisCommand.from` is `Array<ObservationsRef | AnalysisRef>`;
+  `ReplaceAnalysisCommand.from` and `ReverifyCommand.under` are
+  `ObservationsRef[]`. All three write the same `Computation -CONSUMES->
+  Artefact` edge.
+
+  **The consumer half is demonstrated**, over MCP only:
 
   ```
-  pose Q; pursue A; pursue B
-  record + close A
-  enquiry_status(A) -> open:false, closure:"answered", evidence:["yes"]
-  enquiry_status(B) -> open:false, closure:"answered", evidence:["yes"]
+  replace_analysis(supersedes=A2, from=[A1])
+    -> isError: CONSUMES does not allow Computation -> Computation
   ```
 
-  B was never worked on. It reports itself answered, carrying A's evidence.
-  **That is a confidently wrong answer, not an empty one**, so it clears the
-  bar in CLAUDE.md's "Changing the graph model" without needing a further probe.
-
-  The cause is not a bug: `closeEnquiry()` writes `Decision -RESOLVES-> Question`
-  and `enquiryStatus()` derives closure from the Question, both deliberately —
-  closure attached to the question while one question had one pursuit. `pursue`
-  makes that false.
-
-  Two readings, and they need picking between rather than deferring, because one
-  of them is already shipping a wrong answer:
-  - Closure belongs to the **Question**, and the verb is named at the wrong
-    level — it is `resolve_question(via_enquiry=A)`, and `enquiry_status` should
-    report B as *pursuing an answered question* rather than as answered itself.
-  - Closure belongs to the **LineOfEnquiry**, which then needs lifecycle
-    semantics the model does not have.
-
-- [ ] **A consumer holding only MCP handles cannot repair a two-stage
-  pipeline.** The other half of the three-verb asymmetry, and the half PR #2
-  got wrong. `record_analysis` accepts `COMP_` ids for `from`;
-  `replace_analysis` does not, and an agent that recorded stage two holds
-  `COMP_2`, never the `ART_` id underneath it. Measured over MCP only:
-
-  ```
-  replace_analysis(supersedes=A2, from=[A1]) ->
-    isError: CONSUMES does not allow Computation -> Computation
-  ```
-
-  **PR #2 called this "not a functional gap" and that claim was under-
-  demonstrated.** It was measured with an `ART_` id obtained inside the process;
-  a consumer does not have one. The workaround is *recoverable* — the id shows
-  up in `why_supported().restingOn` as `{part: "ART_4", name: "stage one
-  output"}` — but only by asking why a claim is supported in order to find out
-  what a computation read, which is not a route anyone would find.
-
-  Likely fix, per the same review: one `InputRef = ObservationsRef |
-  AnalysisRef` accepted by all three recording verbs. No graph change — the
-  edge is already `Computation -CONSUMES-> Artefact` either way.
-
-- [x] ~~**Six `ReadSurface` methods are unreachable over MCP**~~ — done. All six
-  exposed (`origin_of`, `contract_for`, `criteria_governing`, `gate_status`,
-  `do_these_conflict`, `reproducibility_of`), and
-  `tests/helpers/surface-coverage.ts` now derives the check: every public verb
-  on either surface is reached from `src/mcp/tools.ts` or listed in
-  `NOT_EXPOSED` with a reason. Demonstrated by deleting `gate_status` and
-  watching it fail. `NOT_EXPOSED` is empty today, which is the state and not a
-  claim it must stay so.
-
-  ~~Original entry:~~ **Six `ReadSurface` methods were unreachable over MCP**, so the generated
-  documentation audits the adapter's subset and not the domain: `originOf`,
-  `contractFor`, `criteriaGoverning`, `gateStatus`, `doTheseConflict`,
-  `reproducibilityOf`. An agent can `plan_work`, `state_criterion` and
-  `declare_gate` and then cannot ask what the contract is, which criteria govern
-  the gate, or what state the gate is in.
-
-  Needs a **mechanical coverage assertion**, not a one-off fix: every public
-  `ReadSurface` method is exposed or explicitly excluded with a reason, derived
-  from the prototype the way `tests/helpers/read-only.ts` derives write verbs.
+  An agent that recorded stage two holds `COMP_2` and never the `ART_` id
+  underneath it. The workaround is reachable — the id surfaces in
+  `whySupported().restingOn` — but only by asking why a claim is supported in
+  order to learn what a computation read. Likely fix: one `InputRef` accepted by
+  all three. Same root as the `ART_` item above.
 
 - [ ] **Row AF — execution input order is not recorded.** `CONSUMES` says which
   artefacts a computation read, never in what sequence, so two runs of an
@@ -180,6 +65,25 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   "reproduced" for a reversed run and being wrong in a way the record **states**
   rather than implies. Unowned.
 
+## Deprioritised
+
+- [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**
+  Dan deprioritised this; it is not obstructing work. The cascade that turned
+  one crossing into a burst is fixed (`2de1060`, `5439085`); provisioning got
+  69% cheaper again in `6eeeb92`. What remains is the crossings themselves.
+
+  **Do not re-investigate from scratch.** Refuted with evidence: advisory-lock
+  contention; the pglite-socket desync bug as primary mechanism; fd/socket
+  exhaustion; WASM heap growth; `afterAll` not awaited; bun's runner. Use
+  `LABKIT_TRACE=all` — `src/db/trace.ts` exists so the next investigation does
+  not rebuild instrumentation.
+
+  **Named, not built:** drive `begin()`/`end()` from `beforeEach`/`afterEach`;
+  short-circuit provisioning for `current()`; raise the ceiling (hides it).
+
+  **Measure paired and interleaved, one variable.** An earlier fix passed round
+  one on both arms and failed at the lowest load of four.
+
 ## Deliberately not being done
 
 Here so nobody re-discovers them as gaps.
@@ -188,3 +92,13 @@ Here so nobody re-discovers them as gaps.
   and no source obligation requires it. `Decision.decided_at` is record time.
 - **An instant on `EvidenceUnit`.** Would let `whatWasKnown()` split `open` into
   worked-on and untouched. Nothing has needed it.
+- **A durable event sink.** `read.ts` never touches `events`, and the scenarios
+  that mention the log assert it is *empty* when a historical answer is read.
+  It is a SQL table and a reader; what it waits on is a consumer — an audit log,
+  MCP notifications, or a projection to another view model.
+
+---
+
+## Setup a new clone or worktree needs
+
+**Moved to CLAUDE.md, "First, in a fresh clone or worktree"** (2026-08-22).
