@@ -1211,6 +1211,8 @@ export class WriteSurface extends SessionCore {
     // and silently fell back to printing the id. Same one hop `recorded()`
     // makes to write the CONSUMES edge.
     const inputNames = new Map<string, string>();
+    // Read after the transaction above, so it sees this act's own invalidation.
+    const retracted = new Set<string>();
     for (const o of input.from) {
       const artefact = o.kind === "analysis" ? await this.outputArtefactOf(o) : o.id;
       const rows = await this.graph.query(
@@ -1224,15 +1226,20 @@ export class WriteSurface extends SessionCore {
         { id: artefact },
       );
       if (rows[0]) inputNames.set(o.id, rows[0].a.logical_name);
+      if (rows[0]?.a.invalidated) retracted.add(o.id);
     }
 
+    // `why` is computed, not asserted. Two things had been wrong with the fixed
+    // sentence: it said "observations" while `what` reports `kind: "analysis"`
+    // for an analysis input, and for an input that IS the replaced analysis it
+    // asserted the opposite of what the record says (S-11e).
     const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
       what: o,
+      ...(retracted.has(o.id) ? { invalidated: true as const } : {}),
       named: inputNames.get(o.id) ?? o.id,
-      // Neutral about what kind of record this is. It said "observations were
-      // not produced by ..." while `what` now reports `kind: "analysis"` for an
-      // analysis input -- the same report contradicting itself one field over.
-      why: "not produced by the replaced analysis, and the replacement rests on it",
+      why: retracted.has(o.id)
+        ? "produced by the replaced analysis and retracted by this replacement, which rests on it anyway"
+        : "not produced by the replaced analysis, and the replacement rests on it",
     }));
 
     const report: ReplacementReport = {

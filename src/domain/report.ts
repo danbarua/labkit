@@ -293,6 +293,18 @@ export interface ReplacementReport {
 export interface UnaffectedRecord {
   /** The record's handle, as the caller named it — observations, or an earlier analysis. */
   what: InputRef;
+  /**
+   * Present, and `true`, when this input was retracted by the very act being
+   * reported — the replacement named the analysis it supersedes as its own
+   * input.
+   *
+   * The entry stays in the list and says what it is, the way a superseded
+   * `EvaluationRecord` stays readable and carries `withdrawn`. Dropping it
+   * would hide an input the replacement genuinely rests on; a fixed `why`
+   * saying it was "not produced by the replaced analysis" said something
+   * false about it (S-11e).
+   */
+  invalidated?: true;
   /** What it is, in the researcher's words — the wording half this used to lack. */
   named: string;
   why: string;
@@ -511,6 +523,22 @@ export interface IdentifiedArtefact {
   part: ObservationsRef;
   /** Its `logical_name`. Two parts may legitimately share one. */
   name: string;
+  /**
+   * Present, and `true`, when the record itself marks this artefact retracted.
+   *
+   * `whySupported().restingOn` populates it; the buckets in
+   * `ReproducibilityReport` do not, because that report is about hashes and
+   * says nothing about standing.
+   *
+   * Invalidating a record deliberately does **not** withdraw what rests on it
+   * — S-11's whole design is that the consequence is *enumerable*, through
+   * `whatDependsOn`, rather than automatic. That only holds while the reader
+   * can see the retraction. Without this field a conclusion whose sole input
+   * had been retracted reported `supported: true` and named the artefact with
+   * no hint of its state (S-11e), which is the answer overstating itself
+   * rather than the doctrine working.
+   */
+  invalidated?: true;
 }
 
 /**

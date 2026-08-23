@@ -1388,7 +1388,10 @@ export class ReadSurface extends SessionCore {
        RETURN a, e`,
       {
         // `natural_id` because `restingOn` deduplicates by identity, not by
-        // name -- see where it is built below, and S-9d.
+        // name -- see where it is built below, and S-9d. `invalidated` rides
+        // along on the same row: the filter above is on the evidence's OWN
+        // output, never on what the computation read, so a retracted input was
+        // reported with nothing marking it (S-11e).
         a: vertexProps<ArtefactProps & { natural_id: string }>(),
         e: vertexProps<{ natural_id: string }>(),
       },
@@ -1506,7 +1509,14 @@ export class ReadSurface extends SessionCore {
         ...new Map(
           resting
             .filter((r) => !reverifying.has(r.e.natural_id))
-            .map((r) => [r.a.natural_id, { part: ref("observations", r.a.natural_id), name: r.a.logical_name }]),
+            .map((r) => [
+              r.a.natural_id,
+              {
+                part: ref("observations", r.a.natural_id),
+                name: r.a.logical_name,
+                ...(r.a.invalidated ? { invalidated: true as const } : {}),
+              },
+            ]),
         ).values(),
       ],
       superseded,

@@ -197,6 +197,7 @@ Why a proposition counts as supported (or does not): the findings resting under 
     - `kind`: "observations"
     - `id`: string
   - `name`: string
+  - `invalidated?`: true
 - `superseded`: object[]
   - `finding`: string
   - `evidence`: object
@@ -427,6 +428,7 @@ What a verifying analysis re-checked and whether it reproduced the original — 
       - `kind`: "observations"
       - `id`: string
     - `name`: string
+    - `invalidated?`: true
   - `standing`: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run"
 - `bearing`: "raises" | "lowers"
 - `comparable`: boolean
@@ -680,21 +682,25 @@ Whether an analysis's inputs can be accounted for, given hashes of whatever you 
     - `kind`: "observations"
     - `id`: string
   - `name`: string
+  - `invalidated?`: true
 - `differing`: object[]
   - `part`: object
     - `kind`: "observations"
     - `id`: string
   - `name`: string
+  - `invalidated?`: true
 - `unverifiable`: object[]
   - `part`: object
     - `kind`: "observations"
     - `id`: string
   - `name`: string
+  - `invalidated?`: true
 - `notRebuilt`: object[]
   - `part`: object
     - `kind`: "observations"
     - `id`: string
   - `name`: string
+  - `invalidated?`: true
 - `reproducible`: boolean
 
 ---
@@ -1089,6 +1095,7 @@ Record a corrected analysis in place of a defective one, citing the review that 
   - `what`: object
     - `kind`: "observations" | "analysis"
     - `id`: string
+  - `invalidated?`: true
   - `named`: string
   - `why`: string
 - `changed`: object[]

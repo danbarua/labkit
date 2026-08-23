@@ -94,6 +94,7 @@ const questionStanding = z.strictObject({
 const identifiedArtefact = z.strictObject({
   part: ref("observations"),
   name: z.string(),
+  invalidated: z.literal(true).optional(),
 });
 
 const citedFinding = z.strictObject({ evidence: ref("evidence"), states: z.string() });
@@ -362,6 +363,7 @@ const inputRefSchema = z.union([ref("observations"), ref("analysis")]);
 
 const unaffectedRecord = z.strictObject({
   what: inputRefSchema,
+  invalidated: z.literal(true).optional(),
   named: z.string(),
   why: z.string(),
 });
