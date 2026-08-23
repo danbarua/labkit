@@ -99,7 +99,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       // durable trace of *when* the programme came to believe this, which is the
       // half of row Z that matters -- belief moves on decisions, not evaluations.
       const status = await reader.enquiryStatus(enquiry);
-      expect(status.closure).toBe("answered");
+      expect(status.question!.closure).toBe("answered");
       const timeFields = Object.keys(status).filter((k) => /_?at$|when|time|date/i.test(k));
       expect(timeFields).toEqual([]);
     } finally {

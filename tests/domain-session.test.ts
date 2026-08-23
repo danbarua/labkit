@@ -457,13 +457,13 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
   );
   const status = await session.enquiryStatus(enquiry);
   console.log("CLOSE resolving decisions:", resolving.length);
-  console.log("CLOSE closure:", status.closure, "answer:", status.answer);
-  console.log("CLOSE evidence:", JSON.stringify(status.evidence));
+  console.log("CLOSE closure:", status.question!.closure, "answer:", status.question!.answer);
+  console.log("CLOSE evidence:", JSON.stringify(status.question!.evidence));
 
   // The question was answered "no" on a challenging finding. Anything else is
   // the interrupted close being reported as the researcher's act.
-  expect(status.closure).toBe("answered");
-  expect(status.answer).toBe("no");
+  expect(status.question!.closure).toBe("answered");
+  expect(status.question!.answer).toBe("no");
 });
 
 /**
@@ -529,7 +529,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   });
 
   await s.closeEnquiry({ enquiry });
-  expect((await s.enquiryStatus(enquiry)).closure).toBe("abandoned");
+  expect((await s.enquiryStatus(enquiry)).question!.closure).toBe("abandoned");
 
   await expect(
     s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: "pruning moves convergence" } }),
@@ -538,8 +538,8 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   // And the record is unchanged rather than half-updated: one close, the one
   // that happened.
   const after = await s.enquiryStatus(enquiry);
-  expect(after.closure).toBe("abandoned");
-  expect(after.answer).toBeNull();
+  expect(after.question!.closure).toBe("abandoned");
+  expect(after.question!.answer).toBeNull();
 });
 
 /**
@@ -568,14 +568,14 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     inLightOf: { analysis, proposition: "depth moves convergence" },
   });
   const accepted = await s.enquiryStatus(enquiry);
-  expect(accepted.closure).toBe("accepted-as-unresolved");
-  expect(accepted.open).toBe(true);
+  expect(accepted.question!.closure).toBe("accepted-as-unresolved");
+  expect(accepted.question!.open).toBe(true);
 
   // Evidence arrives. This must be allowed -- DEFERS is not RESOLVES.
   await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: "depth moves convergence" } });
   const closed = await s.enquiryStatus(enquiry);
-  expect(closed.closure).toBe("answered");
-  expect(closed.answer).toBe("yes");
+  expect(closed.question!.closure).toBe("answered");
+  expect(closed.question!.answer).toBe("yes");
 });
 
 /**
@@ -635,7 +635,7 @@ test("an interrupted pursue leaves an enquiry nothing can reach", async () => {
   // And pursuing again works — no phantom blocks it, and two enquiries on one
   // question would be legitimate anyway.
   const retried = await session.pursue({ question, approach: "thermal cycling" });
-  expect((await session.enquiryStatus(retried)).open).toBe(true);
+  expect((await session.enquiryStatus(retried)).question!.open).toBe(true);
 });
 
 /**

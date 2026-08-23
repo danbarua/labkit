@@ -37,6 +37,7 @@
 
 import { z } from "zod";
 import type {
+  QuestionClosure,
   ConflictSide,
   ConflictVerdict,
   GateStatus,
@@ -180,10 +181,9 @@ export const dependencyReportSchema = z.strictObject({
   complete: z.literal(false),
 });
 
-export const enquiryStatusSchema = z.strictObject({
-  enquiry: z.string(),
-  question: z.string().nullable(),
-  asks: z.string().nullable(),
+export const questionClosureSchema = z.strictObject({
+  question: z.string(),
+  asks: z.string(),
   open: z.boolean(),
   closure: z.enum(["answered", "abandoned", "accepted-as-unresolved"]).nullable(),
   answer: z.enum(["yes", "no"]).nullable(),
@@ -191,6 +191,13 @@ export const enquiryStatusSchema = z.strictObject({
   acceptedBecause: z.string().optional(),
   restsOn: z.enum(["exploratory", "confirmatory"]).optional(),
   evidence: z.array(citedFinding),
+});
+
+export const enquiryStatusSchema = z.strictObject({
+  enquiry: z.string(),
+  pursuing: z.string(),
+  contributed: z.array(citedFinding),
+  question: questionClosureSchema.nullable(),
 });
 
 export const designHistorySchema = z.strictObject({
@@ -397,6 +404,7 @@ export type _KnowledgeSurvey = Assert<Exact<z.infer<typeof knowledgeSurveySchema
 export type _HistoricalSurvey = Assert<Exact<z.infer<typeof historicalSurveySchema>, HistoricalSurvey>>;
 export type _SupportExplanation = Assert<Exact<z.infer<typeof supportExplanationSchema>, SupportExplanation>>;
 export type _DependencyReport = Assert<Exact<z.infer<typeof dependencyReportSchema>, DependencyReport>>;
+export type _QuestionClosure = Assert<Exact<z.infer<typeof questionClosureSchema>, QuestionClosure>>;
 export type _EnquiryStatus = Assert<Exact<z.infer<typeof enquiryStatusSchema>, EnquiryStatus>>;
 export type _DesignHistory = Assert<Exact<z.infer<typeof designHistorySchema>, DesignHistory>>;
 export type _InterpretationHistory = Assert<

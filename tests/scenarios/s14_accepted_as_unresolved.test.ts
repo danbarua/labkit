@@ -80,8 +80,8 @@ describe("S-14: deliberately leaving something unresolved", () => {
     const { enquiry, analysis } = await aMarginalComparisonWithNothingLeftToRunIt();
 
     const stillWorking = await session.enquiryStatus(enquiry);
-    expect(stillWorking.open).toBe(true);
-    expect(stillWorking.closure).toBeNull();
+    expect(stillWorking.question!.open).toBe(true);
+    expect(stillWorking.question!.closure).toBeNull();
 
     await session.acceptAsUnresolved({
       enquiry,
@@ -91,10 +91,10 @@ describe("S-14: deliberately leaving something unresolved", () => {
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBe("accepted-as-unresolved");
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBe("accepted-as-unresolved");
     // Not answered. Accepting a question is not deciding it.
-    expect(status.answer).toBeNull();
+    expect(status.question!.answer).toBeNull();
   });
 
   /**
@@ -143,7 +143,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.reopensIf).toBe(CONDITION);
+    expect(status.question!.reopensIf).toBe(CONDITION);
   });
 
   /**
@@ -163,10 +163,10 @@ describe("S-14: deliberately leaving something unresolved", () => {
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.acceptedBecause).toBe(
+    expect(status.question!.acceptedBecause).toBe(
       "the confirmatory dataset is spent and there is no larger held-out sample",
     );
-    expect(status.evidence.map((e) => e.states)).toEqual(["difference 0.4%, CI spans zero"]);
+    expect(status.question!.evidence.map((e) => e.states)).toEqual(["difference 0.4%, CI spans zero"]);
   });
 
   /**
@@ -179,9 +179,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     const { enquiry } = await aMarginalComparisonWithNothingLeftToRunIt();
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBeNull();
-    expect(status.reopensIf).toBeUndefined();
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBeNull();
+    expect(status.question!.reopensIf).toBeUndefined();
 
     const known = await (await afterwards()).whatIsKnown();
     expect(known.accepted).toEqual([]);
@@ -217,9 +217,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     await session.closeEnquiry({ enquiry, answeredBy: { analysis: settled, proposition: PROPOSITION } });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("answered");
-    expect(status.answer).toBe("yes");
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("answered");
+    expect(status.question!.answer).toBe("yes");
   });
 
   /**
@@ -243,9 +243,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     await session.closeEnquiry({ enquiry });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("abandoned");
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("abandoned");
     // The work that was done, and the reason it stopped, are both absent.
-    expect(status.evidence).toEqual([]);
+    expect(status.question!.evidence).toEqual([]);
   });
 });

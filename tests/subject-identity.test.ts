@@ -72,7 +72,7 @@ const call = async (c: Client, name: string, args: Record<string, unknown>) => {
   };
 };
 
-describe("1. an enquiry's status is the question's status", () => {
+describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6", () => {
   /**
    * Ana runs the seed sweep, Bruno the ablation, on one question. Ana's is
    * decisive and gets closed. Bruno asks where his is up to.
@@ -80,7 +80,7 @@ describe("1. an enquiry's status is the question's status", () => {
    * S-1's fourth Afterward already establishes the setup — two pursuits of one
    * question stay one question — and stops one step before this.
    */
-  test("closing one pursuit reports every pursuit of that question as answered", async () => {
+  test("closing one pursuit no longer reports the other as having produced it", async () => {
     const s = await session();
     try {
       const question = await s.pose("does depth move convergence?");
@@ -100,37 +100,40 @@ describe("1. an enquiry's status is the question's status", () => {
       const ana = await later.enquiryStatus(anasSweep);
       const bruno = await later.enquiryStatus(brunosAblation);
 
-      // Ana's is right.
-      expect(ana.open).toBe(false);
-      expect(ana.closure).toBe("answered");
+      // One question, pursued twice. Its state is the same in both reports --
+      // correctly, because it is nested under `question` where neither pursuit
+      // can be read as owning it.
+      expect(ana.question!.question).toBe(bruno.question!.question);
+      expect(ana.question!.closure).toBe("answered");
+      expect(bruno.question!.closure).toBe("answered");
 
-      // **Bruno's is wrong, and this is the demonstration.** Nothing was ever
-      // recorded against the ablation. It reports itself answered.
-      expect(bruno.open).toBe(false);
-      expect(bruno.closure).toBe("answered");
+      // **The fix.** What each pursuit itself produced -- the thing the two
+      // reports must NOT agree on. Before PJ-030 §6 the closing evidence was a
+      // top-level field on both, so a caller summing findings across pursuits
+      // counted one finding twice.
+      // Ana's pursuit produced the observations AND the analysis; the closure
+      // cites only the latter. Two different sets, deliberately -- "what this
+      // pursuit produced" is not "what the answer rests on".
+      const anasFindings = ana.contributed.map((e) => e.evidence);
+      const closingEvidence = ana.question!.evidence.map((e) => e.evidence);
+      expect(closingEvidence.every((id) => anasFindings.includes(id))).toBe(true);
+      expect(anasFindings.length).toBeGreaterThan(closingEvidence.length);
 
-      // Worse than a wrong flag: it offers Ana's evidence as its own.
-      expect(bruno.evidence).toEqual(ana.evidence);
-      expect(bruno.evidence).not.toEqual([]);
+      expect(bruno.contributed).toEqual([]);
+      expect(bruno.pursuing).not.toBe(ana.pursuing);
 
-      // The two reports differ in exactly one field -- the id of the thing they
-      // claim to be about. Everything else is the question's.
-      expect(bruno.enquiry).not.toBe(ana.enquiry);
-      expect(bruno.question).toBe(ana.question);
-      const { enquiry: _a, ...anaRest } = ana;
-      const { enquiry: _b, ...brunoRest } = bruno;
-      expect(brunoRest).toEqual(anaRest);
+      // The reader that used to be wrong: sum findings over every pursuit.
+      const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence));
+      expect(counted.length).toBe(new Set(counted).size);
     } finally {
       await scenario.end();
     }
   });
 
-  test("Bruno can now reach the question, and the wrong answer is still there", async () => {
-    // **Half fixed, and the half that moved is the one PJ-030 §5 step 4
-    // predicted.** Carrying a QuestionRef makes the question *reachable*: Bruno
-    // now holds an id he can ask about separately. It does not stop
-    // enquiryStatus answering about the question under his enquiry's name, so
-    // the wrong answer stands until the closure semantics are decided.
+  test("both facts a second pursuit needs are now separately readable", async () => {
+    // The scenario's first Afterward bullet: *where is my ablation up to?*
+    // Two facts, and one report used to answer only the question's -- under the
+    // enquiry's name, which made it look like the enquiry's own.
     const s = await session();
     try {
       const question = await s.pose("does width matter?");
@@ -149,16 +152,15 @@ describe("1. an enquiry's status is the question's status", () => {
       const later = new ResearchSession(await scenario.current(), { clock });
       const status = await later.enquiryStatus(untouched);
 
-      // Reachable now: an id, not the question's text.
-      expect(status.question).not.toBeNull();
-      expect(status.question).not.toBe(status.asks);
+      // Fact one: the question is answered, and the report says which question.
+      expect(status.question!.question).not.toBeNull();
+      expect(status.question!.closure).toBe("answered");
+      expect(status.question!.evidence.length).toBeGreaterThan(0);
 
-      // Still nothing distinguishing a pursuit that produced the answer from
-      // one that produced nothing. `closure`, `answer` and `evidence` are all
-      // the question's, under this enquiry's name.
-      expect(status.closure).toBe("answered");
-      expect(status.evidence.length).toBeGreaterThan(0);
-      expect(status).not.toHaveProperty("contributed");
+      // Fact two: this pursuit produced nothing. A real answer, and one the
+      // flattened shape could not give -- it had no field that could hold it.
+      expect(status.contributed).toEqual([]);
+      expect(status.pursuing).toBe("second opinion");
     } finally {
       await scenario.end();
     }
@@ -307,13 +309,13 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       expect(looksLikeAnId(status.enquiry)).toBe(true);
       // The question it pursues, by identity -- and it is the RIGHT question,
       // not merely an id-shaped string.
-      expect(status.question).toBe(question.id);
-      expect(looksLikeAnId(status.asks!)).toBe(false);
+      expect(status.question!.question).toBe(question.id);
+      expect(looksLikeAnId(status.question!.asks)).toBe(false);
 
       // Evidence too, as of PJ-030 §5: identity beside the statement.
-      expect(status.evidence.length).toBeGreaterThan(0);
-      expect(status.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
-      expect(status.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
+      expect(status.question!.evidence.length).toBeGreaterThan(0);
+      expect(status.question!.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
+      expect(status.question!.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
     } finally {
       await scenario.end();
     }

@@ -206,17 +206,22 @@ Whether a line of enquiry is still open, and if not how it closed — answered, 
 **Returns**
 
 - `enquiry`: string
-- `question`: string | null
-- `asks`: string | null
-- `open`: boolean
-- `closure`: "answered" | "abandoned" | "accepted-as-unresolved" | null
-- `answer`: "yes" | "no" | null
-- `reopensIf?`: string
-- `acceptedBecause?`: string
-- `restsOn?`: "exploratory" | "confirmatory"
-- `evidence`: object[]
+- `pursuing`: string
+- `contributed`: object[]
   - `evidence`: string
   - `states`: string
+- `question`: object | null
+  - `question?`: string
+  - `asks?`: string
+  - `open?`: boolean
+  - `closure?`: "answered" | "abandoned" | "accepted-as-unresolved" | null
+  - `answer?`: "yes" | "no" | null
+  - `reopensIf?`: string
+  - `acceptedBecause?`: string
+  - `restsOn?`: "exploratory" | "confirmatory"
+  - `evidence?`: object[]
+    - `evidence`: string
+    - `states`: string
 
 ---
 

@@ -84,13 +84,18 @@ test("flags may precede the positional argument", () => {
 test("an enquiry accepted as unresolved does not render as merely open", () => {
   const status: EnquiryStatus = {
     enquiry: "LOE_1",
-    question: "Q_1", asks: "does the pruning schedule move convergence?",
-    open: true,
-    closure: "accepted-as-unresolved",
-    answer: null,
-    acceptedBecause: "the confirmatory set is spent",
-    reopensIf: "a genuinely new design, or a data source other than the spent set",
-    evidence: [],
+    pursuing: "response-curvature sweep",
+    contributed: [],
+    question: {
+      question: "Q_1",
+      asks: "does the pruning schedule move convergence?",
+      open: true,
+      closure: "accepted-as-unresolved",
+      answer: null,
+      acceptedBecause: "the confirmatory set is spent",
+      reopensIf: "a genuinely new design, or a data source other than the spent set",
+      evidence: [],
+    },
   };
   const out = renderEnquiry(status);
   expect(out).toContain("accepted as unresolved");
@@ -99,12 +104,16 @@ test("an enquiry accepted as unresolved does not render as merely open", () => {
 });
 
 test("an answered enquiry says whether its closure rests on promoted work", () => {
-  const base: EnquiryStatus = {
-    enquiry: "LOE_2", question: "Q_2", asks: "does depth move convergence?",
-    open: false, closure: "answered", answer: "yes", evidence: [{ evidence: "EV_1", states: "a result" }],
+  const q = {
+    question: "Q_2", asks: "does depth move convergence?",
+    open: false, closure: "answered" as const, answer: "yes" as const,
+    evidence: [{ evidence: "EV_1", states: "a result" }],
   };
-  expect(renderEnquiry({ ...base, restsOn: "exploratory" })).toContain("exploratory");
-  expect(renderEnquiry({ ...base, restsOn: "confirmatory" })).toContain("confirmatory");
+  const base: EnquiryStatus = {
+    enquiry: "LOE_2", pursuing: "depth sweep", contributed: [], question: q,
+  };
+  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "exploratory" } })).toContain("exploratory");
+  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "confirmatory" } })).toContain("confirmatory");
 });
 
 test("withdrawn, challenged and never-examined render apart", () => {

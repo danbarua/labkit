@@ -335,14 +335,14 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
 
     // Both closed, both answered, and the two worlds agree on everything the
     // read surface treats as structure.
-    expect(byAlice.closure).toBe("answered");
-    expect(byBob.closure).toBe(byAlice.closure);
-    expect(byAlice.answer).toBe(byBob.answer);
-    expect(byAlice.open).toBe(byBob.open);
+    expect(byAlice.question!.closure).toBe("answered");
+    expect(byBob.question!.closure).toBe(byAlice.question!.closure);
+    expect(byAlice.question!.answer).toBe(byBob.question!.answer);
+    expect(byAlice.question!.open).toBe(byBob.question!.open);
 
     // The difference exists only inside a finding's sentence.
-    expect(byAlice.evidence).not.toEqual(byBob.evidence);
-    expect(byAlice.evidence.map((e) => e.states).join(" ")).toContain("Alice");
+    expect(byAlice.question!.evidence).not.toEqual(byBob.question!.evidence);
+    expect(byAlice.question!.evidence.map((e) => e.states).join(" ")).toContain("Alice");
 
     // And it is not reachable as attribution: no field on the status carries a
     // person, so a caller can only recover the name by parsing evidence prose

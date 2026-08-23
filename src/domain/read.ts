@@ -313,6 +313,22 @@ export class ReadSurface extends SessionCore {
       { id: enquiry.id },
     );
 
+    // What this pursuit itself produced. Evidence units address the line of
+    // enquiry they were recorded against, so this is the enquiry's own work --
+    // and it is the field that makes "where is my ablation up to?" answerable
+    // without inferring anything from the question's state.
+    const mine = await this.graph.query(
+      `MATCH (u:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $id})
+       MATCH (u)-[:PRODUCES]->(e:Evidence)
+       RETURN e`,
+      { e: vertexProps<{ statement: string } & Identified>() },
+      { id: enquiry.id },
+    );
+    const contributed = dedupeById(
+      mine.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
+      (f) => f.evidence,
+    );
+
     // Identity and wording, kept apart. The old line was
     // `rows[0]?.q.name ?? loe.loe.name` -- wording, silently substituting the
     // enquiry's own name when no question stood behind it. Two entities' text
@@ -326,12 +342,16 @@ export class ReadSurface extends SessionCore {
     if (!resolving && !deferred) {
       return {
         enquiry: enquiry.id,
-        question,
-        asks,
-        open: true,
-        closure: null,
-        answer: null,
-        evidence: [],
+        pursuing: loe.loe.name,
+        contributed,
+        question: behind && {
+          question: behind.natural_id,
+          asks: behind.name,
+          open: true,
+          closure: null,
+          answer: null,
+          evidence: [],
+        },
       };
     }
     // Accepted, not closed. `open` stays TRUE, which is the correction S-14
@@ -348,17 +368,21 @@ export class ReadSurface extends SessionCore {
       );
       return {
         enquiry: enquiry.id,
-        question,
-        asks,
-        open: true,
-        closure: "accepted-as-unresolved",
-        answer: null,
-        evidence: dedupeById(
-          inLightOf.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
-          (f) => f.evidence,
-        ),
-        acceptedBecause: accepting.reason,
-        reopensIf: accepting.invalidation_check,
+        pursuing: loe.loe.name,
+        contributed,
+        question: behind && {
+          question: behind.natural_id,
+          asks: behind.name,
+          open: true,
+          closure: "accepted-as-unresolved",
+          answer: null,
+          evidence: dedupeById(
+            inLightOf.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
+            (f) => f.evidence,
+          ),
+          acceptedBecause: accepting.reason,
+          reopensIf: accepting.invalidation_check,
+        },
       };
     }
 
@@ -385,12 +409,16 @@ export class ReadSurface extends SessionCore {
     if (cited.length === 0) {
       return {
         enquiry: enquiry.id,
-        question,
-        asks,
-        open: false,
-        closure: "abandoned",
-        answer: null,
-        evidence: [],
+        pursuing: loe.loe.name,
+        contributed,
+        question: behind && {
+          question: behind.natural_id,
+          asks: behind.name,
+          open: false,
+          closure: "abandoned",
+          answer: null,
+          evidence: [],
+        },
       };
     }
 
@@ -411,16 +439,20 @@ export class ReadSurface extends SessionCore {
     );
     return {
       enquiry: enquiry.id,
-      question,
-      asks,
-      open: false,
-      closure: "answered",
-      answer: challenges ? "no" : "yes",
-      evidence: dedupeById(
-        cited.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
-        (f) => f.evidence,
-      ),
-      restsOn: promoted.some((r) => r.c.kind === "confirmatory") ? "confirmatory" : "exploratory",
+      pursuing: loe.loe.name,
+      contributed,
+      question: behind && {
+        question: behind.natural_id,
+        asks: behind.name,
+        open: false,
+        closure: "answered",
+        answer: challenges ? "no" : "yes",
+        evidence: dedupeById(
+          cited.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
+          (f) => f.evidence,
+        ),
+        restsOn: promoted.some((r) => r.c.kind === "confirmatory") ? "confirmatory" : "exploratory",
+      },
     };
   }
 

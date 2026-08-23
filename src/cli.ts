@@ -264,25 +264,34 @@ export function renderAffects(report: DependencyReport): string {
  * should not have to go and look.
  */
 export function renderEnquiry(status: EnquiryStatus): string {
-  const standing =
-    status.closure === "accepted-as-unresolved"
+  const q = status.question;
+  const standing = !q
+    ? "no question behind this enquiry"
+    : q.closure === "accepted-as-unresolved"
       ? "open — accepted as unresolved, deliberately"
-      : status.open
+      : q.open
         ? "open"
-        : `closed — ${status.closure}`;
+        : `closed — ${q.closure}`;
   return [
-    // Wording for the reader, id beside it for anything they do next. Until
-    // PJ-030 §5 step 2 this field WAS the wording, and printing it unchanged
-    // would have silently put `Q_1` where the question used to be -- both are
-    // `string`, so nothing would have failed.
-    status.asks ? `${status.asks}${status.question ? `  (${status.question})` : ""}` : status.enquiry,
+    // The enquiry first, because that is what was asked about. The question's
+    // state is printed as the question's, not as this pursuit's -- PJ-030 §6:
+    // flattened, every pursuit of an answered question read as answered itself.
+    `${status.pursuing}  (${status.enquiry})`,
+    status.contributed.length
+      ? `  produced ${status.contributed.length} finding${status.contributed.length === 1 ? "" : "s"}`
+      : "  has produced nothing yet",
+    "",
+    q ? `Pursuing "${q.asks}"  (${q.question})` : "Pursuing nothing on the record",
     `  ${standing}`,
-    status.acceptedBecause ? `  accepted because: ${status.acceptedBecause}` : "",
-    status.reopensIf ? `  reopens if: ${status.reopensIf}` : "",
-    status.answer ? `  answer: ${status.answer}` : "",
-    status.restsOn ? `  resting on ${status.restsOn} work` : "",
-    status.evidence?.length
-      ? `\nEvidence\n${bullets(status.evidence.map((e) => `${e.states}  (${e.evidence})`), "")}`
+    q?.acceptedBecause ? `  accepted because: ${q.acceptedBecause}` : "",
+    q?.reopensIf ? `  reopens if: ${q.reopensIf}` : "",
+    q?.answer ? `  answer: ${q.answer}` : "",
+    q?.restsOn ? `  resting on ${q.restsOn} work` : "",
+    status.contributed.length
+      ? `\nThis enquiry's findings\n${bullets(status.contributed.map((e) => `${e.states}  (${e.evidence})`), "")}`
+      : "",
+    q?.evidence.length
+      ? `\nThe question's answer rests on\n${bullets(q.evidence.map((e) => `${e.states}  (${e.evidence})`), "")}`
       : "",
   ]
     .filter(Boolean)

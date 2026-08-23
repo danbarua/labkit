@@ -183,8 +183,8 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(nonlinear.supported).toBe(true);
 
     const stronger = await session.enquiryStatus(prior.smearEnquiry);
-    expect(stronger.open).toBe(true);
-    expect(stronger.closure).toBeNull();
+    expect(stronger.question!.open).toBe(true);
+    expect(stronger.question!.closure).toBeNull();
 
     const known = await session.whatIsKnown();
     expect(known.unresolved.map((q) => q.question)).toContain(prior.smear.id);

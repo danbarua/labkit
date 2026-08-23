@@ -68,27 +68,25 @@ export interface Conclusion {
 }
 
 /**
- * Whether an enquiry is still open, and if not, how it closed.
+ * The state of a **question** — resolved or not, and on what.
  *
- * `closure` distinguishes three things that must not collapse into one:
- * a question that was **answered** on evidence, one **abandoned** without
- * any, and one **deferred**. `answer` carries polarity — a question can be
- * answered "no" and that is a substantive result, not a failure.
+ * `closure` distinguishes three things that must not collapse into one: a
+ * question that was **answered** on evidence, one **abandoned** without any,
+ * and one **accepted as unresolved**. `answer` carries polarity — a question
+ * can be answered "no" and that is a substantive result, not a failure.
+ *
+ * Separate from {@link EnquiryStatus} because a question may be pursued more
+ * than once and its closure belongs to the question, not to whichever pursuit
+ * reached it. Nested rather than flattened for one measured reason: flattened,
+ * every pursuit of an answered question reported *itself* answered and offered
+ * the closing evidence as its own, so a caller summing findings across pursuits
+ * counted one finding twice. PJ-030 §6.
  */
-export interface EnquiryStatus {
-  enquiry: string;
-  /**
-   * The question this line of enquiry pursues — its **identity**, not its
-   * wording, matching `QuestionStanding.question` (PJ-030 §4).
-   *
-   * `null` where no question stands behind the enquiry. It used to fall back to
-   * the *line of enquiry's own name*, which put two different entities' text in
-   * one field and made this report unable to refer to the question at all —
-   * which is what the multi-pursuit wrong answer is built on.
-   */
-  question: string | null;
-  /** What that question asks, in its own words. `null` when `question` is. */
-  asks: string | null;
+export interface QuestionClosure {
+  /** The question's identity, matching `QuestionStanding.question`. */
+  question: string;
+  /** What it asks, in its own words. */
+  asks: string;
   open: boolean;
   /**
    * `accepted-as-unresolved` replaces the `deferred` token, which no verb ever
@@ -125,6 +123,35 @@ export interface EnquiryStatus {
   /** The findings the closing decision rests on. Empty means nothing was cited. */
   evidence: CitedFinding[];
 }
+
+/**
+ * Where one line of enquiry stands.
+ *
+ * Everything at this level is true **of the enquiry**. The question's state is
+ * under `question`, where it cannot be mistaken for this pursuit's own — that
+ * separation is the whole of PJ-030 §6, and the shape before it asserted four
+ * things of a pursuit that had produced nothing.
+ */
+export interface EnquiryStatus {
+  /** This line of enquiry. */
+  enquiry: string;
+  /** Its approach, in the researcher's words — what distinguishes it from a sibling pursuit. */
+  pursuing: string;
+  /**
+   * What **this** pursuit has produced, whether or not it closed anything.
+   *
+   * The answer to *"where is my ablation up to?"*. Empty means nothing has been
+   * recorded against it — which is a real answer and used to be unavailable,
+   * because the only findings this report carried were the question's.
+   */
+  contributed: CitedFinding[];
+  /**
+   * The question this pursues, and where that question stands. `null` where no
+   * question stands behind the enquiry.
+   */
+  question: QuestionClosure | null;
+}
+
 
 /**
  * A proposition whose support changed when an analysis was replaced.

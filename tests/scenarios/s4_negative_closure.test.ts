@@ -89,7 +89,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(false);
+    expect(status.question!.open).toBe(false);
   });
 
   test("Afterward 1 & 2: closed, and specifically ANSWERED — not abandoned, not deferred", async () => {
@@ -104,11 +104,11 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("answered");
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("answered");
     // The three must not be one state.
-    expect(status.closure).not.toBe("abandoned");
-    expect(status.closure).not.toBe("deferred");
+    expect(status.question!.closure).not.toBe("abandoned");
+    expect(status.question!.closure).not.toBe("deferred");
   });
 
   test("Afterward 2, polarity: answered NEGATIVELY, and that is queryable", async () => {
@@ -123,7 +123,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.answer).toBe("no");
+    expect(status.question!.answer).toBe("no");
   });
 
   test("Afterward 3: the neighbouring supported claim is untouched, and LabKit says so", async () => {
@@ -164,8 +164,8 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.evidence).toHaveLength(1);
-    expect(status.evidence[0]!.states).toContain("no separation detectable");
+    expect(status.question!.evidence).toHaveLength(1);
+    expect(status.question!.evidence[0]!.states).toContain("no separation detectable");
   });
 
   /**
@@ -180,10 +180,10 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("abandoned");
-    expect(status.answer).toBeNull();
-    expect(status.evidence).toEqual([]);
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("abandoned");
+    expect(status.question!.answer).toBeNull();
+    expect(status.question!.evidence).toEqual([]);
   });
 
   /**
@@ -240,8 +240,8 @@ describe("S-4: a negative result that closes the question", () => {
     // Nothing was written on the way to failing.
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBeNull();
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBeNull();
     expect(observations.kind).toBe("observations");
   });
 
@@ -260,7 +260,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(true);
+    expect(status.question!.open).toBe(true);
   });
 
   /**
@@ -284,11 +284,11 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.closure).toBe("answered");
+    expect(status.question!.closure).toBe("answered");
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
-    expect(status.answer).toBe("yes");
-    expect(status.evidence.map((e) => e.states)).toEqual(["clear separation between constructions"]);
+    expect(status.question!.answer).toBe("yes");
+    expect(status.question!.evidence.map((e) => e.states)).toEqual(["clear separation between constructions"]);
   });
 
   /**
@@ -342,7 +342,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBeNull();
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBeNull();
   });
 });
