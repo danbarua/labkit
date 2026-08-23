@@ -21,10 +21,22 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   the one its verb already had, so no call site changed and `tsc` proves it.
   Verbs taking a single scalar (`pose`, `openEnquiry`, `stateCriterion`) are
   deliberately not wrapped.
-- [ ] **Gap analysis: what an agent needs to track work in LabKit rather than in
-  Markdown.** Read the corpus for the minimum domain surface that has to reach
-  MCP for that to be true. This is the one that decides how much of the write
-  side gets exposed, so do it before building write tools.
+- [x] ~~**Gap analysis: what an agent needs to track work in LabKit rather than
+  in Markdown.**~~ — **deleted, not done.** It was a corpus review standing in
+  front of obvious work. The verbs exist because scenarios earned them one at a
+  time, so "which should be exposed" defaults to all of them, and a review would
+  have been looking for reasons to exclude. The two real gaps were found by
+  building instead: no write tool existed at all, and no read tool returned
+  enquiry ids, so a reconnecting agent could not find an enquiry to work in.
+  Both are closed.
+
+- [ ] **The other nine write tools.** Six are exposed — `pose`, `pursue`,
+  `open_enquiry`, `record_observations`, `record_analysis`, `close_enquiry` —
+  which is the loop that makes a programme exist. The rest of
+  `src/domain/commands.ts` follows the identical pattern. **`promote` first**:
+  without it a concluded question can only reach `provisional`, never
+  `established`, which `tests/mcp.test.ts` currently asserts as the state of
+  affairs rather than as a defect.
 
 - [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**
   Deprioritised by Dan; not obstructing work. The cascade that turned one

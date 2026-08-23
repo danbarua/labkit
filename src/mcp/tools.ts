@@ -1,5 +1,5 @@
 /**
- * The seven read tools, as data.
+ * The tools, as data — reads in `TOOLS`, writes in `WRITE_TOOLS`.
  *
  * Separated from transport deliberately. A tool here is a name, a description,
  * an input shape and a handler taking `(read, args)` — nothing that needs a
@@ -7,20 +7,34 @@
  * call a handler without standing anything up, and it keeps the wiring in
  * `server.ts` down to a loop.
  *
- * **Read-only structurally, not by convention.** A handler receives a
- * `ReadSurface`. There is no write verb in scope to reach for, the same
- * property `src/cli.ts` has and for the same reason.
+ * **The two lists are separate, and that is the whole safety story.** A read
+ * handler receives a `ReadSurface` and has no write verb in scope to reach for;
+ * a write handler receives a `WriteSurface`. Nothing prevents a server from
+ * registering both — this one does — but a tool cannot reach the half it was
+ * not handed. `src/cli.ts` keeps the stronger property: it builds only a
+ * `ReadSurface`, so it cannot write at all.
  *
- * Seven rather than fifteen. `docs/consumer-contract/023` set the bar for the
- * CLI's four and it holds here: these are the questions a caller actually
- * asks. The three the CLI does not have — the two histories and the
- * reproduction check — are here because an agent plausibly asks them and a
- * person at a terminal plausibly does not.
+ * The MCP server was read-only for one batch of work and is not any more. An
+ * agent that can only read a record nothing lets it write is answering
+ * questions about an empty graph.
+ *
+ * Not every verb is exposed. The reads are the questions a caller actually
+ * asks; the writes are the loop that makes a programme exist — ask a question,
+ * open an enquiry on it, record what was measured, record what was concluded,
+ * close it. The other nine commands in `src/domain/commands.ts` follow the same
+ * pattern and are a later pass.
  */
 
 import { z } from "zod";
-import type { ReadSurface } from "../domain";
+import type { ReadSurface, WriteSurface } from "../domain";
+import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
+  acknowledgementSchema,
+  analysisRefSchema,
+  enquiryRefSchema,
+  observationsRefSchema,
+  pursuitsSchema,
+  questionRefSchema,
   dependencyReportSchema,
   designHistorySchema,
   enquiryStatusSchema,
@@ -51,8 +65,28 @@ export interface ToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   handler(read: ReadSurface, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
 }
 
+/**
+ * One write tool. Identical to {@link ToolDefinition} but for the surface its
+ * handler is handed — which is the only thing separating the two kinds.
+ */
+export interface WriteToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  readonly inputSchema: Shape;
+  readonly outputSchema: z.ZodType;
+  handler(write: WriteSurface, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
+}
+
 /** Identity, but it pins `Shape` from `inputSchema` so a handler's `args` is typed. */
 function tool<Shape extends z.ZodRawShape>(def: ToolDefinition<Shape>): ToolDefinition<Shape> {
+  return def;
+}
+
+/** The same, for the write half. */
+function writeTool<Shape extends z.ZodRawShape>(
+  def: WriteToolDefinition<Shape>,
+): WriteToolDefinition<Shape> {
   return def;
 }
 
@@ -63,6 +97,8 @@ function tool<Shape extends z.ZodRawShape>(def: ToolDefinition<Shape>): ToolDefi
  * and over a wire the only handle there is is the id itself.
  */
 const ARTEFACT_PREFIX = "ART_";
+const QUESTION_PREFIX = "Q_";
+const ENQUIRY_PREFIX = "LOE_";
 
 export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   tool({
@@ -183,4 +219,204 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     outputSchema: reproductionReportSchema,
     handler: (read, { analysis }) => read.reproductionOf({ kind: "analysis", id: analysis }),
   }),
+
+  tool({
+    name: "pursuits_of",
+    title: "The lines of enquiry under a question",
+    description:
+      "Every line of enquiry pursuing a question. This is how a caller that did not open " +
+      "an enquiry itself finds one to work in: `known` gives question ids, this gives the " +
+      "enquiry ids beneath them, and every recording verb takes an enquiry. An empty list " +
+      "means the question is on the books and nothing has been started on it.",
+    inputSchema: { question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`) },
+    outputSchema: pursuitsSchema,
+    handler: async (read, { question }) => ({
+      enquiries: await read.pursuitsOf({ kind: "question", id: question }),
+    }),
+  }),
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;
+
+/**
+ * The natural-id prefixes a caller hands back. `recordAnalysis` takes a mixed
+ * list of observation and analysis ids, and the prefix is what says which is
+ * which — the same discrimination `TenantGraph.createEdge` makes, from the same
+ * table (`NODE_TYPES` in `src/db/domain.ts`).
+ */
+// Observations are an `Artefact` -- `recordObservations` returns the artefact's
+// id, not the evidence unit's -- so this is `ARTEFACT_PREFIX` and not a second
+// constant. Checked against `recordObservations`'s return rather than assumed
+// from the ref's name, which says "observations" and would have suggested EU_.
+const OBSERVATIONS_PREFIX = ARTEFACT_PREFIX;
+const ANALYSIS_PREFIX = "COMP_";
+
+/** One id from the wire, resolved to the ref kind its prefix names. */
+function inputRef(id: string): ObservationsRef | AnalysisRef {
+  if (id.startsWith(ANALYSIS_PREFIX)) return { kind: "analysis", id };
+  if (id.startsWith(OBSERVATIONS_PREFIX)) return { kind: "observations", id };
+  throw new Error(
+    `\`${id}\` is neither observations (${OBSERVATIONS_PREFIX}\u2026) nor an analysis (${ANALYSIS_PREFIX}\u2026)`,
+  );
+}
+
+/** One conclusion, as it crosses the wire. */
+const conclusionShape = z.object({
+  proposition: z.string().describe("the claim, as a sentence"),
+  finding: z.string().describe("what was found, in this analysis's own words"),
+  bearing: z
+    .enum(["supports", "challenges"])
+    .optional()
+    .describe("whether the finding supports or challenges the proposition (default: supports)"),
+  standing: z
+    .enum(["exploratory", "confirmatory"])
+    .optional()
+    .describe("confirmatory means it was prespecified; exploratory is the default"),
+});
+
+export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
+  writeTool({
+    name: "pose",
+    title: "Ask a question",
+    description:
+      "Put a question on the record without starting work on it. It appears in `known` as " +
+      "untested — on the books, never pursued, which is not a failure and not an " +
+      "inconclusive result. Use `open_enquiry` instead to ask and start in one act.",
+    inputSchema: { question: z.string().describe("the question, as asked") },
+    outputSchema: questionRefSchema,
+    handler: (write, { question }) => write.pose(question),
+  }),
+
+  writeTool({
+    name: "pursue",
+    title: "Open a line of enquiry on an existing question",
+    description:
+      "Start work on a question already on the record, naming the approach. A question may " +
+      "be pursued more than once, by different approaches, and they stay distinct.",
+    inputSchema: {
+      question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
+      approach: z.string().describe("how this line of enquiry means to answer it"),
+    },
+    outputSchema: enquiryRefSchema,
+    handler: (write, { question, approach }) =>
+      write.pursue({ question: { kind: "question", id: question }, approach }),
+  }),
+
+  writeTool({
+    name: "open_enquiry",
+    title: "Ask a question and start on it",
+    description:
+      "Ask and pursue in one act — the usual way work begins. Records one event, not two: " +
+      "a researcher who opened an enquiry did one thing.",
+    inputSchema: { question: z.string().describe("the question, as asked") },
+    outputSchema: enquiryRefSchema,
+    handler: (write, { question }) => write.openEnquiry(question),
+  }),
+
+  writeTool({
+    name: "record_observations",
+    title: "Record what was measured",
+    description:
+      "Put measurement on the record without analysing it. This is the cheap act: capture " +
+      "first, and promote later if something ends up resting on it. `content_hash` is what " +
+      "makes a later re-run comparable — without it the record cannot say whether two runs " +
+      "read the same data.",
+    inputSchema: {
+      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
+      name: z.string().describe("what these observations are, in the researcher's words"),
+      finding: z.string().describe("what was observed"),
+      content_hash: z
+        .string()
+        .optional()
+        .describe("a hash of the underlying data, if there is one"),
+    },
+    outputSchema: observationsRefSchema,
+    handler: (write, { enquiry, name, finding, content_hash }) =>
+      write.recordObservations({
+        enquiry: { kind: "enquiry", id: enquiry },
+        name,
+        finding,
+        ...(content_hash === undefined ? {} : { contentHash: content_hash }),
+      }),
+  }),
+
+  writeTool({
+    name: "record_analysis",
+    title: "Record a computation and what it concluded",
+    description:
+      "The compound act: a computation, what it read, and one claim per conclusion. `from` " +
+      "takes observation ids or the ids of earlier analyses whose output this one read — a " +
+      "two-stage pipeline records the second stage as consuming the first, never by " +
+      "re-entering the intermediate as if it were fresh measurement. `held_to` names " +
+      "prespecified checks the conclusions must answer to; a check nobody runs still counts " +
+      "against the finding, so it is named here and not at evaluation time.",
+    inputSchema: {
+      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
+      method: z.string().describe("what was done"),
+      from: z
+        .array(z.string())
+        .describe(`ids this run read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`),
+      concludes: z.array(conclusionShape).describe("one entry per conclusion"),
+      implementing: z.string().optional().describe("id of the planned work this carries out"),
+      held_to: z
+        .array(z.string())
+        .optional()
+        .describe("ids of prespecified criteria the conclusions are held to"),
+    },
+    outputSchema: analysisRefSchema,
+    handler: (write, { enquiry, method, from, concludes, implementing, held_to }) =>
+      write.recordAnalysis({
+        enquiry: { kind: "enquiry", id: enquiry },
+        method,
+        from: (from as string[]).map(inputRef),
+        concludes: concludes as Array<{
+          proposition: string;
+          finding: string;
+          bearing?: "supports" | "challenges";
+          standing?: "exploratory" | "confirmatory";
+        }>,
+        ...(implementing === undefined ? {} : { implementing: { kind: "work" as const, id: implementing } }),
+        ...(held_to === undefined
+          ? {}
+          : { heldTo: (held_to as string[]).map((id) => ({ kind: "criterion" as const, id })) }),
+      }),
+  }),
+
+  writeTool({
+    name: "close_enquiry",
+    title: "Close a line of enquiry",
+    description:
+      "Close an enquiry, answered or abandoned. Give `answered_by` — the analysis and the " +
+      "proposition it concluded — to close it as answered; omit it to abandon. Closing an " +
+      "already-closed enquiry is refused rather than recorded twice.",
+    inputSchema: {
+      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
+      answered_by_analysis: z
+        .string()
+        .optional()
+        .describe(`id of the analysis that answered it, e.g. ${ANALYSIS_PREFIX}3`),
+      answered_by_proposition: z
+        .string()
+        .optional()
+        .describe("the proposition that analysis concluded"),
+    },
+    outputSchema: acknowledgementSchema,
+    handler: async (write, { enquiry, answered_by_analysis, answered_by_proposition }) => {
+      if ((answered_by_analysis === undefined) !== (answered_by_proposition === undefined)) {
+        throw new Error(
+          "answered_by_analysis and answered_by_proposition go together: give both to close as answered, or neither to abandon",
+        );
+      }
+      await write.closeEnquiry({
+        enquiry: { kind: "enquiry", id: enquiry },
+        ...(answered_by_analysis === undefined || answered_by_proposition === undefined
+          ? {}
+          : {
+              answeredBy: {
+                analysis: { kind: "analysis", id: answered_by_analysis },
+                proposition: answered_by_proposition,
+              },
+            }),
+      });
+      return { ok: true as const, acted: enquiry };
+    },
+  }),
+] as ReadonlyArray<WriteToolDefinition<z.ZodRawShape>>;

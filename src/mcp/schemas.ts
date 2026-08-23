@@ -37,6 +37,10 @@
 
 import { z } from "zod";
 import type {
+  AnalysisRef,
+  EnquiryRef,
+  ObservationsRef,
+  QuestionRef,
   AmendmentRecord,
   CheckStatus,
   DependencyReport,
@@ -193,6 +197,38 @@ export const reproductionReportSchema = z.strictObject({
   incomparableBecause: z.string().optional(),
 });
 
+/* -- the write tools' return shapes --------------------------------------- */
+
+/**
+ * A verb that mints something returns its reference, and over the wire that
+ * reference is the only handle the caller gets. `structuredContent` must be an
+ * object, so a bare `EnquiryRef[]` cannot cross — hence the wrapper below.
+ */
+export const questionRefSchema = ref("question");
+export const enquiryRefSchema = ref("enquiry");
+export const observationsRefSchema = ref("observations");
+export const analysisRefSchema = ref("analysis");
+
+/** `pursuits_of` — `ReadSurface.pursuitsOf` returns an array, which is not an object. */
+export const pursuitsSchema = z.strictObject({
+  enquiries: z.array(enquiryRefSchema),
+});
+
+/**
+ * What a verb returning `void` says over the wire.
+ *
+ * `closeEnquiry` returns nothing, and `JSON.stringify(undefined)` is the string
+ * `"undefined"` — the content block breaks and `structuredContent` is not an
+ * object, so an outputSchema cannot be declared either. An explicit
+ * acknowledgement is the smallest honest thing: it names what was acted on, so
+ * a caller can tell an accepted call from a dropped one.
+ */
+export const acknowledgementSchema = z.strictObject({
+  ok: z.literal(true),
+  acted: z.string(),
+});
+export type Acknowledgement = z.infer<typeof acknowledgementSchema>;
+
 /* -- the gate ------------------------------------------------------------- */
 
 /**
@@ -222,3 +258,8 @@ export type _InterpretationHistory = Assert<
   Exact<z.infer<typeof interpretationHistorySchema>, InterpretationHistory>
 >;
 export type _ReproductionReport = Assert<Exact<z.infer<typeof reproductionReportSchema>, ReproductionReport>>;
+export type _QuestionRef = Assert<Exact<z.infer<typeof questionRefSchema>, QuestionRef>>;
+export type _EnquiryRef = Assert<Exact<z.infer<typeof enquiryRefSchema>, EnquiryRef>>;
+export type _ObservationsRef = Assert<Exact<z.infer<typeof observationsRefSchema>, ObservationsRef>>;
+export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, AnalysisRef>>;
+export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;

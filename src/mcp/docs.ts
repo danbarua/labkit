@@ -20,7 +20,7 @@
  */
 
 import { z } from "zod";
-import { TOOLS, type ToolDefinition } from "./tools";
+import { TOOLS, WRITE_TOOLS, type ToolDefinition, type WriteToolDefinition } from "./tools";
 import { historicalSurveySchema, knowledgeSurveySchema } from "./schemas";
 
 /** The URI this document is served at. */
@@ -84,7 +84,10 @@ function renderFields(s: JsonSchema, depth = 0): string[] {
   });
 }
 
-function renderInput(tool: ToolDefinition): string[] {
+/** Either kind. The renderer only reads the declaration, never the handler. */
+type AnyTool = ToolDefinition | WriteToolDefinition;
+
+function renderInput(tool: AnyTool): string[] {
   const shape = z.object(tool.inputSchema);
   const json = toJson(shape);
   if (!json.properties || Object.keys(json.properties).length === 0) {
@@ -93,7 +96,7 @@ function renderInput(tool: ToolDefinition): string[] {
   return ["**Takes**", "", ...renderFields(json)];
 }
 
-function renderOutput(tool: ToolDefinition): string[] {
+function renderOutput(tool: AnyTool): string[] {
   if (tool.outputSchema) return ["**Returns**", "", ...renderFields(toJson(tool.outputSchema))];
 
   // `known` is the one tool the SDK cannot carry an output schema for -- it
@@ -119,30 +122,48 @@ function renderOutput(tool: ToolDefinition): string[] {
  * subset and a future server can serve a filtered surface without this needing
  * to know about it.
  */
-export function renderToolDocs(tools: readonly ToolDefinition[] = TOOLS): string {
+export function renderToolDocs(
+  reads: readonly ToolDefinition[] = TOOLS,
+  writes: readonly WriteToolDefinition[] = WRITE_TOOLS,
+): string {
+  const all: AnyTool[] = [...reads, ...writes];
+  const writeNames = new Set(writes.map((t) => t.name));
+  const anchor = (t: AnyTool) => `#${t.name.replace(/_/g, "-")}`;
+  const index = (list: readonly AnyTool[]) =>
+    list.map((t) => `- [\`${t.name}\`](${anchor(t)}) — ${t.title}`);
+
   const lines = [
-    "# LabKit — the read tools",
+    "# LabKit — the tools",
     "",
     "Generated from the server's own tool declarations at the moment you asked",
     "for it. There is no stored copy, so this cannot disagree with the tools.",
     "",
-    "Every tool here is **read-only**: none of them changes the record. They",
-    "answer questions about a research programme — what it knows, why a",
-    "conclusion holds, what rests on a result, and how a wording was arrived at.",
+    "LabKit records **why** a piece of research was done and what rests on it:",
+    "questions, the lines of enquiry pursuing them, what was measured, what was",
+    "concluded, and what any of it is holding up. Work through it rather than",
+    "through notes, and the record can answer questions notes cannot.",
     "",
-    "## Tools",
+    "## Recording work",
     "",
-    ...tools.map((t) => `- [\`${t.name}\`](#${t.name.replace(/_/g, "-")}) — ${t.title}`),
+    "These change the record.",
+    "",
+    ...index(writes),
+    "",
+    "## Asking about the record",
+    "",
+    "These change nothing.",
+    "",
+    ...index(reads),
     "",
   ];
 
-  for (const tool of tools) {
+  for (const tool of all) {
     lines.push(
       "---",
       "",
       `## ${tool.name}`,
       "",
-      `*${tool.title}*`,
+      `*${tool.title}* — ${writeNames.has(tool.name) ? "**changes the record**" : "read-only"}`,
       "",
       tool.description,
       "",

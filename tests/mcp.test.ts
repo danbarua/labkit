@@ -17,18 +17,25 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ReadSurface, ResearchSession, inMemoryEventLog, type Clock } from "../src/domain";
-import { TenantGraph } from "../src/db/graph";
+import { ReadSurface, ResearchSession, WriteSurface, inMemoryEventLog, type Clock } from "../src/domain";
+import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
-import { TOOLS } from "../src/mcp/tools";
+import { TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schemas";
 import { DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { writeVerbNames, writeVerbsCalledIn } from "./helpers/read-only";
+
+/**
+ * The composition `src/domain/session.ts` specifies for an adapter needing both
+ * halves: one graph, one event sink taken from the write side.
+ */
+async function connectServer(graph: TenantGraph, transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0]) {
+  const writes = new WriteSurface(graph);
+  return buildServer(new ReadSurface(graph, { events: writes.events }), writes).connect(transport);
+}
 
 let scenario: Scenario;
 beforeAll(async () => { scenario = await openScenario(); });
@@ -36,47 +43,182 @@ afterAll(async () => { await scenario.close(); });
 
 const clock: Clock = (() => { let t = 0; return { now: () => new Date(Date.UTC(2026, 2, 1) + t++ * 60_000).toISOString() }; })();
 
-/** Source of every file under src/mcp/, comments stripped — prose naming a verb is not importing it. */
-const mcpSource = readdirSync("src/mcp")
-  .map((f) => readFileSync(`src/mcp/${f}`, "utf8"))
-  .join("\n")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/^\s*\/\/.*$/gm, "");
-
 describe("structure", () => {
-  test("the server imports the read half and not the write half", () => {
-    expect(mcpSource).toContain("ReadSurface");
-    expect(mcpSource).not.toContain("WriteSurface");
-    expect(mcpSource).not.toContain("ResearchSession");
-  });
-
-  test("no write verb name appears anywhere under src/mcp", () => {
-    // Both surfaces the server holds, not only WriteSurface -- it builds a
-    // TenantGraph, whose createNode/createEdge are writes that a list derived
-    // from WriteSurface can never contain. PJ-028 found that hole here and in
-    // the CLI at the same time; tests/helpers/read-only.ts states what the
-    // check proves and what it does not.
-    expect(writeVerbNames().length).toBeGreaterThan(10);
-    expect(writeVerbNames()).toContain("createEdge");
-    expect(writeVerbsCalledIn(mcpSource)).toEqual([]);
-  });
-
-  test("every tool names a real read-surface method and declares itself read-only", async () => {
+  /**
+   * **This block used to forbid writing.** Three tests asserted that no write
+   * verb name appeared under `src/mcp/` and that every tool declared
+   * `readOnlyHint`. They were right for the batch of work they were written
+   * for, and wrong as a design position: a record nothing can write to has
+   * nothing in it. They were deleted with the commit that added write tools,
+   * not worked around.
+   *
+   * `tests/cli.test.ts` keeps the same checks, because the CLI *is* read-only
+   * by design — it builds a `ReadSurface` and never a `WriteSurface`.
+   */
+  test("every declared tool is registered, and only the reads claim to be read-only", async () => {
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     const graph = await scenario.begin();
     try {
-      await buildServer(new ReadSurface(graph)).connect(serverSide);
+      await connectServer(graph, serverSide);
       const client = new Client({ name: "test", version: "0" });
       await client.connect(clientSide);
 
       const { tools } = await client.listTools();
-      expect(tools.map((t) => t.name).sort()).toEqual(TOOLS.map((t) => t.name).sort());
-      for (const t of tools) expect(t.annotations?.readOnlyHint).toBe(true);
+      expect(tools.map((t) => t.name).sort()).toEqual(
+        [...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
+      );
+
+      // Derived from which list a tool is in, not from a list of names here.
+      const readNames = new Set(TOOLS.map((t) => t.name));
+      for (const t of tools) {
+        expect(t.annotations?.readOnlyHint ?? false).toBe(readNames.has(t.name));
+      }
       await client.close();
     } finally {
       await scenario.end();
     }
   });
+});
+
+describe("an agent can track work through the tools alone", () => {
+  /**
+   * The sentence this file exists to assert: **an agent with nothing but this
+   * server can put a piece of research on the record and then ask about it.**
+   * Every act below goes over the wire through `callTool` — no `ResearchSession`
+   * is constructed, no verb is called directly, and the reads at the end see
+   * only what the writes put there.
+   *
+   * It is deliberately the shortest whole loop rather than a tour: ask, start,
+   * measure, conclude, close. If the write half were removed, every read at the
+   * end would answer about an empty graph and the test would fail on the first
+   * of them.
+   */
+  async function client() {
+    const graph = await scenario.begin();
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await connectServer(graph, serverSide);
+    const c = new Client({ name: "test", version: "0" });
+    await c.connect(clientSide);
+    return c;
+  }
+
+  const call = async (c: Client, name: string, args: Record<string, unknown>) => {
+    const result = await c.callTool({ name, arguments: args });
+    expect(result.isError ?? false).toBe(false);
+    return result.structuredContent as Record<string, unknown>;
+  };
+
+  test("open, record, conclude, close — then the reads answer about it", async () => {
+    const c = await client();
+    try {
+      const enquiry = await call(c, "open_enquiry", {
+        question: "does the pruning schedule move convergence?",
+      });
+      expect(String(enquiry.id).startsWith("LOE_")).toBe(true);
+
+      const observations = await call(c, "record_observations", {
+        enquiry: enquiry.id,
+        name: "sweep readings",
+        finding: "twelve runs at five seeds",
+        content_hash: "sha256:abc",
+      });
+
+      const analysis = await call(c, "record_analysis", {
+        enquiry: enquiry.id,
+        method: "paired comparison",
+        from: [observations.id],
+        concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
+      });
+
+      await call(c, "close_enquiry", {
+        enquiry: enquiry.id,
+        answered_by_analysis: analysis.id,
+        answered_by_proposition: PROP,
+      });
+
+      // Now the reads, which had nothing to say before any of the above.
+      const status = await call(c, "enquiry_status", { enquiry: enquiry.id });
+      expect(status.open).toBe(false);
+      expect(status.closure).toBe("answered");
+
+      const why = await call(c, "why_supported", { proposition: PROP });
+      expect(why.supported).toBe(true);
+
+      // **`provisional`, not `established`** — and that is the record working,
+      // not the loop falling short. The question is settled as far as anyone
+      // has taken it, but what settles it is a finding nobody promoted, so it
+      // is kept out of `established` on purpose. Reading the survey for "what
+      // do we actually know" must not silently include a lunchtime sweep.
+      //
+      // `promote` is the verb that moves it, and it is not exposed yet. This
+      // assertion is what says so, and it will need changing when it is.
+      const known = await call(c, "known", {});
+      const asks = (bucket: unknown) => (bucket as Array<{ asks: string }>).map((q) => q.asks);
+      expect(asks(known.provisional)).toContain("does the pruning schedule move convergence?");
+      expect(asks(known.established)).toEqual([]);
+      await c.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("pose then pursue, and pursuits_of finds the enquiry a later caller did not open", async () => {
+    // The discovery hole this closes: an agent reconnecting has question ids
+    // from `known` and no way to reach the enquiries beneath them.
+    const c = await client();
+    try {
+      const question = await call(c, "pose", { question: "does depth move convergence?" });
+      const before = await call(c, "pursuits_of", { question: question.id });
+      expect(before.enquiries).toEqual([]);
+
+      const enquiry = await call(c, "pursue", {
+        question: question.id,
+        approach: "depth sweep at fixed width",
+      });
+      const after = await call(c, "pursuits_of", { question: question.id });
+      expect(after.enquiries).toEqual([{ kind: "enquiry", id: enquiry.id }]);
+      await c.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("closing an enquiry twice is refused, not recorded twice", async () => {
+    const c = await client();
+    try {
+      const enquiry = await call(c, "open_enquiry", { question: "does width matter?" });
+      await call(c, "close_enquiry", { enquiry: enquiry.id });
+
+      const again = await c.callTool({
+        name: "close_enquiry",
+        arguments: { enquiry: enquiry.id },
+      });
+      expect(again.isError).toBe(true);
+      await c.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("a half-given answer is refused rather than silently abandoning the enquiry", async () => {
+    // The two `answered_by_*` fields are one argument split across the wire.
+    // Accepting half of it would close as abandoned an enquiry the caller
+    // believed it was answering.
+    const c = await client();
+    try {
+      const enquiry = await call(c, "open_enquiry", { question: "does seed count matter?" });
+      const result = await c.callTool({
+        name: "close_enquiry",
+        arguments: { enquiry: enquiry.id, answered_by_proposition: "it does" },
+      });
+      expect(result.isError).toBe(true);
+      await c.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  const PROP = "the pruning schedule moves convergence";
 });
 
 describe("the tool documentation resource", () => {
@@ -120,7 +262,7 @@ describe("the tool documentation resource", () => {
   async function connected() {
     const graph = await scenario.begin();
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    await buildServer(new ReadSurface(graph)).connect(serverSide);
+    await connectServer(graph, serverSide);
     const client = new Client({ name: "test", version: "0" });
     await client.connect(clientSide);
     return client;
@@ -148,7 +290,7 @@ describe("the tool documentation resource", () => {
       const { contents } = await client.readResource({ uri: DOCS_URI });
       const doc = markdown(contents).text;
 
-      for (const tool of TOOLS) {
+      for (const tool of [...TOOLS, ...WRITE_TOOLS]) {
         expect(doc).toContain(`## ${tool.name}`);
         expect(doc).toContain(tool.description);
         // Input field names, derived from the tool's own declaration.
@@ -172,9 +314,10 @@ describe("the tool documentation resource", () => {
     // Rendering a subset produces a smaller document naming only that subset --
     // which a checked-in file could not do, and which is the property that makes
     // the served one impossible to leave stale.
-    const one = renderToolDocs([TOOLS[0]!]);
+    const one = renderToolDocs([TOOLS[0]!], []);
     expect(one).toContain(`## ${TOOLS[0]!.name}`);
     expect(one).not.toContain(`## ${TOOLS[1]!.name}`);
+    expect(one).not.toContain(`## ${WRITE_TOOLS[0]!.name}`);
   });
 });
 
@@ -200,9 +343,10 @@ describe("behaviour — the same answers, over the wire", () => {
     });
     await s.closeEnquiry({ enquiry, answeredBy: { analysis, proposition: PROP } });
 
-    const read = new ReadSurface(await scenario.current());
+    const current = await scenario.current();
+    const read = new ReadSurface(current);
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    await buildServer(read).connect(serverSide);
+    await connectServer(current, serverSide);
     const client = new Client({ name: "test", version: "0" });
     await client.connect(clientSide);
     return { client, read, enquiry, analysis, observations };

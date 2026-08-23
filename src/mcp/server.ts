@@ -1,18 +1,21 @@
 #!/usr/bin/env bun
 /**
- * The MCP server — the other door onto the reads `src/cli.ts` opens.
+ * The MCP server — the door an agent works through.
  *
- * Same surface, different caller. The CLI is for a person at a terminal and
- * renders prose by default; this is for an agent, and returns the **whole**
- * structured report every time. That is deliberate rather than lazy: the CLI's
- * hand-picked prose fields fell behind the report types twice (see that file's
- * header), and a transport that ships the report entire cannot fall behind it
- * at all.
+ * The CLI next door is for a person at a terminal, renders prose by default,
+ * and is **read-only**: it builds only a `ReadSurface`, so it cannot write at
+ * all. This server is for an agent, returns the **whole** structured report
+ * every time, and reads *and writes*. Returning the report entire is deliberate
+ * rather than lazy: the CLI's hand-picked prose fields fell behind the report
+ * types twice (see that file's header), and a transport that ships the report
+ * entire cannot fall behind it at all.
  *
- * **Read-only structurally.** `buildServer` takes a `ReadSurface`. No write
- * verb is in scope, and `tests/mcp.test.ts` derives the forbidden names from
- * `WriteSurface.prototype` rather than listing them, so a verb added later is
- * covered without anyone remembering.
+ * **It was read-only for one batch of work and is not any more.** A record
+ * nothing can write to is a record with nothing in it, and every read here
+ * answers a question about work some other process had to have done. The two
+ * halves stay separate at the handler boundary — a read tool is handed a
+ * `ReadSurface` and a write tool a `WriteSurface`, so neither can reach the
+ * other's verbs — but the server holds both.
  *
  * **Import from subpaths only.** `@modelcontextprotocol/sdk`'s `exports` maps
  * `"."` to a `dist/esm/index.js` that is not on disk — verified under Bun, not
@@ -29,13 +32,17 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
 import { TenantGraph } from "../db/graph";
-import { ReadSurface } from "../domain";
-import { TOOLS } from "./tools";
+import { ReadSurface, WriteSurface } from "../domain";
+import { TOOLS, WRITE_TOOLS } from "./tools";
 import { DOCS_URI, renderToolDocs } from "./docs";
 
 /**
- * Registers the seven tools against a read surface. Transport-free, so a test
- * can drive it over `InMemoryTransport` without a subprocess.
+ * Registers every tool against the two surfaces. Transport-free, so a test can
+ * drive it over `InMemoryTransport` without a subprocess.
+ *
+ * Both surfaces are required. An optional write half would be the read-only
+ * mode surviving as an API shape, and a caller that wants a read-only server
+ * has one already: `src/cli.ts` builds a `ReadSurface` and nothing else.
  *
  * Every tool declares an `outputSchema`. This reverses what this comment said
  * until 2026-08-22 — that a mirror of the report interfaces would exist only to
@@ -51,7 +58,7 @@ import { DOCS_URI, renderToolDocs } from "./docs";
  * would convert a good refusal into an empty success, which is the one
  * outcome the domain went to trouble to avoid.
  */
-export function buildServer(read: ReadSurface): McpServer {
+export function buildServer(read: ReadSurface, write: WriteSurface): McpServer {
   const server = new McpServer({ name: "labkit", version: "0.0.1" });
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
@@ -86,24 +93,50 @@ export function buildServer(read: ReadSurface): McpServer {
         description: definition.description,
         inputSchema: definition.inputSchema,
         outputSchema: definition.outputSchema,
+        // Only on the reads. An absent hint is not a claim either way, which is
+        // the honest thing to say about a tool that changes the record.
         annotations: { readOnlyHint: true },
       },
-      async (args: Record<string, unknown>) => {
-        inFlight++;
-        try {
-          const result = await definition.handler(read, args);
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-            structuredContent: result as Record<string, unknown>,
-          };
-        } finally {
-          inFlight--;
-        }
+      respond((args) => definition.handler(read, args)),
+    );
+  }
+
+  for (const definition of WRITE_TOOLS) {
+    server.registerTool(
+      definition.name,
+      {
+        title: definition.title,
+        description: definition.description,
+        inputSchema: definition.inputSchema,
+        outputSchema: definition.outputSchema,
       },
+      respond((args) => definition.handler(write, args)),
     );
   }
 
   return server;
+}
+
+/**
+ * The shared handler body: count the call, ship the whole result twice — as
+ * JSON text for a client that reads `content`, and as `structuredContent` for
+ * one that reads the schema.
+ *
+ * Errors are deliberately not caught here; see the note on `buildServer`.
+ */
+function respond(run: (args: Record<string, unknown>) => Promise<unknown>) {
+  return async (args: Record<string, unknown>) => {
+    inFlight++;
+    try {
+      const result = await run(args);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        structuredContent: result as Record<string, unknown>,
+      };
+    } finally {
+      inFlight--;
+    }
+  };
 }
 
 /**
@@ -128,7 +161,19 @@ let inFlight = 0;
 export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Promise<void> {
   const connection = await connectDb();
   const ctx = await resolveTenantContext(connection.db, tenant);
-  const server = buildServer(new ReadSurface(new TenantGraph(ctx, connection.db)));
+  // One graph, so `inTransaction`'s re-entrancy depth is shared between the
+  // halves; one event sink, taken from the write half, so both see the same
+  // stream. This is the composition `src/domain/session.ts` specifies for an
+  // adapter that needs both.
+  //
+  // The sink is the default in-memory one, so **write events do not survive the
+  // process**. The graph is the durable record and always was — events explain
+  // how state changed, the graph says what the state is — but nothing here
+  // persists the former, and a durable sink has not been earned by a caller
+  // asking for one.
+  const graph = new TenantGraph(ctx, connection.db);
+  const writes = new WriteSurface(graph);
+  const server = buildServer(new ReadSurface(graph, { events: writes.events }), writes);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
