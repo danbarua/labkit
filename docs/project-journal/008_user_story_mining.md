@@ -700,7 +700,8 @@ this document's original analysis are marked as such.
 | AC | A withdrawn interpretation has no way back | **S-12** | resolved |
 | AD | Observation-only work on a question reads as no work at all | **S-9b** | resolved |
 | AE | An analysis cannot read another analysis's output | **S-11c**, **S-11d** | resolved |
-| AF | Execution input order is not recorded | **S-10b** | open |
+| AF | Execution input order is not recorded | **S-10b**, **S-10d** | resolved |
+| AG | An artefact id does not say whether it is measured or computed | **S-11f** | refuted |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -708,9 +709,7 @@ be one. `resolved (argued)` — settled, but the closing move was an argument
 rather than a demonstrated wrong answer; weaker, and scannable as such rather
 than distinguished only in the prose below. `demonstrated` — a wrong answer is
 on the record and the **fix** is what is unbuilt; CLAUDE.md permits at most one
-of these at a time and requires clearing it next, and
-`bun run check:ledger` fails when a second appears, so the rule is an
-invariant rather than an intention. `deferred` — real, deliberately not
+of these at a time and requires clearing it next. `deferred` — real, deliberately not
 acted on, **and with a scenario named that would settle it**. `boundary` — a
 known limit of the current model, recorded rather than fixed.
 
@@ -1193,6 +1192,36 @@ of an ordered input list to be wrong within.
 being wrong in a way the record states rather than implies. Not built, and no
 scenario currently named would settle it — unresolved and unowned, recorded here
 rather than left to look like a decision.
+
+**S-10d (2026-08-24): resolved, and the cell above was wrong about its own
+case.** External review of PR #2 proposed the probe this row had been asking
+for, and it fires: `reproductionOf` on a rerun that read the same two records in
+the opposite order returns `execution: "reproduced"`. That is not an inference a
+reader chose to make — the report *states* that two runs of "first input minus
+second", which produced +0.4 and −0.4, are the same execution. The paragraph
+above, arguing that "the reports claim the two runs consumed the same inputs,
+and they did", was answering about `differs` and never checked what `execution`
+asserts one field over. Same defect as row AD: the wrong field was audited.
+
+*The remedy is the S-11c shape, not new state.* `execution` gains a third
+answer, `inputs-unordered`, on the distinction `ReproducibilityReport.unverifiable`
+already draws — the record cannot say, which is not a no. The cost is that it
+declines for every multi-input run, including identical ones, because LabKit
+cannot tell an order-sensitive method from any other; S-10d asserts that cost in
+its own test. Making order part of execution identity — a position on
+`CONSUMES` — remains available and now clears the bar; this change makes its
+absence visible rather than leaving a wrong answer in its place.
+
+**Row AG (2026-08-24): refuted, added by S-11f.** The neighbouring question —
+whether an `ART_` id needing to say measured-versus-computed is missing domain
+state — was measured at the same time and is not. No reader in `src/` branches
+on `Artefact.kind`; `whySupported().restingOn` mislabels a computed input as
+`{kind: "observations"}` and nothing is decided from it; and `reproducibilityOf`
+puts such an input in `unverifiable` rather than `differing`, which is the
+record declining rather than claiming inequality from absence. Reference-model
+debt, not a gap. The one real consequence — an answer weaker than the record
+supports, since the route through `CONSUMES` is never walked — is named in
+S-11f as a discriminator for whoever wants recursive accounting.
 
 **S-11b (2026-08-21): resolved, and the row's own description of itself was
 wrong.** See `docs/consumer-contract/031`, `032`.

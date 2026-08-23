@@ -7,25 +7,6 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ---
 
-## Needs a discriminator
-
-- [ ] **`ART_` does not say what kind of artefact it is.** `ObservationsRef`'s
-  `kind` is `"observations"`; its id is an **Artefact** id, the same prefix an
-  analysis's *output* carries. A caller holding one cannot tell raw measurement
-  from a computed result, and `what_depends_on` takes either.
-
-  **Measured, not argued: naming, not behaviour.** Recording an analysis with
-  `from: [analysisRef]` and with `from: [{kind:"observations", id: <that
-  analysis's output artefact>}]` produce an identical record — same `CONSUMES`
-  edge, same `{part, name}` from `reproducibilityOf`.
-
-  Needs a read that gives a **wrong answer** because the two are
-  indistinguishable. The nearest thing to one was the three recording verbs
-  disagreeing about their inputs, and that turned out to be a separate defect:
-  fixing it (all three take `InputRef`) left this untouched, because the caller
-  now names *the analysis*, not its output artefact, and never sees the `ART_`
-  id at all.
-
 ## Deprioritised
 
 - [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**
