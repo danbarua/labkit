@@ -1112,27 +1112,31 @@ export class ReadSurface extends SessionCore {
    * be a writer with no reader.
    */
   async interpretationHistory(claim: ClaimRef): Promise<InterpretationHistory> {
-    // The walk is by wording -- CHANGES links claims and each step is found by
-    // the name of the one before it -- but the STARTING point is a handle, so
-    // the caller is not guessed at. Walking by id is a separate change and
-    // wants the chain to carry an edge a caller can follow.
+    // **Walked by id.** Every step of a revision chain is already reachable by
+    // identity -- `reinterpret` writes `Decision -MOTIVATES-> narrower` and
+    // `Decision -CHANGES-> each withdrawn claim`, both carrying natural ids --
+    // so this needed a different query and no new structure. It used to find
+    // each step by the NAME of the one after it, which S-12b breaks: two
+    // independent chains passing through one sentence made a legitimate
+    // history throw `is not a single line`, because the by-name match found
+    // the other chain's claim and its decision. Same text is not same claim,
+    // which is this repo's oldest lesson arriving from an external review.
     const proposition = await this.assertedBy(claim);
     if (proposition === undefined) throw new Error(`no claim ${claim.id}`);
     const steps: Revision[] = [];
-    let current = proposition;
+    let current: ConcludedClaim[] = [{ claim, asserts: proposition }];
 
-    // Walk backwards from the current reading. Bounded by the number of
-    // revisions actually recorded, so a cycle cannot spin.
-    // Empty, not seeded with `current`: the set holds claim ids now and
-    // `current` is wording, so seeding it would have added a value nothing can
-    // match. A self-loop is still caught, one step later.
-    const seen = new Set<string>();
+    // Seeded with the entry claim now that it holds ids. It could not be while
+    // it held wording -- a set of names cannot be primed with a claim -- so a
+    // self-loop was caught one step late.
+    const seen = new Set<string>([claim.id]);
+
     for (;;) {
       const rows = await this.graph.query(
-        // `nxt` is bound rather than anonymous so the step can report WHICH
-        // record the decision motivated, not just what it says. Lower-case on
-        // purpose: a camelCase RETURN name decodes as null (CLAUDE.md).
-        `MATCH (d:Decision)-[:MOTIVATES]->(nxt:Claim {name: $name})
+        // `nxt` bound and matched by id. Lower-case names throughout: a
+        // camelCase RETURN name decodes as null (CLAUDE.md).
+        `MATCH (d:Decision)-[:MOTIVATES]->(nxt:Claim)
+         WHERE nxt.natural_id IN $ids
          MATCH (d)-[:CHANGES]->(was:Claim)
          RETURN d, was, nxt`,
         {
@@ -1140,42 +1144,28 @@ export class ReadSurface extends SessionCore {
           was: vertexProps<{ name: string } & Identified>(),
           nxt: vertexProps<{ name: string } & Identified>(),
         },
-        { name: current },
+        { ids: current.map((c) => c.claim.id) },
       );
-      // One line only. Two decisions narrowing different readings to the same
-      // sentence would otherwise send the walk down whichever row came back
-      // first -- the arbitrary-rows[0] shape S-1 turned into a wrong answer.
-      // Several *rows* per decision are normal and not a fork: one decision
-      // withdraws every node asserting the sentence it replaced.
+      // One decision per step. This is now a real structural statement -- the
+      // history is a line rather than a merge -- where the old `replaced.size`
+      // guard was about wording and fired on chains that never met.
       const decisions = new Set(rows.map((r) => r.d.natural_id));
-      const replaced = new Set(rows.map((r) => r.was.name));
-      // `motivated` joins the guard for the same reason the other two are
-      // there: several records asserting the step's new reading would make
-      // `nowClaims` an arbitrary pick between them.
-      const motivated = new Set(rows.map((r) => r.nxt.natural_id));
-      if (decisions.size > 1 || replaced.size > 1 || motivated.size > 1) {
+      if (decisions.size > 1) {
         throw new Error(
-          `interpretation history for "${proposition}" is not a single line at "${current}"`,
+          `interpretation history for "${proposition}" is not a single line at "${current.map((c) => c.asserts).join('", "')}"`,
         );
       }
       const step = rows[0];
       if (!step) break;
+
       // Every record the decision withdrew, not the one that came back first.
-      // One decision withdraws every node asserting the sentence it replaced,
-      // so this step is plural by construction -- S-12's two analyses reaching
-      // one reading are withdrawn together, and naming one of them would be
-      // the arbitrary pick PJ-030 exists to remove.
+      // One decision withdraws every claim asserting the reading it replaced,
+      // so this is plural by construction -- S-12's two analyses reaching one
+      // reading are withdrawn together.
       const withdrew: ConcludedClaim[] = [
-        ...new Map(
-          rows.map((r) => [r.was.natural_id, r.was] as const),
-        ).values(),
+        ...new Map(rows.map((r) => [r.was.natural_id, r.was] as const)).values(),
       ].map((was) => ({ claim: ref("claim", was.natural_id), asserts: was.name }));
 
-      // Keyed by the claim's id, not its wording. Two distinct claims worded
-      // alike at different points in one chain used to raise `loops at`
-      // falsely. Every withdrawn record is marked, not just the first row's --
-      // the guard watched one of N. The *traversal* is still by name, which is
-      // the narrower remaining gap recorded in PJ-030 §7 and in docs/TASKS.md.
       for (const w of withdrew) {
         if (seen.has(w.claim.id))
           throw new Error(
@@ -1189,11 +1179,14 @@ export class ReadSurface extends SessionCore {
         previously: withdrew,
         nowClaims: { claim: ref("claim", step.nxt.natural_id), asserts: step.nxt.name },
         reason: step.d.reason,
-        restingOnTheOldReading: await this.decidedOnTheStrengthOf({
-          proposition: step.was.name,
-        }),
+        // Scoped to the withdrawn claim's own line of enquiry. Passing the
+        // bare proposition asked "what was decided on the strength of this
+        // SENTENCE", which in S-12b reaches the other chain's decisions.
+        restingOnTheOldReading: await this.decidedOnTheStrengthOf(
+          await this.scopeOf(withdrew[0]!.claim),
+        ),
       });
-      current = step.was.name;
+      current = withdrew;
     }
 
     return {

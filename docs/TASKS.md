@@ -7,15 +7,6 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ---
 
-## Ready to build
-
-- [ ] **`interpretationHistory` walks by wording.** Its entry point is a
-  handle, its loop guard is keyed by claim id, and every step now *reports*
-  handles — but the traversal still finds each step by the *name* of the one
-  before it (`MATCH (d:Decision)-[:MOTIVATES]->(nxt:Claim {name: $name})`).
-  Walking by id wants the revision chain to carry an edge a caller can follow,
-  which is a model question rather than a projection.
-
 ## Needs a discriminator
 
 - [ ] **`ART_` does not say what kind of artefact it is.** `ObservationsRef`'s
