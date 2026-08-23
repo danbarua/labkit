@@ -86,6 +86,67 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Needs a discriminator
 
+- [ ] **Closing one pursuit closes every pursuit of the same question, and the
+  untouched one reports evidence it never produced.** External review (ChatGPT,
+  on PR #2) proposed the discriminator; run over MCP only, it fires:
+
+  ```
+  pose Q; pursue A; pursue B
+  record + close A
+  enquiry_status(A) -> open:false, closure:"answered", evidence:["yes"]
+  enquiry_status(B) -> open:false, closure:"answered", evidence:["yes"]
+  ```
+
+  B was never worked on. It reports itself answered, carrying A's evidence.
+  **That is a confidently wrong answer, not an empty one**, so it clears the
+  bar in CLAUDE.md's "Changing the graph model" without needing a further probe.
+
+  The cause is not a bug: `closeEnquiry()` writes `Decision -RESOLVES-> Question`
+  and `enquiryStatus()` derives closure from the Question, both deliberately —
+  closure attached to the question while one question had one pursuit. `pursue`
+  makes that false.
+
+  Two readings, and they need picking between rather than deferring, because one
+  of them is already shipping a wrong answer:
+  - Closure belongs to the **Question**, and the verb is named at the wrong
+    level — it is `resolve_question(via_enquiry=A)`, and `enquiry_status` should
+    report B as *pursuing an answered question* rather than as answered itself.
+  - Closure belongs to the **LineOfEnquiry**, which then needs lifecycle
+    semantics the model does not have.
+
+- [ ] **A consumer holding only MCP handles cannot repair a two-stage
+  pipeline.** The other half of the three-verb asymmetry, and the half PR #2
+  got wrong. `record_analysis` accepts `COMP_` ids for `from`;
+  `replace_analysis` does not, and an agent that recorded stage two holds
+  `COMP_2`, never the `ART_` id underneath it. Measured over MCP only:
+
+  ```
+  replace_analysis(supersedes=A2, from=[A1]) ->
+    isError: CONSUMES does not allow Computation -> Computation
+  ```
+
+  **PR #2 called this "not a functional gap" and that claim was under-
+  demonstrated.** It was measured with an `ART_` id obtained inside the process;
+  a consumer does not have one. The workaround is *recoverable* — the id shows
+  up in `why_supported().restingOn` as `{part: "ART_4", name: "stage one
+  output"}` — but only by asking why a claim is supported in order to find out
+  what a computation read, which is not a route anyone would find.
+
+  Likely fix, per the same review: one `InputRef = ObservationsRef |
+  AnalysisRef` accepted by all three recording verbs. No graph change — the
+  edge is already `Computation -CONSUMES-> Artefact` either way.
+
+- [ ] **Six `ReadSurface` methods are unreachable over MCP**, so the generated
+  documentation audits the adapter's subset and not the domain: `originOf`,
+  `contractFor`, `criteriaGoverning`, `gateStatus`, `doTheseConflict`,
+  `reproducibilityOf`. An agent can `plan_work`, `state_criterion` and
+  `declare_gate` and then cannot ask what the contract is, which criteria govern
+  the gate, or what state the gate is in.
+
+  Needs a **mechanical coverage assertion**, not a one-off fix: every public
+  `ReadSurface` method is exposed or explicitly excluded with a reason, derived
+  from the prototype the way `tests/helpers/read-only.ts` derives write verbs.
+
 - [ ] **Row AF — execution input order is not recorded.** `CONSUMES` says which
   artefacts a computation read, never in what sequence, so two runs of an
   order-sensitive method are indistinguishable (S-10b). Earns nothing under the
