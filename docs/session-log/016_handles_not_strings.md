@@ -1,4 +1,4 @@
-# 016: Handles, not strings — reports, then the verbs
+# 016: Handles, not strings — reports, then every verb
 
 **Session wrap, 2026-08-23, on `feat/mcp-server`.** Not a decision record — the
 diagnosis is `docs/project-journal/030_which_record_is_this_about.md`, and the
@@ -11,7 +11,7 @@ the verbs, until nothing has to search for what the caller meant.
 
 ## Changed
 
-Two commits, and a **dirty tree** described under Open.
+Three code commits. Tree clean.
 
 **`9c1e8f7` — every report handle is its `Ref` type.**
 
@@ -34,8 +34,11 @@ one by wording. 217 tsc errors, all binding sites, mechanically destructured.
 
 ## Verified
 
-- **`bun test` 299 pass, 0 fail, 39 files, 137.9s.** typecheck, depcruise,
-  `check:doc-comments`, `check:tests-assert`, `check:stdout` green.
+- After `9c1e8f7` and `dc07629`: **299 pass, 0 fail**.
+- After `0564bb7`: **298 pass, 0 fail, 39 files, 143.2s.** All five gates green.
+  (One test fewer: S-5's "an ambiguous proposition is refused" and the MCP
+  "half-given answer" test were replaced by assertions at the seam the refusal
+  moved to.)
 
 **The method was the finding.** Dan's instruction was *"we're using TypeScript,
 there's an LSP, this shouldn't be hard"* — change the type and let `tsc`
@@ -55,12 +58,7 @@ hand and missed most of them.
 
 ## Open
 
-**The tree is dirty and does not pass.** `typecheck`, `depcruise` and the three
-static checks are green; **`bun test` is 247/53** — of which roughly 24 are
-real and ~18 are the flake (that run was 338s). It is not committable as it
-stands.
-
-What the uncommitted work does — **retiring wording as identity from the verbs**:
+**`0564bb7` — no verb searches for what the caller meant.**
 
 - `recordAnalysis` → `{analysis, claims}` (committed above); `promote`,
   `closeEnquiry`, `evaluateCriterion`, `acceptAsUnresolved`, `amendDesign`,
@@ -76,22 +74,39 @@ What the uncommitted work does — **retiring wording as identity from the verbs
   and the both-or-neither validation that went with them; each takes one claim
   id.
 
-**One thing I got wrong and the tests caught.** I first made `reinterpret`
-operate on a single claim node. S-12 failed, correctly: a reinterpretation
-narrows a **reading**, and two analyses in one enquiry asserting the same
-sentence share it, so both must stop standing. It now takes a `ClaimRef` and
-derives (proposition, enquiry) from that claim — semantics preserved, nothing
-guessed.
+### What finishing it turned up — worth more than the refactor
 
-**The remaining ~24 failures are the change working.** They fail with
-*"X is claimed 2 times; name one"* — in scenarios where the sentence genuinely
-is asserted twice (a replacement analysis re-asserting its predecessor's
-proposition; S-5's two-enquiry case). Each needs the test to say which claim it
-means, which is what the model has always said is required.
+**Two more instances of the minting defect, found by tests that could not name
+a claim.** `replaceAnalysis` and `reverify` both mint claims and returned only
+refs, so after either there are **two** claims asserting a sentence and a caller
+could name neither. Both now return `claims`. Sixth and seventh time
+CLAUDE.md's *"does the act record what it produced, or only what it acted on?"*
+has caught something.
 
-**`ConclusionRef` is no longer an identity anywhere in the verbs.** I had
-defended it as "a legitimate convenience" before Dan asked how that could be
-legitimate. It was not:
+**Two real bugs I introduced, both the same shape**, and each caught by the
+scenario that exists for it — walking only `SUPPORTS` where a claim may be
+**challenged**:
+
+- `scopeOf` lost the enquiry for every challenging claim → S-5's second stage
+  reported an empty question.
+- `closeEnquiry`'s ownership check rejected a question answered **"no"** on a
+  challenging finding → S-4's entire case.
+
+**A semantic consequence, recorded rather than papered over.** `whySupported`
+could previously answer about a proposition **nobody had claimed**, reporting
+`supported: false, challenged: false`. With a handle there is nothing to ask
+about. S-4 and S-1 now assert `claimsAsserting(...)` is **empty**, which makes
+the same distinction one step earlier and more strongly: a refuted claim
+*exists* and is challenged; an unexamined sentence does not exist at all.
+
+**And one I nearly got wrong.** `reinterpret` first operated on a single claim
+node. S-12 failed, correctly: a reinterpretation narrows a **reading**, and two
+analyses in one enquiry asserting the same sentence share it, so both must stop
+standing. It takes a `ClaimRef` and derives (proposition, enquiry) from it.
+
+**`ConclusionRef` is no longer an identity anywhere.** I had defended it as "a
+legitimate convenience" before Dan asked how that could be legitimate. It was
+not:
 
 > `ConclusionRef {analysis: AnalysisRef, proposition: string}` exists because
 > `recordAnalysis` mints one claim per conclusion and **returns only the
@@ -114,5 +129,9 @@ follow, which is a separate change.
 
 ## Next
 
-Finish the ~24 test call-sites, each naming which claim it means. Then the four
-report fields above.
+The four report fields above — `InterpretationHistory` / `Revision` /
+`ReinterpretationReport`'s claim wording and `ReplacementReport.affected` /
+`.unchanged`. All four now have a `ClaimRef` available, so each is a projection
+change.
+
+This entry is closed. The next piece of work opens 017.
