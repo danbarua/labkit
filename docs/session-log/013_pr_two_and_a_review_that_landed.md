@@ -1,16 +1,17 @@
-# 013: PR #2, a review that landed, and the identity question behind it
+# 013: PR #2, the review it drew, and the read layer shipped
 
 **Session wrap, 2026-08-23, on `feat/mcp-server`.** Not a decision record. The
 multi-pursuit finding below needs a decision that has not been made.
 
 ## Goal
 
-Open a PR for the MCP work, act on the external review it drew, then write down
-the scenario behind its sharpest finding and demonstrate it.
+Open a PR for the MCP work, act on the external review it drew, write down the
+scenario behind its sharpest finding, and close the two adapter gaps the review
+exposed.
 
 ## Changed
 
-Two commits plus this entry.
+Three commits plus this entry.
 
 **`92f726e`** — `docs/TASKS.md`, +61 lines, the three findings below. No code.
 
@@ -24,8 +25,20 @@ Two commits plus this entry.
 - `CLAUDE.md` — one paragraph: *identity is never wording* now names its other
   half and points at both files.
 
-Off-tree: `feat/mcp-server` pushed and **PR #2 opened** (`danbarua/labkit#2`,
-18 commits, +2843/−853), plus a comment carrying the corrections below.
+**`596e699`** — the two gaps closed:
+
+- `src/mcp/tools.ts`, `schemas.ts` — the **six unreachable reads exposed**:
+  `origin_of`, `contract_for`, `criteria_governing`, `gate_status`,
+  `do_these_conflict`, `reproducibility_of`. Every public verb on both surfaces
+  is now an MCP tool.
+- **`tests/helpers/surface-coverage.ts`** (new) — the derived check that would
+  have caught it.
+- **`docs/mcp-tools.md`** (new, 839 lines) + `scripts/render-tool-docs.ts` +
+  `bun run docs:tools`.
+- `CLAUDE.md`, `docs/TASKS.md` — the new file described, the queue item closed.
+
+Off-tree: `feat/mcp-server` pushed, **PR #2** (`danbarua/labkit#2`) now **23
+commits**, head `596e699`, plus a comment carrying the corrections below.
 
 ## Verified
 
@@ -72,6 +85,11 @@ read.
 `criteriaGoverning`, `gateStatus`, `doTheseConflict`, `reproducibilityOf`. Nine
 of fifteen are reachable.
 
+**After `596e699`: `bun test` 294 pass, 0 fail, 39 files, 109.9s**; all five
+gates green. Both new mechanisms were demonstrated by breaking them — deleting
+`gate_status` fails the coverage assertion; appending a line to
+`docs/mcp-tools.md` fails the freshness one.
+
 **After `ed71481`: `bun test` 292 pass, 0 fail, 39 files, 107.4s**; typecheck,
 depcruise, `check:doc-comments`, `check:tests-assert` green. The first
 background run of the suite was **killed before producing output** and was
@@ -117,6 +135,14 @@ stripping it and comparing the rest.
 - **`tests/subject-identity.test.ts` is green while the ambiguities are
   present.** Its header says so, because a green tick otherwise reads as
   approval. Fixing row 1 turns it red on purpose.
+- **`docs/mcp-tools.md` will appear in the diff of any commit touching
+  `src/mcp/tools.ts`.** That is the cost the dependency-graph decision rejected
+  on 2026-08-21, accepted here for a reason stated in CLAUDE.md rather than
+  glossed: this document's diff is the signal, where the graph's byte-stability
+  existed to suppress noise. If it becomes annoying, the honest fix is to stop
+  checking it in, not to stop asserting it.
+- **`NOT_EXPOSED` is empty.** That is today's state, not a claim it must stay
+  empty; the mechanism exists so an exclusion has to carry a reason.
 - **The three recording verbs want one `InputRef`.** No graph change: the edge
   is `Computation -CONSUMES-> Artefact` whichever alias is passed.
 - **Six unexposed reads**, wanting a mechanical coverage assertion rather than a
@@ -131,19 +157,26 @@ stripping it and comparing the rest.
 
 ## Next
 
-Two pieces agreed and not yet built:
+Both blocked discriminators are now runnable, because the reads they need are
+exposed:
 
-1. **Expose the six unreachable reads behind a derived coverage assertion** —
-   every public `ReadSurface` method exposed or explicitly excluded with a
-   reason, derived from the prototype the way `tests/helpers/read-only.ts`
-   derives write verbs. Dan: *"doesn't make sense to build a read layer and not
-   ship it."*
-2. **Check the generated tool documentation into the repo**, kept fresh by a
-   single assertion in `tests/mcp.test.ts` — the file equals what the generator
-   produces — rather than a hook or a new script. The cost, stated: a commit
-   touching `tools.ts` will also touch the document, which is the thing the
-   dependency-graph decision disliked.
+1. **Cold task resumption.** Agent A plans work, declares its gate and exits.
+   Agent B reconnects holding nothing and asks: what work am I to do, why does
+   it exist, what may I read, what would count as done, what is blocking it?
+   `contract_for` and `gate_status` are the reads that make this answerable at
+   all; whether they make it *sufficient* is the actual question, and it is the
+   real test of the Task model.
+2. **Whether `AnalysisRef` assumes one canonical output.** Recorded in PJ-030 as
+   row 3, downstream of the artefact-identity question rather than separate
+   from it.
 
-Then re-run the review's two remaining discriminators, which were blocked on the
-read coverage: cold task resumption, and whether `AnalysisRef` assumes one
-canonical output.
+Undecided and waiting on Dan: multi-pursuit closure (PJ-030 §3).
+
+**Two things I got wrong that are worth carrying forward.** A rendered preamble
+claiming "there is no stored copy" would have shipped false the moment the copy
+was checked in — caught because the sentence was about the thing being changed.
+And the coverage check had to read *source* rather than the prototype: TS's
+`private` is compile-time only, so `getOwnPropertyNames` cannot tell
+`outputArtefactOf` from `recordAnalysis`.
+
+This entry is closed. The next piece of work opens 014.
