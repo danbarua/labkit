@@ -37,6 +37,12 @@
 
 import { z } from "zod";
 import type {
+  ConflictSide,
+  ConflictVerdict,
+  GateStatus,
+  QuestionOrigin,
+  ReproducibilityReport,
+  TaskContract,
   AmendmentReport,
   ChangedConclusion,
   CriterionRef,
@@ -207,6 +213,76 @@ export const reproductionReportSchema = z.strictObject({
   incomparableBecause: z.string().optional(),
 });
 
+/* -- the six reads exposed later than the rest ---------------------------- */
+
+/**
+ * `origin_of` — `null` for a question somebody simply asked, which is most of
+ * them. Wrapped, because `structuredContent` must be an object and a bare
+ * `null` is not one; `origin: null` says "asked outright" rather than "no
+ * answer available".
+ */
+export const questionOriginSchema = z.strictObject({
+  from: z.string(),
+  fromAsks: z.string(),
+  reason: z.string(),
+  knownAtTheTime: z.array(z.string()),
+});
+export const originOfSchema = z.strictObject({ origin: questionOriginSchema.nullable() });
+
+export const taskContractSchema = z.strictObject({
+  objective: z.string(),
+  acceptance: z.string(),
+  mayRead: z.array(z.string()),
+  // Literal `false`. The contract records what work may read; nothing stops a
+  // computation reading elsewhere, and a caller must not be able to read
+  // `enforced: true` from this.
+  enforced: z.literal(false),
+});
+
+/** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */
+export const criteriaGoverningSchema = z.strictObject({
+  criteria: z.array(ref("criterion")),
+});
+
+const evaluationSummary = z.strictObject({
+  value: z.string(),
+  outcome: z.enum(["pass", "fail"]),
+  at: z.string(),
+});
+
+export const gateStatusSchema = z.strictObject({
+  gate: z.string(),
+  consequence: z.string(),
+  state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
+  checks: z.array(checkStatus),
+  unmet: z.array(z.string()),
+  evaluations: z.array(evaluationSummary),
+  gating: z.array(z.string()),
+  everFailed: z.boolean(),
+});
+
+const conflictSide = z.strictObject({
+  proposition: z.string(),
+  asks: z.string(),
+  supportedBy: z.array(z.string()),
+  challengedBy: z.array(z.string()),
+});
+
+export const conflictVerdictSchema = z.strictObject({
+  conflict: z.boolean(),
+  relation: z.enum(["contradiction", "dissociation", "corroboration"]),
+  differsBy: z.literal("scope").nullable(),
+  sides: z.array(conflictSide),
+});
+
+export const reproducibilityReportSchema = z.strictObject({
+  exact: z.array(identifiedArtefact),
+  differing: z.array(identifiedArtefact),
+  unverifiable: z.array(identifiedArtefact),
+  notRebuilt: z.array(identifiedArtefact),
+  reproducible: z.boolean(),
+});
+
 /* -- the write tools' return shapes --------------------------------------- */
 
 /**
@@ -322,6 +398,13 @@ export type _EnquiryRef = Assert<Exact<z.infer<typeof enquiryRefSchema>, Enquiry
 export type _ObservationsRef = Assert<Exact<z.infer<typeof observationsRefSchema>, ObservationsRef>>;
 export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, AnalysisRef>>;
 export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;
+export type _QuestionOrigin = Assert<Exact<z.infer<typeof questionOriginSchema>, QuestionOrigin>>;
+export type _TaskContract = Assert<Exact<z.infer<typeof taskContractSchema>, TaskContract>>;
+export type _CriteriaGoverning = Assert<Exact<z.infer<typeof criteriaGoverningSchema>["criteria"], CriterionRef[]>>;
+export type _GateStatus = Assert<Exact<z.infer<typeof gateStatusSchema>, GateStatus>>;
+export type _ConflictSide = Assert<Exact<z.infer<typeof conflictSide>, ConflictSide>>;
+export type _ConflictVerdict = Assert<Exact<z.infer<typeof conflictVerdictSchema>, ConflictVerdict>>;
+export type _ReproducibilityReport = Assert<Exact<z.infer<typeof reproducibilityReportSchema>, ReproducibilityReport>>;
 export type _ReviewRef = Assert<Exact<z.infer<typeof reviewRefSchema>, ReviewRef>>;
 export type _WorkRef = Assert<Exact<z.infer<typeof workRefSchema>, WorkRef>>;
 export type _CriterionRef2 = Assert<Exact<z.infer<typeof criterionRefSchema>, CriterionRef>>;

@@ -138,7 +138,16 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   AnalysisRef` accepted by all three recording verbs. No graph change — the
   edge is already `Computation -CONSUMES-> Artefact` either way.
 
-- [ ] **Six `ReadSurface` methods are unreachable over MCP**, so the generated
+- [x] ~~**Six `ReadSurface` methods are unreachable over MCP**~~ — done. All six
+  exposed (`origin_of`, `contract_for`, `criteria_governing`, `gate_status`,
+  `do_these_conflict`, `reproducibility_of`), and
+  `tests/helpers/surface-coverage.ts` now derives the check: every public verb
+  on either surface is reached from `src/mcp/tools.ts` or listed in
+  `NOT_EXPOSED` with a reason. Demonstrated by deleting `gate_status` and
+  watching it fail. `NOT_EXPOSED` is empty today, which is the state and not a
+  claim it must stay so.
+
+  ~~Original entry:~~ **Six `ReadSurface` methods were unreachable over MCP**, so the generated
   documentation audits the adapter's subset and not the domain: `originOf`,
   `contractFor`, `criteriaGoverning`, `gateStatus`, `doTheseConflict`,
   `reproducibilityOf`. An agent can `plan_work`, `state_criterion` and

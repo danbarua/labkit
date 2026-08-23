@@ -29,6 +29,12 @@ import { z } from "zod";
 import type { ReadSurface, WriteSurface } from "../domain";
 import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
+  conflictVerdictSchema,
+  criteriaGoverningSchema,
+  gateStatusSchema,
+  originOfSchema,
+  reproducibilityReportSchema,
+  taskContractSchema,
   acknowledgementSchema,
   amendmentReportSchema,
   criterionRefSchema,
@@ -246,6 +252,114 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     handler: async (read, { question }) => ({
       enquiries: await read.pursuitsOf({ kind: "question", id: question }),
     }),
+  }),
+
+  tool({
+    name: "origin_of",
+    title: "Where a question came from",
+    description:
+      "Where a question came from, when it came from sharpening an earlier one — the " +
+      "question it narrowed, why, and **what was known at that moment**, frozen when the " +
+      "sharpening was recorded rather than recomputed now. `origin` is null for a question " +
+      "somebody simply asked, which is most of them; that is an answer, not a failure.",
+    inputSchema: { question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`) },
+    outputSchema: originOfSchema,
+    handler: async (read, { question }) => ({
+      origin: await read.originOf({ kind: "question", id: question }),
+    }),
+  }),
+
+  tool({
+    name: "contract_for",
+    title: "What a piece of planned work is for",
+    description:
+      "A planned piece of work's objective, what would count as meeting it, and what it may " +
+      "read. `enforced` is always false and says so: the record states what the work may " +
+      "look at, and nothing stops a computation reading elsewhere.",
+    inputSchema: { work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1`) },
+    outputSchema: taskContractSchema,
+    handler: (read, { work }) => read.contractFor({ kind: "work", id: work }),
+  }),
+
+  tool({
+    name: "criteria_governing",
+    title: "Which conditions a gate is bound to",
+    description:
+      "The prespecified conditions a gate is governed by. Pair it with `gate_status` to get " +
+      "their current standing; this answers only which conditions apply.",
+    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
+    outputSchema: criteriaGoverningSchema,
+    handler: async (read, { gate }) => ({
+      criteria: await read.criteriaGoverning({ kind: "gate", id: gate }),
+    }),
+  }),
+
+  tool({
+    name: "gate_status",
+    title: "Whether a gate is satisfied, and on what",
+    description:
+      "A gate's state, itemised per condition: which checks passed, which failed, which were " +
+      "never run, and which have no standing verdict. **Computed, never stored** — there is " +
+      "no value anyone can set to `satisfied`, and `everFailed` survives a later pass, so a " +
+      "gate that failed and was re-checked does not read as though it never failed.",
+    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
+    outputSchema: gateStatusSchema,
+    handler: (read, { gate }) => read.gateStatus({ kind: "gate", id: gate }),
+  }),
+
+  tool({
+    name: "do_these_conflict",
+    title: "Whether two conclusions actually disagree",
+    description:
+      "Whether two conclusions contradict each other, are about different things " +
+      "(`dissociation`), or agree. Two analyses reaching opposite-sounding results are not " +
+      "in conflict if they asked about different endpoints, and this is what tells them " +
+      "apart. Each side is named by its analysis and proposition, because a claim is " +
+      "identified by its proposition within a line of enquiry and never by wording alone.",
+    inputSchema: {
+      a_analysis: z.string().describe(`id of the first conclusion's analysis, e.g. ${ANALYSIS_PREFIX}1`),
+      a_proposition: z.string().describe("the first conclusion's proposition"),
+      b_analysis: z.string().describe(`id of the second conclusion's analysis, e.g. ${ANALYSIS_PREFIX}2`),
+      b_proposition: z.string().describe("the second conclusion's proposition"),
+    },
+    outputSchema: conflictVerdictSchema,
+    handler: (read, { a_analysis, a_proposition, b_analysis, b_proposition }) =>
+      read.doTheseConflict(
+        { analysis: { kind: "analysis", id: a_analysis }, proposition: a_proposition },
+        { analysis: { kind: "analysis", id: b_analysis }, proposition: b_proposition },
+      ),
+  }),
+
+  tool({
+    name: "reproducibility_of",
+    title: "Whether an analysis could be rebuilt from what it read",
+    description:
+      "Whether an analysis's inputs can be accounted for, given hashes of whatever you have " +
+      "rebuilt. Each input lands in one of four buckets: rebuilt and identical, rebuilt and " +
+      "different, **unverifiable** (the record kept no hash, so nothing can be said), or not " +
+      "rebuilt at all. `unverifiable` is deliberately not a failure — it is the record " +
+      "admitting it cannot answer, which is different from answering no.",
+    inputSchema: {
+      analysis: z.string().describe(`analysis id, e.g. ${ANALYSIS_PREFIX}3`),
+      rebuilt: z
+        .array(
+          z.object({
+            part: z.string().describe(`the input's id, ${ARTEFACT_PREFIX}\u2026`),
+            hash: z.string().describe("the hash of your rebuilt copy"),
+          }),
+        )
+        .optional()
+        .describe("what you rebuilt, and its hash — omit to ask what the record can account for"),
+    },
+    outputSchema: reproducibilityReportSchema,
+    handler: (read, { analysis, rebuilt }) =>
+      read.reproducibilityOf(
+        { kind: "analysis", id: analysis },
+        ((rebuilt ?? []) as Array<{ part: string; hash: string }>).map((r) => ({
+          part: { kind: "observations" as const, id: r.part },
+          hash: r.hash,
+        })),
+      ),
   }),
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;
 

@@ -6,12 +6,19 @@
  * This renders the same declarations as documentation: what each tool answers,
  * what it takes, and what comes back, field by field.
  *
- * **Generated at read time, never stored.** There is no checked-in copy to fall
- * behind `TOOLS`, and no generator anyone has to remember to re-run. A tool
- * added, a field renamed, a description reworded — all of it appears here on
- * the next read, because there is nowhere else for it to come from. That is
- * CLAUDE.md's document rule applied to a document: this one cannot be wrong
- * next week, because it does not exist until it is asked for.
+ * **Generated, in both places it appears.** The resource renders on each read,
+ * so it cannot fall behind `TOOLS`. The checked-in copy at `DOCS_FILE` can, and
+ * is held to the generator by an assertion in `tests/mcp.test.ts` rather than by
+ * a hook or a `check:*` script — the test already renders this document, so
+ * freshness is one more assertion in a run that was happening anyway.
+ *
+ * The copy is checked in for one reason: it is the only place this domain's API
+ * is reviewable as a single file, and its **diff** is the useful part — a
+ * changed line means the API changed. That is the opposite of the dependency
+ * graph, whose byte-stability existed to suppress noise and which was taken out
+ * of self-maintenance on 2026-08-21 for putting a generated artefact in every
+ * commit. The cost here is the same and is accepted rather than denied: a commit
+ * touching `tools.ts` will also touch `docs/mcp-tools.md`.
  *
  * The types are rendered from **JSON Schema**, not from the Zod objects, for
  * the same reason `server.ts` ships the whole report rather than a chosen
@@ -25,6 +32,14 @@ import { historicalSurveySchema, knowledgeSurveySchema } from "./schemas";
 
 /** The URI this document is served at. */
 export const DOCS_URI = "labkit://docs/tools";
+
+/**
+ * Where the same document is checked in.
+ *
+ * Named here so the generator, the freshness assertion and the resource all
+ * agree on one path rather than three string literals.
+ */
+export const DOCS_FILE = "docs/mcp-tools.md";
 
 type JsonSchema = {
   type?: string | string[];
@@ -135,8 +150,9 @@ export function renderToolDocs(
   const lines = [
     "# LabKit — the tools",
     "",
-    "Generated from the server's own tool declarations at the moment you asked",
-    "for it. There is no stored copy, so this cannot disagree with the tools.",
+    "Generated from the server's own tool declarations. Served live at",
+    "`labkit://docs/tools`, and checked in at `docs/mcp-tools.md` — the two are",
+    "held identical by a test, so neither can disagree with the tools.",
     "",
     "LabKit records **why** a piece of research was done and what rests on it:",
     "questions, the lines of enquiry pursuing them, what was measured, what was",

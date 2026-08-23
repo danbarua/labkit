@@ -90,6 +90,18 @@ list in `src/mcp/tools.ts`, the scripts in `package.json`. This paragraph used
 to carry those numbers and was wrong about them repeatedly.
 
 
+`docs/mcp-tools.md` is **the domain's API as one reviewable file** — every MCP
+tool, what it takes and what it returns — generated from the tool declarations
+by `bun run docs:tools`. The same document is served live at
+`labkit://docs/tools`.
+
+It is checked in because its **diff** is the useful part: a changed line means
+the API changed. Freshness is one assertion in `tests/mcp.test.ts` (the
+checked-in file equals what the generator produces), not a hook and not a
+`check:*` script — that test already renders the document, so the check rides a
+run that was happening anyway. The accepted cost is that a commit touching
+`src/mcp/tools.ts` also touches this file.
+
 `docs/dependency-graph.mmd` is the module dependency graph, as text.
 `bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
 
@@ -168,6 +180,7 @@ bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
 bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
+bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool declarations
 bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document

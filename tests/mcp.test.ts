@@ -24,9 +24,11 @@ import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
 import { TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schemas";
-import { DOCS_URI, renderToolDocs } from "../src/mcp/docs";
+import { DOCS_FILE, DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
+import { NOT_EXPOSED, publicVerbsOf, verbsReachedIn } from "./helpers/surface-coverage";
+import { readFileSync } from "node:fs";
 
 /**
  * The composition `src/domain/session.ts` specifies for an adapter needing both
@@ -55,6 +57,29 @@ describe("structure", () => {
    * `tests/cli.test.ts` keeps the same checks, because the CLI *is* read-only
    * by design — it builds a `ReadSurface` and never a `WriteSurface`.
    */
+  test("every public domain verb is exposed, or excluded with a reason", () => {
+    // The check that would have caught six reads shipping unreachable. Both
+    // lists are derived: the verbs from the surface declarations, the reached
+    // set from the adapter's source. Nothing here names a tool.
+    const toolSource = readFileSync("src/mcp/tools.ts", "utf8");
+    const reads = publicVerbsOf("src/domain/read.ts");
+    const writes = publicVerbsOf("src/domain/write.ts");
+
+    // Guard the derivation itself: a regex that stopped matching would make
+    // this test pass by having nothing to check.
+    expect(reads.length).toBeGreaterThan(10);
+    expect(writes.length).toBeGreaterThan(10);
+    expect(reads).toContain("gateStatus");
+    expect(writes).toContain("recordAnalysis");
+
+    const unreachable = [
+      ...reads.filter((v) => verbsReachedIn(toolSource, "read", [v]).length === 0),
+      ...writes.filter((v) => verbsReachedIn(toolSource, "write", [v]).length === 0),
+    ].filter((v) => !(v in NOT_EXPOSED));
+
+    expect(unreachable).toEqual([]);
+  });
+
   test("every declared tool is registered, and only the reads claim to be read-only", async () => {
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     const graph = await scenario.begin();
@@ -402,6 +427,17 @@ describe("the tool documentation resource", () => {
     } finally {
       await scenario.end();
     }
+  });
+
+  test("the checked-in copy matches what the generator produces", () => {
+    // The whole freshness mechanism: one assertion, in a file that already
+    // renders this document for other reasons. No hook, no check:* script.
+    // When it fails: `bun run docs:tools`.
+    //
+    // docs/mcp-tools.md is checked in because it is the only place this
+    // domain's API is reviewable as a single file, and its diff is the point --
+    // a changed line means the API changed.
+    expect(readFileSync(DOCS_FILE, "utf8")).toBe(renderToolDocs());
   });
 
   test("the document is generated, not stored", async () => {
