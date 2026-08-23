@@ -123,7 +123,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
     const status = await session.gateStatus(programme.advancement);
     expect(status.state).toBe("incomplete");
-    expect(status.unmet).toEqual([SOLVER_HEALTH]);
+    expect(status.unmet.map((u) => u.requires)).toEqual([SOLVER_HEALTH]);
   });
 
   /**
@@ -150,8 +150,8 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
-    expect(status.unmet).toEqual([SOLVER_HEALTH]);
-    expect(status.gating).toEqual(["the full classification run"]);
+    expect(status.unmet.map((u) => u.requires)).toEqual([SOLVER_HEALTH]);
+    expect(status.gating.map((g) => g.objective)).toEqual(["the full classification run"]);
 
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c.state]));
     expect(byName[THROUGHPUT]).toBe("passed");
@@ -189,7 +189,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const status = await later.gateStatus(programme.advancement);
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c]));
 
-    expect(byName[THROUGHPUT]!.evaluations[0]!.basis).toEqual([
+    expect(byName[THROUGHPUT]!.evaluations[0]!.basis.map((b) => b.states)).toEqual([
       "sustained 44 images per second across the slice",
     ]);
     expect(byName[SOLVER_HEALTH]!.evaluations[0]!.basis).toEqual([]);
@@ -268,7 +268,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     // ...and the gate knows nothing about claims either. What it protects is
     // work.
     const status = await later.gateStatus(programme.advancement);
-    expect(status.gating).toEqual(["the full classification run"]);
+    expect(status.gating.map((g) => g.objective)).toEqual(["the full classification run"]);
   });
 
   /** A citation must be one the cited analysis actually reached. */

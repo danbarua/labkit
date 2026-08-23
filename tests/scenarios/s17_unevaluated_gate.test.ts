@@ -83,9 +83,9 @@ describe("S-17: does the guard actually guard?", () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
     const status = await session.gateStatus(gate);
-    expect(status.gating).toEqual(["promote the accelerated implementation to reference"]);
+    expect(status.gating.map((g) => g.objective)).toEqual(["promote the accelerated implementation to reference"]);
 
-    expect((await (await afterwards()).gateStatus(gate)).gating).toEqual([
+    expect((await (await afterwards()).gateStatus(gate)).gating.map((g) => g.objective)).toEqual([
       "promote the accelerated implementation to reference",
     ]);
   });

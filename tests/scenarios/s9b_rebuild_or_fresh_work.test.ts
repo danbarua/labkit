@@ -257,7 +257,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       return (await afterwards()).whySupported(MATCHES);
     });
     expect(why.support.length).toBe(1);
-    expect(why.reverifiedBy).toEqual(["stage2-construction, rebuilt"]);
+    expect(why.reverifiedBy.map((r) => r.method)).toEqual(["stage2-construction, rebuilt"]);
   });
 
   /**

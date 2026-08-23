@@ -120,8 +120,12 @@ Why a proposition counts as supported (or does not): the findings resting under 
 - `promotedBecause?`: string
 - `support`: object[]
   - `finding`: string
-  - `via`: string
-- `reverifiedBy`: string[]
+  - `evidence`: string
+  - `method`: string
+  - `analysis`: string
+- `reverifiedBy`: object[]
+  - `analysis`: string
+  - `method`: string
 - `standard`: object[]
   - `criterion`: string
   - `proposition`: string
@@ -131,26 +135,36 @@ Why a proposition counts as supported (or does not): the findings resting under 
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
-    - `basis`: string[]
+    - `basis`: object[]
+      - `evidence`: string
+      - `states`: string
   - `decidedBy?`: object
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
-    - `basis`: string[]
-- `unmet`: string[]
+    - `basis`: object[]
+      - `evidence`: string
+      - `states`: string
+- `unmet`: object[]
+  - `criterion`: string
+  - `requires`: string
 - `restingOn`: object[]
   - `part`: string
   - `name`: string
 - `superseded`: object[]
   - `finding`: string
-  - `via`: string
+  - `evidence`: string
+  - `method`: string
+  - `analysis`: string
   - `reason`: string
   - `bearing`: "supports" | "challenges"
 - `challenged`: boolean
 - `against`: object[]
   - `finding`: string
-  - `via`: string
+  - `evidence`: string
+  - `method`: string
+  - `analysis`: string
 - `withdrawn`: boolean
 - `replacedBy?`: string
 
@@ -200,7 +214,9 @@ Whether a line of enquiry is still open, and if not how it closed — answered, 
 - `reopensIf?`: string
 - `acceptedBecause?`: string
 - `restsOn?`: "exploratory" | "confirmatory"
-- `evidence`: string[]
+- `evidence`: object[]
+  - `evidence`: string
+  - `states`: string
 
 ---
 
@@ -382,19 +398,27 @@ A gate's state, itemised per condition: which checks passed, which failed, which
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
-    - `basis`: string[]
+    - `basis`: object[]
+      - `evidence`: string
+      - `states`: string
   - `decidedBy?`: object
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
-    - `basis`: string[]
-- `unmet`: string[]
+    - `basis`: object[]
+      - `evidence`: string
+      - `states`: string
+- `unmet`: object[]
+  - `criterion`: string
+  - `requires`: string
 - `evaluations`: object[]
   - `value`: string
   - `outcome`: "pass" | "fail"
   - `at`: string
-- `gating`: string[]
+- `gating`: object[]
+  - `work`: string
+  - `objective`: string
 - `everFailed`: boolean
 
 ---

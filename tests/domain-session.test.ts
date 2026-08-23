@@ -486,7 +486,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
     citing: { analysis, proposition: "the solver converges" },
   });
   const before = await session.gateStatus(gate);
-  expect(before.checks[0]?.evaluations[0]?.basis).toEqual(["residual 1e-9"]);
+  expect(before.checks[0]?.evaluations[0]?.basis?.map((b) => b.states)).toEqual(["residual 1e-9"]);
   expect(before.state).toBe("blocked");
 
   const review = await session.recordReview({

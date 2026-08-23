@@ -206,15 +206,19 @@ export function renderWhy(why: SupportExplanation): string {
     why.replacedBy ? `  replaced by: "${why.replacedBy}"` : "",
     "",
     "Resting on",
-    bullets(why.support.map((s) => `${s.finding}  (via ${s.via})`), "nothing"),
+    bullets(why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis})`), "nothing"),
     why.against.length
-      ? `\nBearing against\n${bullets(why.against.map((a) => `${a.finding}  (via ${a.via})`), "")}`
+      ? `\nBearing against\n${bullets(why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis})`), "")}`
       : "",
-    why.reverifiedBy.length ? `\nRe-checked by\n${bullets(why.reverifiedBy, "")}` : "",
+    why.reverifiedBy.length
+      ? `\nRe-checked by\n${bullets(why.reverifiedBy.map((r) => `${r.method}  (${r.analysis})`), "")}`
+      : "",
     why.standard.length
       ? `\nHeld to\n${bullets(why.standard.map((c) => `${c.proposition} — ${c.state}`), "")}`
       : "\nHeld to no prespecified standard.",
-    why.unmet.length ? `\nNot currently met\n${bullets(why.unmet, "")}` : "",
+    why.unmet.length
+      ? `\nNot currently met\n${bullets(why.unmet.map((u) => `${u.requires}  (${u.criterion})`), "")}`
+      : "",
     why.restingOn.length
       ? `\nUltimately resting on\n${bullets(why.restingOn.map((a) => `${a.name}  [${a.part}]`), "")}`
       : "",
@@ -277,7 +281,9 @@ export function renderEnquiry(status: EnquiryStatus): string {
     status.reopensIf ? `  reopens if: ${status.reopensIf}` : "",
     status.answer ? `  answer: ${status.answer}` : "",
     status.restsOn ? `  resting on ${status.restsOn} work` : "",
-    status.evidence?.length ? `\nEvidence\n${bullets(status.evidence, "")}` : "",
+    status.evidence?.length
+      ? `\nEvidence\n${bullets(status.evidence.map((e) => `${e.states}  (${e.evidence})`), "")}`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");

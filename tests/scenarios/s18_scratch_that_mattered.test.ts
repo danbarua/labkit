@@ -139,8 +139,8 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     });
 
     const why = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
-    expect(why.support).toEqual([
-      { finding: "convergence point moves by ~3 steps", via: "notebook-sweep" },
+    expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
+      { finding: "convergence point moves by ~3 steps", method: "notebook-sweep" },
     ]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["lunchtime sweep"]);
     // And promoting must not read as retracting. `CHANGES: Decision -> Claim`
@@ -164,7 +164,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     expect(why.standing).toBe("exploratory");
     expect(why.promotedBecause).toBeUndefined();
     expect(why.challenged).toBe(false);
-    expect(why.unmet).toEqual([]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([]);
   });
 
   /**

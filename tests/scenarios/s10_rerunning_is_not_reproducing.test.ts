@@ -102,7 +102,7 @@ describe("S-10: rerunning is not reproducing", () => {
     // Two findings, presented alike, with nothing saying one re-checked the
     // other or that their executions differ.
     expect(why.support).toHaveLength(2);
-    expect(why.support.map((s) => s.via).sort()).toEqual(["annealing-v1", "annealing-v1, re-run"]);
+    expect(why.support.map((s) => s.method).sort()).toEqual(["annealing-v1", "annealing-v1, re-run"]);
   });
 
   /**
@@ -190,8 +190,8 @@ describe("S-10: rerunning is not reproducing", () => {
     // And the claim itself now reads as re-verified rather than as twice
     // independently established.
     const why = await (await afterwards()).whySupported({ analysis: historical, proposition: PROPOSITION });
-    expect(why.support.map((s) => s.via)).toEqual(["annealing-v1"]);
-    expect(why.reverifiedBy).toEqual(["annealing-v1, re-run"]);
+    expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);
+    expect(why.reverifiedBy.map((r) => r.method)).toEqual(["annealing-v1, re-run"]);
   });
 
   /**
@@ -428,8 +428,8 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const why = await (await afterwards()).whySupported({ analysis: historical, proposition: PROPOSITION });
-    expect(why.support.map((s) => s.via)).toEqual(["annealing-v1"]);
-    expect(why.reverifiedBy).toEqual(["annealing-v1, re-run"]);
+    expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);
+    expect(why.reverifiedBy.map((r) => r.method)).toEqual(["annealing-v1, re-run"]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["original conditions"]);
   });
 });

@@ -102,7 +102,9 @@ describe("S-3b: the same design with nothing downstream", () => {
     // Not for want of evidence, and not because anything was withdrawn. The
     // finding is still there, still says what it said, and still supports the
     // proposition — S-12's distinction, reached from the other direction.
-    expect(why.support).toEqual([{ finding: "p = 0.002, Holm-corrected", via: "holm-pairwise" }]);
+    expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
+      { finding: "p = 0.002, Holm-corrected", method: "holm-pairwise" },
+    ]);
     expect(why.withdrawn).toBe(false);
     expect(why.challenged).toBe(false);
     expect(why.restingOn.map((a) => a.name)).toEqual(["per-image results"]);
@@ -131,12 +133,12 @@ describe("S-3b: the same design with nothing downstream", () => {
     expect(byName[MEDIAN]).toBe("failed");
     expect(byName[SEED]).toBe("never-run");
     expect(new Set(Object.values(byName)).size).toBe(3);
-    expect([...why.unmet].sort()).toEqual([MEDIAN, SEED].sort());
+    expect([...why.unmet.map((u) => u.requires)].sort()).toEqual([MEDIAN, SEED].sort());
     // The passing check kept its provenance: it was reached against the
     // finding itself, not asserted. Row W's distinction, on the qualification
     // side of the fence this time.
     const decided = why.standard.find((c) => c.proposition === PRIMARY)?.decidedBy;
-    expect(decided?.basis).toEqual(["p = 0.002, Holm-corrected"]);
+    expect(decided?.basis?.map((b) => b.states)).toEqual(["p = 0.002, Holm-corrected"]);
   });
 
   /**
@@ -179,7 +181,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     const why = await session.whySupported(PROPOSITION);
     expect(await (await afterwards()).whySupported(PROPOSITION)).toEqual(why);
     expect(why.supported).toBe(true);
-    expect(why.unmet).toEqual([]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([]);
     expect(why.standard.map((c) => c.state)).toEqual(["passed", "passed", "passed"]);
   });
 
@@ -207,7 +209,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     expect(await (await afterwards()).whySupported(PROPOSITION)).toEqual(why);
     expect(why.supported).toBe(true);
     expect(why.standard).toEqual([]);
-    expect(why.unmet).toEqual([]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([]);
   });
 
   /**
@@ -253,7 +255,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     // The replacement was held to nothing, so it is held to nothing -- not to
     // the checks that failed against the analysis it replaced.
     expect(why.standard).toEqual([]);
-    expect(why.unmet).toEqual([]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([]);
     expect(why.supported).toBe(true);
   });
 
@@ -287,7 +289,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     const reader = await afterwards();
     const here = await reader.whySupported({ analysis, proposition: PROPOSITION });
     expect(here.supported).toBe(false);
-    expect(here.unmet.sort()).toEqual([MEDIAN, SEED].sort());
+    expect(here.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
 
     // The same sentence, a different run, held to nothing. The agreed checks
     // do not travel with the wording.

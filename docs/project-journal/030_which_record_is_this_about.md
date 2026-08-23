@@ -124,7 +124,12 @@ Identity and wording, side by side, neither standing in for the other. Also
 correct: `gateStatus.checks[].criterion` and `designHistory.criterion`, which
 carry a ref beside the criterion's text.
 
-**The fields that carry wording where an identity exists:**
+**The fields that carried wording where an identity exists — all closed
+2026-08-23**, and re-audited by the same method afterwards: every
+entity-naming field in `EnquiryStatus`, `DependencyReport`,
+`SupportExplanation` and `GateStatus` now carries an id beside its wording.
+What remains as bare text is text: enum values, instants, and the wording half
+of each pair.
 
 | report | field | carries | the id it drops |
 | --- | --- | --- | --- |
@@ -156,7 +161,24 @@ resolve wording; another emits it as the answer.
 
 ## 5. The plan
 
-**Steps 1–2 done for `DependencyReport` and `EnquiryStatus`** (2026-08-23). In order, each step shippable on its own:
+**Steps 1–3 done** (2026-08-23). Every row of §4 is closed; the demonstration
+in `tests/subject-identity.test.ts` §4 now asserts the *fixed* shape and names
+each row it used to catch. **Step 4 is the open one**: re-ask the multi-pursuit
+question.
+
+**What the fixes cost, recorded because it is the reusable part.** Four field
+renames (`via` → `analysis`/`method`, `unmet` → `{criterion, requires}`,
+`gating` → `{work, objective}`, `basis` → `{evidence, states}`) made `tsc` name
+every one of ~40 call sites. One field *kept* its name and changed meaning —
+`EnquiryStatus.question`, wording to identity — and `tsc` named **none**,
+because both are `string`. **Rename when the meaning changes.** It is the
+difference between a compiler-assisted edit and a grep you have to be right
+about.
+
+Two dedup defects fell out on the way, neither previously noticed: both
+`whatDependsOn` and `CheckStatus.basis` deduplicated on **wording**, so two
+records saying the same sentence merged into one. S-5 says those are two
+records. In order, each step shippable on its own:
 
 1. **A demonstration first.** Extend `tests/subject-identity.test.ts` with the
    audit as an assertion: for each row of §4's table, the field is prose and the

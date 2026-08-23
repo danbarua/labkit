@@ -114,9 +114,9 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
     const { a: passed, b: failed } = await inTwoWorlds(build("pass"), build("fail"));
 
     expect(passed.supported).toBe(true);
-    expect(passed.unmet).toEqual([]);
+    expect(passed.unmet.map((u) => u.requires)).toEqual([]);
     expect(failed.supported).toBe(false);
-    expect(failed.unmet).toEqual(["stable across five seeds"]);
+    expect(failed.unmet.map((u) => u.requires)).toEqual(["stable across five seeds"]);
   });
 });
 
@@ -342,7 +342,7 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
 
     // The difference exists only inside a finding's sentence.
     expect(byAlice.evidence).not.toEqual(byBob.evidence);
-    expect(byAlice.evidence.join(" ")).toContain("Alice");
+    expect(byAlice.evidence.map((e) => e.states).join(" ")).toContain("Alice");
 
     // And it is not reachable as attribution: no field on the status carries a
     // person, so a caller can only recover the name by parsing evidence prose

@@ -8,7 +8,7 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Ready to build
 
-- [ ] **Carry identifiers through the read models.** The plan is
+- [x] ~~**Carry identifiers through the read models.**~~ — done, all ten rows. The plan is
   `docs/project-journal/030_which_record_is_this_about.md` §5; the audit of
   which reports drop which ids is §4; the demonstration is in
   `tests/subject-identity.test.ts` §4 and is **red-to-green in reverse** — it

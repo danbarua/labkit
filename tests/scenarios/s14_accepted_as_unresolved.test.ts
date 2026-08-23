@@ -166,7 +166,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(status.acceptedBecause).toBe(
       "the confirmatory dataset is spent and there is no larger held-out sample",
     );
-    expect(status.evidence).toEqual(["difference 0.4%, CI spans zero"]);
+    expect(status.evidence.map((e) => e.states)).toEqual(["difference 0.4%, CI spans zero"]);
   });
 
   /**

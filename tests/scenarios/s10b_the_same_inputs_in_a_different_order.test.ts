@@ -133,7 +133,7 @@ describe("S-10b: the same inputs, in a different order", () => {
     });
 
     const verification = await (await afterwards()).whySupported(SHIFTED);
-    expect(verification.reverifiedBy).toEqual(["pairwise-alignment"]);
+    expect(verification.reverifiedBy.map((r) => r.method)).toEqual(["pairwise-alignment"]);
     expect(verification.support).toHaveLength(1);
 
     // The re-run read the same artefacts in the opposite order and the record

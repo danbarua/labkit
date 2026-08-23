@@ -123,7 +123,7 @@ export interface EnquiryStatus {
    */
   restsOn?: "exploratory" | "confirmatory";
   /** The findings the closing decision rests on. Empty means nothing was cited. */
-  evidence: string[];
+  evidence: CitedFinding[];
 }
 
 /**
@@ -206,11 +206,11 @@ export interface GateStatus {
    */
   checks: CheckStatus[];
   /** Conditions not currently passing — what would have to change. Named before anyone spends the compute. */
-  unmet: string[];
+  unmet: UnmetCheck[];
   /** Evaluations of this gate's criteria. Empty is an answer, not an absence. */
   evaluations: Array<{ value: string; outcome: "pass" | "fail"; at: string }>;
   /** What is currently relying on this gate — the blast radius of a fake guard. */
-  gating: string[];
+  gating: GatedWork[];
   /**
    * Whether any evaluation of this criterion has ever come back `fail`.
    *
@@ -269,7 +269,7 @@ export interface EvaluationRecord {
    * work is promoted "by explicit evidence rather than agent enthusiasm", and
    * the two must not read alike. See PJ-008 row W.
    */
-  basis: string[];
+  basis: CitedFinding[];
 }
 
 /**
@@ -431,6 +431,50 @@ export interface AffectedClaim {
   asserts: string;
 }
 
+/**
+ * A finding, identified as well as quoted.
+ *
+ * `evidence` is the handle, `states` what it says. Used wherever a report names
+ * findings a conclusion or a decision rests on — PJ-030 §4.
+ */
+export interface CitedFinding {
+  evidence: string;
+  states: string;
+}
+
+/**
+ * A finding bearing on a claim, with the analysis that produced it.
+ *
+ * `finding` is what it says, `evidence` identifies it; `method` is what the
+ * analysis did, `analysis` identifies that. Both halves of both, because two
+ * runs of one method are two analyses and the old shape — a bare method name
+ * under `via` — could not tell them apart (PJ-030 §4).
+ */
+export interface BearingFinding {
+  finding: string;
+  evidence: string;
+  method: string;
+  analysis: string;
+}
+
+/** Work a gate protects: the task's handle, and its objective. */
+export interface GatedWork {
+  work: string;
+  objective: string;
+}
+
+/** An unmet check: the criterion's handle, and what it requires. */
+export interface UnmetCheck {
+  criterion: string;
+  requires: string;
+}
+
+/** An analysis that re-verified a finding. */
+export interface Reverification {
+  analysis: string;
+  method: string;
+}
+
 /** A line of enquiry reached by `whatDependsOn`. `enquiry` is the handle, `pursuing` its approach. */
 export interface AffectedEnquiry {
   enquiry: string;
@@ -505,7 +549,7 @@ export interface SupportExplanation {
   /** Why it was promoted. Present only when `standing` is `confirmatory`. */
   promotedBecause?: string;
   /** Findings currently supporting the proposition, each with the analysis that produced it. */
-  support: Array<{ finding: string; via: string }>;
+  support: BearingFinding[];
   /**
    * Analyses that re-checked a supporting finding without reproducing its
    * execution, by method (S-10).
@@ -514,7 +558,7 @@ export interface SupportExplanation {
    * independent finding, and listing it as one made a claim established once
    * report itself as corroborated twice — see `EDGE_SCHEMA.REVERIFIES`.
    */
-  reverifiedBy: string[];
+  reverifiedBy: Reverification[];
   /**
    * The prespecified conditions the supporting analyses were held to,
    * itemised the same way a gate's are — `recordAnalysis({ heldTo })`.
@@ -530,7 +574,7 @@ export interface SupportExplanation {
    * change for the finding to stand. A check nobody ran counts, exactly as it
    * does for a gate.
    */
-  unmet: string[];
+  unmet: UnmetCheck[];
   /**
    * Observations the supporting findings ultimately rest on — **identified**,
    * not named.
@@ -548,7 +592,7 @@ export interface SupportExplanation {
    */
   restingOn: IdentifiedArtefact[];
   /** Findings withdrawn because their analysis was replaced — bullet 5. Either bearing. */
-  superseded: Array<{ finding: string; via: string; reason: string; bearing: "supports" | "challenges" }>;
+  superseded: Array<BearingFinding & { reason: string; bearing: "supports" | "challenges" }>;
   /**
    * Whether any finding bears *against* this proposition.
    *
@@ -558,7 +602,7 @@ export interface SupportExplanation {
    * identically confuses absence of evidence with failure — see S-4.
    */
   challenged: boolean;
-  against: Array<{ finding: string; via: string }>;
+  against: BearingFinding[];
   /**
    * Whether the record has stopped claiming this at all.
    *

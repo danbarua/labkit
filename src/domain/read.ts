@@ -48,6 +48,8 @@ import type {
   Revision,
   AffectedClaim,
   AffectedEnquiry,
+  CitedFinding,
+  Reverification,
   DependencyReport,
   IdentifiedArtefact,
   SupportExplanation,
@@ -56,6 +58,18 @@ import { SessionCore } from "./core";
 
 /** Every node carries a natural id; this is how a projection asks for it. */
 type Identified = { natural_id: string };
+
+/**
+ * Deduplicate by identity, never by wording.
+ *
+ * The reason this helper exists rather than a `Set` of strings: two records can
+ * say the same sentence and be different records (S-5), so collapsing on text
+ * reports one where there are two. `whatDependsOn` was doing exactly that until
+ * PJ-030 §5.
+ */
+function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
+  return [...new Map(items.map((item) => [id(item), item])).values()];
+}
 
 export class ReadSurface extends SessionCore {
   /** Every line of enquiry pursuing this question. */
@@ -329,7 +343,7 @@ export class ReadSurface extends SessionCore {
     if (accepting && !resolving) {
       const inLightOf = await this.graph.query(
         `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence) RETURN e`,
-        { e: vertexProps<{ statement: string }>() },
+        { e: vertexProps<{ statement: string } & Identified>() },
         { id: accepting.natural_id },
       );
       return {
@@ -339,7 +353,10 @@ export class ReadSurface extends SessionCore {
         open: true,
         closure: "accepted-as-unresolved",
         answer: null,
-        evidence: [...new Set(inLightOf.map((r) => r.e.statement))],
+        evidence: dedupeById(
+          inLightOf.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
+          (f) => f.evidence,
+        ),
         acceptedBecause: accepting.reason,
         reopensIf: accepting.invalidation_check,
       };
@@ -359,7 +376,7 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (e)-[:CHALLENGES]->(against:Claim)
        RETURN e, against`,
       {
-        e: vertexProps<{ statement: string }>(),
+        e: vertexProps<{ statement: string } & Identified>(),
         against: optional(vertexProps<{ name: string }>()),
       },
       { id: resolving!.natural_id },
@@ -399,7 +416,10 @@ export class ReadSurface extends SessionCore {
       open: false,
       closure: "answered",
       answer: challenges ? "no" : "yes",
-      evidence: [...new Set(cited.map((r) => r.e.statement))],
+      evidence: dedupeById(
+        cited.map((r) => ({ evidence: r.e.natural_id, states: r.e.statement })),
+        (f) => f.evidence,
+      ),
       restsOn: promoted.some((r) => r.c.kind === "confirmatory") ? "confirmatory" : "exploratory",
     };
   }
@@ -426,7 +446,7 @@ export class ReadSurface extends SessionCore {
        RETURN e, comp, a, r`,
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
-        comp: vertexProps<ComputationProps>(),
+        comp: vertexProps<ComputationProps & Identified>(),
         a: optional(vertexProps<ArtefactProps & { natural_id: string }>()),
         r: optional(vertexProps<{ verdict: string }>()),
       },
@@ -808,7 +828,7 @@ export class ReadSurface extends SessionCore {
             evaluated_at: string;
           }>(),
         ),
-        basis: optional(vertexProps<{ statement: string }>()),
+        basis: optional(vertexProps<{ statement: string } & Identified>()),
         basisout: optional(vertexProps<{ invalidated?: boolean }>()),
       },
       { id: gate.id },
@@ -819,7 +839,7 @@ export class ReadSurface extends SessionCore {
     const evaluations = checks.flatMap((c) => c.evaluations);
     const unmet = checks
       .filter((c) => c.state !== "passed")
-      .map((c) => c.proposition);
+      .map((c) => ({ criterion: c.criterion, requires: c.proposition }));
 
     // Order matters. Absence is checked before satisfaction so a gate nobody
     // evaluated can never fall through to "satisfied" (S-17); failure is
@@ -846,7 +866,7 @@ export class ReadSurface extends SessionCore {
 
     const gating = await this.graph.query(
       `MATCH (:Gate {natural_id: $id})-[:GATES]->(w) RETURN w`,
-      { w: vertexProps<{ objective?: string; kind?: string }>() },
+      { w: vertexProps<{ objective?: string; kind?: string } & Identified>() },
       { id: gate.id },
     );
 
@@ -857,7 +877,10 @@ export class ReadSurface extends SessionCore {
       checks,
       unmet,
       evaluations,
-      gating: gating.map((g) => g.w.objective ?? g.w.kind ?? "unknown"),
+      gating: gating.map((g) => ({
+        work: g.w.natural_id,
+        objective: g.w.objective ?? g.w.kind ?? "unknown",
+      })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
   }
@@ -880,7 +903,7 @@ export class ReadSurface extends SessionCore {
         outcome: "pass" | "fail";
         evaluated_at: string;
       } | null;
-      basis: { statement: string } | null;
+      basis: ({ statement: string } & Identified) | null;
       /**
        * The artefact the cited finding was recorded in, carrying whether that
        * analysis has since been replaced.
@@ -922,13 +945,14 @@ export class ReadSurface extends SessionCore {
           value: row.ev.value,
           outcome: row.ev.outcome,
           at: row.ev.evaluated_at,
-          basis: [] as string[],
+          basis: [] as CitedFinding[],
           cited: 0,
           standing: 0,
         };
         if (row.basis) {
-          if (!record.basis.includes(row.basis.statement))
-            record.basis.push(row.basis.statement);
+          // By id, not by statement: two findings can say the same sentence.
+          if (!record.basis.some((b) => b.evidence === row.basis!.natural_id))
+            record.basis.push({ evidence: row.basis.natural_id, states: row.basis.statement });
           record.cited += 1;
           if (!row.basisout?.invalidated) record.standing += 1;
         }
@@ -950,7 +974,7 @@ export class ReadSurface extends SessionCore {
       value: e.value,
       outcome: e.outcome,
       at: e.at,
-      basis: [...e.basis].sort(),
+      basis: [...e.basis].sort((x, y) => x.evidence.localeCompare(y.evidence)),
       // Present only when true, so a record that stands is byte-identical to
       // what it was before this field existed.
       ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
@@ -1186,7 +1210,7 @@ export class ReadSurface extends SessionCore {
     );
 
     const support: SupportExplanation["support"] = [];
-    const reverifiedBy: string[] = [];
+    const reverifiedBy: Reverification[] = [];
     const against: SupportExplanation["against"] = [];
     const superseded: SupportExplanation["superseded"] = [];
     for (const { rows, bearing, live } of [
@@ -1194,14 +1218,19 @@ export class ReadSurface extends SessionCore {
       { rows: againstRows, bearing: "challenges" as const, live: against },
     ]) {
       for (const row of rows) {
-        const entry = { finding: row.e.statement, via: row.comp.kind };
+        const entry = {
+          finding: row.e.statement,
+          evidence: row.e.natural_id,
+          method: row.comp.kind,
+          analysis: row.comp.natural_id,
+        };
         if (row.a?.invalidated) {
           // Deduped, and the reason comes from INVALIDATED_BY rather than from
           // whichever review the OPTIONAL MATCH happened to return. Two defects
           // in one line before row O: a finding superseded once was reported
           // once per review of its unit, each with a different reason, and the
           // reasons contradicted each other.
-          if (!superseded.some((x) => x.finding === entry.finding && x.bearing === bearing))
+          if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
             superseded.push({
               ...entry,
               bearing,
@@ -1214,8 +1243,8 @@ export class ReadSurface extends SessionCore {
           // A re-verification is not a second independent finding. Counting it
           // as one reported a proposition established once as corroborated
           // twice -- S-10, and the reason `REVERIFIES` exists.
-          if (!reverifiedBy.includes(row.comp.kind))
-            reverifiedBy.push(row.comp.kind);
+          if (!reverifiedBy.some((r) => r.analysis === row.comp.natural_id))
+            reverifiedBy.push({ analysis: row.comp.natural_id, method: row.comp.kind });
         } else {
           live.push(entry);
         }
@@ -1283,7 +1312,7 @@ export class ReadSurface extends SessionCore {
             evaluated_at: string;
           }>(),
         ),
-        basis: optional(vertexProps<{ statement: string }>()),
+        basis: optional(vertexProps<{ statement: string } & Identified>()),
         basisout: optional(vertexProps<{ invalidated?: boolean }>()),
       },
       {
@@ -1297,7 +1326,7 @@ export class ReadSurface extends SessionCore {
     // and the two must agree, since in S-3 they are the same checks.
     const unmet = standard
       .filter((c) => c.state !== "passed")
-      .map((c) => c.proposition);
+      .map((c) => ({ criterion: c.criterion, requires: c.proposition }));
 
     // A withdrawn interpretation is not supported, however much evidence once
     // carried it. `support` stays populated deliberately: the findings are

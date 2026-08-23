@@ -86,13 +86,24 @@ const identifiedArtefact = z.strictObject({
   name: z.string(),
 });
 
+const citedFinding = z.strictObject({ evidence: z.string(), states: z.string() });
+
 const evaluationRecord = z.strictObject({
   value: z.string(),
   outcome: z.enum(["pass", "fail"]),
   at: z.string(),
   withdrawn: z.literal(true).optional(),
-  basis: z.array(z.string()),
+  basis: z.array(citedFinding),
 });
+
+const bearingFinding = z.strictObject({
+  finding: z.string(),
+  evidence: z.string(),
+  method: z.string(),
+  analysis: z.string(),
+});
+
+const unmetCheck = z.strictObject({ criterion: z.string(), requires: z.string() });
 
 const checkStatus = z.strictObject({
   criterion: z.string(),
@@ -143,21 +154,19 @@ export const supportExplanationSchema = z.strictObject({
   supported: z.boolean(),
   standing: z.enum(["exploratory", "confirmatory"]),
   promotedBecause: z.string().optional(),
-  support: z.array(z.strictObject({ finding: z.string(), via: z.string() })),
-  reverifiedBy: z.array(z.string()),
+  support: z.array(bearingFinding),
+  reverifiedBy: z.array(z.strictObject({ analysis: z.string(), method: z.string() })),
   standard: z.array(checkStatus),
-  unmet: z.array(z.string()),
+  unmet: z.array(unmetCheck),
   restingOn: z.array(identifiedArtefact),
   superseded: z.array(
-    z.strictObject({
-      finding: z.string(),
-      via: z.string(),
+    bearingFinding.extend({
       reason: z.string(),
       bearing: z.enum(["supports", "challenges"]),
     }),
   ),
   challenged: z.boolean(),
-  against: z.array(z.strictObject({ finding: z.string(), via: z.string() })),
+  against: z.array(bearingFinding),
   withdrawn: z.boolean(),
   replacedBy: z.string().optional(),
 });
@@ -181,7 +190,7 @@ export const enquiryStatusSchema = z.strictObject({
   reopensIf: z.string().optional(),
   acceptedBecause: z.string().optional(),
   restsOn: z.enum(["exploratory", "confirmatory"]).optional(),
-  evidence: z.array(z.string()),
+  evidence: z.array(citedFinding),
 });
 
 export const designHistorySchema = z.strictObject({
@@ -256,9 +265,9 @@ export const gateStatusSchema = z.strictObject({
   consequence: z.string(),
   state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
   checks: z.array(checkStatus),
-  unmet: z.array(z.string()),
+  unmet: z.array(unmetCheck),
   evaluations: z.array(evaluationSummary),
-  gating: z.array(z.string()),
+  gating: z.array(z.strictObject({ work: z.string(), objective: z.string() })),
   everFailed: z.boolean(),
 });
 

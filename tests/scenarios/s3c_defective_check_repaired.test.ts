@@ -132,7 +132,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION })).toEqual(why);
 
     expect(why.supported).toBe(false);
-    expect(why.unmet).toEqual([ROBUSTNESS]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("failed");
     expect(check?.decidedBy?.value).toBe("median p = 0.21");
@@ -194,7 +194,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION })).toEqual(why);
 
     expect(why.supported).toBe(true);
-    expect(why.unmet).toEqual([]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([]);
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("passed");
     expect(check?.decidedBy?.value).toBe("median p = 0.04");
@@ -255,7 +255,7 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     const status = await (await afterwards()).gateStatus(gate);
     expect(status.state).toBe("satisfied");
-    expect(status.unmet).toEqual([]);
+    expect(status.unmet.map((u) => u.requires)).toEqual([]);
     // The guard has still been seen to fail. Correcting a defective check does
     // not turn it into a check nobody has shown can fail -- S-17's question is
     // about the criterion, and its answer is unchanged.
@@ -335,7 +335,7 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     const why = await (await afterwards()).whySupported({ analysis, proposition: PROPOSITION });
     expect(why.supported).toBe(false);
-    expect(why.unmet).toEqual([ROBUSTNESS]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
   });
 
   /**
@@ -382,7 +382,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(check?.evaluations[0]?.withdrawn).toBe(true);
     // And the finding does not stand: nothing has met the agreed standard.
     expect(why.supported).toBe(false);
-    expect(why.unmet).toEqual([ROBUSTNESS]);
+    expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
   });
 
   /**

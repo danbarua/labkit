@@ -101,7 +101,7 @@ test("an enquiry accepted as unresolved does not render as merely open", () => {
 test("an answered enquiry says whether its closure rests on promoted work", () => {
   const base: EnquiryStatus = {
     enquiry: "LOE_2", question: "Q_2", asks: "does depth move convergence?",
-    open: false, closure: "answered", answer: "yes", evidence: ["a result"],
+    open: false, closure: "answered", answer: "yes", evidence: [{ evidence: "EV_1", states: "a result" }],
   };
   expect(renderEnquiry({ ...base, restsOn: "exploratory" })).toContain("exploratory");
   expect(renderEnquiry({ ...base, restsOn: "confirmatory" })).toContain("confirmatory");
@@ -111,7 +111,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
   const base: SupportExplanation = {
     proposition: "the schedule moves convergence",
     supported: false, standing: "exploratory",
-    support: [{ finding: "moves by ~3 steps", via: "COMP_1" }],
+    support: [{ finding: "moves by ~3 steps", evidence: "EV_1", method: "paired comparison", analysis: "COMP_1" }],
     reverifiedBy: [], standard: [], unmet: [], restingOn: [], superseded: [],
     challenged: false, against: [], withdrawn: false,
   };
@@ -124,7 +124,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
 
   // Evidence bears against it.
   const challenged = renderWhy({
-    ...base, challenged: true, against: [{ finding: "no effect at n=5", via: "COMP_2" }],
+    ...base, challenged: true, against: [{ finding: "no effect at n=5", evidence: "EV_2", method: "replication", analysis: "COMP_2" }],
   });
   expect(challenged).toContain("challenged by evidence");
   expect(challenged).toContain("no effect at n=5");

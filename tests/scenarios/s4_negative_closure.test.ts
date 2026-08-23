@@ -165,7 +165,7 @@ describe("S-4: a negative result that closes the question", () => {
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.evidence).toHaveLength(1);
-    expect(status.evidence[0]).toContain("no separation detectable");
+    expect(status.evidence[0]!.states).toContain("no separation detectable");
   });
 
   /**
@@ -288,7 +288,7 @@ describe("S-4: a negative result that closes the question", () => {
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
     expect(status.answer).toBe("yes");
-    expect(status.evidence).toEqual(["clear separation between constructions"]);
+    expect(status.evidence.map((e) => e.states)).toEqual(["clear separation between constructions"]);
   });
 
   /**

@@ -310,10 +310,10 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       expect(status.question).toBe(question.id);
       expect(looksLikeAnId(status.asks!)).toBe(false);
 
-      // Still outstanding: the evidence a closure rests on is statements, not
-      // references. PJ-030 §4, EnquiryStatus.evidence[].
+      // Evidence too, as of PJ-030 §5: identity beside the statement.
       expect(status.evidence.length).toBeGreaterThan(0);
-      expect(status.evidence.every(looksLikeAnId)).toBe(false);
+      expect(status.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
+      expect(status.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
     } finally {
       await scenario.end();
     }
@@ -336,16 +336,19 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("whySupported cites the computation by method name, not by id", async () => {
+  test("whySupported identifies the analysis it cites — FIXED, PJ-030 §5 step 2", async () => {
     try {
       const { read } = await programme();
       const why = await read.whySupported(MOVES);
 
       expect(why.support.length).toBeGreaterThan(0);
-      // `via` is the computation's method text. Two runs of one method are
-      // indistinguishable here, which is the same wording-as-identity failure
-      // whySupported itself REFUSES to make when resolving its argument.
-      expect(why.support.every((s) => looksLikeAnId(s.via))).toBe(false);
+      // Was a bare `via` holding the computation's METHOD text, so two runs of
+      // one method were indistinguishable -- the same wording-as-identity
+      // failure whySupported REFUSES to make when resolving its own argument.
+      expect(why.support.every((s) => looksLikeAnId(s.analysis))).toBe(true);
+      expect(why.support.every((s) => looksLikeAnId(s.evidence))).toBe(true);
+      expect(why.support.every((s) => looksLikeAnId(s.method))).toBe(false);
+      expect(why.unmet.every((u) => looksLikeAnId(u.criterion))).toBe(true);
       // The template, in the same report: restingOn carries both.
       expect(why.restingOn.every((p) => looksLikeAnId(p.part))).toBe(true);
       expect(why.restingOn.every((p) => looksLikeAnId(p.name))).toBe(false);
@@ -354,14 +357,16 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("gateStatus names the work it gates by objective, not by id", async () => {
+  test("gateStatus identifies the work it gates — FIXED, PJ-030 §5 step 2", async () => {
     try {
       const { read, gate } = await programme();
       const status = await read.gateStatus(gate);
 
       expect(looksLikeAnId(status.gate)).toBe(true);
       expect(status.gating.length).toBeGreaterThan(0);
-      expect(status.gating.every(looksLikeAnId)).toBe(false);
+      expect(status.gating.every((g) => looksLikeAnId(g.work))).toBe(true);
+      expect(status.gating.every((g) => looksLikeAnId(g.objective))).toBe(false);
+      expect(status.unmet.every((u) => looksLikeAnId(u.criterion))).toBe(true);
       // The template again, one field over.
       expect(status.checks.every((c) => looksLikeAnId(c.criterion))).toBe(true);
     } finally {

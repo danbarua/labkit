@@ -92,8 +92,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
-    expect(status.unmet.sort()).toEqual([MEDIAN, SEED].sort());
-    expect(status.gating).toEqual(["fit the tertiary model"]);
+    expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
+    expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
   });
 
   /**
@@ -128,7 +128,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
-    expect(status.unmet.sort()).toEqual([MEDIAN, SEED].sort());
+    expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
   });
 
   /**
@@ -147,8 +147,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("blocked");
-    expect(status.unmet).toContain(MEDIAN);
-    expect(status.gating).toEqual(["fit the tertiary model"]);
+    expect(status.unmet.map((u) => u.requires)).toContain(MEDIAN);
+    expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
   });
 
   /**
@@ -198,9 +198,11 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const why = await session.whySupported("T differs from rewired");
     expect(await (await afterwards()).whySupported("T differs from rewired")).toEqual(why);
     expect(why.supported).toBe(false);
-    expect([...why.unmet].sort()).toEqual([MEDIAN, SEED].sort());
+    expect([...why.unmet.map((u) => u.requires)].sort()).toEqual([MEDIAN, SEED].sort());
     // Disqualified, not withdrawn: the numbers are exactly as they were.
-    expect(why.support).toEqual([{ finding: "p = 0.002, Holm-corrected", via: "holm-pairwise" }]);
+    expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
+      { finding: "p = 0.002, Holm-corrected", method: "holm-pairwise" },
+    ]);
     expect(analysis.kind).toBe("analysis");
   });
 
@@ -261,7 +263,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("blocked");
-    expect(status.unmet).toEqual([MEDIAN]);
+    expect(status.unmet.map((u) => u.requires)).toEqual([MEDIAN]);
     expect(status.everFailed).toBe(true);
   });
 });
