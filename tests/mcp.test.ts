@@ -144,18 +144,26 @@ describe("an agent can track work through the tools alone", () => {
       const why = await call(c, "why_supported", { proposition: PROP });
       expect(why.supported).toBe(true);
 
-      // **`provisional`, not `established`** — and that is the record working,
-      // not the loop falling short. The question is settled as far as anyone
-      // has taken it, but what settles it is a finding nobody promoted, so it
-      // is kept out of `established` on purpose. Reading the survey for "what
-      // do we actually know" must not silently include a lunchtime sweep.
-      //
-      // `promote` is the verb that moves it, and it is not exposed yet. This
-      // assertion is what says so, and it will need changing when it is.
-      const known = await call(c, "known", {});
+      // **`provisional` before promotion, `established` after** — the whole of
+      // capture-cheaply-then-promote, asserted on both sides of the one act
+      // that moves it. A question answered on a finding nobody vouched for is
+      // settled as far as anyone has taken it and no further, so reading the
+      // survey for "what do we actually know" cannot silently include a
+      // lunchtime sweep.
       const asks = (bucket: unknown) => (bucket as Array<{ asks: string }>).map((q) => q.asks);
-      expect(asks(known.provisional)).toContain("does the pruning schedule move convergence?");
-      expect(asks(known.established)).toEqual([]);
+      const before = await call(c, "known", {});
+      expect(asks(before.provisional)).toContain("does the pruning schedule move convergence?");
+      expect(asks(before.established)).toEqual([]);
+
+      await call(c, "promote", {
+        analysis: analysis.id,
+        proposition: PROP,
+        because: "checked against the held-out split",
+      });
+
+      const after = await call(c, "known", {});
+      expect(asks(after.established)).toContain("does the pruning schedule move convergence?");
+      expect(asks(after.provisional)).toEqual([]);
       await c.close();
     } finally {
       await scenario.end();
@@ -177,6 +185,90 @@ describe("an agent can track work through the tools alone", () => {
       });
       const after = await call(c, "pursuits_of", { question: question.id });
       expect(after.enquiries).toEqual([{ kind: "enquiry", id: enquiry.id }]);
+      await c.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("a gate is computed from its checks, not set", async () => {
+    // The second loop worth having end to end: state a condition before running
+    // anything, gate work on it, record an analysis held to it, then evaluate.
+    // Nothing anywhere sets a gate to `satisfied` -- the read computes it.
+    const c = await client();
+    try {
+      const criterion = await call(c, "state_criterion", {
+        proposition: "the effect holds at five seeds",
+      });
+      const work = await call(c, "plan_work", {
+        objective: "publish the convergence result",
+        acceptance: "the prespecified check passes",
+      });
+      const gate = await call(c, "declare_gate", {
+        governed_by: [criterion.id],
+        consequence: "whether the result may be published",
+        protecting: [work.id],
+      });
+
+      const enquiry = await call(c, "open_enquiry", { question: "does it hold at five seeds?" });
+      const observations = await call(c, "record_observations", {
+        enquiry: enquiry.id, name: "seed sweep", finding: "five seeds, consistent",
+      });
+      await call(c, "record_analysis", {
+        enquiry: enquiry.id,
+        method: "seed sweep",
+        from: [observations.id],
+        concludes: [{ proposition: HOLDS, finding: "holds at all five", standing: "confirmatory" }],
+        implementing: work.id,
+        held_to: [criterion.id],
+      });
+
+      // Unmet before the check is run -- an unrun check counts against the
+      // finding it qualifies, which is why the criterion is stated up front.
+      const beforeCheck = await call(c, "why_supported", { proposition: HOLDS });
+      expect(beforeCheck.unmet).not.toEqual([]);
+
+      await call(c, "evaluate_criterion", {
+        criterion: criterion.id,
+        gate: gate.id,
+        value: "5/5 seeds",
+        outcome: "pass",
+      });
+
+      const afterCheck = await call(c, "why_supported", { proposition: HOLDS });
+      expect(afterCheck.unmet).toEqual([]);
+      await c.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("a claim's reading can be narrowed, and the history says so", async () => {
+    const c = await client();
+    try {
+      const enquiry = await call(c, "open_enquiry", { question: "is the gain general?" });
+      const observations = await call(c, "record_observations", {
+        enquiry: enquiry.id, name: "benchmark run", finding: "faster on the suite",
+      });
+      const analysis = await call(c, "record_analysis", {
+        enquiry: enquiry.id, method: "benchmark",
+        from: [observations.id],
+        concludes: [{ proposition: GENERAL, finding: "12% faster overall" }],
+      });
+      expect(analysis.kind).toBe("analysis");
+
+      const report = await call(c, "reinterpret", {
+        proposition: GENERAL,
+        as: "the method is faster on this benchmark suite",
+        because: "the suite is not representative of the general case",
+      });
+      expect(report.previously).toBe(GENERAL);
+      expect(report.nowClaims).toBe("the method is faster on this benchmark suite");
+
+      const history = await call(c, "interpretation_history", {
+        proposition: "the method is faster on this benchmark suite",
+      });
+      expect(history.originally).toBe(GENERAL);
       await c.close();
     } finally {
       await scenario.end();
@@ -219,6 +311,8 @@ describe("an agent can track work through the tools alone", () => {
   });
 
   const PROP = "the pruning schedule moves convergence";
+  const HOLDS = "the effect holds at five seeds";
+  const GENERAL = "the method is faster";
 });
 
 describe("the tool documentation resource", () => {

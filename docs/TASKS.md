@@ -48,43 +48,41 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   a discriminator before it is worth changing anything: a read that gives a
   confidently wrong answer because the two are indistinguishable.
 
-- [ ] **The other nine write tools.** Six are exposed — `pose`, `pursue`,
-  `open_enquiry`, `record_observations`, `record_analysis`, `close_enquiry` —
-  which is the loop that makes a programme exist. The rest of
-  `src/domain/commands.ts` follows the identical pattern. **`promote` first**:
-  without it a concluded question can only reach `provisional`, never
-  `established`, which `tests/mcp.test.ts` currently asserts as the state of
-  affairs rather than as a defect.
+- [x] ~~**The other write tools.**~~ — done. **Every verb on `WriteSurface` is
+  now an MCP tool**, and every command shape in `src/domain/commands.ts` is
+  reachable. `bun run mcp` exposes the reads, `pursuits_of`, and the writes.
 
-- [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**
-  Deprioritised by Dan; not obstructing work. The cascade that turned one
-  crossing into a burst is fixed (`2de1060` FIFO connection ownership,
-  `5439085` truncate instead of dropping the graph — the second also took
-  provisioning off the critical path and halved suite wall time). Provisioning
-  got 69% cheaper again in `6eeeb92`. What remains is the crossings themselves.
+- [x] ~~**Read the generated documentation as a diagnostic.**~~ — **done, and
+  it worked.** With every verb exposed, `labkit://docs/tools` renders to one
+  page, and reading the id-bearing fields down that page surfaced three things
+  no single tool showed on its own:
 
-  **Do not re-investigate from scratch.** Refuted with evidence: advisory-lock
-  contention; the pglite-socket desync bug as primary mechanism; fd/socket
-  exhaustion; WASM heap growth; `afterAll` not awaited; bun's runner. Use
-  `LABKIT_TRACE=all` — `src/db/trace.ts` exists so the next investigation does
-  not rebuild instrumentation.
+  1. **The read tools' id descriptions had no prefix examples and the write
+     tools' did**, because the reads were written first. Visible immediately as
+     a ragged column. **Fixed** — every id parameter now names its prefix.
+  2. **`from` means two unrelated things.** `record_analysis.from` is a list of
+     sources; `sharpen.from` is the question being sharpened. Not a defect, but
+     nobody would choose it, and only the one-page view shows it.
+  3. **The asymmetry below**, which is the real find.
 
-  **Named, not built:** drive `begin()`/`end()` from `beforeEach`/`afterEach`;
-  short-circuit provisioning for `current()`; raise the ceiling (hides it).
+- [ ] **Only one of the three verbs that record a computation can consume
+  another analysis's output.** `RecordAnalysisCommand.from` is
+  `Array<ObservationsRef | AnalysisRef>`; `ReplaceAnalysisCommand.from` and
+  `ReverifyCommand.under` are both `ObservationsRef[]`. So a second-stage
+  analysis can be recorded but, by the types, not replaced or re-verified in
+  terms of the stage it consumed.
 
-  **If you measure this, measure it paired and interleaved, one variable.** An
-  earlier fix passed round one on both arms and failed at the lowest load of
-  four; shipping on round one would have shipped a regression. A clean run
-  cannot verify a claim about what happens during a flake.
+  **Measured before being written down, and it is not a functional gap.**
+  Passing an analysis's *output artefact* id as an `ObservationsRef` produces an
+  identical record to passing the `AnalysisRef` — same `CONSUMES` edge, same
+  `{part, name}` from `reproducibilityOf` (see the `ART_` item below). So the
+  workaround exists and is indistinguishable in the graph. What is wrong is the
+  types disagreeing about what these three verbs accept, when all three write
+  the same edge.
 
-- [ ] **Read the generated documentation as a diagnostic, once the write tools
-  are complete.** `labkit://docs/tools` renders every tool's inputs and outputs
-  into one document from the declarations themselves. With all fifteen commands
-  exposed, that document puts every id parameter, every ref kind and every
-  prefix side by side on one page — which is where an inconsistency like the
-  `ART_` one above is visible as an inconsistency rather than as a single
-  puzzling field. Nobody has read it that way yet, because six tools is not
-  enough of the surface for a discrepancy to stand out.
+  Needs a discriminator: a case where the workaround gives a **wrong answer**,
+  not merely an inelegant call. Related to the `ART_` item — both are the same
+  root, that an artefact id does not say what kind of artefact it is.
 
 ## Needs a discriminator
 

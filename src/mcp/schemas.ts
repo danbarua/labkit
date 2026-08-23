@@ -37,6 +37,16 @@
 
 import { z } from "zod";
 import type {
+  AmendmentReport,
+  ChangedConclusion,
+  CriterionRef,
+  GateRef,
+  ReinterpretationReport,
+  ReplacementReport,
+  ReviewRef,
+  UnaffectedRecord,
+  VerificationReport,
+  WorkRef,
   AnalysisRef,
   EnquiryRef,
   ObservationsRef,
@@ -208,6 +218,55 @@ export const questionRefSchema = ref("question");
 export const enquiryRefSchema = ref("enquiry");
 export const observationsRefSchema = ref("observations");
 export const analysisRefSchema = ref("analysis");
+export const reviewRefSchema = ref("review");
+export const workRefSchema = ref("work");
+export const criterionRefSchema = ref("criterion");
+export const gateRefSchema = ref("gate");
+
+const changedConclusion = z.strictObject({
+  proposition: z.string(),
+  before: z.string(),
+  after: z.string(),
+});
+
+const unaffectedRecord = z.strictObject({
+  what: z.string(),
+  why: z.string(),
+});
+
+export const verificationReportSchema = z.strictObject({
+  at: z.string(),
+  verification: analysisRefSchema,
+  of: analysisRefSchema,
+});
+
+export const amendmentReportSchema = z.strictObject({
+  at: z.string(),
+  amendment: z.string(),
+  replaced: z.string(),
+  nowRequires: z.string(),
+  rerun: z.array(z.string()),
+  confirmatoryAffected: z.array(z.string()),
+  nature: z.enum(["mechanical", "scientific"]),
+});
+
+export const replacementReportSchema = z.strictObject({
+  at: z.string(),
+  replacement: analysisRefSchema,
+  affected: z.array(z.string()),
+  unaffected: z.array(unaffectedRecord),
+  changed: z.array(changedConclusion),
+  unchanged: z.array(z.string()),
+});
+
+export const reinterpretationReportSchema = z.strictObject({
+  at: z.string(),
+  previously: z.string(),
+  nowClaims: z.string(),
+  evidenceStanding: z.array(z.string()),
+  restingOnTheOldReading: z.array(z.string()),
+  requiresRecomputation: z.boolean(),
+});
 
 /** `pursuits_of` — `ReadSurface.pursuitsOf` returns an array, which is not an object. */
 export const pursuitsSchema = z.strictObject({
@@ -263,3 +322,13 @@ export type _EnquiryRef = Assert<Exact<z.infer<typeof enquiryRefSchema>, Enquiry
 export type _ObservationsRef = Assert<Exact<z.infer<typeof observationsRefSchema>, ObservationsRef>>;
 export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, AnalysisRef>>;
 export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;
+export type _ReviewRef = Assert<Exact<z.infer<typeof reviewRefSchema>, ReviewRef>>;
+export type _WorkRef = Assert<Exact<z.infer<typeof workRefSchema>, WorkRef>>;
+export type _CriterionRef2 = Assert<Exact<z.infer<typeof criterionRefSchema>, CriterionRef>>;
+export type _GateRef = Assert<Exact<z.infer<typeof gateRefSchema>, GateRef>>;
+export type _ChangedConclusion = Assert<Exact<z.infer<typeof changedConclusion>, ChangedConclusion>>;
+export type _UnaffectedRecord = Assert<Exact<z.infer<typeof unaffectedRecord>, UnaffectedRecord>>;
+export type _VerificationReport = Assert<Exact<z.infer<typeof verificationReportSchema>, VerificationReport>>;
+export type _AmendmentReport = Assert<Exact<z.infer<typeof amendmentReportSchema>, AmendmentReport>>;
+export type _ReplacementReport = Assert<Exact<z.infer<typeof replacementReportSchema>, ReplacementReport>>;
+export type _ReinterpretationReport = Assert<Exact<z.infer<typeof reinterpretationReportSchema>, ReinterpretationReport>>;
