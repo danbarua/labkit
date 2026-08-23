@@ -31,6 +31,7 @@ import { resolveTenantContext } from "../db/tenant";
 import { TenantGraph } from "../db/graph";
 import { ReadSurface } from "../domain";
 import { TOOLS } from "./tools";
+import { DOCS_URI, renderToolDocs } from "./docs";
 
 /**
  * Registers the seven tools against a read surface. Transport-free, so a test
@@ -52,6 +53,30 @@ import { TOOLS } from "./tools";
  */
 export function buildServer(read: ReadSurface): McpServer {
   const server = new McpServer({ name: "labkit", version: "0.0.1" });
+
+  // The tool surface as prose, rendered on each read from the same `TOOLS` the
+  // loop below registers. A resource rather than a tool because it takes no
+  // arguments and answers nothing about the record -- it describes the server,
+  // and a caller should be able to read it before deciding which tool to call.
+  //
+  // It holds no `read`: a client can fetch this against a server whose database
+  // is unreachable, which is when an agent most needs to know what it is
+  // talking to.
+  server.registerResource(
+    "tool-docs",
+    DOCS_URI,
+    {
+      title: "LabKit read tools",
+      description:
+        "Human-readable documentation of every tool this server exposes -- what each " +
+        "answers, what it takes and what it returns -- generated from the tool " +
+        "declarations themselves, so it cannot fall behind them.",
+      mimeType: "text/markdown",
+    },
+    (uri) => ({
+      contents: [{ uri: uri.href, mimeType: "text/markdown", text: renderToolDocs() }],
+    }),
+  );
 
   for (const definition of TOOLS) {
     server.registerTool(

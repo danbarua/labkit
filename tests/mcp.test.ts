@@ -25,6 +25,8 @@ import { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
 import { TOOLS } from "../src/mcp/tools";
 import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schemas";
+import { DOCS_URI, renderToolDocs } from "../src/mcp/docs";
+import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { writeVerbNames, writeVerbsCalledIn } from "./helpers/read-only";
 
@@ -74,6 +76,105 @@ describe("structure", () => {
     } finally {
       await scenario.end();
     }
+  });
+});
+
+describe("the tool documentation resource", () => {
+  /**
+   * The property worth testing is not that the markdown looks right -- it is
+   * that it is *derived*. Nothing below names a tool or a field: every
+   * expectation is computed from TOOLS, so a tool added without documentation,
+   * or a field renamed in a report type, fails here rather than shipping a
+   * document that quietly describes last week's server.
+   *
+   * Demonstrated by breaking the generator and watching this fail: dropping a
+   * tool's description fails it, and so does refusing to render nested fields.
+   * The second only became true after the test was fixed -- the first version
+   * read `properties` at the top level only, and passed with every nested name
+   * missing from the document. A derived test can still check the wrong thing.
+   */
+  /** Every property name in a JSON Schema, at any depth. */
+  function leafNames(schema: unknown, depth = 0): string[] {
+    const s = schema as {
+      properties?: Record<string, unknown>;
+      items?: unknown;
+      anyOf?: unknown[];
+    };
+    if (!s || depth > 4) return [];
+    const here = Object.keys(s.properties ?? {});
+    const nested = [
+      ...Object.values(s.properties ?? {}),
+      ...(s.items ? [s.items] : []),
+      ...(s.anyOf ?? []),
+    ].flatMap((child) => leafNames(child, depth + 1));
+    return [...here, ...nested];
+  }
+
+  /** The one content block, narrowed to the text variant a markdown resource returns. */
+  const markdown = (contents: ReadonlyArray<{ mimeType?: string } & Record<string, unknown>>) => {
+    const first = contents[0];
+    if (!first || typeof first.text !== "string") throw new Error("resource returned no text");
+    return { mimeType: first.mimeType, text: first.text };
+  };
+
+  async function connected() {
+    const graph = await scenario.begin();
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await buildServer(new ReadSurface(graph)).connect(serverSide);
+    const client = new Client({ name: "test", version: "0" });
+    await client.connect(clientSide);
+    return client;
+  }
+
+  test("the resource is listed and serves markdown", async () => {
+    const client = await connected();
+    try {
+      const { resources } = await client.listResources();
+      expect(resources.map((r) => r.uri)).toContain(DOCS_URI);
+
+      const { contents } = await client.readResource({ uri: DOCS_URI });
+      expect(contents).toHaveLength(1);
+      expect(markdown(contents).mimeType).toBe("text/markdown");
+      expect(markdown(contents).text.startsWith("# LabKit")).toBe(true);
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("every tool, and every field of every declared output, is documented", async () => {
+    const client = await connected();
+    try {
+      const { contents } = await client.readResource({ uri: DOCS_URI });
+      const doc = markdown(contents).text;
+
+      for (const tool of TOOLS) {
+        expect(doc).toContain(`## ${tool.name}`);
+        expect(doc).toContain(tool.description);
+        // Input field names, derived from the tool's own declaration.
+        for (const field of Object.keys(tool.inputSchema)) expect(doc).toContain(`\`${field}`);
+        // Output field names, derived from the schema rather than listed --
+        // and walked to the leaves, because the first version of this test read
+        // only the top level and passed while every nested name was missing.
+        if (tool.outputSchema) {
+          for (const field of leafNames(z.toJSONSchema(tool.outputSchema))) {
+            expect(doc).toContain(`\`${field}`);
+          }
+        }
+      }
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("the document is generated, not stored", async () => {
+    // Rendering a subset produces a smaller document naming only that subset --
+    // which a checked-in file could not do, and which is the property that makes
+    // the served one impossible to leave stale.
+    const one = renderToolDocs([TOOLS[0]!]);
+    expect(one).toContain(`## ${TOOLS[0]!.name}`);
+    expect(one).not.toContain(`## ${TOOLS[1]!.name}`);
   });
 });
 
