@@ -66,13 +66,13 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
 
 describe("S-10c: which input changed?", () => {
   /**
-   * The re-run is correctly *not* a reproduction — it read a different artefact,
-   * and the record says so. That much has worked since S-10.
+   * The re-run read a different artefact and the record says so. That much has
+   * worked since S-10; what changed is that the record no longer *concludes*
+   * anything from it — `execution: "not-reproduced"` was a verdict and is gone.
    */
-  test("swapping an input for a same-named one is not a reproduction", async () => {
+  test("swapping an input for a same-named one is reported as two differences", async () => {
     const { verification } = await aReVerificationAgainstTheRegeneratedControl(session);
     const report = await (await afterwards()).reproductionOf(verification);
-    expect(report.execution).toBe("not-reproduced");
     expect(report.differs).toHaveLength(2);
   });
 

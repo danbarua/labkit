@@ -421,7 +421,18 @@ What a verifying analysis re-checked and whether it reproduced the original — 
   - `id`: string
 - `ofMethod`: string
 - `conclusion`: "agrees" | "disagrees"
-- `execution`: "reproduced" | "not-reproduced" | "inputs-unordered"
+- `verificationRead`: object[]
+  - `part`: object
+    - `kind`: "observations"
+    - `id`: string
+  - `name`: string
+  - `invalidated?`: true
+- `ofRead`: object[]
+  - `part`: object
+    - `kind`: "observations"
+    - `id`: string
+  - `name`: string
+  - `invalidated?`: true
 - `differs`: object[]
   - `what`: object
     - `part`: object
@@ -431,8 +442,6 @@ What a verifying analysis re-checked and whether it reproduced the original — 
     - `invalidated?`: true
   - `standing`: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run"
 - `bearing`: "raises" | "lowers"
-- `comparable`: boolean
-- `incomparableBecause?`: string
 
 ---
 

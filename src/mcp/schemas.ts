@@ -236,7 +236,8 @@ export const reproductionReportSchema = z.strictObject({
   of: ref("analysis"),
   ofMethod: z.string(),
   conclusion: z.enum(["agrees", "disagrees"]),
-  execution: z.enum(["reproduced", "not-reproduced", "inputs-unordered"]),
+  verificationRead: z.array(identifiedArtefact),
+  ofRead: z.array(identifiedArtefact),
   differs: z.array(
     z.strictObject({
       what: identifiedArtefact,
@@ -244,8 +245,6 @@ export const reproductionReportSchema = z.strictObject({
     }),
   ),
   bearing: z.enum(["raises", "lowers"]),
-  comparable: z.boolean(),
-  incomparableBecause: z.string().optional(),
 });
 
 /* -- the six reads exposed later than the rest ---------------------------- */

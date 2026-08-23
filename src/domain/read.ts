@@ -12,7 +12,7 @@
  * that is enforced by construction rather than by review.
  */
 
-import { optional, scalar, vertexProps } from "../db/cypher";
+import { edgeProps, optional, scalar, vertexProps } from "../db/cypher";
 import type {
   ArtefactProps,
   ClaimProps,
@@ -588,16 +588,28 @@ export class ReadSurface extends SessionCore {
     // the names made those the same execution input. That is the identity-
     // versus-wording mistake this project has now found in four unrelated
     // places (S-5, S-12, S-3b, and here, by external review).
+    // Ordered by the position the caller gave, which the CONSUMES edge now
+    // carries. Runs recorded before that have no position; they sort last and
+    // among themselves by identity, so the list is stable rather than
+    // arbitrary. Absence of a position is not zero.
     const inputs = async (
       computation: string,
     ): Promise<Map<string, IdentifiedArtefact>> => {
       const rows = await this.graph.query(
-        `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
-        { a: vertexProps<{ natural_id: string; logical_name: string }>() },
+        `MATCH (:Computation {natural_id: $id})-[c:CONSUMES]->(a:Artefact) RETURN a, c`,
+        {
+          a: vertexProps<{ natural_id: string; logical_name: string }>(),
+          c: edgeProps<{ position?: number }>(),
+        },
         { id: computation },
       );
+      const ordered = [...rows].sort((x, y) => {
+        const xp = x.c.position ?? Number.MAX_SAFE_INTEGER;
+        const yp = y.c.position ?? Number.MAX_SAFE_INTEGER;
+        return xp - yp || x.a.natural_id.localeCompare(y.a.natural_id);
+      });
       return new Map(
-        rows.map((r) => [
+        ordered.map((r) => [
           r.a.natural_id,
           { part: ref("observations", r.a.natural_id), name: r.a.logical_name },
         ]),
@@ -637,15 +649,6 @@ export class ReadSurface extends SessionCore {
       (a, b) => a.what.name.localeCompare(b.what.name) || a.what.part.id.localeCompare(b.what.part.id),
     );
 
-    const sameInputs = !provenanceMissing && differs.length === 0;
-    // The same artefacts, and the record does not say in what order either run
-    // read them. `CONSUMES` is a set; the command took an ordered array. For an
-    // order-sensitive method the two are different executions, and LabKit has
-    // no way to tell such a method from any other -- so it declines for every
-    // multi-input run rather than guessing (S-10d, row AF).
-    const orderUnknown = sameInputs && mine.size > 1;
-    const reproduced = sameInputs && !orderUnknown;
-
     // Which way each run cut, read from the bearing each finding was recorded
     // with -- never from comparing the two findings' wording. Both are needed:
     // reading only the re-run's made two runs that each found *against* the
@@ -671,23 +674,17 @@ export class ReadSurface extends SessionCore {
       of: ref("analysis", found.oldcomp.natural_id),
       ofMethod: found.oldcomp.kind,
       conclusion: agrees ? "agrees" : "disagrees",
-      execution: reproduced ? "reproduced" : orderUnknown ? "inputs-unordered" : "not-reproduced",
+      // Both lists, in order, and no verdict over them. Whether the same
+      // records read in a different order is the same execution depends on what
+      // the method does; the record does not know and does not guess.
+      verificationRead: [...mine.values()],
+      ofRead: [...theirs.values()],
       differs,
       // Which way the RE-RUN cuts for the claim -- a question about the
       // proposition, not about whether the two runs concur. Two runs that agree
       // on a negative finding agree with each other and lower confidence in the
       // proposition, and those are different sentences.
       bearing: newChallenges ? "lowers" : "raises",
-      comparable: reproduced,
-      ...(reproduced
-        ? {}
-        : {
-            incomparableBecause: provenanceMissing
-              ? "the original run's initial conditions were never recorded, so the two runs' numbers describe different executions"
-              : orderUnknown
-                ? "both runs read the same records, and the order in which each read them is not recorded; for an order-sensitive method those are different executions"
-                : "the two runs consumed different inputs",
-          }),
     };
   }
 

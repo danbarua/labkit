@@ -449,29 +449,27 @@ export interface ReproductionReport {
   /** Whether the re-run reached the same conclusion. Says nothing about how. */
   conclusion: "agrees" | "disagrees";
   /**
-   * Whether the same execution was reproduced — the same recorded inputs, not
-   * merely the same protocol. `not-reproduced` covers "the original never
-   * recorded what it consumed", which is absence rather than difference; see
-   * `differs`.
+   * What each run read, **in the order it was given**.
    *
-   * **`inputs-unordered` is a third answer and not a soft no**, the same
-   * distinction `ReproducibilityReport.unverifiable` draws: the record cannot
-   * say, which is different from saying the runs differ. `CONSUMES` keeps a
-   * *set*, so two runs that read the same artefacts in opposite orders are
-   * indistinguishable here — and `recordAnalysis` accepts an **ordered array**,
-   * so the command promised something the store does not keep. For a method
-   * that is order-sensitive those are different executions: S-10d runs
-   * "first input minus second" twice with the inputs swapped and the report
-   * used to call it `reproduced`, which is a positive wrong answer rather than
-   * an inference a reader chose to make (row AF, found by external review).
+   * There is deliberately no verdict beside these. LabKit is bookkeeping: it
+   * records what each run consumed and hands both lists to whoever can read
+   * them. Whether reading the same records in a different order is the same
+   * execution depends on what the method does, which the record does not know
+   * and should not guess.
    *
-   * LabKit cannot tell an order-sensitive method from an order-insensitive
-   * one, so it says so for **every** run with more than one input rather than
-   * guessing. That cost is deliberate and visible: if it becomes intolerable,
-   * the remedy is to make ordering part of execution identity — a position on
-   * `CONSUMES` — which is a stored-model change this one does not foreclose.
+   * An `execution: "reproduced" | "not-reproduced"` field used to sit here and
+   * was removed for exactly that. It called a reversed rerun of an
+   * order-sensitive method a reproduction, and the fix attempted first — a
+   * third value meaning "cannot say" — made the guess hedged rather than
+   * absent. Two lists and no adjudication is less machinery than either.
+   *
+   * Order is recorded because the caller supplied it: `recordAnalysis({ from })`
+   * takes an ordered array, and discarding it was the actual defect — losing
+   * something a caller said, in the record whose job is not to.
    */
-  execution: "reproduced" | "not-reproduced" | "inputs-unordered";
+  verificationRead: IdentifiedArtefact[];
+  /** The same, for the analysis being re-checked. Empty when it recorded nothing. */
+  ofRead: IdentifiedArtefact[];
   /**
    * What the two runs did not share. `unrecorded-in-the-original` is the case
    * S-10 exists for and is **not** the same as `changed`: nobody wrote the
@@ -496,17 +494,6 @@ export interface ReproductionReport {
   }>;
   /** Which way the re-run cuts for the historical claim. */
   bearing: "raises" | "lowers";
-  /**
-   * Whether the two runs' numbers may be put side by side.
-   *
-   * Carried here rather than enforced by a refusing verb: LabKit has nothing
-   * that plots or compares numbers, so a command existing only to reject its
-   * arguments would be a feature invented to manufacture a wrong answer. The
-   * caveat instead travels with the report a reader already asks for.
-   */
-  comparable: boolean;
-  /** Why not, when `comparable` is false. Absent when it is true. */
-  incomparableBecause?: string;
 }
 
 /**

@@ -464,12 +464,18 @@ export class WriteSurface extends SessionCore {
       "PRODUCES",
       output.natural_id,
     );
-    for (const source of input.from) {
+    for (const [position, source] of input.from.entries()) {
       // An analysis is named by its computation; what it *read* is that
       // computation's output artefact, which is what CONSUMES points at.
       const artefact =
         source.kind === "analysis" ? await this.outputArtefactOf(source) : source.id;
-      await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact);
+      // `position` because the caller gave an ordered array and the record used
+      // to throw the order away -- losing something a caller said, in the store
+      // whose job is not to. No verdict rests on it: `reproductionOf` reports
+      // both runs' lists in order and adjudicates nothing (S-10d).
+      await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact, {
+        position,
+      });
     }
 
     const minted: ConcludedClaim[] = [];

@@ -128,7 +128,11 @@ describe("S-10: rerunning is not reproducing", () => {
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
     expect(report.conclusion).toBe("agrees");
-    expect(report.execution).toBe("not-reproduced");
+    // The original recorded nothing it read, so there is nothing to have
+    // reproduced. LabKit says that and stops: `execution: "not-reproduced"`
+    // used to sit here and was a verdict on what the two runs mean.
+    expect(report.ofRead).toEqual([]);
+    expect(report.differs.map((d) => d.standing)).toEqual(["unrecorded-in-the-original"]);
   });
 
   /**
@@ -186,7 +190,7 @@ describe("S-10: rerunning is not reproducing", () => {
     // that an independent re-check can never confirm a claim. Those two fields
     // already say everything demonstrated, without settling what the overloaded
     // word means.
-    expect(report.execution).toBe("not-reproduced");
+    expect(report.ofRead).toEqual([]);
 
     // And the claim itself now reads as re-verified rather than as twice
     // independently established.
@@ -205,7 +209,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * manufacture a wrong answer — PJ-011 §5, from the other side. The caveat has
    * to travel with the report a reader already asks for.
    */
-  test("Afterward 4: the two are reported as not numerically comparable, with the reason", async () => {
+  test("Afterward 4: the record says the original never recorded what it read", async () => {
     const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
@@ -221,8 +225,16 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    expect(report.comparable).toBe(false);
-    expect(report.incomparableBecause).toMatch(/initial conditions/);
+    // `comparable: false` with a prose reason used to sit here, and it was
+    // LabKit deciding whether two sets of numbers may be put side by side --
+    // which is the reader's call, not the record's. The fact it rested on is
+    // still here and is what a reader needs: the re-run named what it read and
+    // the original named nothing.
+    expect(report.ofRead).toEqual([]);
+    expect(report.verificationRead.map((i) => i.name)).toEqual([
+      "initial conditions, newly specified",
+    ]);
+    expect(report.differs.map((d) => d.standing)).toEqual(["unrecorded-in-the-original"]);
   });
 
   /**
@@ -252,10 +264,14 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    expect(report.execution).toBe("reproduced");
+    // Both runs named what they read, and it was the same record. Nothing
+    // differs, and the report says so without calling that a reproduction --
+    // whether it is one depends on what the method does.
     expect(report.differs).toEqual([]);
-    expect(report.comparable).toBe(true);
-    expect(report.incomparableBecause).toBeUndefined();
+    expect(report.verificationRead.map((i) => i.part.id)).toEqual(
+      report.ofRead.map((i) => i.part.id),
+    );
+    expect(report.ofRead).toHaveLength(1);
   });
 
   /**
@@ -292,7 +308,6 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    expect(report.execution).toBe("not-reproduced");
     // Both directions, and both are true: the re-run read an "initial
     // conditions" the original did not, and the original read one the re-run
     // did not. Identical names, two artefacts, two differences.
@@ -332,9 +347,10 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    expect(report.execution).toBe("not-reproduced");
-    expect(report.comparable).toBe(false);
-    expect(report.incomparableBecause).toMatch(/never recorded/);
+    // Neither run named anything. Two empty lists, and no claim that they
+    // therefore match -- absence on both sides is still absence.
+    expect(report.verificationRead).toEqual([]);
+    expect(report.ofRead).toEqual([]);
   });
 
   /**
@@ -361,7 +377,6 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    expect(report.execution).toBe("not-reproduced");
     expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
       { what: "conditions B", standing: "not-used-by-the-re-run" },
     ]);

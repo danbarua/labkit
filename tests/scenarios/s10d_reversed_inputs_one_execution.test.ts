@@ -1,18 +1,29 @@
 /**
- * S-10d — "Same members, reversed. Same execution?"
- * External review of PR #2, discriminator 3. Ledger row AF.
+ * S-10d — "The record keeps the order it was given."
+ * External review of PR #2, discriminator 3, then corrected by Dan.
  *
- * Row AF said input order "earns nothing under the wrong-answer bar: the
- * reports claim the two runs consumed the same inputs, and they did — what a
- * reader *infers* is the wrong part." The review disagreed, and named the
- * probe the row had been asking for:
+ * **What this file first argued, and why that was wrong.** It ran an analysis
+ * called "first input minus second" twice with the inputs swapped, got +0.4 and
+ * −0.4, and called the report's `execution: "reproduced"` a wrong answer. The
+ * remedy was a third value meaning "cannot say".
  *
- * > If this returns `execution: reproduced`, that looks like a positive wrong
- * > answer, not merely an inference a reader chose to make. [...] Same members
- * > is not necessarily same execution.
+ * Both halves of that were scope creep. Whether +0.4 and −0.4 are the same
+ * result depends on the question — if the researcher asked for the absolute
+ * magnitude of the difference, they are — and the probe answered that question
+ * on the researcher's behalf in order to declare the record wrong. Then the fix
+ * made the record hedge its own answer to the same question rather than stop
+ * answering it.
  *
- * The method here is order-sensitive and says so in its own name. The command
- * that recorded it took an **ordered array**. `CONSUMES` keeps a set.
+ * **LabKit is bookkeeping. Interpreting the books is for the reader.** So
+ * `execution` and `comparable` are gone, along with `incomparableBecause`. The
+ * report says what each run read, in the order it was given, and what differs
+ * between them. Whether that constitutes a reproduction is a question about the
+ * method, which the record does not know.
+ *
+ * What survives from the probe is the defect underneath it, which is a
+ * bookkeeping defect and squarely LabKit's: `recordAnalysis({ from })` took an
+ * ordered array and the record threw the order away. Losing something the
+ * caller said is the one thing this store exists not to do.
  *
  * Imports only src/domain — never src/db (enforced).
  */
@@ -33,12 +44,12 @@ beforeEach(async () => {
 });
 afterEach(async () => { await scenario.end(); });
 
-const METHOD = "first input minus second";
-const PROP = "the treated series sits above the control";
+const METHOD = "difference of the two series";
+const PROP = "the two series differ in magnitude";
 
-/** Two series, and a run that subtracts the second from the first. */
-async function aSubtraction() {
-  const enquiry = await session.openEnquiry("does the treated series sit above the control?");
+/** Two series, and a run that takes the difference between them. */
+async function aDifference() {
+  const enquiry = await session.openEnquiry("do the two series differ?");
   const treated = await session.recordObservations({
     enquiry, name: "treated series", finding: "twelve points", contentHash: "sha256:treated",
   });
@@ -47,79 +58,74 @@ async function aSubtraction() {
   });
   const { analysis } = await session.recordAnalysis({
     enquiry, method: METHOD, from: [treated, control],
-    concludes: [{ proposition: PROP, finding: "difference +0.4" }],
+    concludes: [{ proposition: PROP, finding: "difference 0.4" }],
   });
   return { enquiry, treated, control, analysis };
 }
 
-describe("S-10d — two runs of an order-sensitive method, inputs reversed", () => {
-  test("the record does not call a reversed run a reproduction", async () => {
-    const { enquiry, treated, control, analysis } = await aSubtraction();
-
-    // The same method, the same two series, the other way round. For this
-    // method that is a different computation with the opposite sign.
+describe("S-10d — the order a run read its inputs in", () => {
+  test("a rerun that read the same records in the other order is shown as such", async () => {
+    const { enquiry, treated, control, analysis } = await aDifference();
     const rerun = await session.reverify({
       historical: analysis, enquiry, method: METHOD,
       under: [control, treated],
-      concludes: { proposition: PROP, finding: "difference -0.4" },
+      concludes: { proposition: PROP, finding: "difference 0.4" },
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const report = await later.reproductionOf(rerun.verification);
 
-    // Whatever the model decides about ordering, it must not state that these
-    // two runs are the same execution.
-    expect(report.execution).not.toBe("reproduced");
+    // The same two records on both sides, so nothing differs...
+    expect(report.differs).toEqual([]);
+    // ...and the order each run read them in is on the record, which is the
+    // whole of what LabKit has to say about it. A reader who knows whether this
+    // method is order-sensitive can now tell; before, the information was gone.
+    expect(report.ofRead.map((i) => i.name)).toEqual(["treated series", "control series"]);
+    expect(report.verificationRead.map((i) => i.name)).toEqual(["control series", "treated series"]);
   });
 
-  /**
-   * The price of the answer above, asserted rather than left implicit.
-   *
-   * A rerun that read the same two records in the same order is *also*
-   * `inputs-unordered`, because nothing distinguishes it from the reversed one
-   * in the record. LabKit cannot tell an order-sensitive method from any other,
-   * so it declines for every multi-input run instead of guessing — and that is
-   * a real loss of an answer people want, kept visible here so the case for
-   * storing order is made by evidence rather than by taste.
-   */
-  test("and it declines for the identical rerun too, which is the cost", async () => {
-    const { enquiry, treated, control, analysis } = await aSubtraction();
+  test("a rerun that read them in the same order is shown as that", async () => {
+    const { enquiry, treated, control, analysis } = await aDifference();
     const rerun = await session.reverify({
       historical: analysis, enquiry, method: METHOD,
       under: [treated, control],
-      concludes: { proposition: PROP, finding: "difference +0.4" },
+      concludes: { proposition: PROP, finding: "difference 0.4" },
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const report = await later.reproductionOf(rerun.verification);
-    expect(report.execution).toBe("inputs-unordered");
-    expect(report.comparable).toBe(false);
-    expect(report.incomparableBecause).toContain("order in which each read them is not recorded");
 
-    // Not a soft "no": nothing differs, and the report says nothing differs.
-    // Absence of an answer and a negative answer are different states, which is
-    // the distinction `ReproducibilityReport.unverifiable` already draws.
     expect(report.differs).toEqual([]);
+    expect(report.verificationRead.map((i) => i.name)).toEqual(["treated series", "control series"]);
+    expect(report.verificationRead.map((i) => i.part.id)).toEqual(
+      report.ofRead.map((i) => i.part.id),
+    );
   });
 
-  test("a single-input rerun is still recognised, so the decline has a boundary", async () => {
-    const enquiry = await session.openEnquiry("does the series trend up?");
-    const series = await session.recordObservations({
-      enquiry, name: "series", finding: "twelve points", contentHash: "sha256:series",
-    });
-    const { analysis } = await session.recordAnalysis({
-      enquiry, method: "linear fit", from: [series],
-      concludes: [{ proposition: PROP, finding: "slope +0.4" }],
-    });
+  /**
+   * The pairing that makes the two tests above evidence rather than decoration.
+   *
+   * If order were still discarded, both would report the same list and the
+   * first test could not fail. This asserts the two orders are genuinely
+   * different sequences of the same two records.
+   */
+  test("the two orders are different sequences of the same records", async () => {
+    const { enquiry, treated, control, analysis } = await aDifference();
     const rerun = await session.reverify({
-      historical: analysis, enquiry, method: "linear fit",
-      under: [series],
-      concludes: { proposition: PROP, finding: "slope +0.4" },
+      historical: analysis, enquiry, method: METHOD,
+      under: [control, treated],
+      concludes: { proposition: PROP, finding: "difference 0.4" },
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const report = await later.reproductionOf(rerun.verification);
-    expect(report.execution).toBe("reproduced");
-    expect(report.comparable).toBe(true);
+
+    expect(report.verificationRead.map((i) => i.part.id)).not.toEqual(
+      report.ofRead.map((i) => i.part.id),
+    );
+    expect([...report.verificationRead].map((i) => i.part.id).sort()).toEqual(
+      [...report.ofRead].map((i) => i.part.id).sort(),
+    );
+    void treated; void control;
   });
 });

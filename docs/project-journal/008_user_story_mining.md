@@ -1212,6 +1212,39 @@ its own test. Making order part of execution identity — a position on
 `CONSUMES` — remains available and now clears the bar; this change makes its
 absence visible rather than leaving a wrong answer in its place.
 
+**Same day, corrected: the two paragraphs above are both over-corrections, and
+the row is resolved a third way.** Dan read them and named the shape:
+
+> LabKit is bookkeeping. Interpreting the books is for the human/AI
+> collaborators. Execution and Comparable are scope creep.
+
+*What the probe smuggled in.* It ran a method called "first input minus second"
+so that reversing the inputs would flip the sign, then treated +0.4 and −0.4 as
+obviously different results. Whether they are depends on the question: for the
+absolute magnitude of a difference they are the same answer. The probe decided
+that on the researcher's behalf in order to convict the record — which is the
+very thing it was convicting the record of.
+
+*What the first remedy did.* A third value made LabKit hedge the same
+inference instead of stopping. More machinery, same category error.
+
+*The original cell was closer to right than the correction above it.* "The
+reports claim the two runs consumed the same inputs, and they did — what a
+reader *infers* is the wrong part" is correct, and what it missed is smaller
+than that paragraph claims: not that the row earned a change, but that a
+neighbouring field was making the inference on the reader's behalf.
+
+*Resolved by removal.* `execution`, `comparable` and `incomparableBecause` are
+gone. `reproductionOf` reports what each run read, in order (`verificationRead`,
+`ofRead`), and what differs. Whether that is a reproduction is a question about
+the method, and the reader holds it.
+
+*And the bookkeeping defect underneath is real and is fixed.*
+`recordAnalysis({ from })` took an ordered array and `CONSUMES` threw the order
+away — losing something the caller said, in the store whose job is not to. The
+edge now carries `position`. That is not "order as execution identity"; nothing
+is decided from it. It is the record keeping what it was given.
+
 **Row AG (2026-08-24): refuted, added by S-11f.** The neighbouring question —
 whether an `ART_` id needing to say measured-versus-computed is missing domain
 state — was measured at the same time and is not. No reader in `src/` branches
