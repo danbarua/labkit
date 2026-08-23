@@ -229,10 +229,12 @@ export function renderWhy(why: SupportExplanation): string {
 export function renderAffects(report: DependencyReport): string {
   return [
     "Claims that would be affected",
-    bullets(report.claims, "none found"),
+    // Id and wording both. A person reading this needs the sentence; a person
+    // acting on it needs the handle every other command takes.
+    bullets(report.claims.map((c) => `${c.asserts}  (${c.claim})`), "none found"),
     "",
     "Lines of enquiry",
-    bullets(report.enquiries, "none found"),
+    bullets(report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry})`), "none found"),
     "",
     "Routes walked",
     bullets(report.routesWalked, ""),
@@ -265,7 +267,11 @@ export function renderEnquiry(status: EnquiryStatus): string {
         ? "open"
         : `closed — ${status.closure}`;
   return [
-    status.question,
+    // Wording for the reader, id beside it for anything they do next. Until
+    // PJ-030 §5 step 2 this field WAS the wording, and printing it unchanged
+    // would have silently put `Q_1` where the question used to be -- both are
+    // `string`, so nothing would have failed.
+    status.asks ? `${status.asks}${status.question ? `  (${status.question})` : ""}` : status.enquiry,
     `  ${standing}`,
     status.acceptedBecause ? `  accepted because: ${status.acceptedBecause}` : "",
     status.reopensIf ? `  reopens if: ${status.reopensIf}` : "",

@@ -46,11 +46,16 @@ import type {
   QuestionStanding,
   InterpretationHistory,
   Revision,
+  AffectedClaim,
+  AffectedEnquiry,
   DependencyReport,
   IdentifiedArtefact,
   SupportExplanation,
 } from "./report";
 import { SessionCore } from "./core";
+
+/** Every node carries a natural id; this is how a projection asks for it. */
+type Identified = { natural_id: string };
 
 export class ReadSurface extends SessionCore {
   /** Every line of enquiry pursuing this question. */
@@ -287,14 +292,20 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (deferring:Decision)-[:DEFERS]->(q)
        RETURN q, resolving, deferring`,
       {
-        q: vertexProps<{ name: string }>(),
+        q: vertexProps<{ name: string; natural_id: string }>(),
         resolving: optional(vertexProps<{ natural_id: string }>()),
         deferring: optional(vertexProps<{ natural_id: string; reason: string; invalidation_check: string }>()),
       },
       { id: enquiry.id },
     );
 
-    const question = rows[0]?.q.name ?? loe.loe.name;
+    // Identity and wording, kept apart. The old line was
+    // `rows[0]?.q.name ?? loe.loe.name` -- wording, silently substituting the
+    // enquiry's own name when no question stood behind it. Two entities' text
+    // in one field, and no way for a caller to reach the question at all.
+    const behind = rows[0]?.q ?? null;
+    const question = behind?.natural_id ?? null;
+    const asks = behind?.name ?? null;
     const resolving = rows.find((r) => r.resolving)?.resolving ?? null;
     const deferred = rows.some((r) => r.deferring);
 
@@ -302,6 +313,7 @@ export class ReadSurface extends SessionCore {
       return {
         enquiry: enquiry.id,
         question,
+        asks,
         open: true,
         closure: null,
         answer: null,
@@ -323,6 +335,7 @@ export class ReadSurface extends SessionCore {
       return {
         enquiry: enquiry.id,
         question,
+        asks,
         open: true,
         closure: "accepted-as-unresolved",
         answer: null,
@@ -356,6 +369,7 @@ export class ReadSurface extends SessionCore {
       return {
         enquiry: enquiry.id,
         question,
+        asks,
         open: false,
         closure: "abandoned",
         answer: null,
@@ -381,6 +395,7 @@ export class ReadSurface extends SessionCore {
     return {
       enquiry: enquiry.id,
       question,
+      asks,
       open: false,
       closure: "answered",
       answer: challenges ? "no" : "yes",
@@ -1498,17 +1513,22 @@ export class ReadSurface extends SessionCore {
       frontier = next;
     }
 
-    const claims = new Set<string>();
-    const enquiries = new Set<string>();
+    // Deduplicated **by id**, not by wording. Two claims asserting the same
+    // sentence in different lines of enquiry are two claims (S-5), and the
+    // previous version -- a `Set<string>` of names -- silently merged them, so
+    // invalidating a record under one reported one affected claim where there
+    // were two.
+    const claims = new Map<string, AffectedClaim>();
+    const enquiries = new Map<string, AffectedEnquiry>();
     for (const artefact of reached) {
       const { claims: c, enquiries: e } = await this.restingOnArtefact(artefact);
-      for (const name of c) claims.add(name);
-      for (const name of e) enquiries.add(name);
+      for (const found of c) claims.set(found.claim, found);
+      for (const found of e) enquiries.set(found.enquiry, found);
     }
 
     return {
-      claims: [...claims],
-      enquiries: [...enquiries],
+      claims: [...claims.values()],
+      enquiries: [...enquiries.values()],
       routesWalked: [
         "evidence recorded in this artefact, and the claims it bears on",
         "computations that consumed this artefact, and the claims their findings bear on",
@@ -1521,7 +1541,7 @@ export class ReadSurface extends SessionCore {
   /** The claims and enquiries resting on one artefact, by the two direct routes. */
   private async restingOnArtefact(
     artefact: string,
-  ): Promise<{ claims: string[]; enquiries: string[] }> {
+  ): Promise<{ claims: AffectedClaim[]; enquiries: AffectedEnquiry[] }> {
     const rows = await this.graph.query(
       `MATCH (a:Artefact {natural_id: $id})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
@@ -1530,9 +1550,9 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (loe:LineOfEnquiry)-[:REQUIRES]->(e)
        RETURN claim, challenged, loe`,
       {
-        claim: optional(vertexProps<ClaimProps>()),
-        challenged: optional(vertexProps<ClaimProps>()),
-        loe: optional(vertexProps<{ name: string }>()),
+        claim: optional(vertexProps<ClaimProps & Identified>()),
+        challenged: optional(vertexProps<ClaimProps & Identified>()),
+        loe: optional(vertexProps<{ name: string } & Identified>()),
       },
       { id: artefact },
     );
@@ -1548,9 +1568,9 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (u)-[:ADDRESSES]->(loe:LineOfEnquiry)
        RETURN claim, challenged, loe`,
       {
-        claim: optional(vertexProps<ClaimProps>()),
-        challenged: optional(vertexProps<ClaimProps>()),
-        loe: optional(vertexProps<{ name: string }>()),
+        claim: optional(vertexProps<ClaimProps & Identified>()),
+        challenged: optional(vertexProps<ClaimProps & Identified>()),
+        loe: optional(vertexProps<{ name: string } & Identified>()),
       },
       { id: artefact },
     );
@@ -1560,9 +1580,13 @@ export class ReadSurface extends SessionCore {
       // A claim whose refutation rested on this record is affected by
       // invalidating it, exactly as a supported one is.
       claims: all.flatMap((r) =>
-        [r.claim?.name, r.challenged?.name].filter((n): n is string => !!n),
+        [r.claim, r.challenged]
+          .filter((c): c is ClaimProps & Identified => !!c)
+          .map((c) => ({ claim: c.natural_id, asserts: c.name })),
       ),
-      enquiries: all.flatMap((r) => (r.loe ? [r.loe.name] : [])),
+      enquiries: all.flatMap((r) =>
+        r.loe ? [{ enquiry: r.loe.natural_id, pursuing: r.loe.name }] : [],
+      ),
     };
   }
 

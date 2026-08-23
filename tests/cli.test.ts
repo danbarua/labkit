@@ -84,7 +84,7 @@ test("flags may precede the positional argument", () => {
 test("an enquiry accepted as unresolved does not render as merely open", () => {
   const status: EnquiryStatus = {
     enquiry: "LOE_1",
-    question: "does the pruning schedule move convergence?",
+    question: "Q_1", asks: "does the pruning schedule move convergence?",
     open: true,
     closure: "accepted-as-unresolved",
     answer: null,
@@ -100,7 +100,7 @@ test("an enquiry accepted as unresolved does not render as merely open", () => {
 
 test("an answered enquiry says whether its closure rests on promoted work", () => {
   const base: EnquiryStatus = {
-    enquiry: "LOE_2", question: "does depth move convergence?",
+    enquiry: "LOE_2", question: "Q_2", asks: "does depth move convergence?",
     open: false, closure: "answered", answer: "yes", evidence: ["a result"],
   };
   expect(renderEnquiry({ ...base, restsOn: "exploratory" })).toContain("exploratory");

@@ -128,7 +128,7 @@ describe("S-10c: which input changed?", () => {
     // Reference: answered, separately, for each.
     for (const part of [original, regenerated]) {
       const rests = await reader.whatDependsOn(part);
-      expect(rests.claims).toEqual([HOLDS]);
+      expect(rests.claims.map((c) => c.asserts)).toEqual([HOLDS]);
     }
   });
 });

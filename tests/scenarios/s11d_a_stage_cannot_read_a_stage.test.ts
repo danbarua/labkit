@@ -108,7 +108,7 @@ describe("S-11d: a stage cannot read a stage", () => {
     const { raw } = await aPipelineOnUnverifiableRawData(session);
 
     const fromRaw = await (await afterwards()).whatDependsOn(raw);
-    expect(fromRaw.claims.sort()).toEqual(["the calibration is stable", TRENDS].sort());
+    expect(fromRaw.claims.map((c) => c.asserts).sort()).toEqual(["the calibration is stable", TRENDS].sort());
     // Still open-world -- the traversal is now transitive, not complete.
     expect(fromRaw.complete).toBe(false);
   });

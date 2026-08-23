@@ -104,8 +104,8 @@ describe("S-11c: nothing found is not nothing there", () => {
     // subject nothing depends on, which is why `complete: false` is not
     // decoration. Recording the second stage properly is what fixes it, and
     // S-11d asserts that it does.
-    expect(affected.claims).toEqual([CALIBRATION]);
-    expect(affected.claims).not.toContain(TREND);
+    expect(affected.claims.map((c) => c.asserts)).toEqual([CALIBRATION]);
+    expect(affected.claims.map((c) => c.asserts)).not.toContain(TREND);
     expect(affected.complete).toBe(false);
   });
 

@@ -77,7 +77,18 @@ export interface Conclusion {
  */
 export interface EnquiryStatus {
   enquiry: string;
-  question: string;
+  /**
+   * The question this line of enquiry pursues — its **identity**, not its
+   * wording, matching `QuestionStanding.question` (PJ-030 §4).
+   *
+   * `null` where no question stands behind the enquiry. It used to fall back to
+   * the *line of enquiry's own name*, which put two different entities' text in
+   * one field and made this report unable to refer to the question at all —
+   * which is what the multi-pursuit wrong answer is built on.
+   */
+  question: string | null;
+  /** What that question asks, in its own words. `null` when `question` is. */
+  asks: string | null;
   open: boolean;
   /**
    * `accepted-as-unresolved` replaces the `deferred` token, which no verb ever
@@ -407,6 +418,26 @@ export interface VerificationReport {
 }
 
 /**
+ * A claim reached by `whatDependsOn`, identified as well as quoted.
+ *
+ * `claim` is the handle; `asserts` is what it says. Both, because a report
+ * telling you what would be affected is useless if you cannot then go and look
+ * at any of it — every follow-up verb takes a reference — and unreadable if it
+ * gives you only an id. This is the shape `QuestionStanding` and
+ * `IdentifiedArtefact` already use (PJ-030 §4).
+ */
+export interface AffectedClaim {
+  claim: string;
+  asserts: string;
+}
+
+/** A line of enquiry reached by `whatDependsOn`. `enquiry` is the handle, `pursuing` its approach. */
+export interface AffectedEnquiry {
+  enquiry: string;
+  pursuing: string;
+}
+
+/**
  * What is affected if this record turns out to be wrong — and, deliberately, a
  * statement that the answer is a **lower bound**.
  *
@@ -422,9 +453,9 @@ export interface VerificationReport {
  */
 export interface DependencyReport {
   /** Claims found to rest on the subject, supporting or challenging. */
-  claims: string[];
+  claims: AffectedClaim[];
   /** Lines of enquiry found to reach it. */
-  enquiries: string[];
+  enquiries: AffectedEnquiry[];
   /**
    * The routes actually walked, named so a reader knows what was considered.
    *

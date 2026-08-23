@@ -111,7 +111,7 @@ describe("S-8b: there is no who, only what ran", () => {
     expect(result.matched.reproducible).toBe(true);
     expect(result.mismatched.differing.map((p) => p.name)).toEqual([CONFIG]);
     expect(result.mismatched.reproducible).toBe(false);
-    expect(result.rests.claims).toEqual([MOVES]);
+    expect(result.rests.claims.map((c) => c.asserts)).toEqual([MOVES]);
   });
 
   /**

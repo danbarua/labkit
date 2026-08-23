@@ -168,8 +168,12 @@ What would be affected if a record turned out to be wrong: the claims and lines 
 
 **Returns**
 
-- `claims`: string[]
-- `enquiries`: string[]
+- `claims`: object[]
+  - `claim`: string
+  - `asserts`: string
+- `enquiries`: object[]
+  - `enquiry`: string
+  - `pursuing`: string
 - `routesWalked`: string[]
 - `complete`: false
 
@@ -188,7 +192,8 @@ Whether a line of enquiry is still open, and if not how it closed — answered, 
 **Returns**
 
 - `enquiry`: string
-- `question`: string
+- `question`: string | null
+- `asks`: string | null
 - `open`: boolean
 - `closure`: "answered" | "abandoned" | "accepted-as-unresolved" | null
 - `answer`: "yes" | "no" | null

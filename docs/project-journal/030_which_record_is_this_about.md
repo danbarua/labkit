@@ -156,7 +156,7 @@ resolve wording; another emits it as the answer.
 
 ## 5. The plan
 
-Not started. In order, each step shippable on its own:
+**Steps 1–2 done for `DependencyReport` and `EnquiryStatus`** (2026-08-23). In order, each step shippable on its own:
 
 1. **A demonstration first.** Extend `tests/subject-identity.test.ts` with the
    audit as an assertion: for each row of §4's table, the field is prose and the
@@ -164,8 +164,17 @@ Not started. In order, each step shippable on its own:
    everything below, and it fails honestly today.
 2. **Fix the pattern where it is already established**, one report at a time,
    adding the reference *beside* the wording rather than replacing it —
-   `{question: QuestionRef, asks: string}` is the shape three reports already
-   use, so this is not a new convention. Additive: no caller breaks.
+   `{question, asks}` is the shape three reports already use, so this is not a
+   new convention. ~~Additive: no caller breaks.~~ **Wrong, corrected by
+   doing it:** where the wording lives in a bare `string[]` or a bare `string`,
+   there is nowhere to add a reference beside it, so both fixes were *shape
+   changes*. `tsc` named every call site for `DependencyReport`. It named none
+   for `EnquiryStatus.question`, because that field changed meaning from wording
+   to identity and both are `string` — the CLI would have silently printed
+   `Q_1` where the question used to be. Found by grepping readers, not by the
+   compiler. **A field that changes meaning without changing type is the
+   dangerous half of this plan**, and the remaining rows in §4 are mostly that
+   shape.
 3. **`DependencyReport` first**, because it is the one whose answer is
    unusable without it, and `EnquiryStatus` second, because it is the one
    shipping a wrong answer.

@@ -163,8 +163,8 @@ export const supportExplanationSchema = z.strictObject({
 });
 
 export const dependencyReportSchema = z.strictObject({
-  claims: z.array(z.string()),
-  enquiries: z.array(z.string()),
+  claims: z.array(z.strictObject({ claim: z.string(), asserts: z.string() })),
+  enquiries: z.array(z.strictObject({ enquiry: z.string(), pursuing: z.string() })),
   routesWalked: z.array(z.string()),
   // Literal `false`, not `boolean`. The report is a lower bound and says so in
   // its type; a caller must not be able to read `complete: true` from it.
@@ -173,7 +173,8 @@ export const dependencyReportSchema = z.strictObject({
 
 export const enquiryStatusSchema = z.strictObject({
   enquiry: z.string(),
-  question: z.string(),
+  question: z.string().nullable(),
+  asks: z.string().nullable(),
   open: z.boolean(),
   closure: z.enum(["answered", "abandoned", "accepted-as-unresolved"]).nullable(),
   answer: z.enum(["yes", "no"]).nullable(),

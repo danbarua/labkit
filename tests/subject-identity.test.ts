@@ -125,11 +125,12 @@ describe("1. an enquiry's status is the question's status", () => {
     }
   });
 
-  test("the two facts Bruno needs cannot both be read", async () => {
-    // "The question is answered" and "my line has produced nothing" are
-    // different facts. One read returns one state, so the second is unavailable
-    // -- not wrong, absent. Compare S-1's refusal to collapse `untested` into
-    // `unresolved`, which is this distinction one level up.
+  test("Bruno can now reach the question, and the wrong answer is still there", async () => {
+    // **Half fixed, and the half that moved is the one PJ-030 §5 step 4
+    // predicted.** Carrying a QuestionRef makes the question *reachable*: Bruno
+    // now holds an id he can ask about separately. It does not stop
+    // enquiryStatus answering about the question under his enquiry's name, so
+    // the wrong answer stands until the closure semantics are decided.
     const s = await session();
     try {
       const question = await s.pose("does width matter?");
@@ -148,12 +149,15 @@ describe("1. an enquiry's status is the question's status", () => {
       const later = new ResearchSession(await scenario.current(), { clock });
       const status = await later.enquiryStatus(untouched);
 
-      // Nothing in the report distinguishes a pursuit that produced the answer
-      // from one that produced nothing. Both fields below are the question's.
-      expect(Object.keys(status).sort()).toEqual(
-        ["answer", "closure", "enquiry", "evidence", "open", "question", "restsOn"].sort(),
-      );
-      // There is no field that could carry "this pursuit contributed nothing".
+      // Reachable now: an id, not the question's text.
+      expect(status.question).not.toBeNull();
+      expect(status.question).not.toBe(status.asks);
+
+      // Still nothing distinguishing a pursuit that produced the answer from
+      // one that produced nothing. `closure`, `answer` and `evidence` are all
+      // the question's, under this enquiry's name.
+      expect(status.closure).toBe("answered");
+      expect(status.evidence.length).toBeGreaterThan(0);
       expect(status).not.toHaveProperty("contributed");
     } finally {
       await scenario.end();
@@ -295,16 +299,19 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("EnquiryStatus names a question and a body of evidence, and identifies neither", async () => {
+  test("EnquiryStatus identifies its question — FIXED, PJ-030 §5 step 2", async () => {
     try {
-      const { read, enquiry } = await programme();
+      const { read, enquiry, question } = await programme();
       const status = await read.enquiryStatus(enquiry);
 
       expect(looksLikeAnId(status.enquiry)).toBe(true);
-      // The question it pursues -- wording only. This is the field the
-      // multi-pursuit wrong answer is built on.
-      expect(looksLikeAnId(status.question)).toBe(false);
-      // The evidence the closure rests on -- statements, not references.
+      // The question it pursues, by identity -- and it is the RIGHT question,
+      // not merely an id-shaped string.
+      expect(status.question).toBe(question.id);
+      expect(looksLikeAnId(status.asks!)).toBe(false);
+
+      // Still outstanding: the evidence a closure rests on is statements, not
+      // references. PJ-030 §4, EnquiryStatus.evidence[].
       expect(status.evidence.length).toBeGreaterThan(0);
       expect(status.evidence.every(looksLikeAnId)).toBe(false);
     } finally {
@@ -312,16 +319,18 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("whatDependsOn answers what is affected with prose nobody can act on", async () => {
-    // The clearest of them. This report exists to say *go and look at these*,
-    // and every follow-up verb takes a reference.
+  test("whatDependsOn now identifies what is affected — FIXED, PJ-030 §5 step 2", async () => {
+    // Was: claims:["depth moves convergence"], enquiries:["seed sweep"] -- prose
+    // no follow-up verb accepts. Now both, in the shape the other reports use.
     try {
       const { read } = await programme();
       const affected = await read.whatDependsOn("sweep readings");
 
       expect(affected.claims.length + affected.enquiries.length).toBeGreaterThan(0);
-      expect(affected.claims.every(looksLikeAnId)).toBe(false);
-      expect(affected.enquiries.every(looksLikeAnId)).toBe(false);
+      expect(affected.claims.every((c) => looksLikeAnId(c.claim))).toBe(true);
+      expect(affected.claims.every((c) => looksLikeAnId(c.asserts))).toBe(false);
+      expect(affected.enquiries.every((e) => looksLikeAnId(e.enquiry))).toBe(true);
+      expect(affected.enquiries.every((e) => looksLikeAnId(e.pursuing))).toBe(false);
     } finally {
       await scenario.end();
     }

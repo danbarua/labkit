@@ -129,7 +129,7 @@ describe("S-9d: resting on one thing, or two?", () => {
 
     for (const part of [surviving, regenerated]) {
       const rests = await reader.whatDependsOn(part);
-      expect(rests.claims).toEqual([DIVERGE]);
+      expect(rests.claims.map((c) => c.asserts)).toEqual([DIVERGE]);
     }
     expect(surviving.id).not.toEqual(regenerated.id);
 

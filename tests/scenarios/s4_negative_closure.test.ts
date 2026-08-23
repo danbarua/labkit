@@ -334,7 +334,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     // ...and invalidating the record enumerates the challenged claim.
     const downstream = await session.whatDependsOn("cluster-comparison output");
-    expect(downstream.claims).toContain(SPECIFICITY);
+    expect(downstream.claims.map((c) => c.asserts)).toContain(SPECIFICITY);
   });
 
   test("an enquiry nobody has closed is open, and that is not a kind of closure", async () => {

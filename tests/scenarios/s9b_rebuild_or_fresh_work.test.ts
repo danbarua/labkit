@@ -99,6 +99,16 @@ async function theCachedConstruction(s: ResearchSession) {
   return { enquiry, control, analysis };
 }
 
+/** Replaces every natural-id counter with `N`, so two worlds compare on structure. */
+function normaliseIds<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value).replace(
+      /"(Q|LOE|EU|EV|CLM|DEC|CRIT|CEVAL|GATE|REV|ART|COMP|TASK)_\d+"/g,
+      '"$1_N"',
+    ),
+  ) as T;
+}
+
 describe("S-9b: was this a rebuild, or new work?", () => {
   /**
    * The control, and it is doing the same job probe 1 does in the consumer
@@ -164,7 +174,12 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       return {
         why: await reader.whySupported(MATCHES),
         known: (await reader.whatIsKnown()).provisional.map((q) => q.asks).sort(),
-        depends: await reader.whatDependsOn(second),
+        // Identity normalised, the way `rebuilt` below already is. Natural ids
+        // are global sequences, so two paired worlds legitimately draw
+        // different ones -- comparing them raw would report a difference that
+        // is only the counter moving. What the comparison is for is whether
+        // anything *else* differs.
+        depends: normaliseIds(await reader.whatDependsOn(second)),
         rebuilt: rebuilt.id.replace(/\d+/, "N"),
       };
     };
@@ -173,6 +188,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       build("randomised control series, regenerated from an inferred algorithm"),
       build("randomised control series for stage 3, generated afresh"),
     );
+
 
     // Everything a reader can ask is identical except the sentence the
     // researcher happened to type. Attribution of a rebuild is currently
@@ -384,7 +400,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       expect(Object.keys(exact).sort()).toEqual([
         "claims", "complete", "enquiries", "routesWalked",
       ]);
-      expect(exact.claims).toEqual([MATCHES]);
+      expect(exact.claims.map((c) => c.asserts)).toEqual([MATCHES]);
 
       // Same detector on the other read a consumer would reach for. The
       // reproducibility report is offered per part and says which parts match;

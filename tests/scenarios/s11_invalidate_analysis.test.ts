@@ -148,7 +148,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // ...and the same answer from a fresh query, not just from the report.
     const downstream = await session.whatDependsOn("bootstrap-pairwise output");
-    expect(downstream.claims.sort()).toEqual(report.affected.sort());
+    expect(downstream.claims.map((c) => c.asserts).sort()).toEqual(report.affected.sort());
   });
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {

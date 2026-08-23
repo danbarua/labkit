@@ -105,8 +105,8 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     await aCachedConstructionWithOneUnrecordedPart();
 
     const dependents = await (await afterwards()).whatDependsOn(CONTROL);
-    expect(dependents.claims).toEqual([PROPOSITION]);
-    expect(dependents.enquiries).toEqual(["does the accelerated path match the reference?"]);
+    expect(dependents.claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
+    expect(dependents.enquiries.map((e) => e.pursuing)).toEqual(["does the accelerated path match the reference?"]);
   });
 
   /**
@@ -143,11 +143,11 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     // The historical part still carries what always rested on it, and nothing
     // that rests on the rebuild.
     const historical = await reader.whatDependsOn(original);
-    expect(historical.claims).toEqual([PROPOSITION]);
+    expect(historical.claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
 
     // And the regenerated part carries only its own.
     const rebuilt = await reader.whatDependsOn(regenerated);
-    expect(rebuilt.claims).toEqual(["the rebuild agrees with the cache"]);
+    expect(rebuilt.claims.map((c) => c.asserts)).toEqual(["the rebuild agrees with the cache"]);
     expect(downstream).toBeDefined();
   });
 
@@ -190,7 +190,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     const { enquiry } = await aCachedConstructionWithOneUnrecordedPart();
 
     // Before regenerating, the name is unambiguous and the question answerable.
-    expect((await session.whatDependsOn(CONTROL)).claims).toEqual([PROPOSITION]);
+    expect((await session.whatDependsOn(CONTROL)).claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
 
     await session.recordObservations({
       enquiry,
@@ -296,6 +296,6 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     // What S-9 did establish, and all this test claims to pin:
     expect(regenerated.id).not.toBe(original.id);
     expect((await reader.whatDependsOn(regenerated)).claims).toEqual([]);
-    expect((await reader.whatDependsOn(original)).claims).toEqual([PROPOSITION]);
+    expect((await reader.whatDependsOn(original)).claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
   });
 });
