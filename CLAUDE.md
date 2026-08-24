@@ -775,9 +775,10 @@ paragraph said the cost was `provisionTenantGraph()` reconciling on every
 `begin()` and `current()`. That was written sixteen minutes before `6eeeb92`
 cut reconciliation from ~80 round trips to 6, and nobody updated the sentence —
 so it misdirected every investigation after it, including two of this repo's
-own. Measured on today's code: a steady-state provisioning call is **6 queries,
-1-4ms**; the cold one is 83 queries and happens **once per file**. Provisioning
-is 8-18% of query time in the files that actually fail.
+own. **Profiled 2026-08-24**, and every figure in this section is of that date:
+a steady-state provisioning call is **6 queries, 1-4ms**; the cold one is 83
+queries and happens **once per file**; provisioning is 8-18% of query time in
+the files that actually fail.
 
 The predictor is **queries per test**. Files cluster from 6 to ~280 and
 individual tests reach ~380, which is the band that straddles 5000ms once

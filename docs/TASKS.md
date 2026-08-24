@@ -11,8 +11,16 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 - [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**
   Dan deprioritised this; it is not obstructing work. The cascade that turned
-  one crossing into a burst is fixed (`2de1060`, `5439085`); provisioning got
-  69% cheaper again in `6eeeb92`. What remains is the crossings themselves.
+  one crossing into a burst is fixed (`2de1060`, `5439085`), and `6eeeb92` cut
+  provisioning reconciliation to 6 queries in the steady state. What remains is
+  the crossings themselves.
+
+  (A "69% cheaper" figure stood here and has been deleted rather than dated. Its
+  workings — "two queries instead of ~78 checks, three round trips in the steady
+  state" — were in the same sentence originally and were edited away by
+  `d596672`; what survived could not be re-derived, and its remnant basis of
+  three steady-state round trips contradicts the six measured on 2026-08-24.
+  Found by auditing this file for exactly that, after `07d3dab`.)
 
   **Do not re-investigate from scratch.** Refuted with evidence: advisory-lock
   contention; the pglite-socket desync bug as primary mechanism; fd/socket
