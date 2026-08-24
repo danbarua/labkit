@@ -26,28 +26,34 @@
  * Imports only src/domain — never src/db (enforced).
  */
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
+let graph: Awaited<ReturnType<Scenario["begin"]>>;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
 beforeAll(async () => { scenario = await openScenario(); });
+beforeEach(async () => { graph = await scenario.begin(); });
+afterEach(async () => { await scenario.end(); });
 afterAll(async () => { await scenario.close(); });
 
 async function afterwards(): Promise<ResearchSession> {
   return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
 }
 
+/**
+ * Scopes a session over the world the hooks opened.
+ *
+ * It used to call `begin()`/`end()` itself, which put both on the **test's own
+ * clock** — bun's 5000ms ceiling times the body and runs `beforeEach`/
+ * `afterEach` outside it. Both tests here open exactly one world, so the
+ * lifecycle moved to the hooks and the call sites did not change.
+ */
 async function inOneWorld<T>(build: (s: ResearchSession) => Promise<T>): Promise<T> {
-  const graph = await scenario.begin();
-  try {
-    return await build(new ResearchSession(graph, { clock, events: inMemoryEventLog() }));
-  } finally {
-    await scenario.end();
-  }
+  return build(new ResearchSession(graph, { clock, events: inMemoryEventLog() }));
 }
 
 const MOVES = "the pruning schedule shifts the convergence point";
