@@ -761,3 +761,46 @@ test("an interrupted declareGate leaves a gate no reader enumerates", async () =
   const contract = await session.contractFor(work);
   expect(contract.objective).toBe("scale up"); // ...and invisible from the work.
 });
+
+/**
+ * The empty contract, which is the case the array conversion could have broken
+ * quietly.
+ *
+ * `Task.mayRead` was a JSON string until 2026-08-24, read back through a
+ * `JSON.parse` in a try/catch. S-8 covers the populated round trip with real
+ * values; nothing covered **no** values, and that is where a native agtype
+ * array can differ from a serialised one — an empty list is the shape most
+ * likely to come back absent rather than empty.
+ *
+ * Both spellings are asserted because `planWork` accepts either, and both mean
+ * "reads nothing". `contractFor` has **no fallback** for a missing property, so
+ * these assertions read the stored array itself rather than a default standing
+ * in for it -- verified by putting a sentinel in a `?? []` and watching it
+ * never appear.
+ */
+test("a task planned with no readable inputs reports an empty contract, not a missing one", async () => {
+  const omitted = await session.planWork({
+    objective: "write the discussion section",
+    acceptance: "a draft exists",
+  });
+  const explicit = await session.planWork({
+    objective: "tidy the repository",
+    acceptance: "no stray files",
+    mayRead: [],
+  });
+
+  expect((await session.contractFor(omitted)).mayRead).toEqual([]);
+  expect((await session.contractFor(explicit)).mayRead).toEqual([]);
+
+  // And the populated case still round-trips through the same read, so this
+  // test fails for the right reason if arrays stop working altogether.
+  const populated = await session.planWork({
+    objective: "rerun the sweep",
+    acceptance: "all seeds complete",
+    mayRead: ["seeds.csv", "config.toml"],
+  });
+  expect((await session.contractFor(populated)).mayRead).toEqual([
+    "seeds.csv",
+    "config.toml",
+  ]);
+});

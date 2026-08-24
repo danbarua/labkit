@@ -5,9 +5,9 @@
  * they construct a `ReadSurface`, never a `ResearchSession`, so no write verb
  * is in scope. The PJ-028 sweep found the hole, and it is one the original
  * check could not see by construction: both adapters hold a `TenantGraph`,
- * whose `createNode`, `createEdge` and `closeDecision` are writes and are not
- * `WriteSurface` verbs, so a list derived from `WriteSurface.prototype` can
- * never contain them.
+ * whose `createNode` and `createEdge` are writes and are not `WriteSurface`
+ * verbs, so a list derived from `WriteSurface.prototype` can never contain
+ * them.
  *
  * Both lists are derived rather than typed out, for the reason the original
  * one was: a verb added later is covered without anyone remembering. The

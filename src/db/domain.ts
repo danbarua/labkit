@@ -350,12 +350,17 @@ export interface ClaimProps {
 }
 
 /**
- * `is_open`/`closed_at` are kept as explicit operational state (PJ-004
- * decision #2) — narrowly scoped to "is this decision record still active
- * in the control process?", never "is the proposition scientifically
- * valid?" (that flows from evidence/supersession/review, never from these
- * fields). `evidence` (a string shadow of `Decision -[:BASED_ON]-> Evidence`)
- * is removed (PJ-003 §10).
+ * `evidence` (a string shadow of `Decision -[:BASED_ON]-> Evidence`) is removed
+ * (PJ-003 §10).
+ *
+ * So are `is_open`/`closed_at`, PJ-004 decision #2's explicit operational
+ * state, removed on 2026-08-24 with `TenantGraph.closeDecision()` and the
+ * biconditional validator that guarded them. **Nothing was ever stored in
+ * them.** All six verbs that mint a Decision pass exactly the three properties
+ * below, so the only branch of that validator production ever reached was the
+ * one defaulting `is_open` to `true`; nothing anywhere read whether a decision
+ * was closed. A decision's standing is expressed by supersession and review,
+ * which is where the doc comment said it belonged all along.
  */
 export interface DecisionProps {
   reason: string;
@@ -379,8 +384,6 @@ export interface DecisionProps {
    * unplaceable, which is why deriving the order from evidence failed.
    */
   decided_at: string;
-  is_open?: boolean;
-  closed_at?: string;
 }
 
 export interface CriterionProps {
@@ -427,7 +430,19 @@ export interface ComputationProps {
 
 export interface TaskProps {
   objective: string;
-  inputs: string;
+  /**
+   * What the task is permitted to read — a **native agtype array**, not a JSON
+   * string.
+   *
+   * It was `inputs: string` holding `JSON.stringify(mayRead)`, on the stated
+   * grounds that serialising kept it from being queried by element. That was
+   * not a platform constraint and the repo already disproved it:
+   * `CONSUMES.positions` is a `number[]` written and read as an array with no
+   * serialisation either way. Storing it honestly deleted the round trip, a
+   * try/catch and two runtime type guards on the read side — all of which
+   * existed to survive a shape the writer could not produce.
+   */
+  mayRead: string[];
   outputs: string;
   acceptance: string;
   is_open?: boolean;
@@ -468,10 +483,14 @@ interface NodeType<L extends NodeLabel> {
 
   /**
    * Creation-time enforcement of per-label property invariants (PJ-004
-   * decision #8) — `TenantGraph.closeDecision()` alone can't be the whole
-   * story, since a generic create would otherwise happily accept a
-   * pre-contradicted Decision. Returns the props to actually write, so a
-   * validator can normalize (default `is_open`) as well as reject.
+   * decision #8). Returns the props to actually write, so a validator can
+   * normalize as well as reject.
+   *
+   * **No label declares one today.** `Decision` was the only user and went with
+   * `closeDecision()` on 2026-08-24. The hook is kept rather than culled with
+   * it: it is one optional field and one ternary in `createNode`, and it is the
+   * seam a per-label invariant attaches to. Deleting and re-adding it would
+   * cost more than leaving it.
    */
   readonly validate?: (props: NodePropsByLabel[L]) => NodePropsByLabel[L];
 }
@@ -487,18 +506,7 @@ export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
   EvidenceUnit: { prefix: "EU" },
   Evidence: { prefix: "EV" },
   Claim: { prefix: "CLM" },
-  Decision: {
-    prefix: "DEC",
-    // Strict biconditional, tightened from PJ-004 decision #2's original
-    // "may have closed_at" now that there's no legacy data to accommodate.
-    validate: (props) => {
-      const is_open = props.is_open ?? true;
-      const closed_at = props.closed_at;
-      if (is_open && closed_at) throw new Error("Decision.is_open=true cannot have closed_at set");
-      if (!is_open && !closed_at) throw new Error("Decision.is_open=false requires closed_at");
-      return { ...props, is_open };
-    },
-  },
+  Decision: { prefix: "DEC" },
   Criterion: { prefix: "CRIT" },
   CriterionEvaluation: { prefix: "CEVAL" },
   Gate: { prefix: "GATE" },

@@ -31,7 +31,6 @@ export type {
   ReinterpretationReport,
   Revision,
   InterpretationHistory,
-  ClaimSubject,
   ConflictSide,
   ConflictVerdict,
   TaskContract,
