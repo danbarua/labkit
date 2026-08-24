@@ -209,10 +209,11 @@ neither can reach the other's verbs, and
 listed in `NOT_EXPOSED` with a reason. **`docs/mcp-tools.md` is the tool list**;
 this paragraph deliberately does not count them.
 
-`bun test` exits with a non-zero code even when every test passes — this is
-a known `bun test` + PGlite WASM teardown interaction, not a failure signal.
-Read the actual pass/fail counts in the output, don't trust the exit code.
-`bun examples/full-lifecycle.ts` **used to do the same and no longer does.** It
+`bun test`'s exit code means what it says: **0 is a clean run, non-zero is a
+failure.** It returned 99 on a passing suite until PGlite 0.5.7 (2026-08-24)
+fixed the WASM teardown interaction behind it.
+
+`bun examples/full-lifecycle.ts` had the same defect and was fixed earlier. It
 exited 99 on a success, so this file told everyone to ignore its exit code and
 read the output instead — and the script had been dead since `af5a1d2` deleted
 the views it read back through, dying at `relation "labkit_t1.claim" does not
@@ -245,8 +246,8 @@ about the pipe, not about that incident.
 **Nothing runs these for you** — there is no CI workflow and no git hook. Before
 committing, run `bun test`, `bun run typecheck` and
 `npx depcruise src tests --output-type err`; add `check:migrations` if you
-touched `drizzle/`, and `check:tests-assert` if you touched tests. Read `bun test`'s pass/fail counts,
-not its exit code, and do not pipe it — both traps are above.
+touched `drizzle/`, and `check:tests-assert` if you touched tests. Do not pipe
+`bun test` — that trap is above, and is still live.
 
 ## Architecture: two persistence halves, deliberately not one
 

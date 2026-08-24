@@ -60,18 +60,15 @@ bun run typecheck
 npx depcruise src tests --output-type err
 ```
 
-Three traps in this repo, all of which have caught someone already
-(see CLAUDE.md):
+One trap in this repo, which has caught someone already (see CLAUDE.md):
 
-- **`bun test` exits non-zero even when every test passes** — a PGlite WASM
-  teardown interaction. Record the pass/fail counts from the output. Never
-  record the exit code as if it meant something.
 - **`$?` after a pipeline reports the last command's status.** `bun test | tail`
   reports `tail`'s success. Don't pipe a command whose status you intend to
-  report.
-- **`bun examples/full-lifecycle.ts` exits 99 on a completely successful run.**
-  Judge it by the output ending `closed connection cleanly` with no raw
-  graphids in it.
+  report — redirect to a file and read the file.
+
+Exit codes are otherwise trustworthy: `bun test` and
+`bun examples/full-lifecycle.ts` both return 0 on success and non-zero on
+failure.
 
 ## 3. Write the entry
 
