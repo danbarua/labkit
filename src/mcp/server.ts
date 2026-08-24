@@ -32,17 +32,30 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
 import { TenantGraph } from "../db/graph";
-import { ReadSurface, WriteSurface } from "../domain";
+import { ReadSurface, WriteSurface, inMemoryEventLog } from "../domain";
+import { commandContext, mockGitContext, mockSessionContext } from "../attribution";
 import { TOOLS, WRITE_TOOLS } from "./tools";
 import { DOCS_URI, renderToolDocs } from "./docs";
 
 /**
- * Registers every tool against the two surfaces. Transport-free, so a test can
- * drive it over `InMemoryTransport` without a subprocess.
+ * Registers every tool against the read surface and a **factory** for the write
+ * one. Transport-free, so a test can drive it over `InMemoryTransport` without
+ * a subprocess.
  *
- * Both surfaces are required. An optional write half would be the read-only
- * mode surviving as an API shape, and a caller that wants a read-only server
- * has one already: `src/cli.ts` builds a `ReadSurface` and nothing else.
+ * Both are required. An optional write half would be the read-only mode
+ * surviving as an API shape, and a caller that wants a read-only server has one
+ * already: `src/cli.ts` builds a `ReadSurface` and nothing else.
+ *
+ * **A factory rather than an instance, so attribution can be per command.** A
+ * surface holds no query state — no constructor and no field of its own beyond
+ * `SessionCore`'s three, and the only mutable state in reach is
+ * `inTransaction`'s depth counter on the shared `TenantGraph` — so building one
+ * per tool call costs a `new` over three references and buys a fresh
+ * `git_hash` and session id each time. The alternative was threading a context
+ * argument through all eighteen write verbs.
+ *
+ * The read side stays a single instance on purpose: reads never touch the clock
+ * and never emit, so there is nothing per-call for them to carry.
  *
  * Every tool declares an `outputSchema`. This reverses what this comment said
  * until 2026-08-22 — that a mirror of the report interfaces would exist only to
@@ -58,7 +71,7 @@ import { DOCS_URI, renderToolDocs } from "./docs";
  * would convert a good refusal into an empty success, which is the one
  * outcome the domain went to trouble to avoid.
  */
-export function buildServer(read: ReadSurface, write: WriteSurface): McpServer {
+export function buildServer(read: ReadSurface, makeWrite: () => WriteSurface): McpServer {
   const server = new McpServer({ name: "labkit", version: "0.0.1" });
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
@@ -110,7 +123,9 @@ export function buildServer(read: ReadSurface, write: WriteSurface): McpServer {
         inputSchema: definition.inputSchema,
         outputSchema: definition.outputSchema,
       },
-      respond((args) => definition.handler(write, args)),
+      // A surface per call, so each write records the attribution and commit
+      // in force at the moment it ran rather than at server start.
+      respond((args) => definition.handler(makeWrite(), args)),
     );
   }
 
@@ -152,7 +167,8 @@ function respond(run: (args: Record<string, unknown>) => Promise<unknown>) {
 let inFlight = 0;
 
 /**
- * Resolves one tenant, builds one read surface, serves over stdio.
+ * Resolves one tenant, builds the read surface and a per-call write factory,
+ * serves over stdio.
  *
  * The tenant is resolved once at the boundary and never again — below it every
  * function takes a resolved context, and there is no "current tenant" anyone
@@ -160,13 +176,25 @@ let inFlight = 0;
  */
 export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Promise<void> {
   const connection = await connectDb();
-  const ctx = await resolveTenantContext(connection.db, tenant);
+  // `tenantCtx`, not `ctx`. There are two contexts in scope below and they are
+  // unrelated: this one is which tenant's graph to talk to, and the
+  // `CommandContext` further down is who is talking and when.
+  const tenantCtx = await resolveTenantContext(connection.db, tenant);
+
   // One graph, so `inTransaction`'s re-entrancy depth is shared between the
-  // halves; one event sink, taken from the write half, so both see the same
-  // stream. This is the composition `src/domain/session.ts` specifies for an
+  // halves. This is the composition `src/domain/session.ts` specifies for an
   // adapter that needs both.
+  const graph = new TenantGraph(tenantCtx, connection.db);
+
+  // The sink is constructed **here** rather than taken from a surface, and that
+  // is load-bearing now that the write half is built per call. It used to be
+  // whatever `new WriteSurface(graph)` defaulted to, handed on to the read half
+  // as `writes.events`; with a surface per call each one would default to its
+  // own fresh log, the read half would hold the first call's, and the stream
+  // would fragment silently. Owning it at this level makes the process-scoped
+  // sink a decision instead of a consequence of construction order.
   //
-  // The sink is the default in-memory one, and that is the design rather than a
+  // It is still the in-memory one, and that is the design rather than a
   // shortfall. The graph is the record: `src/domain/read.ts` never touches
   // `events`, and the scenarios that mention the log assert it is **empty** at
   // the moment a historical answer is read, which is what proves the answer is
@@ -174,11 +202,22 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   //
   // A durable sink is a SQL table and a reader — not difficult, just unearned.
   // What would earn it is a consumer: an audit log, notifications pushed to an
-  // MCP client, or a projection into a different view model. None exists yet, so
-  // building one now would be a feature nothing asks for.
-  const graph = new TenantGraph(ctx, connection.db);
-  const writes = new WriteSurface(graph);
-  const server = buildServer(new ReadSurface(graph, { events: writes.events }), writes);
+  // MCP client, or a projection into a different view model. Attribution now
+  // rides on every event and is read by nothing, which is a second, nearer
+  // trigger than the one `src/domain/events.ts` names — see PJ-031.
+  const events = inMemoryEventLog();
+
+  // Providers are sampled per call, not once here, so a long-running server
+  // records the commit each piece of work was actually done against. Both are
+  // mocks today; `src/attribution.ts` is the single file that changes when they
+  // stop being.
+  const makeWrite = () =>
+    new WriteSurface(graph, {
+      ...commandContext(mockGitContext, mockSessionContext),
+      events,
+    });
+
+  const server = buildServer(new ReadSurface(graph, { events }), makeWrite);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

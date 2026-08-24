@@ -1427,12 +1427,28 @@ export class WriteSurface extends SessionCore {
     };
   }
 
+  /**
+   * The single choke point. Every state-changing verb reaches the sink through
+   * here, so a field added to this one `record` call is stamped on every event
+   * the domain will ever emit — which is why `attribution` needed no verb to
+   * change and no signature to move.
+   *
+   * Both context fields are read at the moment of the emit, not captured at
+   * construction, so a surface built per command reports that command's clock
+   * and that command's attribution.
+   */
   private emit(
     operation: string,
     subject: string,
     detail?: Record<string, unknown>,
   ): void {
-    this.events.record({ at: this.clock.now(), operation, subject, detail });
+    this.events.record({
+      at: this.clock.now(),
+      attribution: this.attribution,
+      operation,
+      subject,
+      detail,
+    });
   }
   private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(

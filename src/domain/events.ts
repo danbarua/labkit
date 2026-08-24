@@ -35,6 +35,15 @@
  * implementation has to satisfy, and its shape is whatever the domain turns
  * out to require. `inMemoryEventLog()` below is therefore a decision, not an
  * unfinished edge.
+ *
+ * **A second trigger now stands beside that one, and it is nearer.** Time was
+ * one aspect of a command's execution context; who ran it is another, and
+ * `AttributionContext` below records it. Attribution is *written* here and read
+ * by nothing — the shape CLAUDE.md calls dead code after PJ-007's
+ * `buildAsClause`. It ships that way deliberately, and the trigger is a
+ * consumer asking who did something: an audit read, a "what has this session
+ * been doing" report, an MCP notification. Until one exists, attribution
+ * reaches the end of this process and stops. See PJ-031.
  */
 
 /** Injected so scenario tests can assert on exact timestamps instead of racing the wall clock. */
@@ -47,12 +56,76 @@ export const systemClock: Clock = {
 };
 
 /**
+ * Who ran a command, and from what code state.
+ *
+ * Three fields, and each answers a different question a reader of the record
+ * actually asks. `attribution_label` is for a human scanning ("claude-opus-5",
+ * "dan"); `attribution_id` is the stable handle two events can be compared on,
+ * because labels collide and get renamed; `git_hash` is the code the command
+ * ran against, which is the difference between "this was decided" and "this was
+ * decided by a version that had the bug".
+ *
+ * Empty strings rather than optional fields: an unattributed command should
+ * say so — see {@link UNATTRIBUTED} — rather than arrive with the question
+ * unasked. A missing key and a known-absent value read the same at a call site
+ * and mean different things.
+ */
+export interface AttributionContext {
+  attribution_label: string;
+  attribution_id: string;
+  git_hash: string;
+}
+
+/**
+ * What a command executes in.
+ *
+ * `Clock` was here first and alone, because PJ-009 §3 built the temporal seam
+ * before a scenario forced it: the part that is hard to retrofit is the API
+ * discipline, not the field. That argument was never specific to time. Once
+ * callers can mutate research state without leaving a trace of *who*, "which
+ * agent recorded this analysis?" is unanswerable for everything already
+ * written, exactly as "what evidence existed when this was amended?" would have
+ * been.
+ *
+ * So this is the temporal seam generalised one level, and the clock keeps its
+ * name and position inside it. {@link ResearchSessionOptions} extends
+ * `Partial<CommandContext>` rather than nesting it under a `ctx` key — nesting
+ * would have moved 110 call sites across 38 files and changed no behaviour.
+ */
+export interface CommandContext {
+  clock: Clock;
+  attribution: AttributionContext;
+}
+
+/**
+ * The attribution of a command nobody claimed.
+ *
+ * Named rather than written inline at the default, so it appears in an event
+ * as a positive statement — *this ran unattributed* — instead of as three empty
+ * strings a reader has to interpret. Every direct construction of a surface in
+ * the test suite gets this, which is correct: a scenario is a research
+ * conversation, not an agent doing work.
+ */
+export const UNATTRIBUTED: AttributionContext = {
+  attribution_label: "unattributed",
+  attribution_id: "",
+  git_hash: "",
+};
+
+/**
  * One recorded domain operation. `subject` is the natural id of whatever the
  * operation was primarily about; `detail` carries the operation-specific
  * payload a later query would need to reconstruct what happened.
  */
 export interface DomainEvent {
   at: string;
+  /**
+   * Required, not optional, and that is the enforcement.
+   * `WriteSurface.emit` is the only caller of `record`, so a required field
+   * means the type system — not a convention — is what stops an event reaching
+   * the sink without saying who caused it.
+   */
+  attribution: AttributionContext;
   operation: string;
   subject: string;
   detail?: Record<string, unknown>;

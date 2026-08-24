@@ -64,8 +64,11 @@ const session = async () =>
 async function overTheWire() {
   const graph = await scenario.begin();
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const writes = new WriteSurface(graph);
-  await buildServer(new ReadSurface(graph, { events: writes.events }), writes).connect(serverSide);
+  const events = inMemoryEventLog();
+  await buildServer(
+    new ReadSurface(graph, { events }),
+    () => new WriteSurface(graph, { clock, events }),
+  ).connect(serverSide);
   const client = new Client({ name: "subject-identity", version: "0" });
   await client.connect(clientSide);
   return client;

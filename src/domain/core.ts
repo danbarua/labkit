@@ -7,9 +7,9 @@
  * and the measurement bore it out: 18 write verbs and 14 read verbs partitioned
  * with **no member doing both**, and `emit` had 18 callers, every one a write.
  *
- * This class holds the graph, the clock and the event sink, plus the nine
- * helpers that both halves genuinely need. Nine, not five: the first pass found
- * five by direct use, and transitive closure through those five pulled in four
+ * This class holds the graph, the clock, the attribution and the event sink,
+ * plus the nine helpers that both halves genuinely need. Nine, not five: the
+ * first pass found five by direct use, and transitive closure through those five pulled in four
  * more — `findingFor`, `enquiriesClaiming`, `enquiryAddressedBy` and
  * `withdrawalOf`, the last of which a regex pass had called read-only.
  *
@@ -21,8 +21,11 @@
 import type { TenantGraph } from "../db/graph";
 import { optional, vertexProps } from "../db/cypher";
 import {
+  type AttributionContext,
   type Clock,
+  type CommandContext,
   type EventSink,
+  UNATTRIBUTED,
   inMemoryEventLog,
   systemClock,
 } from "./events";
@@ -38,13 +41,41 @@ import type {
 } from "./report";
 import { ref } from "./report";
 
-export interface ResearchSessionOptions {
-  clock?: Clock;
+/**
+ * What a surface is constructed with: a command's execution context, plus where
+ * its events go.
+ *
+ * `extends Partial<CommandContext>` rather than `{ ctx?: CommandContext }`, and
+ * the difference is the whole cost of the change. Nesting would have rewritten
+ * 110 construction sites across 38 test files — `{ clock }` to
+ * `{ ctx: { clock, attribution } }` — to change no behaviour whatsoever. Spread
+ * flat, every existing call site stays valid, `clock` keeps its name and
+ * position, and an adapter that has built a whole `CommandContext` still hands
+ * it over in one piece: `new WriteSurface(graph, { ...ctx, events })`.
+ *
+ * Both context fields stay optional. `tests/domain-session.test.ts` constructs
+ * `new ResearchSession(graph)` bare, and a surface with no stated attribution is
+ * a real case — the CLI is one — not a caller who forgot.
+ */
+export interface ResearchSessionOptions extends Partial<CommandContext> {
   events?: EventSink;
 }
 
 export class SessionCore {
   protected readonly clock: Clock;
+  /**
+   * Who is running commands through this surface.
+   *
+   * Session-scoped in the field and *per-command* in practice, because a
+   * surface is cheap to construct: `src/mcp/server.ts` builds a fresh
+   * `WriteSurface` per tool call over the same graph and the same sink, so each
+   * call can carry its own attribution and its own `git_hash`. That works
+   * because neither surface declares a field or a constructor of its own: the
+   * three assignments below are the whole of a surface's state, and the only
+   * mutable state in reach — `inTransaction`'s re-entrancy depth — belongs to
+   * the shared `TenantGraph`, not here.
+   */
+  protected readonly attribution: AttributionContext;
   readonly events: EventSink;
 
   constructor(
@@ -52,6 +83,7 @@ export class SessionCore {
     options: ResearchSessionOptions = {},
   ) {
     this.clock = options.clock ?? systemClock;
+    this.attribution = options.attribution ?? UNATTRIBUTED;
     this.events = options.events ?? inMemoryEventLog();
   }
 

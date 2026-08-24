@@ -6,8 +6,14 @@ export type { ResearchSessionOptions } from "./session";
 export { ReadSurface } from "./read";
 export { WriteSurface } from "./write";
 export { SessionCore } from "./core";
-export { systemClock, inMemoryEventLog } from "./events";
-export type { Clock, DomainEvent, EventSink } from "./events";
+export { systemClock, inMemoryEventLog, UNATTRIBUTED } from "./events";
+export type {
+  Clock,
+  AttributionContext,
+  CommandContext,
+  DomainEvent,
+  EventSink,
+} from "./events";
 export type {
   Ref,
   ObservationsRef,

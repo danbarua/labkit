@@ -37,12 +37,18 @@ import { readFileSync } from "node:fs";
 import { claimNamed, claimOf } from "./helpers/claims";
 
 /**
- * The composition `src/domain/session.ts` specifies for an adapter needing both
- * halves: one graph, one event sink taken from the write side.
+ * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and
+ * a **factory** for the write half so each tool call gets its own surface. The
+ * sink must be constructed at this level rather than taken from a surface — a
+ * per-call surface defaulting to its own log would fragment the stream and
+ * leave the read half holding an empty one.
  */
 async function connectServer(graph: TenantGraph, transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0]) {
-  const writes = new WriteSurface(graph);
-  return buildServer(new ReadSurface(graph, { events: writes.events }), writes).connect(transport);
+  const events = inMemoryEventLog();
+  return buildServer(
+    new ReadSurface(graph, { events }),
+    () => new WriteSurface(graph, { events }),
+  ).connect(transport);
 }
 
 let scenario: Scenario;
