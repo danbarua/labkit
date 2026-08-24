@@ -5,6 +5,11 @@ see `docs/project-journal/016_…md` for the row V change, and `017_…md` and
 `024_…md` for the two reviews this session produced. Renamed from
 `002_cold_context_review_of_s3b.md` once the session outgrew that title.
 
+**This session stayed open and did one more thing on 2026-08-24**, on `main`:
+`9fccfef`, the PGlite 0.5.7 upgrade that restored `bun test`'s exit code. It is
+recorded under its own heading at the end rather than mixed into the 20th's
+narrative, because nothing else here is about it.
+
 **Where this landed.** `spike/drizzle-age` was fast-forwarded into `main` with
 no merge commit, `feat/domain-consumer` was cut from the same commit, and all
 three were pushed. `spike/drizzle-age` still exists at `b991da8`, so no sha in
@@ -28,7 +33,8 @@ exposed.
 
 ## Changed
 
-Twelve commits. The reviews modified nothing; `d34229d` and `b3d6f33` were the
+Twelve commits on 2026-08-20; the 24th's single commit is under its own heading
+at the end. The reviews modified nothing; `d34229d` and `b3d6f33` were the
 user acting on the first review, the other ten are this session's — of which
 **six are successive rewrites of this entry**, each forced by the Stop hook
 re-firing on the peer session's commits. That churn is the seventh tooling
@@ -204,3 +210,52 @@ empty and a decoder reads it as "nothing matched". In all three the tool
 answered a question it had not been asked. The check that broke each of them was
 the same — run it against something real, or have someone who did not write the
 query read the result.
+
+## 2026-08-24 — PGlite 0.5.7, and a signal that came back
+
+Four days after the rest of this entry, on `main`, one commit: **`9fccfef`**.
+
+**What prompted it.** A check of whether electric-sql's 2026-08-23 releases
+fixed anything this repo works around. Two of the three did not:
+`pglite#1046` (socket concurrency corruption) is still open with no maintainer
+response, and `MERGE` on edges under `pglite-age` is untouched — both
+`pglite-socket` 0.2.9/0.2.10 and `pglite-age` 0.0.7/0.0.8 are dependency bumps
+with no code of their own. Core `pglite` 0.5.6 listed *"fixes for
+`process.exitCode`"*, which was worth one measurement.
+
+**Measured, one variable, same 323 tests:**
+
+| Version | Result | Exit code |
+| --- | --- | --- |
+| 0.5.5 | 323 pass, 0 fail | **99** |
+| 0.5.7 | 323 pass, 0 fail | **0** |
+| 0.5.7 | deliberate failing test | **1** |
+| 0.5.7 | run hitting the leader-election flake, 322/1 | **1** |
+
+Trustworthy in both directions, which the third and fourth rows are there to
+establish — a zero that is always zero would be no better than a 99.
+
+**The confirmation run is the part worth keeping.** *Round one is not the
+result*, so the suite was run twice; the second came back `1` on
+`leader election > concurrent connectDb()` timing out at 5006ms. Under exit 99
+that run was indistinguishable from a clean one. The signal earned its keep
+inside two minutes of being restored.
+
+**What went from the docs.** The "ignore the exit code" instruction, from
+`CLAUDE.md` in two places and from `.claude/skills/wrap/SKILL.md`, which drops
+from three traps to one. This repo's own rule is that *a rule telling readers to
+ignore a signal removes the only watcher that signal had* — and the remedy it
+prescribes is to fix or delete, not annotate. Deleted, therefore.
+
+The `$?`-after-a-pipeline trap stays. It is a fact about the shell, not about
+PGlite, and it is now the only one in the wrap skill's list.
+
+**Not fixed, still worked around:** the socket concurrency bug, so one fresh
+connection per test remains the containment; and `MERGE` on edges, so
+`createEdge()` keeps its explicit `MATCH`-then-`CREATE`.
+
+All five `@electric-sql` packages moved together because they publish as a set —
+`pglite` 0.5.7, `pglite-socket` 0.2.10, `pglite-age` 0.0.8, `pglite-pgvector`
+0.0.8, `pglite-prepopulatedfs` 0.5.7. Note `^0.0.6` pins exactly under npm caret
+rules, so the two `0.0.x` extensions needed a manifest edit rather than
+`bun update`.
