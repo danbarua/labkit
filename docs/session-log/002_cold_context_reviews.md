@@ -140,8 +140,18 @@ and fifteen lines of shell, not a defect.
 
 ## Tooling note
 
-Seven findings. Two were fixed in `e386027`; testing that commit produced two
-more, fixed in `4692559`. The last is recorded, not fixed.
+Findings, in the order they were found. Two were fixed in `e386027`; testing
+that commit produced two more, fixed in `4692559`. One is recorded, not fixed.
+The last arrived on 2026-08-24 and is fixed in `f991b93`:
+
+**A wrap entry may not contain a commit count.** This entry carried four, and I
+corrected them twice before Dan pointed out why that never ends: the entry is
+itself a commit, so any count in it is false the moment it lands, and false again
+when a peer session pushes. `SKILL.md` now forbids writing one — name the shas,
+because the list is the count and it does not go stale. Other sessions' entries
+keep theirs, which is not an inconsistency: CLAUDE.md exempts dated records, and
+a count in an entry nobody reopens is a measurement of its date. This one was a
+live claim in a document that kept being reopened.
 
 **Both previously-untested Stop-hook branches have run.** The first fire
 created this entry from clean state; the second detected it and forced
