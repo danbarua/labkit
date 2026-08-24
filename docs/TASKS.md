@@ -76,18 +76,45 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   `tests/scenarios/s9b_*` 908 after, against 1340 before *by arithmetic*
   (908 + 2 × 216 edges), −32%.
 
-  Extrapolated, and labelled as such: s9b's heaviest test was 378 queries ≈ 6.0s
-  at the loaded rate; at the same ratio it is ~256 ≈ 4.1s, under the ceiling.
-  **Not measured against the failure rate** — that still needs induced load.
+  **Measured against the failure rate 2026-08-24, and it does not fix the
+  flake.** Twelve full runs, ABBA-interleaved over three rounds, every core
+  saturated by busy loops for the duration of each run. A = `082b8a9` (before
+  any of this work), B = `61e6022` (both changes):
+
+  | arm | failures per run | median | wall median |
+  | --- | --- | --- | --- |
+  | A | 1, 1, 1, 1, 1, 0 | **1** | 218s |
+  | B | 0, 25, 1, 1, 1, 1 | **1** | 208s |
+
+  **Identical median failure rate.** What the query reduction bought is ~5% of
+  wall time, not fewer failures. B's total (29 against A's 5) is one 620s run —
+  3× the median, the known cascade signature — and with n=6 per arm it cannot be
+  attributed to the change; B does strictly less work per run. Both arms fail
+  about one test per run under load and both are capable of a catastrophic run.
+
+  So the earlier extrapolation (s9b's heaviest test ~6.0s → ~4.1s) may well be
+  true of that test and still not move the failure rate, because the tests that
+  fail are not always the heaviest ones.
+
+  **The quiet-machine arm is worth knowing too**: run-to-run wall time varied
+  **4×** on identical code (107s to 427s). That is why every single-run
+  comparison in this investigation — including ones cited in merged PRs — proved
+  nothing, and why induced load *reduces* variance rather than adding it (A's
+  loaded spread was 208-224s, an 8% band).
 
   **The next lever is the same shape one level up**: 220-314 queries per heavy
   file are domain cypher, and the verbs issue them in per-item loops
   (`reinterpret` runs a query per withdrawn claim, `replaceAnalysis` one per
   input). `closeDecision` also still does a precheck-then-write, unbatched.
+  **On the above evidence, expect it to make the suite faster and not less
+  flaky** — the ceiling is crossed by whichever test is unlucky, not by the
+  slowest one.
 
-  **Measure paired and interleaved, one variable, under induced load** — a
-  clean machine passes on every arm, so a green run proves nothing. An earlier
-  fix passed round one on both arms and failed at the lowest load of four.
+  Method, so it is not re-derived: `scratchpad/loaded.sh` shape — checkout arm,
+  saturate `sysctl -n hw.ncpu` cores with busy loops, run, kill loops, count
+  `^\(fail\)` lines. ABBA per round cancels within-round drift. **Do not use
+  `grep -c ... || echo 0`** — grep prints `0` *and* exits 1, so the field
+  doubles.
 
 ## Deliberately not being done
 

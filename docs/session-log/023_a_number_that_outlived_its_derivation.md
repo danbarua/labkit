@@ -5,7 +5,7 @@ the corrected statements are in CLAUDE.md and `docs/TASKS.md`.
 
 **The range is wider than this entry.** The pinned baseline is `72dbe15` and
 covers twenty-seven commits across seven entries; 017-022 hold the rest. This
-entry covers `07d3dab` and `4682e89`.
+entry covers `07d3dab`, `4682e89` and `61e6022`.
 
 **PR #3 merged** (`d54cce3`), so entry 022's closing line — "`fix/suite-ceiling`
 is pushed and unmerged" — was true when written and is not now. This branch is
@@ -107,7 +107,7 @@ Unchanged from entry 022, and none of it addressed here:
 
 ## Next
 
-`fix/date-the-rate` is pushed and unmerged, three commits.
+`fix/date-the-rate` merged as `d0cc3c9` (PR #4).
 
 The queued lever is unchanged: 220-314 queries per heavy file are domain cypher
 issued in per-item loops (`reinterpret` runs one per withdrawn claim,
