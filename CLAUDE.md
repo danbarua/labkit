@@ -803,10 +803,16 @@ hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
 `timed out after 5000ms`, the body wording. So in the files that set up from
 `beforeEach`, setup cost is not the mechanism.
 
-**Two changes have been made against it and neither moved the failure rate.**
-Measured 2026-08-24, twelve runs, ABBA-interleaved under saturated CPU: median
-one failing test per run both before and after, ~5% off wall time. Reducing a
-test's query count makes the suite faster without making it less flaky, because
-the ceiling is crossed by whichever test is unlucky rather than by the slowest
-one. `docs/TASKS.md` carries the method and what has been refuted; session-log
+**Three changes have been made against it and none moved the failure rate.**
+Measured 2026-08-24, twelve runs each, ABBA-interleaved under saturated CPU:
+cutting query counts ~30%, moving setup off the per-test clock, and booting one
+PGlite instead of 44. All three bought wall time — 5%, 7% and **40%** — and left
+the failure median where it was. Making the suite faster does not make it less
+flaky, because the ceiling is crossed by whichever test is unlucky rather than
+by the slowest one.
+
+**Before profiling, ask what the profiler cannot see.** `LABKIT_TRACE`
+instruments the `LabKitDB` seam and therefore cannot observe anything before a
+connection exists. WASM boot was 44-110s of a ~200s suite and invisible to it,
+so three rounds of hypotheses were all downstream of the largest cost. `docs/TASKS.md` carries the method and what has been refuted; session-log
 entries 022, 024 and 026 carry the numbers.
