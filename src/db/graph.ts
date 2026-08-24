@@ -192,8 +192,7 @@ export class TenantGraph {
    * mean two callers with different properties racing to overwrite each other
    * under a contract that currently promises retries are free. If a property
    * ever needs to change after the fact, that wants its own verb and its own
-   * argument, the way `closeDecision()` is the only sanctioned way to set
-   * `is_open`.
+   * argument rather than a second `createEdge` with different properties.
    *
    * Ledger row **T** claimed edges cannot carry properties. They can — every
    * AGE label is a real Postgres table and an edge row has the same
@@ -317,23 +316,5 @@ export class TenantGraph {
     throw new Error(
       `${edge} ${fromId} -> ${toId}: both endpoints exist but CREATE matched nothing in tenant ${this.ctx.graphName}`,
     );
-  }
-
-  /**
-   * The only sanctioned way to close a Decision — sets `is_open = false`
-   * and `closed_at` together, in one Cypher `SET`, so the biconditional
-   * invariant (`NODE_TYPES.Decision.validate`) can never be observed broken
-   * between the two writes.
-   */
-  async closeDecision(naturalId: string, closedAt: string = new Date().toISOString()): Promise<void> {
-    // One round trip. The SET matches the node itself, so an absent decision
-    // returns no rows -- the same information the separate existence check was
-    // buying, without the extra query. Same change `createEdge` got.
-    const rows = await this.query(
-      `MATCH (n:Decision {natural_id: $id}) SET n.is_open = false, n.closed_at = $closedAt RETURN n`,
-      { n: vertexColumn() },
-      { id: naturalId, closedAt },
-    );
-    if (rows.length === 0) throw new Error(`decision ${naturalId} not found in tenant ${this.ctx.graphName}`);
   }
 }

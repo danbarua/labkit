@@ -8,10 +8,17 @@
  * with **no member doing both**, and `emit` had 18 callers, every one a write.
  *
  * This class holds the graph, the clock, the attribution and the event sink,
- * plus the nine helpers that both halves genuinely need. Nine, not five: the
- * first pass found five by direct use, and transitive closure through those five pulled in four
- * more — `findingFor`, `enquiriesClaiming`, `enquiryAddressedBy` and
- * `withdrawalOf`, the last of which a regex pass had called read-only.
+ * plus the helpers both halves genuinely need.
+ *
+ * **Membership is by use, and it has to be re-checked rather than assumed.**
+ * The first pass took what each half calls directly; transitive closure through
+ * those pulled in more, including `withdrawalOf`, which a regex pass had
+ * wrongly called read-only. It also pulled in two that were already dead —
+ * `enquiriesClaiming` and `enquiryAddressedBy` had no caller anywhere — and
+ * `claimFor` lost its last one later with nothing to notice. All three were
+ * removed on 2026-08-24. The count that used to open this paragraph went with
+ * them: a numeral in prose must earn its assertion (PJ-028), and that one
+ * asserted a membership nobody re-derived.
  *
  * It deliberately holds **no verbs and no `emit`**. `emit` lives on the write
  * side so that a read *cannot* stamp an event: the invariant that reads are
@@ -30,10 +37,8 @@ import {
   systemClock,
 } from "./events";
 import type {
-  ClaimSubject,
   ClaimRef,
   AnalysisRef,
-  ConclusionRef,
   ConfirmatoryResult,
   ReplacementClaim,
   DecidedQuestion,
@@ -247,30 +252,6 @@ export class SessionCore {
     };
   }
 
-  /**
-   * The claim a conclusion refers to, by id.
-   *
-   * Both bearings, because a conclusion may challenge rather than support and
-   * `doTheseConflict` needs the handle either way. Two queries rather than
-   * `[:SUPPORTS|CHALLENGES]`, which pglite-age rejects outright.
-   *
-   * Lifted here from `WriteSurface` when `sideOf` needed it: `ConflictSide`
-   * carried four entity-naming fields and not one identifier (PJ-030 §7).
-   */
-  protected async claimFor(ref: ConclusionRef): Promise<string> {
-    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const rows = await this.graph.query(
-        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(:Evidence)-[:${bearing}]->(c:Claim {name: $name})
-         RETURN c`,
-        { c: vertexProps<{ natural_id: string }>() },
-        { id: ref.analysis.id, name: ref.proposition },
-      );
-      const found = rows[0];
-      if (found) return found.c.natural_id;
-    }
-    throw new Error(`analysis ${ref.analysis.id} concluded nothing about "${ref.proposition}"`);
-  }
-
   /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
 
   protected async decidedOnTheStrengthOf(scope: {
@@ -328,35 +309,5 @@ export class SessionCore {
     }
     if (name === undefined) throw new Error(`no claim ${claim.id}`);
     return { proposition: name, ...(enquiry ? { enquiry } : {}) };
-  }
-
-
-
-  /** Lines of enquiry in which some claim of this wording is asserted. */
-
-  protected async enquiriesClaiming(proposition: string): Promise<string[]> {
-    const found = new Set<string>();
-    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const rows = await this.graph.query(
-        `MATCH (:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-         MATCH (u)-[:ADDRESSES]->(loe:LineOfEnquiry)
-         RETURN loe`,
-        { loe: vertexProps<{ natural_id: string }>() },
-        { name: proposition },
-      );
-      for (const row of rows) found.add(row.loe.natural_id);
-    }
-    return [...found];
-  }
-
-  protected async enquiryAddressedBy(
-    analysis: AnalysisRef,
-  ): Promise<string | undefined> {
-    const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry) RETURN loe`,
-      { loe: vertexProps<{ natural_id: string }>() },
-      { id: analysis.id },
-    );
-    return rows[0]?.loe.natural_id;
   }
 }

@@ -1074,15 +1074,6 @@ export interface InterpretationHistory {
   revisions: Revision[];
 }
 
-/**
- * How a caller names one claim rather than another.
- *
- * A bare proposition is fine while a sentence is asserted in one line of
- * enquiry, which is the ordinary case. When the same words are asserted in
- * two, it stops identifying anything and a `ConclusionRef` — this analysis,
- * this proposition — is what picks one out. See S-5.
- */
-export type ClaimSubject = string | ConclusionRef;
 
 /** One side of a comparison between two findings. */
 export interface ConflictSide {

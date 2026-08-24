@@ -305,9 +305,6 @@ per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
   idempotent: calling it twice with the same three values is a no-op, not a
   duplicate edge (enforced by a real `UNIQUE (start_id, end_id)` Postgres
   index per edge label — see "AGE-specific gotchas" below).
-- `closeDecision(id)` — the only sanctioned way to set `Decision.is_open`/
-  `closed_at`; `NODE_TYPES.Decision.validate` enforces the same invariant at
-  creation.
 
 A compound domain verb must run inside `graph.inTransaction(fn)` — everything
 it writes commits together or none of it does. Earned by external review of

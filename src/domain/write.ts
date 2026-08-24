@@ -75,7 +75,6 @@ import type { ArtefactProps, ClaimProps, EvidenceProps } from "../db/domain";
 import type {
   VerificationReport,
   TaskContract,
-  ClaimSubject,
   AmendmentReport,
   AnalysisRef,
   CriterionRef,
@@ -706,7 +705,7 @@ export class WriteSurface extends SessionCore {
   async planWork(input: PlanWorkCommand): Promise<WorkRef> {
     const task = await this.graph.createNode("Task", {
       objective: input.objective,
-      inputs: JSON.stringify(input.mayRead ?? []),
+      mayRead: input.mayRead ?? [],
       outputs: "",
       acceptance: input.acceptance,
       is_open: true,

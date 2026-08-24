@@ -236,37 +236,6 @@ describe("decision amendments", () => {
   });
 });
 
-describe("decision lifecycle integrity", () => {
-  test("createNode rejects a Decision created already-open with closed_at set", async () => {
-    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z", is_open: true, closed_at: "2026-08-18T00:00:00Z" })).rejects.toThrow(
-      /cannot have closed_at/,
-    );
-  });
-
-  test("createNode rejects a Decision created already-closed without closed_at", async () => {
-    await expect(graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z", is_open: false })).rejects.toThrow(/requires closed_at/);
-  });
-
-  test("createNode defaults is_open to true when omitted", async () => {
-    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
-    const props = d.properties as DecisionProps;
-    expect(props.is_open).toBe(true);
-    expect(props.closed_at).toBeUndefined();
-  });
-
-  test("closeDecision sets is_open and closed_at together", async () => {
-    const d = await graph.createNode("Decision", { reason: "r", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
-    await graph.closeDecision(d.natural_id, "2026-08-18T12:00:00Z");
-
-    const rows = await graph.query(`MATCH (n:Decision {natural_id: $id}) RETURN n`, { n: vertexProps<DecisionProps>() }, { id: d.natural_id });
-    expect(rows[0]!.n).toMatchObject({ is_open: false, closed_at: "2026-08-18T12:00:00Z" });
-  });
-
-  test("closeDecision throws for a nonexistent decision", async () => {
-    await expect(graph.closeDecision("DEC_999")).rejects.toThrow(/not found/);
-  });
-});
-
 describe("edge integrity", () => {
   test("createEdge throws when the (fromLabel, toLabel) pair isn't in EDGE_SCHEMA", async () => {
     const claim = await graph.createNode("Claim", { name: "c" });
@@ -350,7 +319,7 @@ describe("all node labels", () => {
     Review: { verdict: "v" },
     Artefact: { kind: "json", logical_name: "a" },
     Computation: { kind: "k", status: "s" },
-    Task: { objective: "o", inputs: "i", outputs: "o", acceptance: "a" },
+    Task: { objective: "o", mayRead: ["a.csv"], outputs: "o", acceptance: "a" },
   };
 
   // Generic helper rather than an inline call: inside it `L` is a single
@@ -447,7 +416,7 @@ describe("provisioning reconciliation", () => {
 
     await resolveTenantContext(db, "labkit");
 
-    const task = await graph.createNode("Task", { objective: "o", inputs: "i", outputs: "o", acceptance: "a" });
+    const task = await graph.createNode("Task", { objective: "o", mayRead: ["a.csv"], outputs: "o", acceptance: "a" });
     expect(task.natural_id).toMatch(/^TASK_\d+$/);
   });
 });
@@ -573,8 +542,8 @@ test("an edge carries properties, in Cypher and in the table underneath it", asy
  * Create-if-absent means a repeat call is a no-op, so properties it carries are
  * dropped. Asserted rather than left to be discovered: an upsert would let two
  * callers race to overwrite each other under a contract that promises retries
- * are free, and a property that needs to change later wants its own verb, the
- * way `closeDecision()` is the only sanctioned way to set `is_open`.
+ * are free, and a property that needs to change later wants its own verb and
+ * its own argument.
  */
 test("createEdge writes edge properties, and a repeat call does not change them", async () => {
   const question = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });

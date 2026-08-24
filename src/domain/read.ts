@@ -25,7 +25,6 @@ import type {
   ReproductionReport,
   AmendmentRecord,
   TaskContract,
-  ClaimSubject,
   ClaimRef,
   ConcludedClaim,
   ConflictSide,
@@ -535,7 +534,7 @@ export class ReadSurface extends SessionCore {
         t: vertexProps<{
           objective: string;
           acceptance: string;
-          inputs: string;
+          mayRead: string[];
         }>(),
       },
       { id: work.id },
@@ -543,20 +542,18 @@ export class ReadSurface extends SessionCore {
     const task = rows[0]?.t;
     if (!task) throw new Error(`no planned work ${work.id}`);
 
-    let mayRead: string[] = [];
-    try {
-      const parsed: unknown = JSON.parse(task.inputs || "[]");
-      if (Array.isArray(parsed))
-        mayRead = parsed.filter((x): x is string => typeof x === "string");
-    } catch {
-      // Work planned before contracts existed carries free text here. An
-      // unparseable contract is an empty one, not a crash.
-    }
+    // No fallback, and that is checked rather than assumed. `planWork` writes
+    // `mayRead: input.mayRead ?? []`, so the property is always present and an
+    // empty contract round-trips as a real empty array -- confirmed by putting
+    // a sentinel in a `?? []` here and watching it never appear. A `JSON.parse`
+    // in a try/catch and two runtime type guards used to stand here, all of
+    // them guarding a shape the writer cannot produce. Adding a fresh guard in
+    // their place would have been the same defect wearing shorter code.
     return {
       work,
       objective: task.objective,
       acceptance: task.acceptance,
-      mayRead,
+      mayRead: task.mayRead,
       enforced: false,
     };
   }
