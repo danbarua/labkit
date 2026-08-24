@@ -13,12 +13,20 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   Dan deprioritised this; it is not obstructing work. The cascade that turned
   one crossing into a burst is fixed (`2de1060`, `5439085`).
 
-  **Cutting query counts does not move it.** Measured 2026-08-24 — twelve runs,
-  ABBA-interleaved under saturated CPU — a ~30% reduction left the median at one
-  failing test per run on both arms and bought ~5% of wall time. The ceiling is
-  crossed by whichever test is unlucky, not by the slowest one, so anything that
-  lowers the *mean* is the wrong shape. Session-log entries 022, 024 and 026
-  carry the numbers; CLAUDE.md carries the mechanism.
+  **Three changes have been measured against the failure rate and none moved
+  it.** Cutting query counts ~30%, moving setup off the per-test clock, and
+  booting one PGlite instead of 44 — each twelve runs, ABBA-interleaved under
+  saturated CPU. All three bought wall time (5%, 7%, **40%**) and left the
+  failure median where it was. The ceiling is crossed by whichever test is
+  unlucky, not by the slowest one, so anything that lowers the *mean* is the
+  wrong shape. Entries 022, 024, 026 and 028 carry the numbers.
+
+  **The instrument shaped the hypothesis for three of those rounds, and that is
+  the reusable lesson.** `LABKIT_TRACE` instruments the `LabKitDB` seam, so it
+  cannot see anything before a connection exists — WASM boot was invisible to it
+  by construction, and boot was 44-110s of a ~200s suite. Every hypothesis
+  generated from the tracer was downstream of the largest cost. **Before
+  profiling, ask what the profiler cannot see.**
 
   **Do not re-investigate from scratch.** Refuted with evidence: advisory-lock
   contention; the pglite-socket desync bug as primary mechanism; fd/socket
@@ -33,13 +41,11 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   induced load *reduces* variance rather than adding it. Do not use
   `grep -c … || echo 0`: grep prints `0` **and** exits 1, so the field doubles.
 
-  **Two unmerged branches**, neither measured against the failure rate and
-  neither expected to move it:
-  - `flake/current-no-reprovision` — content already in `main`; the branch is
-    redundant.
-  - `flake/setup-off-budget` — moves `begin()`/`end()` into hooks for the ~5
-    files that call them in-body, which also takes `reset()` off the test clock.
-    Cut from a pre-merge lineage; needs a port, not a merge.
+  **One known flaw in that harness.** ABBA runs A,B,B,A, so A holds positions 1
+  and 4 of a round and B holds 2 and 3 — equal mean position, which cancels
+  linear drift but not an effect peaking mid-round. The catastrophic run landed
+  on B in two consecutive experiments. Randomise arm order per round, or
+  alternate ABBA with BAAB.
 
   What would actually move it has to change the *shape* of the distribution
   rather than the mean: raising the ceiling (hides it), or stopping a timed-out
