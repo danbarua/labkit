@@ -101,7 +101,13 @@ The five parts, in this order, and nothing else:
 ## Changed
 
 <The file list from git diff --stat, with a clause each on what moved and why.
-Commits by sha and subject. Say plainly if the tree is dirty and what is in it.>
+Commits by sha and subject. Say plainly if the tree is dirty and what is in it.
+
+**Never write a commit count.** "Twelve commits", "N are this session's", "67 in
+the range" — every one of those is false the moment this entry is committed,
+because the entry is itself a commit, and false again when a peer session pushes.
+Name the shas; the list is the count and it does not go stale. Same for anything
+else git can be asked directly.>
 
 ## Verified
 

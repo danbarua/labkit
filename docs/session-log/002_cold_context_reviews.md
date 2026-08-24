@@ -15,14 +15,14 @@ no merge commit, `feat/domain-consumer` was cut from the same commit, and all
 three were pushed. `spike/drizzle-age` still exists at `b991da8`, so no sha in
 this entry is stale.
 
-**Scope warning, because the numbers mislead.** This session's baseline is
-pinned at `94d3d80` and HEAD was `d5274f0` when this was written — 67 commits,
-and still moving: a peer session was committing throughout. **Ten are this
-session's**, and they are the stable fact here; the range is not. The rest
-belong to `003_clearing_ledger_rows.md` (S-3c, S-10, S-9, S-14, S-18, two
-external reviews and row F's close-out), which ran between this session's two
-halves. Read 003 for that work; this entry does not restate it. `collect.sh`
-now prints this warning by itself — see the tooling note.
+**Scope warning, because the range misleads.** This session's baseline is pinned
+at `94d3d80`, and the range from there to any later HEAD is mostly not this
+session's work — a peer session was committing throughout. The commits that are
+this session's are listed by sha below; that list is the stable fact, the range
+is not. The rest belong to `003_clearing_ledger_rows.md` (S-3c, S-10, S-9, S-14,
+S-18, two external reviews and row F's close-out), which ran between this
+session's two halves. Read 003 for that work; this entry does not restate it.
+`collect.sh` now prints this warning by itself — see the tooling note.
 
 ## Goal
 
@@ -33,12 +33,12 @@ exposed.
 
 ## Changed
 
-Twelve commits on 2026-08-20; the 24th's single commit is under its own heading
-at the end. The reviews modified nothing; `d34229d` and `b3d6f33` were the
-user acting on the first review, the other ten are this session's — of which
-**six are successive rewrites of this entry**, each forced by the Stop hook
-re-firing on the peer session's commits. That churn is the seventh tooling
-finding below, visible in the log rather than described.
+This session's commits on 2026-08-20, by sha; the 24th's is under its own
+heading at the end. The reviews modified nothing; `d34229d` and `b3d6f33` were
+the user acting on the first review, the rest are this session's — and the run
+of them that are **successive rewrites of this entry** were each forced by the
+Stop hook re-firing on the peer session's commits. That churn is the seventh
+tooling finding below, visible in the log rather than described.
 
 - `d34229d` — filed the first review as
   `docs/project-journal/017_cold_context_review.md` (+172, byte-identical).
