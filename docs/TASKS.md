@@ -102,13 +102,29 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   nothing, and why induced load *reduces* variance rather than adding it (A's
   loaded spread was 208-224s, an 8% band).
 
-  **The next lever is the same shape one level up**: 220-314 queries per heavy
-  file are domain cypher, and the verbs issue them in per-item loops
-  (`reinterpret` runs a query per withdrawn claim, `replaceAnalysis` one per
-  input). `closeDecision` also still does a precheck-then-write, unbatched.
-  **On the above evidence, expect it to make the suite faster and not less
-  flaky** — the ceiling is crossed by whichever test is unlucky, not by the
-  slowest one.
+  **The next lever named here was wrong, and the measurement says so.** It
+  predicted the per-item query loops (`reinterpret` per withdrawn claim,
+  `replaceAnalysis` per input) were where the volume was. Batching all three
+  with `IN $ids` saved **six queries across three heavy files** — the
+  collections hold one or two items, so there was nothing to batch.
+
+  Where the volume actually is: `recorded()` writes three edges per conclusion
+  and each paid a duplicate-existence round trip. `createEdge` now takes an
+  opt-in `endpointIsNew` for the case where the caller minted an endpoint in
+  the same call, so no edge can exist yet. Measured, same files:
+
+  | file | before | after |
+  | --- | --- | --- |
+  | `s11_invalidate_analysis` | 1584 | **1320** (−16.7%) |
+  | `s12_reinterpret_claim` | 1127 | **1070** (−5.1%) |
+  | `s11b_which_review_retracted_it` | 572 | **542** (−5.2%) |
+
+  `closeDecision` also lost its precheck-then-write, the shape `createEdge`
+  shed: the `SET` matches the node itself, so an absent decision returns no rows.
+
+  **Do not expect this to move the failure rate either** — entry 024 measured
+  that a ~30% query cut did not, because the ceiling is crossed by whichever
+  test is unlucky rather than by the slowest one.
 
   Method, so it is not re-derived: `scratchpad/loaded.sh` shape — checkout arm,
   saturate `sysctl -n hw.ncpu` cores with busy loops, run, kill loops, count

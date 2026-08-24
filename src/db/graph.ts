@@ -219,6 +219,22 @@ export class TenantGraph {
     // a repeat is a no-op, so a run that read one record twice cannot be two
     // edges. See `recorded()` and S-10e.
     props?: Record<string, string | number | boolean | number[]>,
+    /**
+     * Skip the duplicate check because at least one endpoint was created by
+     * the *same* call and cannot already carry this edge.
+     *
+     * The check is not decoration: a `23505` raised inside `inTransaction`
+     * poisons the enclosing Postgres transaction, so an idempotent re-call
+     * would take a compound verb down with it. It costs a round trip per edge
+     * — 284 of 1584 queries in `tests/scenarios/s11_invalidate_analysis.test.ts`,
+     * 18% of that file — and where the endpoint was minted microseconds ago it
+     * is buying a guarantee already held by construction.
+     *
+     * **Only pass this when a fresh node is an endpoint.** It is a claim about
+     * the caller, not a preference, and `EDGE_SCHEMA` validation and endpoint
+     * diagnosis are unaffected either way.
+     */
+    endpointIsNew = false,
   ): Promise<void> {
     const fromLabel = labelForNaturalId(fromId);
     const toLabel = labelForNaturalId(toId);
@@ -244,12 +260,14 @@ export class TenantGraph {
     // endpoints exist and the edge genuinely connects them, returns zero rows
     // and **no error** when one is missing, and still raises `23505` on a
     // duplicate.
-    const existing = await this.query(
-      `MATCH (:${fromLabel} {natural_id: $from})-[e:${edge}]->(:${toLabel} {natural_id: $to}) RETURN e`,
-      { e: edgeColumn() },
-      { from: fromId, to: toId },
-    );
-    if (existing.length > 0) return;
+    if (!endpointIsNew) {
+      const existing = await this.query(
+        `MATCH (:${fromLabel} {natural_id: $from})-[e:${edge}]->(:${toLabel} {natural_id: $to}) RETURN e`,
+        { e: edgeColumn() },
+        { from: fromId, to: toId },
+      );
+      if (existing.length > 0) return;
+    }
 
     // Expanded per key rather than passed as a map: AGE rejects a whole-map
     // `CREATE (a)-[e:LABEL $props]->(b)`, the same limitation createNode()
@@ -308,12 +326,14 @@ export class TenantGraph {
    * between the two writes.
    */
   async closeDecision(naturalId: string, closedAt: string = new Date().toISOString()): Promise<void> {
-    const rows = await this.query(`MATCH (n:Decision {natural_id: $id}) RETURN n`, { n: vertexColumn() }, { id: naturalId });
+    // One round trip. The SET matches the node itself, so an absent decision
+    // returns no rows -- the same information the separate existence check was
+    // buying, without the extra query. Same change `createEdge` got.
+    const rows = await this.query(
+      `MATCH (n:Decision {natural_id: $id}) SET n.is_open = false, n.closed_at = $closedAt RETURN n`,
+      { n: vertexColumn() },
+      { id: naturalId, closedAt },
+    );
     if (rows.length === 0) throw new Error(`decision ${naturalId} not found in tenant ${this.ctx.graphName}`);
-
-    await this.runner.execute(`MATCH (n:Decision {natural_id: $id}) SET n.is_open = false, n.closed_at = $closedAt`, {
-      id: naturalId,
-      closedAt,
-    });
   }
 }

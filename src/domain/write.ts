@@ -505,15 +505,23 @@ export class WriteSurface extends SessionCore {
         name: conclusion.proposition,
         kind: conclusion.standing ?? "exploratory",
       });
+      // `endpointIsNew`: `evidence` and `claim` were created two lines up, so
+      // no edge can already reach them and the duplicate check is buying a
+      // guarantee already held. Three edges per conclusion, one round trip each
+      // — 18% of the queries in the heaviest scenario file.
       await this.graph.createEdge(
         unit.natural_id,
         "PRODUCES",
         evidence.natural_id,
+        undefined,
+        true,
       );
       await this.graph.createEdge(
         evidence.natural_id,
         "RECORDED_IN",
         output.natural_id,
+        undefined,
+        true,
       );
       // A null result is a finding, not an absence of one -- it bears
       // against the proposition rather than failing to bear on it.
@@ -523,6 +531,8 @@ export class WriteSurface extends SessionCore {
         evidence.natural_id,
         bearing,
         claim.natural_id,
+        undefined,
+        true,
       );
       minted.push({
         claim: ref("claim", claim.natural_id),
@@ -1237,20 +1247,27 @@ export class WriteSurface extends SessionCore {
     const inputNames = new Map<string, string>();
     // Read after the transaction above, so it sees this act's own invalidation.
     const retracted = new Set<string>();
+    // One query for every input, not one per input. `logical_name` is what an
+    // Artefact carries; this read `.name` -- a property no Artefact has -- so it
+    // set `undefined` and printed the id instead.
+    const artefactFor = new Map<string, string>();
     for (const o of input.from) {
-      const artefact = o.kind === "analysis" ? await this.outputArtefactOf(o) : o.id;
-      const rows = await this.graph.query(
-        `MATCH (a:Artefact {natural_id: $id}) RETURN a`,
-        // `logical_name`, which is what an Artefact actually carries. This read
-        // `.name` -- a property no Artefact has -- so it set `undefined` and the
-        // `?? o.id` below printed the id. The field exists BECAUSE `what` was a
-        // naked id, and it had been a second naked id since the day it landed;
-        // nothing asserted on it until an MCP test did.
-        { a: vertexProps<ArtefactProps>() },
-        { id: artefact },
-      );
-      if (rows[0]) inputNames.set(o.id, rows[0].a.logical_name);
-      if (rows[0]?.a.invalidated) retracted.add(o.id);
+      artefactFor.set(o.id, o.kind === "analysis" ? await this.outputArtefactOf(o) : o.id);
+    }
+    const found = new Map(
+      (
+        await this.graph.query(
+          `MATCH (a:Artefact) WHERE a.natural_id IN $ids RETURN a`,
+          { a: vertexProps<ArtefactProps & { natural_id: string }>() },
+          { ids: [...new Set(artefactFor.values())] },
+        )
+      ).map((r) => [r.a.natural_id, r.a] as const),
+    );
+    for (const [handle, artefact] of artefactFor) {
+      const a = found.get(artefact);
+      if (!a) continue;
+      inputNames.set(handle, a.logical_name);
+      if (a.invalidated) retracted.add(handle);
     }
 
     // `why` is computed, not asserted. Two things had been wrong with the fixed
@@ -1362,31 +1379,28 @@ export class WriteSurface extends SessionCore {
       // the statement was kept, so two findings phrased alike merged -- in the
       // field whose whole job is showing the findings survived unchanged.
       const carried = new Map<string, CitedFinding>();
-      for (const id of new Set(claims.map((c) => c.c.natural_id))) {
-        const claim = { c: { natural_id: id } };
+      const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
+      for (const id of withdrawnIds) {
+        await this.graph.createEdge(review.natural_id, "EVALUATES", id);
+        await this.graph.createEdge(decision.natural_id, "CHANGES", id);
+      }
+      // One query for every withdrawn claim's evidence, not one per claim.
+      // Deduplicated by the Map below, as before: the query selects
+      // `natural_id` AND `statement` and keying on the statement merged two
+      // findings phrased alike -- in the field whose whole job is showing the
+      // findings survived unchanged.
+      const evidence = await this.graph.query(
+        `MATCH (e:Evidence)-[:SUPPORTS]->(c:Claim) WHERE c.natural_id IN $ids RETURN e`,
+        { e: vertexProps<{ natural_id: string; statement: string }>() },
+        { ids: withdrawnIds },
+      );
+      for (const row of evidence) {
         await this.graph.createEdge(
-          review.natural_id,
-          "EVALUATES",
-          claim.c.natural_id,
+          row.e.natural_id,
+          "SUPPORTS",
+          narrower.natural_id,
         );
-        await this.graph.createEdge(
-          decision.natural_id,
-          "CHANGES",
-          claim.c.natural_id,
-        );
-        const evidence = await this.graph.query(
-          `MATCH (e:Evidence)-[:SUPPORTS]->(:Claim {natural_id: $id}) RETURN e`,
-          { e: vertexProps<{ natural_id: string; statement: string }>() },
-          { id: claim.c.natural_id },
-        );
-        for (const row of evidence) {
-          await this.graph.createEdge(
-            row.e.natural_id,
-            "SUPPORTS",
-            narrower.natural_id,
-          );
-          carried.set(row.e.natural_id, { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
-        }
+        carried.set(row.e.natural_id, { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
       }
 
       return { narrower, carried };
