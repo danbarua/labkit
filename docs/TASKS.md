@@ -48,8 +48,24 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
     since it also moves `reset()` off the test clock. Its `tests/mcp.test.ts`
     work was written against a pre-merge lineage and needs redoing.
 
-  **The lever the profile actually points at is query count per test**, which
-  neither candidate touches.
+  **The lever the profile pointed at was query count per test**, and it has now
+  been attacked once: `createEdge` charged **three** round trips before writing
+  anything — two endpoint-existence checks and a duplicate check. The two
+  endpoint checks moved to the failure path (`d0a4a5e`-ish; see
+  `src/db/graph.ts`), since the `CREATE` matches both endpoints itself and
+  returns no rows when one is missing. Measured, same file, same classifier:
+  `tests/scenarios/s11b_*` **812 → 572 queries (−29.6%)**;
+  `tests/scenarios/s9b_*` 908 after, against 1340 before *by arithmetic*
+  (908 + 2 × 216 edges), −32%.
+
+  Extrapolated, and labelled as such: s9b's heaviest test was 378 queries ≈ 6.0s
+  at the loaded rate; at the same ratio it is ~256 ≈ 4.1s, under the ceiling.
+  **Not measured against the failure rate** — that still needs induced load.
+
+  **The next lever is the same shape one level up**: 220-314 queries per heavy
+  file are domain cypher, and the verbs issue them in per-item loops
+  (`reinterpret` runs a query per withdrawn claim, `replaceAnalysis` one per
+  input). `closeDecision` also still does a precheck-then-write, unbatched.
 
   **Measure paired and interleaved, one variable, under induced load** — a
   clean machine passes on every arm, so a green run proves nothing. An earlier

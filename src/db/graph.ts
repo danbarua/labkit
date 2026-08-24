@@ -228,12 +228,22 @@ export class TenantGraph {
       throw new Error(`${edge} does not allow ${fromLabel} -> ${toLabel} (natural ids ${fromId} -> ${toId})`);
     }
 
-    const fromRows = await this.query(`MATCH (n:${fromLabel} {natural_id: $id}) RETURN n`, { n: vertexColumn() }, { id: fromId });
-    if (fromRows.length === 0) throw new Error(`source ${fromId} not found in tenant ${this.ctx.graphName}`);
-
-    const toRows = await this.query(`MATCH (n:${toLabel} {natural_id: $id}) RETURN n`, { n: vertexColumn() }, { id: toId });
-    if (toRows.length === 0) throw new Error(`target ${toId} not found in tenant ${this.ctx.graphName}`);
-
+    // **The endpoints are not checked up front.** They used to be, one query
+    // each, and that made every edge cost three round trips before a single
+    // byte was written. The `CREATE` below matches both endpoints itself: if
+    // either is missing the pattern binds nothing, the statement creates
+    // nothing and returns **no rows**, which is the same information those two
+    // queries were buying -- so they are issued only when that happens, purely
+    // to say *which* endpoint was missing. Measured on
+    // `tests/scenarios/s11b_which_review_retracted_it.test.ts`: 240 of that
+    // file's 812 queries were these two, 30% of everything it ran.
+    //
+    // Verified against this backend before relying on it, because pglite-age
+    // has form on edge operations (`MERGE` builds edges with both endpoints
+    // `0`): `CREATE (a)-[e:E]->(b) RETURN e` returns exactly one row when both
+    // endpoints exist and the edge genuinely connects them, returns zero rows
+    // and **no error** when one is missing, and still raises `23505` on a
+    // duplicate.
     const existing = await this.query(
       `MATCH (:${fromLabel} {natural_id: $from})-[e:${edge}]->(:${toLabel} {natural_id: $to}) RETURN e`,
       { e: edgeColumn() },
@@ -255,9 +265,13 @@ export class TenantGraph {
       ? ` {${entries.map(([k]) => `${k}: $p_${k}`).join(", ")}}`
       : "";
 
+    let created: unknown[];
     try {
-      await this.runner.execute(
-        `MATCH (a:${fromLabel} {natural_id: $from}), (b:${toLabel} {natural_id: $to}) CREATE (a)-[:${edge}${assignment}]->(b)`,
+      // `RETURN e` so the caller can tell "created" from "matched nothing".
+      // Lower-case on purpose: a camelCase RETURN name decodes as null.
+      created = await this.query(
+        `MATCH (a:${fromLabel} {natural_id: $from}), (b:${toLabel} {natural_id: $to}) CREATE (a)-[e:${edge}${assignment}]->(b) RETURN e`,
+        { e: edgeColumn() },
         {
           from: fromId,
           to: toId,
@@ -268,6 +282,23 @@ export class TenantGraph {
       if ((err as { code?: string }).code === "23505") return; // lost the race to a concurrent caller — same edge now exists, which is the desired end state
       throw err;
     }
+    if (created.length > 0) return;
+
+    // Nothing was created, so one of the endpoints did not match. Only now is
+    // it worth two queries to say which -- this is the slow path, and it ends
+    // in a throw.
+    const fromRows = await this.query(`MATCH (n:${fromLabel} {natural_id: $id}) RETURN n`, { n: vertexColumn() }, { id: fromId });
+    if (fromRows.length === 0) throw new Error(`source ${fromId} not found in tenant ${this.ctx.graphName}`);
+
+    const toRows = await this.query(`MATCH (n:${toLabel} {natural_id: $id}) RETURN n`, { n: vertexColumn() }, { id: toId });
+    if (toRows.length === 0) throw new Error(`target ${toId} not found in tenant ${this.ctx.graphName}`);
+
+    // Both endpoints are there and the CREATE still matched nothing. Nothing
+    // known produces this; say so loudly rather than returning as though the
+    // edge exists, which is what a silent `return` here would claim.
+    throw new Error(
+      `${edge} ${fromId} -> ${toId}: both endpoints exist but CREATE matched nothing in tenant ${this.ctx.graphName}`,
+    );
   }
 
   /**
