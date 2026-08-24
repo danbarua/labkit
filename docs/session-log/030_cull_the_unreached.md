@@ -1,115 +1,102 @@
-# 030: cull the unreached, then name the strings
+# 030: cull the unreached, name the strings, ban the bare ones
 
-**Session wrap, 2026-08-24, on `chore/string-taxonomy`.** Not a decision
-record — the reasoning for what was kept versus deleted, and for keeping two
-copies of one fact, is in the commit messages and PRs #13/#14.
+**Session wrap, 2026-08-24, on `chore/no-stringly-typed`.** Not a decision
+record — the reasoning is in the three commit messages and PRs #13/#14/#15.
 
 **The baseline is much wider than this entry.** It is still pinned at `72dbe15`
 from the start of a long session; everything up to `3ca3cd0` belongs to entries
-022-028, and `eb431c3`/`ed8ef3a` to entry 029. This entry covers `ec852d0` and
-`65e8064`.
+022-028, and `eb431c3`/`ed8ef3a` to entry 029. This entry covers `ec852d0`,
+`65e8064` and `9173db4` — the three parts of one housekeeping plan.
 
 ## Goal
 
-Housekeeping before the persisted event store: delete what nothing reaches, and
-replace the one `string` on every node property with names that say what LabKit
-does with it.
+Housekeeping before the persisted event store: delete what nothing reaches, say
+what LabKit does with each stored string, and stop signatures from taking bare
+ones.
 
 ## Changed
 
-**`ec852d0` — cull dead behaviour, and store a list as a list.** Merged as
-PR #13. Eleven files, +105/−170.
+**`ec852d0` — cull dead behaviour, and store a list as a list.** Merged, PR #13.
+`claimFor`/`enquiriesClaiming`/`enquiryAddressedBy` (zero references anywhere),
+`ClaimSubject` (exported, used by nothing), and the whole Decision-closure
+lifecycle — `closeDecision()`, `is_open`, `closed_at`, the biconditional
+validator, its five tests. `NodeType.validate` kept as the seam an invariant
+attaches to. `Task.inputs` (a JSON string) became `Task.mayRead` (a native
+agtype array).
 
-- `src/domain/core.ts` — `claimFor`, `enquiriesClaiming` and
-  `enquiryAddressedBy` deleted; **zero references anywhere**, verified
-  unfiltered. The header's "nine, not five" went with them: it named two of the
-  three as pulled in by transitive closure, a numeral asserting a membership
-  nobody re-derived.
-- `src/domain/report.ts` + four import sites — `ClaimSubject`, exported and used
-  by nothing.
-- `src/db/graph.ts`, `src/db/domain.ts`, `tests/domain-graph.test.ts` — the
-  whole Decision-closure lifecycle: `closeDecision()`, `is_open`, `closed_at`,
-  the biconditional validator, its five tests. `NodeType.validate` **kept** as
-  the seam a per-label invariant attaches to.
-- `Task.inputs` (a JSON string) became `Task.mayRead` (a native agtype array),
-  deleting a `JSON.parse`, a try/catch, an `Array.isArray` check and a `typeof`
-  filter.
+**`65e8064` — the string taxonomy, and indexes generated from it.** Merged,
+PR #14. `IndexedString`, `Timestamp`, `IdentityString`, `ReadOnlyString<T>`,
+`Prose` applied to every property of all thirteen `*Props`; `INDEXED_PROPS` and
+`ensurePropertyIndexes()`; `scripts/check-prop-classes.ts`.
 
-**`65e8064` — the string taxonomy, and indexes generated from it.** Open as
-PR #14. Six files, +428/−42.
-
-- `src/db/domain.ts` — `IndexedString`, `Timestamp`, `IdentityString`,
-  `ReadOnlyString<T>`, `Prose`, applied to every property of all thirteen
-  `*Props` interfaces; plus `INDEXED_PROPS`, the runtime table.
-- `src/db/provisioning.ts` — `ensurePropertyIndexes()`, looped per label
-  beside the natural-id indexes.
-- `scripts/check-prop-classes.ts` (new), `package.json` — the checker holding
-  the table to the annotations, via the TypeScript compiler API.
-- `tests/reconciliation.test.ts` — one test: the index is built, is non-unique,
-  and is restored on re-resolve after being dropped.
-- `CLAUDE.md` — the taxonomy in the `src/db/` section, the new script in two
-  lists, and the `EvidenceUnitRole` contrast re-pointed at the type that now
-  carries the fact.
+**`9173db4` — no bare `string` in a domain service signature.** Open as PR #15.
+`UnitRef` (the last natural-id prefix without a handle), `scopeParams()`, ~29
+positions converted across `core.ts`/`read.ts`/`write.ts`, and
+`scripts/check-no-stringly-typed.ts`.
 
 Working tree clean.
 
 ## Verified
 
-Both commits, none of it piped.
+Each commit, none of it piped: `bun test` **323 / 324 / 324 pass, 0 fail, exit
+0**; `typecheck`; `depcruise` (101 modules); `check:doc-comments`,
+`check:tests-assert`, `check:stdout`, `check:migrations`, and the two new
+scripts — all clean.
 
-- `bun test` — `ec852d0`: **323 pass, 0 fail, exit 0**. `65e8064`: **324 pass,
-  0 fail, exit 0**.
-- `typecheck`, `depcruise` (101 modules, 337 dependencies), `check:doc-comments`,
-  `check:tests-assert`, `check:stdout`, `check:migrations`, `check:prop-classes`
-  — all clean.
+**Every guard added was watched to fail**, and three results came from disproof
+rather than from a green suite:
 
-**Three things were verified by disproof rather than by a green suite**, which
-is the part worth trusting:
-
-- The `mayRead` read carried a `?? []` fallback. A sentinel inside it never
-  appeared across 17 passing tests, so it was unreachable — `planWork` always
-  writes the property. It was the same defect being deleted, in shorter code.
-- Deleting the provisioning loop turns the new reconciliation test red.
-- Deleting `Claim: ["name"]` from `INDEXED_PROPS` makes `check:prop-classes`
-  name it.
-
-**Two checkers caught something they were not aimed at.**
-`check:prop-classes` found `Computation.started_at`/`finished_at` annotated
-`Timestamp` and missing from the table on its **first run**, which is this
-repo's stated bar for a new check script. `check:doc-comments` caught the
-taxonomy's overview written as a doc comment above another doc comment rather
-than above a declaration.
+- The replacement `mayRead` read carried a `?? []` fallback. A sentinel inside
+  it never appeared across 17 passing tests — `planWork` always writes the
+  property, so it was the same defect being deleted, in shorter code.
+- Deleting the provisioning loop turns the new reconciliation test red;
+  deleting `Claim: ["name"]` makes `check:prop-classes` name it; reverting one
+  signature makes `check:no-stringly-typed` name it.
+- Both new checkers found something on their first run:
+  `check:prop-classes` two mis-classified timestamps, `check:no-stringly-typed`
+  eight positions the manual pass had missed.
 
 ## Open
 
-**`INDEXED_PROPS` and the annotations are two copies of one fact.** Kept
-deliberately, argued in the commit and the script header: the copies fail
-silently in opposite directions — a missing entry is a sequential scan nobody
-sees, a spurious one an index nobody reads, and neither shows up in a test
-because both spellings return the same rows. Generating the table from the
-types (the `docs/mcp-tools.md` pattern) is the honest end state and is not done.
+**The refactor shipped three defects that no type caught, and one of them is
+worth more than the refactor.** Cypher params are `Record<string, unknown>`, so
+`{ id: gate }` where `{ id: gate.id }` was meant compiles, binds a `{kind, id}`
+object as the parameter and matches nothing. The suite went 35 failures → 19 →
+1 as they came out.
+
+The last was `sameScope = left.enquiry === right.enquiry`. Those were strings;
+they are objects now, so `===` is **reference equality** — always false, and
+type-correct because both sides have the same type. It reported two claims in
+one line of enquiry as being in different ones, turning a contradiction into a
+dissociation. S-5 caught it. **Compare `.id`, never handles**; both blind spots
+are now in CLAUDE.md beside the rule.
+
+**That is new evidence on a parked question.** A branded-string `Ref` would not
+have this failure mode at all, since `===` on branded strings is value equality.
+The parked measurement (~470 compiler-enumerated edits; `.kind` read at runtime
+in two places; `labelForNaturalId()` already deriving the same fact from the
+prefix) now has an argument beside it that it did not have when the decision was
+taken.
+
+**`INDEXED_PROPS` and the annotations are two copies of one fact**, kept
+because they fail silently in opposite directions — a missing entry is a
+sequential scan nobody sees, a spurious one an index nobody reads. Generating
+the table from the types is the honest end state and is not done.
 
 **`Computation.kind` holds `input.method`** — free-text prose — while
 `Artefact.kind` holds actual kinds. The classification exposed it and does not
-settle it: either the property is misnamed or the writes are misusing it.
-Recorded in the type's doc comment.
+settle it.
 
-**Part 3 is unbuilt** — ~21 signature conversions in `core.ts`/`read.ts`/
-`write.ts`, `UnitRef` for the one natural-id prefix with no `Ref` type, and
-`check:no-stringly-typed`.
-
-**Parked by decision: the branded `Ref`.** `.kind` is read at runtime in exactly
-two places, and `labelForNaturalId()` already derives the same fact from the
-prefix — so `{kind: "claim", id: "GATE_1"}` is constructible today and nothing
-catches it. Measured at ~470 compiler-enumerated edits.
-
-**Recorded, not built: `(proposition, enquiry)` is a hidden entity.** It is
-withdrawable as a unit and can block a write, with no node, no id, no `Ref` and
-no report type. Wants a journal entry; CLAUDE.md's bar for a model change is a
-scenario showing a wrong answer, and nothing here is wrong today.
+**Recorded, not built: `(proposition, enquiry)` is a hidden entity.**
+Withdrawable as a unit, able to block a write, with no node, id, `Ref` or report
+type. Wants a journal entry; CLAUDE.md's bar for a model change is a scenario
+showing a wrong answer, and nothing here is wrong today.
 
 ## Next
 
-PR #14 awaits review. Then Part 3: start at `core.ts`'s `workGatedBy` and
-`confirmatoryResultsBehind`, both taking `gates: string[]` that hold GATE_ ids,
-and add `UnitRef` for `unitOf()` at `write.ts:1560`.
+PR #15 awaits review. Then the persisted event store: `labkit_event` declared in
+`src/db/schema.ts`, `emit` made async and moved inside each verb's
+`inTransaction`, and the minted-ids collector on `TenantGraph` whose residue
+guard is one line in `inTransaction`'s existing `finally`. `emit`'s `subject`
+gets its type there — it is allowlisted in `check:no-stringly-typed` for exactly
+that reason.

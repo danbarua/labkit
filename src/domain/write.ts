@@ -71,14 +71,23 @@
 
 import type { TenantGraph } from "../db/graph";
 import { optional, scalar, vertexProps } from "../db/cypher";
-import type { ArtefactProps, ClaimProps, EvidenceProps } from "../db/domain";
+import type {
+  ArtefactProps,
+  ClaimProps,
+  EvidenceProps,
+  IndexedString,
+  Prose,
+} from "../db/domain";
 import type {
   VerificationReport,
   TaskContract,
   AmendmentReport,
   AnalysisRef,
   CriterionRef,
+  DecisionRef,
+  EvidenceRef,
   GateRef,
+  UnitRef,
   WorkRef,
   ChangedConclusion,
   ClaimRef,
@@ -143,7 +152,7 @@ export class WriteSurface extends SessionCore {
    * twice gives two questions, because two people can ask the same thing for
    * different reasons and only the asker knows whether they meant one.
    */
-  async pose(question: string): Promise<QuestionRef> {
+  async pose(question: Prose): Promise<QuestionRef> {
     const asked = await this.posed(question);
     this.emit("pose", asked.id, { question });
     return asked;
@@ -155,7 +164,7 @@ export class WriteSurface extends SessionCore {
    * event stream is a record of research actions, and a researcher who opened
    * an enquiry did one thing, not three.
    */
-  private async posed(question: string): Promise<QuestionRef> {
+  private async posed(question: Prose): Promise<QuestionRef> {
     const asked = await this.graph.createNode("Question", { name: question, posed_at: this.clock.now() });
     return { kind: "question", id: asked.natural_id };
   }
@@ -203,7 +212,7 @@ export class WriteSurface extends SessionCore {
    * collapse, not a gap in the model: `MOTIVATES` and `RESOLVES` both already
    * existed. See PJ-008 row Q.
    */
-  async openEnquiry(question: string): Promise<EnquiryRef> {
+  async openEnquiry(question: Prose): Promise<EnquiryRef> {
     const asked = await this.posed(question);
     const enquiry = await this.pursued({ question: asked, approach: question });
     this.emit("openEnquiry", enquiry.id, { question, asked: asked.id });
@@ -247,7 +256,7 @@ export class WriteSurface extends SessionCore {
     await this.graph.createEdge(decision.natural_id, "NARROWS", input.from.id);
 
     for (const finding of await this.standingFindings()) {
-      await this.graph.createEdge(decision.natural_id, "BASED_ON", finding);
+      await this.graph.createEdge(decision.natural_id, "BASED_ON", finding.id);
     }
 
     const sharper = await this.posed(input.into);
@@ -261,7 +270,7 @@ export class WriteSurface extends SessionCore {
   }
 
   /** Every finding currently on the record — what "we knew at the time" means when an act is recorded. */
-  private async standingFindings(): Promise<string[]> {
+  private async standingFindings(): Promise<EvidenceRef[]> {
     const rows = await this.graph.query(
       `MATCH (:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
        OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
@@ -271,7 +280,7 @@ export class WriteSurface extends SessionCore {
         a: optional(vertexProps<{ invalidated?: boolean }>()),
       },
     );
-    return rows.filter((r) => !r.a?.invalidated).map((r) => r.e.natural_id);
+    return rows.filter((r) => !r.a?.invalidated).map((r) => ref("evidence", r.e.natural_id));
   }
 
   /**
@@ -408,7 +417,7 @@ export class WriteSurface extends SessionCore {
       // would block legitimate work concluding the same words in another.
       const { withdrawn, replacedBy } = await this.withdrawalOf({
         proposition: conclusion.proposition,
-        enquiry: input.enquiry.id,
+        enquiry: input.enquiry,
       });
       if (withdrawn) {
         throw new Error(
@@ -482,7 +491,7 @@ export class WriteSurface extends SessionCore {
       // An analysis is named by its computation; what it *read* is that
       // computation's output artefact, which is what CONSUMES points at.
       const artefact =
-        source.kind === "analysis" ? await this.outputArtefactOf(source) : source.id;
+        source.kind === "analysis" ? (await this.outputArtefactOf(source)).id : source.id;
       const seen = positionsFor.get(artefact);
       if (seen) seen.push(position);
       else positionsFor.set(artefact, [position]);
@@ -556,7 +565,7 @@ export class WriteSurface extends SessionCore {
     await this.graph.createEdge(
       review.natural_id,
       "EVALUATES",
-      await this.unitOf(input.of),
+      await this.unitOf(input.of).then((u) => u.id),
     );
     this.emit("recordReview", review.natural_id, {
       of: input.of.id,
@@ -612,7 +621,7 @@ export class WriteSurface extends SessionCore {
     const alreadyResolved = await this.graph.query(
       `MATCH (d:Decision)-[:RESOLVES]->(:Question {natural_id: $id}) RETURN d`,
       { d: vertexProps<{ natural_id: string; reason: string }>() },
-      { id: question },
+      { id: question.id },
     );
     if (alreadyResolved.length > 0) {
       throw new Error(
@@ -622,7 +631,7 @@ export class WriteSurface extends SessionCore {
       );
     }
 
-    let answerBearing: string | undefined;
+    let answerBearing: EvidenceRef | undefined;
     let answeredProposition: string | undefined;
     if (input.answeredBy) {
       // The claim identifies itself; what still has to be checked is that it
@@ -675,9 +684,9 @@ export class WriteSurface extends SessionCore {
           : "closed without a cited result",
         invalidation_check: "new evidence bearing on the question",
       });
-      await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
+      await this.graph.createEdge(decision.natural_id, "RESOLVES", question.id);
       if (answerBearing)
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing.id);
     });
 
     this.emit("closeEnquiry", input.enquiry.id, {
@@ -688,13 +697,14 @@ export class WriteSurface extends SessionCore {
 
   private async questionBehind(
     enquiry: EnquiryRef,
-  ): Promise<string | undefined> {
+  ): Promise<QuestionRef | undefined> {
     const rows = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
       { q: vertexProps<{ natural_id: string }>() },
       { id: enquiry.id },
     );
-    return rows[0]?.q.natural_id;
+    const q = rows[0]?.q.natural_id;
+    return q ? ref("question", q) : undefined;
   }
 
   // -------------------------------------------------------------------------
@@ -715,7 +725,7 @@ export class WriteSurface extends SessionCore {
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
-  async stateCriterion(proposition: string): Promise<CriterionRef> {
+  async stateCriterion(proposition: Prose): Promise<CriterionRef> {
     const criterion = await this.graph.createNode("Criterion", { proposition });
     this.emit("stateCriterion", criterion.natural_id, { proposition });
     return { kind: "criterion", id: criterion.natural_id };
@@ -776,7 +786,7 @@ export class WriteSurface extends SessionCore {
     // a criterion can do: an evaluation that neither triggers a gate nor bears
     // on a finding held to it is durable nonsense no reader would ever surface.
     else await this.assertCriterionQualifiesSomething(input.criterion);
-    let basis: string | undefined;
+    let basis: EvidenceRef | undefined;
     if (input.citing) {
       const found = await this.findingOn(input.citing);
       if (!found) throw new Error(`no finding bears on claim ${input.citing.id}`);
@@ -813,7 +823,7 @@ export class WriteSurface extends SessionCore {
       // Evidence` was declared in PJ-004 and never written until S-8; without
       // it, a condition established by measurement and one asserted by an agent
       // returned identical records. See PJ-008 row W.
-      if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
+      if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis.id);
       return ev;
     });
     this.emit("evaluateCriterion", evaluation.natural_id, {
@@ -868,7 +878,7 @@ export class WriteSurface extends SessionCore {
         throw new Error(
           "unreachable: the analysis just recorded this conclusion",
         );
-      await this.graph.createEdge(restated, "REVERIFIES", original);
+      await this.graph.createEdge(restated.id, "REVERIFIES", original.id);
       return recorded;
     });
 
@@ -922,10 +932,10 @@ export class WriteSurface extends SessionCore {
         reason: input.because,
         invalidation_check: input.until,
       });
-      await this.graph.createEdge(decision.natural_id, "DEFERS", question);
+      await this.graph.createEdge(decision.natural_id, "DEFERS", question.id);
       // What was known when the call was made -- S-1's requirement, and the
       // reason `evidence` is answerable afterwards rather than only now.
-      await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
+      await this.graph.createEdge(decision.natural_id, "BASED_ON", basis.id);
     });
 
     this.emit("acceptAsUnresolved", input.enquiry.id, { because: input.because, until: input.until, at });
@@ -1020,7 +1030,7 @@ export class WriteSurface extends SessionCore {
     if (!cited) throw new Error(`no finding bears on claim ${input.citing.id}`);
     const diagnosis = cited.evidence;
 
-    const gates = await this.gatesGovernedBy(input.criterion.id);
+    const gates = await this.gatesGovernedBy(input.criterion);
     if (gates.length === 0) {
       throw new Error(
         `condition ${input.criterion.id} governs nothing; there is no locked design to amend`,
@@ -1055,7 +1065,7 @@ export class WriteSurface extends SessionCore {
           proposition: input.nowRequires,
         });
         for (const gate of gates)
-          await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
+          await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate.id);
 
         const decision = await this.graph.createNode("Decision", {
       decided_at: this.clock.now(),
@@ -1068,9 +1078,9 @@ export class WriteSurface extends SessionCore {
           "CHANGES",
           input.criterion.id,
         );
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis.id);
         if (prior)
-          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
+          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior.id);
         return { replacement, decision };
       },
     );
@@ -1106,19 +1116,19 @@ export class WriteSurface extends SessionCore {
     };
   }
 
-  private async gatesGovernedBy(criterionId: string): Promise<string[]> {
+  private async gatesGovernedBy(criterion: CriterionRef): Promise<GateRef[]> {
     const rows = await this.graph.query(
       `MATCH (:Criterion {natural_id: $id})-[:GOVERNS]->(g:Gate) RETURN g`,
       { g: vertexProps<{ natural_id: string }>() },
-      { id: criterionId },
+      { id: criterion.id },
     );
-    return [...new Set(rows.map((r) => r.g.natural_id))];
+    return [...new Set(rows.map((r) => r.g.natural_id))].map((id) => ref("gate", id));
   }
 
   /** The most recent amendment to this design — the one nothing has superseded yet. */
   private async latestAmendmentOn(
-    gates: string[],
-  ): Promise<string | undefined> {
+    gates: GateRef[],
+  ): Promise<DecisionRef | undefined> {
     for (const gate of gates) {
       const rows = await this.graph.query(
         `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
@@ -1128,7 +1138,7 @@ export class WriteSurface extends SessionCore {
           d: vertexProps<{ natural_id: string }>(),
           newer: optional(vertexProps<{ natural_id: string }>()),
         },
-        { id: gate },
+        { id: gate.id },
       );
       const superseded = new Set(
         rows.filter((r) => r.newer).map((r) => r.d.natural_id),
@@ -1136,7 +1146,7 @@ export class WriteSurface extends SessionCore {
       const latest = rows
         .map((r) => r.d.natural_id)
         .find((d) => !superseded.has(d));
-      if (latest) return latest;
+      if (latest) return ref("decision", latest);
     }
     return undefined;
   }
@@ -1168,7 +1178,7 @@ export class WriteSurface extends SessionCore {
       await this.graph.query(
         `MATCH (a:Artefact {natural_id: $id}) SET a.invalidated = true RETURN a`,
         { a: vertexProps<ArtefactProps>() },
-        { id: output },
+        { id: output.id },
       );
       // Which review this rested on, recorded rather than validated and
       // discarded (row O). `because` was checked against the analysis and then
@@ -1177,7 +1187,7 @@ export class WriteSurface extends SessionCore {
       // critical review and a confirming one on one analysis, reported the
       // approval as the reason for the retraction. See
       // EDGE_SCHEMA.INVALIDATED_BY.
-      await this.graph.createEdge(output, "INVALIDATED_BY", input.because.id);
+      await this.graph.createEdge(output.id, "INVALIDATED_BY", input.because.id);
 
       // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
       //
@@ -1251,7 +1261,7 @@ export class WriteSurface extends SessionCore {
     // set `undefined` and printed the id instead.
     const artefactFor = new Map<string, string>();
     for (const o of input.from) {
-      artefactFor.set(o.id, o.kind === "analysis" ? await this.outputArtefactOf(o) : o.id);
+      artefactFor.set(o.id, o.kind === "analysis" ? (await this.outputArtefactOf(o)).id : o.id);
     }
     const found = new Map(
       (
@@ -1333,7 +1343,7 @@ export class WriteSurface extends SessionCore {
       { c: vertexProps<{ natural_id: string }>() },
       {
         name: scope.proposition,
-        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+        ...this.scopeParams(scope),
       },
     );
     // Every record this act withdraws, by handle. The reading is one sentence
@@ -1477,7 +1487,7 @@ export class WriteSurface extends SessionCore {
         : [];
     });
   }
-  private async outputArtefactOf(analysis: AnalysisRef): Promise<string> {
+  private async outputArtefactOf(analysis: AnalysisRef): Promise<ObservationsRef> {
     // One hop, via the computation's own PRODUCES -- the direct counterpart
     // to CONSUMES. This previously had to go out through the evidence unit.
     const rows = await this.graph.query(
@@ -1488,7 +1498,7 @@ export class WriteSurface extends SessionCore {
     );
     const found = rows[0];
     if (!found) throw new Error(`analysis ${analysis.id} has no output record`);
-    return found.a.natural_id;
+    return ref("observations", found.a.natural_id);
   }
 
   private async assertCriterionGovernsGate(
@@ -1556,7 +1566,7 @@ export class WriteSurface extends SessionCore {
    * changed now, because S-11 passes and renaming nouns is not a reason to
    * refactor; flagged so a later scenario can settle it.
    */
-  private async unitOf(analysis: AnalysisRef): Promise<string> {
+  private async unitOf(analysis: AnalysisRef): Promise<UnitRef> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:USES]-(u:EvidenceUnit) RETURN u`,
       { u: vertexProps<{ natural_id: string }>() },
@@ -1565,6 +1575,6 @@ export class WriteSurface extends SessionCore {
     const found = rows[0];
     if (!found)
       throw new Error(`analysis ${analysis.id} has no inferential unit`);
-    return found.u.natural_id;
+    return ref("unit", found.u.natural_id);
   }
 }

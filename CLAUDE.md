@@ -190,6 +190,7 @@ bun run check:tests-assert     # finds tests that assert nothing, or comparing t
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
+bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
@@ -249,8 +250,9 @@ about the pipe, not about that incident.
 **Nothing runs these for you** — there is no CI workflow and no git hook. Before
 committing, run `bun test`, `bun run typecheck` and
 `npx depcruise src tests --output-type err`; add `check:migrations` if you
-touched `drizzle/`, `check:tests-assert` if you touched tests, and
-`check:prop-classes` if you touched a `*Props` interface. Do not pipe
+touched `drizzle/`, `check:tests-assert` if you touched tests,
+`check:prop-classes` if you touched a `*Props` interface, and
+`check:no-stringly-typed` if you touched a signature in `src/domain/`. Do not pipe
 `bun test` — that trap is above, and is still live.
 
 ## Architecture: two persistence halves, deliberately not one
@@ -476,6 +478,21 @@ answer about?** The second is PJ-030: a reference denoting one record while the
 verb answers about another. `tests/subject-identity.test.ts` holds the whole
 argument in one file and is worth reading before touching a report or a verb
 signature.
+
+**No bare `string` in a signature in `core.ts`/`read.ts`/`write.ts`**, enforced
+by `bun run check:no-stringly-typed`. A parameter either names a record — a
+`Ref` — or carries a value, in which case it takes one of `src/db/domain.ts`'s
+taxonomy aliases. The taxonomy is what makes the rule satisfiable: without
+somewhere to put `pose(question: Prose)` there would be no answer for it.
+
+**Two things that rule cannot catch, both of which shipped while it was being
+written.** Cypher params are `Record<string, unknown>`, so `{ id: gate }` where
+`{ id: gate.id }` was meant compiles, binds a `{kind, id}` object as the
+parameter and matches nothing — three of those, all found by tests. And `Ref` is
+an object, so `left.enquiry === right.enquiry` is reference equality, always
+false, and type-correct; that turned a contradiction into a dissociation until
+S-5 caught it. **Compare `.id`, never handles.** A signature rule buys
+signatures; the bodies still need tests.
 
 **Every handle in a report is a `Ref`, and every verb takes one.** A value read
 out of a report goes straight back into a verb — `gateStatus().gate` into

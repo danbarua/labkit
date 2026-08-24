@@ -70,6 +70,22 @@ export type ClaimRef = Ref<"claim">;
 /** A finding, by identity. */
 export type EvidenceRef = Ref<"evidence">;
 
+/**
+ * The inferential activity an analysis carried out — an `EvidenceUnit`.
+ *
+ * The last natural-id prefix without a handle. `EU_` had no `Ref` type because
+ * nothing outside the write surface names one: a caller says *analysis* and
+ * means the `Computation`, while the unit is what `EVALUATES` and `IMPLEMENTS`
+ * actually point at. It exists now because `unitOf()` was handing one back as a
+ * bare string, which is the shape this refactor is removing, not because a new
+ * caller wants it.
+ *
+ * Kind `"unit"`, not `"evidenceUnit"` — the kinds name research concepts rather
+ * than labels throughout (`observations` for `Artefact`, `analysis` for
+ * `Computation`, `work` for `Task`), and this follows that.
+ */
+export type UnitRef = Ref<"unit">;
+
 /** An evaluation of a criterion, by identity. */
 export type EvaluationRef = Ref<"evaluation">;
 
