@@ -12,15 +12,17 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 - [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**
   Dan deprioritised this; it is not obstructing work. The cascade that turned
   one crossing into a burst is fixed (`2de1060`, `5439085`), and `6eeeb92` cut
-  provisioning reconciliation to 6 queries in the steady state. What remains is
-  the crossings themselves.
+  provisioning bookkeeping from **1,086 queries to 332 (−69%)** over one
+  scenario file, taking that file from 2,448 queries to 1,716 (−30%) — its own
+  commit message carries the measurement. What remains is the crossings
+  themselves.
 
-  (A "69% cheaper" figure stood here and has been deleted rather than dated. Its
-  workings — "two queries instead of ~78 checks, three round trips in the steady
-  state" — were in the same sentence originally and were edited away by
-  `d596672`; what survived could not be re-derived, and its remnant basis of
-  three steady-state round trips contradicts the six measured on 2026-08-24.
-  Found by auditing this file for exactly that, after `07d3dab`.)
+  (That figure was briefly withdrawn as underivable and is restored. The
+  withdrawal was wrong: the workings were in `6eeeb92`'s commit message the
+  whole time, and nobody looked there. Its apparent conflict with the six
+  queries measured on 2026-08-24 was not one either — `6eeeb92` reports three
+  round trips of *reconciliation*, and the six are a whole provisioning call,
+  those three plus `BEGIN`, the advisory lock and `COMMIT`.)
 
   **Do not re-investigate from scratch.** Refuted with evidence: advisory-lock
   contention; the pglite-socket desync bug as primary mechanism; fd/socket

@@ -43,20 +43,28 @@ error codes.
   own headline rule is that a sentence wrong next week does not belong in a
   document, one paragraph above where `07d3dab` had just fixed the identical
   defect. `docs/TASKS.md` dated the same cluster correctly.
-- *Withdrawn.* "Provisioning got 69% cheaper" could not be re-derived. Its
-  original sentence carried its workings — *"two queries instead of ~78 checks,
-  three round trips in the steady state"* — and they were edited away by
-  `d596672`, the same rewrite that dropped the `311 / 4.955s` line. What
-  survived sits between three unreconcilable numbers: ~80 round trips to 6
-  (≈92%), the deleted ~78 to 2, and the six measured on 2026-08-24. No way to
-  recover which quantity 69% was ever of.
+- *Withdrawn, then restored — and the withdrawal was the worse error.*
+  "Provisioning got 69% cheaper" looked underivable: its prose workings had been
+  edited away by `d596672`, and what survived seemed to sit between three
+  unreconcilable numbers. It was deleted on that basis in `4682e89`.
 
-**The audit found a fourth outcome CLAUDE.md's rule does not name.** The rule is
-*earn an assertion, be deleted, or be explicitly dated*. A claim about a change
-against a baseline that no longer exists can do none of those honestly — there
-is nothing to re-measure *to*, and dating it preserves an unfalsifiable number
-with a date attached. **Withdraw and say so** is the fourth, and the withdrawal
-is noted in place so the next reader does not re-derive a figure that was pulled.
+  **It was fully recoverable, and I did not look where the workings were.**
+  `6eeeb92`'s own commit message carries the measurement: 2,448 queries before
+  and 1,716 after over one scenario file, of which provisioning bookkeeping went
+  1,086 → 332. That is the 69%, and the 30% beside it. The apparent conflict was
+  not one either — `6eeeb92` reports three round trips of *reconciliation*, and
+  2026-08-24's six are a whole provisioning call: those three plus `BEGIN`, the
+  advisory lock and `COMMIT`. Restored with its derivation.
+
+**A fourth outcome exists, and this was not an instance of it.** CLAUDE.md's
+rule is *earn an assertion, be deleted, or be explicitly dated*; a claim whose
+baseline no longer exists can do none of those honestly, so **withdraw and say
+so** is real. But reaching it here took a search that stopped one artefact
+short. The ordering matters more than the outcome: prose history, then **every
+machine-written record — commit messages, tracer output, script results** — and
+only then withdrawal. A commit message is a durable artefact written at the
+moment of measurement, and it is the first place to look for the workings of a
+number about a change, not a place nobody thought of.
 
 ## Verified
 

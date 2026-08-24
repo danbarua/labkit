@@ -773,7 +773,7 @@ with zero unfinished.
 **What pushes a test over is its own query count, not provisioning.** This
 paragraph said the cost was `provisionTenantGraph()` reconciling on every
 `begin()` and `current()`. That was written sixteen minutes before `6eeeb92`
-cut reconciliation from ~80 round trips to 6, and nobody updated the sentence —
+cut reconciliation from ~80 round trips to three, and nobody updated it —
 so it misdirected every investigation after it, including two of this repo's
 own. **Profiled 2026-08-24**, and every figure in this section is of that date:
 a steady-state provisioning call is **6 queries, 1-4ms**; the cold one is 83
