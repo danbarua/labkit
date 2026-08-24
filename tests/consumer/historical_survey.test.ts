@@ -14,15 +14,20 @@
  * Imports only src/domain, never src/db (enforced — see .dependency-cruiser.cjs).
  */
 
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, days } from "../helpers/clock";
 import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
+let graph: Awaited<ReturnType<Scenario["begin"]>>;
 
 beforeAll(async () => { scenario = await openScenario(); });
+// `begin()` in a hook, not a test body: bun runs beforeEach/afterEach OUTSIDE
+// the 5000ms per-test budget, so setup paid here does not count against the
+// ceiling. `end()` was already off-budget for the same reason.
+beforeEach(async () => { graph = await scenario.begin(); });
 afterEach(async () => { await scenario.end(); });
 afterAll(async () => { await scenario.close(); });
 
@@ -50,7 +55,6 @@ describe("what was known, as of an instant", () => {
    * promotion made in August").
    */
   test("a question posed after the instant is not reported as open at it", async () => {
-    const graph = await scenario.begin();
     const clock = windableClock("2026-03-01T09:00:00.000Z");
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
 
@@ -78,7 +82,6 @@ describe("what was known, as of an instant", () => {
    * way the moments they name do.
    */
   test("an instant given with a UTC offset is compared as a moment, not as text", async () => {
-    const graph = await scenario.begin();
     const clock = windableClock("2026-03-01T08:00:00.000Z");
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
 
