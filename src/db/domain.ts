@@ -26,6 +26,44 @@ export const NODE_LABELS = [
 ] as const;
 export type NodeLabel = (typeof NODE_LABELS)[number];
 
+/**
+ * Which node properties get a Postgres index, per label.
+ *
+ * **The runtime half of the string taxonomy, and the only half with teeth.**
+ * `IndexedString` and `Timestamp` above are erased by the compiler, so
+ * `provisionTenantGraph()` cannot read them; this table is what it actually
+ * loops. Every entry must be a property annotated `IndexedString` or
+ * `Timestamp`, and every such property must appear here —
+ * `bun run check:prop-classes` fails when the two disagree.
+ *
+ * That checker exists under protest. CLAUDE.md is right that a fact in one
+ * place needs no checker, and this is a fact in two: the type is for the reader
+ * and this is for the machine. The honest upgrade is to **generate** this from
+ * the types, the way `docs/mcp-tools.md` is generated from the tool
+ * declarations and its freshness asserted by a test that was running anyway. It
+ * is written by hand first because a generator for a table nobody has read yet
+ * is a step ahead of the evidence.
+ *
+ * Non-unique, unlike the natural-id indexes next to them in
+ * `provisioning.ts` — two claims may assert the same sentence on purpose (S-5),
+ * and a unique index here would make that a database error instead of a
+ * research finding.
+ */
+export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = {
+  Question: ["posed_at"],
+  Claim: ["name"],
+  Decision: ["decided_at"],
+  CriterionEvaluation: ["evaluated_at"],
+  Artefact: ["logical_name"],
+  // Written by nothing today, and indexed anyway — `check:prop-classes` found
+  // them missing on its first run, which is the rule working. An index over a
+  // property that is always absent costs almost nothing in Postgres, and it is
+  // already there for the integration that fills them. Exceptions to
+  // "every Timestamp is indexed" would need a reason; these have none.
+  Computation: ["started_at", "finished_at"],
+};
+
+
 export const EDGE_LABELS = [
   "MOTIVATES", // Question -> LineOfEnquiry
   "REQUIRES", // LineOfEnquiry -> Evidence
@@ -292,6 +330,83 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
 };
 
+// **What LabKit does with a stored string — five names instead of one.**
+//
+// Every property below is a `string` at runtime; these say nothing about the
+// value's shape and everything about the *code's relationship to it*. That is
+// the question a reader of `*Props` actually has, and answering it used to
+// require reading every Cypher query in `src/domain/` — an audit that took
+// three hundred seconds of machine time and could go stale the next afternoon.
+//
+// They are plain aliases, so none of them constrains anything at a call site.
+// The enforcement is elsewhere and deliberately narrow: `INDEXED_PROPS` below
+// is what `provisionTenantGraph()` actually reads, and `bun run
+// check:prop-classes` fails when it disagrees with these annotations. A
+// classification nobody re-reads is not a mechanism (PJ-025), so exactly one
+// of them has a machine consequence and the rest are for the reader.
+//
+// The axis is *does LabKit inspect this, and where* — not *what does it look
+// like*. `posed_at` is a timestamp and `content_hash` is a digest, but what
+// decides their type here is that one appears in a Cypher predicate and the
+// other is only ever compared in TypeScript.
+
+/**
+ * LabKit matches on this **in Cypher**, so it is worth an index and gets one.
+ *
+ * Only two properties qualify today, and both were sequential scans until
+ * `INDEXED_PROPS` existed: `Claim.name` is matched in twelve places, and
+ * `Artefact.logical_name` in one.
+ */
+export type IndexedString = string;
+
+/**
+ * A unique handle from **outside** LabKit — a digest, a URI, another system's
+ * run id. Compared for equality in TypeScript, never matched in a query.
+ *
+ * **Most of these are written by nothing today, and that is not a reason to
+ * delete them.** LabKit does not decide on their contents, but the wider
+ * toolset may show them to a researcher who does, and an integration may fill
+ * them: PJ-009 names `CONSUMES`/`PRODUCES` as *"where an external run tracker
+ * would eventually attach"*, and these are its attachment points. The type is
+ * where that reason lives, so the next audit finds an answer rather than an
+ * unexplained empty field.
+ */
+export type IdentityString = string;
+
+/**
+ * An ISO-8601 instant, from the injected `Clock`.
+ *
+ * Indexed, like {@link IndexedString} — a timestamp exists to be ordered or
+ * bounded, and `posed_at` already is, in Cypher. `decided_at` and
+ * `evaluated_at` are compared in TypeScript today and get indexes on the same
+ * reasoning rather than waiting for the query that needs one.
+ */
+export type Timestamp = string;
+
+/**
+ * Stored, handed back to callers, never decided on.
+ *
+ * **Generic on purpose.** A bare alias here would widen
+ * `role: EvidenceUnitRole` to accept any string, which is strictly less safety
+ * than before the classification existed. `ReadOnlyString<EvidenceUnitRole>`
+ * keeps the union and adds the fact that nothing reads it.
+ */
+export type ReadOnlyString<T extends string = string> = T;
+
+/**
+ * {@link ReadOnlyString}, and potentially large — free text a human or an agent
+ * wrote.
+ *
+ * The distinction from `ReadOnlyString` is size, not treatment, and it is drawn
+ * because size is what would decide whether a property belongs in the graph at
+ * all. Every property's value is parsed out of one `properties` agtype column
+ * by a recursive-descent parser on **every read of that node**, including reads
+ * that wanted only its `natural_id` — so a paragraph costs something on a path
+ * that never looks at it. Nothing is being moved on that basis yet; the type is
+ * what makes the question answerable without another audit.
+ */
+export type Prose = string;
+
 export type EvidenceUnitRole =
   | "experiment"
   | "feasibility"
@@ -307,7 +422,7 @@ export type EvidenceUnitRole =
 // graph itself is the tenant partition now, not a repeated node property.
 
 export interface QuestionProps {
-  name: string;
+  name: Prose;
   /**
    * When the question entered the record, from the injected clock.
    *
@@ -328,25 +443,50 @@ export interface QuestionProps {
    * Required, not optional. A question whose instant is unknown cannot be
    * placed in time at all, and a survey that quietly includes the unplaceable
    * is the wrong answer this property exists to stop.
+   *
+   * The **only** node property LabKit matches on in Cypher besides `natural_id`
+   * — `WHERE q.posed_at <= $at` in `whatWasKnown()`. That is why it is indexed;
+   * the other two timestamps are indexed by analogy, this one by a live query.
    */
-  posed_at: string;
+  posed_at: Timestamp;
 }
 
 export interface LineOfEnquiryProps {
-  name: string;
+  name: Prose;
 }
 
 export interface EvidenceUnitProps {
-  role: EvidenceUnitRole;
+  /**
+   * Written by two verbs, read by none.
+   *
+   * `ReadOnlyString<EvidenceUnitRole>` rather than a bare `ReadOnlyString`: the
+   * union is what stops a third writer inventing a tenth value, and widening it
+   * to `string` in the name of classifying it would trade real safety for a
+   * label. CLAUDE.md uses this property as the contrast that bounds the
+   * no-cull policy — an unwalked *edge* is a claim about the domain and is
+   * protected; a property value is not — so the type is now where that fact
+   * lives, rather than a paragraph a reader has to find.
+   */
+  role: ReadOnlyString<EvidenceUnitRole>;
 }
 
 export interface EvidenceProps {
-  statement: string;
+  statement: Prose;
 }
 
 export interface ClaimProps {
-  name: string;
-  kind?: "exploratory" | "confirmatory";
+  /**
+   * The proposition, and the most-matched string in the codebase — twelve
+   * Cypher sites address a claim by it.
+   *
+   * `IndexedString`, not `Prose`, and the difference is the whole point of the
+   * taxonomy: this reads like free text and behaves like a key. It is still
+   * **not** identity — `claimsAsserting()` is the one seam where wording
+   * becomes a handle, and it returns every match and refuses to pick, because
+   * two claims can assert the same sentence (S-5).
+   */
+  name: IndexedString;
+  kind?: ReadOnlyString<"exploratory" | "confirmatory">;
 }
 
 /**
@@ -363,8 +503,16 @@ export interface ClaimProps {
  * which is where the doc comment said it belonged all along.
  */
 export interface DecisionProps {
-  reason: string;
-  invalidation_check: string;
+  reason: Prose;
+  /**
+   * What would reopen this decision.
+   *
+   * `Prose`, but only one of the six writers takes it from the caller —
+   * `acceptAsUnresolved` passes `input.until`. The other five write a constant
+   * chosen by the verb. Worth knowing before treating this as something a
+   * researcher said.
+   */
+  invalidation_check: Prose;
   /**
    * When the act was recorded, from the injected clock. Earned by row Z.
    *
@@ -383,53 +531,78 @@ export interface DecisionProps {
    * `CriterionEvaluation.evaluated_at` bounded some closures and left the rest
    * unplaceable, which is why deriving the order from evidence failed.
    */
-  decided_at: string;
+  decided_at: Timestamp;
 }
 
 export interface CriterionProps {
-  proposition: string;
+  proposition: Prose;
 }
 
 // `evidence_ref` removed (PJ-004 decision #5) — represented in-graph now as
 // `CriterionEvaluation -[:BASED_ON]-> Evidence` instead of a string shadow.
 export interface CriterionEvaluationProps {
-  value: string;
-  outcome: "pass" | "fail";
-  evaluated_at: string;
+  value: Prose;
+  outcome: ReadOnlyString<"pass" | "fail">;
+  evaluated_at: Timestamp;
 }
 
 export interface GateProps {
-  consequence: string;
+  consequence: Prose;
 }
 
 export interface ReviewProps {
-  verdict: string;
+  /**
+   * `Prose`, and `EDGE_SCHEMA.CHANGES` says why that is a decision rather than
+   * a shrug: telling a confirming review from a retracting one by reading this
+   * text *"would be text-matching"*, so the model expresses it structurally
+   * instead. Nothing branches on these words and nothing should.
+   */
+  verdict: Prose;
 }
 
 // verbatim property list from the journal's Artefact section
 export interface ArtefactProps {
-  kind: string;
-  logical_name: string;
-  content_hash?: string;
-  uri?: string;
-  external_ref?: string;
+  /**
+   * `"observations"` or `"analysis-output"` — a real kind, unlike
+   * {@link ComputationProps.kind}. Nothing reads it: `report.ts` notes that the
+   * `ART_` prefix cannot tell a raw input from an analysis output, and this
+   * property could and does not. A promotion candidate for `IndexedString` if
+   * a query ever wants it.
+   */
+  kind: ReadOnlyString;
+  logical_name: IndexedString;
+  content_hash?: IdentityString;
+  uri?: IdentityString;
+  external_ref?: IdentityString;
   invalidated?: boolean;
 }
 
 // verbatim property list from the journal's Computation section
 export interface ComputationProps {
-  kind: string;
-  status: string;
-  backend?: string;
-  external_run_id?: string;
-  started_at?: string;
-  finished_at?: string;
-  code_revision?: string;
-  environment_ref?: string;
+  /**
+   * **Classified `ReadOnlyString` alongside {@link ArtefactProps.kind}, and the
+   * classification exposes a mismatch rather than settling it.**
+   *
+   * Every writer passes `input.method` here — the researcher's free-text
+   * description of how an analysis was carried out, which is `Prose` by any
+   * reading. `Artefact.kind` holds actual kinds. So either this property is
+   * misnamed, or the writes are misusing it and `method` wants a `Prose`
+   * property of its own. Recorded here rather than guessed at; both are
+   * promotion candidates for `IndexedString` if a query ever wants them.
+   */
+  kind: ReadOnlyString;
+  /** Hardcoded `"completed"` by the only writer. A running or failed computation has nowhere to say so yet. */
+  status: ReadOnlyString;
+  backend?: IdentityString;
+  external_run_id?: IdentityString;
+  started_at?: Timestamp;
+  finished_at?: Timestamp;
+  code_revision?: IdentityString;
+  environment_ref?: IdentityString;
 }
 
 export interface TaskProps {
-  objective: string;
+  objective: Prose;
   /**
    * What the task is permitted to read — a **native agtype array**, not a JSON
    * string.
@@ -442,9 +615,10 @@ export interface TaskProps {
    * try/catch and two runtime type guards on the read side — all of which
    * existed to survive a shape the writer could not produce.
    */
-  mayRead: string[];
-  outputs: string;
-  acceptance: string;
+  mayRead: Prose[];
+  /** Hardcoded `""` by the only writer. What a task produced has nowhere to be said yet. */
+  outputs: ReadOnlyString;
+  acceptance: Prose;
   is_open?: boolean;
 }
 

@@ -12,7 +12,7 @@
  * module-private.
  */
 
-import { NODE_LABELS, EDGE_LABELS, NODE_TYPES, type NodeLabel, type EdgeLabel } from "./domain";
+import { NODE_LABELS, EDGE_LABELS, NODE_TYPES, INDEXED_PROPS, type NodeLabel, type EdgeLabel } from "./domain";
 import { LABKIT_SCHEMA } from "./schema";
 import type { LabKitDB } from "./client";
 
@@ -148,6 +148,7 @@ class TenantGraphProvisioner {
       if (!labels.has(edge)) await this.db.query(`SELECT ag_catalog.create_elabel($1, $2)`, [this.graphName, edge]);
     }
     for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label, indexes);
+    for (const label of NODE_LABELS) await this.ensurePropertyIndexes(label, indexes);
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
   }
 
@@ -197,6 +198,32 @@ class TenantGraphProvisioner {
     await this.db.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${label}" ((ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)))`,
     );
+  }
+
+  /**
+   * Indexes for the properties LabKit actually matches on, from
+   * `INDEXED_PROPS`.
+   *
+   * Same functional-index form as `ensureNaturalIdIndex` and for the same
+   * reason — a property lives inside one `properties` agtype column, so the
+   * index has to be on the extraction expression rather than a column.
+   *
+   * **Not unique.** The natural-id index above is; this one must not be. Two
+   * claims asserting the same sentence in different lines of enquiry are two
+   * claims (S-5), and a unique index on `Claim.name` would turn that from
+   * something the domain models into a `23505`.
+   *
+   * Before this existed, every `MATCH (c:Claim {name: $name})` — twelve sites —
+   * was a sequential scan over the label's table.
+   */
+  private async ensurePropertyIndexes(label: NodeLabel, existing: Set<string>): Promise<void> {
+    for (const prop of INDEXED_PROPS[label] ?? []) {
+      const indexName = `${label.toLowerCase()}_${prop}_idx`;
+      if (existing.has(indexName)) continue;
+      await this.db.query(
+        `CREATE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${label}" ((ag_catalog.agtype_access_operator(properties, '"${prop}"'::agtype)))`,
+      );
+    }
   }
 
   /**

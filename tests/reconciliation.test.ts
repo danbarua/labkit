@@ -103,3 +103,66 @@ test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", 
   expect(Number(labels.rows[0]!.n)).toBeGreaterThan(30);
   await db.close();
 });
+
+/**
+ * Property indexes, and the two things worth asserting separately: that
+ * provisioning **built** one, and that reconciliation **restores** it.
+ *
+ * `Claim.name` is matched in twelve Cypher sites and was a sequential scan
+ * over the label's table until `INDEXED_PROPS` existed. Nothing about that is
+ * observable from a query result — the same rows come back either way — so the
+ * index has to be asserted against `pg_indexes` directly or not at all.
+ *
+ * The drop-and-re-resolve half is the point PJ-005 exists for: an index added
+ * to the codebase must reach a tenant whose graph was provisioned before it
+ * shipped. Exercised through `resolveTenantContext()`, never provisioning
+ * internals.
+ */
+test("a property index is built, and a tenant missing one picks it up on re-resolve", async () => {
+  const db = await testDb.openClient();
+  const ctx = await resolveTenantContext(db, "labkit");
+
+  const indexNames = async (): Promise<string[]> => {
+    const rows = await db.query<{ indexname: string }>(
+      `SELECT indexname FROM pg_indexes WHERE schemaname = $1 ORDER BY indexname`,
+      [ctx.graphName],
+    );
+    return rows.rows.map((r) => r.indexname);
+  };
+
+  expect(await indexNames()).toContain("claim_name_idx");
+
+  // Not unique, and that is load-bearing rather than incidental: two claims may
+  // assert the same sentence in different lines of enquiry (S-5), so a unique
+  // index here would make a modelled situation a 23505.
+  const unique = await db.query<{ indisunique: boolean }>(
+    `SELECT i.indisunique FROM pg_class c
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     JOIN pg_index i ON i.indexrelid = c.oid
+     WHERE n.nspname = $1 AND c.relname = 'claim_name_idx'`,
+    [ctx.graphName],
+  );
+  expect(unique.rows[0]!.indisunique).toBe(false);
+
+  // A graph provisioned by an older build, simulated the way the CONSUMES test
+  // above does it: remove what this commit adds and leave the rest.
+  await db.query(`DROP INDEX "${ctx.graphName}".claim_name_idx`);
+  expect(await indexNames()).not.toContain("claim_name_idx");
+
+  await resolveTenantContext(db, "labkit");
+  expect(await indexNames()).toContain("claim_name_idx");
+
+  // And the index actually serves the query it was built for. Two claims of the
+  // same wording so the match is not trivially empty.
+  const graph = new TenantGraph(ctx, db);
+  await graph.createNode("Claim", { name: "the coating slows corrosion" });
+  await graph.createNode("Claim", { name: "the coating slows corrosion" });
+  const found = await graph.query(
+    `MATCH (c:Claim {name: $name}) RETURN count(c) AS found`,
+    { found: scalar<number>() },
+    { name: "the coating slows corrosion" },
+  );
+  expect(found[0]!.found).toBe(2);
+
+  await db.close();
+});
