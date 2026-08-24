@@ -46,9 +46,10 @@ import { traced } from "../../src/db/trace";
  * `tests/helpers/scenario.ts` and `tests/scenario-harness.test.ts`. Tests can
  * still cross the ceiling and fail; what they can no longer do is take the
  * next test with them. Instrumentation across a failing run tracked 59,086
- * queries with **zero** unfinished and found no desync signature at all. What
- * pushes a test to the ceiling is `provisionTenantGraph()` re-checking every
- * node and edge label on each `begin()` and `current()`. See `docs/TASKS.md`.
+ * queries with **zero** unfinished and found no desync signature at all.
+ *
+ * The last sentence here used to blame `provisionTenantGraph()`. It was wrong —
+ * see CLAUDE.md, which carries the 2026-08-24 profile.
  */
 export interface TestDb {
   /** Opens a fresh, independently-bootstrapped connection — call in `beforeEach`, not once for the whole file. See the file-level comment. */
@@ -58,7 +59,34 @@ export interface TestDb {
   close(): Promise<void>;
 }
 
-export async function setupTestDb(): Promise<TestDb> {
+/**
+ * The one PGlite instance the whole suite shares, booted on first use.
+ *
+ * **Booting is the single largest cost in the suite and it was paid 44 times.**
+ * Measured 2026-08-24: `setupTestDb()` takes ~900ms on a quiet machine and
+ * **~2.5s with ten cores saturated**, while connecting and querying afterwards
+ * cost 2-13ms. Forty-four files each called it from `beforeAll`, so 44-110s of a
+ * ~200s suite was booting WASM, running migrations and starting socket servers
+ * — which is why the query-count and off-budget work only moved 5-7%: both
+ * optimised the minority.
+ *
+ * Bun runs every test file in one process, so one instance serves all of them.
+ * Isolation is unchanged and still comes from `reset()`, which truncates
+ * between tests, and from `openClient()`, which hands each test its own
+ * connection — the containment for the pglite-socket defect described above.
+ *
+ * Graphs survive between files because `reset()` truncates rather than drops,
+ * deliberately (see `reset()`), so the second file onward finds provisioning's
+ * six-query steady path instead of its 83-query cold one.
+ */
+let shared: Promise<{
+  rawDb: PGlite;
+  server: PGLiteSocketServer;
+  host: string;
+  port: number;
+}> | undefined;
+
+async function boot() {
   const rawDb = new PGlite({ extensions: { age, vector } });
 
   // Migration ordering mirrors backend.ts's primary role exactly: migrate
@@ -72,7 +100,12 @@ export async function setupTestDb(): Promise<TestDb> {
   const server = new PGLiteSocketServer({ db: rawDb, port: 0, host: "127.0.0.1", maxConnections: 16 });
   await server.start();
   const [host, portStr] = server.getServerConn().split(":");
-  const port = Number(portStr);
+  return { rawDb, server, host: host!, port: Number(portStr) };
+}
+
+export async function setupTestDb(): Promise<TestDb> {
+  shared ??= boot();
+  const { host, port } = await shared;
 
   let opened = 0;
   async function openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }> {
@@ -137,10 +170,17 @@ export async function setupTestDb(): Promise<TestDb> {
         `);
       }
     },
+    /**
+     * Closes this file's admin connection and **leaves the shared instance
+     * running** for the files after it.
+     *
+     * Tearing it down here would defeat the point: bun runs files in sequence,
+     * so the first `afterAll` would kill the instance and the next file would
+     * boot another. The process exits when the run ends and takes the socket
+     * server and the WASM instance with it.
+     */
     async close() {
       await admin.close();
-      await server.stop();
-      await rawDb.close();
     },
   };
 }
