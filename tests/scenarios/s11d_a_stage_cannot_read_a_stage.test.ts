@@ -47,7 +47,7 @@ async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
   const raw = await s.recordObservations({
     enquiry, name: "raw sensor series", finding: "eleven dose levels, instrument settings not logged",
   });
-  const calibration = await s.recordAnalysis({
+  const { analysis: calibration, claims: calibrationClaims } = await s.recordAnalysis({
     enquiry, method: "calibrate", from: [raw],
     concludes: [{ proposition: "the calibration is stable", finding: "drift under 0.2%" }],
   });
@@ -56,7 +56,7 @@ async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
   // expressible: `from` took observations only, so the intermediate had to be
   // re-entered as if it were fresh measurement — severing the chain to the raw
   // series and making stage two look independently reproducible.
-  const trend = await s.recordAnalysis({
+  const { analysis: trend, claims: trendClaims } = await s.recordAnalysis({
     enquiry, method: "dose-response-fit", from: [calibration],
     concludes: [{ proposition: TRENDS, finding: "monotonic increase, p < 0.01" }],
   });
@@ -108,7 +108,7 @@ describe("S-11d: a stage cannot read a stage", () => {
     const { raw } = await aPipelineOnUnverifiableRawData(session);
 
     const fromRaw = await (await afterwards()).whatDependsOn(raw);
-    expect(fromRaw.claims.sort()).toEqual(["the calibration is stable", TRENDS].sort());
+    expect(fromRaw.claims.map((c) => c.asserts).sort()).toEqual(["the calibration is stable", TRENDS].sort());
     // Still open-world -- the traversal is now transitive, not complete.
     expect(fromRaw.complete).toBe(false);
   });

@@ -49,7 +49,7 @@ async function anAnalysisComparingBothControls(s: ResearchSession) {
   const regenerated = await s.recordObservations({
     enquiry, name: NAME, finding: "regenerated from an inferred algorithm", contentHash: "sha256:regen",
   });
-  const comparison = await s.recordAnalysis({
+  const { analysis: comparison, claims: comparisonClaims } = await s.recordAnalysis({
     enquiry, method: "compare-controls", from: [original, regenerated],
     concludes: [{ proposition: "the controls agree", finding: "within tolerance" }],
   });
@@ -76,8 +76,8 @@ describe("S-9c: two parts, one name", () => {
       { part: regenerated, hash: "sha256:something-else" },
     ]);
 
-    expect(report.exact).toEqual([{ part: original.id, name: NAME }]);
-    expect(report.differing).toEqual([{ part: regenerated.id, name: NAME }]);
+    expect(report.exact).toEqual([{ part: original, name: NAME }]);
+    expect(report.differing).toEqual([{ part: regenerated, name: NAME }]);
     expect(report.reproducible).toBe(false);
 
     // The names alone are identical, which is the whole point: identity is the
@@ -92,13 +92,13 @@ describe("S-9c: two parts, one name", () => {
     const noHash = await session.recordObservations({
       enquiry, name: NAME, finding: "a third copy, no hash recorded",
     });
-    const analysis = await session.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
       enquiry, method: "second-look", from: [noHash],
       concludes: [{ proposition: "the third copy is unrecoverable", finding: "no hash" }],
     });
 
     const report = await (await afterwards()).reproducibilityOf(analysis, []);
-    expect(report.unverifiable).toEqual([{ part: noHash.id, name: NAME }]);
+    expect(report.unverifiable).toEqual([{ part: noHash, name: NAME }]);
     expect(report.notRebuilt).toEqual([]);
   });
 });

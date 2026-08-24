@@ -18,6 +18,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test
 import { ResearchSession, inMemoryEventLog } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, days } from "../helpers/clock";
+import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 
@@ -85,14 +86,14 @@ describe("what was known, as of an instant", () => {
     const observations = await s.recordObservations({
       enquiry, name: "sweep readings", finding: "twelve runs",
     });
-    const analysis = await s.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
       enquiry, from: [observations], method: "paired comparison",
       concludes: [{ proposition: "the schedule moves convergence", finding: "moves by ~3 steps" }],
     });
     clock.windTo("2026-03-01T10:00:00.000Z");
     await s.closeEnquiry({
       enquiry,
-      answeredBy: { analysis, proposition: "the schedule moves convergence" },
+      answeredBy: claimOf(analysisClaims, "the schedule moves convergence"),
     });
 
     // 14:00Z, four hours after the close — but "09" sorts before "10".

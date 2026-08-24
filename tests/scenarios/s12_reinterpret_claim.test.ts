@@ -18,6 +18,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimOf } from "../helpers/claims";
+import { claimNamed } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -53,7 +55,7 @@ async function assertedTwice() {
     name: "attenuation readings, cohort A",
     finding: "signal amplitude before and after encoding, both signal types, cohort A",
   });
-  const first = await session.recordAnalysis({
+  const { analysis: first, claims: firstClaims } = await session.recordAnalysis({
     enquiry,
     method: "attenuation-ratio",
     from: [firstReadings],
@@ -65,14 +67,14 @@ async function assertedTwice() {
     name: "attenuation readings, cohort B",
     finding: "signal amplitude before and after encoding, both signal types, cohort B",
   });
-  const second = await session.recordAnalysis({
+  const { analysis: second, claims: secondClaims } = await session.recordAnalysis({
     enquiry,
     method: "attenuation-ratio",
     from: [secondReadings],
     concludes: [{ proposition: PREFERENTIAL, finding: "discriminative amplitude ratio 0.79, non-discriminative 0.41" }],
   });
 
-  return { enquiry, first, second, firstReadings, secondReadings };
+  return { enquiry, first, firstClaims, second, secondClaims, firstReadings, secondReadings };
 }
 
 describe("S-12 — the numbers are right; the sentence about them is wrong", () => {
@@ -84,17 +86,27 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // Reviewer:   no. The interpretation is backwards -- both signal types
     //             attenuate, and the discriminative one attenuates more.
     const report = await session.reinterpret({
-      of: PREFERENTIAL,
+      of: claimOf(programme.firstClaims, PREFERENTIAL),
       as: NARROWER,
       because: "both types attenuate; the ratio is a difference in degree, not preservation",
     });
 
     // LabKit:     evidence stands; the claim is superseded by a narrower
     //             interpretation.
-    expect(report.nowClaims).toBe(NARROWER);
-    expect(report.previously).toBe(PREFERENTIAL);
+    expect(report.nowClaims.asserts).toBe(NARROWER);
+    // Both records that asserted the old reading, by handle. The report said
+    // the sentence and nothing else, so a caller could not name either claim
+    // this withdrew -- and a single handle here would have picked between two
+    // records arbitrarily, which is the whole of PJ-030.
+    expect(report.previously.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
+    expect(report.previously.map((c) => c.claim.id).sort()).toEqual(
+      [
+        claimOf(programme.firstClaims, PREFERENTIAL).id,
+        claimOf(programme.secondClaims, PREFERENTIAL).id,
+      ].sort(),
+    );
     expect(report.requiresRecomputation).toBe(false);
-    expect(report.evidenceStanding.sort()).toEqual([
+    expect(report.evidenceStanding.map((f) => f.states).sort()).toEqual([
       "discriminative amplitude ratio 0.79, non-discriminative 0.41",
       "discriminative amplitude ratio 0.81, non-discriminative 0.44",
     ]);
@@ -110,19 +122,19 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    * node that happened to be found first.
    */
   test("the withdrawn interpretation stops standing, in full", async () => {
-    await assertedTwice();
-    const beforehand = await session.whySupported(PREFERENTIAL);
+    const programme = await assertedTwice();
+    const beforehand = await session.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(beforehand.supported).toBe(true);
     expect(beforehand.support).toHaveLength(2);
 
-    await session.reinterpret({
-      of: PREFERENTIAL,
+    const narrowing = await session.reinterpret({
+      of: claimOf(programme.firstClaims, PREFERENTIAL),
       as: NARROWER,
       because: "both types attenuate",
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const withdrawn = await later.whySupported(PREFERENTIAL);
+    const withdrawn = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(withdrawn.supported).toBe(false);
 
     // Withdrawn is its own state. Nobody asserts the sentence any more, and
@@ -130,15 +142,20 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // contradicted anything here, the reading of it changed.
     expect(withdrawn.withdrawn).toBe(true);
     expect(withdrawn.challenged).toBe(false);
-    expect(withdrawn.replacedBy).toBe(NARROWER);
+    // The same record the verb said it minted, not merely something worded
+    // like it. Matching on the sentence would not have noticed either way.
+    expect(withdrawn.replacedBy?.claim).toEqual(narrowing.nowClaims.claim);
+    expect(withdrawn.replacedBy?.asserts).toBe(NARROWER);
     // Its findings are still there, and still say what they said.
     expect(withdrawn.support).toHaveLength(2);
 
     // Still readable, and readable as history rather than as something that
     // never happened.
-    const history = await later.interpretationHistory(NARROWER);
-    expect(history.originally).toBe(PREFERENTIAL);
-    expect(history.nowClaims).toBe(NARROWER);
+    // Asked with the handle the verb returned -- no round trip back through
+    // the wording to re-find the record this very call created.
+    const history = await later.interpretationHistory(narrowing.nowClaims.claim);
+    expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
+    expect(history.nowClaims.asserts).toBe(NARROWER);
     expect(history.revisions).toHaveLength(1);
     expect(history.revisions[0]!.reason).toContain("both types attenuate");
   });
@@ -153,13 +170,13 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   test("every finding survives, and nothing was invalidated", async () => {
     const programme = await assertedTwice();
     await session.reinterpret({
-      of: PREFERENTIAL,
+      of: claimOf(programme.firstClaims, PREFERENTIAL),
       as: NARROWER,
       because: "both types attenuate",
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const now = await later.whySupported(NARROWER);
+    const now = await later.whySupported(await claimNamed(later, NARROWER));
     expect(now.supported).toBe(true);
     expect(now.support.map((s) => s.finding).sort()).toEqual([
       "discriminative amplitude ratio 0.79, non-discriminative 0.41",
@@ -177,7 +194,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
     // And the withdrawn interpretation's findings are not reported as
     // withdrawn evidence: nothing about them changed.
-    const withdrawn = await later.whySupported(PREFERENTIAL);
+    const withdrawn = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(withdrawn.superseded).toEqual([]);
     void programme;
   });
@@ -194,22 +211,22 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     const programme = await assertedTwice();
     await session.closeEnquiry({
       enquiry: programme.enquiry,
-      answeredBy: { analysis: programme.first, proposition: PREFERENTIAL },
+      answeredBy: claimOf(programme.firstClaims, PREFERENTIAL),
     });
 
     const report = await session.reinterpret({
-      of: PREFERENTIAL,
+      of: claimOf(programme.firstClaims, PREFERENTIAL),
       as: NARROWER,
       because: "both types attenuate",
     });
 
-    expect(report.restingOnTheOldReading).toEqual([
+    expect(report.restingOnTheOldReading.map((q) => q.asks)).toEqual([
       "does the encoding preferentially preserve discriminative signal?",
     ]);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const history = await later.interpretationHistory(NARROWER);
-    expect(history.revisions[0]!.restingOnTheOldReading).toEqual([
+    const history = await later.interpretationHistory(await claimNamed(later, NARROWER));
+    expect(history.revisions[0]!.restingOnTheOldReading.map((q) => q.asks)).toEqual([
       "does the encoding preferentially preserve discriminative signal?",
     ]);
   });
@@ -221,20 +238,26 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    * empty event log, with no timestamp on anything.
    */
   test("successive reinterpretations are ordered without timestamps or an event log", async () => {
-    await assertedTwice();
+    const programme = await assertedTwice();
     const EVEN_NARROWER = "discriminative signal attenuates less in cohort A only";
 
-    await session.reinterpret({ of: PREFERENTIAL, as: NARROWER, because: "both types attenuate" });
-    await session.reinterpret({ of: NARROWER, as: EVEN_NARROWER, because: "the cohort B ratio does not separate" });
+    await session.reinterpret({ of: claimOf(programme.firstClaims, PREFERENTIAL), as: NARROWER, because: "both types attenuate" });
+    await session.reinterpret({ of: await claimNamed(session, NARROWER), as: EVEN_NARROWER, because: "the cohort B ratio does not separate" });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     expect(later.events.all()).toHaveLength(0);
 
-    const history = await later.interpretationHistory(EVEN_NARROWER);
-    expect(history.originally).toBe(PREFERENTIAL);
-    expect(history.nowClaims).toBe(EVEN_NARROWER);
-    expect(history.revisions.map((r) => r.nowClaims)).toEqual([NARROWER, EVEN_NARROWER]);
-    expect(history.revisions.map((r) => r.previously)).toEqual([PREFERENTIAL, NARROWER]);
+    const history = await later.interpretationHistory(await claimNamed(later, EVEN_NARROWER));
+    expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
+    expect(history.nowClaims.asserts).toBe(EVEN_NARROWER);
+    expect(history.revisions.map((r) => r.nowClaims.asserts)).toEqual([NARROWER, EVEN_NARROWER]);
+    // Plural per step, and the counts differ: the first reinterpretation
+    // withdrew the two claims that had reached the same reading, the second
+    // withdrew the one narrower claim that replaced them.
+    expect(history.revisions.map((r) => r.previously.map((c) => c.asserts))).toEqual([
+      [PREFERENTIAL, PREFERENTIAL],
+      [NARROWER],
+    ]);
   });
 
   /**
@@ -264,7 +287,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const standing = await later.whySupported(PREFERENTIAL);
+    const standing = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(standing.challenged).toBe(true);
     // Challenged, but nobody withdrew it -- the two states must not collapse.
     expect(standing.withdrawn).toBe(false);
@@ -288,7 +311,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    */
   test("recording the withdrawn sentence again does not quietly restore it", async () => {
     const programme = await assertedTwice();
-    await session.reinterpret({ of: PREFERENTIAL, as: NARROWER, because: "both types attenuate" });
+    await session.reinterpret({ of: claimOf(programme.firstClaims, PREFERENTIAL), as: NARROWER, because: "both types attenuate" });
 
     const moreReadings = await session.recordObservations({
       enquiry: programme.enquiry,
@@ -305,26 +328,26 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     ).rejects.toThrow(/"the encoding preferentially preserves discriminative signal" was withdrawn/);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const still = await later.whySupported(PREFERENTIAL);
+    const still = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(still.withdrawn).toBe(true);
-    expect(still.replacedBy).toBe(NARROWER);
+    expect(still.replacedBy?.asserts).toBe(NARROWER);
     expect(still.supported).toBe(false);
   });
 
   /** Reinterpreting something nobody claimed writes nothing. */
   test("reinterpreting a proposition that is not on the record writes nothing", async () => {
-    await assertedTwice();
-    const before = await session.whySupported(PREFERENTIAL);
+    const programme = await assertedTwice();
+    const before = await session.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
 
     await expect(
       session.reinterpret({
-        of: "a sentence nobody wrote",
+        of: { kind: "claim" as const, id: "CLM_9999" },
         as: "some narrower version of it",
         because: "it should not get this far",
       }),
-    ).rejects.toThrow(/nothing on the record claims "a sentence nobody wrote"/);
+    ).rejects.toThrow(/no claim CLM_9999/);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    expect(await later.whySupported(PREFERENTIAL)).toEqual(before);
+    expect(await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL))).toEqual(before);
   });
 });

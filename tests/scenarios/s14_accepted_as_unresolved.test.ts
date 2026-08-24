@@ -18,6 +18,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -58,13 +59,13 @@ async function aMarginalComparisonWithNothingLeftToRunIt() {
     name: "marginal split results",
     finding: "per-image accuracy on the marginal split",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "paired-comparison",
     from: [observations],
     concludes: [{ proposition: PROPOSITION, finding: "difference 0.4%, CI spans zero" }],
   });
-  return { enquiry, observations, analysis };
+  return { enquiry, observations, analysis, analysisClaims };
 }
 
 describe("S-14: deliberately leaving something unresolved", () => {
@@ -77,24 +78,24 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * it, so an accepted question and an untouched one returned the same answer.
    */
   test("Afterward 1: accepted-as-open is a state of its own, not 'still being worked'", async () => {
-    const { enquiry, analysis } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
 
     const stillWorking = await session.enquiryStatus(enquiry);
-    expect(stillWorking.open).toBe(true);
-    expect(stillWorking.closure).toBeNull();
+    expect(stillWorking.question!.open).toBe(true);
+    expect(stillWorking.question!.closure).toBeNull();
 
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
       until: CONDITION,
-      inLightOf: { analysis, proposition: PROPOSITION },
+      inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBe("accepted-as-unresolved");
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBe("accepted-as-unresolved");
     // Not answered. Accepting a question is not deciding it.
-    expect(status.answer).toBeNull();
+    expect(status.question!.answer).toBeNull();
   });
 
   /**
@@ -103,12 +104,12 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * purpose is turning the survey green.
    */
   test("Afterward 2: accepting creates no work, and the survey stops calling it pending", async () => {
-    const { enquiry, analysis } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
       until: CONDITION,
-      inLightOf: { analysis, proposition: PROPOSITION },
+      inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
     const reader = await afterwards();
@@ -134,16 +135,16 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * be about the world rather than about running the same analysis again.
    */
   test("Afterward 3: the condition that would reopen it is recorded, and is not 'more analysis'", async () => {
-    const { enquiry, analysis } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
       until: CONDITION,
-      inLightOf: { analysis, proposition: PROPOSITION },
+      inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.reopensIf).toBe(CONDITION);
+    expect(status.question!.reopensIf).toBe(CONDITION);
   });
 
   /**
@@ -154,19 +155,19 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * a reason that survives only in the event stream has not been recorded.
    */
   test("Afterward 4: the reasoning survives, and so does what was known at the time", async () => {
-    const { enquiry, analysis } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
       until: CONDITION,
-      inLightOf: { analysis, proposition: PROPOSITION },
+      inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.acceptedBecause).toBe(
+    expect(status.question!.acceptedBecause).toBe(
       "the confirmatory dataset is spent and there is no larger held-out sample",
     );
-    expect(status.evidence).toEqual(["difference 0.4%, CI spans zero"]);
+    expect(status.question!.evidence.map((e) => e.states)).toEqual(["difference 0.4%, CI spans zero"]);
   });
 
   /**
@@ -179,9 +180,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     const { enquiry } = await aMarginalComparisonWithNothingLeftToRunIt();
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBeNull();
-    expect(status.reopensIf).toBeUndefined();
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBeNull();
+    expect(status.question!.reopensIf).toBeUndefined();
 
     const known = await (await afterwards()).whatIsKnown();
     expect(known.accepted).toEqual([]);
@@ -194,12 +195,12 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * has been answered — but the acceptance must not have pre-empted it.
    */
   test("an accepted question can still be answered later, and then reads as answered", async () => {
-    const { enquiry, analysis } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
       until: CONDITION,
-      inLightOf: { analysis, proposition: PROPOSITION },
+      inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
     // A new data source turns up -- the named condition, met.
@@ -208,18 +209,18 @@ describe("S-14: deliberately leaving something unresolved", () => {
       name: "external replication cohort",
       finding: "per-image accuracy, independent cohort",
     });
-    const settled = await session.recordAnalysis({
+    const { analysis: settled, claims: settledClaims } = await session.recordAnalysis({
       enquiry,
       method: "paired-comparison, external cohort",
       from: [fresh],
       concludes: [{ proposition: PROPOSITION, finding: "difference 2.1%, CI excludes zero" }],
     });
-    await session.closeEnquiry({ enquiry, answeredBy: { analysis: settled, proposition: PROPOSITION } });
+    await session.closeEnquiry({ enquiry, answeredBy: claimOf(settledClaims, PROPOSITION) });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("answered");
-    expect(status.answer).toBe("yes");
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("answered");
+    expect(status.question!.answer).toBe("yes");
   });
 
   /**
@@ -243,9 +244,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     await session.closeEnquiry({ enquiry });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("abandoned");
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("abandoned");
     // The work that was done, and the reason it stopped, are both absent.
-    expect(status.evidence).toEqual([]);
+    expect(status.question!.evidence).toEqual([]);
   });
 });

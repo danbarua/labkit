@@ -62,7 +62,7 @@ async function aTwoStagePipeline(s: ResearchSession) {
     enquiry, name: "raw sensor series", finding: "eleven dose levels, uncalibrated",
     contentHash: "sha256:raw",
   });
-  const calibration = await s.recordAnalysis({
+  const { analysis: calibration, claims: calibrationClaims } = await s.recordAnalysis({
     enquiry, method: "calibrate", from: [raw],
     concludes: [{ proposition: CALIBRATION, finding: "drift under 0.2% across the run" }],
   });
@@ -73,7 +73,7 @@ async function aTwoStagePipeline(s: ResearchSession) {
     enquiry, name: "calibrated series", finding: "eleven dose levels, calibrated",
     contentHash: "sha256:calibrated",
   });
-  const trend = await s.recordAnalysis({
+  const { analysis: trend, claims: trendClaims } = await s.recordAnalysis({
     enquiry, method: "dose-response-fit", from: [calibrated],
     concludes: [{ proposition: TREND, finding: "monotonic increase, p < 0.01" }],
   });
@@ -104,8 +104,8 @@ describe("S-11c: nothing found is not nothing there", () => {
     // subject nothing depends on, which is why `complete: false` is not
     // decoration. Recording the second stage properly is what fixes it, and
     // S-11d asserts that it does.
-    expect(affected.claims).toEqual([CALIBRATION]);
-    expect(affected.claims).not.toContain(TREND);
+    expect(affected.claims.map((c) => c.asserts)).toEqual([CALIBRATION]);
+    expect(affected.claims.map((c) => c.asserts)).not.toContain(TREND);
     expect(affected.complete).toBe(false);
   });
 

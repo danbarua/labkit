@@ -74,6 +74,7 @@ export class ResearchSession {
   readonly reinterpret: WriteSurface["reinterpret"] = (...args) => this.writes.reinterpret(...args);
   readonly interpretationHistory: ReadSurface["interpretationHistory"] = (...args) => this.reads.interpretationHistory(...args);
   readonly doTheseConflict: ReadSurface["doTheseConflict"] = (...args) => this.reads.doTheseConflict(...args);
+  readonly claimsAsserting: ReadSurface["claimsAsserting"] = (...args) => this.reads.claimsAsserting(...args);
   readonly whySupported: ReadSurface["whySupported"] = (...args) => this.reads.whySupported(...args);
   readonly reproducibilityOf: ReadSurface["reproducibilityOf"] = (...args) => this.reads.reproducibilityOf(...args);
   readonly whatDependsOn: ReadSurface["whatDependsOn"] = (...args) => this.reads.whatDependsOn(...args);

@@ -26,7 +26,17 @@ import {
   inMemoryEventLog,
   systemClock,
 } from "./events";
-import type { ClaimSubject, AnalysisRef } from "./report";
+import type {
+  ClaimSubject,
+  ClaimRef,
+  AnalysisRef,
+  ConclusionRef,
+  ConfirmatoryResult,
+  ReplacementClaim,
+  DecidedQuestion,
+  GatedWork,
+} from "./report";
+import { ref } from "./report";
 
 export interface ResearchSessionOptions {
   clock?: Clock;
@@ -43,6 +53,42 @@ export class SessionCore {
   ) {
     this.clock = options.clock ?? systemClock;
     this.events = options.events ?? inMemoryEventLog();
+  }
+
+  /**
+   * The finding that bears on a claim, and what the claim asserts.
+   *
+   * The direct replacement for `findingFor(analysis, proposition)`: with a
+   * `ClaimRef` there is nothing to search for, so this matches the claim by id
+   * and walks one edge back. No wording crosses the query.
+   */
+  protected async findingOn(
+    claim: ClaimRef,
+  ): Promise<{ evidence: string; asserts: string } | undefined> {
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (c:Claim {natural_id: $id})<-[:${bearing}]-(e:Evidence)
+         RETURN c, e`,
+        {
+          c: vertexProps<{ name: string }>(),
+          e: vertexProps<{ natural_id: string }>(),
+        },
+        { id: claim.id },
+      );
+      const found = rows[0];
+      if (found) return { evidence: found.e.natural_id, asserts: found.c.name };
+    }
+    return undefined;
+  }
+
+  /** What a claim asserts. */
+  protected async assertedBy(claim: ClaimRef): Promise<string | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ name: string }>() },
+      { id: claim.id },
+    );
+    return rows[0]?.c.name;
   }
 
   /** The single finding by which an analysis concluded something about one proposition. */
@@ -78,17 +124,22 @@ export class SessionCore {
   }
 
   /** Work these gates protect, and which therefore has to be run again when their condition changes. */
-  protected async workGatedBy(gates: string[]): Promise<string[]> {
-    const objectives = new Set<string>();
+  protected async workGatedBy(gates: string[]): Promise<GatedWork[]> {
+    // Keyed by id, not by objective. Two tasks can share an objective and be
+    // two tasks; deduping on the text reported one piece of work to re-run
+    // where there were two. Same traversal `gateStatus` reports as
+    // `{work, objective}` -- one was converted and this was not (PJ-030 §7).
+    const found = new Map<string, GatedWork>();
     for (const gate of gates) {
       const rows = await this.graph.query(
         `MATCH (:Gate {natural_id: $id})-[:GATES]->(t:Task) RETURN t`,
-        { t: vertexProps<{ objective: string }>() },
+        { t: vertexProps<{ objective: string; natural_id: string }>() },
         { id: gate },
       );
-      for (const row of rows) objectives.add(row.t.objective);
+      for (const row of rows)
+        found.set(row.t.natural_id, { work: ref("work", row.t.natural_id), objective: row.t.objective });
     }
-    return [...objectives].sort();
+    return [...found.values()].sort((a, b) => a.work.id.localeCompare(b.work.id));
   }
 
   /**
@@ -101,29 +152,33 @@ export class SessionCore {
    * gives — see S-4 on absence of evidence reading as a negative.
    */
 
-  protected async confirmatoryResultsBehind(gates: string[]): Promise<string[]> {
-    const affected = new Set<string>();
+  protected async confirmatoryResultsBehind(gates: string[]): Promise<ConfirmatoryResult[]> {
+    // Keyed by id. S-5's literal case: one sentence asserted in two lines of
+    // enquiry is two claims, and merging them understated the blast radius of
+    // a scientific amendment.
+    const affected = new Map<string, ConfirmatoryResult>();
     for (const gate of gates) {
       for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
         const rows = await this.graph.query(
           `MATCH (:Gate {natural_id: $id})-[:GATES]->(:Task)-[:IMPLEMENTS]->(u:EvidenceUnit)
            MATCH (u)-[:PRODUCES]->(e:Evidence)-[:${bearing}]->(c:Claim)
            RETURN c`,
-          { c: vertexProps<{ name: string; kind?: string }>() },
+          { c: vertexProps<{ name: string; kind?: string; natural_id: string }>() },
           { id: gate },
         );
         for (const row of rows)
-          if (row.c.kind === "confirmatory") affected.add(row.c.name);
+          if (row.c.kind === "confirmatory")
+            affected.set(row.c.natural_id, { claim: ref("claim", row.c.natural_id), asserts: row.c.name });
       }
     }
-    return [...affected].sort();
+    return [...affected.values()].sort((a, b) => a.claim.id.localeCompare(b.claim.id));
   }
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */
   protected async withdrawalOf(scope: {
     proposition: string;
     enquiry?: string;
-  }): Promise<{ withdrawn: boolean; replacedBy?: string }> {
+  }): Promise<{ withdrawn: boolean; replacedBy?: ReplacementClaim }> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
@@ -133,7 +188,7 @@ export class SessionCore {
       {
         c: vertexProps<{ natural_id: string }>(),
         d: optional(vertexProps<{ natural_id: string }>()),
-        now: optional(vertexProps<{ name: string }>()),
+        now: optional(vertexProps<{ name: string; natural_id: string }>()),
       },
       {
         name: scope.proposition,
@@ -150,8 +205,38 @@ export class SessionCore {
     );
     if (standing.size > 0) return { withdrawn: false };
 
-    const replacedBy = rows.find((r) => r.now)?.now?.name;
-    return { withdrawn: true, ...(replacedBy ? { replacedBy } : {}) };
+    // Identity as well as wording. This was the claim's NAME, picked from
+    // whichever row happened to carry one -- arbitrary row and arbitrary text,
+    // in the field that says what the record asserts instead (PJ-030 §7).
+    const now = rows.find((r) => r.now)?.now;
+    return {
+      withdrawn: true,
+      ...(now ? { replacedBy: { claim: ref("claim", now.natural_id), asserts: now.name } } : {}),
+    };
+  }
+
+  /**
+   * The claim a conclusion refers to, by id.
+   *
+   * Both bearings, because a conclusion may challenge rather than support and
+   * `doTheseConflict` needs the handle either way. Two queries rather than
+   * `[:SUPPORTS|CHALLENGES]`, which pglite-age rejects outright.
+   *
+   * Lifted here from `WriteSurface` when `sideOf` needed it: `ConflictSide`
+   * carried four entity-naming fields and not one identifier (PJ-030 §7).
+   */
+  protected async claimFor(ref: ConclusionRef): Promise<string> {
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(:Evidence)-[:${bearing}]->(c:Claim {name: $name})
+         RETURN c`,
+        { c: vertexProps<{ natural_id: string }>() },
+        { id: ref.analysis.id, name: ref.proposition },
+      );
+      const found = rows[0];
+      if (found) return found.c.natural_id;
+    }
+    throw new Error(`analysis ${ref.analysis.id} concluded nothing about "${ref.proposition}"`);
   }
 
   /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
@@ -159,8 +244,11 @@ export class SessionCore {
   protected async decidedOnTheStrengthOf(scope: {
     proposition: string;
     enquiry?: string;
-  }): Promise<string[]> {
-    const asked = new Set<string>();
+  }): Promise<DecidedQuestion[]> {
+    // Keyed by id. Two identically-worded questions are two questions -- S-1
+    // poses exactly that pair, and `report.ts` says neither may be resolved by
+    // comparing text. This helper was doing it anyway.
+    const asked = new Map<string, DecidedQuestion>();
     // Both bearings: a question can be settled "no" on a finding that
     // challenges the proposition, and that closure rests on this reading just
     // as much as a supporting one does.
@@ -171,68 +259,46 @@ export class SessionCore {
          ${this.withinScope(scope)}
          MATCH (d)-[:RESOLVES]->(q:Question)
          RETURN q`,
-        { q: vertexProps<{ name: string }>() },
+        { q: vertexProps<{ name: string; natural_id: string }>() },
         {
           name: scope.proposition,
           ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
         },
       );
-      for (const row of rows) asked.add(row.q.name);
+      for (const row of rows)
+        asked.set(row.q.natural_id, { question: ref("question", row.q.natural_id), asks: row.q.name });
     }
-    return [...asked].sort();
+    return [...asked.values()].sort((a, b) => a.question.id.localeCompare(b.question.id));
   }
 
-  /**
-   * Works out which claim a caller meant.
-   *
-   * Proposition text identifies a claim only while a sentence is asserted in
-   * one line of enquiry. S-5 is the case where it is asserted in two — the
-   * same words about different endpoints — and there text identifies nothing.
-   * Rather than picking one, this refuses and says how many there are. The
-   * wrong answer available here is not "no result": before this existed,
-   * `whySupported()` merged both into a single claim that was simultaneously
-   * supported and challenged, and `reinterpret()` withdrew an unrelated line
-   * of work's claim with no decision saying so.
-   *
-   * Scope is the line of enquiry, reached by traversal. Nothing is stored on
-   * the claim — see PJ-008 row C.
-   */
-
-  protected async scopeFor(
-    subject: ClaimSubject,
+  protected async scopeOf(
+    claim: ClaimRef,
   ): Promise<{ proposition: string; enquiry?: string }> {
-    if (typeof subject !== "string") {
-      // A citation has to be one the cited analysis actually made. Without
-      // this, naming a proposition it never concluded still resolves to its
-      // line of enquiry, and the answer comes back about whatever *other*
-      // analysis in that scope said -- so `reinterpret()` would withdraw a
-      // claim the cited analysis never asserted. Same check `closeEnquiry()`
-      // and `amendDesign()` already make of their citations.
-      const concluded = await this.findingFor(
-        subject.analysis,
-        subject.proposition,
+    // BOTH bearings. A conclusion that challenges its proposition reaches its
+    // line of enquiry the same way one that supports it does, and walking only
+    // SUPPORTS lost the enquiry for every challenging claim -- which S-5's
+    // second stage is, and which is how this was caught.
+    let name: string | undefined;
+    let enquiry: string | undefined;
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (c:Claim {natural_id: $id})
+         OPTIONAL MATCH (c)<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)-[:ADDRESSES]->(loe:LineOfEnquiry)
+         RETURN c, loe`,
+        {
+          c: vertexProps<{ name: string }>(),
+          loe: optional(vertexProps<{ natural_id: string }>()),
+        },
+        { id: claim.id },
       );
-      if (!concluded) {
-        throw new Error(
-          `analysis ${subject.analysis.id} concluded nothing about "${subject.proposition}"`,
-        );
-      }
-      const enquiry = await this.enquiryAddressedBy(subject.analysis);
-      if (!enquiry)
-        throw new Error(
-          `analysis ${subject.analysis.id} addresses no line of enquiry`,
-        );
-      return { proposition: subject.proposition, enquiry };
+      if (rows[0]) name = rows[0].c.name;
+      enquiry ??= rows.find((r) => r.loe)?.loe?.natural_id;
     }
-
-    const scopes = await this.enquiriesClaiming(subject);
-    if (scopes.length > 1) {
-      throw new Error(
-        `"${subject}" is claimed in ${scopes.length} lines of enquiry; name which, by the analysis that concluded it`,
-      );
-    }
-    return { proposition: subject };
+    if (name === undefined) throw new Error(`no claim ${claim.id}`);
+    return { proposition: name, ...(enquiry ? { enquiry } : {}) };
   }
+
+
 
   /** Lines of enquiry in which some claim of this wording is asserted. */
 

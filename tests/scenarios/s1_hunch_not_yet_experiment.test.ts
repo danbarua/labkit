@@ -21,6 +21,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink, type QuestionRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -60,7 +61,7 @@ async function priorState() {
     name: "curvature sweep readings",
     finding: "response departs from the linear fit across the sweep",
   });
-  const nlAnalysis = await session.recordAnalysis({
+  const { analysis: nlAnalysis, claims: nlAnalysisClaims } = await session.recordAnalysis({
     enquiry: nlEnquiry,
     method: "curvature-fit",
     from: [nlObs],
@@ -80,7 +81,7 @@ async function priorState() {
   });
   await session.closeEnquiry({
     enquiry: nlEnquiry,
-    answeredBy: { analysis: nlAnalysis, proposition: NONLINEAR },
+    answeredBy: claimOf(nlAnalysisClaims, NONLINEAR),
   });
 
   const smear = await session.pose("does the encoding do anything beyond a nonlinear smear?");
@@ -117,9 +118,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // LabKit:     nonlinearity is established; the smear question is
     //             unresolved; external task utility has not been tested.
     const known = await session.whatIsKnown();
-    expect(known.established.map((q) => q.question)).toEqual([prior.nonlinearity.id]);
-    expect(known.unresolved.map((q) => q.question)).toContain(prior.smear.id);
-    expect(known.untested.map((q) => q.question)).toContain(prior.utility.id);
+    expect(known.established.map((q) => q.question.id)).toEqual([prior.nonlinearity.id]);
+    expect(known.unresolved.map((q) => q.question.id)).toContain(prior.smear.id);
+    expect(known.untested.map((q) => q.question.id)).toContain(prior.utility.id);
 
     // Researcher: fine. Let's pursue whether different inputs map to
     //             reproducibly different internal responses.
@@ -143,7 +144,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const prior = await priorState();
 
     const known = await session.whatIsKnown();
-    const ids = (qs: Array<{ question: string }>) => qs.map((q) => q.question);
+    const ids = (qs: Array<{ question: { id: string } }>) => qs.map((q) => q.question.id);
 
     expect(ids(known.established)).toContain(prior.nonlinearity.id);
     expect(ids(known.unresolved)).toContain(prior.smear.id);
@@ -159,10 +160,12 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // above is what carries that; this pins the weaker companion claim -- that
     // posing a question mints nothing that could later be read as a finding
     // against it. It would hold for any string, and is here to stay holding.
-    const untestedProposition = await session.whySupported("does the learned topology help on an external task?");
-    expect(untestedProposition.challenged).toBe(false);
-    expect(untestedProposition.against).toEqual([]);
-    expect(untestedProposition.supported).toBe(false);
+    // Posing a question mints no claim, so there is nothing to ask about --
+    // which is the same statement the old assertion made (`supported: false`,
+    // `against: []`) and a stronger one: no record exists at all.
+    expect(
+      await session.claimsAsserting("does the learned topology help on an external task?"),
+    ).toEqual([]);
 
     // Afterward, from a second reader over the same graph.
     const later = new ResearchSession(await scenario.current(), { clock });
@@ -179,15 +182,15 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
   test("an established weaker result does not discharge the stronger open question", async () => {
     const prior = await priorState();
 
-    const nonlinear = await session.whySupported(NONLINEAR);
+    const nonlinear = await session.whySupported(await claimNamed(session, NONLINEAR));
     expect(nonlinear.supported).toBe(true);
 
     const stronger = await session.enquiryStatus(prior.smearEnquiry);
-    expect(stronger.open).toBe(true);
-    expect(stronger.closure).toBeNull();
+    expect(stronger.question!.open).toBe(true);
+    expect(stronger.question!.closure).toBeNull();
 
     const known = await session.whatIsKnown();
-    expect(known.unresolved.map((q) => q.question)).toContain(prior.smear.id);
+    expect(known.unresolved.map((q) => q.question.id)).toContain(prior.smear.id);
   });
 
   /**
@@ -206,20 +209,20 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     });
 
     const origin = await session.originOf(sharper);
-    expect(origin?.from).toBe(hunch.id);
+    expect(origin?.from.id).toBe(hunch.id);
     expect(origin?.reason).toContain("not testable");
 
     // From a second reader: the original still asks what it originally asked.
     const later = new ResearchSession(await scenario.current(), { clock });
     const durable = await later.originOf(sharper);
-    expect(durable?.from).toBe(hunch.id);
+    expect(durable?.from.id).toBe(hunch.id);
     expect(durable?.fromAsks).toBe("is the learned topology doing something computationally interesting?");
 
     // Narrowing is not answering. Nothing has been shown about the hunch, so
     // it is still on the books untested -- not established, and not a failure.
     const known = await later.whatIsKnown();
-    expect(known.established.map((q) => q.question)).not.toContain(hunch.id);
-    expect(known.untested.map((q) => q.question)).toContain(hunch.id);
+    expect(known.established.map((q) => q.question.id)).not.toContain(hunch.id);
+    expect(known.untested.map((q) => q.question.id)).toContain(hunch.id);
     expect(known.untested.map((q) => q.asks)).toContain("is the learned topology doing something computationally interesting?");
   });
 
@@ -268,7 +271,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // The finding that arrived after the first sharpening must not appear
     // behind it, and must appear behind the second.
     const LATE = "family separation survives when initial conditions are held fixed";
-    expect(behindSecond?.knownAtTheTime).toContain(LATE);
+    expect(behindSecond?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
     expect(behindFirst?.knownAtTheTime).not.toContain(LATE);
 
     // ...and the two sharpenings are told apart at all.
@@ -280,7 +283,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     expect(later.events.all()).toHaveLength(0);
     expect((await later.originOf(first))?.knownAtTheTime).not.toContain(LATE);
-    expect((await later.originOf(second))?.knownAtTheTime).toContain(LATE);
+    expect((await later.originOf(second))?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
   });
 
   /**
@@ -309,7 +312,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const later = new ResearchSession(await scenario.current(), { clock });
     const after = await later.whatIsKnown();
     const census = (k: Awaited<ReturnType<typeof later.whatIsKnown>>) =>
-      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question).sort();
+      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question.id).sort();
     expect(census(after)).toEqual(census(before));
 
     // Nothing on the record cites the sharpening that never happened.
@@ -340,7 +343,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // One question on the books, not two.
     const known = await later.whatIsKnown();
     const all = [...known.established, ...known.unresolved, ...known.untested];
-    expect(all.filter((q) => q.question === question.id)).toHaveLength(1);
+    expect(all.filter((q) => q.question.id === question.id)).toHaveLength(1);
   });
 
   test("two questions worded identically are two questions", async () => {

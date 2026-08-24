@@ -18,6 +18,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -60,7 +61,7 @@ async function twoStages() {
     name: "mapping-strength readings across constructions",
     finding: "mapping strength measured for five graph constructions",
   });
-  const earlier = await session.recordAnalysis({
+  const { analysis: earlier, claims: earlierClaims } = await session.recordAnalysis({
     enquiry: internalWork,
     method: "mapping-strength-comparison",
     from: [internalReadings],
@@ -74,7 +75,7 @@ async function twoStages() {
     name: "downstream classification readings",
     finding: "held-out classification accuracy measured for the same five constructions",
   });
-  const later = await session.recordAnalysis({
+  const { analysis: later, claims: laterClaims } = await session.recordAnalysis({
     enquiry: externalWork,
     method: "downstream-classification",
     from: [externalReadings],
@@ -85,7 +86,7 @@ async function twoStages() {
     }],
   });
 
-  return { internal, internalWork, earlier, external, externalWork, later };
+  return { internal, internalWork, earlier, earlierClaims, external, externalWork, later, laterClaims };
 }
 
 describe("S-5 — contradiction or dissociation?", () => {
@@ -95,8 +96,8 @@ describe("S-5 — contradiction or dissociation?", () => {
     // Researcher: didn't the earlier stage prove the graph choice doesn't
     //             matter? Why does this one rank them?
     const verdict = await session.doTheseConflict(
-      { analysis: programme.earlier, proposition: IMMATERIAL },
-      { analysis: programme.later, proposition: IMMATERIAL },
+      claimOf(programme.earlierClaims, IMMATERIAL),
+      claimOf(programme.laterClaims, IMMATERIAL),
     );
 
     // LabKit:     the earlier stage tested internal mapping strength; this one
@@ -123,8 +124,8 @@ describe("S-5 — contradiction or dissociation?", () => {
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const verdict = await later.doTheseConflict(
-      { analysis: programme.earlier, proposition: IMMATERIAL },
-      { analysis: programme.later, proposition: IMMATERIAL },
+      claimOf(programme.earlierClaims, IMMATERIAL),
+      claimOf(programme.laterClaims, IMMATERIAL),
     );
 
     const [first, second] = verdict.sides;
@@ -133,10 +134,10 @@ describe("S-5 — contradiction or dissociation?", () => {
     expect(first!.asks).toBe(INTERNAL);
     expect(second!.asks).toBe(EXTERNAL);
 
-    expect(first!.supportedBy).toEqual(["all five constructions within 0.02 of each other on mapping strength"]);
+    expect(first!.supportedBy.map((f) => f.states)).toEqual(["all five constructions within 0.02 of each other on mapping strength"]);
     expect(first!.challengedBy).toEqual([]);
     expect(second!.supportedBy).toEqual([]);
-    expect(second!.challengedBy).toEqual(["constructions separate by 11 points of held-out accuracy"]);
+    expect(second!.challengedBy.map((f) => f.states)).toEqual(["constructions separate by 11 points of held-out accuracy"]);
   });
 
   /**
@@ -153,7 +154,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "mapping-strength readings, wider construction set",
       finding: "mapping strength measured for twelve graph constructions",
     });
-    const dissenting = await session.recordAnalysis({
+    const { analysis: dissenting, claims: dissentingClaims } = await session.recordAnalysis({
       enquiry: programme.internalWork,
       method: "mapping-strength-comparison",
       from: [rerun],
@@ -165,8 +166,8 @@ describe("S-5 — contradiction or dissociation?", () => {
     });
 
     const verdict = await session.doTheseConflict(
-      { analysis: programme.earlier, proposition: IMMATERIAL },
-      { analysis: dissenting, proposition: IMMATERIAL },
+      claimOf(programme.earlierClaims, IMMATERIAL),
+      claimOf(dissentingClaims, IMMATERIAL),
     );
 
     expect(verdict.conflict).toBe(true);
@@ -176,8 +177,8 @@ describe("S-5 — contradiction or dissociation?", () => {
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const durable = await later.doTheseConflict(
-      { analysis: programme.earlier, proposition: IMMATERIAL },
-      { analysis: dissenting, proposition: IMMATERIAL },
+      claimOf(programme.earlierClaims, IMMATERIAL),
+      claimOf(dissentingClaims, IMMATERIAL),
     );
     expect(durable.relation).toBe("contradiction");
   });
@@ -195,19 +196,19 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
 
     await session.reinterpret({
-      of: { analysis: programme.earlier, proposition: IMMATERIAL },
+      of: claimOf(programme.earlierClaims, IMMATERIAL),
       as: "graph construction does not affect mapping strength within 0.02",
       because: "immaterial overstates it; the measurement was of mapping strength alone",
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
 
-    const withdrawn = await later.whySupported({ analysis: programme.earlier, proposition: IMMATERIAL });
+    const withdrawn = await later.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
     expect(withdrawn.withdrawn).toBe(true);
 
     // The other stage's claim is untouched: same words, different question,
     // nobody withdrew it.
-    const untouched = await later.whySupported({ analysis: programme.later, proposition: IMMATERIAL });
+    const untouched = await later.whySupported(claimOf(programme.laterClaims, IMMATERIAL));
     expect(untouched.withdrawn).toBe(false);
     expect(untouched.challenged).toBe(true);
     expect(untouched.against).toHaveLength(1);
@@ -231,16 +232,16 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured for the same five constructions",
     });
-    const settled = await session.recordAnalysis({
+    const { analysis: settled, claims: settledClaims } = await session.recordAnalysis({
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
       concludes: [{ proposition: IMMATERIAL, finding: "reconstruction error within 0.01 across constructions" }],
     });
-    await session.closeEnquiry({ enquiry: work, answeredBy: { analysis: settled, proposition: IMMATERIAL } });
+    await session.closeEnquiry({ enquiry: work, answeredBy: claimOf(settledClaims, IMMATERIAL) });
 
     const report = await session.reinterpret({
-      of: { analysis: programme.earlier, proposition: IMMATERIAL },
+      of: claimOf(programme.earlierClaims, IMMATERIAL),
       as: "graph construction does not affect mapping strength within 0.02",
       because: "immaterial overstates it",
     });
@@ -250,7 +251,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     expect(report.restingOnTheOldReading).toEqual([]);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const settledStill = await later.whySupported({ analysis: settled, proposition: IMMATERIAL });
+    const settledStill = await later.whySupported(claimOf(settledClaims, IMMATERIAL));
     expect(settledStill.withdrawn).toBe(false);
     expect(settledStill.supported).toBe(true);
   });
@@ -266,7 +267,7 @@ describe("S-5 — contradiction or dissociation?", () => {
   test("withdrawing a sentence here does not block concluding it elsewhere", async () => {
     const programme = await twoStages();
     await session.reinterpret({
-      of: { analysis: programme.earlier, proposition: IMMATERIAL },
+      of: claimOf(programme.earlierClaims, IMMATERIAL),
       as: "graph construction does not affect mapping strength within 0.02",
       because: "immaterial overstates it",
     });
@@ -278,7 +279,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured across constructions",
     });
-    const fresh = await session.recordAnalysis({
+    const { analysis: fresh, claims: freshClaims } = await session.recordAnalysis({
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
@@ -286,28 +287,28 @@ describe("S-5 — contradiction or dissociation?", () => {
     });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const here = await later.whySupported({ analysis: programme.earlier, proposition: IMMATERIAL });
-    const there = await later.whySupported({ analysis: fresh, proposition: IMMATERIAL });
+    const here = await later.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
+    const there = await later.whySupported(claimOf(freshClaims, IMMATERIAL));
     expect(here.withdrawn).toBe(true);
     expect(there.withdrawn).toBe(false);
     expect(there.supported).toBe(true);
   });
 
   /** A citation must be one the cited analysis actually made. */
-  test("naming a conclusion an analysis never reached is refused", async () => {
+  test("naming a claim that does not exist is refused", async () => {
     const programme = await twoStages();
 
     await expect(
-      session.whySupported({ analysis: programme.earlier, proposition: "a conclusion nobody drew" }),
-    ).rejects.toThrow(/concluded nothing about "a conclusion nobody drew"/);
+      session.whySupported({ kind: "claim", id: "CLM_9999" }),
+    ).rejects.toThrow(/no claim CLM_9999/);
 
     await expect(
       session.reinterpret({
-        of: { analysis: programme.later, proposition: "a conclusion nobody drew" },
+        of: { kind: "claim" as const, id: "CLM_9999" },
         as: "narrower still",
         because: "it should not get this far",
       }),
-    ).rejects.toThrow(/concluded nothing about "a conclusion nobody drew"/);
+    ).rejects.toThrow(/no claim CLM_9999/);
   });
 
   /**
@@ -318,22 +319,37 @@ describe("S-5 — contradiction or dissociation?", () => {
    * so rather than picking one — the wrong answer here is not "no result", it
    * is a confident answer about a claim the caller did not mean.
    */
-  test("an ambiguous proposition is refused, not guessed at", async () => {
-    await twoStages();
+  test("an ambiguous proposition is refused at the one place wording is resolved", async () => {
+    const programme = await twoStages();
 
-    await expect(session.whySupported(IMMATERIAL)).rejects.toThrow(
-      /"the graph construction is immaterial" is claimed in 2 lines of enquiry; name which/,
+    // **The refusal moved, and that is the point.** It used to live inside
+    // `whySupported` and `reinterpret`, each of which took a sentence and had
+    // to work out which claim was meant. Both take a handle now, so neither
+    // can guess -- and `claimsAsserting` is the single seam where text becomes
+    // a handle. It reports every match rather than choosing.
+    const found = await session.claimsAsserting(IMMATERIAL);
+    expect(found).toHaveLength(2);
+    expect(found.map((c) => c.claim.id).sort()).toEqual(
+      [
+        claimOf(programme.earlierClaims, IMMATERIAL).id,
+        claimOf(programme.laterClaims, IMMATERIAL).id,
+      ].sort(),
     );
 
-    await expect(
-      session.reinterpret({ of: IMMATERIAL, as: "something narrower", because: "..." }),
-    ).rejects.toThrow(/is claimed in 2 lines of enquiry; name which/);
+    // A caller that resolves by wording and does not choose gets a refusal.
+    await expect(claimNamed(session, IMMATERIAL)).rejects.toThrow(/is claimed 2 times/);
+
+    // And naming one is unambiguous: each answers about its own question.
+    const earlier = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
+    const later = await session.whySupported(claimOf(programme.laterClaims, IMMATERIAL));
+    expect(earlier.proposition).toBe(later.proposition);
+    expect(earlier.support).not.toEqual(later.support);
   });
 
   /** One sentence in one scope still reads by text — every earlier scenario depends on it. */
   test("an unambiguous proposition still answers to its own words", async () => {
     const programme = await twoStages();
-    const solo = await session.whySupported({ analysis: programme.earlier, proposition: IMMATERIAL });
+    const solo = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
 
     const enquiryOnly = await session.pose("does the encoding respond nonlinearly?");
     const work = await session.pursue({ question: enquiryOnly, approach: "curvature sweep" });
@@ -349,7 +365,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       concludes: [{ proposition: "the encoding responds nonlinearly", finding: "departure from linearity across the sweep" }],
     });
 
-    const byText = await session.whySupported("the encoding responds nonlinearly");
+    const byText = await session.whySupported(await claimNamed(session, "the encoding responds nonlinearly"));
     expect(byText.supported).toBe(true);
     expect(solo.supported).toBe(true);
   });

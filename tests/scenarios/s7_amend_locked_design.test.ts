@@ -19,6 +19,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -82,7 +83,7 @@ async function lockedProgramme() {
     name: "held-out comparison readings",
     finding: "evolved and rewired conditions measured on the held-out split",
   });
-  const confirmatory = await session.recordAnalysis({
+  const { analysis: confirmatory, claims: confirmatoryClaims } = await session.recordAnalysis({
     enquiry,
     method: "prespecified-comparison",
     implementing: confirmatoryWork,
@@ -109,14 +110,14 @@ async function diagnose(enquiry: Awaited<ReturnType<typeof lockedProgramme>>["en
     name: "non-convergence traces",
     finding: "solver hits the iteration cap on 9 of 10 sweeps",
   });
-  const analysis = await session.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "convergence-diagnosis",
     implementing: work,
     from: [traces],
     concludes: [{ proposition: MULTICOLLINEAR, finding: "condition number rises with feature count; enlarging the sample does not reduce it" }],
   });
-  return { analysis, cites: { analysis, proposition: MULTICOLLINEAR } };
+  return { analysis, analysisClaims, cites: claimOf(analysisClaims, MULTICOLLINEAR) };
 }
 
 describe("S-7 — locked design, then feasibility finds a mechanical defect", () => {
@@ -143,7 +144,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // LabKit:     amendment recorded; the confirmatory boundary is untouched.
     expect(report.nature).toBe("mechanical");
     expect(report.confirmatoryAffected).toEqual([]);
-    expect(report.rerun).toEqual(["feasibility sweep of the evolved condition"]);
+    expect(report.rerun.map((w) => w.objective)).toEqual(["feasibility sweep of the evolved condition"]);
   });
 
   /**
@@ -163,13 +164,13 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
 
     const history = await session.designHistory(programme.feasibilityBoundary);
-    expect(history.originally).toBe(LOCKED_LIMIT);
-    expect(history.nowRequires).toBe(RAISED_LIMIT);
+    expect(history.originally.requires).toBe(LOCKED_LIMIT);
+    expect(history.nowRequires.requires).toBe(RAISED_LIMIT);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const durable = await later.designHistory(programme.feasibilityBoundary);
-    expect(durable.originally).toBe(LOCKED_LIMIT);
-    expect(durable.nowRequires).toBe(RAISED_LIMIT);
+    expect(durable.originally.requires).toBe(LOCKED_LIMIT);
+    expect(durable.nowRequires.requires).toBe(RAISED_LIMIT);
   });
 
   /**
@@ -192,13 +193,13 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     const history = await later.designHistory(programme.feasibilityBoundary);
     expect(history.amendments).toHaveLength(1);
     expect(history.amendments[0]!.reason).toContain("unrelated to the effect under test");
-    expect(history.amendments[0]!.citing).toEqual([
+    expect(history.amendments[0]!.citing.map((f) => f.states)).toEqual([
       "condition number rises with feature count; enlarging the sample does not reduce it",
     ]);
 
     // ...and the cited diagnosis is a finding with a chain behind it, not an
     // assertion attached to the amendment.
-    const why = await later.whySupported(MULTICOLLINEAR);
+    const why = await later.whySupported(await claimNamed(later, MULTICOLLINEAR));
     expect(why.supported).toBe(true);
     expect(why.restingOn.map((a) => a.name)).toContain("non-convergence traces");
   });
@@ -228,7 +229,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // The confirmatory result is on the record, and is not in the blast radius.
     expect(report.confirmatoryAffected).toEqual([]);
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    const standing = await later.whySupported(BEATS_CONTROL);
+    const standing = await later.whySupported(await claimNamed(later, BEATS_CONTROL));
     expect(standing.supported).toBe(true);
     expect(standing.superseded).toEqual([]);
   });
@@ -262,7 +263,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       citing: cites,
     });
     expect(scientific.nature).toBe("scientific");
-    expect(scientific.confirmatoryAffected).toEqual([BEATS_CONTROL]);
+    expect(scientific.confirmatoryAffected.map((c) => c.asserts)).toEqual([BEATS_CONTROL]);
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const feasibility = await later.designHistory(programme.feasibilityBoundary);
@@ -290,7 +291,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
 
     const current = await session.designHistory(programme.feasibilityBoundary);
-    const raised = current.nowRequires;
+    const raised = current.nowRequires.requires;
     expect(raised).toBe(RAISED_LIMIT);
 
     await session.amendDesign({
@@ -309,13 +310,13 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     expect(later.events.all()).toHaveLength(0);
 
     const history = await later.designHistory(programme.feasibilityBoundary);
-    expect(history.originally).toBe(LOCKED_LIMIT);
-    expect(history.nowRequires).toBe("the solver converges within 50,000 iterations");
-    expect(history.amendments.map((a) => a.nowRequires)).toEqual([
+    expect(history.originally.requires).toBe(LOCKED_LIMIT);
+    expect(history.nowRequires.requires).toBe("the solver converges within 50,000 iterations");
+    expect(history.amendments.map((a) => a.nowRequires.requires)).toEqual([
       RAISED_LIMIT,
       "the solver converges within 50,000 iterations",
     ]);
-    expect(history.amendments.map((a) => a.replaced)).toEqual([LOCKED_LIMIT, RAISED_LIMIT]);
+    expect(history.amendments.map((a) => a.replaced.requires)).toEqual([LOCKED_LIMIT, RAISED_LIMIT]);
   });
 
   /**
@@ -335,12 +336,12 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       citing: cites,
     });
 
-    expect(report.rerun).toEqual(["feasibility sweep of the evolved condition"]);
+    expect(report.rerun.map((w) => w.objective)).toEqual(["feasibility sweep of the evolved condition"]);
     expect(report.rerun).not.toContain("the prespecified comparison against the rewired control");
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const history = await later.designHistory(programme.feasibilityBoundary);
-    expect(history.amendments[0]!.rerun).toEqual(["feasibility sweep of the evolved condition"]);
+    expect(history.amendments[0]!.rerun.map((w) => w.objective)).toEqual(["feasibility sweep of the evolved condition"]);
   });
 
   /**

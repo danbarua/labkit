@@ -2,6 +2,50 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## First, in a fresh clone or worktree
+
+```sh
+bun install
+```
+
+**Nothing else in this file works until that runs, and the failure does not name
+its cause.** A worktree starts with no `node_modules`, so `bun run typecheck`
+and `npx depcruise src tests --output-type err` — two of the three gates — fail
+with `TS2688: Cannot find type definition file for 'bun'`, which reads like a
+TypeScript configuration problem and is not one. `bun run check:doc-comments`
+passes throughout, being a plain script with no dependencies, so a green check
+is available to mislead you. Found on 2026-08-22 in this state.
+
+Two more things a worktree will not have, because they are untracked:
+
+- `.claude/settings.local.json`, `.claude/.wrap-state/` and
+  `.claude/hookify.*.local.md`. The hookify rules are the ones worth copying
+  across — they warn on mistakes already made in this repo. `.wrap-state/` must
+  be **seeded** before the first Stop fire or the first wrap is silently
+  swallowed; `.claude/skills/wrap/SKILL.md` §Forking has the command.
+- Nothing to configure for git hooks. `.githooks/` and the generated SVG were
+  both removed (`ce97456`); `bun run dev:dependency-cruiser` regenerates
+  `docs/dependency-graph.mmd` by hand, and graphviz is no longer needed.
+
+## The one rule about documents
+
+**If a sentence would be wrong next week because something changed, it doesn't
+go in a document.**
+
+Statuses, counts, ranges, "no row is currently open", "X files", "the newest
+entry is N" — that is state, and state belongs in exactly one place, which is
+the thing itself: the code, the index table, `git log`. Every documentation
+defect this repo has found was state written into a sentence. None was a bad
+argument; the arguments have all held.
+
+So: other documents may write `row F` and nothing else about it. If a reader
+wants its status they grep one table. This deleted a checker rather than adding
+one — `check:ledger` existed only to police a copy that should not have existed.
+
+**Dated records are exempt and must stay exempt** — `docs/project-journal/`,
+`docs/session-log/`, `docs/consumer-contract/`. They say their date and are
+measurements of it, so they cannot go stale. Do not "correct" them.
+
 ## What this is
 
 LabKit is a research control plane: it tracks provenance, justification, and
@@ -12,136 +56,51 @@ run logs, sweeps). See `docs/project-journal/001_git_init.md` for the full
 domain rationale and boundary tests.
 
 The domain model lives across a chain of project-journal entries
-(`docs/project-journal/00N_*.md`) that read newest-first for "what's true
-now" — each records *why* a decision was made, not just what changed. Before
-touching `src/db/`, skim 001 (domain model), 003 (tenancy review), 004-007
-(current persistence design) rather than inferring intent from code alone.
-Before touching `src/domain/`, skim 008 (the interaction corpus the service
-layer is built against), 009 (the first scenario built from it), 010 (a
-cold-context review of both), 011 (the control chain under scenario pressure),
-then 014 (the question lifecycle: S-4, S-1), 015 (claims and amendment: S-7,
-S-12, S-5), 016 (the standard a finding is held to: S-3b), 018 (when a failed
-check stops counting: S-3c), 019 (re-verification is not reproduction: S-10),
-020 (a third external review: atomicity, and identity by wording again), 021 (a
-regenerated part is not the part: S-9), 022 (leaving a question open on
-purpose: S-14) and **023 (capture cheaply, promote before citing: S-18, and the
-Bonsai corpus exhausted)** — those are the current state of the domain model,
-and 023 is the newest decision about the **model**; 027 is the newest entry in the chain, and is about the method. 012 is the implementing agent's own perspective after S-3, opinion
-rather than decision and now largely superseded by 014/015. 013 is an external
-read-only review of the whole arc, written by a different reviewer; its
-improvement list is what 014/015 and the surrounding cleanup address. **017 is
-a second external review**, of S-3b and the row V close-out. Its three items are
-closed: `resolved (argued)` exists as a status, row X was nominated and then
-cleared by S-3c (018), and row K's verdict was already in PJ-008 — S-8 was built
-and gave none, and the ledger records *that* as the verdict. Row K has since
-been settled outright by S-18 (023), which the same §4 condition had nominated
-and which three reviews walked past. **024 is a third external review**, of the
-completed arc: it verifies the corpus-exhaustion claim against §3's ownership
-table and records the arc totals **as they stood when it was written** — node
-labels 13 → 13, edge labels 19 → 24, zero migrations, fifteen scenarios. Read
-that as a dated measurement, not as current state: `024` is a review and its
-figures are frozen at its own date. Edge labels have since reached 25. **The
-live counts are `NODE_LABELS.length` and `EDGE_LABELS.length` in
-`src/db/domain.ts` and nowhere else** — this sentence said 24 for a while, which
-made it the eighth instance of `028`'s numeral pattern, in the paragraph
-introducing `028`. **025 through 028 are about the method
-rather than the model** — 025 on why a condition recorded where nobody re-reads
-it is not a mechanism (rows K, Z and P all fired unread); 026 on the one failure
-mode the predictions protocol cannot see from inside itself, that a predictions
-document may state what will happen and what would refute it and may **not**
-rank the outcomes by how impressive they would be; 027 on why **prose
-agreeing with itself is not evidence that the code agrees with the prose** —
-three unrelated places held a rule in a comment and code that ignored it, each
-an asymmetry where the rule was applied where the author happened to be looking;
-and **028**, which is 027 tested rather than argued. All four are one shape: a
-document doing the work of a check.
+(`docs/project-journal/00N_*.md`) — each records *why* a decision was made.
+They are dated records: read them for reasoning, never for current state.
 
-**028 is the first deliberate sweep for 027's defect**, six read-only readers
-over ~19,000 lines, and it answers a question 027 left open: *can any of this be
-machine-checked?* Mostly no, now measured rather than asserted. Of two proposed
-comment-shaped checks, one found only stale prose and the other found **nothing**
-— every real instance was cross-file and needed its own lookup. What generalised
-was not about prose at all: **a test that asserts nothing**, two forms, two hits,
-two findings, zero false positives (`bun run check:tests-assert`). It was landed
-**red on purpose**, naming the two tests it was written from — the demonstration
-first, in the same order every other fix here is made. Both are now fixed
-(`7c6853f`) and it is green; a red one means a test has stopped testing. A test's name
-is a claim and its body is the check on that claim, so 027's mechanism opens there
-too — and wider, because a green tick reads as evidence. The runner-up, a numeral
-in a comment next to something countable, was **seven for seven wrong** and is
-deliberately *not* one check: each has a different denominator, and a generic
-warning would fire on every past-tense measurement this repo keeps on purpose.
-Fixing all seven then corrected 028 itself: **a numeral in prose must earn an
-assertion, be deleted, or be explicitly dated**, and **zero of the seven earned
-an assertion** — six were decoration on an argument that survives without them,
-and the seventh was already asserted empirically one line below, by a guard that
-*tightens* as labels are added where a count assertion would merely break. An
-assertion protecting nothing an existing assertion does not is a change-detector.
-The third branch is what the arc-totals figures above are doing: a review's
-numbers are a dated measurement, and those are fine as long as they say so.
+- Before touching `src/db/`: 001 (domain model), 003 (tenancy), 004-007
+  (persistence design).
+- Before touching `src/domain/`: 008 (the interaction corpus the service layer
+  is built against — its §3 index is the ledger), 009, 011, then 014-023 for
+  how individual verbs were earned. 010, 013, 017, 020 and 024 are external
+  reviews; 012 is superseded by 014/015.
+- **025-029 are about the method, not the model**, and are the ones worth
+  reading if you are about to write a document. Their rules, which is all you
+  need from them:
+  - A condition recorded where nobody re-reads it is not a mechanism (025).
+  - A predictions document may not rank outcomes by how impressive they would
+    be (026).
+  - Prose agreeing with itself is not evidence that the code agrees with the
+    prose (027).
+  - A numeral in prose must earn an assertion, be deleted, or be explicitly
+    dated (028). Zero of the seven audited earned an assertion.
+  - A conclusion can be right with the reasoning under it wrong, and no test
+    catches that because the tests pass either way (029). Hence: paired and
+    interleaved, one variable, *round one is not the result*, and a negative
+    result is not evidence unless it could have been positive.
+  - **"Be more careful" is not an available remedy** (028's last section). Four
+    instances of one defect were committed in a day by two authors who had it
+    named and in front of them. What worked was checking the *other side* of
+    the operation in front of you, and a disagreeing measurement.
 
-**029 is about the method's *social* half** — what a second agent turned out to
-be for, which was not throughput. Every useful catch in a two-session day was a
-conclusion that was **right** with reasoning underneath it that was **wrong**,
-which no test detects because the tests pass either way. Its sharpest line is
-027's asymmetry restated as a property of verification rather than authorship:
-**a passing check on the file I edited told me nothing about the two I didn't.**
-It also carries the measurement disciplines each failure forced — paired and
-interleaved, one variable, *round one is not the result*, and **a negative
-result is not evidence unless it could have been positive** — plus the rule that
-where two fixes are order-dependent, *both* commit messages must say so.
+**The live counts of anything countable are in the code, not here** —
+`NODE_LABELS.length` and `EDGE_LABELS.length` in `src/db/domain.ts`, the tool
+list in `src/mcp/tools.ts`, the scripts in `package.json`. This paragraph used
+to carry those numbers and was wrong about them repeatedly.
 
-**028's real argument is its last section, and it is the one to read.** Four
-instances of this defect were committed *in one day, by two authors who had it
-in front of them* — including the commit that fixed one, a comment promising an
-assertion nobody had written, a failure signature piped away ten minutes after
-its author agreed in writing that this was the mistake worth recording, and a
-rule generalised from a single observation inside the correction for that.
-Under the best conditions anyone gets — the defect named, catalogued, freshly in
-mind — **"be more careful" is not available as a remedy, because these are what
-being careful looks like.** Each is a small asymmetry, and attention is exactly
-what does not distribute evenly across one. What worked: checking the *other
-side* of the operation you are looking at (three of the four), and a disagreeing
-measurement (the fourth). That is the argument for a checker, not for resolving
-to concentrate harder.
 
-024's one open item — row F's missing S-9 verdict — was closed the same day.
-**One row is `open` + unowned today: AF**, and it earns nothing under §5 by its
-own cell. **Row Z was closed on 2026-08-21** by the
-consumer probe (`docs/consumer-contract/025`, `026`) — `Decision.decided_at`,
-no migration, after rung 1 was built and shown to fail. It cost a **second**
-property the same day: an external review found `whatWasKnown()` reporting a
-question posed in April as `open` in March, since it began `MATCH (q:Question)`
-and had no way to know when a question was asked. `Question.posed_at` cleared it
-— demonstrated first (`tests/consumer/historical_survey.test.ts`), one writer,
-no migration, no new noun. Two properties, then, not one.
+`docs/mcp-tools.md` is **the domain's API as one reviewable file** — every MCP
+tool, what it takes and what it returns — generated from the tool declarations
+by `bun run docs:tools`. The same document is served live at
+`labkit://docs/tools`.
 
-**Row F reached `boundary` the same day** (`035`, `036`), after four bites that
-were all in *reporting* — `reproducibilityOf()`, `whySupported().restingOn`,
-`reproductionOf().differs` — and all fixed by carrying `natural_id`, which
-already existed. A version-of relationship would have fixed none of them, so
-they are evidence against the row. **Row F was the only candidate in this
-project's history that would have required a first new noun, and it did not.**
-It reopens if anyone asks for versions as an ordered sequence.
-
-That arc also produced **row AD**, carrying a fourth status and the only one with
-a deadline: `demonstrated`, where the wrong answer is on the record and what is
-unbuilt is the fix. **AD was opened and closed the same day** (`029`, `030`) —
-`recordObservations()` now mints the `EvidenceUnit` PJ-001 says must exist.
-**Row O closed too** (`031`, `032`), on an external challenge rather than a
-prediction of this project's own: `INVALIDATED_BY: Artefact → Review` records
-which review a retraction rested on. **Rows S and T are `refuted`** — there is no
-*who* to attribute work to when agents run the analyses, and edges do carry
-properties. Read §3's legend before treating the statuses as one pile.
-
-**This file is a third copy of the ledger's state, and only a reader can
-reconcile it.** §3 records every row's status twice — index table and the row's
-own cell — and `bun run check:ledger` holds those two to each other. It cannot
-see this file, and it deliberately will not: CLAUDE.md's claims are narrative,
-and a checker over prose would be wrong more often than the prose is. So a green
-`check:ledger` means *the ledger agrees with itself*, never *these paragraphs
-are current*. The sentence above said no row was known-open for a day after row
-AD made it false, in the file every agent reads first.
+It is checked in because its **diff** is the useful part: a changed line means
+the API changed. Freshness is one assertion in `tests/mcp.test.ts` (the
+checked-in file equals what the generator produces), not a hook and not a
+`check:*` script — that test already renders the document, so the check rides a
+run that was happening anyway. The accepted cost is that a commit touching
+`src/mcp/tools.ts` also touches this file.
 
 `docs/dependency-graph.mmd` is the module dependency graph, as text.
 `bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
@@ -180,11 +139,9 @@ second copy is a second thing to go stale. Read it if a token in a journal entry
 means nothing to you; `D1`/`D2` in particular mean two unrelated things
 depending on the document.
 
-`docs/TASKS.md` is the **work queue** — what is ready to build, what needs a
-discriminator first, what waits on a decision, and what is deliberately not being
-done. It is not a record: PJ-008 §3's ledger stays authoritative on what the
-model knows, and TASKS.md points at it rather than restating verdicts. Where the
-two disagree, the ledger is right and TASKS.md is stale.
+`docs/TASKS.md` is the **work queue** — actionable items only. It carries no
+statuses, verdicts or counts; PJ-008 §3's index is authoritative on what the
+model knows, and standing facts and gates are in this file.
 
 **Never suggest `git reset --hard` to another session.** You cannot see its
 working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
@@ -197,6 +154,13 @@ cannot see through. The advice was right in shape and wrong in verb.
 More generally: a parallel session's **worktree state is invisible to you** in a
 way its branch state is not. `git log` tells you where it is; nothing tells you
 what it is holding.
+
+`docs/consumer-contract/` holds the **predictions-and-verdict pairs** — an
+odd-numbered file states what a probe will show and what would refute it, the
+next records what happened. Bare numerals elsewhere in this file mean
+`docs/project-journal/`; consumer-contract files are always named with their
+directory, because both chains have an `029`. The pile closed with the
+inferred-verb corpus.
 
 `docs/session-log/` holds mechanical per-session handovers written by the
 `wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
@@ -216,23 +180,34 @@ bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
 bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
+bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool declarations
 bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
-bun run check:ledger           # fails if two PJ-008 rows are `demonstrated` at once
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
+bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun examples/full-lifecycle.ts # runnable end-to-end smoke test of the persistence layer
+bun run dev                    # the CLI (src/cli.ts)
+bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
 There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
-binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is four
-read-only commands over `ReadSurface` (`known`, `why`, `affects`, `enquiry`),
-and `src/mcp/server.ts` is the same reads for an agent caller, seven tools over
-stdio (`bun run mcp`).
+binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is
+**read-only by construction**: it builds a `ReadSurface` and never a
+`WriteSurface`, so it cannot write, which `tests/cli.test.ts` checks by deriving
+the forbidden verb list from the prototype.
+
+**`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
+one batch of work and that is not a design position: a record nothing can write
+to has nothing in it. Read and write handlers are handed different surfaces, so
+neither can reach the other's verbs, and
+`tests/mcp.test.ts` asserts every public verb on either surface is exposed or
+listed in `NOT_EXPOSED` with a reason. **`docs/mcp-tools.md` is the tool list**;
+this paragraph deliberately does not count them.
 
 `bun test` exits with a non-zero code even when every test passes — this is
 a known `bun test` + PGlite WASM teardown interaction, not a failure signal.
@@ -266,6 +241,12 @@ every `(fail)` line, so a run reporting 23 failures leaves you unable to name a
 single failing test — or to tell a real regression from a teardown cascade.
 Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
 about the pipe, not about that incident.
+
+**Nothing runs these for you** — there is no CI workflow and no git hook. Before
+committing, run `bun test`, `bun run typecheck` and
+`npx depcruise src tests --output-type err`; add `check:migrations` if you
+touched `drizzle/`, and `check:tests-assert` if you touched tests. Read `bun test`'s pass/fail counts,
+not its exit code, and do not pipe it — both traps are above.
 
 ## Architecture: two persistence halves, deliberately not one
 
@@ -355,7 +336,7 @@ shapes. `src/domain/` is the domain *as it matters to a researcher*:
 ```
 src/db/        knows nodes and edges
 src/domain/    knows research actions
-(MCP, later)   knows researcher/agent language
+src/mcp/       knows researcher/agent language
 ```
 
 `ResearchSession` (`src/domain/session.ts`) is **verb-first**. There is
@@ -460,8 +441,26 @@ qualifies, so `QUALIFIES` is written when the analysis is recorded and not when
 the check is evaluated — the same edge minted at the later moment cannot
 express the case the scenario exists for (S-3b, PJ-016).
 
-**Identity is never wording.** Six unrelated regions have now had to decide
-this — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
+**Identity is never wording** — and its other half, **which record is this
+answer about?** The second is PJ-030: a reference denoting one record while the
+verb answers about another. `tests/subject-identity.test.ts` holds the whole
+argument in one file and is worth reading before touching a report or a verb
+signature.
+
+**Every handle in a report is a `Ref`, and every verb takes one.** A value read
+out of a report goes straight back into a verb — `gateStatus().gate` into
+`designHistory()` — with no re-wrapping. Reports carry `{handle, wording}` pairs
+where a reader needs the text (`{claim, asserts}`, `{criterion, requires}`,
+`{work, objective}`, `{evidence, states}`); the handle is never a bare string
+and the wording never stands in for it.
+
+**A verb that mints something returns what it minted.** `recordAnalysis`,
+`replaceAnalysis` and `reverify` all return their claims. This is the
+`does the act record what it produced, or only what it acted on?` heuristic, and
+it has now caught seven things — the last three because a caller could not name
+a claim without describing it.
+
+Six unrelated regions have had to decide the first form — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
 (S-3c), execution inputs (S-10, caught by review after shipping wrong) and
 artefacts (S-9, where a regenerated part carries the name of what it replaces).
 Three of the six got it right first time because someone asked at the time, so
@@ -469,13 +468,17 @@ the rule is not "we keep failing at this" but **every new comparison is a fresh
 chance to fail at it**: when you write an equality test between two records, say
 out loud which field carries identity.
 
-A claim is identified by its **proposition within a line of enquiry**, never by
-its wording alone. Two stages of one programme can assert the same sentence
-about different endpoints, and merging them reports a claim that is
-simultaneously supported and challenged when each separately has a clean
-answer (S-5). Verbs take a `ClaimSubject` — bare text while a sentence is
-asserted once, a `ConclusionRef` naming the analysis when it is not — and
-**refuse** rather than guess when text is ambiguous.
+A claim has its own handle, `ClaimRef`. Two stages of one programme can assert
+the same sentence about different endpoints, and merging them reports a claim
+that is simultaneously supported and challenged when each separately has a clean
+answer (S-5).
+
+**No verb resolves wording.** They take handles; `claimsAsserting` is the one
+place text becomes a handle, it returns *every* match, and it refuses to pick.
+The CLI resolves there and so do the tests (`tests/helpers/claims.ts`). One
+consequence worth knowing: `whySupported` can no longer answer about a
+proposition nobody has claimed — there is no handle for one — so *"has anyone
+claimed this?"* is `claimsAsserting` returning empty, which S-4 and S-1 assert.
 
 Prefer structure in the **query** over structure in the **stored model**.
 S-3's four gate states and per-criterion itemisation are computed, not
@@ -540,9 +543,11 @@ Two rules, so this is checkable rather than remembered:
    cleared another row is nominated too, demonstrated or not** — otherwise
    clearing one row can quietly make a second worse while the rule that would
    have caught it stops applying, which is exactly what happened to row X when
-   S-3b cleared row V (PJ-017 §3). **No row is currently that one, and this is
-   now checked rather than asserted** — `bun run check:ledger` fails when two
-   §3 rows carry the `demonstrated` status. Row AD held it for a few hours on
+   S-3b cleared row V (PJ-017 §3). Which row, if any, is currently
+   `demonstrated` is in PJ-008 §3's index table and nowhere else. A checker
+   held two copies of that status to each other until 2026-08-22; the copies
+   were deleted instead, and a fact in one place needs no checker.
+   Row AD held it for a few hours on
    2026-08-21: `recordObservations()` minted no `EvidenceUnit`, so a question
    worked on through observations alone reported itself as one nothing had ever
    been run against. It was found by S-9b and cleared the same day, which is the
@@ -581,10 +586,10 @@ resolution, plus a standing non-additive migration problem (a view's columns
 can't be removed or reordered in place) held open for no consumer. This is not
 a reversal of the no-cull policy: that policy protects unused *labels and
 edges*, because a declared-but-unwalked edge is a claim about the domain. A view
-claims nothing. What would bring them back is the MCP/CLI read layer, where a
-relational projection actually pays;
-`git show 51b70d6:src/db/provisioning.ts` has the implementation.
-
+claims nothing. The MCP/CLI read layer was the case for bringing them back and
+it has since been built without them — every read goes through `cypher()` and
+none wanted a relational projection. `git show 51b70d6:src/db/provisioning.ts`
+has the implementation if one is ever earned;
 `provisionTenantGraph()` and `dropTenantGraph()` (`src/db/provisioning.ts`)
 are the only exports there. The class that does the work,
 `TenantGraphProvisioner`, is **module-private** on purpose — it takes no lock

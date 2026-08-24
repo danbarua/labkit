@@ -18,6 +18,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -56,11 +57,11 @@ async function anAnalysisRestingOnBothControls(s: ResearchSession) {
     enquiry, name: NAME, finding: "the remainder, regenerated from an inferred algorithm",
     contentHash: "sha256:regenerated",
   });
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry, method: "arm-comparison", from: [surviving, regenerated],
     concludes: [{ proposition: DIVERGE, finding: "divergence beyond the noise floor" }],
   });
-  return { enquiry, surviving, regenerated, analysis };
+  return { enquiry, surviving, regenerated, analysis, analysisClaims };
 }
 
 describe("S-9d: resting on one thing, or two?", () => {
@@ -81,7 +82,7 @@ describe("S-9d: resting on one thing, or two?", () => {
       { part: regenerated, hash: "sha256:regenerated" },
     ]);
 
-    expect(parts.exact.map((p) => p.part).sort()).toEqual([surviving.id, regenerated.id].sort());
+    expect(parts.exact.map((p) => p.part.id).sort()).toEqual([surviving.id, regenerated.id].sort());
     expect(parts.exact.map((p) => p.name)).toEqual([NAME, NAME]);
   });
 
@@ -103,10 +104,10 @@ describe("S-9d: resting on one thing, or two?", () => {
   test("two inputs sharing a name are reported as two", async () => {
     const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
 
-    const why = await (await afterwards()).whySupported(DIVERGE);
+    const why = await whyOf(await afterwards(), DIVERGE);
 
     expect(why.restingOn).toHaveLength(2);
-    expect(why.restingOn.map((a) => a.part).sort()).toEqual(
+    expect(why.restingOn.map((a) => a.part.id).sort()).toEqual(
       [surviving.id, regenerated.id].sort(),
     );
     expect(why.restingOn.map((a) => a.name)).toEqual([NAME, NAME]);
@@ -129,13 +130,13 @@ describe("S-9d: resting on one thing, or two?", () => {
 
     for (const part of [surviving, regenerated]) {
       const rests = await reader.whatDependsOn(part);
-      expect(rests.claims).toEqual([DIVERGE]);
+      expect(rests.claims.map((c) => c.asserts)).toEqual([DIVERGE]);
     }
     expect(surviving.id).not.toEqual(regenerated.id);
 
     await expect(reader.whatDependsOn(NAME)).rejects.toThrow(/2 artefacts are named/);
 
-    const restingOn = (await reader.whySupported(DIVERGE)).restingOn;
-    expect(restingOn.map((a) => a.part).sort()).toEqual([surviving.id, regenerated.id].sort());
+    const restingOn = (await reader.whySupported(await claimNamed(reader, DIVERGE))).restingOn;
+    expect(restingOn.map((a) => a.part.id).sort()).toEqual([surviving.id, regenerated.id].sort());
   });
 });

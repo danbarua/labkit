@@ -82,6 +82,10 @@ import type {
   GateRef,
   WorkRef,
   ChangedConclusion,
+  ClaimRef,
+  ConcludedClaim,
+  RecordedAnalysis,
+  CitedFinding,
   Conclusion,
   ConclusionRef,
   EnquiryRef,
@@ -92,7 +96,39 @@ import type {
   ReviewRef,
   UnaffectedRecord,
 } from "./report";
+import { ref } from "./report";
+import type {
+  AcceptAsUnresolvedCommand,
+  AmendDesignCommand,
+  CloseEnquiryCommand,
+  DeclareGateCommand,
+  EvaluateCriterionCommand,
+  PlanWorkCommand,
+  PromoteCommand,
+  PursueCommand,
+  RecordAnalysisCommand,
+  RecordObservationsCommand,
+  RecordReviewCommand,
+  ReinterpretCommand,
+  ReplaceAnalysisCommand,
+  ReverifyCommand,
+  SharpenCommand,
+} from "./commands";
 import { SessionCore } from "./core";
+
+/**
+ * A conclusion **already on the record**, as read back from the graph.
+ *
+ * Deliberately not {@link Conclusion}, which is the *command* shape: a caller
+ * recording conclusions holds no claim id yet, so widening the input to carry
+ * one would demand a handle for a record that does not exist. Reading them
+ * back is the other direction and the id is right there.
+ */
+interface RecordedConclusion {
+  claim: ClaimRef;
+  proposition: string;
+  finding: string;
+}
 
 export class WriteSurface extends SessionCore {
   /**
@@ -135,10 +171,7 @@ export class WriteSurface extends SessionCore {
    * pursuit, not the question, and carrying similar words to another pursuit
    * of the same question has no effect on identity either way.
    */
-  async pursue(input: {
-    question: QuestionRef;
-    approach: string;
-  }): Promise<EnquiryRef> {
+  async pursue(input: PursueCommand): Promise<EnquiryRef> {
     const enquiry = await this.pursued(input);
     this.emit("pursue", enquiry.id, {
       question: input.question.id,
@@ -148,10 +181,7 @@ export class WriteSurface extends SessionCore {
   }
 
   /** The write, without the event — see `posed`. */
-  private async pursued(input: {
-    question: QuestionRef;
-    approach: string;
-  }): Promise<EnquiryRef> {
+  private async pursued(input: PursueCommand): Promise<EnquiryRef> {
     const enquiry = await this.graph.createNode("LineOfEnquiry", {
       name: input.approach,
     });
@@ -200,11 +230,7 @@ export class WriteSurface extends SessionCore {
    * decision. S-1 asks this question after more evidence has arrived, for
    * exactly that reason.
    */
-  async sharpen(input: {
-    from: QuestionRef;
-    into: string;
-    because: string;
-  }): Promise<QuestionRef> {
+  async sharpen(input: SharpenCommand): Promise<QuestionRef> {
     const original = await this.graph.query(
       `MATCH (q:Question {natural_id: $id}) RETURN q`,
       { q: vertexProps<{ name: string }>() },
@@ -278,12 +304,7 @@ export class WriteSurface extends SessionCore {
    * `Evidence -SUPPORTS|CHALLENGES-> Claim`, which observation evidence has
    * neither of, or through a required `USES -> Computation`.
    */
-  async recordObservations(input: {
-    enquiry: EnquiryRef;
-    name: string;
-    finding: string;
-    contentHash?: string;
-  }): Promise<ObservationsRef> {
+  async recordObservations(input: RecordObservationsCommand): Promise<ObservationsRef> {
     // Atomic, and this is the sharper half of row AD's fix. Before the unit
     // existed there was nothing an interrupted call could leave behind that the
     // model called impossible; now a failure between the evidence and the unit
@@ -356,11 +377,9 @@ export class WriteSurface extends SessionCore {
    * back — which answered a different question and produced a genuine false
    * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
    */
-  async recordAnalysis(
-    input: Parameters<WriteSurface["recorded"]>[0],
-  ): Promise<AnalysisRef> {
+  async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     const analysis = await this.graph.inTransaction(() => this.recorded(input));
-    this.emit("recordAnalysis", analysis.id, {
+    this.emit("recordAnalysis", analysis.analysis.id, {
       enquiry: input.enquiry.id,
       method: input.method,
       concludes: input.concludes.map((c) => c.proposition),
@@ -377,48 +396,7 @@ export class WriteSurface extends SessionCore {
    * external review found it had lapsed: `reverify()` and `replaceAnalysis()`
    * were each emitting two events while their journals claimed one.
    */
-  private async recorded(input: {
-    enquiry: EnquiryRef;
-    method: string;
-    /**
-     * What this analysis read: recorded observations, or **another analysis's
-     * output**. Earned by S-11d, row AE.
-     *
-     * Until it accepted an `AnalysisRef`, a two-stage pipeline had one
-     * recordable form — re-enter the intermediate as if it were fresh
-     * measurement — and that produced a confidently wrong answer: stage two
-     * reported `reproducible: true` while resting on data the record itself
-     * called unverifiable, because the re-entered intermediate carried a hash
-     * of its own and the chain to the real input was severed.
-     *
-     * No new edge. `CONSUMES: Computation -> Artefact` already existed and
-     * already meant "this run read that"; an analysis output is an `Artefact`
-     * like any other, so the second rung of the change bar was enough and
-     * nothing was added to the model.
-     */
-    from: Array<ObservationsRef | AnalysisRef>;
-    concludes: Conclusion[];
-    /**
-     * The planned work this analysis carries out, if it carries out any.
-     *
-     * Earned by S-7: a gate protects work, and until an analysis said which
-     * work it was, the blast radius of amending a gated condition reached the
-     * *work* and stopped there — so "was any confirmatory result affected?"
-     * could only be answered by asserting it. `IMPLEMENTS` already existed
-     * for this and had never been written.
-     */
-    implementing?: WorkRef;
-    /**
-     * The prespecified conditions this analysis's conclusions are held to.
-     *
-     * Earned by S-3b: criteria that qualify a finding and gate nothing. The
-     * checks are agreed before the run, so they are stated separately and
-     * named here; recording them at evaluation time cannot work, because a
-     * check nobody ran must still count against the finding. See
-     * EDGE_SCHEMA.QUALIFIES.
-     */
-    heldTo?: CriterionRef[];
-  }): Promise<AnalysisRef> {
+  private async recorded(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     // Checked before anything is written. A proposition the record has
     // withdrawn cannot be re-asserted as a side effect of recording an
     // analysis: a fresh claim node would restore it while the objection that
@@ -486,14 +464,39 @@ export class WriteSurface extends SessionCore {
       "PRODUCES",
       output.natural_id,
     );
-    for (const source of input.from) {
+    // Every position at which each artefact was read, collected before writing.
+    //
+    // `positions` and not `position`, and one edge per distinct artefact rather
+    // than one per occurrence: `createEdge` treats `(from, label, to)` as
+    // identity and a repeat as a no-op, backed by a real
+    // `UNIQUE (start_id, end_id)` index -- so `from: [A, B, A]` cannot be three
+    // edges, and writing it as two silently dropped the second A (S-10e).
+    //
+    // The caller said the run read three things. Storing two is losing what the
+    // caller said, in the store whose job is not to. Refusing `[A, A]` was the
+    // other available answer and is worse: a null test compares a series against
+    // itself, which is an ordinary thing to record, and declining it would be
+    // LabKit deciding a legitimate run is not recordable -- exactly what S-10d
+    // took out.
+    const positionsFor = new Map<string, number[]>();
+    for (const [position, source] of input.from.entries()) {
       // An analysis is named by its computation; what it *read* is that
       // computation's output artefact, which is what CONSUMES points at.
       const artefact =
         source.kind === "analysis" ? await this.outputArtefactOf(source) : source.id;
-      await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact);
+      const seen = positionsFor.get(artefact);
+      if (seen) seen.push(position);
+      else positionsFor.set(artefact, [position]);
+    }
+    for (const [artefact, positions] of positionsFor) {
+      // No verdict rests on any of this: `reproductionOf` reports both runs'
+      // lists in order and adjudicates nothing (S-10d).
+      await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact, {
+        positions,
+      });
     }
 
+    const minted: ConcludedClaim[] = [];
     for (const conclusion of input.concludes) {
       const evidence = await this.graph.createNode("Evidence", {
         statement: conclusion.finding,
@@ -521,9 +524,13 @@ export class WriteSurface extends SessionCore {
         bearing,
         claim.natural_id,
       );
+      minted.push({
+        claim: ref("claim", claim.natural_id),
+        asserts: conclusion.proposition,
+      });
     }
 
-    return { kind: "analysis", id: computation.natural_id };
+    return { analysis: ref("analysis", computation.natural_id), claims: minted };
   }
 
   /**
@@ -533,10 +540,7 @@ export class WriteSurface extends SessionCore {
    * to the execution that ran it — what gets criticized in S-11 is the
    * method, and nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
-  async recordReview(input: {
-    of: AnalysisRef;
-    verdict: string;
-  }): Promise<ReviewRef> {
+  async recordReview(input: RecordReviewCommand): Promise<ReviewRef> {
     const review = await this.graph.createNode("Review", {
       verdict: input.verdict,
     });
@@ -563,10 +567,7 @@ export class WriteSurface extends SessionCore {
    * closing with nothing cited is a real and different act, and the two must
    * not read alike.
    */
-  async closeEnquiry(input: {
-    enquiry: EnquiryRef;
-    answeredBy?: ConclusionRef;
-  }): Promise<void> {
+  async closeEnquiry(input: CloseEnquiryCommand): Promise<void> {
     // Everything is validated before anything is written. A rejected close
     // must leave no Decision behind, and an analysis from some other enquiry
     // must not become the stated basis for resolving this question.
@@ -613,25 +614,34 @@ export class WriteSurface extends SessionCore {
     }
 
     let answerBearing: string | undefined;
+    let answeredProposition: string | undefined;
     if (input.answeredBy) {
-      const { analysis, proposition } = input.answeredBy;
-      const addresses = await this.graph.query(
-        `MATCH (:Computation {natural_id: $analysis})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
-         RETURN 1`,
-        { ok: scalar<number>() },
-        { analysis: analysis.id, enquiry: input.enquiry.id },
-      );
+      // The claim identifies itself; what still has to be checked is that it
+      // belongs to THIS enquiry. One hop from the claim rather than a search
+      // for a proposition.
+      // BOTH bearings. A question answered "no" is answered on a finding that
+      // CHALLENGES its proposition -- S-4's whole case -- and checking only
+      // SUPPORTS rejected exactly the closure the scenario exists for.
+      const addresses: unknown[] = [];
+      for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+        addresses.push(
+          ...(await this.graph.query(
+            `MATCH (:Claim {natural_id: $claim})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
+             RETURN 1`,
+            { ok: scalar<number>() },
+            { claim: input.answeredBy.id, enquiry: input.enquiry.id },
+          )),
+        );
+      }
       if (addresses.length === 0) {
         throw new Error(
-          `analysis ${analysis.id} does not address enquiry ${input.enquiry.id}; it cannot answer its question`,
+          `claim ${input.answeredBy.id} does not belong to enquiry ${input.enquiry.id}; it cannot answer its question`,
         );
       }
-      answerBearing = await this.findingFor(analysis, proposition);
-      if (!answerBearing) {
-        throw new Error(
-          `analysis ${analysis.id} concluded nothing about "${proposition}"`,
-        );
-      }
+      const found = await this.findingOn(input.answeredBy);
+      if (!found) throw new Error(`no finding bears on claim ${input.answeredBy.id}`);
+      answerBearing = found.evidence;
+      answeredProposition = found.asserts;
     }
 
     // Transactional, demonstrated — `docs/consumer-contract/043`.
@@ -651,8 +661,8 @@ export class WriteSurface extends SessionCore {
     await this.graph.inTransaction(async () => {
       const decision = await this.graph.createNode("Decision", {
         decided_at: this.clock.now(),
-        reason: input.answeredBy
-          ? `answered on "${input.answeredBy.proposition}"`
+        reason: answeredProposition
+          ? `answered on "${answeredProposition}"`
           : "closed without a cited result",
         invalidation_check: "new evidence bearing on the question",
       });
@@ -662,8 +672,8 @@ export class WriteSurface extends SessionCore {
     });
 
     this.emit("closeEnquiry", input.enquiry.id, {
-      answeredBy: input.answeredBy?.analysis.id ?? null,
-      proposition: input.answeredBy?.proposition ?? null,
+      answeredBy: input.answeredBy?.id ?? null,
+      proposition: answeredProposition ?? null,
     });
   }
 
@@ -683,20 +693,7 @@ export class WriteSurface extends SessionCore {
   // -------------------------------------------------------------------------
 
   /** Records a piece of work whose start a gate may protect. */
-  async planWork(input: {
-    objective: string;
-    acceptance: string;
-    /**
-     * What this work is permitted to read. Closed-world — see `TaskContract`.
-     *
-     * Earned by S-8, and the first walk of `TaskProps.inputs`, which
-     * `planWork()` had hardcoded to `""` since it was written. Stored as JSON
-     * rather than a delimited string so an entry containing punctuation cannot
-     * silently split; if a scenario ever needs to query *by element*, that is
-     * when it becomes a real list property rather than a serialised one.
-     */
-    mayRead?: string[];
-  }): Promise<WorkRef> {
+  async planWork(input: PlanWorkCommand): Promise<WorkRef> {
     const task = await this.graph.createNode("Task", {
       objective: input.objective,
       inputs: JSON.stringify(input.mayRead ?? []),
@@ -720,11 +717,7 @@ export class WriteSurface extends SessionCore {
    * work. Declaring a gate must not make it satisfied — that is the entire
    * subject of S-17.
    */
-  async declareGate(input: {
-    governedBy: CriterionRef[];
-    consequence: string;
-    protecting: WorkRef[];
-  }): Promise<GateRef> {
+  async declareGate(input: DeclareGateCommand): Promise<GateRef> {
     if (input.governedBy.length === 0)
       throw new Error("a gate governed by no condition is not a gate");
     // And a gate protecting nothing is not a gate either. Before S-3b there
@@ -767,20 +760,7 @@ export class WriteSurface extends SessionCore {
    * Same invariant class as `assertReviewOf`, and both are checked before
    * anything is written so a rejected command leaves no partial state.
    */
-  async evaluateCriterion(input: {
-    criterion: CriterionRef;
-    /**
-     * The gate this verdict is being reached for, if it is being reached for
-     * one. Omitted when the condition qualifies a finding and gates no work —
-     * S-3b, where requiring a gate forced the caller to mint one that
-     * protected nothing.
-     */
-    gate?: GateRef;
-    value: string;
-    outcome: "pass" | "fail";
-    /** The finding this verdict was reached against, if it was reached against one. */
-    citing?: ConclusionRef;
-  }): Promise<void> {
+  async evaluateCriterion(input: EvaluateCriterionCommand): Promise<void> {
     if (input.gate)
       await this.assertCriterionGovernsGate(input.criterion, input.gate);
     // Same invariant class as `assertCriterionGovernsGate`, for the other job
@@ -789,15 +769,9 @@ export class WriteSurface extends SessionCore {
     else await this.assertCriterionQualifiesSomething(input.criterion);
     let basis: string | undefined;
     if (input.citing) {
-      basis = await this.findingFor(
-        input.citing.analysis,
-        input.citing.proposition,
-      );
-      if (!basis) {
-        throw new Error(
-          `analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`,
-        );
-      }
+      const found = await this.findingOn(input.citing);
+      if (!found) throw new Error(`no finding bears on claim ${input.citing.id}`);
+      basis = found.evidence;
     }
     const at = this.clock.now();
     // Transactional, demonstrated rather than assumed — `docs/consumer-contract/041`.
@@ -856,13 +830,7 @@ export class WriteSurface extends SessionCore {
    *
    * One event, not two: a researcher who re-verified a result did one thing.
    */
-  async reverify(input: {
-    historical: AnalysisRef;
-    enquiry: EnquiryRef;
-    method: string;
-    under: ObservationsRef[];
-    concludes: Conclusion;
-  }): Promise<VerificationReport> {
+  async reverify(input: ReverifyCommand): Promise<VerificationReport> {
     const at = this.clock.now();
     // Atomic: without the second write the durable state is precisely S-10's
     // demonstrated wrong answer -- a second independent support standing where
@@ -884,7 +852,7 @@ export class WriteSurface extends SessionCore {
         concludes: [input.concludes],
       });
       const restated = await this.findingFor(
-        recorded,
+        recorded.analysis,
         input.concludes.proposition,
       );
       if (!restated)
@@ -895,11 +863,16 @@ export class WriteSurface extends SessionCore {
       return recorded;
     });
 
-    this.emit("reverify", verification.id, {
+    this.emit("reverify", verification.analysis.id, {
       of: input.historical.id,
       proposition: input.concludes.proposition,
     });
-    return { at, verification, of: input.historical };
+    return {
+      at,
+      verification: verification.analysis,
+      of: input.historical,
+      claims: verification.claims,
+    };
   }
 
   /**
@@ -925,26 +898,15 @@ export class WriteSurface extends SessionCore {
    * Writes `DEFERS`, which is its first writer since PJ-004 declared it —
    * CLAUDE.md's standing example of a reader with no writer, now walked.
    */
-  async acceptAsUnresolved(input: {
-    enquiry: EnquiryRef;
-    /** Why it is being accepted rather than pursued. */
-    because: string;
-    /** What would reopen it. About the world, not about re-running the same analysis. */
-    until: string;
-    /** The finding it is being accepted in light of — what was known at the time. */
-    inLightOf: ConclusionRef;
-  }): Promise<void> {
+  async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<void> {
     const at = this.clock.now();
     await this.graph.inTransaction(async () => {
       const question = await this.questionBehind(input.enquiry);
       if (!question) throw new Error(`enquiry ${input.enquiry.id} pursues no question`);
 
-      const basis = await this.findingFor(input.inLightOf.analysis, input.inLightOf.proposition);
-      if (!basis) {
-        throw new Error(
-          `analysis ${input.inLightOf.analysis.id} concluded nothing about "${input.inLightOf.proposition}"`,
-        );
-      }
+      const found = await this.findingOn(input.inLightOf);
+      if (!found) throw new Error(`no finding bears on claim ${input.inLightOf.id}`);
+      const basis = found.evidence;
 
       const decision = await this.graph.createNode("Decision", {
       decided_at: this.clock.now(),
@@ -987,9 +949,9 @@ export class WriteSurface extends SessionCore {
    * unevaluated confirmatory gate reading exploratory, and S-7's amendment
    * check would miss a scientific change. Promotion is an act with a reason.
    */
-  async promote(input: { claim: ConclusionRef; because: string }): Promise<void> {
+  async promote(input: PromoteCommand): Promise<void> {
     await this.graph.inTransaction(async () => {
-      const claim = await this.claimFor(input.claim);
+      const claim = input.claim.id;
       // `invalidation_check` is the verb's own sentence about what would make a
       // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
       // `amendDesign` and `reinterpret`. S-14 is the one place the researcher
@@ -1007,20 +969,7 @@ export class WriteSurface extends SessionCore {
         { id: claim },
       );
     });
-    this.emit("promote", input.claim.analysis.id, { proposition: input.claim.proposition });
-  }
-
-  /** The Claim node a conclusion asserts, within its own line of enquiry. */
-  private async claimFor(ref: ConclusionRef): Promise<string> {
-    const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(:Evidence)-[:SUPPORTS]->(c:Claim {name: $name})
-       RETURN c`,
-      { c: vertexProps<{ natural_id: string }>() },
-      { id: ref.analysis.id, name: ref.proposition },
-    );
-    const found = rows[0];
-    if (!found) throw new Error(`analysis ${ref.analysis.id} concluded nothing about "${ref.proposition}"`);
-    return found.c.natural_id;
+    this.emit("promote", input.claim.id, { proposition: await this.assertedBy(input.claim) });
   }
 
   /**
@@ -1044,12 +993,7 @@ export class WriteSurface extends SessionCore {
    * found rather than supplied: an ordering that depends on the caller
    * remembering to pass the right handle is not an ordering.
    */
-  async amendDesign(input: {
-    criterion: CriterionRef;
-    nowRequires: string;
-    because: string;
-    citing: ConclusionRef;
-  }): Promise<AmendmentReport> {
+  async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
     const at = this.clock.now();
 
     // Everything validated before anything is written -- a rejected amendment
@@ -1063,15 +1007,9 @@ export class WriteSurface extends SessionCore {
     if (!replaced)
       throw new Error(`no condition ${input.criterion.id} to amend`);
 
-    const diagnosis = await this.findingFor(
-      input.citing.analysis,
-      input.citing.proposition,
-    );
-    if (!diagnosis) {
-      throw new Error(
-        `analysis ${input.citing.analysis.id} concluded nothing about "${input.citing.proposition}"`,
-      );
-    }
+    const cited = await this.findingOn(input.citing);
+    if (!cited) throw new Error(`no finding bears on claim ${input.citing.id}`);
+    const diagnosis = cited.evidence;
 
     const gates = await this.gatesGovernedBy(input.criterion.id);
     if (gates.length === 0) {
@@ -1127,7 +1065,6 @@ export class WriteSurface extends SessionCore {
         return { replacement, decision };
       },
     );
-    void replacement;
 
     const rerun = await this.workGatedBy(gates);
     const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
@@ -1141,9 +1078,15 @@ export class WriteSurface extends SessionCore {
 
     return {
       at,
-      amendment: decision.natural_id,
-      replaced,
-      nowRequires: input.nowRequires,
+      amendment: ref("decision", decision.natural_id),
+      // `void replacement;` stood here: the amended criterion was created and
+      // its handle thrown away, so the report named both conditions by wording
+      // and a caller could reach neither.
+      replaced: { criterion: input.criterion, requires: replaced ?? "" },
+      nowRequires: {
+        criterion: ref("criterion", replacement.natural_id),
+        requires: input.nowRequires,
+      },
       rerun,
       confirmatoryAffected,
       // Derived, never declared. An amendment is scientific exactly when
@@ -1199,14 +1142,7 @@ export class WriteSurface extends SessionCore {
    * the old analysis's OUTPUT is invalidated. That separation is the whole
    * point of S-11.
    */
-  async replaceAnalysis(input: {
-    supersedes: AnalysisRef;
-    because: ReviewRef;
-    enquiry: EnquiryRef;
-    method: string;
-    from: ObservationsRef[];
-    concludes: Conclusion[];
-  }): Promise<ReplacementReport> {
+  async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
     const at = this.clock.now();
     // Atomic, and this is the one that made transactions necessary rather than
     // tidy. Invalidating the superseded output is not an isolated write: since
@@ -1261,37 +1197,91 @@ export class WriteSurface extends SessionCore {
       return { before, replacement };
     });
 
+    // Both sides carry a handle. After a replacement two records assert each
+    // sentence -- the withdrawn one and the fresh one -- so a report naming
+    // only the wording leaves a reader unable to say which it means. `was`
+    // comes from the superseded analysis, `claim` from the replacement, and
+    // the replacement's claims are taken BY INDEX: `recorded()` mints one per
+    // conclusion in order, so position is identity and a lookup keyed by the
+    // sentence would collapse two conclusions phrased alike.
+    //
+    // The `before` match is by wording because it has to be -- the superseded
+    // analysis's claims and the replacement's share no handle, and "the same
+    // proposition, re-derived" is precisely what the caller asserts by passing
+    // them.
     const changed: ChangedConclusion[] = [];
-    const unchanged: string[] = [];
-    for (const now of input.concludes) {
+    const unchanged: ConcludedClaim[] = [];
+    for (const [i, now] of input.concludes.entries()) {
       const was = before.find((b) => b.proposition === now.proposition);
-      if (!was) continue;
-      if (was.finding === now.finding) unchanged.push(now.proposition);
+      const claim = replacement.claims[i]?.claim;
+      if (!was || !claim) continue;
+      if (was.finding === now.finding)
+        unchanged.push({ claim, asserts: now.proposition });
       else
         changed.push({
           proposition: now.proposition,
+          was: was.claim,
           before: was.finding,
+          claim,
           after: now.finding,
         });
     }
 
+    // The wording half. `what` was a naked id -- the inverse of the convention
+    // every other pair follows, and unreadable without a second lookup.
+    //
+    // An analysis handle has to be dereferenced to its output artefact first:
+    // the id is a `COMP_`, and looking THAT up as an artefact matches nothing
+    // and silently fell back to printing the id. Same one hop `recorded()`
+    // makes to write the CONSUMES edge.
+    const inputNames = new Map<string, string>();
+    // Read after the transaction above, so it sees this act's own invalidation.
+    const retracted = new Set<string>();
+    for (const o of input.from) {
+      const artefact = o.kind === "analysis" ? await this.outputArtefactOf(o) : o.id;
+      const rows = await this.graph.query(
+        `MATCH (a:Artefact {natural_id: $id}) RETURN a`,
+        // `logical_name`, which is what an Artefact actually carries. This read
+        // `.name` -- a property no Artefact has -- so it set `undefined` and the
+        // `?? o.id` below printed the id. The field exists BECAUSE `what` was a
+        // naked id, and it had been a second naked id since the day it landed;
+        // nothing asserted on it until an MCP test did.
+        { a: vertexProps<ArtefactProps>() },
+        { id: artefact },
+      );
+      if (rows[0]) inputNames.set(o.id, rows[0].a.logical_name);
+      if (rows[0]?.a.invalidated) retracted.add(o.id);
+    }
+
+    // `why` is computed, not asserted. Two things had been wrong with the fixed
+    // sentence: it said "observations" while `what` reports `kind: "analysis"`
+    // for an analysis input, and for an input that IS the replaced analysis it
+    // asserted the opposite of what the record says (S-11e).
     const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
-      what: o.id,
-      why: "observations were not produced by the replaced analysis, and the replacement rests on them",
+      what: o,
+      ...(retracted.has(o.id) ? { invalidated: true as const } : {}),
+      named: inputNames.get(o.id) ?? o.id,
+      why: retracted.has(o.id)
+        ? "produced by the replaced analysis and retracted by this replacement, which rests on it anyway"
+        : "not produced by the replaced analysis, and the replacement rests on it",
     }));
 
     const report: ReplacementReport = {
       at,
-      replacement,
-      affected: before.map((b) => b.proposition),
+      replacement: replacement.analysis,
+      claims: replacement.claims,
+      affected: before.map((b) => ({ claim: b.claim, asserts: b.proposition })),
       unaffected,
       changed,
       unchanged,
     };
-    this.emit("replaceAnalysis", replacement.id, {
+    this.emit("replaceAnalysis", replacement.analysis.id, {
       supersedes: input.supersedes.id,
       because: input.because.id,
-      affected: report.affected,
+      // Sentences, not handles. `detail` is Record<string, unknown>, so
+      // nothing would have complained had this silently become objects when
+      // `affected` grew handles -- the one shape PJ-030 §5 warns tsc misses.
+      affected: report.affected.map((a) => a.asserts),
       changed: report.changed.map((c) => c.proposition),
     });
     return report;
@@ -1309,19 +1299,17 @@ export class WriteSurface extends SessionCore {
    * express that, its whole mechanism being invalidation of the output. Here
    * the numbers were right and only the sentence about them was wrong.
    */
-  async reinterpret(input: {
-    /**
-     * Which claim. A bare proposition while the sentence is asserted once;
-     * naming the analysis that concluded it when it is not — S-5, where
-     * withdrawing by wording alone retracted an unrelated line of work.
-     */
-    of: ClaimSubject;
-    as: string;
-    because: string;
-  }): Promise<ReinterpretationReport> {
+  async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
     const at = this.clock.now();
 
-    const scope = await this.scopeFor(input.of);
+    // A reinterpretation narrows a READING, not one node. Two analyses in one
+    // line of enquiry concluding the same sentence share a reading, and S-12
+    // requires both to stop standing -- so the scope is still (proposition,
+    // enquiry). What changed is that both now come FROM THE NAMED CLAIM
+    // instead of being searched for, so nothing is guessed and the caller
+    // cannot be surprised about which reading was narrowed.
+    const scope = await this.scopeOf(input.of);
+    const previously = scope.proposition;
     const claims = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
@@ -1332,8 +1320,15 @@ export class WriteSurface extends SessionCore {
         ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
       },
     );
+    // Every record this act withdraws, by handle. The reading is one sentence
+    // and the records asserting it are several -- reporting the sentence alone
+    // left a caller unable to name which claims stopped standing, and reporting
+    // one handle would have picked between them arbitrarily.
+    const withdrawn: ConcludedClaim[] = [
+      ...new Set(claims.map((c) => c.c.natural_id)),
+    ].map((id) => ({ claim: ref("claim", id), asserts: previously }));
     if (claims.length === 0)
-      throw new Error(`nothing on the record claims "${scope.proposition}"`);
+      throw new Error(`no claim ${input.of.id} to reinterpret`);
 
     // Atomic. Interrupted between withdrawing the original and carrying its
     // evidence across, this retracts a finding and puts nothing in its place.
@@ -1363,7 +1358,10 @@ export class WriteSurface extends SessionCore {
         narrower.natural_id,
       );
 
-      const carried = new Set<string>();
+      // Keyed by id. The query below selects natural_id AND statement and only
+      // the statement was kept, so two findings phrased alike merged -- in the
+      // field whose whole job is showing the findings survived unchanged.
+      const carried = new Map<string, CitedFinding>();
       for (const id of new Set(claims.map((c) => c.c.natural_id))) {
         const claim = { c: { natural_id: id } };
         await this.graph.createEdge(
@@ -1387,7 +1385,7 @@ export class WriteSurface extends SessionCore {
             "SUPPORTS",
             narrower.natural_id,
           );
-          carried.add(row.e.statement);
+          carried.set(row.e.natural_id, { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
         }
       }
 
@@ -1397,15 +1395,19 @@ export class WriteSurface extends SessionCore {
     const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
     this.emit("reinterpret", narrower.natural_id, {
-      previously: scope.proposition,
+      previously,
       because: input.because,
     });
 
     return {
       at,
-      previously: scope.proposition,
-      nowClaims: input.as,
-      evidenceStanding: [...carried].sort(),
+      previously: withdrawn,
+      // The narrower claim was minted here and its handle discarded -- the
+      // eighth thing CLAUDE.md's "does the act record what it produced, or
+      // only what it acted on?" has caught. A caller had to go back through
+      // `claimsAsserting` to name what this very call had just created.
+      nowClaims: { claim: ref("claim", narrower.natural_id), asserts: input.as },
+      evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
       restingOnTheOldReading,
       requiresRecomputation: false,
     };
@@ -1418,7 +1420,7 @@ export class WriteSurface extends SessionCore {
   ): void {
     this.events.record({ at: this.clock.now(), operation, subject, detail });
   }
-  private async conclusionsOf(analysis: AnalysisRef): Promise<Conclusion[]> {
+  private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(
       // Either bearing: an analysis whose findings all CHALLENGE returned no
       // conclusions at all, so replacing one reported nothing as affected.
@@ -1428,14 +1430,22 @@ export class WriteSurface extends SessionCore {
        RETURN e, sc, cc`,
       {
         e: vertexProps<EvidenceProps>(),
-        sc: optional(vertexProps<ClaimProps>()),
-        cc: optional(vertexProps<ClaimProps>()),
+        sc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
+        cc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
       },
       { id: analysis.id },
     );
     return rows.flatMap((r) => {
       const claim = r.sc ?? r.cc;
-      return claim ? [{ proposition: claim.name, finding: r.e.statement }] : [];
+      return claim
+        ? [
+            {
+              claim: ref("claim", claim.natural_id),
+              proposition: claim.name,
+              finding: r.e.statement,
+            },
+          ]
+        : [];
     });
   }
   private async outputArtefactOf(analysis: AnalysisRef): Promise<string> {

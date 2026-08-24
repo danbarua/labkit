@@ -14,6 +14,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -71,7 +72,7 @@ describe("S-4: a negative result that closes the question", () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
 
     // Agent: no detectable evidence of that. All five form a tight cluster.
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -85,70 +86,70 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // Researcher: then close that question for this endpoint.
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(false);
+    expect(status.question!.open).toBe(false);
   });
 
   test("Afterward 1 & 2: closed, and specifically ANSWERED — not abandoned, not deferred", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("answered");
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("answered");
     // The three must not be one state.
-    expect(status.closure).not.toBe("abandoned");
-    expect(status.closure).not.toBe("deferred");
+    expect(status.question!.closure).not.toBe("abandoned");
+    expect(status.question!.closure).not.toBe("deferred");
   });
 
   test("Afterward 2, polarity: answered NEGATIVELY, and that is queryable", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.answer).toBe("no");
+    expect(status.question!.answer).toBe("no");
   });
 
   test("Afterward 3: the neighbouring supported claim is untouched, and LabKit says so", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
 
     // Reconstructible from a fresh reader, not from a value we kept.
     const reader = new ResearchSession(await scenario.current(), { clock });
-    const neighbour = await reader.whySupported(TRANSFORMATION);
+    const neighbour = await reader.whySupported(await claimNamed(reader, TRANSFORMATION));
     expect(neighbour.supported).toBe(true);
     expect(neighbour.superseded).toEqual([]);
 
-    const closed = await reader.whySupported(SPECIFICITY);
+    const closed = await reader.whySupported(await claimNamed(reader, SPECIFICITY));
     expect(closed.supported).toBe(false);
   });
 
   test("Afterward 4: the null result is cited AS evidence, not as an absence of it", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const nullResult = await session.recordAnalysis({
+    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -160,12 +161,12 @@ describe("S-4: a negative result that closes the question", () => {
         },
       ],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: nullResult, proposition: SPECIFICITY } });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.evidence).toHaveLength(1);
-    expect(status.evidence[0]).toContain("no separation detectable");
+    expect(status.question!.evidence).toHaveLength(1);
+    expect(status.question!.evidence[0]!.states).toContain("no separation detectable");
   });
 
   /**
@@ -180,10 +181,10 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(false);
-    expect(status.closure).toBe("abandoned");
-    expect(status.answer).toBeNull();
-    expect(status.evidence).toEqual([]);
+    expect(status.question!.open).toBe(false);
+    expect(status.question!.closure).toBe("abandoned");
+    expect(status.question!.answer).toBeNull();
+    expect(status.question!.evidence).toEqual([]);
   });
 
   /**
@@ -201,17 +202,20 @@ describe("S-4: a negative result that closes the question", () => {
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
 
-    const refuted = await session.whySupported(SPECIFICITY);
-    const neverExamined = await session.whySupported("nobody has ever asked this");
+    const refuted = await session.whySupported(await claimNamed(session, SPECIFICITY));
+
+    // **A sentence nobody claimed has no claim to ask about.** `whySupported`
+    // used to take text and answer `supported: false, challenged: false` for
+    // one; it takes a handle now, and there is no handle to hand it. The
+    // distinction the scenario exists for survives, one step earlier: a
+    // refuted claim EXISTS and is challenged, an unexamined sentence does not
+    // exist at all -- which is a stronger statement than a false flag.
+    expect(await session.claimsAsserting("nobody has ever asked this")).toEqual([]);
 
     expect(refuted.supported).toBe(false);
-    expect(neverExamined.supported).toBe(false);
-    // ...but they must not be the same answer.
     expect(refuted.challenged).toBe(true);
-    expect(neverExamined.challenged).toBe(false);
     expect(refuted.against).toHaveLength(1);
     expect(refuted.against[0]!.finding).toContain("no separation detectable");
-    expect(neverExamined.against).toEqual([]);
   });
 
   /**
@@ -226,7 +230,7 @@ describe("S-4: a negative result that closes the question", () => {
       name: "unrelated measurements",
       finding: "unrelated",
     });
-    const unrelated = await session.recordAnalysis({
+    const { analysis: unrelated, claims: unrelatedClaims } = await session.recordAnalysis({
       enquiry: established,
       method: "unrelated-analysis",
       from: [elsewhere],
@@ -234,20 +238,20 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     await expect(
-      session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: unrelated, proposition: SPECIFICITY } }),
-    ).rejects.toThrow(/does not address enquiry/);
+      session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(unrelatedClaims, SPECIFICITY) }),
+    ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
     // Nothing was written on the way to failing.
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBeNull();
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBeNull();
     expect(observations.kind).toBe("observations");
   });
 
   test("a question cannot be answered on a proposition the analysis never concluded", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const analysis = await session.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -255,12 +259,12 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     await expect(
-      session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis, proposition: "something else entirely" } }),
-    ).rejects.toThrow(/concluded nothing about/);
+      session.closeEnquiry({ enquiry: specificity, answeredBy: { kind: "claim" as const, id: "CLM_99999" } }),
+    ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(true);
+    expect(status.question!.open).toBe(true);
   });
 
   /**
@@ -270,7 +274,7 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("polarity comes from the answering finding, not from any finding in the analysis", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const mixed = await session.recordAnalysis({
+    const { analysis: mixed, claims: mixedClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "mixed-analysis",
       from: [observations],
@@ -280,15 +284,15 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: { analysis: mixed, proposition: SPECIFICITY } });
+    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(mixedClaims, SPECIFICITY) });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.closure).toBe("answered");
+    expect(status.question!.closure).toBe("answered");
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
-    expect(status.answer).toBe("yes");
-    expect(status.evidence).toEqual(["clear separation between constructions"]);
+    expect(status.question!.answer).toBe("yes");
+    expect(status.question!.evidence.map((e) => e.states)).toEqual(["clear separation between constructions"]);
   });
 
   /**
@@ -297,14 +301,14 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("a withdrawn challenge is historical, and propagates as an affected claim", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const refutation = await session.recordAnalysis({
+    const { analysis: refutation, claims: refutationClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
       concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
     });
 
-    const before = await session.whySupported(SPECIFICITY);
+    const before = await session.whySupported(claimOf(refutationClaims, SPECIFICITY));
     expect(before.challenged).toBe(true);
     expect(before.against).toHaveLength(1);
 
@@ -319,10 +323,17 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // conclusionsOf() saw nothing at all when an analysis only challenged.
-    expect(report.affected).toEqual([SPECIFICITY]);
+    // By handle, not by sentence: after the replacement two records assert
+    // these words, and this names the refutation's own claim -- the one that
+    // was withdrawn.
+    expect(report.affected).toEqual([
+      { claim: claimOf(refutationClaims, SPECIFICITY), asserts: SPECIFICITY },
+    ]);
     expect(report.changed).toHaveLength(1);
 
-    const after = await session.whySupported(SPECIFICITY);
+    // After the replacement the sentence is claimed twice; this asks about
+    // the original, which is the one that was withdrawn.
+    const after = await session.whySupported(claimOf(refutationClaims, SPECIFICITY));
     // The old challenge is withdrawn, not still standing.
     expect(after.against.map((a) => a.finding)).toEqual(["still no separation, corrected metric"]);
     expect(after.superseded).toHaveLength(1);
@@ -334,7 +345,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     // ...and invalidating the record enumerates the challenged claim.
     const downstream = await session.whatDependsOn("cluster-comparison output");
-    expect(downstream.claims).toContain(SPECIFICITY);
+    expect(downstream.claims.map((c) => c.asserts)).toContain(SPECIFICITY);
   });
 
   test("an enquiry nobody has closed is open, and that is not a kind of closure", async () => {
@@ -342,7 +353,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
-    expect(status.open).toBe(true);
-    expect(status.closure).toBeNull();
+    expect(status.question!.open).toBe(true);
+    expect(status.question!.closure).toBeNull();
   });
 });

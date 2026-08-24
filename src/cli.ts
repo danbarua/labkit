@@ -26,7 +26,7 @@ import { resolveTenantContext } from "./db/tenant";
 import { TenantGraph } from "./db/graph";
 import { ReadSurface } from "./domain";
 import type {
-  ClaimSubject,
+  ClaimRef,
   EnquiryStatus,
   HistoricalSurvey,
   KnowledgeSurvey,
@@ -125,7 +125,7 @@ function bullets(items: string[], empty: string): string {
 function questionLines(questions: QuestionStanding[], all: QuestionStanding[]): string[] {
   const counts = new Map<string, number>();
   for (const q of all) counts.set(q.asks, (counts.get(q.asks) ?? 0) + 1);
-  return questions.map((q) => (counts.get(q.asks)! > 1 ? `${q.asks}  [${q.question}]` : q.asks));
+  return questions.map((q) => (counts.get(q.asks)! > 1 ? `${q.asks}  [${q.question.id}]` : q.asks));
 }
 
 /** Every question in a survey, whichever bucket it landed in — the collision set. */
@@ -203,20 +203,24 @@ export function renderWhy(why: SupportExplanation): string {
     `"${why.proposition}"`,
     `  ${verdict}, ${why.standing}`,
     why.promotedBecause ? `  promoted because: ${why.promotedBecause}` : "",
-    why.replacedBy ? `  replaced by: "${why.replacedBy}"` : "",
+    why.replacedBy ? `  replaced by: "${why.replacedBy.asserts}"  (${why.replacedBy.claim})` : "",
     "",
     "Resting on",
-    bullets(why.support.map((s) => `${s.finding}  (via ${s.via})`), "nothing"),
+    bullets(why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis.id})`), "nothing"),
     why.against.length
-      ? `\nBearing against\n${bullets(why.against.map((a) => `${a.finding}  (via ${a.via})`), "")}`
+      ? `\nBearing against\n${bullets(why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis.id})`), "")}`
       : "",
-    why.reverifiedBy.length ? `\nRe-checked by\n${bullets(why.reverifiedBy, "")}` : "",
+    why.reverifiedBy.length
+      ? `\nRe-checked by\n${bullets(why.reverifiedBy.map((r) => `${r.method}  (${r.analysis.id})`), "")}`
+      : "",
     why.standard.length
       ? `\nHeld to\n${bullets(why.standard.map((c) => `${c.proposition} — ${c.state}`), "")}`
       : "\nHeld to no prespecified standard.",
-    why.unmet.length ? `\nNot currently met\n${bullets(why.unmet, "")}` : "",
+    why.unmet.length
+      ? `\nNot currently met\n${bullets(why.unmet.map((u) => `${u.requires}  (${u.criterion.id})`), "")}`
+      : "",
     why.restingOn.length
-      ? `\nUltimately resting on\n${bullets(why.restingOn.map((a) => `${a.name}  [${a.part}]`), "")}`
+      ? `\nUltimately resting on\n${bullets(why.restingOn.map((a) => `${a.name}  [${a.part.id}]`), "")}`
       : "",
     why.superseded.length
       ? `\nSuperseded\n${bullets(why.superseded.map((s) => `${s.finding} — ${s.reason}`), "")}`
@@ -229,10 +233,12 @@ export function renderWhy(why: SupportExplanation): string {
 export function renderAffects(report: DependencyReport): string {
   return [
     "Claims that would be affected",
-    bullets(report.claims, "none found"),
+    // Id and wording both. A person reading this needs the sentence; a person
+    // acting on it needs the handle every other command takes.
+    bullets(report.claims.map((c) => `${c.asserts}  (${c.claim.id})`), "none found"),
     "",
     "Lines of enquiry",
-    bullets(report.enquiries, "none found"),
+    bullets(report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry.id})`), "none found"),
     "",
     "Routes walked",
     bullets(report.routesWalked, ""),
@@ -258,20 +264,35 @@ export function renderAffects(report: DependencyReport): string {
  * should not have to go and look.
  */
 export function renderEnquiry(status: EnquiryStatus): string {
-  const standing =
-    status.closure === "accepted-as-unresolved"
+  const q = status.question;
+  const standing = !q
+    ? "no question behind this enquiry"
+    : q.closure === "accepted-as-unresolved"
       ? "open — accepted as unresolved, deliberately"
-      : status.open
+      : q.open
         ? "open"
-        : `closed — ${status.closure}`;
+        : `closed — ${q.closure}`;
   return [
-    status.question,
+    // The enquiry first, because that is what was asked about. The question's
+    // state is printed as the question's, not as this pursuit's -- PJ-030 §6:
+    // flattened, every pursuit of an answered question read as answered itself.
+    `${status.pursuing}  (${status.enquiry.id})`,
+    status.contributed.length
+      ? `  produced ${status.contributed.length} finding${status.contributed.length === 1 ? "" : "s"}`
+      : "  has produced nothing yet",
+    "",
+    q ? `Pursuing "${q.asks}"  (${q.question.id})` : "Pursuing nothing on the record",
     `  ${standing}`,
-    status.acceptedBecause ? `  accepted because: ${status.acceptedBecause}` : "",
-    status.reopensIf ? `  reopens if: ${status.reopensIf}` : "",
-    status.answer ? `  answer: ${status.answer}` : "",
-    status.restsOn ? `  resting on ${status.restsOn} work` : "",
-    status.evidence?.length ? `\nEvidence\n${bullets(status.evidence, "")}` : "",
+    q?.acceptedBecause ? `  accepted because: ${q.acceptedBecause}` : "",
+    q?.reopensIf ? `  reopens if: ${q.reopensIf}` : "",
+    q?.answer ? `  answer: ${q.answer}` : "",
+    q?.restsOn ? `  resting on ${q.restsOn} work` : "",
+    status.contributed.length
+      ? `\nThis enquiry's findings\n${bullets(status.contributed.map((e) => `${e.states}  (${e.evidence.id})`), "")}`
+      : "",
+    q?.evidence.length
+      ? `\nThe question's answer rests on\n${bullets(q.evidence.map((e) => `${e.states}  (${e.evidence.id})`), "")}`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -306,17 +327,27 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
       }
 
       case "why": {
-        const proposition = positionals[0];
-        if (!proposition) return usageError("why needs a proposition");
-        // A claim is identified by its proposition *within a line of enquiry*,
-        // never by wording alone (S-5), and `whySupported()` refuses rather
-        // than guessing when a sentence is asserted in more than one. Without
-        // `--analysis` the CLI had no way to answer that refusal, so a correct
-        // refusal became a dead end at the transport boundary.
-        const subject: ClaimSubject = flags.analysis
-          ? { analysis: { kind: "analysis", id: flags.analysis }, proposition }
-          : proposition;
-        const why = await read.whySupported(subject);
+        const subject = positionals[0];
+        if (!subject) return usageError("why needs a claim id or a proposition");
+        // A person types a sentence; the domain takes a handle. Resolving one
+        // to the other happens HERE, at the human boundary, and refuses rather
+        // than picking when a sentence is asserted in more than one line of
+        // enquiry (S-5). No read verb guesses any more.
+        let claim: ClaimRef;
+        if (subject.startsWith("CLM_")) {
+          claim = { kind: "claim", id: subject };
+        } else {
+          const found = await read.claimsAsserting(subject);
+          if (found.length === 0) return usageError(`nothing on the record claims "${subject}"`);
+          if (found.length > 1)
+            return usageError(
+              `"${subject}" is claimed ${found.length} times; name one: ${found
+                .map((c) => c.claim.id)
+                .join(", ")}`,
+            );
+          claim = found[0]!.claim;
+        }
+        const why = await read.whySupported(claim);
         return show(json, why, () => renderWhy(why)), 0;
       }
 

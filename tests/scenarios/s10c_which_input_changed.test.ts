@@ -47,7 +47,7 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
   const original = await s.recordObservations({
     enquiry, name: NAME, finding: "the original series", contentHash: "sha256:original",
   });
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry, method: "effect-test", from: [original],
     concludes: [{ proposition: HOLDS, finding: "effect survives the control" }],
   });
@@ -61,18 +61,18 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
     under: [regenerated],
     concludes: { proposition: HOLDS, finding: "effect survives the control" },
   });
-  return { enquiry, original, regenerated, analysis, verification };
+  return { enquiry, original, regenerated, analysis, analysisClaims, verification };
 }
 
 describe("S-10c: which input changed?", () => {
   /**
-   * The re-run is correctly *not* a reproduction — it read a different artefact,
-   * and the record says so. That much has worked since S-10.
+   * The re-run read a different artefact and the record says so. That much has
+   * worked since S-10; what changed is that the record no longer *concludes*
+   * anything from it — `execution: "not-reproduced"` was a verdict and is gone.
    */
-  test("swapping an input for a same-named one is not a reproduction", async () => {
+  test("swapping an input for a same-named one is reported as two differences", async () => {
     const { verification } = await aReVerificationAgainstTheRegeneratedControl(session);
     const report = await (await afterwards()).reproductionOf(verification);
-    expect(report.execution).toBe("not-reproduced");
     expect(report.differs).toHaveLength(2);
   });
 
@@ -97,14 +97,14 @@ describe("S-10c: which input changed?", () => {
     const report = await (await afterwards()).reproductionOf(verification);
 
     expect(report.differs.map((d) => d.what.name)).toEqual([NAME, NAME]);
-    expect(report.differs.map((d) => d.what.part).sort()).toEqual(
+    expect(report.differs.map((d) => d.what.part.id).sort()).toEqual(
       [original.id, regenerated.id].sort(),
     );
 
     // And each is paired with the standing that belongs to it: the regenerated
     // series is what the re-run introduced, the original is what it stopped
     // using.
-    const byPart = new Map(report.differs.map((d) => [d.what.part, d.standing]));
+    const byPart = new Map(report.differs.map((d) => [d.what.part.id, d.standing]));
     expect(byPart.get(regenerated.id)).toBe("changed");
     expect(byPart.get(original.id)).toBe("not-used-by-the-re-run");
   });
@@ -128,7 +128,7 @@ describe("S-10c: which input changed?", () => {
     // Reference: answered, separately, for each.
     for (const part of [original, regenerated]) {
       const rests = await reader.whatDependsOn(part);
-      expect(rests.claims).toEqual([HOLDS]);
+      expect(rests.claims.map((c) => c.asserts)).toEqual([HOLDS]);
     }
   });
 });

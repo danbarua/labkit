@@ -27,6 +27,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, claimOf, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 
@@ -92,11 +93,21 @@ async function theCachedConstruction(s: ResearchSession) {
   const control = await s.recordObservations({
     enquiry, name: CONTROL, finding: "randomised control series",
   });
-  const analysis = await s.recordAnalysis({
+  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry, method: "stage2-construction", from: [control],
     concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
   });
-  return { enquiry, control, analysis };
+  return { enquiry, control, analysis, analysisClaims };
+}
+
+/** Replaces every natural-id counter with `N`, so two worlds compare on structure. */
+function normaliseIds<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value).replace(
+      /"(Q|LOE|EU|EV|CLM|DEC|CRIT|CEVAL|GATE|REV|ART|COMP|TASK)_\d+"/g,
+      '"$1_N"',
+    ),
+  ) as T;
 }
 
 describe("S-9b: was this a rebuild, or new work?", () => {
@@ -116,7 +127,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         enquiry, name: "second control", finding: "control series, second pass",
         contentHash: recorded,
       });
-      const rebuilt = await s.recordAnalysis({
+      const { analysis: rebuilt, claims: rebuiltClaims } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, second control", from: [second],
         concludes: [{ proposition: "the second control agrees", finding: "agreement within 1e-6" }],
       });
@@ -156,15 +167,20 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       const second = await s.recordObservations({
         enquiry, name: CONTROL, finding, contentHash: "sha256:second",
       });
-      const rebuilt = await s.recordAnalysis({
+      const { analysis: rebuilt, claims: rebuiltClaims } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, second control", from: [second],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
       const reader = await afterwards();
       return {
-        why: await reader.whySupported(MATCHES),
+        why: await reader.whySupported(claimOf(rebuiltClaims, MATCHES)),
         known: (await reader.whatIsKnown()).provisional.map((q) => q.asks).sort(),
-        depends: await reader.whatDependsOn(second),
+        // Identity normalised, the way `rebuilt` below already is. Natural ids
+        // are global sequences, so two paired worlds legitimately draw
+        // different ones -- comparing them raw would report a difference that
+        // is only the counter moving. What the comparison is for is whether
+        // anything *else* differs.
+        depends: normaliseIds(await reader.whatDependsOn(second)),
         rebuilt: rebuilt.id.replace(/\d+/, "N"),
       };
     };
@@ -173,6 +189,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       build("randomised control series, regenerated from an inferred algorithm"),
       build("randomised control series for stage 3, generated afresh"),
     );
+
 
     // Everything a reader can ask is identical except the sentence the
     // researcher happened to type. Attribution of a rebuild is currently
@@ -202,11 +219,11 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         enquiry, name: CONTROL, contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
-      await s.recordAnalysis({
+      const { claims: secondClaims } = await s.recordAnalysis({
         enquiry, method: "stage2-construction, rebuilt", from: [regenerated],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
-      return (await afterwards()).whySupported(MATCHES);
+      return (await afterwards()).whySupported(claimOf(secondClaims, MATCHES));
     });
     // Recorded, not asserted-as-correct. Whether two entries here is a wrong
     // answer or an accurate report of what the researcher recorded is the
@@ -233,15 +250,15 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         enquiry, name: CONTROL, contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
-      await s.reverify({
+      const verified = await s.reverify({
         historical: analysis, enquiry, method: "stage2-construction, rebuilt",
         under: [regenerated],
         concludes: { proposition: MATCHES, finding: "agreement within 1e-6" },
       });
-      return (await afterwards()).whySupported(MATCHES);
+      return (await afterwards()).whySupported(claimOf(verified.claims, MATCHES));
     });
     expect(why.support.length).toBe(1);
-    expect(why.reverifiedBy).toEqual(["stage2-construction, rebuilt"]);
+    expect(why.reverifiedBy.map((r) => r.method)).toEqual(["stage2-construction, rebuilt"]);
   });
 
   /**
@@ -375,16 +392,19 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // of consumer probe 3. Give any read on this path a field naming what
       // was rebuilt and this line fails.
       //
-      // It has already fired once, correctly, on a change that had nothing to
-      // do with row F: S-11c added `routesWalked` and `complete` to this
-      // report. The detector cannot tell which field arrived, only that the
-      // shape moved -- which is what it is for, and why the list is updated
-      // rather than loosened.
+      // It has now fired twice, correctly, on changes that had nothing to do
+      // with row F: S-11c added `routesWalked` and `complete`, and PJ-030
+      // added `subject` -- the handle of the artefact ASKED ABOUT, which is
+      // not the artefact it was an attempt to rebuild. The detector cannot
+      // tell which field arrived, only that the shape moved, which is what it
+      // is for and why the list is updated rather than loosened.
       const exact = await reader.whatDependsOn(regenerated);
       expect(Object.keys(exact).sort()).toEqual([
-        "claims", "complete", "enquiries", "routesWalked",
+        "claims", "complete", "enquiries", "routesWalked", "subject",
       ]);
-      expect(exact.claims).toEqual([MATCHES]);
+      // And the echo is of the record asked about, not merely of its wording.
+      expect(exact.subject).toEqual(regenerated);
+      expect(exact.claims.map((c) => c.asserts)).toEqual([MATCHES]);
 
       // Same detector on the other read a consumer would reach for. The
       // reproducibility report is offered per part and says which parts match;
@@ -392,9 +412,12 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       const report = await reader.reproducibilityOf(analysis, [
         { part: regenerated, hash: "sha256:second" },
       ]);
+      // `analysis` here is likewise the construction handed in, not an answer
+      // to what any part was rebuilding.
       expect(Object.keys(report).sort()).toEqual([
-        "differing", "exact", "notRebuilt", "reproducible", "unverifiable",
+        "analysis", "differing", "exact", "notRebuilt", "reproducible", "unverifiable",
       ]);
+      expect(report.analysis).toEqual(analysis);
     });
   });
 });

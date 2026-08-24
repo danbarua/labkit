@@ -16,6 +16,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimNamed, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -92,8 +93,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
-    expect(status.unmet.sort()).toEqual([MEDIAN, SEED].sort());
-    expect(status.gating).toEqual(["fit the tertiary model"]);
+    expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
+    expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
   });
 
   /**
@@ -128,7 +129,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
-    expect(status.unmet.sort()).toEqual([MEDIAN, SEED].sort());
+    expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
   });
 
   /**
@@ -147,8 +148,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("blocked");
-    expect(status.unmet).toContain(MEDIAN);
-    expect(status.gating).toEqual(["fit the tertiary model"]);
+    expect(status.unmet.map((u) => u.requires)).toContain(MEDIAN);
+    expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
   });
 
   /**
@@ -171,7 +172,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
     });
-    const analysis = await session.recordAnalysis({
+    const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
       enquiry,
       method: "holm-pairwise",
       from: [observations],
@@ -195,12 +196,14 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     // It was left asserting the wrong answer on purpose, as ledger row V, to
     // be updated by whoever fixed it rather than drifting silently. Fixed by
     // `QUALIFIES`; see tests/scenarios/s3b_criteria_qualify_only.test.ts.
-    const why = await session.whySupported("T differs from rewired");
-    expect(await (await afterwards()).whySupported("T differs from rewired")).toEqual(why);
+    const why = await session.whySupported(await claimNamed(session, "T differs from rewired"));
+    expect(await whyOf(await afterwards(), "T differs from rewired")).toEqual(why);
     expect(why.supported).toBe(false);
-    expect([...why.unmet].sort()).toEqual([MEDIAN, SEED].sort());
+    expect([...why.unmet.map((u) => u.requires)].sort()).toEqual([MEDIAN, SEED].sort());
     // Disqualified, not withdrawn: the numbers are exactly as they were.
-    expect(why.support).toEqual([{ finding: "p = 0.002, Holm-corrected", via: "holm-pairwise" }]);
+    expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
+      { finding: "p = 0.002, Holm-corrected", method: "holm-pairwise" },
+    ]);
     expect(analysis.kind).toBe("analysis");
   });
 
@@ -225,7 +228,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.checks).toHaveLength(2);
-    expect(new Set(status.checks.map((c) => c.criterion)).size).toBe(2);
+    expect(new Set(status.checks.map((c) => c.criterion.id)).size).toBe(2);
     // One checked, one not -- which the collapsed version could not express.
     expect(status.checks.filter((c) => c.state === "passed")).toHaveLength(1);
     expect(status.checks.filter((c) => c.state === "never-run")).toHaveLength(1);
@@ -261,7 +264,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("blocked");
-    expect(status.unmet).toEqual([MEDIAN]);
+    expect(status.unmet.map((u) => u.requires)).toEqual([MEDIAN]);
     expect(status.everFailed).toBe(true);
   });
 });

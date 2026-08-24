@@ -83,14 +83,19 @@ test("flags may precede the positional argument", () => {
 
 test("an enquiry accepted as unresolved does not render as merely open", () => {
   const status: EnquiryStatus = {
-    enquiry: "LOE_1",
-    question: "does the pruning schedule move convergence?",
-    open: true,
-    closure: "accepted-as-unresolved",
-    answer: null,
-    acceptedBecause: "the confirmatory set is spent",
-    reopensIf: "a genuinely new design, or a data source other than the spent set",
-    evidence: [],
+    enquiry: { kind: "enquiry" as const, id: "LOE_1" },
+    pursuing: "response-curvature sweep",
+    contributed: [],
+    question: {
+      question: { kind: "question" as const, id: "Q_1" },
+      asks: "does the pruning schedule move convergence?",
+      open: true,
+      closure: "accepted-as-unresolved",
+      answer: null,
+      acceptedBecause: "the confirmatory set is spent",
+      reopensIf: "a genuinely new design, or a data source other than the spent set",
+      evidence: [],
+    },
   };
   const out = renderEnquiry(status);
   expect(out).toContain("accepted as unresolved");
@@ -99,19 +104,24 @@ test("an enquiry accepted as unresolved does not render as merely open", () => {
 });
 
 test("an answered enquiry says whether its closure rests on promoted work", () => {
-  const base: EnquiryStatus = {
-    enquiry: "LOE_2", question: "does depth move convergence?",
-    open: false, closure: "answered", answer: "yes", evidence: ["a result"],
+  const q = {
+    question: { kind: "question" as const, id: "Q_2" }, asks: "does depth move convergence?",
+    open: false, closure: "answered" as const, answer: "yes" as const,
+    evidence: [{ evidence: { kind: "evidence" as const, id: "EV_1" }, states: "a result" }],
   };
-  expect(renderEnquiry({ ...base, restsOn: "exploratory" })).toContain("exploratory");
-  expect(renderEnquiry({ ...base, restsOn: "confirmatory" })).toContain("confirmatory");
+  const base: EnquiryStatus = {
+    enquiry: { kind: "enquiry" as const, id: "LOE_2" }, pursuing: "depth sweep", contributed: [], question: q,
+  };
+  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "exploratory" } })).toContain("exploratory");
+  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "confirmatory" } })).toContain("confirmatory");
 });
 
 test("withdrawn, challenged and never-examined render apart", () => {
   const base: SupportExplanation = {
+    claim: { kind: "claim" as const, id: "CLM_9" },
     proposition: "the schedule moves convergence",
     supported: false, standing: "exploratory",
-    support: [{ finding: "moves by ~3 steps", via: "COMP_1" }],
+    support: [{ finding: "moves by ~3 steps", evidence: { kind: "evidence" as const, id: "EV_1" }, method: "paired comparison", analysis: { kind: "analysis" as const, id: "COMP_1" } }],
     reverifiedBy: [], standard: [], unmet: [], restingOn: [], superseded: [],
     challenged: false, against: [], withdrawn: false,
   };
@@ -124,7 +134,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
 
   // Evidence bears against it.
   const challenged = renderWhy({
-    ...base, challenged: true, against: [{ finding: "no effect at n=5", via: "COMP_2" }],
+    ...base, challenged: true, against: [{ finding: "no effect at n=5", evidence: { kind: "evidence" as const, id: "EV_2" }, method: "replication", analysis: { kind: "analysis" as const, id: "COMP_2" } }],
   });
   expect(challenged).toContain("challenged by evidence");
   expect(challenged).toContain("no effect at n=5");
@@ -132,7 +142,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
   // Nobody asserts this wording any more -- and the findings underneath are
   // untouched, which is exactly why the old rendering was misleading.
   const withdrawn = renderWhy({
-    ...base, withdrawn: true, replacedBy: "the schedule moves convergence at depth 8",
+    ...base, withdrawn: true, replacedBy: { claim: { kind: "claim" as const, id: "CLM_9" }, asserts: "the schedule moves convergence at depth 8" },
   });
   expect(withdrawn).toContain("withdrawn");
   expect(withdrawn).toContain("the schedule moves convergence at depth 8");
@@ -141,11 +151,11 @@ test("withdrawn, challenged and never-examined render apart", () => {
 
 test("identically worded questions are distinguishable in the survey", () => {
   const survey: KnowledgeSurvey = {
-    established: [{ question: "Q_1", asks: "does it converge?" }],
+    established: [{ question: { kind: "question" as const, id: "Q_1" }, asks: "does it converge?" }],
     provisional: [],
     accepted: [],
-    unresolved: [{ question: "Q_2", asks: "does it converge?" }],
-    untested: [{ question: "Q_3", asks: "does depth matter?" }],
+    unresolved: [{ question: { kind: "question" as const, id: "Q_2" }, asks: "does it converge?" }],
+    untested: [{ question: { kind: "question" as const, id: "Q_3" }, asks: "does depth matter?" }],
   };
   const out = renderKnown(survey);
   expect(out).toContain("does it converge?  [Q_1]");

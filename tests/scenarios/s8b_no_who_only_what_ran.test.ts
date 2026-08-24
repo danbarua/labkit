@@ -29,6 +29,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { claimOf, whyOf } from "../helpers/claims";
 
 let scenario: Scenario;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
@@ -73,7 +74,7 @@ describe("S-8b: there is no who, only what ran", () => {
         enquiry, name: CONFIG, finding: "opus-5, temperature 0, prompt v3",
         contentHash: "sha256:cfg-v3",
       });
-      const first = await s.recordAnalysis({
+      const { analysis: first, claims: firstClaims } = await s.recordAnalysis({
         enquiry, method: "convergence-fit", from: [readings, older],
         concludes: [{ proposition: MOVES, finding: "convergence moves by ~3 steps" }],
       });
@@ -89,7 +90,7 @@ describe("S-8b: there is no who, only what ran", () => {
 
       const reader = await afterwards();
       return {
-        // Offering the older configuration against the older analysis matches.
+        // Offering the older configuration against the older analysis, analysisClaims matches.
         matched: await reader.reproducibilityOf(first, [
           { part: readings, hash: "sha256:sweep" },
           { part: older, hash: "sha256:cfg-v3" },
@@ -111,7 +112,7 @@ describe("S-8b: there is no who, only what ran", () => {
     expect(result.matched.reproducible).toBe(true);
     expect(result.mismatched.differing.map((p) => p.name)).toEqual([CONFIG]);
     expect(result.mismatched.reproducible).toBe(false);
-    expect(result.rests.claims).toEqual([MOVES]);
+    expect(result.rests.claims.map((c) => c.asserts)).toEqual([MOVES]);
   });
 
   /**
@@ -132,20 +133,20 @@ describe("S-8b: there is no who, only what ran", () => {
       const readings = await s.recordObservations({
         enquiry, name: "cost projection", finding: "projected 31 GPU-hours at target scale",
       });
-      const analysis = await s.recordAnalysis({
+      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry, method: "cost-projection", from: [readings],
         concludes: [{ proposition: "the scale-up fits the budget", finding: "31 GPU-hours projected" }],
         heldTo: [budget],
       });
       await s.evaluateCriterion({
         criterion: budget, value: "31 GPU-hours", outcome: "pass",
-        citing: { analysis, proposition: "the scale-up fits the budget" },
+        citing: claimOf(analysisClaims, "the scale-up fits the budget"),
       });
       await s.closeEnquiry({
         enquiry,
-        answeredBy: { analysis, proposition: "the scale-up fits the budget" },
+        answeredBy: claimOf(analysisClaims, "the scale-up fits the budget"),
       });
-      return (await afterwards()).whySupported("the scale-up fits the budget");
+      return whyOf(await afterwards(), "the scale-up fits the budget");
     });
 
     // The approval is fully accounted for without anyone signing it: what was

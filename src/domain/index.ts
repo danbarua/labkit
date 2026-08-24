@@ -30,6 +30,13 @@ export type {
   ConflictVerdict,
   TaskContract,
   Conclusion,
+  ConcludedClaim,
+  RecordedAnalysis,
+  ClaimRef,
+  EvidenceRef,
+  EvaluationRef,
+  DecisionRef,
+  Condition,
   ConclusionRef,
   ChangedConclusion,
   ReplacementReport,
@@ -45,3 +52,23 @@ export type {
   GateRef,
   WorkRef,
 } from "./report";
+// The write half's command shapes. `report.ts` above is what a read returns;
+// these are what an act takes. Exported so an adapter can hold one -- which is
+// what an MCP write tool will need and what inline anonymous shapes prevented.
+export type {
+  PursueCommand,
+  SharpenCommand,
+  RecordObservationsCommand,
+  RecordAnalysisCommand,
+  RecordReviewCommand,
+  CloseEnquiryCommand,
+  PlanWorkCommand,
+  DeclareGateCommand,
+  EvaluateCriterionCommand,
+  ReverifyCommand,
+  AcceptAsUnresolvedCommand,
+  AmendDesignCommand,
+  ReplaceAnalysisCommand,
+  ReinterpretCommand,
+  PromoteCommand,
+} from "./commands";
