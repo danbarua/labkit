@@ -189,6 +189,7 @@ bun run check:doc-comments     # finds doc comments detached from what they docu
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
+bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
@@ -248,7 +249,8 @@ about the pipe, not about that incident.
 **Nothing runs these for you** — there is no CI workflow and no git hook. Before
 committing, run `bun test`, `bun run typecheck` and
 `npx depcruise src tests --output-type err`; add `check:migrations` if you
-touched `drizzle/`, and `check:tests-assert` if you touched tests. Do not pipe
+touched `drizzle/`, `check:tests-assert` if you touched tests, and
+`check:prop-classes` if you touched a `*Props` interface. Do not pipe
 `bun test` — that trap is above, and is still live.
 
 ## Architecture: two persistence halves, deliberately not one
@@ -273,14 +275,23 @@ dependency direction is enforced by `npx depcruise src tests --output-type err`
 | `client.ts` | `LabKitDB` (the connection seam) + `bootstrapSession` |
 | `agtype.ts` | agtype parsing, identifier validation, Cypher clause/quoting helpers |
 | `cypher.ts` | `CypherRunner` + column decoders — typed Cypher execution |
-| `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA` |
+| `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA`, `INDEXED_PROPS` |
 | `graph.ts` | `TenantGraph` — the domain-typed verbs |
 | `provisioning.ts` | per-tenant graph schema reconciliation |
 | `tenant.ts` | resolving a slug to a `TenantContext` |
 
 `domain.ts` imports nothing from `src/db/`; it's pure types and data, read by
 both `graph.ts` (to type and validate writes) and `provisioning.ts` (to decide
-what to create). `NODE_TYPES` is one entry per node label carrying its
+what to create). Its **string taxonomy** — `IndexedString`,
+`Timestamp`, `IdentityString`, `ReadOnlyString<T>`, `Prose` — says what LabKit
+*does* with each stored string, so a reader learns it from the declaration
+instead of auditing every Cypher query. All five are plain aliases and constrain
+nothing; the one with a machine consequence is `INDEXED_PROPS`, which
+`provisionTenantGraph()` loops to build a non-unique functional index per
+matched property, and which `check:prop-classes` holds to the annotations. Two
+copies of one fact, kept because they fail silently in opposite directions — a
+missing entry is a sequential scan nobody sees, a spurious one an index nobody
+reads. Generating the table from the types is the honest end state. `NODE_TYPES` is one entry per node label carrying its
 natural-id `prefix` and its optional `validate` — the four parallel per-label
 tables it replaced are not coming back. It also carried `viewColumns` until the
 per-tenant CQRS views were removed; see "No relational read side" below.
@@ -525,11 +536,18 @@ about the domain, so "the label is walked" is the wrong unit to check.
 
 Named rather than culled, which is the policy working: an unwalked pair is a
 computable map of where the model has an untested claim, and an *unnamed* one is
-a map nobody has. Contrast it with `EvidenceUnitRole` — nine values, one writer,
-no readers — which was **not** given the same protection and had a tenth value
-declined, because that policy covers labels and edges as claims about the domain
-and a property value is not one. The two are the same shape at different levels
-and the policy's answer differs; that contrast is the informative part.
+a map nobody has. Contrast it with `EvidenceUnit.role` — one writer, no readers
+— which was **not** given the same protection and had a tenth value declined,
+because that policy covers labels and edges as claims about the domain and a
+property value is not one. The two are the same shape at different levels and
+the policy's answer differs; that contrast is the informative part.
+
+**The type now carries that fact, so this paragraph does not have to be found
+first.** `role: ReadOnlyString<EvidenceUnitRole>` says in the declaration that
+nothing reads it — see the string taxonomy in `src/db/domain.ts`, whose whole
+purpose is that *what LabKit does with a stored string* should be readable
+where the property is declared rather than reconstructed by auditing every
+Cypher query.
 
 Keep the policy anyway, for what it caught on the way out. `DEFERS` had a
 reader that could report `closure: "deferred"` and no writer, so the branch was
