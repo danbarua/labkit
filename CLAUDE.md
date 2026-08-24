@@ -64,7 +64,9 @@ They are dated records: read them for reasoning, never for current state.
 - Before touching `src/domain/`: 008 (the interaction corpus the service layer
   is built against — its §3 index is the ledger), 009, 011, then 014-023 for
   how individual verbs were earned. 010, 013, 017, 020 and 024 are external
-  reviews; 012 is superseded by 014/015.
+  reviews; 012 is superseded by 014/015. 030 is on reference-vs-subject
+  identity and 031 on the execution-context seam — read 031 before changing how
+  a surface is constructed, not only before touching events.
 - **025-029 are about the method, not the model**, and are the ones worth
   reading if you are about to write a document. Their rules, which is all you
   need from them:
@@ -359,10 +361,29 @@ A verb that composes others records **one** event, not one per step
 stream is a record of research actions; a researcher who opened an enquiry did
 one thing, and a log that decomposes it describes the implementation instead.
 
-`src/domain/events.ts` is the temporal seam: every state-changing verb flows
-through one choke point that stamps it from an injected `Clock`. The durable
-sink is deliberately still an interface (PJ-009 §3). The rule that keeps it
-honest:
+`src/domain/events.ts` is the **execution-context seam**: every state-changing
+verb flows through one choke point that stamps it from an injected
+`CommandContext` — a `Clock` and an `AttributionContext`. Time was the first
+aspect of a command's execution context to be injected and never the only one
+there is; PJ-009 §3's argument for building the seam early (the API discipline
+is what is hard to retrofit, not the field) applies unchanged to *who ran this*,
+and PJ-031 is where it was applied.
+
+Two consequences worth knowing before touching this:
+
+- **A surface holds no query state, so it is cheap to construct per command.**
+  `src/mcp/server.ts` builds a `WriteSurface` per tool call over one shared
+  graph and one shared sink, which is how attribution and `git_hash` come out
+  per-command without any verb taking a context parameter. The sink is
+  constructed by `main()` and passed in — **not** defaulted inside a surface. A
+  per-call surface defaulting its own log fragments the stream silently, and
+  `tests/attribution.test.ts` is the guard.
+- **Attribution is written and nothing reads it.** Deliberate, argued in PJ-031
+  §5 rather than overlooked: unlike a view, an unattributed command cannot be
+  reconstructed later. It is a second and nearer trigger for the durable sink,
+  which is still an interface (PJ-009 §3).
+
+The rule that keeps the sink honest:
 
 > Events explain *how state changed*. The graph explains *what the current
 > research state is*.

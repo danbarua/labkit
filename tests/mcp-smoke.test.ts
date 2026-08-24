@@ -23,7 +23,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ReadSurface, WriteSurface } from "../src/domain";
+import { ReadSurface, WriteSurface, inMemoryEventLog, type EventSink } from "../src/domain";
+import { commandContext, mockGitContext, mockSessionContext } from "../src/attribution";
 import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
 import { TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
@@ -36,18 +37,39 @@ afterAll(async () => { await scenario.close(); });
 /** Every tool this file has actually called, accumulated across the sessions below. */
 const called = new Set<string>();
 
-async function connectServer(graph: TenantGraph, transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0]) {
-  const writes = new WriteSurface(graph);
-  return buildServer(new ReadSurface(graph, { events: writes.events }), writes).connect(transport);
+/**
+ * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and
+ * a **factory** for the write half so each tool call gets its own surface. The
+ * sink must be constructed at this level rather than taken from a surface — a
+ * per-call surface defaulting to its own log would fragment the stream and
+ * leave the read half holding an empty one.
+ */
+async function connectServer(
+  graph: TenantGraph,
+  transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0],
+): Promise<EventSink> {
+  const events = inMemoryEventLog();
+  await buildServer(
+    new ReadSurface(graph, { events }),
+    () => new WriteSurface(graph, { ...commandContext(mockGitContext, mockSessionContext), events }),
+  ).connect(transport);
+  return events;
 }
 
-async function client(): Promise<Client> {
+/**
+ * A client, and the sink its server writes through.
+ *
+ * The sink is returned because attribution is only observable there — it rides
+ * on the event, not on any tool's reply — so the one test that checks it
+ * survives the full MCP path needs a handle on the log the server is filling.
+ */
+async function client(): Promise<{ client: Client; events: EventSink }> {
   const graph = await scenario.begin();
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  await connectServer(graph, serverSide);
+  const events = await connectServer(graph, serverSide);
   const c = new Client({ name: "smoke", version: "0" });
   await c.connect(clientSide);
-  return c;
+  return { client: c, events };
 }
 
 type Json = Record<string, unknown>;
@@ -66,7 +88,7 @@ const claimIn = (r: Json, asserts: string) =>
 
 describe("every tool answers when an agent actually calls it", () => {
   test("ask, sharpen, plan, gate, measure, conclude", async () => {
-    const c = await client();
+    const { client: c, events } = await client();
     try {
       const broad = await call(c, "pose", { question: "is the solver faster?" });
       const sharp = await call(c, "sharpen", {
@@ -147,6 +169,18 @@ describe("every tool answers when an agent actually calls it", () => {
       expect((amendment.confirmatoryAffected as unknown[]).length).toBeGreaterThan(0);
       const history = await call(c, "design_history", { gate: id(gate) });
       expect((history.amendments as unknown[])).toHaveLength(1);
+
+      // Attribution over the full MCP path, not just a direct surface call.
+      // The server builds a fresh `WriteSurface` per tool call, so this also
+      // checks the sink survived that: every write in this session landed in
+      // one log, each stamped by the mock providers. Asserted against
+      // `commandContext` rather than literals -- a test restating the mock's
+      // constants would agree with itself and notice nothing.
+      const expected = commandContext(mockGitContext, mockSessionContext).attribution;
+      const written = events.all();
+      expect(written.length).toBeGreaterThan(1);
+      expect(written.map((e) => e.attribution)).toEqual(written.map(() => expected));
+
       await c.close();
     } finally {
       await scenario.end();
@@ -154,7 +188,7 @@ describe("every tool answers when an agent actually calls it", () => {
   });
 
   test("review, replace, re-verify, reinterpret, close", async () => {
-    const c = await client();
+    const { client: c } = await client();
     try {
       const enquiry = await call(c, "open_enquiry", { question: "does the coating slow corrosion?" });
       const observations = await call(c, "record_observations", {
@@ -204,7 +238,7 @@ describe("every tool answers when an agent actually calls it", () => {
   });
 
   test("two enquiries asserting one sentence, and one left deliberately open", async () => {
-    const c = await client();
+    const { client: c } = await client();
     try {
       const sparse = await call(c, "open_enquiry", { question: "does it hold on sparse instances?" });
       const dense = await call(c, "open_enquiry", { question: "does it hold on dense instances?" });
