@@ -773,16 +773,28 @@ with zero unfinished.
 **What pushes a test over is its own query count, not provisioning.** This
 paragraph said the cost was `provisionTenantGraph()` reconciling on every
 `begin()` and `current()`. That was written sixteen minutes before `6eeeb92`
-cut reconciliation from ~80 round trips to 6, and nobody updated the sentence —
+cut reconciliation from ~80 round trips to three, and nobody updated it —
 so it misdirected every investigation after it, including two of this repo's
-own. Measured on today's code: a steady-state provisioning call is **6 queries,
-1-4ms**; the cold one is 83 queries and happens **once per file**. Provisioning
-is 8-18% of query time in the files that actually fail.
+own. **Profiled 2026-08-24**, and every figure in this section is of that date:
+a steady-state provisioning call is **6 queries, 1-4ms**; the cold one is 83
+queries and happens **once per file**; provisioning is 8-18% of query time in
+the files that actually fail.
 
-The predictor is **queries per test**. Files cluster from 6 to ~280, individual
-tests reach ~380, and at the loaded per-round-trip cost this repo has measured
-(~16ms) that band straddles 5000ms — which is why it is 7-15 different tests
-each run rather than one broken test. Two costs the old sentence never named:
+The predictor is **queries per test**. Files cluster from 6 to ~280 and
+individual tests reach ~380, which is the band that straddles 5000ms once
+per-round-trip latency degrades under load — and that threshold effect, not one
+broken test, is why 7-15 *different* tests fail each run.
+
+**The per-round-trip figure everyone quotes is `311 queries / 4.955s` ≈ 16ms,
+measured 2026-08-21 and not since.** It is not today's rate and should not be
+used as one. That run's own note says its dominant cost was
+`provisionTenantGraph()` re-checking ~38 labels at one round trip each — the
+exact work `6eeeb92` deleted hours later — so 16ms is an average over a query
+mix that no longer exists, biased in a direction nobody has measured. Every
+extrapolation in `docs/TASKS.md` that multiplies a query count by it inherits
+that. Re-measure before relying on it.
+
+Two costs the old sentence never named:
 `reset()` in `tests/helpers/db.ts` is ~35-40ms a call and **29%** of suite query
 time against provisioning's 18%, and it lands on the *test's own clock* in the
 handful of files that call `begin()`/`end()` inside a test body rather than from

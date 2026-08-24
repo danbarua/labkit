@@ -11,8 +11,18 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 - [ ] **The suite crosses bun's fixed 5000ms ceiling and those tests fail.**
   Dan deprioritised this; it is not obstructing work. The cascade that turned
-  one crossing into a burst is fixed (`2de1060`, `5439085`); provisioning got
-  69% cheaper again in `6eeeb92`. What remains is the crossings themselves.
+  one crossing into a burst is fixed (`2de1060`, `5439085`), and `6eeeb92` cut
+  provisioning bookkeeping from **1,086 queries to 332 (−69%)** over one
+  scenario file, taking that file from 2,448 queries to 1,716 (−30%) — its own
+  commit message carries the measurement. What remains is the crossings
+  themselves.
+
+  (That figure was briefly withdrawn as underivable and is restored. The
+  withdrawal was wrong: the workings were in `6eeeb92`'s commit message the
+  whole time, and nobody looked there. Its apparent conflict with the six
+  queries measured on 2026-08-24 was not one either — `6eeeb92` reports three
+  round trips of *reconciliation*, and the six are a whole provisioning call,
+  those three plus `BEGIN`, the advisory lock and `COMMIT`.)
 
   **Do not re-investigate from scratch.** Refuted with evidence: advisory-lock
   contention; the pglite-socket desync bug as primary mechanism; fd/socket
@@ -25,9 +35,17 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   `6eeeb92` by sixteen minutes and was never updated. On today's code a
   steady-state provisioning call is 6 queries and 1-4ms, the cold one is 83 and
   runs once per file, and provisioning is 8-18% of query time in the files that
-  fail. **The predictor is queries per test** — files span 6 to ~280, individual
-  tests reach ~380, and at ~16ms per round trip under load that band straddles
-  5000ms, which is why it is 7-15 *different* tests each run.
+  fail. **The predictor is queries per test** — files span 6 to ~280 and
+  individual tests reach ~380, the band that straddles 5000ms once
+  per-round-trip latency degrades under load.
+
+  **Every `Nms` extrapolation below rests on one number, and it is stale.**
+  `311 queries / 4.955s` ≈ 16ms, measured 2026-08-21 and not since. That run's
+  own note says its dominant cost was provisioning re-checking ~38 labels at a
+  round trip each — the work `6eeeb92` then deleted — so it is an average over a
+  query mix that no longer exists, biased unknowably. The extrapolations are
+  kept because a wrong-but-stated basis can be re-derived and a deleted one
+  cannot, but **re-measure before acting on any of them.**
 
   Two costs nothing had named: `reset()` (`tests/helpers/db.ts`) is ~35-40ms a
   call and 29% of suite query time against provisioning's 18%; and bun's hook
