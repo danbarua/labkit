@@ -20,11 +20,40 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   `LABKIT_TRACE=all` — `src/db/trace.ts` exists so the next investigation does
   not rebuild instrumentation.
 
-  **Named, not built:** drive `begin()`/`end()` from `beforeEach`/`afterEach`;
-  short-circuit provisioning for `current()`; raise the ceiling (hides it).
+  **Profiled 2026-08-24, and the mechanism everyone was working from was
+  wrong.** CLAUDE.md said provisioning was the cost; that sentence predated
+  `6eeeb92` by sixteen minutes and was never updated. On today's code a
+  steady-state provisioning call is 6 queries and 1-4ms, the cold one is 83 and
+  runs once per file, and provisioning is 8-18% of query time in the files that
+  fail. **The predictor is queries per test** — files span 6 to ~280, individual
+  tests reach ~380, and at ~16ms per round trip under load that band straddles
+  5000ms, which is why it is 7-15 *different* tests each run.
 
-  **Measure paired and interleaved, one variable.** An earlier fix passed round
-  one on both arms and failed at the lowest load of four.
+  Two costs nothing had named: `reset()` (`tests/helpers/db.ts`) is ~35-40ms a
+  call and 29% of suite query time against provisioning's 18%; and bun's hook
+  and body clocks are **separate** — a slow `beforeEach` reports `a beforeEach
+  hook timed out`, while every failure recorded here says `timed out after
+  5000ms`, the body wording. So in the ~23 files that set up from `beforeEach`,
+  setup cost cannot be the mechanism; only the ~5 that call `begin()`/`end()`
+  inside a test body pay it, and `reset()`, on the test's own clock.
+
+  **Two candidates exist as branches, both built 2026-08-24, neither measured
+  against the failure rate.** Honest pricing from the profile, not from a run:
+
+  - `flake/current-no-reprovision` — `current()` reuses the `TenantContext`
+    `begin()` resolved. Removes 8 round trips per call, ~100-130ms under load.
+    Against a 6s test that is ~4%. One file, `src/db` untouched.
+  - `flake/setup-off-budget` — moves `begin()`/`end()` into hooks for the files
+    that call them in-body. Better motivated by the profile than the above,
+    since it also moves `reset()` off the test clock. Its `tests/mcp.test.ts`
+    work was written against a pre-merge lineage and needs redoing.
+
+  **The lever the profile actually points at is query count per test**, which
+  neither candidate touches.
+
+  **Measure paired and interleaved, one variable, under induced load** — a
+  clean machine passes on every arm, so a green run proves nothing. An earlier
+  fix passed round one on both arms and failed at the lowest load of four.
 
 ## Deliberately not being done
 
