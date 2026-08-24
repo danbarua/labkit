@@ -268,8 +268,8 @@ describe("S-10: rerunning is not reproducing", () => {
     // differs, and the report says so without calling that a reproduction --
     // whether it is one depends on what the method does.
     expect(report.differs).toEqual([]);
-    expect(report.verificationRead.map((i) => i.part.id)).toEqual(
-      report.ofRead.map((i) => i.part.id),
+    expect(report.verificationRead.map((i) => i.part)).toEqual(
+      report.ofRead.map((i) => i.part),
     );
     expect(report.ofRead).toHaveLength(1);
   });

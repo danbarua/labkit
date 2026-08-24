@@ -97,8 +97,8 @@ describe("S-10d — the order a run read its inputs in", () => {
 
     expect(report.differs).toEqual([]);
     expect(report.verificationRead.map((i) => i.name)).toEqual(["treated series", "control series"]);
-    expect(report.verificationRead.map((i) => i.part.id)).toEqual(
-      report.ofRead.map((i) => i.part.id),
+    expect(report.verificationRead.map((i) => i.part)).toEqual(
+      report.ofRead.map((i) => i.part),
     );
   });
 
@@ -120,11 +120,11 @@ describe("S-10d — the order a run read its inputs in", () => {
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const report = await later.reproductionOf(rerun.verification);
 
-    expect(report.verificationRead.map((i) => i.part.id)).not.toEqual(
-      report.ofRead.map((i) => i.part.id),
+    expect(report.verificationRead.map((i) => i.part)).not.toEqual(
+      report.ofRead.map((i) => i.part),
     );
-    expect([...report.verificationRead].map((i) => i.part.id).sort()).toEqual(
-      [...report.ofRead].map((i) => i.part.id).sort(),
+    expect([...report.verificationRead].map((i) => i.part).sort()).toEqual(
+      [...report.ofRead].map((i) => i.part).sort(),
     );
     void treated; void control;
   });

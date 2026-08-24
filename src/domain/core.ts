@@ -114,7 +114,7 @@ export class SessionCore {
           c: vertexProps<{ name: string }>(),
           e: vertexProps<{ natural_id: string }>(),
         },
-        { id: claim.id },
+        { id: claim },
       );
       const found = rows[0];
       if (found) return { evidence: ref("evidence", found.e.natural_id), asserts: found.c.name };
@@ -127,7 +127,7 @@ export class SessionCore {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ name: string }>() },
-      { id: claim.id },
+      { id: claim },
     );
     return rows[0]?.c.name;
   }
@@ -147,7 +147,7 @@ export class SessionCore {
         sc: optional(vertexProps<{ name: string }>()),
         cc: optional(vertexProps<{ name: string }>()),
       },
-      { analysis: analysis.id, proposition },
+      { analysis: analysis, proposition },
     );
     const found = rows.find((r) => r.sc !== null || r.cc !== null);
     return found ? ref("evidence", found.e.natural_id) : undefined;
@@ -175,7 +175,7 @@ export class SessionCore {
    * error at runtime rather than a type error now.
    */
   protected scopeParams(scope: { enquiry?: EnquiryRef }): { enquiry?: string } {
-    return scope.enquiry ? { enquiry: scope.enquiry.id } : {};
+    return scope.enquiry ? { enquiry: scope.enquiry } : {};
   }
 
   /** Work these gates protect, and which therefore has to be run again when their condition changes. */
@@ -189,12 +189,12 @@ export class SessionCore {
       const rows = await this.graph.query(
         `MATCH (:Gate {natural_id: $id})-[:GATES]->(t:Task) RETURN t`,
         { t: vertexProps<{ objective: string; natural_id: string }>() },
-        { id: gate.id },
+        { id: gate },
       );
       for (const row of rows)
         found.set(row.t.natural_id, { work: ref("work", row.t.natural_id), objective: row.t.objective });
     }
-    return [...found.values()].sort((a, b) => a.work.id.localeCompare(b.work.id));
+    return [...found.values()].sort((a, b) => a.work.localeCompare(b.work));
   }
 
   /**
@@ -219,14 +219,14 @@ export class SessionCore {
            MATCH (u)-[:PRODUCES]->(e:Evidence)-[:${bearing}]->(c:Claim)
            RETURN c`,
           { c: vertexProps<{ name: string; kind?: string; natural_id: string }>() },
-          { id: gate.id },
+          { id: gate },
         );
         for (const row of rows)
           if (row.c.kind === "confirmatory")
             affected.set(row.c.natural_id, { claim: ref("claim", row.c.natural_id), asserts: row.c.name });
       }
     }
-    return [...affected.values()].sort((a, b) => a.claim.id.localeCompare(b.claim.id));
+    return [...affected.values()].sort((a, b) => a.claim.localeCompare(b.claim));
   }
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */
@@ -293,7 +293,7 @@ export class SessionCore {
       for (const row of rows)
         asked.set(row.q.natural_id, { question: ref("question", row.q.natural_id), asks: row.q.name });
     }
-    return [...asked.values()].sort((a, b) => a.question.id.localeCompare(b.question.id));
+    return [...asked.values()].sort((a, b) => a.question.localeCompare(b.question));
   }
 
   protected async scopeOf(
@@ -314,12 +314,12 @@ export class SessionCore {
           c: vertexProps<{ name: string }>(),
           loe: optional(vertexProps<{ natural_id: string }>()),
         },
-        { id: claim.id },
+        { id: claim },
       );
       if (rows[0]) name = rows[0].c.name;
       enquiry ??= rows.find((r) => r.loe)?.loe?.natural_id;
     }
-    if (name === undefined) throw new Error(`no claim ${claim.id}`);
+    if (name === undefined) throw new Error(`no claim ${claim}`);
     return { proposition: name, ...(enquiry ? { enquiry: ref("enquiry", enquiry) } : {}) };
   }
 }

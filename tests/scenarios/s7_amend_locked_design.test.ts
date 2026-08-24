@@ -20,6 +20,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
+import { ref } from "../../src/domain/report";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -386,7 +387,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
     await expect(
       session.amendDesign({
-        criterion: { kind: "criterion", id: "CRIT_404" },
+        criterion: ref("criterion", "CRIT_404"),
         nowRequires: "something else entirely",
         because: "it should not get this far",
         citing: cites,

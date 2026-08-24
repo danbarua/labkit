@@ -114,6 +114,6 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // "not automatic" is relying on. If it did not, `supported: true` would be
     // a wrong answer with no way to find out.
     const affected = await later.whatDependsOn(why.restingOn[0]!.part);
-    expect(affected.claims.map((c) => c.claim.id)).toContain(report.claims[0]!.claim.id);
+    expect(affected.claims.map((c) => c.claim)).toContain(report.claims[0]!.claim);
   });
 });

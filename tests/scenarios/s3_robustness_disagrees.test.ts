@@ -204,7 +204,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
       { finding: "p = 0.002, Holm-corrected", method: "holm-pairwise" },
     ]);
-    expect(analysis.kind).toBe("analysis");
+    expect(analysis).toMatch(/^COMP_/);
   });
 
   /**
@@ -228,7 +228,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.checks).toHaveLength(2);
-    expect(new Set(status.checks.map((c) => c.criterion.id)).size).toBe(2);
+    expect(new Set(status.checks.map((c) => c.criterion)).size).toBe(2);
     // One checked, one not -- which the collapsed version could not express.
     expect(status.checks.filter((c) => c.state === "passed")).toHaveLength(1);
     expect(status.checks.filter((c) => c.state === "never-run")).toHaveLength(1);

@@ -94,7 +94,7 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
     const { a, b } = await twoChains();
     expect(a.middle.asserts).toBe(SHARED);
     expect(b.middle.asserts).toBe(SHARED);
-    expect(a.middle.claim.id).not.toBe(b.middle.claim.id);
+    expect(a.middle.claim).not.toBe(b.middle.claim);
   });
 
   test("each history reads back its own chain, and none of the other's", async () => {
@@ -103,13 +103,13 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
 
     const historyA = await later.interpretationHistory(a.last.claim);
     expect(historyA.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, A3]);
-    expect(historyA.originally.map((c) => c.claim.id)).toEqual([a.first.id]);
+    expect(historyA.originally.map((c) => c.claim)).toEqual([a.first]);
     // The step through the shared wording is A's record, not B's.
-    expect(historyA.revisions[1]!.previously.map((c) => c.claim.id)).toEqual([a.middle.claim.id]);
+    expect(historyA.revisions[1]!.previously.map((c) => c.claim)).toEqual([a.middle.claim]);
 
     const historyB = await later.interpretationHistory(b.last.claim);
     expect(historyB.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, B3]);
-    expect(historyB.originally.map((c) => c.claim.id)).toEqual([b.first.id]);
-    expect(historyB.revisions[1]!.previously.map((c) => c.claim.id)).toEqual([b.middle.claim.id]);
+    expect(historyB.originally.map((c) => c.claim)).toEqual([b.first]);
+    expect(historyB.revisions[1]!.previously.map((c) => c.claim)).toEqual([b.middle.claim]);
   });
 });

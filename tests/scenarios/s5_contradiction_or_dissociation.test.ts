@@ -19,6 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
+import { ref } from "../../src/domain/report";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -299,12 +300,12 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
 
     await expect(
-      session.whySupported({ kind: "claim", id: "CLM_9999" }),
+      session.whySupported(ref("claim", "CLM_9999")),
     ).rejects.toThrow(/no claim CLM_9999/);
 
     await expect(
       session.reinterpret({
-        of: { kind: "claim" as const, id: "CLM_9999" },
+        of: ref("claim", "CLM_9999"),
         as: "narrower still",
         because: "it should not get this far",
       }),
@@ -329,10 +330,10 @@ describe("S-5 — contradiction or dissociation?", () => {
     // a handle. It reports every match rather than choosing.
     const found = await session.claimsAsserting(IMMATERIAL);
     expect(found).toHaveLength(2);
-    expect(found.map((c) => c.claim.id).sort()).toEqual(
+    expect(found.map((c) => c.claim).sort()).toEqual(
       [
-        claimOf(programme.earlierClaims, IMMATERIAL).id,
-        claimOf(programme.laterClaims, IMMATERIAL).id,
+        claimOf(programme.earlierClaims, IMMATERIAL),
+        claimOf(programme.laterClaims, IMMATERIAL),
       ].sort(),
     );
 

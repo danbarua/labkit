@@ -20,6 +20,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { claimNamed } from "../helpers/claims";
+import { ref } from "../../src/domain/report";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -99,10 +100,10 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // this withdrew -- and a single handle here would have picked between two
     // records arbitrarily, which is the whole of PJ-030.
     expect(report.previously.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
-    expect(report.previously.map((c) => c.claim.id).sort()).toEqual(
+    expect(report.previously.map((c) => c.claim).sort()).toEqual(
       [
-        claimOf(programme.firstClaims, PREFERENTIAL).id,
-        claimOf(programme.secondClaims, PREFERENTIAL).id,
+        claimOf(programme.firstClaims, PREFERENTIAL),
+        claimOf(programme.secondClaims, PREFERENTIAL),
       ].sort(),
     );
     expect(report.requiresRecomputation).toBe(false);
@@ -341,7 +342,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
     await expect(
       session.reinterpret({
-        of: { kind: "claim" as const, id: "CLM_9999" },
+        of: ref("claim", "CLM_9999"),
         as: "some narrower version of it",
         because: "it should not get this far",
       }),

@@ -32,9 +32,23 @@ import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schema
 import { DOCS_FILE, DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
+import { ref } from "../src/domain/report";
 import { NOT_EXPOSED, publicVerbsOf, verbsReachedIn } from "./helpers/surface-coverage";
 import { readFileSync } from "node:fs";
 import { claimNamed, claimOf } from "./helpers/claims";
+
+/**
+ * A handle out of a tool's reply.
+ *
+ * A tool whose whole answer is one handle returns it under a field named for
+ * what it is — `{"question": "Q_1"}` — because MCP's `structuredContent` must
+ * be an object and a handle is a bare string now. This takes that sole value.
+ */
+const id = (v: unknown): string =>
+  // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
+  // reaches the server as a handle and is refused there -- loudly, but two
+  // layers from the mistake.
+  typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
 /**
  * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and
@@ -142,9 +156,9 @@ describe("an agent can track work through the tools alone", () => {
   /** The one place a test resolves wording, through the tool that exists for it. */
   const claimIdFor = async (c: Client, proposition: string) => {
     const found = (await call(c, "claims_asserting", { proposition })).claims as Array<{
-      claim: { id: string };
+      claim: string;
     }>;
-    return found[0]!.claim.id;
+    return found[0]!.claim;
   };
 
   const call = async (c: Client, name: string, args: Record<string, unknown>) => {
@@ -162,28 +176,28 @@ describe("an agent can track work through the tools alone", () => {
       const enquiry = await call(c, "open_enquiry", {
         question: "does the pruning schedule move convergence?",
       });
-      expect(String(enquiry.id).startsWith("LOE_")).toBe(true);
+      expect(String(id(enquiry)).startsWith("LOE_")).toBe(true);
 
       const observations = await call(c, "record_observations", {
-        enquiry: enquiry.id,
+        enquiry: id(enquiry),
         name: "sweep readings",
         finding: "twelve runs at five seeds",
         content_hash: "sha256:abc",
       });
 
       const analysis = await call(c, "record_analysis", {
-        enquiry: enquiry.id,
+        enquiry: id(enquiry),
         method: "paired comparison",
-        from: [observations.id],
+        from: [id(observations)],
         concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
       });
 
-      const claimId = (analysis.claims as Array<{ claim: { id: string }; asserts: string }>)
-        .find((x) => x.asserts === PROP)!.claim.id;
-      await call(c, "close_enquiry", { enquiry: enquiry.id, answered_by: claimId });
+      const claimId = (analysis.claims as Array<{ claim: string; asserts: string }>)
+        .find((x) => x.asserts === PROP)!.claim;
+      await call(c, "close_enquiry", { enquiry: id(enquiry), answered_by: claimId });
 
       // Now the reads, which had nothing to say before any of the above.
-      const status = await call(c, "enquiry_status", { enquiry: enquiry.id });
+      const status = await call(c, "enquiry_status", { enquiry: id(enquiry) });
       expect((status.question as {open:boolean}).open).toBe(false);
       expect((status.question as {closure:string}).closure).toBe("answered");
 
@@ -218,15 +232,15 @@ describe("an agent can track work through the tools alone", () => {
     const c = await client();
     try {
       const question = await call(c, "pose", { question: "does depth move convergence?" });
-      const before = await call(c, "pursuits_of", { question: question.id });
+      const before = await call(c, "pursuits_of", { question: id(question) });
       expect(before.enquiries).toEqual([]);
 
       const enquiry = await call(c, "pursue", {
-        question: question.id,
+        question: id(question),
         approach: "depth sweep at fixed width",
       });
-      const after = await call(c, "pursuits_of", { question: question.id });
-      expect(after.enquiries).toEqual([{ kind: "enquiry", id: enquiry.id }]);
+      const after = await call(c, "pursuits_of", { question: id(question) });
+      expect(after.enquiries).toEqual([id(enquiry)]);
       await c.close();
     } finally {
       await scenario.end();
@@ -247,22 +261,22 @@ describe("an agent can track work through the tools alone", () => {
         acceptance: "the prespecified check passes",
       });
       const gate = await call(c, "declare_gate", {
-        governed_by: [criterion.id],
+        governed_by: [id(criterion)],
         consequence: "whether the result may be published",
-        protecting: [work.id],
+        protecting: [id(work)],
       });
 
       const enquiry = await call(c, "open_enquiry", { question: "does it hold at five seeds?" });
       const observations = await call(c, "record_observations", {
-        enquiry: enquiry.id, name: "seed sweep", finding: "five seeds, consistent",
+        enquiry: id(enquiry), name: "seed sweep", finding: "five seeds, consistent",
       });
       await call(c, "record_analysis", {
-        enquiry: enquiry.id,
+        enquiry: id(enquiry),
         method: "seed sweep",
-        from: [observations.id],
+        from: [id(observations)],
         concludes: [{ proposition: HOLDS, finding: "holds at all five", standing: "confirmatory" }],
-        implementing: work.id,
-        held_to: [criterion.id],
+        implementing: id(work),
+        held_to: [id(criterion)],
       });
 
       // Unmet before the check is run -- an unrun check counts against the
@@ -271,8 +285,8 @@ describe("an agent can track work through the tools alone", () => {
       expect(beforeCheck.unmet).not.toEqual([]);
 
       await call(c, "evaluate_criterion", {
-        criterion: criterion.id,
-        gate: gate.id,
+        criterion: id(criterion),
+        gate: id(gate),
         value: "5/5 seeds",
         outcome: "pass",
       });
@@ -290,14 +304,14 @@ describe("an agent can track work through the tools alone", () => {
     try {
       const enquiry = await call(c, "open_enquiry", { question: "is the gain general?" });
       const observations = await call(c, "record_observations", {
-        enquiry: enquiry.id, name: "benchmark run", finding: "faster on the suite",
+        enquiry: id(enquiry), name: "benchmark run", finding: "faster on the suite",
       });
       const analysis = await call(c, "record_analysis", {
-        enquiry: enquiry.id, method: "benchmark",
-        from: [observations.id],
+        enquiry: id(enquiry), method: "benchmark",
+        from: [id(observations)],
         concludes: [{ proposition: GENERAL, finding: "12% faster overall" }],
       });
-      expect((analysis.analysis as { kind: string }).kind).toBe("analysis");
+      expect(analysis.analysis as string).toMatch(/^COMP_/);
 
       const report = await call(c, "reinterpret", {
         claim: await claimIdFor(c, GENERAL),
@@ -307,15 +321,15 @@ describe("an agent can track work through the tools alone", () => {
       // Over the wire the pairs survive as objects, not sentences -- the
       // schema mirror in src/mcp/schemas.ts is held to the report interface at
       // compile time, and this checks the same thing at run time.
-      const previously = report.previously as Array<{ claim: { id: string }; asserts: string }>;
-      const nowClaims = report.nowClaims as { claim: { id: string }; asserts: string };
+      const previously = report.previously as Array<{ claim: string; asserts: string }>;
+      const nowClaims = report.nowClaims as { claim: string; asserts: string };
       expect(previously.map((c) => c.asserts)).toEqual([GENERAL]);
       expect(nowClaims.asserts).toBe("the method is faster on this benchmark suite");
-      expect(nowClaims.claim.id.startsWith("CLM_")).toBe(true);
+      expect(nowClaims.claim.startsWith("CLM_")).toBe(true);
 
       // Asked with the handle `reinterpret` just returned, not by looking the
       // sentence back up.
-      const history = await call(c, "interpretation_history", { claim: nowClaims.claim.id });
+      const history = await call(c, "interpretation_history", { claim: nowClaims.claim });
       expect((history.originally as Array<{ asserts: string }>).map((c) => c.asserts)).toEqual([
         GENERAL,
       ]);
@@ -341,25 +355,25 @@ describe("an agent can track work through the tools alone", () => {
     try {
       const enquiry = await call(c, "open_enquiry", { question: "does the calibration hold?" });
       const raw = await call(c, "record_observations", {
-        enquiry: enquiry.id, name: "raw series", finding: "uncalibrated instrument output",
+        enquiry: id(enquiry), name: "raw series", finding: "uncalibrated instrument output",
       });
       const calibration = await call(c, "record_analysis", {
-        enquiry: enquiry.id, method: "calibrate", from: [raw.id],
+        enquiry: id(enquiry), method: "calibrate", from: [id(raw)],
         concludes: [{ proposition: "the series is calibrated", finding: "offset removed" }],
       });
       const trend = await call(c, "record_analysis", {
-        enquiry: enquiry.id, method: "trend", from: [(calibration.analysis as { id: string }).id],
+        enquiry: id(enquiry), method: "trend", from: [(calibration.analysis as string)],
         concludes: [{ proposition: TRENDS, finding: "slope 0.4" }],
       });
       const review = await call(c, "record_review", {
-        of: (trend.analysis as { id: string }).id, verdict: "the slope test was one-sided",
+        of: (trend.analysis as string), verdict: "the slope test was one-sided",
       });
 
-      const stageOne = (calibration.analysis as { id: string }).id;
+      const stageOne = (calibration.analysis as string);
       const report = await call(c, "replace_analysis", {
-        supersedes: (trend.analysis as { id: string }).id,
-        because: review.id,
-        enquiry: enquiry.id,
+        supersedes: (trend.analysis as string),
+        because: id(review),
+        enquiry: id(enquiry),
         method: "trend, two-sided",
         from: [stageOne],
         concludes: [{ proposition: TRENDS, finding: "slope 0.4, two-sided" }],
@@ -369,22 +383,22 @@ describe("an agent can track work through the tools alone", () => {
       // artefact relabelled "observations" -- and `named` is the output's own
       // name, which needed the same dereference the CONSUMES edge needs.
       const unaffected = report.unaffected as Array<{
-        what: { kind: string; id: string }; named: string; why: string;
+        what: string; named: string; why: string;
       }>;
       expect(unaffected).toHaveLength(1);
-      expect(unaffected[0]!.what).toEqual({ kind: "analysis", id: stageOne });
+      expect(unaffected[0]!.what).toEqual(stageOne);
       expect(unaffected[0]!.named).toBe("calibrate output");
 
       // The observations branch of the same field, which had never been
       // asserted either and was returning its id too.
       const other = await call(c, "replace_analysis", {
-        supersedes: (calibration.analysis as { id: string }).id,
-        because: (await call(c, "record_review", {
-          of: (calibration.analysis as { id: string }).id, verdict: "offset table was stale",
-        })).id,
-        enquiry: enquiry.id,
+        supersedes: (calibration.analysis as string),
+        because: id(await call(c, "record_review", {
+          of: (calibration.analysis as string), verdict: "offset table was stale",
+        })),
+        enquiry: id(enquiry),
         method: "calibrate, current offsets",
-        from: [raw.id],
+        from: [id(raw)],
         concludes: [{ proposition: "the series is calibrated", finding: "offset removed, current table" }],
       });
       expect((other.unaffected as Array<{ named: string }>)[0]!.named).toBe("raw series");
@@ -392,13 +406,13 @@ describe("an agent can track work through the tools alone", () => {
       // And the same id is accepted by the third verb, which also took
       // observations alone.
       const verified = await call(c, "reverify", {
-        historical: (trend.analysis as { id: string }).id,
-        enquiry: enquiry.id,
+        historical: (trend.analysis as string),
+        enquiry: id(enquiry),
         method: "trend, held-out split",
         under: [stageOne],
         concludes: { proposition: TRENDS, finding: "slope 0.38 on the held-out split" },
       });
-      expect(String((verified.verification as { id: string }).id).startsWith("COMP_")).toBe(true);
+      expect(String((verified.verification as string)).startsWith("COMP_")).toBe(true);
       await c.close();
     } finally {
       await scenario.end();
@@ -409,11 +423,11 @@ describe("an agent can track work through the tools alone", () => {
     const c = await client();
     try {
       const enquiry = await call(c, "open_enquiry", { question: "does width matter?" });
-      await call(c, "close_enquiry", { enquiry: enquiry.id });
+      await call(c, "close_enquiry", { enquiry: id(enquiry) });
 
       const again = await c.callTool({
         name: "close_enquiry",
-        arguments: { enquiry: enquiry.id },
+        arguments: { enquiry: id(enquiry) },
       });
       expect(again.isError).toBe(true);
       await c.close();
@@ -586,13 +600,13 @@ describe("behaviour — the same answers, over the wire", () => {
         JSON.parse(JSON.stringify(await read.whatIsKnown())),
       );
       const claim = await claimNamed(read, PROP);
-      expect(await structured(client, "why_supported", { claim: claim.id })).toEqual(
+      expect(await structured(client, "why_supported", { claim: claim })).toEqual(
         JSON.parse(JSON.stringify(await read.whySupported(claim))),
       );
       expect(await structured(client, "what_depends_on", { artefact: "sweep readings" })).toEqual(
         JSON.parse(JSON.stringify(await read.whatDependsOn("sweep readings"))),
       );
-      expect(await structured(client, "enquiry_status", { enquiry: enquiry.id })).toEqual(
+      expect(await structured(client, "enquiry_status", { enquiry: enquiry })).toEqual(
         JSON.parse(JSON.stringify(await read.enquiryStatus(enquiry))),
       );
       await client.close();
@@ -628,7 +642,7 @@ describe("behaviour — the same answers, over the wire", () => {
     try {
       const claim = await claimNamed(read, PROP);
       const direct = JSON.parse(JSON.stringify(await read.whySupported(claim)));
-      const overWire = await structured(client, "why_supported", { claim: claim.id });
+      const overWire = await structured(client, "why_supported", { claim: claim });
       expect(Object.keys(overWire).sort()).toEqual(Object.keys(direct).sort());
       await client.close();
     } finally {
@@ -657,9 +671,9 @@ describe("behaviour — the same answers, over the wire", () => {
         if (!result.success) throw new Error(`${name}: ${JSON.stringify(result.error.issues)}`);
       };
 
-      await parsed("why_supported", { claim: (await read.claimsAsserting(PROP))[0]!.claim.id });
+      await parsed("why_supported", { claim: (await read.claimsAsserting(PROP))[0]!.claim });
       await parsed("what_depends_on", { artefact: "sweep readings" });
-      await parsed("enquiry_status", { enquiry: enquiry.id });
+      await parsed("enquiry_status", { enquiry: enquiry });
 
       // `known` is the one tool with no declared schema -- the SDK cannot carry
       // a union (see src/mcp/tools.ts). Its two shapes are still checked, here.

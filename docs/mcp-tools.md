@@ -69,53 +69,35 @@ What this research programme currently knows, partitioned by how well each answe
 *Without `at` — what is known now:*
 
 - `established`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `unresolved`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `untested`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `provisional`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `accepted`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 
 *With `at` — what was known then:*
 
 - `at`: string
 - `established`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `provisional`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `accepted`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `open`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 
 ---
@@ -132,98 +114,66 @@ Why a proposition counts as supported (or does not): the findings resting under 
 
 **Returns**
 
-- `claim`: object
-  - `kind`: "claim"
-  - `id`: string
+- `claim`: string
 - `proposition`: string
 - `supported`: boolean
 - `standing`: "exploratory" | "confirmatory"
 - `promotedBecause?`: string
 - `support`: object[]
   - `finding`: string
-  - `evidence`: object
-    - `kind`: "evidence"
-    - `id`: string
+  - `evidence`: string
   - `method`: string
-  - `analysis`: object
-    - `kind`: "analysis"
-    - `id`: string
+  - `analysis`: string
 - `reverifiedBy`: object[]
-  - `analysis`: object
-    - `kind`: "analysis"
-    - `id`: string
+  - `analysis`: string
   - `method`: string
 - `standard`: object[]
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `proposition`: string
   - `state`: "passed" | "failed" | "never-run" | "no-standing-verdict"
   - `evaluations`: object[]
-    - `evaluation`: object
-      - `kind`: "evaluation"
-      - `id`: string
-    - `criterion`: object
-      - `kind`: "criterion"
-      - `id`: string
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
     - `basis`: object[]
-      - `evidence`: object
+      - `evidence`: string
       - `states`: string
   - `decidedBy?`: object
-    - `evaluation`: object
-      - `kind`: "evaluation"
-      - `id`: string
-    - `criterion`: object
-      - `kind`: "criterion"
-      - `id`: string
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
     - `basis`: object[]
-      - `evidence`: object
+      - `evidence`: string
       - `states`: string
 - `unmet`: object[]
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `requires`: string
 - `restingOn`: object[]
-  - `part`: object
-    - `kind`: "observations"
-    - `id`: string
+  - `part`: string
   - `name`: string
   - `invalidated?`: true
 - `superseded`: object[]
   - `finding`: string
-  - `evidence`: object
-    - `kind`: "evidence"
-    - `id`: string
+  - `evidence`: string
   - `method`: string
-  - `analysis`: object
-    - `kind`: "analysis"
-    - `id`: string
+  - `analysis`: string
   - `reason`: string
   - `bearing`: "supports" | "challenges"
 - `challenged`: boolean
 - `against`: object[]
   - `finding`: string
-  - `evidence`: object
-    - `kind`: "evidence"
-    - `id`: string
+  - `evidence`: string
   - `method`: string
-  - `analysis`: object
-    - `kind`: "analysis"
-    - `id`: string
+  - `analysis`: string
 - `withdrawn`: boolean
 - `replacedBy?`: object
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 
 ---
@@ -240,18 +190,12 @@ What would be affected if a record turned out to be wrong: the claims and lines 
 
 **Returns**
 
-- `subject`: object
-  - `kind`: "observations"
-  - `id`: string
+- `subject`: string
 - `claims`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `enquiries`: object[]
-  - `enquiry`: object
-    - `kind`: "enquiry"
-    - `id`: string
+  - `enquiry`: string
   - `pursuing`: string
 - `routesWalked`: string[]
 - `complete`: false
@@ -270,19 +214,13 @@ Whether a line of enquiry is still open, and if not how it closed — answered, 
 
 **Returns**
 
-- `enquiry`: object
-  - `kind`: "enquiry"
-  - `id`: string
+- `enquiry`: string
 - `pursuing`: string
 - `contributed`: object[]
-  - `evidence`: object
-    - `kind`: "evidence"
-    - `id`: string
+  - `evidence`: string
   - `states`: string
 - `question`: object | null
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
   - `open`: boolean
   - `closure`: "answered" | "abandoned" | "accepted-as-unresolved" | null
@@ -291,9 +229,7 @@ Whether a line of enquiry is still open, and if not how it closed — answered, 
   - `acceptedBecause?`: string
   - `restsOn?`: "exploratory" | "confirmatory"
   - `evidence`: object[]
-    - `evidence`: object
-      - `kind`: "evidence"
-      - `id`: string
+    - `evidence`: string
     - `states`: string
 
 ---
@@ -310,46 +246,28 @@ How the conditions on a gate reached their current wording: each amendment, its 
 
 **Returns**
 
-- `gate`: object
-  - `kind`: "gate"
-  - `id`: string
+- `gate`: string
 - `originally`: object
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `requires`: string
 - `nowRequires`: object
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `requires`: string
-- `criterion`: object
-  - `kind`: "criterion"
-  - `id`: string
+- `criterion`: string
 - `amendments`: object[]
-  - `amendment`: object
-    - `kind`: "decision"
-    - `id`: string
+  - `amendment`: string
   - `replaced`: object
-    - `criterion`: object
-      - `kind`: "criterion"
-      - `id`: string
+    - `criterion`: string
     - `requires`: string
   - `nowRequires`: object
-    - `criterion`: object
-      - `kind`: "criterion"
-      - `id`: string
+    - `criterion`: string
     - `requires`: string
   - `reason`: string
   - `citing`: object[]
-    - `evidence`: object
-      - `kind`: "evidence"
-      - `id`: string
+    - `evidence`: string
     - `states`: string
   - `rerun`: object[]
-    - `work`: object
-      - `kind`: "work"
-      - `id`: string
+    - `work`: string
     - `objective`: string
   - `nature`: "mechanical" | "scientific"
 
@@ -368,34 +286,22 @@ How a claim's current reading was arrived at: the claims each step withdrew, the
 **Returns**
 
 - `originally`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `nowClaims`: object
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `revisions`: object[]
-  - `revision`: object
-    - `kind`: "decision"
-    - `id`: string
+  - `revision`: string
   - `previously`: object[]
-    - `claim`: object
-      - `kind`: "claim"
-      - `id`: string
+    - `claim`: string
     - `asserts`: string
   - `nowClaims`: object
-    - `claim`: object
-      - `kind`: "claim"
-      - `id`: string
+    - `claim`: string
     - `asserts`: string
   - `reason`: string
   - `restingOnTheOldReading`: object[]
-    - `question`: object
-      - `kind`: "question"
-      - `id`: string
+    - `question`: string
     - `asks`: string
 
 ---
@@ -412,32 +318,22 @@ What a verifying analysis re-checked, what each of the two runs read (in the ord
 
 **Returns**
 
-- `verification`: object
-  - `kind`: "analysis"
-  - `id`: string
+- `verification`: string
 - `verificationMethod`: string
-- `of`: object
-  - `kind`: "analysis"
-  - `id`: string
+- `of`: string
 - `ofMethod`: string
 - `conclusion`: "agrees" | "disagrees"
 - `verificationRead`: object[]
-  - `part`: object
-    - `kind`: "observations"
-    - `id`: string
+  - `part`: string
   - `name`: string
   - `invalidated?`: true
 - `ofRead`: object[]
-  - `part`: object
-    - `kind`: "observations"
-    - `id`: string
+  - `part`: string
   - `name`: string
   - `invalidated?`: true
 - `differs`: object[]
   - `what`: object
-    - `part`: object
-      - `kind`: "observations"
-      - `id`: string
+    - `part`: string
     - `name`: string
     - `invalidated?`: true
   - `standing`: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run"
@@ -458,9 +354,7 @@ The claims asserting a sentence. **The one place wording is resolved**: every ot
 **Returns**
 
 - `claims`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 
 ---
@@ -477,9 +371,7 @@ Every line of enquiry pursuing a question. This is how a caller that did not ope
 
 **Returns**
 
-- `enquiries`: object[]
-  - `kind`: "enquiry"
-  - `id`: string
+- `enquiries`: string[]
 
 ---
 
@@ -496,15 +388,11 @@ Where a question came from, when it came from sharpening an earlier one — the 
 **Returns**
 
 - `origin`: object | null
-  - `from`: object
-    - `kind`: "question"
-    - `id`: string
+  - `from`: string
   - `fromAsks`: string
   - `reason`: string
   - `knownAtTheTime`: object[]
-    - `evidence`: object
-      - `kind`: "evidence"
-      - `id`: string
+    - `evidence`: string
     - `states`: string
 
 ---
@@ -521,9 +409,7 @@ A planned piece of work's objective, what would count as meeting it, and what it
 
 **Returns**
 
-- `work`: object
-  - `kind`: "work"
-  - `id`: string
+- `work`: string
 - `objective`: string
 - `acceptance`: string
 - `mayRead`: string[]
@@ -543,9 +429,7 @@ The prespecified conditions a gate is governed by. Pair it with `gate_status` to
 
 **Returns**
 
-- `criteria`: object[]
-  - `kind`: "criterion"
-  - `id`: string
+- `criteria`: string[]
 
 ---
 
@@ -561,70 +445,48 @@ A gate's state, itemised per condition: which checks passed, which failed, which
 
 **Returns**
 
-- `gate`: object
-  - `kind`: "gate"
-  - `id`: string
+- `gate`: string
 - `consequence`: string
 - `state`: "never-evaluated" | "incomplete" | "blocked" | "satisfied"
 - `checks`: object[]
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `proposition`: string
   - `state`: "passed" | "failed" | "never-run" | "no-standing-verdict"
   - `evaluations`: object[]
-    - `evaluation`: object
-      - `kind`: "evaluation"
-      - `id`: string
-    - `criterion`: object
-      - `kind`: "criterion"
-      - `id`: string
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
     - `basis`: object[]
-      - `evidence`: object
+      - `evidence`: string
       - `states`: string
   - `decidedBy?`: object
-    - `evaluation`: object
-      - `kind`: "evaluation"
-      - `id`: string
-    - `criterion`: object
-      - `kind`: "criterion"
-      - `id`: string
+    - `evaluation`: string
+    - `criterion`: string
     - `value`: string
     - `outcome`: "pass" | "fail"
     - `at`: string
     - `withdrawn?`: true
     - `basis`: object[]
-      - `evidence`: object
+      - `evidence`: string
       - `states`: string
 - `unmet`: object[]
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `requires`: string
 - `evaluations`: object[]
-  - `evaluation`: object
-    - `kind`: "evaluation"
-    - `id`: string
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `evaluation`: string
+  - `criterion`: string
   - `value`: string
   - `outcome`: "pass" | "fail"
   - `at`: string
   - `withdrawn?`: true
   - `basis`: object[]
-    - `evidence`: object
-      - `kind`: "evidence"
-      - `id`: string
+    - `evidence`: string
     - `states`: string
 - `gating`: object[]
-  - `work`: object
-    - `kind`: "work"
-    - `id`: string
+  - `work`: string
   - `objective`: string
 - `everFailed`: boolean
 
@@ -647,23 +509,15 @@ Whether two conclusions contradict each other, are about different things (`diss
 - `relation`: "contradiction" | "dissociation" | "corroboration"
 - `differsBy`: "scope" | null
 - `sides`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `claim`: string
+  - `question`: string
   - `proposition`: string
   - `asks`: string
   - `supportedBy`: object[]
-    - `evidence`: object
-      - `kind`: "evidence"
-      - `id`: string
+    - `evidence`: string
     - `states`: string
   - `challengedBy`: object[]
-    - `evidence`: object
-      - `kind`: "evidence"
-      - `id`: string
+    - `evidence`: string
     - `states`: string
 
 ---
@@ -683,31 +537,21 @@ Whether an analysis's inputs can be accounted for, given hashes of whatever you 
 
 **Returns**
 
-- `analysis`: object
-  - `kind`: "analysis"
-  - `id`: string
+- `analysis`: string
 - `exact`: object[]
-  - `part`: object
-    - `kind`: "observations"
-    - `id`: string
+  - `part`: string
   - `name`: string
   - `invalidated?`: true
 - `differing`: object[]
-  - `part`: object
-    - `kind`: "observations"
-    - `id`: string
+  - `part`: string
   - `name`: string
   - `invalidated?`: true
 - `unverifiable`: object[]
-  - `part`: object
-    - `kind`: "observations"
-    - `id`: string
+  - `part`: string
   - `name`: string
   - `invalidated?`: true
 - `notRebuilt`: object[]
-  - `part`: object
-    - `kind`: "observations"
-    - `id`: string
+  - `part`: string
   - `name`: string
   - `invalidated?`: true
 - `reproducible`: boolean
@@ -726,8 +570,7 @@ Put a question on the record without starting work on it. It appears in `known` 
 
 **Returns**
 
-- `kind`: "question"
-- `id`: string
+- `question`: string
 
 ---
 
@@ -744,8 +587,7 @@ Start work on a question already on the record, naming the approach. A question 
 
 **Returns**
 
-- `kind`: "enquiry"
-- `id`: string
+- `enquiry`: string
 
 ---
 
@@ -761,8 +603,7 @@ Ask and pursue in one act — the usual way work begins. Records one event, not 
 
 **Returns**
 
-- `kind`: "enquiry"
-- `id`: string
+- `enquiry`: string
 
 ---
 
@@ -781,8 +622,7 @@ Put measurement on the record without analysing it. This is the cheap act: captu
 
 **Returns**
 
-- `kind`: "observations"
-- `id`: string
+- `observations`: string
 
 ---
 
@@ -807,13 +647,9 @@ The compound act: a computation, what it read, and one claim per conclusion. `fr
 
 **Returns**
 
-- `analysis`: object
-  - `kind`: "analysis"
-  - `id`: string
+- `analysis`: string
 - `claims`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 
 ---
@@ -850,8 +686,7 @@ Replace a broad question with a sharper one, recording why. The sharper question
 
 **Returns**
 
-- `kind`: "question"
-- `id`: string
+- `question`: string
 
 ---
 
@@ -868,8 +703,7 @@ Put a review of an analysis on the record. A retraction later rests on the revie
 
 **Returns**
 
-- `kind`: "review"
-- `id`: string
+- `review`: string
 
 ---
 
@@ -887,8 +721,7 @@ Record planned work: what it is for, and what acceptance looks like. `may_read` 
 
 **Returns**
 
-- `kind`: "work"
-- `id`: string
+- `work`: string
 
 ---
 
@@ -904,8 +737,7 @@ Put a prespecified condition on the record. Stating it separately is what makes 
 
 **Returns**
 
-- `kind`: "criterion"
-- `id`: string
+- `criterion`: string
 
 ---
 
@@ -923,8 +755,7 @@ Declare that some work is gated on some criteria, and say what the gate is for. 
 
 **Returns**
 
-- `kind`: "gate"
-- `id`: string
+- `gate`: string
 
 ---
 
@@ -970,16 +801,10 @@ Record that an earlier analysis was checked again against observations available
 **Returns**
 
 - `at`: string
-- `verification`: object
-  - `kind`: "analysis"
-  - `id`: string
-- `of`: object
-  - `kind`: "analysis"
-  - `id`: string
+- `verification`: string
+- `of`: string
 - `claims`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 
 ---
@@ -1038,28 +863,18 @@ Reword a prespecified criterion after work has begun, citing what prompted it. T
 **Returns**
 
 - `at`: string
-- `amendment`: object
-  - `kind`: "decision"
-  - `id`: string
+- `amendment`: string
 - `replaced`: object
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `requires`: string
 - `nowRequires`: object
-  - `criterion`: object
-    - `kind`: "criterion"
-    - `id`: string
+  - `criterion`: string
   - `requires`: string
 - `rerun`: object[]
-  - `work`: object
-    - `kind`: "work"
-    - `id`: string
+  - `work`: string
   - `objective`: string
 - `confirmatoryAffected`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `nature`: "mechanical" | "scientific"
 
@@ -1087,40 +902,26 @@ Record a corrected analysis in place of a defective one, citing the review that 
 **Returns**
 
 - `at`: string
-- `replacement`: object
-  - `kind`: "analysis"
-  - `id`: string
+- `replacement`: string
 - `claims`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `affected`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `unaffected`: object[]
-  - `what`: object
-    - `kind`: "observations" | "analysis"
-    - `id`: string
+  - `what`: string | string
   - `invalidated?`: true
   - `named`: string
   - `why`: string
 - `changed`: object[]
   - `proposition`: string
-  - `was`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `was`: string
   - `before`: string
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `after`: string
 - `unchanged`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 
 ---
@@ -1141,23 +942,15 @@ Record that a claim's reading has been narrowed — the evidence is unchanged, w
 
 - `at`: string
 - `previously`: object[]
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `nowClaims`: object
-  - `claim`: object
-    - `kind`: "claim"
-    - `id`: string
+  - `claim`: string
   - `asserts`: string
 - `evidenceStanding`: object[]
-  - `evidence`: object
-    - `kind`: "evidence"
-    - `id`: string
+  - `evidence`: string
   - `states`: string
 - `restingOnTheOldReading`: object[]
-  - `question`: object
-    - `kind`: "question"
-    - `id`: string
+  - `question`: string
   - `asks`: string
 - `requiresRecomputation`: boolean

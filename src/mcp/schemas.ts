@@ -74,9 +74,26 @@ import type {
   Revision,
   SupportExplanation,
 } from "../domain/report";
+import type { Ref } from "../domain/report";
 
-/** `Ref<K>` — the natural-id handle the domain passes around. */
-const ref = <K extends string>(kind: K) => z.strictObject({ kind: z.literal(kind), id: z.string() });
+/**
+ * `Ref<K>` — the natural-id handle the domain passes around, which over the
+ * wire is just its id: `"GATE_1"`, not `{"kind":"gate","id":"GATE_1"}`.
+ *
+ * **These are output schemas, so there is nothing here to validate.** They
+ * describe what LabKit returns, and LabKit returns handles it minted itself.
+ * The `kind` argument is kept for readability at the ~46 call sites — it says
+ * which handle a field carries — and is deliberately unused.
+ *
+ * The check that used to live here as `kind: z.literal(kind)` has not been
+ * dropped; it moved and got stronger. It only ever verified that a caller had
+ * *said* "gate", never that the id was one, and the two could disagree. Input
+ * handles now reach the domain through `ref()` (`src/domain/report.ts`), which
+ * refuses an id whose prefix names another label — so `"CLM_3"` where a gate
+ * belongs is a refusal, and `server.ts` turns that throw into an `isError`
+ * result carrying the message.
+ */
+const ref = <K extends string>(_kind: K) => z.string() as unknown as z.ZodType<Ref<K>>;
 
 /** `{claim, asserts}` — the report convention's pair for a claim, in one place. */
 const concludedClaim = z.strictObject({ claim: ref("claim"), asserts: z.string() });
@@ -320,11 +337,19 @@ export const reproducibilityReportSchema = z.strictObject({
 /**
  * A verb that mints something returns its reference, and over the wire that
  * reference is the only handle the caller gets. `structuredContent` must be an
- * object, so a bare `EnquiryRef[]` cannot cross — hence the wrapper below.
+ * object, so a handle cannot cross on its own — hence this wrapper.
+ *
+ * It used to cross by accident: a handle was `{"kind":"question","id":"Q_1"}`,
+ * which is an object already. It is `"Q_1"` now, so the field has to be named —
+ * and naming it says more than the tag did. `{"question":"Q_1"}` says what the
+ * id is *for* in this reply, where `kind` only ever repeated what the prefix
+ * already carried, and could contradict it.
  */
-export const questionRefSchema = ref("question");
-export const enquiryRefSchema = ref("enquiry");
-export const observationsRefSchema = ref("observations");
+const minted = <K extends string>(kind: K) => z.strictObject({ [kind]: ref(kind) } as { [P in K]: z.ZodType<Ref<K>> });
+
+export const questionRefSchema = minted("question");
+export const enquiryRefSchema = minted("enquiry");
+export const observationsRefSchema = minted("observations");
 export const analysisRefSchema = ref("analysis");
 
 /**
@@ -337,10 +362,10 @@ export const recordedAnalysisSchema = z.strictObject({
   analysis: analysisRefSchema,
   claims: z.array(concludedClaim),
 });
-export const reviewRefSchema = ref("review");
-export const workRefSchema = ref("work");
-export const criterionRefSchema = ref("criterion");
-export const gateRefSchema = ref("gate");
+export const reviewRefSchema = minted("review");
+export const workRefSchema = minted("work");
+export const criterionRefSchema = minted("criterion");
+export const gateRefSchema = minted("gate");
 
 const changedConclusion = z.strictObject({
   proposition: z.string(),
@@ -405,7 +430,9 @@ export const reinterpretationReportSchema = z.strictObject({
 
 /** `pursuits_of` — `ReadSurface.pursuitsOf` returns an array, which is not an object. */
 export const pursuitsSchema = z.strictObject({
-  enquiries: z.array(enquiryRefSchema),
+  // The bare handle, not `minted("enquiry")` — the wrapper exists only so a
+  // tool whose *whole* answer is one handle has an object to return.
+  enquiries: z.array(ref("enquiry")),
 });
 
 /**
@@ -453,9 +480,9 @@ export type _InterpretationHistory = Assert<
   Exact<z.infer<typeof interpretationHistorySchema>, InterpretationHistory>
 >;
 export type _ReproductionReport = Assert<Exact<z.infer<typeof reproductionReportSchema>, ReproductionReport>>;
-export type _QuestionRef = Assert<Exact<z.infer<typeof questionRefSchema>, QuestionRef>>;
-export type _EnquiryRef = Assert<Exact<z.infer<typeof enquiryRefSchema>, EnquiryRef>>;
-export type _ObservationsRef = Assert<Exact<z.infer<typeof observationsRefSchema>, ObservationsRef>>;
+export type _QuestionRef = Assert<Exact<z.infer<typeof questionRefSchema>["question"], QuestionRef>>;
+export type _EnquiryRef = Assert<Exact<z.infer<typeof enquiryRefSchema>["enquiry"], EnquiryRef>>;
+export type _ObservationsRef = Assert<Exact<z.infer<typeof observationsRefSchema>["observations"], ObservationsRef>>;
 export type _RecordedAnalysis = Assert<Exact<z.infer<typeof recordedAnalysisSchema>, RecordedAnalysis>>;
 export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, AnalysisRef>>;
 export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;
@@ -466,10 +493,10 @@ export type _GateStatus = Assert<Exact<z.infer<typeof gateStatusSchema>, GateSta
 export type _ConflictSide = Assert<Exact<z.infer<typeof conflictSide>, ConflictSide>>;
 export type _ConflictVerdict = Assert<Exact<z.infer<typeof conflictVerdictSchema>, ConflictVerdict>>;
 export type _ReproducibilityReport = Assert<Exact<z.infer<typeof reproducibilityReportSchema>, ReproducibilityReport>>;
-export type _ReviewRef = Assert<Exact<z.infer<typeof reviewRefSchema>, ReviewRef>>;
-export type _WorkRef = Assert<Exact<z.infer<typeof workRefSchema>, WorkRef>>;
-export type _CriterionRef2 = Assert<Exact<z.infer<typeof criterionRefSchema>, CriterionRef>>;
-export type _GateRef = Assert<Exact<z.infer<typeof gateRefSchema>, GateRef>>;
+export type _ReviewRef = Assert<Exact<z.infer<typeof reviewRefSchema>["review"], ReviewRef>>;
+export type _WorkRef = Assert<Exact<z.infer<typeof workRefSchema>["work"], WorkRef>>;
+export type _CriterionRef2 = Assert<Exact<z.infer<typeof criterionRefSchema>["criterion"], CriterionRef>>;
+export type _GateRef = Assert<Exact<z.infer<typeof gateRefSchema>["gate"], GateRef>>;
 export type _ChangedConclusion = Assert<Exact<z.infer<typeof changedConclusion>, ChangedConclusion>>;
 export type _UnaffectedRecord = Assert<Exact<z.infer<typeof unaffectedRecord>, UnaffectedRecord>>;
 export type _VerificationReport = Assert<Exact<z.infer<typeof verificationReportSchema>, VerificationReport>>;

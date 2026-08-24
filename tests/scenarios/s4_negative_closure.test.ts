@@ -15,6 +15,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
+import { ref } from "../../src/domain/report";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -246,7 +247,7 @@ describe("S-4: a negative result that closes the question", () => {
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
     expect(status.question!.open).toBe(true);
     expect(status.question!.closure).toBeNull();
-    expect(observations.kind).toBe("observations");
+    expect(observations).toMatch(/^ART_/);
   });
 
   test("a question cannot be answered on a proposition the analysis never concluded", async () => {
@@ -259,7 +260,7 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     await expect(
-      session.closeEnquiry({ enquiry: specificity, answeredBy: { kind: "claim" as const, id: "CLM_99999" } }),
+      session.closeEnquiry({ enquiry: specificity, answeredBy: ref("claim", "CLM_99999") }),
     ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
     const status = await session.enquiryStatus(specificity);

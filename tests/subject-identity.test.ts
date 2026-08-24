@@ -47,6 +47,20 @@ import { ReadSurface, ResearchSession, WriteSurface, inMemoryEventLog, type Cloc
 import { buildServer } from "../src/mcp/server";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
+import { ref } from "../src/domain/report";
+
+/**
+ * A handle out of a tool's reply.
+ *
+ * A tool whose whole answer is one handle returns it under a field named for
+ * what it is — `{"question": "Q_1"}` — because MCP's `structuredContent` must
+ * be an object and a handle is a bare string now. This takes that sole value.
+ */
+const id = (v: unknown): string =>
+  // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
+  // reaches the server as a handle and is refused there -- loudly, but two
+  // layers from the mistake.
+  typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
 let scenario: Scenario;
 beforeAll(async () => { scenario = await openScenario(); });
@@ -114,7 +128,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       // One question, pursued twice. Its state is the same in both reports --
       // correctly, because it is nested under `question` where neither pursuit
       // can be read as owning it.
-      expect(ana.question!.question.id).toBe(bruno.question!.question.id);
+      expect(ana.question!.question).toBe(bruno.question!.question);
       expect(ana.question!.closure).toBe("answered");
       expect(bruno.question!.closure).toBe("answered");
 
@@ -125,8 +139,8 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       // Ana's pursuit produced the observations AND the analysis; the closure
       // cites only the latter. Two different sets, deliberately -- "what this
       // pursuit produced" is not "what the answer rests on".
-      const anasFindings = ana.contributed.map((e) => e.evidence.id);
-      const closingEvidence = ana.question!.evidence.map((e) => e.evidence.id);
+      const anasFindings = ana.contributed.map((e) => e.evidence);
+      const closingEvidence = ana.question!.evidence.map((e) => e.evidence);
       expect(closingEvidence.every((id) => anasFindings.includes(id))).toBe(true);
       expect(anasFindings.length).toBeGreaterThan(closingEvidence.length);
 
@@ -134,7 +148,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       expect(bruno.pursuing).not.toBe(ana.pursuing);
 
       // The reader that used to be wrong: sum findings over every pursuit.
-      const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence.id));
+      const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence));
       expect(counted.length).toBe(new Set(counted).size);
     } finally {
       await scenario.end();
@@ -199,14 +213,19 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const consumed = [...parts.exact, ...parts.differing, ...parts.unverifiable, ...parts.notRebuilt];
 
       // Raw measurement is an artefact.
-      expect(observations.id.startsWith("ART_")).toBe(true);
+      expect(observations.startsWith("ART_")).toBe(true);
       // So is what the analysis produced -- same prefix, same space.
-      const output = consumed.map((p) => p.part.id);
+      const output = consumed.map((p) => p.part);
       expect(output.every((id) => id.startsWith("ART_"))).toBe(true);
 
-      // And the ref asserts a kind the id cannot support: `observations.kind`
-      // says "observations" about an id whose prefix is shared with outputs.
-      expect(observations.kind).toBe("observations");
+      // So the two are **indistinguishable by handle**, which is the finding.
+      // A handle used to carry a `kind` field beside the id, and this assertion
+      // used to read `observations.kind === "observations"` -- a tag saying
+      // something the id could not support, about an id whose prefix is shared
+      // with outputs. Handles are branded strings now, so there is no second
+      // field to disagree with the first and the ambiguity is in the open where
+      // a scenario can decide it.
+      expect(output).toContain(observations);
     } finally {
       await scenario.end();
     }
@@ -231,7 +250,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const read = new ReadSurface(await scenario.current());
       const consumedByA = await read.reproducibilityOf(viaAnalysis, []);
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
-      expect(outputOfStageOne?.id.startsWith("ART_")).toBe(true);
+      expect(outputOfStageOne?.startsWith("ART_")).toBe(true);
 
       const { analysis: viaArtefact, claims: viaArtefactClaims } = await s.recordAnalysis({
         enquiry,
@@ -298,14 +317,14 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       // whatIsKnown: `question` is the id, `asks` is the text.
       const known = await read.whatIsKnown();
       const standing = [...known.established, ...known.provisional][0]!;
-      expect(looksLikeAnId(standing.question.id)).toBe(true);
+      expect(looksLikeAnId(standing.question)).toBe(true);
       expect(looksLikeAnId(standing.asks)).toBe(false);
 
       // reproducibilityOf: `part` is the id, `name` is the text.
       const parts = await read.reproducibilityOf(analysis, []);
       const inputs = [...parts.exact, ...parts.differing, ...parts.unverifiable, ...parts.notRebuilt];
       expect(inputs.length).toBeGreaterThan(0);
-      expect(inputs.every((p) => looksLikeAnId(p.part.id))).toBe(true);
+      expect(inputs.every((p) => looksLikeAnId(p.part))).toBe(true);
       expect(inputs.every((p) => looksLikeAnId(p.name))).toBe(false);
     } finally {
       await scenario.end();
@@ -317,15 +336,15 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       const { read, enquiry, question } = await programme();
       const status = await read.enquiryStatus(enquiry);
 
-      expect(looksLikeAnId(status.enquiry.id)).toBe(true);
+      expect(looksLikeAnId(status.enquiry)).toBe(true);
       // The question it pursues, by identity -- and it is the RIGHT question,
       // not merely an id-shaped string.
-      expect(status.question!.question.id).toBe(question.id);
+      expect(status.question!.question).toBe(question);
       expect(looksLikeAnId(status.question!.asks)).toBe(false);
 
       // Evidence too, as of PJ-030 §5: identity beside the statement.
       expect(status.question!.evidence.length).toBeGreaterThan(0);
-      expect(status.question!.evidence.every((e) => looksLikeAnId(e.evidence.id))).toBe(true);
+      expect(status.question!.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
       expect(status.question!.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
     } finally {
       await scenario.end();
@@ -340,9 +359,9 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       const affected = await read.whatDependsOn("sweep readings");
 
       expect(affected.claims.length + affected.enquiries.length).toBeGreaterThan(0);
-      expect(affected.claims.every((c) => looksLikeAnId(c.claim.id))).toBe(true);
+      expect(affected.claims.every((c) => looksLikeAnId(c.claim))).toBe(true);
       expect(affected.claims.every((c) => looksLikeAnId(c.asserts))).toBe(false);
-      expect(affected.enquiries.every((e) => looksLikeAnId(e.enquiry.id))).toBe(true);
+      expect(affected.enquiries.every((e) => looksLikeAnId(e.enquiry))).toBe(true);
       expect(affected.enquiries.every((e) => looksLikeAnId(e.pursuing))).toBe(false);
     } finally {
       await scenario.end();
@@ -358,12 +377,12 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       // Was a bare `via` holding the computation's METHOD text, so two runs of
       // one method were indistinguishable -- the same wording-as-identity
       // failure whySupported REFUSES to make when resolving its own argument.
-      expect(why.support.every((s) => looksLikeAnId(s.analysis.id))).toBe(true);
-      expect(why.support.every((s) => looksLikeAnId(s.evidence.id))).toBe(true);
+      expect(why.support.every((s) => looksLikeAnId(s.analysis))).toBe(true);
+      expect(why.support.every((s) => looksLikeAnId(s.evidence))).toBe(true);
       expect(why.support.every((s) => looksLikeAnId(s.method))).toBe(false);
-      expect(why.unmet.every((u) => looksLikeAnId(u.criterion.id))).toBe(true);
+      expect(why.unmet.every((u) => looksLikeAnId(u.criterion))).toBe(true);
       // The template, in the same report: restingOn carries both.
-      expect(why.restingOn.every((p) => looksLikeAnId(p.part.id))).toBe(true);
+      expect(why.restingOn.every((p) => looksLikeAnId(p.part))).toBe(true);
       expect(why.restingOn.every((p) => looksLikeAnId(p.name))).toBe(false);
     } finally {
       await scenario.end();
@@ -375,13 +394,13 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       const { read, gate } = await programme();
       const status = await read.gateStatus(gate);
 
-      expect(looksLikeAnId(status.gate.id)).toBe(true);
+      expect(looksLikeAnId(status.gate)).toBe(true);
       expect(status.gating.length).toBeGreaterThan(0);
-      expect(status.gating.every((g) => looksLikeAnId(g.work.id))).toBe(true);
+      expect(status.gating.every((g) => looksLikeAnId(g.work))).toBe(true);
       expect(status.gating.every((g) => looksLikeAnId(g.objective))).toBe(false);
-      expect(status.unmet.every((u) => looksLikeAnId(u.criterion.id))).toBe(true);
+      expect(status.unmet.every((u) => looksLikeAnId(u.criterion))).toBe(true);
       // The template again, one field over.
-      expect(status.checks.every((c) => looksLikeAnId(c.criterion.id))).toBe(true);
+      expect(status.checks.every((c) => looksLikeAnId(c.criterion))).toBe(true);
     } finally {
       await scenario.end();
     }
@@ -411,7 +430,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       // that name resolved to -- the one thing a caller passing a name cannot
       // otherwise learn about the answer they got back.
       const byName = await read.whatDependsOn("sweep readings");
-      expect(looksLikeAnId(byName.subject.id)).toBe(true);
+      expect(looksLikeAnId(byName.subject)).toBe(true);
       expect(await read.whatDependsOn(byName.subject)).toEqual(byName);
     } finally {
       await scenario.end();
@@ -446,47 +465,85 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
     try {
       const enquiry = (await call(client, "open_enquiry", { question: "two stage?" })).body;
       const raw = (await call(client, "record_observations", {
-        enquiry: enquiry.id, name: "raw", finding: "f",
+        enquiry: id(enquiry), name: "raw", finding: "f",
       })).body;
       const stageOne = ((await call(client, "record_analysis", {
-        enquiry: enquiry.id, method: "stage one", from: [raw.id],
+        enquiry: id(enquiry), method: "stage one", from: [id(raw)],
         concludes: [{ proposition: "p1", finding: "f1" }],
-      })).body.analysis) as { kind: string; id: string };
+      })).body.analysis) as string;
       const stageTwoResult = (await call(client, "record_analysis", {
-        enquiry: enquiry.id, method: "stage two", from: [stageOne.id],
+        enquiry: id(enquiry), method: "stage two", from: [stageOne],
         concludes: [{ proposition: "p2", finding: "f2" }],
       })).body;
-      const stageTwo = stageTwoResult.analysis as { kind: string; id: string };
-      const p2 = (stageTwoResult.claims as Array<{ claim: { id: string }; asserts: string }>)
-        .find((c) => c.asserts === "p2")!.claim.id;
+      const stageTwo = stageTwoResult.analysis as string;
+      const p2 = (stageTwoResult.claims as Array<{ claim: string; asserts: string }>)
+        .find((c) => c.asserts === "p2")!.claim;
       const review = (await call(client, "record_review", {
-        of: stageTwo.id, verdict: "stage two mis-specified",
+        of: stageTwo, verdict: "stage two mis-specified",
       })).body;
 
       // Recording stage two on stage one was accepted all along.
-      expect(String(stageOne.id).startsWith("COMP_")).toBe(true);
+      expect(String(stageOne).startsWith("COMP_")).toBe(true);
 
       // Repairing it, on the same input, is now accepted too.
       const repair = await call(client, "replace_analysis", {
-        supersedes: stageTwo.id, because: review.id, enquiry: enquiry.id,
-        method: "stage two, corrected", from: [stageOne.id],
+        supersedes: stageTwo, because: id(review), enquiry: id(enquiry),
+        method: "stage two, corrected", from: [stageOne],
         concludes: [{ proposition: "p2", finding: "f2 corrected" }],
       });
       expect(repair.failed).toBe(false);
       // And the report names the input as the caller named it, rather than as
       // an artefact relabelled "observations".
-      expect((repair.body.unaffected as Array<{ what: { kind: string; id: string } }>)[0]!.what)
-        .toEqual({ kind: "analysis", id: stageOne.id });
+      expect((repair.body.unaffected as Array<{ what: string }>)[0]!.what)
+        .toEqual(stageOne);
 
       // The detour still works and is no longer the only route. It is what a
       // consumer had to do: ask why a claim was supported in order to learn
       // what a computation read.
       const why = (await call(client, "why_supported", { claim: p2 })).body;
-      const restingOn = why.restingOn as Array<{ part: { id: string }; name: string }>;
-      expect(restingOn.some((p) => p.part.id.startsWith("ART_"))).toBe(true);
+      const restingOn = why.restingOn as Array<{ part: string; name: string }>;
+      expect(restingOn.some((p) => p.part.startsWith("ART_"))).toBe(true);
       await client.close();
     } finally {
       await scenario.end();
     }
   });
+});
+
+/**
+ * **A handle whose id names another record is refused at the moment it is
+ * minted.** This is the check that replaced the `kind` field.
+ *
+ * Under `{ kind, id }` the two halves could disagree — `{kind: "claim", id:
+ * "GATE_1"}` was constructible and nothing anywhere noticed, because `kind` was
+ * never the authority: `createEdge` has always resolved an endpoint's label
+ * from the id's prefix. A branded handle *is* the id, so the disagreement
+ * cannot be written down; `ref()` enforces the same fact one step earlier, when
+ * a caller names which kind of thing an id is supposed to be.
+ *
+ * This is the mistake an agent assembling a call from two different reports
+ * actually makes — passing the claim it just read where the gate belongs — and
+ * before this it reached the graph and returned an empty result, which reads
+ * like "nothing matched" rather than "you named the wrong thing".
+ */
+test("ref refuses an id whose prefix names a different record", () => {
+  expect(() => ref("gate", "CLM_1")).toThrow(/gate handle expected a Gate id/);
+  expect(() => ref("claim", "GATE_9")).toThrow(/claim handle expected a Claim id/);
+
+  // The five kinds named for a research concept rather than a label are the
+  // ones a mapping by name would get wrong, so they are asserted directly.
+  expect(() => ref("analysis", "ART_1")).toThrow(/expected a Computation id/);
+  expect(() => ref("observations", "COMP_1")).toThrow(/expected an? Artefact id/);
+  expect(() => ref("work", "LOE_1")).toThrow(/expected a Task id/);
+  expect(() => ref("enquiry", "TASK_1")).toThrow(/expected a LineOfEnquiry id/);
+  expect(() => ref("evaluation", "CRIT_1")).toThrow(/expected a CriterionEvaluation id/);
+
+  // And the matching cases pass through unchanged — the handle *is* the id.
+  // Through `String()` because `expect(handle).toBe("GATE_1")` does not
+  // compile: a branded handle is not comparable to a raw literal, which is the
+  // nominal typing doing its job and worth seeing here rather than working
+  // around silently.
+  expect(String(ref("gate", "GATE_1"))).toBe("GATE_1");
+  expect(String(ref("analysis", "COMP_2"))).toBe("COMP_2");
+  expect(String(ref("unit", "EU_3"))).toBe("EU_3");
 });

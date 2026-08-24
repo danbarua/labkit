@@ -26,6 +26,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { ref } from "../../src/domain/report";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -96,7 +97,7 @@ describe("S-9e: reproducing nothing", () => {
    */
   test("an analysis that does not exist is refused, not reported on", async () => {
     await expect(
-      session.reproducibilityOf({ kind: "analysis", id: "COMP_999999" }, []),
+      session.reproducibilityOf(ref("analysis", "COMP_999999"), []),
     ).rejects.toThrow(/COMP_999999/);
   });
 
@@ -115,7 +116,7 @@ describe("S-9e: reproducing nothing", () => {
     const empty = await read.reproducibilityOf(analysis, []);
     let ghost = "(no throw)";
     try {
-      await read.reproducibilityOf({ kind: "analysis", id: "COMP_999999" }, []);
+      await read.reproducibilityOf(ref("analysis", "COMP_999999"), []);
     } catch (e) {
       ghost = (e as Error).message;
     }

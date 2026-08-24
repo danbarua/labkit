@@ -255,7 +255,7 @@ test("recordObservations writes the unit and the evidence together or not at all
     name: "thermal cycling run",
     finding: "no delamination after 200 cycles",
   });
-  expect(again.id).toMatch(/^ART_/);
+  expect(again).toMatch(/^ART_/);
 });
 
 /**
@@ -664,8 +664,8 @@ test("stateCriterion and planWork have no interruption window to have", async ()
 
   // Neither verb writes an edge, so neither has a gap between two writes.
   expect(edges).toBe(0);
-  expect(criterion.id).toMatch(/^CRIT_/);
-  expect(work.id).toMatch(/^TASK_/);
+  expect(criterion).toMatch(/^CRIT_/);
+  expect(work).toMatch(/^TASK_/);
 });
 
 /**
