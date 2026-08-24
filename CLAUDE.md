@@ -804,4 +804,9 @@ hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
 `timed out after 5000ms`, the body wording. So in the files that set up from
 `beforeEach`, setup cost is not the mechanism.
 
-See `docs/TASKS.md` for the evidence, the candidates and what has been refuted.
+**Two changes have been made against it and neither moved the failure rate.**
+Measured 2026-08-24, twelve runs, ABBA-interleaved under saturated CPU: median
+one failing test per run both before and after, ~5% off wall time. Reducing a
+test's query count makes the suite faster without making it less flaky, because
+the ceiling is crossed by whichever test is unlucky rather than by the slowest
+one. See `docs/TASKS.md` for the table, the method and what has been refuted.
