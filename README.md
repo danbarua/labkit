@@ -90,7 +90,7 @@ so it cannot change the record. `bun run mcp` is the half that writes.
 and the AGE-specific traps. In short:
 
 ```sh
-bun test                                    # read the pass/fail counts, not the exit code
+bun test                                    # 0 is clean; never pipe it, or $? reports the pipe
 bun run typecheck
 npx depcruise src tests --output-type err
 ```
