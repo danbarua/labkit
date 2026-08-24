@@ -25,9 +25,17 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   `6eeeb92` by sixteen minutes and was never updated. On today's code a
   steady-state provisioning call is 6 queries and 1-4ms, the cold one is 83 and
   runs once per file, and provisioning is 8-18% of query time in the files that
-  fail. **The predictor is queries per test** — files span 6 to ~280, individual
-  tests reach ~380, and at ~16ms per round trip under load that band straddles
-  5000ms, which is why it is 7-15 *different* tests each run.
+  fail. **The predictor is queries per test** — files span 6 to ~280 and
+  individual tests reach ~380, the band that straddles 5000ms once
+  per-round-trip latency degrades under load.
+
+  **Every `Nms` extrapolation below rests on one number, and it is stale.**
+  `311 queries / 4.955s` ≈ 16ms, measured 2026-08-21 and not since. That run's
+  own note says its dominant cost was provisioning re-checking ~38 labels at a
+  round trip each — the work `6eeeb92` then deleted — so it is an average over a
+  query mix that no longer exists, biased unknowably. The extrapolations are
+  kept because a wrong-but-stated basis can be re-derived and a deleted one
+  cannot, but **re-measure before acting on any of them.**
 
   Two costs nothing had named: `reset()` (`tests/helpers/db.ts`) is ~35-40ms a
   call and 29% of suite query time against provisioning's 18%; and bun's hook
