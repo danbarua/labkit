@@ -768,7 +768,27 @@ not: a test's legitimate work crosses bun's fixed **5000ms** ceiling, bun's
 timeout **does not cancel the test body**, and the abandoned test's late
 `scenario.end()` then resets the database and closes the *next* test's
 connection. Nothing hangs — 59,086 queries were tracked across a failing run
-with zero unfinished. The cost that pushes a test to the ceiling is
-`provisionTenantGraph()` running full reconciliation on every `begin()` and
-every `current()`. See `docs/TASKS.md` for the evidence and for the fix that was
-tried and refuted.
+with zero unfinished.
+
+**What pushes a test over is its own query count, not provisioning.** This
+paragraph said the cost was `provisionTenantGraph()` reconciling on every
+`begin()` and `current()`. That was written sixteen minutes before `6eeeb92`
+cut reconciliation from ~80 round trips to 6, and nobody updated the sentence —
+so it misdirected every investigation after it, including two of this repo's
+own. Measured on today's code: a steady-state provisioning call is **6 queries,
+1-4ms**; the cold one is 83 queries and happens **once per file**. Provisioning
+is 8-18% of query time in the files that actually fail.
+
+The predictor is **queries per test**. Files cluster from 6 to ~280, individual
+tests reach ~380, and at the loaded per-round-trip cost this repo has measured
+(~16ms) that band straddles 5000ms — which is why it is 7-15 different tests
+each run rather than one broken test. Two costs the old sentence never named:
+`reset()` in `tests/helpers/db.ts` is ~35-40ms a call and **29%** of suite query
+time against provisioning's 18%, and it lands on the *test's own clock* in the
+handful of files that call `begin()`/`end()` inside a test body rather than from
+hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
+`a beforeEach hook timed out`, and every failure this repo has recorded says
+`timed out after 5000ms`, the body wording. So in the files that set up from
+`beforeEach`, setup cost is not the mechanism.
+
+See `docs/TASKS.md` for the evidence, the candidates and what has been refuted.

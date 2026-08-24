@@ -494,7 +494,10 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     let createAttempts = 0;
     const flakyDb: LabKitDB = {
       async query(sql: string, params?: unknown[]) {
-        if (sql.includes("CREATE (a)-[:")) {
+        // `CREATE (a)-[e:` — the CREATE binds and returns the edge now, so
+        // that `createEdge()` can tell "created" from "matched nothing" and
+        // charge the endpoint-existence queries only to the failure path.
+        if (sql.includes("CREATE (a)-[e:")) {
           createAttempts++;
           const err = new Error("duplicate key value violates unique constraint") as Error & { code?: string };
           err.code = "23505";

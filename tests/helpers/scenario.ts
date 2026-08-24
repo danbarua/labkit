@@ -9,7 +9,7 @@
  * and takes care of isolation between tests.
  */
 
-import { resolveTenantContext } from "../../src/db/tenant";
+import { resolveTenantContext, type TenantContext } from "../../src/db/tenant";
 import { TenantGraph } from "../../src/db/graph";
 import type { LabKitDB } from "../../src/db/client";
 import { setupTestDb, type TestDb } from "./db";
@@ -22,14 +22,25 @@ export interface Scenario {
    * re-asserted through.
    *
    * Be precise about what this proves, because it is less than it looks.
-   * It re-resolves the tenant and builds a **new** `TenantGraph`, so an
-   * assertion made through it cannot be reading a value the test kept in a
-   * local variable, and it would catch a `ResearchSession` or `TenantGraph`
-   * that started memoising. Today neither holds any query state, so against a
-   * plain re-query on the same session the marginal proof is **nil** — checked,
-   * not assumed: pointing every durable read in S-3 back at the writing session
-   * leaves all nine tests passing. This is cheap insurance against a future
-   * cache, not a proof in itself, and it should not be described as one.
+   * It builds a **new** `TenantGraph`, so an assertion made through it cannot
+   * be reading a value the test kept in a local variable, and it would catch
+   * a `ResearchSession` or `TenantGraph` that started memoising. Today
+   * neither holds any query state, so against a plain re-query on the same
+   * session the marginal proof is **nil** — checked, not assumed: pointing
+   * every durable read in S-3 back at the writing session leaves all nine
+   * tests passing. This is cheap insurance against a future cache, not a
+   * proof in itself, and it should not be described as one.
+   *
+   * It reuses the `TenantContext` `begin()` already resolved, rather than
+   * calling `resolveTenantContext()` a second time. That call's
+   * reconciliation pass is what `begin()` exists to prove happened; repeating
+   * it microseconds later against the same tenant is waste, not a second
+   * proof, and `begin()` still runs it unconditionally — the self-healing
+   * guarantee PJ-005 argued for is exactly as strong as before. `TenantContext`
+   * (`src/db/tenant.ts`) is plain `{tenantId, graphName}` data with no query
+   * state of its own, so reusing it carries none of the memoising risk this
+   * method exists to catch — that risk lives in the `TenantGraph`/
+   * `ResearchSession` instance, and this still builds a fresh one every call.
    *
    * It deliberately does **not** open a new connection: `@electric-sql/pglite-socket`
    * has a confirmed concurrency bug (see tests/helpers/db.ts and PJ-006), so
@@ -56,6 +67,16 @@ export async function openScenario(): Promise<Scenario> {
    */
   const open: Array<LabKitDB & { close(): Promise<void> }> = [];
 
+  /**
+   * The `TenantContext` the most recent `begin()` resolved. `current()`
+   * reuses it instead of calling `resolveTenantContext()` again, so it does
+   * not pay for a second full reconciliation pass on the same tenant
+   * microseconds later — see the doc comment on `Scenario.current()` for why
+   * that is sound. Always set in the same `begin()` call that pushes onto
+   * `open`, so the two describe the same test's connection.
+   */
+  let ctx: TenantContext | undefined;
+
   return {
     async begin() {
       // Normally a no-op, and that is the point. `open` is empty on the happy
@@ -70,13 +91,12 @@ export async function openScenario(): Promise<Scenario> {
       // load-bearing rather than tidiness.
       const db = await testDb.openClient(`test-${open.length + 1}`);
       open.push(db);
-      const ctx = await resolveTenantContext(db, "labkit");
+      ctx = await resolveTenantContext(db, "labkit");
       return new TenantGraph(ctx, db);
     },
     async current() {
       const db = open[open.length - 1];
-      if (!db) throw new Error("scenario not begun");
-      const ctx = await resolveTenantContext(db, "labkit");
+      if (!db || !ctx) throw new Error("scenario not begun");
       return new TenantGraph(ctx, db);
     },
     async end() {
