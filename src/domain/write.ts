@@ -464,17 +464,35 @@ export class WriteSurface extends SessionCore {
       "PRODUCES",
       output.natural_id,
     );
+    // Every position at which each artefact was read, collected before writing.
+    //
+    // `positions` and not `position`, and one edge per distinct artefact rather
+    // than one per occurrence: `createEdge` treats `(from, label, to)` as
+    // identity and a repeat as a no-op, backed by a real
+    // `UNIQUE (start_id, end_id)` index -- so `from: [A, B, A]` cannot be three
+    // edges, and writing it as two silently dropped the second A (S-10e).
+    //
+    // The caller said the run read three things. Storing two is losing what the
+    // caller said, in the store whose job is not to. Refusing `[A, A]` was the
+    // other available answer and is worse: a null test compares a series against
+    // itself, which is an ordinary thing to record, and declining it would be
+    // LabKit deciding a legitimate run is not recordable -- exactly what S-10d
+    // took out.
+    const positionsFor = new Map<string, number[]>();
     for (const [position, source] of input.from.entries()) {
       // An analysis is named by its computation; what it *read* is that
       // computation's output artefact, which is what CONSUMES points at.
       const artefact =
         source.kind === "analysis" ? await this.outputArtefactOf(source) : source.id;
-      // `position` because the caller gave an ordered array and the record used
-      // to throw the order away -- losing something a caller said, in the store
-      // whose job is not to. No verdict rests on it: `reproductionOf` reports
-      // both runs' lists in order and adjudicates nothing (S-10d).
+      const seen = positionsFor.get(artefact);
+      if (seen) seen.push(position);
+      else positionsFor.set(artefact, [position]);
+    }
+    for (const [artefact, positions] of positionsFor) {
+      // No verdict rests on any of this: `reproductionOf` reports both runs'
+      // lists in order and adjudicates nothing (S-10d).
       await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact, {
-        position,
+        positions,
       });
     }
 

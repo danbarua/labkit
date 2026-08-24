@@ -214,7 +214,11 @@ export class TenantGraph {
     fromId: string,
     edge: EdgeLabel,
     toId: string,
-    props?: Record<string, string | number | boolean>,
+    // `number[]` because one CONSUMES edge has to carry every position at which
+    // its artefact was read: `(from, label, to)` is this method's identity and
+    // a repeat is a no-op, so a run that read one record twice cannot be two
+    // edges. See `recorded()` and S-10e.
+    props?: Record<string, string | number | boolean | number[]>,
   ): Promise<void> {
     const fromLabel = labelForNaturalId(fromId);
     const toLabel = labelForNaturalId(toId);

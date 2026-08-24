@@ -170,15 +170,24 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
        OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
        OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
+       OPTIONAL MATCH (cited)-[:CHALLENGES]->(against:Claim)
        OPTIONAL MATCH (promoting:Decision)-[:PROMOTES]->(settled)
+       OPTIONAL MATCH (denying:Decision)-[:PROMOTES]->(against)
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
-       RETURN q, resolving, cited, settled, promoting, accepting`,
+       RETURN q, resolving, cited, settled, against, promoting, denying, accepting`,
       {
         q: vertexProps<{ natural_id: string; name: string }>(),
         resolving: optional(vertexProps<{ decided_at: string }>()),
         cited: optional(vertexProps<{ natural_id: string }>()),
         settled: optional(vertexProps<{ natural_id: string }>()),
+        // The claim the closing evidence bears AGAINST, and its promotion.
+        // A question answered *no* is settled that way and matched nothing
+        // above, so a promoted negative result read as scratch (S-18b). Two
+        // OPTIONAL MATCHes because AGE has no edge alternation, and the names
+        // are lower-case because a camelCase RETURN name decodes as null.
+        against: optional(vertexProps<{ natural_id: string }>()),
         promoting: optional(vertexProps<{ decided_at: string }>()),
+        denying: optional(vertexProps<{ decided_at: string }>()),
         accepting: optional(vertexProps<{ decided_at: string }>()),
       },
       { at: asOf },
@@ -201,7 +210,11 @@ export class ReadSurface extends SessionCore {
       // A promotion only counts toward *this* question if the resolution it
       // qualifies had also happened -- otherwise a claim promoted early would
       // establish a question resolved later.
-      entry.promoted ||= resolvedByThen && row.promoting !== null && row.promoting.decided_at <= asOf;
+      // Either promotion, and still read from the PROMOTES decision rather than
+      // the claim's current `kind` -- `kind` is right for now and wrong for any
+      // past instant, which is what this whole method is about.
+      const vouched = row.promoting ?? row.denying;
+      entry.promoted ||= resolvedByThen && vouched !== null && vouched.decided_at <= asOf;
       entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= asOf;
       by.set(row.q.natural_id, entry);
     }
@@ -237,15 +250,20 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
        OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
        OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
+       OPTIONAL MATCH (cited)-[:CHALLENGES]->(against:Claim)
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
        OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)
-       RETURN q, cited, work, accepting, settled`,
+       RETURN q, cited, work, accepting, settled, against`,
       {
         q: vertexProps<{ natural_id: string; name: string }>(),
         cited: optional(vertexProps<{ natural_id: string }>()),
         work: optional(vertexProps<{ natural_id: string }>()),
         accepting: optional(vertexProps<{ natural_id: string }>()),
         settled: optional(vertexProps<{ kind?: string }>()),
+        // The claim the closing evidence bears AGAINST. A question answered
+        // *no* is settled this way and matched nothing above, so a promoted
+        // negative result counted as scratch (S-18b).
+        against: optional(vertexProps<{ kind?: string }>()),
       },
     );
 
@@ -264,7 +282,7 @@ export class ReadSurface extends SessionCore {
       entry.cited ||= row.cited !== null;
       entry.worked ||= row.work !== null;
       entry.accepted ||= row.accepting !== null;
-      entry.promoted ||= row.settled?.kind === "confirmatory";
+      entry.promoted ||= (row.settled ?? row.against)?.kind === "confirmatory";
       byQuestion.set(row.q.natural_id, entry);
     }
 
@@ -437,10 +455,22 @@ export class ReadSurface extends SessionCore {
     // Answered either way -- the question is settled as far as anyone has taken
     // it -- but a reader deciding whether to build on it should not have to go
     // and look (S-18).
+    // **Both bearings.** A question answered *no* is settled by evidence that
+    // CHALLENGES the claim, and walking only SUPPORTS found no claim at all --
+    // so a negative result somebody had vouched for reported itself as resting
+    // on scratch, which tells a reader not to build on it (S-18b). Third time
+    // this assumption has been found in a query path: `scopeOf` and
+    // `closeEnquiry`'s ownership check were the first two. No edge alternation
+    // in AGE, so it is two OPTIONAL MATCHes, exactly as `conclusionsOf` does.
     const promoted = await this.graph.query(
-      `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(:Evidence)-[:SUPPORTS]->(c:Claim)
-       RETURN c`,
-      { c: vertexProps<{ kind?: string }>() },
+      `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
+       OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
+       RETURN sc, cc`,
+      {
+        sc: optional(vertexProps<{ kind?: string }>()),
+        cc: optional(vertexProps<{ kind?: string }>()),
+      },
       { id: resolving!.natural_id },
     );
     return {
@@ -457,7 +487,9 @@ export class ReadSurface extends SessionCore {
           cited.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
           (f) => f.evidence.id,
         ),
-        restsOn: promoted.some((r) => r.c.kind === "confirmatory") ? "confirmatory" : "exploratory",
+        restsOn: promoted.some((r) => (r.sc ?? r.cc)?.kind === "confirmatory")
+          ? "confirmatory"
+          : "exploratory",
       },
     };
   }
@@ -588,56 +620,70 @@ export class ReadSurface extends SessionCore {
     // the names made those the same execution input. That is the identity-
     // versus-wording mistake this project has now found in four unrelated
     // places (S-5, S-12, S-3b, and here, by external review).
-    // Ordered by the position the caller gave, which the CONSUMES edge now
-    // carries. Runs recorded before that have no position; they sort last and
+    // What a run read, **in order and with repeats**, plus the same as a set
+    // for the difference calculation below.
+    //
+    // Two shapes because they answer different questions. `read` is the
+    // sequence the caller gave: `from: [A, B, A]` is three occurrences and a
+    // reader comparing two runs needs all three. `bySubject` is which records
+    // were involved, which is what `differs` is about -- reading one twice and
+    // reading it once are not a *difference in inputs*, they are a difference
+    // in the sequence, and the two lists show that plainly.
+    //
+    // Edges written before `positions` existed have none; they sort last and
     // among themselves by identity, so the list is stable rather than
-    // arbitrary. Absence of a position is not zero.
+    // arbitrary. An absent position is not position zero.
     const inputs = async (
       computation: string,
-    ): Promise<Map<string, IdentifiedArtefact>> => {
+    ): Promise<{ read: IdentifiedArtefact[]; bySubject: Map<string, IdentifiedArtefact> }> => {
       const rows = await this.graph.query(
         `MATCH (:Computation {natural_id: $id})-[c:CONSUMES]->(a:Artefact) RETURN a, c`,
         {
           a: vertexProps<{ natural_id: string; logical_name: string }>(),
-          c: edgeProps<{ position?: number }>(),
+          c: edgeProps<{ positions?: number[] }>(),
         },
         { id: computation },
       );
-      const ordered = [...rows].sort((x, y) => {
-        const xp = x.c.position ?? Number.MAX_SAFE_INTEGER;
-        const yp = y.c.position ?? Number.MAX_SAFE_INTEGER;
-        return xp - yp || x.a.natural_id.localeCompare(y.a.natural_id);
-      });
-      return new Map(
-        ordered.map((r) => [
-          r.a.natural_id,
-          { part: ref("observations", r.a.natural_id), name: r.a.logical_name },
-        ]),
+      const occurrences = rows.flatMap((r) =>
+        (r.c.positions ?? [Number.MAX_SAFE_INTEGER]).map((position) => ({ position, a: r.a })),
       );
+      occurrences.sort(
+        (x, y) => x.position - y.position || x.a.natural_id.localeCompare(y.a.natural_id),
+      );
+      const identify = (a: { natural_id: string; logical_name: string }): IdentifiedArtefact => ({
+        part: ref("observations", a.natural_id),
+        name: a.logical_name,
+      });
+      return {
+        read: occurrences.map((o) => identify(o.a)),
+        bySubject: new Map(rows.map((r) => [r.a.natural_id, identify(r.a)])),
+      };
     };
     const mine = await inputs(verification.id);
     const theirs = await inputs(found.oldcomp.natural_id);
+    const mineBy = mine.bySubject;
+    const theirsBy = theirs.bySubject;
 
     // Absence and difference are not the same answer, and absence on BOTH sides
     // is still absence: two runs that each recorded nothing have not reproduced
     // anything, they have simply both failed to say what they read. Comparing
     // the two empty sets reported `reproduced`, contradicting the premise the
     // scenario exists for.
-    const provenanceMissing = theirs.size === 0;
+    const provenanceMissing = theirsBy.size === 0;
     const differs: ReproductionReport["differs"] = provenanceMissing
-      ? [...mine.values()].map((what) => ({
+      ? [...mineBy.values()].map((what) => ({
           what,
           standing: "unrecorded-in-the-original" as const,
         }))
       : [
-          ...[...mine]
-            .filter(([id]) => !theirs.has(id))
+          ...[...mineBy]
+            .filter(([id]) => !theirsBy.has(id))
             .map(([, what]) => ({ what, standing: "changed" as const })),
           // The other direction, which was not computed at all: an input the
           // original read and the re-run did not is a difference too, and
           // reporting `not-reproduced` with an empty `differs` named nothing.
-          ...[...theirs]
-            .filter(([id]) => !mine.has(id))
+          ...[...theirsBy]
+            .filter(([id]) => !mineBy.has(id))
             .map(([, what]) => ({
               what,
               standing: "not-used-by-the-re-run" as const,
@@ -677,8 +723,8 @@ export class ReadSurface extends SessionCore {
       // Both lists, in order, and no verdict over them. Whether the same
       // records read in a different order is the same execution depends on what
       // the method does; the record does not know and does not guess.
-      verificationRead: [...mine.values()],
-      ofRead: [...theirs.values()],
+      verificationRead: mine.read,
+      ofRead: theirs.read,
       differs,
       // Which way the RE-RUN cuts for the claim -- a question about the
       // proposition, not about whether the two runs concur. Two runs that agree

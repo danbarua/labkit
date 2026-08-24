@@ -42,7 +42,7 @@ These change nothing.
 - [`enquiry_status`](#enquiry-status) — Whether a line of enquiry is open
 - [`design_history`](#design-history) — How a gate's conditions were amended
 - [`interpretation_history`](#interpretation-history) — How a claim's reading was narrowed
-- [`reproduction_of`](#reproduction-of) — Whether a re-run reproduced its original
+- [`reproduction_of`](#reproduction-of) — What a re-run read, against what its original read
 - [`claims_asserting`](#claims-asserting) — Which claims assert a proposition
 - [`pursuits_of`](#pursuits-of) — The lines of enquiry under a question
 - [`origin_of`](#origin-of) — Where a question came from
@@ -402,9 +402,9 @@ How a claim's current reading was arrived at: the claims each step withdrew, the
 
 ## reproduction_of
 
-*Whether a re-run reproduced its original* — read-only
+*What a re-run read, against what its original read* — read-only
 
-What a verifying analysis re-checked and whether it reproduced the original — derived from what each run recorded consuming, not from a stored flag, so there is no value anyone can set to `reproduced`. Takes the id of the analysis that did the verifying, not the one being verified.
+What a verifying analysis re-checked, what each of the two runs read (in the order given, repeats included) and what differs between them. It does **not** say whether the re-run reproduced the original: whether reading the same records constitutes the same execution depends on what the method does, which the record does not know. `conclusion` says only whether the two runs' findings cut the same way. Takes the id of the analysis that did the verifying, not the one being verified.
 
 **Takes**
 

@@ -18,11 +18,14 @@
  * agent that can only read a record nothing lets it write is answering
  * questions about an empty graph.
  *
- * Not every verb is exposed. The reads are the questions a caller actually
- * asks; the writes are the loop that makes a programme exist — ask a question,
- * open an enquiry on it, record what was measured, record what was concluded,
- * close it. The other nine commands in `src/domain/commands.ts` follow the same
- * pattern and are a later pass.
+ * **Every public verb on either surface is exposed**, or listed in
+ * `NOT_EXPOSED` with a reason — `tests/mcp.test.ts` derives the list from the
+ * source and fails otherwise, and `tests/mcp-smoke.test.ts` fails if any tool
+ * goes uncalled. This comment used to say nine commands were "a later pass";
+ * they landed, and the sentence outlived them.
+ *
+ * `docs/mcp-tools.md` is the tool list. This file deliberately does not count
+ * them.
  */
 
 import { z } from "zod";
@@ -226,12 +229,14 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
 
   tool({
     name: "reproduction_of",
-    title: "Whether a re-run reproduced its original",
+    title: "What a re-run read, against what its original read",
     description:
-      "What a verifying analysis re-checked and whether it reproduced the original — derived " +
-      "from what each run recorded consuming, not from a stored flag, so there is no value " +
-      "anyone can set to `reproduced`. Takes the id of the analysis that did the verifying, " +
-      "not the one being verified.",
+      "What a verifying analysis re-checked, what each of the two runs read (in the order " +
+      "given, repeats included) and what differs between them. It does **not** say whether " +
+      "the re-run reproduced the original: whether reading the same records constitutes the " +
+      "same execution depends on what the method does, which the record does not know. " +
+      "`conclusion` says only whether the two runs' findings cut the same way. Takes the id " +
+      "of the analysis that did the verifying, not the one being verified.",
     inputSchema: { analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`) },
     outputSchema: reproductionReportSchema,
     handler: (read, { analysis }) => read.reproductionOf({ kind: "analysis", id: analysis }),

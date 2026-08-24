@@ -73,7 +73,7 @@ export function buildServer(read: ReadSurface, write: WriteSurface): McpServer {
     "tool-docs",
     DOCS_URI,
     {
-      title: "LabKit read tools",
+      title: "LabKit tools",
       description:
         "Human-readable documentation of every tool this server exposes -- what each " +
         "answers, what it takes and what it returns -- generated from the tool " +
