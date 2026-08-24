@@ -26,6 +26,7 @@
  */
 
 import type { TenantGraph } from "../db/graph";
+import type { IndexedString, Prose } from "../db/domain";
 import { optional, vertexProps } from "../db/cypher";
 import {
   type AttributionContext,
@@ -39,6 +40,9 @@ import {
 import type {
   ClaimRef,
   AnalysisRef,
+  EnquiryRef,
+  EvidenceRef,
+  GateRef,
   ConfirmatoryResult,
   ReplacementClaim,
   DecidedQuestion,
@@ -101,7 +105,7 @@ export class SessionCore {
    */
   protected async findingOn(
     claim: ClaimRef,
-  ): Promise<{ evidence: string; asserts: string } | undefined> {
+  ): Promise<{ evidence: EvidenceRef; asserts: Prose } | undefined> {
     for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
       const rows = await this.graph.query(
         `MATCH (c:Claim {natural_id: $id})<-[:${bearing}]-(e:Evidence)
@@ -113,13 +117,13 @@ export class SessionCore {
         { id: claim.id },
       );
       const found = rows[0];
-      if (found) return { evidence: found.e.natural_id, asserts: found.c.name };
+      if (found) return { evidence: ref("evidence", found.e.natural_id), asserts: found.c.name };
     }
     return undefined;
   }
 
   /** What a claim asserts. */
-  protected async assertedBy(claim: ClaimRef): Promise<string | undefined> {
+  protected async assertedBy(claim: ClaimRef): Promise<Prose | undefined> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ name: string }>() },
@@ -131,8 +135,8 @@ export class SessionCore {
   /** The single finding by which an analysis concluded something about one proposition. */
   protected async findingFor(
     analysis: AnalysisRef,
-    proposition: string,
-  ): Promise<string | undefined> {
+    proposition: IndexedString,
+  ): Promise<EvidenceRef | undefined> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $analysis})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim {name: $proposition})
@@ -145,7 +149,8 @@ export class SessionCore {
       },
       { analysis: analysis.id, proposition },
     );
-    return rows.find((r) => r.sc !== null || r.cc !== null)?.e.natural_id;
+    const found = rows.find((r) => r.sc !== null || r.cc !== null);
+    return found ? ref("evidence", found.e.natural_id) : undefined;
   }
 
   /**
@@ -154,14 +159,27 @@ export class SessionCore {
    * no qualifier, and every scenario before S-5 relies on that.
    */
 
-  protected withinScope(scope: { enquiry?: string }): string {
+  protected withinScope(scope: { enquiry?: EnquiryRef }): string {
     return scope.enquiry
       ? `MATCH (u)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})`
       : "";
   }
 
+  /**
+   * The params half of {@link withinScope}, so the clause and the binding it
+   * needs are never written apart.
+   *
+   * They were: eight call sites each spelled
+   * `...(scope.enquiry ? { enquiry: scope.enquiry } : {})` beside a
+   * `withinScope(scope)`, and a clause emitted without its param is a Cypher
+   * error at runtime rather than a type error now.
+   */
+  protected scopeParams(scope: { enquiry?: EnquiryRef }): { enquiry?: string } {
+    return scope.enquiry ? { enquiry: scope.enquiry.id } : {};
+  }
+
   /** Work these gates protect, and which therefore has to be run again when their condition changes. */
-  protected async workGatedBy(gates: string[]): Promise<GatedWork[]> {
+  protected async workGatedBy(gates: GateRef[]): Promise<GatedWork[]> {
     // Keyed by id, not by objective. Two tasks can share an objective and be
     // two tasks; deduping on the text reported one piece of work to re-run
     // where there were two. Same traversal `gateStatus` reports as
@@ -171,7 +189,7 @@ export class SessionCore {
       const rows = await this.graph.query(
         `MATCH (:Gate {natural_id: $id})-[:GATES]->(t:Task) RETURN t`,
         { t: vertexProps<{ objective: string; natural_id: string }>() },
-        { id: gate },
+        { id: gate.id },
       );
       for (const row of rows)
         found.set(row.t.natural_id, { work: ref("work", row.t.natural_id), objective: row.t.objective });
@@ -189,7 +207,7 @@ export class SessionCore {
    * gives — see S-4 on absence of evidence reading as a negative.
    */
 
-  protected async confirmatoryResultsBehind(gates: string[]): Promise<ConfirmatoryResult[]> {
+  protected async confirmatoryResultsBehind(gates: GateRef[]): Promise<ConfirmatoryResult[]> {
     // Keyed by id. S-5's literal case: one sentence asserted in two lines of
     // enquiry is two claims, and merging them understated the blast radius of
     // a scientific amendment.
@@ -201,7 +219,7 @@ export class SessionCore {
            MATCH (u)-[:PRODUCES]->(e:Evidence)-[:${bearing}]->(c:Claim)
            RETURN c`,
           { c: vertexProps<{ name: string; kind?: string; natural_id: string }>() },
-          { id: gate },
+          { id: gate.id },
         );
         for (const row of rows)
           if (row.c.kind === "confirmatory")
@@ -213,8 +231,8 @@ export class SessionCore {
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */
   protected async withdrawalOf(scope: {
-    proposition: string;
-    enquiry?: string;
+    proposition: IndexedString;
+    enquiry?: EnquiryRef;
   }): Promise<{ withdrawn: boolean; replacedBy?: ReplacementClaim }> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
@@ -227,10 +245,7 @@ export class SessionCore {
         d: optional(vertexProps<{ natural_id: string }>()),
         now: optional(vertexProps<{ name: string; natural_id: string }>()),
       },
-      {
-        name: scope.proposition,
-        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
-      },
+      { name: scope.proposition, ...this.scopeParams(scope) },
     );
     if (rows.length === 0) return { withdrawn: false };
 
@@ -255,8 +270,8 @@ export class SessionCore {
   /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
 
   protected async decidedOnTheStrengthOf(scope: {
-    proposition: string;
-    enquiry?: string;
+    proposition: IndexedString;
+    enquiry?: EnquiryRef;
   }): Promise<DecidedQuestion[]> {
     // Keyed by id. Two identically-worded questions are two questions -- S-1
     // poses exactly that pair, and `report.ts` says neither may be resolved by
@@ -273,10 +288,7 @@ export class SessionCore {
          MATCH (d)-[:RESOLVES]->(q:Question)
          RETURN q`,
         { q: vertexProps<{ name: string; natural_id: string }>() },
-        {
-          name: scope.proposition,
-          ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
-        },
+        { name: scope.proposition, ...this.scopeParams(scope) },
       );
       for (const row of rows)
         asked.set(row.q.natural_id, { question: ref("question", row.q.natural_id), asks: row.q.name });
@@ -286,7 +298,7 @@ export class SessionCore {
 
   protected async scopeOf(
     claim: ClaimRef,
-  ): Promise<{ proposition: string; enquiry?: string }> {
+  ): Promise<{ proposition: IndexedString; enquiry?: EnquiryRef }> {
     // BOTH bearings. A conclusion that challenges its proposition reaches its
     // line of enquiry the same way one that supports it does, and walking only
     // SUPPORTS lost the enquiry for every challenging claim -- which S-5's
@@ -308,6 +320,6 @@ export class SessionCore {
       enquiry ??= rows.find((r) => r.loe)?.loe?.natural_id;
     }
     if (name === undefined) throw new Error(`no claim ${claim.id}`);
-    return { proposition: name, ...(enquiry ? { enquiry } : {}) };
+    return { proposition: name, ...(enquiry ? { enquiry: ref("enquiry", enquiry) } : {}) };
   }
 }

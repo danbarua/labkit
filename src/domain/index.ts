@@ -39,6 +39,7 @@ export type {
   RecordedAnalysis,
   ClaimRef,
   EvidenceRef,
+  UnitRef,
   EvaluationRef,
   DecisionRef,
   Condition,

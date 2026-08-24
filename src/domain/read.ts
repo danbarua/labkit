@@ -18,6 +18,10 @@ import type {
   ClaimProps,
   ComputationProps,
   EvidenceProps,
+  IdentityString,
+  IndexedString,
+  Prose,
+  Timestamp,
 } from "../db/domain";
 import type {
   HistoricalSurvey,
@@ -34,6 +38,7 @@ import type {
   EnquiryStatus,
   EvaluationRecord,
   CriterionRef,
+  DecisionRef,
   GateRef,
   GateStatus,
   WorkRef,
@@ -157,7 +162,7 @@ export class ReadSurface extends SessionCore {
    * `Date.parse` accepted it, which is exactly why validating a string is not
    * the same as being able to order it.
    */
-  async whatWasKnown(at: string): Promise<HistoricalSurvey> {
+  async whatWasKnown(at: Timestamp): Promise<HistoricalSurvey> {
     const parsed = Date.parse(at);
     if (Number.isNaN(parsed))
       throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
@@ -502,7 +507,7 @@ export class ReadSurface extends SessionCore {
    * closed set of literals here, never from a caller.
    */
   private async findingsBearing(
-    scope: { proposition: string; enquiry?: string },
+    scope: { proposition: IndexedString; enquiry?: EnquiryRef },
     bearing: "SUPPORTS" | "CHALLENGES",
   ) {
     return this.graph.query(
@@ -521,7 +526,7 @@ export class ReadSurface extends SessionCore {
       },
       {
         name: scope.proposition,
-        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+        ...this.scopeParams(scope),
       },
     );
   }
@@ -772,22 +777,22 @@ export class ReadSurface extends SessionCore {
       );
     }
 
-    const chain = await this.amendmentChain(gate.id);
-    const rerun = await this.workGatedBy([gate.id]);
-    const confirmatory = await this.confirmatoryResultsBehind([gate.id]);
+    const chain = await this.amendmentChain(gate);
+    const rerun = await this.workGatedBy([gate]);
+    const confirmatory = await this.confirmatoryResultsBehind([gate]);
     const nature =
       confirmatory.length > 0
         ? ("scientific" as const)
         : ("mechanical" as const);
 
     const amendments: AmendmentRecord[] = chain.map((step, i) => {
-      const wasCriterion = changedBy.get(step.decision);
+      const wasCriterion = changedBy.get(step.decision.id);
       const nextCriterion =
         i + 1 < chain.length
-          ? changedBy.get(chain[i + 1]!.decision)
+          ? changedBy.get(chain[i + 1]!.decision.id)
           : inForce[0];
       return {
-        amendment: ref("decision", step.decision),
+        amendment: step.decision,
         replaced: {
           criterion: ref("criterion", wasCriterion ?? ""),
           requires: (wasCriterion && propositionOf.get(wasCriterion)) ?? "",
@@ -821,8 +826,8 @@ export class ReadSurface extends SessionCore {
 
   /** Amendments to one design, ordered oldest-first by following supersession back to its root. */
   private async amendmentChain(
-    gateId: string,
-  ): Promise<Array<{ decision: string; reason: string; citing: CitedFinding[] }>> {
+    gate: GateRef,
+  ): Promise<Array<{ decision: DecisionRef; reason: Prose; citing: CitedFinding[] }>> {
     const rows = await this.graph.query(
       `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
        OPTIONAL MATCH (d)-[:SUPERSEDES]->(older:Decision)
@@ -833,7 +838,7 @@ export class ReadSurface extends SessionCore {
         older: optional(vertexProps<{ natural_id: string }>()),
         e: optional(vertexProps<{ statement: string } & Identified>()),
       },
-      { id: gateId },
+      { id: gate.id },
     );
 
     const nodes = new Map<
@@ -860,15 +865,15 @@ export class ReadSurface extends SessionCore {
     }
 
     const ordered: Array<{
-      decision: string;
-      reason: string;
+      decision: DecisionRef;
+      reason: Prose;
       citing: CitedFinding[];
     }> = [];
     let cursor = root;
     while (cursor) {
       const node = nodes.get(cursor)!;
       ordered.push({
-        decision: cursor,
+        decision: ref("decision", cursor),
         reason: node.reason,
         citing: [...node.citing.values()].sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
       });
@@ -881,7 +886,7 @@ export class ReadSurface extends SessionCore {
     // refuses to render.
     if (ordered.length !== nodes.size) {
       throw new Error(
-        `gate ${gateId} has ${nodes.size} amendments but only ${ordered.length} form a chain; its history is not a single line`,
+        `gate ${gate.id} has ${nodes.size} amendments but only ${ordered.length} form a chain; its history is not a single line`,
       );
     }
     return ordered;
@@ -1260,7 +1265,13 @@ export class ReadSurface extends SessionCore {
     const sides = [await this.sideOf(a), await this.sideOf(b)];
     const [left, right] = sides;
 
-    const sameScope = left!.enquiry === right!.enquiry;
+    // `.id`, not the handles. `EnquiryRef` is an object, so `===` between two
+    // of them is reference equality and is false even for the same enquiry --
+    // which read as "different lines of enquiry" and turned a contradiction
+    // into a dissociation, silently. The compiler accepts it: both sides have
+    // the same type. Caught by S-5, which exists to catch exactly the class of
+    // error where two records are wrongly told apart or run together.
+    const sameScope = left!.enquiry.id === right!.enquiry.id;
     if (!sameScope) {
       // Support for equivalence on one endpoint says nothing about another.
       // Identical wording does not make them one claim.
@@ -1285,14 +1296,14 @@ export class ReadSurface extends SessionCore {
   }
   private async sideOf(
     conclusion: ClaimRef,
-  ): Promise<ConflictSide & { enquiry: string }> {
+  ): Promise<ConflictSide & { enquiry: EnquiryRef }> {
     const resolved = await this.scopeOf(conclusion);
     const enquiry = resolved.enquiry!;
 
     const asked = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
       { q: vertexProps<{ name: string } & Identified>() },
-      { id: enquiry },
+      { id: enquiry.id },
     );
 
     const scope = resolved;
@@ -1331,7 +1342,7 @@ export class ReadSurface extends SessionCore {
    * picking one and being wrong when a sentence is asserted in two lines of
    * enquiry (S-5).
    */
-  async claimsAsserting(proposition: string): Promise<ConcludedClaim[]> {
+  async claimsAsserting(proposition: IndexedString): Promise<ConcludedClaim[]> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name}) RETURN c`,
       { c: vertexProps<{ name: string } & Identified>() },
@@ -1446,7 +1457,7 @@ export class ReadSurface extends SessionCore {
       },
       {
         name: proposition,
-        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+        ...this.scopeParams(scope),
       },
     );
 
@@ -1492,7 +1503,7 @@ export class ReadSurface extends SessionCore {
       },
       {
         name: proposition,
-        ...(scope.enquiry ? { enquiry: scope.enquiry } : {}),
+        ...this.scopeParams(scope),
       },
     );
     const standard = this.checksFrom(standardRows);
@@ -1520,7 +1531,7 @@ export class ReadSurface extends SessionCore {
         c: vertexProps<{ kind?: string }>(),
         d: optional(vertexProps<{ reason: string }>()),
       },
-      { name: proposition, ...(scope.enquiry ? { enquiry: scope.enquiry } : {}) },
+      { name: proposition, ...this.scopeParams(scope) },
     );
     const confirmed = promotion.some((r) => r.c.kind === "confirmatory");
     const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
@@ -1591,7 +1602,7 @@ export class ReadSurface extends SessionCore {
    */
   async reproducibilityOf(
     analysis: AnalysisRef,
-    rebuilt: Array<{ part: ObservationsRef; hash: string }>,
+    rebuilt: Array<{ part: ObservationsRef; hash: IdentityString }>,
   ): Promise<ReproducibilityReport> {
     const offered = new Map(rebuilt.map((r) => [r.part.id, r.hash]));
 
@@ -1695,9 +1706,10 @@ export class ReadSurface extends SessionCore {
    * silently inheriting the original's standing" the scenario exists to prevent.
    */
   async whatDependsOn(
-    subject: string | ObservationsRef,
+    subject: IndexedString | ObservationsRef,
   ): Promise<DependencyReport> {
-    const start = typeof subject === "string" ? await this.artefactNamed(subject) : subject.id;
+    const start =
+      typeof subject === "string" ? (await this.artefactNamed(subject)).id : subject.id;
 
     // Walk the pipeline downstream before asking what rests on it. An analysis
     // can read another analysis's output (row AE), so invalidating a raw input
@@ -1736,7 +1748,7 @@ export class ReadSurface extends SessionCore {
     const claims = new Map<string, AffectedClaim>();
     const enquiries = new Map<string, AffectedEnquiry>();
     for (const artefact of reached) {
-      const { claims: c, enquiries: e } = await this.restingOnArtefact(artefact);
+      const { claims: c, enquiries: e } = await this.restingOnArtefact(ref("observations", artefact));
       for (const found of c) claims.set(found.claim.id, found);
       for (const found of e) enquiries.set(found.enquiry.id, found);
     }
@@ -1758,7 +1770,7 @@ export class ReadSurface extends SessionCore {
 
   /** The claims and enquiries resting on one artefact, by the two direct routes. */
   private async restingOnArtefact(
-    artefact: string,
+    artefact: ObservationsRef,
   ): Promise<{ claims: AffectedClaim[]; enquiries: AffectedEnquiry[] }> {
     const rows = await this.graph.query(
       `MATCH (a:Artefact {natural_id: $id})
@@ -1772,7 +1784,7 @@ export class ReadSurface extends SessionCore {
         challenged: optional(vertexProps<ClaimProps & Identified>()),
         loe: optional(vertexProps<{ name: string } & Identified>()),
       },
-      { id: artefact },
+      { id: artefact.id },
     );
 
     // The input side. Separate query rather than more OPTIONAL MATCHes on the
@@ -1790,7 +1802,7 @@ export class ReadSurface extends SessionCore {
         challenged: optional(vertexProps<ClaimProps & Identified>()),
         loe: optional(vertexProps<{ name: string } & Identified>()),
       },
-      { id: artefact },
+      { id: artefact.id },
     );
 
     const all = [...rows, ...consumers];
@@ -1816,7 +1828,7 @@ export class ReadSurface extends SessionCore {
    * inferred one. Declining beats guessing, exactly as it does for a claim
    * asserted in two lines of enquiry (S-5).
    */
-  private async artefactNamed(name: string): Promise<string> {
+  private async artefactNamed(name: IndexedString): Promise<ObservationsRef> {
     const rows = await this.graph.query(
       `MATCH (a:Artefact {logical_name: $name}) RETURN a`,
       { a: vertexProps<{ natural_id: string }>() },
@@ -1828,7 +1840,7 @@ export class ReadSurface extends SessionCore {
         `${rows.length} artefacts are named "${name}"; name which, by the record that produced it`,
       );
     }
-    return rows[0]!.a.natural_id;
+    return ref("observations", rows[0]!.a.natural_id);
   }
 
 }

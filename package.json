@@ -19,6 +19,7 @@
     "check:doc-comments": "bun scripts/check-doc-comments.ts",
     "check:migrations": "bun scripts/check-migrations.ts",
     "check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
+    "check:no-stringly-typed": "bun scripts/check-no-stringly-typed.ts",
     "check:prop-classes": "bun scripts/check-prop-classes.ts",
     "check:stdout": "bash scripts/check-stdout.sh",
     "check:pglite-concurrency": "bash scripts/check-pglite-concurrency.sh",
