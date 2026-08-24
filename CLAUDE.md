@@ -791,9 +791,8 @@ measured 2026-08-21 and not since.** It is not today's rate and should not be
 used as one. That run's own note says its dominant cost was
 `provisionTenantGraph()` re-checking ~38 labels at one round trip each — the
 exact work `6eeeb92` deleted hours later — so 16ms is an average over a query
-mix that no longer exists, biased in a direction nobody has measured. Every
-extrapolation in `docs/TASKS.md` that multiplies a query count by it inherits
-that. Re-measure before relying on it.
+mix that no longer exists, biased in a direction nobody has measured.
+Re-measure before relying on it rather than carrying it forward.
 
 Two costs the old sentence never named:
 `reset()` in `tests/helpers/db.ts` is ~35-40ms a call and **29%** of suite query
@@ -809,4 +808,5 @@ Measured 2026-08-24, twelve runs, ABBA-interleaved under saturated CPU: median
 one failing test per run both before and after, ~5% off wall time. Reducing a
 test's query count makes the suite faster without making it less flaky, because
 the ceiling is crossed by whichever test is unlucky rather than by the slowest
-one. See `docs/TASKS.md` for the table, the method and what has been refuted.
+one. `docs/TASKS.md` carries the method and what has been refuted; session-log
+entries 022, 024 and 026 carry the numbers.
