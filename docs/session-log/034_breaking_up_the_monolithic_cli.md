@@ -9,59 +9,44 @@ with `close-entry.sh` before this work began.
 ## Goal
 
 Port the 1435-line `src/cli.ts` into `src/cli/` by separation of concerns, on a
-real argument-parsing library, without touching the working one.
+real argument-parsing library, without breaking the working one on the way.
 
 ## Changed
 
-Open as **PR #23**, staged. Stage 3 pushes to the same branch.
+**PR #23**, three stages on one branch. Complete.
 
 **`006b22e` — stage 1: skeleton, views, read commands.**
-
-- `src/cli/cli.ts` — the composition root, 54 lines.
-- `src/cli/program.ts` — assembles the commands, connects to nothing, so a test
-  can build the whole surface and inspect it.
-- `src/cli/session.ts` — the wrap: connect, resolve tenant, build both surfaces
-  over one graph and one durable sink, run, print, close. `Run` is *injected*
-  into the command modules, which is what lets the contract test drive every
-  command with no database.
-- `src/cli/args.ts` — argv to domain values, on zod; every coercion throws
-  commander's `InvalidArgumentError`, so a caller's typo stays distinct from a
-  verb's deliberate refusal.
-- `src/cli/views/{format,knowledge,enquiry,gates,analysis,events}.ts` — the
-  eighteen renderers, extracted verbatim with their comments.
-- `src/cli/commands/reads.ts`, `tests/cli/{views,coverage,json-contract}.test.ts`,
-  `scripts/check-stdout.sh` (both roots exempt by name), commander 15.
+`src/cli/cli.ts` (composition root, 54 lines), `program.ts` (assembles commands,
+connects to nothing), `session.ts` (the wrap: connect, resolve, build both
+surfaces over one graph and one durable sink, run, print, close — `Run` is
+*injected*, which is what lets tests drive commands with no database),
+`args.ts` (argv to domain values, on zod, throwing commander's
+`InvalidArgumentError`), `views/*` (the eighteen renderers, extracted verbatim),
+`commands/reads.ts`, `tests/cli/{views,coverage,json-contract}.test.ts`,
+commander 15.
 
 **`ca72106` — split the example from the check.** `bun run example` was a smoke
-test wearing the name: it captured every answer into a variable and printed
-`ok <label>`.
-
-- `examples/full-lifecycle.sh` — shows each command as typed with its real
-  output and a few lines of intent per section.
-- `scripts/smoke-cli.sh` **new** (`bun run check:cli`) — the assertions,
-  unchanged.
-- `examples/full-lifecycle.md` — was archaeology plus a hundred-line checklist
-  with the example below the fold; now the walkthrough with real output inline.
-- `docs/persistence-spikes.md` **new** — those spike outcomes, as findings.
-- `CLAUDE.md`, `.claude/skills/wrap/SKILL.md` — the two script names.
+test wearing the name. Now: `examples/full-lifecycle.sh` shows each command as
+typed with its real output; `scripts/smoke-cli.sh` (`bun run check:cli`) keeps
+the assertions; `examples/full-lifecycle.md` is the walkthrough rather than
+archaeology; `docs/persistence-spikes.md` **new** takes the spike outcomes.
 
 **`a9234d8` — stage 2: the eighteen write commands.**
+`src/cli/commands/writes.ts`. The five `void` verbs answer `{ok, acted}`,
+declared locally — nothing under `src/cli/` imports `src/mcp`.
+`scripts/diff-cli.sh` **new**, the old-vs-new transcript differential.
+The contract test's seed now drives the write **commands**, so eleven write
+answers are parsed against the MCP schema for the same verb.
 
-- `src/cli/commands/writes.ts` — one declaration per `WriteSurface` verb. The
-  five that return `void` answer `{ok, acted}`, the shape MCP uses, **declared
-  locally rather than imported** — nothing under `src/cli/` imports `src/mcp`.
-- `scripts/diff-cli.sh` **new** (`bun run check:cli-diff`) — runs the example
-  against both CLIs and diffs the transcripts. Scaffolding; dies at cutover.
-- `tests/cli/json-contract.test.ts` — its seed now drives the **write commands**
-  rather than the surfaces, so eleven write answers are captured as they happen
-  and parsed against the MCP schema for the same verb. Missing `afterAll` added.
-- `tests/cli/coverage.test.ts` — write-verb coverage, symmetric with reads.
-- `docs/dependency-graph.mmd` regenerated.
+**`4bf6a9f` — stage 3: cutover.** `bin`, `dev`, `build` → `src/cli/cli.ts`.
+`src/cli.ts`, `tests/cli.test.ts` and `scripts/diff-cli.sh` deleted.
+`scripts/check-test-teardown.ts` **new** (`bun run check:test-teardown`).
+`tests/cli/wiring.test.ts` and `tests/cli/args.test.ts` **new** — the
+assertions the deleted file was about to take with it.
+`check-stdout.sh` narrows back to one exemption. `CLAUDE.md`, `docs/TASKS.md`,
+`docs/dependency-graph.mmd`.
 
-**`390f156`, `c70820a`** are this entry.
-
-**`src/cli.ts` is untouched** and still the entry point: `bin`, `dev` and
-`build` all point at it. Both trees pass their tests.
+**`390f156`, `c70820a`, and this commit** are the entry.
 
 Working tree clean.
 
@@ -69,64 +54,70 @@ Working tree clean.
 
 None of it piped.
 
-- `bun test` — **366 pass, 0 fail, exit 0**, 1871 assertions, 52 files.
+- `bun test` — **352 pass, 0 fail, exit 0**, 1732 assertions, 53 files.
 - `bun run typecheck` — clean.
-- `npx depcruise src tests --output-type err` — no violations, 120 modules, 433
+- `npx depcruise src tests --output-type err` — no violations, 120 modules, 421
   dependencies.
-- `check:stdout`, `check:tests-assert`, `check:doc-comments` — clean.
-- `bun run example`, `bun run check:cli`, `bun run check:cli-diff` — all exit 0.
-- **The two CLIs print byte-identical transcripts** across twenty-odd commands,
-  timestamps and commit hash blanked and nothing else.
-- **Watched to fail, twice**: a `console.log` in `views/format.ts` reddens
-  `check:stdout`; a bullet changed from `-` to `*` in the same file reddens
-  `check:cli-diff` with 38 differing lines.
-
-Not run: `check:pglite-concurrency`, `check:migrations`, `check:prop-classes`,
-`check:no-stringly-typed` — nothing here is in their scope.
+- `check:doc-comments`, `check:tests-assert`, `check:test-teardown`,
+  `check:stdout`, `check:no-stringly-typed`, `check:prop-classes`,
+  `check:migrations`, `check:no-tracked-symlinks` — all clean.
+- `bun run example`, `bun run check:cli`, `bun run dev --help` — all exit 0.
+- **The two CLIs printed byte-identical transcripts** across twenty-odd
+  commands, run one last time immediately before the old one was deleted. The
+  post-cutover example output is byte-identical to the pre-cutover old-CLI
+  transcript, checked directly.
+- **Watched to fail, three times**: a `console.log` in `views/format.ts` reddens
+  `check:stdout`; a bullet changed from `-` to `*` reddens `check:cli-diff` with
+  38 lines; removing the `afterAll` from the contract test reddens
+  `check:test-teardown` by name.
 
 ## Open
 
+**`bun run build` produces a binary that cannot migrate a fresh database.**
+`runMigrations()` resolves `drizzle/` from `import.meta.url`, which inside a
+compiled bundle is `/$bunfs/root/…`, so it dies with
+`Can't find meta/_journal.json file`. **Measured against both entry points** —
+the old `src/cli.ts` built as a binary fails identically — so it predates the
+split and was never caused by it. The binary has simply never been run against
+an empty database, and `bun run build` exits 0 on something that cannot work.
+`docs/TASKS.md` carries it with two shapes of fix, neither chosen.
+
+**Compare old and new test names whenever a test file is retired.** The deleted
+`tests/cli.test.ts` had 24 tests: eight obsoleted by commander generating its
+own help and parsing, thirteen already moved — and three that had done neither,
+including the two guarding confidently-wrong answers (durable sink, real
+attribution). Nothing but the name comparison would have surfaced it.
+
 **A missing `afterAll` is invisible from the file that causes it.** Stage 1's
-contract test never tore down, so its tenant graph survived into
-`tests/scenarios/s18`, whose reader found a question this file had established
-and failed `expect(known.established).toEqual([])`. Deterministic — the two
-files run together reproduce it — and no check looks for a missing teardown.
-Fixed in stage 2.
-
-**oclif was ruled out by this repo's own build target.** Its docs say *"We do
-not support bundling"*, and the only bundler-viable discovery strategy is the
-one that cannot use `oclif.manifest.json`. `bun build --compile` is already a
-script here, so the manifest — which would have given auto-docs and a checkable
-command list — is mutually exclusive with the binary the repo already builds.
-
-**`--json` is the MCP document, with one real exception.** Four MCP tools wrap a
-bare array because `structuredContent` must be an object; the test unwraps.
-`what_happened` genuinely reshapes — flattening attribution, defaulting an
-absent `seq` to `0` — and the CLI prints the `DomainEvent` as held. Asserted as
-a divergence, so it reddens if MCP stops reshaping.
-
-**Coverage runs one way only**, and that was a stated requirement: every verb
-needs a command, a command needs no MCP tool. A terminal-only command cannot
-redden anything.
+contract test never tore down; its tenant graph survived into
+`tests/scenarios/s18`, whose reader found a question this file had established.
+Deterministic, and the red file was not the wrong one. Now checked.
 
 **A document can be worse than the code it describes.**
 `examples/full-lifecycle.md` had a hundred lines of dated spike outcomes above
 the example, as a checklist with one item unticked — read by a newcomer as
 outstanding work they were meant to action. The same instinct had put forty
-lines of commit-message prose in the script header. Neither was caught by any
-check.
+lines of commit-message prose in the script header. No check looks at this.
+
+**oclif was ruled out by this repo's own build target** — *"We do not support
+bundling"*, and the only bundler-viable discovery strategy cannot use
+`oclif.manifest.json`, which is the artefact that would have justified it.
+
+**`--json` is the MCP document, with one recorded exception.** Four MCP tools
+wrap a bare array because `structuredContent` must be an object; the test
+unwraps. `what_happened` genuinely reshapes, and that divergence is asserted so
+it reddens if MCP stops.
+
+**Coverage runs one way only**: every verb needs a command, a command needs no
+MCP tool. A terminal-only command cannot redden anything.
 
 **`--no-ansi` deliberately absent.** Nothing emits an escape sequence yet.
 
-**Two entry points write to stdout until stage 3.** The exemption in
-`check-stdout.sh` names both; it narrows again when the old file goes.
-
 ## Next
 
-Stage 3, same branch and PR: flip `bin`/`dev`/`build` to `src/cli/cli.ts`,
-narrow the stdout exemption to one root, delete `src/cli.ts`,
-`tests/cli.test.ts` and `scripts/diff-cli.sh`, then generate shell completions
-and `docs/cli.md` from the command declarations.
+PR #23 awaits review. Nothing queued behind it.
 
-Run `bun run check:cli-diff` one last time before deleting the old CLI — it is
-the only thing that compares them, and it goes with it.
+Named and not built: shell completions and a generated `docs/cli.md` from the
+command declarations — both were reasons to consider oclif, both are now
+straightforward because `program.ts` builds the whole command surface without a
+database. `bun run docs:tools` is the pattern to copy.
