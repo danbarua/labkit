@@ -19,7 +19,7 @@
 		"check": "bun scripts/check-all.ts",
 		"check:all-checks": "bun scripts/check-all-checks.ts",
 		"check:format": "biome format .",
-    "check:lint": "biome lint .",
+		"check:lint": "biome lint .",
 		"format": "biome format --write .",
 		"check:doc-comments": "bun scripts/check-doc-comments.ts",
 		"check:migrations": "bun scripts/check-migrations.ts",
@@ -59,6 +59,7 @@
 		"commander": "^15.0.0",
 		"drizzle-orm": "^0.45.2",
 		"pg": "^8.23.0",
+		"picocolors": "^1.1.1",
 		"zod": "^4.4.3"
 	}
 }

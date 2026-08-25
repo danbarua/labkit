@@ -6,6 +6,7 @@
  */
 
 import type { DomainEvent } from "../../domain";
+import type { Palette } from "../palette";
 
 /**
  * The acts themselves, oldest first.
@@ -16,13 +17,13 @@ import type { DomainEvent } from "../../domain";
  * read back. `seq` prints first because it is both the order and the cursor —
  * a reader paging through hands the last one back as `--since`.
  */
-export function renderHappened(events: readonly DomainEvent[]): string {
+export function renderHappened(events: readonly DomainEvent[], p: Palette): string {
   if (events.length === 0)
     return [
-      "Nothing matching.",
+      p.untested("Nothing matching."),
       "",
-      "An empty log is not an empty record: every other command answers from",
-      "the graph, and answers there are durable whether or not an act was logged.",
+      p.quiet("An empty log is not an empty record: every other command answers from"),
+      p.quiet("the graph, and answers there are durable whether or not an act was logged."),
     ].join("\n");
   return events
     .map((e) => {
@@ -30,10 +31,12 @@ export function renderHappened(events: readonly DomainEvent[]): string {
       // Short hash, because the full forty characters push the line past a
       // terminal and the first eight are what anybody types back into `git`.
       const commit = e.attribution.git_hash ? ` @${e.attribution.git_hash.slice(0, 8)}` : "";
-      const minted = e.created?.length ? `, minting ${e.created.join(", ")}` : "";
+      const minted = e.created?.length
+        ? p.quiet(", minting ") + e.created.map((h) => p.handle(h)).join(p.quiet(", "))
+        : "";
       return [
-        `${String(e.seq ?? 0).padStart(5)}  ${e.at}  ${e.operation}  ${e.subject}`,
-        `         by ${who}${commit}${minted}`,
+        `${p.quiet(String(e.seq ?? 0).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${p.handle(e.subject)}`,
+        `         ${p.quiet(`by ${who}${commit}`)}${minted}`,
       ].join("\n");
     })
     .join("\n");

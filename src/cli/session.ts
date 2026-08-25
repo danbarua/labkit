@@ -20,6 +20,8 @@ import { ReadSurface, WriteSurface } from "../domain";
 import { pgEventLog } from "../domain/event-store";
 import { commandContext, gitContext, personContext } from "../attribution";
 import { asJson, type Answer } from "./output";
+import { isColorSupported } from "picocolors";
+import { type Palette, palette } from "./palette";
 
 /** The global options, after parsing. */
 export interface Globals {
@@ -27,6 +29,21 @@ export interface Globals {
   db?: string;
   author?: string;
   json?: boolean;
+  /** Commander's negatable `--no-ansi`: present and `false` when passed. */
+  ansi?: boolean;
+}
+
+/**
+ * Whether to colour, decided once and here.
+ *
+ * `picocolors.isColorSupported` is reused rather than reimplemented — it is
+ * what handles `NO_COLOR`, `FORCE_COLOR`, a dumb terminal and a pipe, and it
+ * was measured to get all of those right under Bun where two alternatives did
+ * not. `--no-ansi` only ever turns it *off*: a caller who has piped the output
+ * and asks for colour anyway has `FORCE_COLOR`, which picocolors already reads.
+ */
+export function coloursFor(opts: Globals): Palette {
+  return palette(opts.ansi !== false && isColorSupported);
 }
 
 /** Both halves, held separately so a command can only reach the one it was given. */
@@ -79,7 +96,7 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
           events,
         }),
       });
-      write(opts.json ? asJson(answered.value) : answered.render());
+      write(opts.json ? asJson(answered.value) : answered.render(coloursFor(opts)));
     } finally {
       await connection.close();
     }

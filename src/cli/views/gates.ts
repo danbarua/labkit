@@ -14,6 +14,7 @@ import type {
   GateStatus,
   TaskContract,
 } from "../../domain";
+import type { Palette } from "../palette";
 import { bullets } from "./format";
 
 /**
@@ -29,16 +30,37 @@ import { bullets } from "./format";
  * Withdrawn evaluations are listed rather than dropped, marked as withdrawn.
  * A check that was decided and then withdrawn is not a check nobody ran.
  */
-export function renderGate(status: GateStatus): string {
+export function renderGate(status: GateStatus, p: Palette): string {
+  // The four states are the whole point of this page, so each gets its own
+  // colour rather than pass/not-pass.
+  //
+  // **The colour is chosen from `key` and applied to `text`, which are not
+  // always the same string.** A condition's state is padded to a column before
+  // it is coloured — padding afterwards would pad the escape bytes nobody can
+  // see — and the first version passed the *padded* string in, so `"failed   "`
+  // matched none of the cases and every state fell through to the same colour.
+  // `tests/cli/views.test.ts` caught it by asserting two states differ.
+  const state = (key: string, text: string = key) =>
+    key === "passed" || key === "satisfied"
+      ? p.settled(text)
+      : key === "failed" || key === "blocked"
+        ? p.contested(text)
+        : key === "never-run" || key === "never-evaluated"
+          ? p.untested(text)
+          : p.provisional(text);
   const check = (c: CheckStatus): string => {
-    const decided = c.decidedBy ? `  decided ${c.decidedBy.outcome} on "${c.decidedBy.value}"` : "";
-    return `${c.state.padEnd(19)} ${c.proposition}  (${c.criterion})${decided}`;
+    const decided = c.decidedBy
+      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")} on "${c.decidedBy.value}"`
+      : "";
+    // Padded before colouring: an escape sequence has length and would throw
+    // the column off by exactly the bytes nobody can see.
+    return `${state(c.state, c.state.padEnd(19))} ${c.proposition}  ${p.handle(`(${c.criterion})`)}${decided}`;
   };
   return [
-    `${status.gate} — ${status.state}${status.everFailed ? "  (has failed at least once)" : ""}`,
+    `${p.handle(status.gate)} — ${state(status.state)}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
     `  consequence: ${status.consequence}`,
     "",
-    "Conditions",
+    p.heading("Conditions"),
     bullets(status.checks.map(check), "none"),
     status.unmet.length
       ? `\nNot currently met\n${bullets(
@@ -53,28 +75,31 @@ export function renderGate(status: GateStatus): string {
         )}`
       : "",
     status.evaluations.length
-      ? `\nEvaluations\n${bullets(
+      ? `\n${p.heading("Evaluations")}\n${bullets(
           status.evaluations.map(
             (e) =>
-              `${e.at}  ${e.outcome}  "${e.value}"  (${e.evaluation})${e.withdrawn ? "  withdrawn" : ""}`,
+              `${p.quiet(e.at)}  ${state(e.outcome === "pass" ? "passed" : "failed")}  "${e.value}"  ${p.handle(`(${e.evaluation})`)}${e.withdrawn ? `  ${p.provisional("withdrawn")}` : ""}`,
           ),
           "",
         )}`
       : "",
     "",
-    "Computed, never stored. There is no value anyone can set to `satisfied`.",
+    p.quiet("Computed, never stored. There is no value anyone can set to `satisfied`."),
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-export function renderCriteria(criteria: CriterionRef[], gate: GateRef): string {
+export function renderCriteria(criteria: CriterionRef[], gate: GateRef, p: Palette): string {
   return [
-    `Conditions governing ${gate}`,
-    bullets([...criteria], "none — this gate is bound to no prespecified condition"),
+    p.heading(`Conditions governing ${p.handle(gate)}`),
+    bullets(
+      criteria.map((c) => p.handle(c)),
+      p.untested("none — this gate is bound to no prespecified condition"),
+    ),
     "",
-    "Handles only. `labkit gate` gives the same conditions with their wording and",
-    "their current standing.",
+    p.quiet("Handles only. `labkit gate` gives the same conditions with their wording and"),
+    p.quiet("their current standing."),
   ].join("\n");
 }
 
@@ -86,31 +111,33 @@ export function renderCriteria(criteria: CriterionRef[], gate: GateRef): string 
  * prespecified comparison is not a tidy-up — and it is the field a reader
  * skims for.
  */
-export function renderDesign(history: DesignHistory): string {
+export function renderDesign(history: DesignHistory, p: Palette): string {
   const amendment = (a: AmendmentRecord): string =>
     [
-      `${a.nature}  (${a.amendment})`,
+      // `mechanical` versus `scientific` is what S-7 built IMPLEMENTS to tell
+      // apart, and the field a reader skims for.
+      `${a.nature === "scientific" ? p.contested(a.nature) : p.provisional(a.nature)}  ${p.handle(`(${a.amendment})`)}`,
       `  was: ${a.replaced.requires}`,
       `  now: ${a.nowRequires.requires}`,
       `  because: ${a.reason}`,
       a.citing.length ? `  citing: ${a.citing.map((f) => f.states).join("; ")}` : "",
       a.rerun.length
-        ? `  needs re-running: ${a.rerun.map((w) => `${w.objective} (${w.work})`).join("; ")}`
+        ? `  ${p.contested("needs re-running")}: ${a.rerun.map((w) => `${w.objective} ${p.handle(`(${w.work})`)}`).join("; ")}`
         : "",
     ]
       .filter(Boolean)
       .join("\n");
   return [
-    `${history.gate}, on ${history.criterion}`,
+    `${p.handle(history.gate)}, on ${p.handle(history.criterion)}`,
     `  originally: ${history.originally.requires}`,
     `  now requires: ${history.nowRequires.requires}`,
     "",
-    "Amendments",
+    p.heading("Amendments"),
     history.amendments.length
       ? history.amendments.map(amendment).join("\n\n")
-      : "  none — the condition still reads as it was first stated",
+      : `  ${p.untested("none — the condition still reads as it was first stated")}`,
     "",
-    "Ordered from the record itself, not from timestamps.",
+    p.quiet("Ordered from the record itself, not from timestamps."),
   ].join("\n");
 }
 
@@ -121,15 +148,15 @@ export function renderDesign(history: DesignHistory): string {
  * field is typed `false`, so there is no other case, and a reader who sees a
  * `mayRead` list without it will take the list for a sandbox.
  */
-export function renderContract(contract: TaskContract): string {
+export function renderContract(contract: TaskContract, p: Palette): string {
   return [
-    `${contract.objective}  (${contract.work})`,
+    `${p.heading(contract.objective)}  ${p.handle(`(${contract.work})`)}`,
     `  meeting it means: ${contract.acceptance}`,
     "",
-    "May read",
-    bullets(contract.mayRead, "nothing named"),
+    p.heading("May read"),
+    bullets(contract.mayRead, p.untested("nothing named")),
     "",
-    "Not enforced. The record states what this work may look at; nothing stops",
-    "a computation reading elsewhere.",
+    p.provisional("Not enforced. The record states what this work may look at; nothing stops"),
+    p.provisional("a computation reading elsewhere."),
   ].join("\n");
 }

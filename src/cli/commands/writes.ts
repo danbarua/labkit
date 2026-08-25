@@ -49,7 +49,13 @@ const acknowledged = (acted: string) => {
   return answer(ack, () => acted);
 };
 
-/** A verb that mints one thing: `{question: "Q_1"}` in JSON, `Q_1` in prose. */
+/**
+ * A verb that mints one thing: `{question: "Q_1"}` in JSON, `Q_1` in prose.
+ *
+ * Uncoloured on purpose — see {@link asHandles}. The whole of stdout here is an
+ * id the next command consumes, and an escape sequence in it breaks
+ * `$(labkit …)` the moment someone sets `FORCE_COLOR`.
+ */
 const mintedOne = <K extends string>(kind: K, id: string) =>
   answer({ [kind]: id } as Record<K, string>, () => id);
 
@@ -157,7 +163,9 @@ export function registerWrites(program: Command, run: Run): void {
           ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
           ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
         });
-        return answer(recorded, (r) => asHandles([r.analysis, ...r.claims.map((c) => c.claim)]));
+        return answer(recorded, (r, p) =>
+          asHandles([r.analysis, ...r.claims.map((c) => c.claim)], p),
+        );
       }),
     );
 
@@ -316,7 +324,9 @@ export function registerWrites(program: Command, run: Run): void {
           under: opts.under,
           concludes: opts.concludes,
         });
-        return answer(report, (r) => asHandles([r.verification, ...r.claims.map((c) => c.claim)]));
+        return answer(report, (r, p) =>
+          asHandles([r.verification, ...r.claims.map((c) => c.claim)], p),
+        );
       }),
     );
 
@@ -384,7 +394,7 @@ export function registerWrites(program: Command, run: Run): void {
           because: opts.because,
           citing: opts.citing,
         });
-        return answer(report, (r) => asHandles([r.amendment]));
+        return answer(report, (r, p) => asHandles([r.amendment], p));
       }),
     );
 
@@ -412,7 +422,9 @@ export function registerWrites(program: Command, run: Run): void {
           from: opts.from,
           concludes: opts.concludes,
         });
-        return answer(report, (r) => asHandles([r.replacement, ...r.claims.map((c) => c.claim)]));
+        return answer(report, (r, p) =>
+          asHandles([r.replacement, ...r.claims.map((c) => c.claim)], p),
+        );
       }),
     );
 
@@ -434,7 +446,7 @@ export function registerWrites(program: Command, run: Run): void {
           as: opts.as,
           because: opts.because,
         });
-        return answer(report, (r) => asHandles([r.nowClaims.claim]));
+        return answer(report, (r, p) => asHandles([r.nowClaims.claim], p));
       }),
     );
 }

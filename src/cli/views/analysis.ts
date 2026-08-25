@@ -12,11 +12,12 @@ import type {
   ReproductionReport,
   Revision,
 } from "../../domain";
+import type { Palette } from "../palette";
 import { bullets, partLine } from "./format";
 
-export function renderAffects(report: DependencyReport): string {
+export function renderAffects(report: DependencyReport, p: Palette): string {
   return [
-    "Claims that would be affected",
+    p.heading("Claims that would be affected"),
     // Id and wording both. A person reading this needs the sentence; a person
     // acting on it needs the handle every other command takes.
     bullets(
@@ -24,18 +25,21 @@ export function renderAffects(report: DependencyReport): string {
       "none found",
     ),
     "",
-    "Lines of enquiry",
+    p.heading("Lines of enquiry"),
     bullets(
       report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry})`),
       "none found",
     ),
     "",
-    "Routes walked",
-    bullets(report.routesWalked, ""),
+    p.heading("Routes walked"),
+    bullets(
+      report.routesWalked.map((r) => p.quiet(r)),
+      "",
+    ),
     "",
-    "This is a lower bound, not a finding of independence: anything",
-    "connected by a route not listed above is absent from these lists",
-    "and is not thereby unaffected.",
+    p.provisional("This is a lower bound, not a finding of independence: anything"),
+    p.provisional("connected by a route not listed above is absent from these lists"),
+    p.provisional("and is not thereby unaffected."),
   ].join("\n");
 }
 
@@ -48,27 +52,34 @@ export function renderAffects(report: DependencyReport): string {
  * and the record does not know that (PJ-019). The closing paragraph says so
  * rather than leaving the reader to supply the stronger claim themselves.
  */
-export function renderReproduction(report: ReproductionReport): string {
+export function renderReproduction(report: ReproductionReport, p: Palette): string {
+  const verdict = report.conclusion === "agrees" ? p.settled : p.contested;
   return [
-    `${report.verificationMethod}  (${report.verification})`,
-    `  re-checking ${report.ofMethod}  (${report.of})`,
-    `  the two runs' findings ${report.conclusion} — this ${report.bearing} confidence`,
+    `${p.heading(report.verificationMethod)}  ${p.handle(`(${report.verification})`)}`,
+    `  re-checking ${report.ofMethod}  ${p.handle(`(${report.of})`)}`,
+    `  the two runs' findings ${verdict(report.conclusion)} — this ${verdict(report.bearing)} confidence`,
     "",
-    "The re-run read",
-    bullets(report.verificationRead.map(partLine), "nothing on the record"),
+    p.heading("The re-run read"),
+    bullets(
+      report.verificationRead.map((a) => partLine(a, p)),
+      p.untested("nothing on the record"),
+    ),
     "",
-    "The original read",
-    bullets(report.ofRead.map(partLine), "nothing on the record"),
+    p.heading("The original read"),
+    bullets(
+      report.ofRead.map((a) => partLine(a, p)),
+      p.untested("nothing on the record"),
+    ),
     report.differs.length
-      ? `\nDiffering\n${bullets(
-          report.differs.map((d) => `${partLine(d.what)} — ${d.standing}`),
+      ? `\n${p.contested("Differing")}\n${bullets(
+          report.differs.map((d) => `${partLine(d.what, p)} — ${p.contested(d.standing)}`),
           "",
         )}`
-      : "\nNothing differs in what the two runs read.",
+      : `\n${p.settled("Nothing differs in what the two runs read.")}`,
     "",
-    "This does not say the original was reproduced. Whether reading the same",
-    "records is the same execution depends on what the method does, and the",
-    "record does not know that.",
+    p.provisional("This does not say the original was reproduced. Whether reading the same"),
+    p.provisional("records is the same execution depends on what the method does, and the"),
+    p.provisional("record does not know that."),
   ].join("\n");
 }
 
@@ -79,21 +90,35 @@ export function renderReproduction(report: ReproductionReport): string {
  * admitting it kept no hash, which is not the same answer as "differs" — and
  * folding it in would report a failure nobody found.
  */
-export function renderReproducibility(report: ReproducibilityReport): string {
+export function renderReproducibility(report: ReproducibilityReport, p: Palette): string {
   return [
-    `${report.analysis} — ${report.reproducible ? "accounted for" : "not accounted for"}`,
+    `${p.handle(report.analysis)} — ${report.reproducible ? p.settled("accounted for") : p.contested("not accounted for")}`,
     "",
-    "Rebuilt and identical",
-    bullets(report.exact.map(partLine), "nothing"),
+    p.settled("Rebuilt and identical"),
+    bullets(
+      report.exact.map((a) => partLine(a, p)),
+      p.untested("nothing"),
+    ),
     "",
-    "Rebuilt and different",
-    bullets(report.differing.map(partLine), "nothing"),
+    p.contested("Rebuilt and different"),
+    bullets(
+      report.differing.map((a) => partLine(a, p)),
+      p.untested("nothing"),
+    ),
     "",
-    "Unverifiable (the record kept no hash, so nothing can be said either way)",
-    bullets(report.unverifiable.map(partLine), "nothing"),
+    // Provisional, not contested: the record declining to answer is not the
+    // same as answering no, which is the distinction this bucket exists for.
+    p.provisional("Unverifiable (the record kept no hash, so nothing can be said either way)"),
+    bullets(
+      report.unverifiable.map((a) => partLine(a, p)),
+      p.untested("nothing"),
+    ),
     "",
-    "Not rebuilt",
-    bullets(report.notRebuilt.map(partLine), "nothing"),
+    p.untested("Not rebuilt"),
+    bullets(
+      report.notRebuilt.map((a) => partLine(a, p)),
+      p.untested("nothing"),
+    ),
   ].join("\n");
 }
 
@@ -105,33 +130,33 @@ export function renderReproducibility(report: ReproducibilityReport): string {
  * withdrawn together (S-12). A rendering keyed on wording would show one
  * withdrawal where there were two.
  */
-export function renderInterpretation(history: InterpretationHistory): string {
+export function renderInterpretation(history: InterpretationHistory, p: Palette): string {
   const revision = (r: Revision): string =>
     [
-      `${r.revision}`,
-      `  withdrew: ${r.previously.map((c) => `"${c.asserts}" (${c.claim})`).join("; ")}`,
-      `  now claims: "${r.nowClaims.asserts}"  (${r.nowClaims.claim})`,
+      p.handle(r.revision),
+      `  ${p.provisional("withdrew")}: ${r.previously.map((c) => `"${c.asserts}" ${p.handle(`(${c.claim})`)}`).join("; ")}`,
+      `  now claims: "${r.nowClaims.asserts}"  ${p.handle(`(${r.nowClaims.claim})`)}`,
       `  because: ${r.reason}`,
       r.restingOnTheOldReading.length
-        ? `  resting on the old reading: ${r.restingOnTheOldReading
-            .map((q) => `"${q.asks}" (${q.question})`)
+        ? `  ${p.contested("resting on the old reading")}: ${r.restingOnTheOldReading
+            .map((q) => `"${q.asks}" ${p.handle(`(${q.question})`)}`)
             .join("; ")}`
         : "",
     ]
       .filter(Boolean)
       .join("\n");
   return [
-    `Now claims "${history.nowClaims.asserts}"  (${history.nowClaims.claim})`,
+    `${p.heading(`Now claims "${history.nowClaims.asserts}"`)}  ${p.handle(`(${history.nowClaims.claim})`)}`,
     "",
-    "Originally",
+    p.heading("Originally"),
     bullets(
-      history.originally.map((c) => `${c.asserts}  (${c.claim})`),
-      "nothing was withdrawn to reach this reading",
+      history.originally.map((c) => `${c.asserts}  ${p.handle(`(${c.claim})`)}`),
+      p.untested("nothing was withdrawn to reach this reading"),
     ),
     "",
-    "Revisions",
+    p.heading("Revisions"),
     history.revisions.length
       ? history.revisions.map(revision).join("\n\n")
-      : "  none — this reading has not been narrowed",
+      : `  ${p.untested("none — this reading has not been narrowed")}`,
   ].join("\n");
 }
