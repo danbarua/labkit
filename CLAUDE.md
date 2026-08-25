@@ -213,8 +213,9 @@ bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
-There is no lint script yet. `bun run build` compiles `src/cli/cli.ts` to a
-binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
+Formatting is `bun run format` (biome — see below); there is no *linting*
+script yet, biome's linter being off until its findings have been read.
+`bun run build` compiles `src/cli/cli.ts` to a binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
 resolves `drizzle/` from `import.meta.url`, which inside a compiled bundle is
 `/$bunfs/root/…`, so it dies with `Can't find meta/_journal.json file`.
 Measured 2026-08-25 against both the old and new entry points, so it predates
@@ -312,6 +313,14 @@ The general lesson, which cost more than the script did: **a rule that tells
 readers to ignore a signal removes the only watcher that signal had.** If a
 signal is unreliable, fix it or delete it — do not annotate it.
 
+**`\s` is not a character class in BSD `sed` or `grep`, and this userland is
+BSD.** It does not error — it matches a literal `s`, so a substitution silently
+does nothing. Cost a wrong measurement on 2026-08-25: a comparison meant to
+prove biome had not reflowed any comment stripped no indentation, compared
+indented text against indented text, and reported 38 differences that were not
+there. `[[:space:]]` is the portable form. The same applies to `\d`, `\w` and
+`\+`.
+
 Note also that `$?` after a pipeline reports the *last* command's status, so
 `bun ... | tail` will happily report success that isn't there. This has now
 caught someone twice: the second time with `${PIPESTATUS[1]:-$?}`, which is
@@ -339,9 +348,20 @@ later is picked up without anyone editing anything.
 
 **`check:` means green is fine and red is yours to fix.** Anything that does
 not mean that needs a different prefix — see `probe:pglite-concurrency`, whose
-exit 0 means an upstream bug *still reproduces*. It sat under `check:` and had
-to be excluded from the sweep by name; renaming it deleted the exclusion list
-rather than documenting it.
+exit 0 means an upstream bug *still reproduces*.
+
+**An exclusion list is a tell.** That probe sat under `check:` and the first
+version of `check-all.ts` excluded it by name, with a paragraph explaining why.
+The paragraph was the signal: the script was fine and the *name* was wrong.
+Renaming it out of the namespace deleted the exclusion rather than documenting
+it. When a derived list needs a hand-written exception, check whether the thing
+being excepted is misnamed before writing the exception down.
+
+**The sweep does not run everything, and each absence has a reason.**
+`bun run example` is for reading rather than checking;
+`probe:pglite-concurrency` has an inverted exit code and takes minutes. Two is
+a considered set; a third omission needs its own reason rather than joining a
+habit.
 
 **A check announces `OK:` or `FAILED:` and does not repeat its own name** —
 `bun run check` already said which one is running. `FAILED:` means the check ran

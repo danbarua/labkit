@@ -73,6 +73,20 @@ as data and makes the binary a two-file artefact.
 Not urgent — nothing ships the binary — but `bun run build` currently exits 0
 on something that cannot work, which is the shape CLAUDE.md warns about.
 
+## Biome's linter is unread
+
+`biome.jsonc` has `linter.enabled: false`. Turning it on reports **96 errors and
+376 warnings** (2026-08-25, biome 2.5.10, `recommended` rules).
+
+Not suppressed in bulk, deliberately. Some of those will be real, some will
+disagree with a choice this repo made on purpose, and a blanket
+`"rules": { "recommended": false }` or a wall of `biome-ignore` comments loses
+the difference — which is the whole reason the linter was left off in the same
+commit that adopted the formatter.
+
+The work is to read them in groups, fix what should be fixed, and disable each
+remaining rule *by name with a reason* in `biome.jsonc`.
+
 ## Deliberately not being done
 
 Here so nobody re-discovers them as gaps.

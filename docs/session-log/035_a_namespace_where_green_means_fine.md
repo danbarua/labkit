@@ -65,46 +65,24 @@ code means the opposite of a check's.
 
 ## Open
 
-**An exclusion list is a tell.** `check-all.ts` first excluded
-`check:pglite-concurrency` by name with a paragraph explaining why. The script
-was fine; the *name* was wrong, because `check:` is a namespace where green
-means fine and that was the one entry where it did not. Renaming it deleted the
-exclusion rather than documenting it. Rule now in CLAUDE.md: **`check:` means
-green is fine and red is yours to fix.**
+**Biome's linter is unread** — 96 errors, 376 warnings, `linter.enabled: false`
+in `biome.jsonc`. Not suppressed in bulk, because that loses the difference
+between a real finding and a rule disagreeing with a deliberate choice.
+`docs/TASKS.md` carries the work.
 
-**`biome.json` fails silently and `biome.jsonc` does not.** The JSON config
-rejects comments, and `biome format --write` then falls back to its **defaults**
-with no parse error — just "Formatted N files". It re-indented 121 files to tabs
-at width 80 and touched `tsconfig.json`, `.dependency-cruiser.cjs` and drizzle's
-generated snapshots, all of which the intended config excludes. `biome check`
-does report the parse error; the writing command does not.
+**`bun run build` still produces a binary that cannot migrate**, unchanged from
+entry 034 and unrelated to this session. Also in `docs/TASKS.md`.
 
-**A pattern spanning a token boundary needs a parser.** Biome split
-`write.pursue({…})` across lines and `\bwrite\.pursue\s*\(` stopped matching —
-five verbs reported unreachable that were reached fine. The first fix was a
-whitespace-tolerant regex, which was a patch on the wrong layer:
-`surface-coverage.ts` had already argued in its own header that *"the
-declaration is the only place the distinction survives, so this reads it"*, and
-then read it with a regex, while two `check:*` scripts in the same repo were
-already on the compiler. The other text-reading checks were surveyed and left
-alone — first-four-lines, comments-as-trivia, and plain substrings are all
-genuinely textual. The rule is not *use the compiler everywhere*.
+Nothing else. **What this session learnt went to CLAUDE.md, not here** — an
+earlier draft of this entry used `## Open` as a place to write down findings,
+which is the wrong home twice over: a session log is disposable and nobody
+greps it for a rule, and CLAUDE.md is where a standing fact gets read. Moved
+there this turn: *an exclusion list is a tell*, *`\s` is not a character class
+in BSD sed*, and the reason the sweep deliberately does not run everything. The
+biome and parser findings were already there.
 
-**`\s` is not supported by BSD `sed`.** The first comment-integrity comparison
-used it, silently compared indented text, and "found" 38 differences that were
-not there. `[[:space:]]` is the portable form.
-
-**A line number is a fact that differs by language**, and the header convention
-was specified as "line 4", then "line 2" — each wrong for one of the two.
-`check-all.ts` calls `summaryOf()` rather than counting.
-
-**The biome linter is unread.** 96 errors, 376 warnings. Some will be fine, some
-will disagree with a deliberate choice here, and bulk-suppressing loses the
-difference.
-
-**The sweep does not run everything.** `bun run example` and
-`probe:pglite-concurrency` are outside it, each for its own reason. A third
-omission would need one too.
+Entries 033 and 034 have the same defect and are **not** being retro-edited —
+dated records stay as written.
 
 ## Next
 
