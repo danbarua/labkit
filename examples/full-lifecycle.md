@@ -1,154 +1,227 @@
-# Full-lifecycle checklist
-
-`full-lifecycle.sh` is a runnable smoke test of LabKit end to end. Run it with:
+# A research lifecycle, through the CLI
 
 ```sh
-bash examples/full-lifecycle.sh
+bun run example
 ```
 
-**Exit 0 means it worked and nothing else does.** It asserts on what came back,
-not on whether the commands ran, and it is hermetic: `--db` points it at a fresh
-temporary directory, removed on exit, so it can neither touch a working database
-nor contend with one.
+Runs against a throwaway database, deleted when it exits. Nothing you have is
+touched.
 
-It replaced `full-lifecycle.ts`, which wrote by calling
-`TenantGraph.createNode` directly — underneath the domain layer, so it exercised
-the persistence machinery and said nothing about whether the research verbs were
-usable, and it put nodes on the record that no verb had recorded making. Every
-line of the shell version is a command a person could type.
+It takes one question from being asked to being answered, and shows what LabKit
+records along the way. Every command below is one you could type.
 
-The spike outcomes below are **dated records of 2026-08-17/18** and are about
-the persistence layer, which is unchanged. They are why the machinery underneath
-is shaped as it is; read them before touching tenancy, natural ids or
-provisioning. Several sections mention the CQRS views, which were removed on
-2026-08-19 (`af5a1d2`) — see CLAUDE.md's "No relational read side".
+---
 
-## Spike outcomes this script's design depends on
+## Ask a question
 
-Resolved during implementation, recorded here so the next change to the
-tenancy/natural-id/CQRS machinery starts from confirmed facts, not
-assumptions:
+```
+$ labkit open 'does the pruning schedule move convergence?'
+LOE_1
+```
 
-- [x] **Function-in-Cypher-CREATE** (2026-08-17): works, but only with
-  explicit `::text` casts on literal arguments
-  (`labkit_next_natural_id('computation'::text, 'COMP'::text)`) — without
-  the cast, Postgres can't resolve a `(text, text)` overload against
-  Cypher's `agtype`-typed string literals.
-- [x] **View-over-label-table property shape** (2026-08-17): a label's
-  `properties` column round-trips cleanly through
-  `(properties::text)::jsonb ->> 'key'` — no `::vertex`/`::edge`-suffix
-  stripping needed (that suffix is only on a full vertex/edge composite
-  returned by `cypher()`, not a bare `properties` column read directly off
-  the table).
-- [x] **Label-table column shape** (2026-08-17): confirmed via
-  `information_schema.columns` — exactly two columns, `id` (graphid) and
-  `properties` (agtype).
-- [x] **Natural-id uniqueness** (2026-08-17): DB-enforced via a functional
-  `UNIQUE INDEX` on
-  `ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)`
-  — confirmed a duplicate `natural_id` set via Cypher `SET` raises a real
-  Postgres `duplicate key value violates unique constraint` error, not just
-  relying on `nextval()`'s atomicity as an unenforced assumption.
-- [x] **Generated column for `tenants.graph_name`** (2026-08-18): `text
-  GENERATED ALWAYS AS ('labkit_t' || id) STORED` works under PGlite exactly
-  as it would against real Postgres — confirmed via `drizzle-kit generate`'s
-  output and a direct insert/select round trip.
-- [x] **Advisory-lock-guarded transactional tenant provisioning** (2026-08-18):
-  `BEGIN; SELECT pg_advisory_xact_lock($1); ...; COMMIT;` wrapping the full
-  `create_graph`/`create_vlabel`/`create_elabel`/index/view sequence works
-  under `pglite-age` — confirmed idempotent (a second `provisionTenantGraph`
-  call for the same tenant is a no-op) and confirmed under real concurrency
-  via `tests/helloworld.test.ts`'s 3-way leader-election race, each process
-  provisioning a distinct new tenant.
-- [ ] **`MERGE` for relationships — spiked and found BROKEN** (2026-08-18):
-  `MATCH (a...), (b...) MERGE (a)-[:EDGE]->(b)` runs without error and
-  returns what looks like a valid edge, but the created edge's
-  `start_id`/`end_id` are both `0` — it never actually connects `a` and `b`.
-  `TenantGraph.createEdge()` uses an explicit existence check + `CREATE`
-  instead (see the postgres-age skill's gotchas section). Left unchecked
-  here deliberately — it's the one item on this list that did NOT resolve
-  the way it was expected to.
-- [x] **Edge label tables have `id`/`start_id`/`end_id`/`properties`
-  columns** (2026-08-18): confirmed via `information_schema.columns` for
-  `"labkit_t1"."USES"` — the same "labels are real Postgres tables" fact
-  PJ-002 already established for vertices, extended to edges. This is what
-  made a real `UNIQUE (start_id, end_id)` index possible, closing the
-  concurrent-`createEdge` race the check-then-`CREATE` fallback above
-  couldn't on its own — see
-  `docs/project-journal/005_provisioning_reconciliation.md`.
-- [x] **`ag_catalog.drop_label(graph, label, false)`** (2026-08-18): drops a
-  vertex or edge label. The documented third `cascade`/force argument
-  rejects `true` under pglite-age ("force option is not supported yet") —
-  pass `false`. Used to test provisioning reconciliation — re-resolving a
-  tenant (`resolveTenantContext()`, the real production path, not an
-  internal function called directly) restores a label that was dropped out
-  from under it.
+One act: the question, and a line of enquiry pursuing it. `LOE_1` is the handle
+every later command uses to name this work.
 
-## Scenarios another agent should try next
+## Say in advance what would count
 
-Beyond what `full-lifecycle.sh` already exercises:
+```
+$ labkit plan --objective 'sweep depth 4 through 20 under the pruning schedule' \
+              --acceptance 'a convergence curve with n>=20 at each depth'
+TASK_1
 
-- **Second tenant, natural ids keep incrementing globally.** Run the script
-  twice with a different tenant slug (edit the `resolveTenantContext` call)
-  and confirm the second run's `Computation` gets `COMP_2`, not another
-  `COMP_1` in a fresh sequence — natural ids are scoped globally per
-  entity-type, not per-tenant (PJ-004 decision #3), even though each
-  tenant's nodes live in a structurally disjoint graph.
-- **Tenant isolation under real concurrency, not just a unit test.** Run two
-  copies of a script resolving two different tenant slugs at the same time
-  against the same `projectRoot` and confirm neither's data is visible to
-  the other's `TenantGraph` — `tests/domain-graph.test.ts`'s "tenant
-  isolation" describe block covers this within one process; a real
-  multi-process version is a stronger check.
-- **Invalidate an artefact, confirm propagation by natural id only.** Add
-  an `Artefact` node, `RECORDED_IN`-link it to the `Evidence` this script
-  creates, then run the invalidation-propagation query from
-  `.claude/skills/postgres-age/SKILL.md`'s cookbook and confirm the
-  returned `Claim`/`Decision`/`LineOfEnquiry` are addressable by
-  `natural_id` alone — no raw graphid should ever need to appear in that
-  output.
-- **Kill and restart the leader.** Start `full-lifecycle.sh`, and while it's
-  mid-run (or right after) start a second process connecting to the same
-  `projectRoot` — confirm one becomes primary, the other secondary, and
-  both see the same data (this is what `tests/helloworld.test.ts` already
-  covers with a controlled 3-way race; trying it with real staggered
-  process starts is a stronger real-world check than a `Promise.all` in
-  one test file).
-- ~~**Real Postgres backend, via Docker.**~~ **Done (2026-08-18).**
-  `docker-compose.yml` (repo root) runs `apache/age:release_PG18_1.7.0` —
-  the exact AGE version/branch `pglite-age` itself is built from (see the
-  postgres-age skill's "Overview"), not an arbitrary AGE release:
+$ labkit criterion 'the effect holds at n>=20'
+CRIT_1
 
-  ```sh
-  docker compose up -d
-  ```
+$ labkit declare --governed-by CRIT_1 --protecting TASK_1 \
+                 --consequence 'the result may not be built on until this holds'
+GATE_1
+```
 
-  Confirmed against that container:
-  - **`pgvector` is NOT bundled** in this image (`CREATE EXTENSION vector`
-    fails: `extension "vector" is not available`) — no longer "unconfirmed
-    either way." Not blocking today (nothing queries vector features yet),
-    but a real gap to close before this image can stand in for a full
-    direct-Postgres deployment.
-  - **The full stack round-trips correctly**: migrations (0000/0002, with
-    0001's `CREATE EXTENSION vector` statement skipped for the reason
-    above), `resolveTenantContext`/`provisionTenantGraph`, `createNode`
-    natural-id generation, `createEdge` idempotency (calling it twice still
-    produces exactly one edge), the CQRS view read-side, and the
-    schema-qualification fix (`labkit_next_natural_id`/`labkit_prop` land in
-    `public`, confirmed via `pg_proc`/`pg_namespace`) — all verified via a
-    one-off script using `drizzle-orm/node-postgres`'s migrator (not
-    `runMigrations()`, which is PGlite-specific — see `src/db/migrate.ts`).
-    There is still no real `db:migrate`-equivalent script wired up for
-    `directPostgresBackend`; that remains the documented out-of-band-step
-    gap (PJ-004), unaffected by this verification.
-  - **`MERGE` for relationships works correctly here** — `start_id`/`end_id`
-    come back properly populated, unlike under `pglite-age`. This confirms
-    the `MERGE` bug is a genuine WASM/pglite-age-specific regression, not a
-    stock-AGE limitation like the other three known gotchas (which *do*
-    reproduce identically on this real container — see the postgres-age
-    skill's "Upstream filing" section for the full breakdown and what's
-    worth reporting where). `TenantGraph.createEdge()`'s check-then-`CREATE`
-    fallback is confirmed to be a `pglite-age`-only workaround, not a
-    permanent design choice — worth revisiting if a future `pglite-age`
-    upgrade picks up a MERGE fix, though the `UNIQUE (start_id, end_id)`
-    index stays regardless as the real concurrency guarantee.
+The condition is stated **before** the measurement. A check agreed after seeing
+the numbers is not the same check, and LabKit is built to keep those apart.
+
+A gate has a state before anyone checks it, and it is not *passed*:
+
+```
+$ labkit gate GATE_1
+GATE_1 — never-evaluated
+  consequence: the result may not be built on until this holds
+Conditions
+  - never-run           the effect holds at n>=20  (CRIT_1)
+
+Not currently met
+  - the effect holds at n>=20  (CRIT_1)
+
+Gating
+  - sweep depth 4 through 20 under the pruning schedule  (TASK_1)
+Computed, never stored. There is no value anyone can set to `satisfied`.
+```
+
+## Measure, then analyse
+
+Observations land before anything is concluded from them:
+
+```
+$ labkit observe LOE_1 --name depth-sweep-raw \
+        --finding 'convergence step counts at depths 4, 8, 12, 16, 20' \
+        --hash sha256:9f2b
+ART_1
+```
+
+The analysis says what it read, which planned work it carries out, and which
+prespecified condition its conclusions are held to:
+
+```
+$ labkit analyse LOE_1 \
+        --method 'paired comparison against the unpruned baseline' \
+        --from ART_1 --implementing TASK_1 --held-to CRIT_1 \
+        --concludes '{"proposition": "the pruning schedule moves convergence",
+                      "finding": "converges ~3 steps earlier at every depth"}'
+COMP_1
+CLM_1
+```
+
+One command, five records: a computation, an evidence unit, an output artefact,
+the evidence, and a claim. It answers with the analysis and then a claim per
+conclusion, so the next command can take them straight off stdout.
+
+## Check, promote, close
+
+```
+$ labkit evaluate CRIT_1 --gate GATE_1 --value 'n=24 at every depth' --outcome pass
+CRIT_1
+
+$ labkit gate GATE_1
+GATE_1 — satisfied
+  ...
+Conditions
+  - passed              the effect holds at n>=20  (CRIT_1)  decided pass on "n=24 at every depth"
+```
+
+Promotion is a **separate act** from concluding. Until a finding is promoted it
+is scratch, and an answer resting on it is *provisional* rather than
+*established*:
+
+```
+$ labkit promote CLM_1 --because 'the prespecified check passed at every depth'
+CLM_1
+
+$ labkit close LOE_1 --answered-by CLM_1
+LOE_1
+```
+
+## Read it back
+
+```
+$ labkit known
+Established
+  - does the pruning schedule move convergence?
+
+Provisional (resting on work nobody promoted)
+  nothing
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  nothing
+```
+
+Five buckets, and the difference between them is the product. *Established* and
+*provisional* are both answered — what differs is what the answer rests on.
+
+Why does it stand?
+
+```
+$ labkit why CLM_1
+"the pruning schedule moves convergence"
+  supported, confirmatory
+  promoted because: the prespecified check passed at every depth
+Resting on
+  - converges ~3 steps earlier at every depth  (via paired comparison against the unpruned baseline, COMP_1)
+
+Held to
+  - the effect holds at n>=20 — passed
+
+Ultimately resting on
+  - depth-sweep-raw  [ART_1]
+```
+
+And if the raw measurement turned out to be wrong:
+
+```
+$ labkit affects depth-sweep-raw
+Claims that would be affected
+  - the pruning schedule moves convergence  (CLM_1)
+
+Lines of enquiry
+  - does the pruning schedule move convergence?  (LOE_1)
+
+Routes walked
+  - evidence recorded in this artefact, and the claims it bears on
+  - computations that consumed this artefact, and the claims their findings bear on
+  - the same, for every artefact downstream of this one through CONSUMES/PRODUCES
+
+This is a lower bound, not a finding of independence: anything
+connected by a route not listed above is absent from these lists
+and is not thereby unaffected.
+```
+
+That closing paragraph is not hedging. The walk is exhaustive over the routes it
+names and silent about any it does not, and saying so is the difference between
+a dependency report and a false clean bill of health.
+
+## What was done, and by whom
+
+Every other command answers from the record — what is *true now*. One answers
+from the event log:
+
+```
+$ labkit happened
+    1  2026-08-25T14:36:47.166Z  openEnquiry  LOE_1
+         by full-lifecycle.sh @390f1562, minting Q_1, LOE_1
+    ...
+    6  2026-08-25T14:36:49.175Z  recordAnalysis  COMP_1
+         by full-lifecycle.sh @390f1562, minting COMP_1, EU_2, ART_2, EV_2, CLM_1
+    8  2026-08-25T14:36:50.128Z  promote  CLM_1
+         by full-lifecycle.sh @390f1562, minting DEC_1
+```
+
+Who ran it and against which commit — neither is reconstructable from the graph.
+`openEnquiry` is one event, not a `pose` and a `pursue`: a researcher who opened
+an enquiry did one thing.
+
+An act is findable by what it **created**, not only by what it was about:
+
+```
+$ labkit happened CLM_1
+    6  ...  recordAnalysis  COMP_1     minting ..., CLM_1
+    8  ...  promote         CLM_1
+```
+
+## Anything else
+
+Every command takes `--json`, which prints the same document an MCP client gets:
+
+```
+$ labkit --json known
+{
+  "established": [
+    { "question": "Q_1", "asks": "does the pruning schedule move convergence?" }
+  ],
+  "provisional": [],
+  "unresolved": [],
+  "untested": [],
+  "accepted": []
+}
+```
+
+`labkit --help` lists the rest — sharpening a question, amending a gate's
+conditions, replacing a defective analysis, re-verifying, narrowing an
+interpretation, deliberately leaving a question open.
+
+`bun run check:cli` walks this same path with assertions on it, and
+`docs/persistence-spikes.md` has the AGE findings the storage layer rests on.
