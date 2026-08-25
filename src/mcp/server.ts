@@ -32,7 +32,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
 import { TenantGraph } from "../db/graph";
-import { ReadSurface, WriteSurface, inMemoryEventLog } from "../domain";
+import { ReadSurface, WriteSurface } from "../domain";
+import { pgEventLog } from "../domain/event-store";
 import { commandContext, mockGitContext, mockSessionContext } from "../attribution";
 import { TOOLS, WRITE_TOOLS } from "./tools";
 import { DOCS_URI, renderToolDocs } from "./docs";
@@ -194,18 +195,17 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   // would fragment silently. Owning it at this level makes the process-scoped
   // sink a decision instead of a consequence of construction order.
   //
-  // It is still the in-memory one, and that is the design rather than a
-  // shortfall. The graph is the record: `src/domain/read.ts` never touches
-  // `events`, and the scenarios that mention the log assert it is **empty** at
-  // the moment a historical answer is read, which is what proves the answer is
-  // durable rather than replayed.
+  // **Durable now.** It was `inMemoryEventLog()` on the grounds that a store
+  // was unearned: the graph is the record, `read.ts` never consulted the log,
+  // and the scenarios that mention it assert it is *empty* when a historical
+  // answer is read. What earned it is the consumer PJ-031 named — attribution
+  // rode on every event and nothing could read it, because the log died with
+  // the process.
   //
-  // A durable sink is a SQL table and a reader — not difficult, just unearned.
-  // What would earn it is a consumer: an audit log, notifications pushed to an
-  // MCP client, or a projection into a different view model. Attribution now
-  // rides on every event and is read by nothing, which is a second, nearer
-  // trigger than the one `src/domain/events.ts` names — see PJ-031.
-  const events = inMemoryEventLog();
+  // Same connection as the graph, which is the atomicity story: `emit` runs
+  // inside each verb's `inTransaction`, so an event and the writes it describes
+  // commit together. A second connection would silently end that.
+  const events = pgEventLog(connection.db, tenantCtx.tenantId);
 
   // Providers are sampled per call, not once here, so a long-running server
   // records the commit each piece of work was actually done against. Both are

@@ -65,8 +65,10 @@ They are dated records: read them for reasoning, never for current state.
   is built against — its §3 index is the ledger), 009, 011, then 014-023 for
   how individual verbs were earned. 010, 013, 017, 020 and 024 are external
   reviews; 012 is superseded by 014/015. 030 is on reference-vs-subject
-  identity and 031 on the execution-context seam — read 031 before changing how
-  a surface is constructed, not only before touching events.
+  identity, 031 on the execution-context seam — read it before changing how a
+  surface is constructed, not only before touching events — and 032 on the
+  durable event log, which is where the atomicity of every write verb is
+  argued.
 - **025-029 are about the method, not the model**, and are the ones worth
   reading if you are about to write a document. Their rules, which is all you
   need from them:
@@ -388,12 +390,23 @@ Two consequences worth knowing before touching this:
   constructed by `main()` and passed in — **not** defaulted inside a surface. A
   per-call surface defaulting its own log fragments the stream silently, and
   `tests/attribution.test.ts` is the guard.
-- **Attribution is written and nothing reads it.** Deliberate, argued in PJ-031
-  §5 rather than overlooked: unlike a view, an unattributed command cannot be
-  reconstructed later. It is a second and nearer trigger for the durable sink,
-  which is still an interface (PJ-009 §3).
+- **The sink is durable, and attribution is what earned it.** It was in-memory
+  from PJ-009 §3 until PJ-032, on the honest grounds that nothing read the
+  stream — every historical answer comes from the graph, asserted with a
+  provably empty log. Attribution (PJ-031) was the consumer that changed it:
+  who ran a command is not reconstructable from the graph at all.
+  `pgEventLog()` (`src/domain/event-store.ts`) writes `public.labkit_event` on
+  **the same connection as the graph**, which is what makes an event commit with
+  the writes it describes. `inMemoryEventLog()` is still the default and is what
+  every test uses.
+- **Every write verb runs inside `inTransaction`**, because an event has to
+  commit with its writes. That was not true before PJ-032: all 18 `emit` calls
+  sat *after* their closure returned, and ten verbs had a transaction that the
+  event was outside of. A side effect worth knowing — three tests used to assert
+  that an interrupted verb leaves an unreachable orphan, and now assert it
+  leaves nothing.
 
-The rule that keeps the sink honest:
+The rule that keeps the sink honest, and it did not change:
 
 > Events explain *how state changed*. The graph explains *what the current
 > research state is*.

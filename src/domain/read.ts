@@ -63,6 +63,7 @@ import type {
 } from "./report";
 import { ref, isRefOfKind } from "./report";
 import { SessionCore } from "./core";
+import type { DomainEvent, EventFilter } from "./events";
 
 /** Every node carries a natural id; this is how a projection asks for it. */
 type Identified = { natural_id: string };
@@ -80,6 +81,30 @@ function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
 }
 
 export class ReadSurface extends SessionCore {
+  /**
+   * What was done, in order — the one read that answers from the event log
+   * rather than the graph.
+   *
+   * **This is not the exception to CLAUDE.md's rule, it is the rule's other
+   * half.** *Events explain how state changed; the graph explains what the
+   * current research state is.* Every other read here answers "what is true
+   * now" and must never consult the log. This one asks "what happened", which
+   * the graph cannot answer at all: the graph holds the result of every act and
+   * no record of the acts themselves, and after PJ-031 the log is the only
+   * place that says **who** did any of it.
+   *
+   * So: do not reach for this to establish current state, and do not add a
+   * caller that does. If an answer can be derived from the graph, derive it
+   * there — that is what makes the graph's answers durable rather than
+   * replayed, which several scenarios assert with a provably empty log.
+   *
+   * Ordered by `seq`, not by `at`. Under a frozen clock every event in a
+   * session shares one instant; the sequence is the only thing that orders them.
+   */
+  async whatHappened(filter: EventFilter = {}): Promise<readonly DomainEvent[]> {
+    return this.events.select(filter);
+  }
+
   /** Every line of enquiry pursuing this question. */
   async pursuitsOf(question: QuestionRef): Promise<EnquiryRef[]> {
     const rows = await this.graph.query(

@@ -282,12 +282,21 @@ test("recordObservations writes the unit and the evidence together or not at all
  *   exactly what `pose()` produces, reported as `untested`, which is true: it
  *   is on the books and nothing has been run against it.
  *
- * A real property rather than an accident of today's code, so it is asserted
- * rather than left in prose (PJ-028). **If someone adds a reader of `NARROWS`
- * that does not require `MOTIVATES`, the first case stops being unreachable and
- * `sharpen` becomes transactional.** This test is what says so.
+ * **All of that is now history, and the test says what it says because the
+ * prediction above came true from an unexpected direction.** It named its own
+ * trigger — "if someone adds a reader of `NARROWS` that does not require
+ * `MOTIVATES` … `sharpen` becomes transactional". Nobody added that reader. The
+ * persisted event store did it instead: an event has to commit with the writes
+ * it describes, so every write verb is wrapped in `inTransaction`, and
+ * `sharpen` got a transaction as a side effect of something else entirely.
+ *
+ * So the reasoning above is preserved as the argument that *was* correct while
+ * it applied, and the assertion below is now the stronger one: an interrupted
+ * `sharpen` leaves **nothing at all**, reachable or otherwise. Unreachable
+ * leftovers were acceptable; no leftovers is better, and it is what a reader
+ * checking the record after a failure would expect.
  */
-test("a partial sharpen leaves nothing a reader can reach", async () => {
+test("an interrupted sharpen leaves nothing at all", async () => {
   const enquiry = await session.openEnquiry("does the coating hold?");
   const obs = await session.recordObservations({
     enquiry, name: "run A", finding: "no delamination",
@@ -316,21 +325,17 @@ test("a partial sharpen leaves nothing a reader can reach", async () => {
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
-  // The half-built decision survives...
-  const orphaned = await graph.query(
-    `MATCH (d:Decision)-[:NARROWS]->(:Question) RETURN d`,
+  // No decision at all. This used to assert the opposite -- a half-built
+  // decision keeping one finding of three, harmless only because no reader
+  // could reach it. The rollback means there is nothing to reach.
+  const decisions = await graph.query(
+    `MATCH (d:Decision) RETURN d`,
     { d: vertexProps<{ reason: string }>() },
   );
-  expect(orphaned.map((r) => r.d.reason)).toEqual(["too vague"]);
+  expect(decisions).toEqual([]);
 
-  // ...and no reader can reach it, because `originOf` needs the MOTIVATES that
-  // was never written. That is what makes the subset harmless rather than a
-  // wrong answer, and it is the whole argument for leaving sharpen alone.
-  const motivates = await graph.query(
-    `MATCH (:Decision)-[:MOTIVATES]->(q:Question) RETURN q`,
-    { q: vertexProps<{ name: string }>() },
-  );
-  expect(motivates).toEqual([]);
+  // And so `originOf` answers null because the question genuinely has no
+  // origin, not because the edge it needs happened to be written last.
   expect(await session.originOf(original)).toBeNull();
 
   // The sharper question was never created, so the survey is simply correct.
@@ -596,7 +601,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
  * described: if anything ever writes `REQUIRES` before `MOTIVATES`, the orphan
  * becomes reachable and `pursue` needs the transaction.
  */
-test("an interrupted pursue leaves an enquiry nothing can reach", async () => {
+test("an interrupted pursue leaves no enquiry at all", async () => {
   const question = await session.pose("does the coating hold at temperature?");
 
   const realCreateEdge = graph.createEdge.bind(graph);
@@ -610,20 +615,15 @@ test("an interrupted pursue leaves an enquiry nothing can reach", async () => {
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
-  // The orphan is there...
+  // No enquiry at all. This used to assert that an orphan survived carrying no
+  // inbound edge -- unreachable, therefore harmless. Since the event store made
+  // every write verb transactional, the orphan does not exist to be reasoned
+  // about.
   const orphans = await graph.query(
     `MATCH (loe:LineOfEnquiry) RETURN loe`,
     { loe: vertexProps<{ natural_id: string; name: string }>() },
   );
-  expect(orphans.map((r) => r.loe.name)).toEqual(["thermal cycling"]);
-
-  // ...and carries no inbound edge, which is what makes it unreachable rather
-  // than merely unreferenced. `whatDependsOn` would surface it otherwise.
-  const attached = await graph.query(
-    `MATCH (:Question)-[:MOTIVATES]->(loe:LineOfEnquiry) RETURN loe`,
-    { loe: vertexProps<{ natural_id: string }>() },
-  );
-  expect(attached).toEqual([]);
+  expect(orphans).toEqual([]);
 
   // The question is reported untested, which is true: it is on the books and
   // nothing has been run against it. Same answer `pose()` alone would give.
@@ -708,13 +708,18 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
  * dangerous arrangement — and is clean for a weaker reason: **every `Gate` reader
  * is keyed by `natural_id`**, and an interrupted call returns none.
  *
- * That is unreachable-by-handle rather than unreachable-by-structure, and it is
- * the one this test exists to pin. The assertion is that no reader walks
- * `GOVERNS` *forward* into a gate nobody named — if one ever does, a half-built
- * gate surfaces governed by a subset of its criteria, and `gateStatus` computes
- * `incomplete` from exactly that set.
+ * That was unreachable-by-handle rather than unreachable-by-structure — the
+ * weakest of the three guarantees on this page, and the one most easily lost to
+ * a new reader. **It no longer has to hold.** The persisted event store requires
+ * an event to commit with the writes it describes, so every write verb runs
+ * inside `inTransaction`, and an interrupted `declareGate` now leaves no gate
+ * for a reader to enumerate or fail to enumerate.
+ *
+ * The reasoning above is kept because it was the correct argument while it
+ * applied, and because it names what the weaker guarantee cost: it depended on
+ * nothing on the read surface ever enumerating gates.
  */
-test("an interrupted declareGate leaves a gate no reader enumerates", async () => {
+test("an interrupted declareGate leaves no gate at all", async () => {
   const c1 = await session.stateCriterion("residual below 1e-8");
   const c2 = await session.stateCriterion("runtime under an hour");
   const work = await session.planWork({ objective: "scale up", acceptance: "both hold" });
@@ -735,31 +740,21 @@ test("an interrupted declareGate leaves a gate no reader enumerates", async () =
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
-  // A half-built gate survives, governed by one of its two criteria...
-  const half = await graph.query(
-    `MATCH (:Criterion)-[:GOVERNS]->(g:Gate) RETURN g`,
-    { g: vertexProps<{ natural_id: string }>() },
-  );
-  expect(half).toHaveLength(1);
-
-  // ...and it protects nothing, so no reader entering from work can find it.
-  const gating = await graph.query(
-    `MATCH (:Gate)-[:GATES]->(t:Task) RETURN t`,
-    { t: vertexProps<{ objective: string }>() },
-  );
-  expect(gating).toEqual([]);
-
-  // The caller holds no handle, and every Gate reader is keyed by natural_id --
-  // which is the whole guarantee. Asserted rather than described, because it is
-  // weaker than structural unreachability and one new reader could take it away:
-  // nothing on the read surface enumerates gates, so there is no route in.
+  // No gate at all. This used to assert that a half-built one survived,
+  // governed by one of its two criteria and protecting nothing -- safe only
+  // because every Gate reader is keyed by natural_id and the caller held none.
+  // That guarantee is no longer load-bearing.
   const gateReaders = await graph.query(
     `MATCH (g:Gate) RETURN g`,
     { g: vertexProps<{ natural_id: string }>() },
   );
-  expect(gateReaders).toHaveLength(1); // present in the graph...
+  expect(gateReaders).toEqual([]);
+
+  // The work the gate would have protected is untouched, which is the half of
+  // the old assertion that still means something: a failed `declareGate` must
+  // not damage what it was declared over.
   const contract = await session.contractFor(work);
-  expect(contract.objective).toBe("scale up"); // ...and invisible from the work.
+  expect(contract.objective).toBe("scale up");
 });
 
 /**

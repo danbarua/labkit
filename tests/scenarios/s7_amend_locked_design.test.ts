@@ -308,7 +308,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     await session.sharpen({ from: aside, into: "does sweep width interact with convergence?", because: "worth separating" });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    expect(later.events.all()).toHaveLength(0);
+    expect((await later.events.all())).toHaveLength(0);
 
     const history = await later.designHistory(programme.feasibilityBoundary);
     expect(history.originally.requires).toBe(LOCKED_LIMIT);

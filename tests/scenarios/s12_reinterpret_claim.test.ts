@@ -246,7 +246,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     await session.reinterpret({ of: await claimNamed(session, NARROWER), as: EVEN_NARROWER, because: "the cohort B ratio does not separate" });
 
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    expect(later.events.all()).toHaveLength(0);
+    expect((await later.events.all())).toHaveLength(0);
 
     const history = await later.interpretationHistory(await claimNamed(later, EVEN_NARROWER));
     expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);

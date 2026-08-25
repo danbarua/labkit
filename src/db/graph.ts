@@ -40,6 +40,19 @@ export class TenantGraph {
   private readonly db: LabKitDB;
   /** Depth counter, so a compound verb calling another one does not nest BEGIN. */
   private depth = 0;
+  /**
+   * Natural ids minted since the last {@link drainMinted}.
+   *
+   * **Collected here rather than listed by callers**, because a caller that
+   * mints three nodes and remembers two is a state nobody could see. A verb
+   * writes an event saying what it created; that list has to come from the
+   * thing doing the creating.
+   *
+   * Cleared at the end of every depth-0 transaction — see {@link inTransaction}
+   * — so a verb that throws before draining cannot leave its ids to be claimed
+   * by the next one.
+   */
+  private minted: string[] = [];
 
   constructor(
     private readonly ctx: TenantContext,
@@ -106,7 +119,23 @@ export class TenantGraph {
       // the TenantGraph. Never observed firing; found while investigating the
       // suite flake and demonstrated in tests/domain-graph.test.ts.
       this.depth -= 1;
+      // A verb that threw never reached its `emit`, so its minted ids are still
+      // here. Clearing them at depth 0 is what stops the next verb's event
+      // claiming to have created records that were rolled back. On the success
+      // path `emit` has already drained and this is a no-op.
+      if (this.depth === 0) this.minted.length = 0;
     }
+  }
+
+  /**
+   * The natural ids minted since the last call, and clears them.
+   *
+   * Read once per event, by `WriteSurface.emit`. Draining rather than reading
+   * is deliberate: two events in one transaction must not both claim the same
+   * new records.
+   */
+  drainMinted(): string[] {
+    return this.minted.splice(0);
   }
 
   /**
@@ -150,6 +179,7 @@ export class TenantGraph {
     if (!created) throw new Error(`CREATE (n:${label}) returned no rows`);
 
     const { natural_id, ...properties } = created.n.properties;
+    this.minted.push(natural_id);
     return { natural_id, label, properties: properties as unknown as NodePropsByLabel[L] };
   }
 

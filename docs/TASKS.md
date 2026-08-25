@@ -59,11 +59,3 @@ Here so nobody re-discovers them as gaps.
   and no source obligation requires it. `Decision.decided_at` is record time.
 - **An instant on `EvidenceUnit`.** Would let `whatWasKnown()` split `open` into
   worked-on and untouched. Nothing has needed it.
-- **A durable event sink.** `read.ts` never touches `events`, and the scenarios
-  that mention the log assert it is *empty* when a historical answer is read.
-  It is a SQL table and a reader; what it waits on is a consumer — an audit log,
-  MCP notifications, or a projection to another view model.
-
-  Attribution rides on every event as of PJ-031 and nothing reads it, which is a
-  second and nearer trigger than the one `src/domain/events.ts` names. Still not
-  a reason to build the sink; it is a reason the wait is now visible.

@@ -12,7 +12,9 @@ export type {
   AttributionContext,
   CommandContext,
   DomainEvent,
+  EventFilter,
   EventSink,
+  Operation,
 } from "./events";
 export type {
   Ref,

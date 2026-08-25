@@ -43,6 +43,7 @@ These change nothing.
 - [`design_history`](#design-history) — How a gate's conditions were amended
 - [`interpretation_history`](#interpretation-history) — How a claim's reading was narrowed
 - [`reproduction_of`](#reproduction-of) — What a re-run read, against what its original read
+- [`what_happened`](#what-happened) — What was done, and by whom
 - [`claims_asserting`](#claims-asserting) — Which claims assert a proposition
 - [`pursuits_of`](#pursuits-of) — The lines of enquiry under a question
 - [`origin_of`](#origin-of) — Where a question came from
@@ -338,6 +339,35 @@ What a verifying analysis re-checked, what each of the two runs read (in the ord
     - `invalidated?`: true
   - `standing`: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run"
 - `bearing`: "raises" | "lowers"
+
+---
+
+## what_happened
+
+*What was done, and by whom* — read-only
+
+The acts themselves, oldest first — **the only tool that answers from the event log rather than the record**. Every other read tells you what is true now; this tells you what was done to make it so, when, and by which agent against which commit. Use it for 'what have we been working on', 'what did this session do', or 'who recorded this'. `seq` is both the order and the cursor: pass the last one back as `since_seq` to page. `touching` matches an act *about* a record or one that *created* it — most verbs are about something other than what they minted, so both are needed.
+
+**Takes**
+
+- `since_seq?`: number — only acts after this seq — the cursor
+- `by?`: string — one agent's acts, by attribution id
+- `operation?`: string — one verb, e.g. `record_analysis`
+- `touching?`: string — acts about, or minting, this id
+- `limit?`: number — how many at most (default 50)
+
+**Returns**
+
+- `events`: object[]
+  - `seq`: number
+  - `at`: string
+  - `operation`: string
+  - `subject`: string
+  - `created`: string[]
+  - `attribution_label`: string
+  - `attribution_id`: string
+  - `git_hash`: string
+  - `detail`: object | null
 
 ---
 

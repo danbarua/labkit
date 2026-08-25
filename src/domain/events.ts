@@ -113,11 +113,61 @@ export const UNATTRIBUTED: AttributionContext = {
 };
 
 /**
+ * The verb an event records — one name per public write verb, and the same name.
+ *
+ * **Not a hand-kept copy of the verb list.** Checked when this was written: the
+ * eighteen `emit` operations and the eighteen public verbs on `WriteSurface` are
+ * the same eighteen strings, because CLAUDE.md requires it — *"a verb that
+ * composes others records **one** event, not one per step"*, and that one event
+ * is named for the act the researcher took. `openEnquiry` is `pose` + `pursue`
+ * and emits only `openEnquiry`.
+ *
+ * Written as a union rather than `string` so a typo is a compile error.
+ * `this.emit("recordAnalyis", …)` used to compile and would have written an
+ * event nobody could ever filter for.
+ */
+export type Operation =
+  | "pose"
+  | "pursue"
+  | "openEnquiry"
+  | "sharpen"
+  | "recordObservations"
+  | "recordAnalysis"
+  | "recordReview"
+  | "closeEnquiry"
+  | "planWork"
+  | "stateCriterion"
+  | "declareGate"
+  | "evaluateCriterion"
+  | "reverify"
+  | "acceptAsUnresolved"
+  | "promote"
+  | "amendDesign"
+  | "replaceAnalysis"
+  | "reinterpret";
+
+/**
  * One recorded domain operation. `subject` is the natural id of whatever the
  * operation was primarily about; `detail` carries the operation-specific
  * payload a later query would need to reconstruct what happened.
  */
 export interface DomainEvent {
+  /**
+   * Position in this tenant's stream — **assigned by the store, so absent until
+   * one has it.**
+   *
+   * Optional for that reason and no other: an event on its way to a sink has no
+   * position yet, and `inMemoryEventLog()` never gives it one because a process
+   * -lifetime array has nothing to number. Anything read back out of
+   * `pgEventLog()` has it.
+   *
+   * It is the stream's order, not `at`. A frozen clock — which most of the
+   * suite runs — stamps every event in a scenario with one instant, and this
+   * file already refuses natural-id allocation order as "an accident of the
+   * sequence and not a modelled fact". A sequence on the event table is that
+   * modelled fact.
+   */
+  seq?: number;
   at: string;
   /**
    * Required, not optional, and that is the enforcement.
@@ -126,15 +176,58 @@ export interface DomainEvent {
    * the sink without saying who caused it.
    */
   attribution: AttributionContext;
-  operation: string;
+  operation: Operation;
   subject: string;
+  /**
+   * Every handle this act minted.
+   *
+   * `subject` says what the act was *about*; this says what came into
+   * existence, and for most verbs they differ. Six verbs mint a `Decision` and
+   * only `amendDesign` names that decision as its subject — the others name the
+   * enquiry or the claim, because that is what the researcher was doing. So
+   * "which act created this record?" is answerable from here and not from
+   * `subject`.
+   *
+   * Optional, and only because an event that predates the collector or comes
+   * from a hand-built fixture has none. `WriteSurface.emit` always supplies it,
+   * empty if the act minted nothing.
+   */
+  created?: readonly string[];
   detail?: Record<string, unknown>;
 }
 
+/**
+ * What a caller wants out of the stream.
+ *
+ * Every field narrows; omitting all of them asks for everything. `since` is a
+ * `seq`, not an instant — see {@link DomainEvent.seq} for why an instant cannot
+ * order this stream.
+ */
+export interface EventFilter {
+  /** Strictly after this `seq`. */
+  since?: number;
+  /** One agent's acts, by `attribution_id`. */
+  by?: string;
+  operation?: string;
+  /** Acts about, or minting, this handle. */
+  touching?: string;
+  limit?: number;
+}
+
+/**
+ * Where events go.
+ *
+ * **Asynchronous, which it was not until the store existed.** `record` returned
+ * `void` while the only implementation pushed onto an array; a SQL insert
+ * cannot, and pretending otherwise would mean either losing the write's errors
+ * or letting an event land outside the transaction it belongs to.
+ */
 export interface EventSink {
-  record(event: DomainEvent): void;
+  record(event: DomainEvent): Promise<void>;
   /** Everything recorded so far, oldest first. */
-  all(): readonly DomainEvent[];
+  all(): Promise<readonly DomainEvent[]>;
+  /** The subset a caller asked for, oldest first. */
+  select(filter: EventFilter): Promise<readonly DomainEvent[]>;
 }
 
 /**
@@ -153,8 +246,20 @@ export interface EventSink {
  */
 export function inMemoryEventLog(): EventSink {
   const events: DomainEvent[] = [];
+  const matches = (e: DomainEvent, f: EventFilter): boolean =>
+    (f.since === undefined || (e.seq ?? 0) > f.since) &&
+    (f.by === undefined || e.attribution.attribution_id === f.by) &&
+    (f.operation === undefined || e.operation === f.operation) &&
+    (f.touching === undefined || e.subject === f.touching || (e.created ?? []).includes(f.touching));
   return {
-    record: (event) => void events.push(event),
-    all: () => events,
+    record: async (event) => void events.push(event),
+    all: async () => events,
+    // Filtered in TypeScript, which is the whole difference between the two
+    // sinks: this one holds every event it has ever seen, so `select` is a
+    // `filter`, where `pgEventLog` turns the same shape into a WHERE clause.
+    select: async (filter) => {
+      const found = events.filter((e) => matches(e, filter));
+      return filter.limit === undefined ? found : found.slice(0, filter.limit);
+    },
   };
 }
