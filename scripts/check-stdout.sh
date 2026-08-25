@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI guard: nothing under src/ may write to stdout except the CLI.
+# Nothing under src/ may write to stdout except the CLI.
 #
 # This became load-bearing on 2026-08-21, when src/mcp/server.ts started
 # speaking MCP over stdio. stdout IS the protocol channel there: one stray

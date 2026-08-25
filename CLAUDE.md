@@ -194,6 +194,7 @@ bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
 bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool declarations
 bun run typecheck              # tsc --noEmit
 bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
+bun run check:all-checks       # every check script must introduce itself in one plain sentence
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
@@ -340,6 +341,25 @@ not mean that needs a different prefix — see `probe:pglite-concurrency`, whose
 exit 0 means an upstream bug *still reproduces*. It sat under `check:` and had
 to be excluded from the sweep by name; renaming it deleted the exclusion list
 rather than documenting it.
+
+**A check script introduces itself in one plain sentence**, and `bun run check`
+prints that sentence before running it — so a reader looking at a failure from
+a script they have never opened is told what it checks rather than
+`check:prop-classes`. `check:all-checks` enforces the shape:
+
+```
+#!/usr/bin/env bun                 #!/usr/bin/env bash
+/**                                # One sentence: what this checks.
+ * One sentence: what this checks. #
+ *                                 # Then the prose: why it exists.
+ * Then the prose: why it exists.
+ */
+```
+
+Shell has no block opener, so its sentence is a line higher. That is why
+`check-all.ts` calls `summaryOf()` rather than printing a fixed line number —
+the two of us picked "line 4" and then "line 2" while designing this, and both
+were wrong for one of the two languages.
 
 Do not pipe `bun test` — that trap is above, and is still live. `bun run check`
 passes each step's output straight through for the same reason.

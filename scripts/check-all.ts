@@ -35,32 +35,68 @@
  */
 
 import { readFileSync } from "node:fs";
+import { summaryOf } from "./check-all-checks";
 
-/** A thing to run: a label, and the argv to run it with. */
+/**
+ * A thing to run: a label, the argv, and the sentence printed before it runs.
+ *
+ * **The sentence comes from the script itself**, via `summaryOf` — not from a
+ * table here, which would be a second copy of a fact that drifts. The audience
+ * is someone who changed code, ran this, and is looking at a failure from a
+ * script they have never opened: `check:prop-classes` tells them nothing,
+ * *"Holds `INDEXED_PROPS` to the string taxonomy it is supposed to mirror"*
+ * tells them where to look.
+ *
+ * It is a function and not a fixed line number because the line differs by
+ * language — 3 for TypeScript, where line 2 is the `/**` opener, and 2 for
+ * shell, which has no opener to spend a line on. `check:all-checks` is what
+ * guarantees there is always a sentence there to find.
+ */
 interface Step {
   readonly name: string;
   readonly argv: string[];
+  readonly says: string;
 }
 
 const scripts: Record<string, string> = JSON.parse(
   readFileSync("package.json", "utf8"),
 ).scripts;
 
+/** The script file a `check:*` command runs, for `summaryOf` to read. */
+const fileFor = (name: string): string | undefined =>
+  scripts[name]?.split(/\s+/).find((token) => token.startsWith("scripts/"));
+
 const steps: Step[] = [
   // The three CLAUDE.md names as the pre-commit bar, first, because they are
-  // the ones that fail for real reasons rather than for tidiness.
-  { name: "test", argv: ["bun", "test"] },
-  { name: "typecheck", argv: ["bun", "run", "typecheck"] },
-  { name: "depcruise", argv: ["npx", "depcruise", "src", "tests", "--output-type", "err"] },
+  // the ones that fail for real reasons rather than for tidiness. Their
+  // sentences are written here because they are not scripts in this repo and
+  // have no header to read.
+  { name: "test", argv: ["bun", "test"], says: "Every test in the suite." },
+  { name: "typecheck", argv: ["bun", "run", "typecheck"], says: "The types agree." },
+  {
+    name: "depcruise",
+    argv: ["npx", "depcruise", "src", "tests", "--output-type", "err"],
+    says: "The layering rules hold, and nothing imports in a circle.",
+  },
   ...Object.keys(scripts)
     .filter((name) => name.startsWith("check:"))
     .sort()
-    .map((name) => ({ name, argv: ["bun", "run", name] })),
+    .map((name) => {
+      const file = fileFor(name);
+      return {
+        name,
+        argv: ["bun", "run", name],
+        // `check:all-checks` is what stops this falling back. If it is passing,
+        // every check script has a summary and this reads it.
+        says: (file && summaryOf(file)) ?? "(no summary — see check:all-checks)",
+      };
+    }),
 ];
 
 const results: Array<{ name: string; ok: boolean; ms: number }> = [];
 
 for (const step of steps) {
+  console.log(`\n▸ ${step.name} — ${step.says}`);
   const started = performance.now();
   // Output goes straight through. A sweep that swallowed a failing test's
   // diagnosis and reported "test: FAIL" would cost the thing you actually

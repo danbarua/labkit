@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#
 # The CLI against a real database, asserted — the end-to-end check.
 #
 # **Split out of `examples/full-lifecycle.sh`, which is now what its name says.**

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI guard: fail if any symlink is tracked in git.
+# Refuses a symlink tracked in git.
 #
 # A symlink committed from a build sandbox points at a path that exists on
 # exactly one machine. Everywhere else the checkout produces a dangling

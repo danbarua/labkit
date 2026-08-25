@@ -1,5 +1,24 @@
-// scripts/check-migrations.ts
-// https://medium.com/@2nick2patel2/typescript-safe-sql-migrations-with-dbmate-prisma-compile-time-guards-for-ddl-d387e9a070cc
+#!/usr/bin/env bun
+/**
+ * Refuses a migration that drops a table or a column without saying so.
+ *
+ * `DROP TABLE` and `DROP COLUMN` are forbidden outright, and an `ALTER TABLE`
+ * must carry a `-- lock-strategy:` comment — because the person writing it
+ * knows whether it takes an exclusive lock and the person deploying it does
+ * not. Both are grep, not a parser: practical, not perfect.
+ *
+ * There is no persistent database yet, so today this guards a convention rather
+ * than production data. That is the cheap moment to start — the migration that
+ * would have needed it is the one written after the first deploy, by someone
+ * who has never had to think about it here.
+ *
+ * The idea came from
+ * https://medium.com/@2nick2patel2/typescript-safe-sql-migrations-with-dbmate-prisma-compile-time-guards-for-ddl-d387e9a070cc
+ *
+ * Usage: bun run check:migrations
+ * Exit:  0 when every migration is within policy, 1 otherwise.
+ */
+
 import fs from "node:fs";
 import path from "node:path";
 

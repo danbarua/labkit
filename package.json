@@ -17,6 +17,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "check": "bun scripts/check-all.ts",
+    "check:all-checks": "bun scripts/check-all-checks.ts",
     "check:doc-comments": "bun scripts/check-doc-comments.ts",
     "check:migrations": "bun scripts/check-migrations.ts",
     "check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
