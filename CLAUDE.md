@@ -207,6 +207,20 @@ binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is
 `WriteSurface`, so it cannot write, which `tests/cli.test.ts` checks by deriving
 the forbidden verb list from the prototype.
 
+**It answers every question the MCP read tools answer**, and the same test
+derives that too — every public verb in `src/domain/read.ts` has a command or
+is listed in `NO_COMMAND_FOR` with a reason. It did not for a while: the CLI
+shipped with four commands while eleven reads were reachable over MCP and not
+from a terminal, and its own header called four the point. Neither list is
+counted here; `labkit --help` and `docs/mcp-tools.md` are the two surfaces.
+
+**Its event log is passed in, not defaulted.** `SessionCore` falls back to
+`inMemoryEventLog()`, which in a process that exits after one query is an array
+nothing ever wrote to — `labkit happened` over one reports that nothing has ever
+happened, against a full database. That is a confidently wrong answer rather
+than an empty one, so `main()` builds `pgEventLog()` over the connection the
+graph already has, and the test asserts the source does.
+
 **`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
 one batch of work and that is not a design position: a record nothing can write
 to has nothing in it. Read and write handlers are handed different surfaces, so
