@@ -66,9 +66,10 @@ They are dated records: read them for reasoning, never for current state.
   how individual verbs were earned. 010, 013, 017, 020 and 024 are external
   reviews; 012 is superseded by 014/015. 030 is on reference-vs-subject
   identity, 031 on the execution-context seam — read it before changing how a
-  surface is constructed, not only before touching events — and 032 on the
+  surface is constructed, not only before touching events — 032 on the
   durable event log, which is where the atomicity of every write verb is
-  argued.
+  argued, and 033 on retiring the CLI's read-only constraint, whose §4 is a
+  negative control that found an assertion asserting nothing.
 - **025-029 are about the method, not the model**, and are the ones worth
   reading if you are about to write a document. Their rules, which is all you
   need from them:
@@ -196,30 +197,53 @@ bun run check:no-stringly-typed  # no bare `string` in a core/read/write signatu
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
-bun examples/full-lifecycle.ts # runnable end-to-end smoke test of the persistence layer
+bun run example               # examples/full-lifecycle.sh — a research lifecycle through the CLI
 bun run dev                    # the CLI (src/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
 There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
-binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is
-**read-only by construction**: it builds a `ReadSurface` and never a
-`WriteSurface`, so it cannot write, which `tests/cli.test.ts` checks by deriving
-the forbidden verb list from the prototype.
+binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is the
+full surface, reads *and* writes (`bun run dev`).
 
-**It answers every question the MCP read tools answer**, and the same test
-derives that too — every public verb in `src/domain/read.ts` has a command or
-is listed in `NO_COMMAND_FOR` with a reason. It did not for a while: the CLI
-shipped with four commands while eleven reads were reachable over MCP and not
-from a terminal, and its own header called four the point. Neither list is
-counted here; `labkit --help` and `docs/mcp-tools.md` are the two surfaces.
+**It was read-only by construction and is not any more**, and that is the same
+correction the MCP server got. Read-only was never a shipping goal; what it
+produced was a record with **no way to put anything into it** except by wiring
+up an agent and an MCP server. The one script that did write —
+`examples/full-lifecycle.ts` — did it by calling `TenantGraph.createNode`
+underneath the domain layer, which is the bypass the read-only tests existed to
+prevent, in the only writer there was. The two structural tests were deleted
+with the commit that added write commands, not worked around, and
+`tests/helpers/read-only.ts` went with them.
 
-**Its event log is passed in, not defaulted.** `SessionCore` falls back to
-`inMemoryEventLog()`, which in a process that exits after one query is an array
-nothing ever wrote to — `labkit happened` over one reports that nothing has ever
-happened, against a full database. That is a confidently wrong answer rather
-than an empty one, so `main()` builds `pgEventLog()` over the connection the
-graph already has, and the test asserts the source does.
+**Every public verb on either surface has a command**, derived in
+`tests/cli.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
+`tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
+`NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
+this paragraph deliberately does not count them. What survives from the
+read-only era, as a narrower test: **the CLI reaches the graph only through the
+domain verbs**, calling nothing on the `TenantGraph` it constructs.
+
+**Its event log is passed in, not defaulted, on both halves.** `SessionCore`
+falls back to `inMemoryEventLog()`, which in a process that exits after one
+command is an array nothing ever wrote to. On the read side `labkit happened`
+then reports that nothing has ever happened against a full database; on the
+write side a verb commits its graph changes durably while the event describing
+them dies at exit — durable state with no record of the act that caused it. Both
+are confidently wrong rather than empty. `main()` builds one `pgEventLog()` over
+the connection the graph already has and hands it to both.
+
+**The CLI is where attribution stopped being a mock.** `src/attribution.ts`
+predicted that a real `GitContextProvider` would be the first subprocess under
+`src/`; `gitContext` is it, and `personContext` names the user. The MCP server
+keeps the stubs, because *which agent* and *which session* are facts the
+protocol does not carry. `--author` overrides the username, because a script
+driving LabKit is not the account it runs under.
+
+**`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
+the project root by another route. `derivePort` hashes that path, so a temporary
+directory gets its own file *and* its own port, which is what makes
+`examples/full-lifecycle.sh` hermetic. `LABKIT_DB_URL` still wins over both.
 
 **`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
 one batch of work and that is not a design position: a record nothing can write
@@ -233,17 +257,23 @@ this paragraph deliberately does not count them.
 failure.** It returned 99 on a passing suite until PGlite 0.5.7 (2026-08-24)
 fixed the WASM teardown interaction behind it.
 
-`bun examples/full-lifecycle.ts` had the same defect and was fixed earlier. It
-exited 99 on a success, so this file told everyone to ignore its exit code and
-read the output instead — and the script had been dead since `af5a1d2` deleted
-the views it read back through, dying at `relation "labkit_t1.claim" does not
-exist` for 221 commits. The rule was added *the same day, after the break*, by
-the commit whose subject was closing out the last verification step. Declaring
-the exit code meaningless left the genuine failure with no watcher either. It
-now ends with an explicit `process.exit(0)`, so **0 means it worked** and
-anything else means it did not; it also asserts the provenance chain it walks
-and refuses any id that is not a natural id, rather than leaving that to a
-reader's eye.
+`bun run example` (`examples/full-lifecycle.sh`) had the same defect in its
+predecessor and is where the lesson below was learnt. `full-lifecycle.ts` exited
+99 on a success, so this file told everyone to ignore its exit code and read the
+output instead — and the script had been dead since `af5a1d2` deleted the views
+it read back through, dying at `relation "labkit_t1.claim" does not exist` for
+221 commits. The rule was added *the same day, after the break*, by the commit
+whose subject was closing out the last verification step. Declaring the exit code
+meaningless left the genuine failure with no watcher either.
+
+The shell version keeps what that cost bought: **0 means it worked and nothing
+else does**, it asserts on the answers rather than on whether the commands ran,
+and each assertion is one a person could check by hand. It is hermetic —
+`--db` points it at a temporary directory removed on exit — so it can neither
+touch a working database nor contend with one. It also **drives the CLI and
+nothing else**, where `full-lifecycle.ts` wrote by calling
+`TenantGraph.createNode` underneath the domain layer: a writer that put nodes on
+the record no verb had recorded making.
 
 The general lesson, which cost more than the script did: **a rule that tells
 readers to ignore a signal removes the only watcher that signal had.** If a

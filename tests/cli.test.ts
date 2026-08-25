@@ -1,16 +1,30 @@
 /**
- * The CLI is read-only, and the test that matters is the structural one.
+ * The CLI reads and writes, and the tests that matter are the coverage ones.
  *
- * It constructs a `ReadSurface`, never a `ResearchSession`, so no write verb is
- * in scope to reach for. That is the property worth asserting: a convention
- * that the CLI "only reads" is worth nothing next to a surface that cannot
- * write.
+ * **This file used to forbid writing.** Two tests asserted that `WriteSurface`
+ * did not appear in `src/cli.ts` and that no write verb name did either,
+ * derived from both surfaces the CLI held. They were right for the batch of
+ * work they were written for and wrong as a design position, and they are
+ * deleted with the commit that added write commands rather than worked around
+ * — `tests/mcp.test.ts` set that precedent when the MCP server stopped being
+ * read-only, in the same words.
+ *
+ * The read-only property was never a shipping goal. What it produced was a
+ * record with **no way to put anything in it** except by wiring up an agent and
+ * an MCP server; the one script that wrote to a LabKit database,
+ * `examples/full-lifecycle.ts`, did it by going underneath the domain layer to
+ * `TenantGraph.createNode` — the exact bypass the read-only tests existed to
+ * prevent, in the only writer there was.
+ *
+ * `tests/helpers/read-only.ts` went with them. It had no other consumer, and
+ * its header described a world with two read-only adapters in it.
  */
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { ReadSurface } from "../src/domain";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ReadSurface, WriteSurface } from "../src/domain";
 import { ref } from "../src/domain/report";
-import { writeVerbNames, writeVerbsCalledIn } from "./helpers/read-only";
 import { publicVerbsOf, verbsReachedIn } from "./helpers/surface-coverage";
 
 const source = readFileSync("src/cli.ts", "utf8");
@@ -18,21 +32,24 @@ const source = readFileSync("src/cli.ts", "utf8");
  *  in prose is not importing it. Strip them before checking. */
 const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-test("the CLI imports the read half and not the write half", () => {
+test("the CLI holds both surfaces and not the session that joins them", () => {
   expect(code).toContain("ReadSurface");
-  expect(code).not.toContain("WriteSurface");
+  expect(code).toContain("WriteSurface");
+  // `ResearchSession` is still absent, and that part is unchanged: an adapter
+  // holding both halves separately can hand each command the one it needs, and
+  // the two lists are what `tests/mcp.test.ts` calls the whole safety story.
   expect(code).not.toContain("ResearchSession");
 });
 
-test("no write verb name appears in the CLI", () => {
-  // Derived, not typed out, so a verb added later is covered without anyone
-  // remembering -- and derived from BOTH surfaces the CLI holds. Until PJ-028
-  // this checked `WriteSurface` alone, which by construction could never
-  // contain `TenantGraph.createNode`; the CLI holds one of those too. See
-  // tests/helpers/read-only.ts, including what this does and does not prove.
-  expect(writeVerbNames().length).toBeGreaterThan(10);
-  expect(writeVerbNames()).toContain("createNode");
-  expect(writeVerbsCalledIn(code)).toEqual([]);
+test("the CLI reaches the graph only through the domain verbs", () => {
+  // The property the deleted read-only tests were really protecting, kept and
+  // narrowed. `examples/full-lifecycle.ts` wrote by calling these directly,
+  // which is how a record got written without any verb recording that it had
+  // been. `TenantGraph` is constructed here -- the surfaces need one -- but
+  // nothing on it is called.
+  for (const bypass of ["createNode", "createEdge", "inTransaction", ".query("]) {
+    expect(code).not.toContain(bypass);
+  }
 });
 
 test("every command the usage text advertises is implemented", () => {
@@ -73,14 +90,45 @@ test("every read verb the domain exposes has a CLI command", () => {
   expect(unreachable).toEqual([]);
 });
 
+test("every write verb the domain exposes has a CLI command", () => {
+  // The same derivation on the other half, added when the CLI stopped being
+  // read-only. `NO_COMMAND_FOR` covers both surfaces; nothing is in it.
+  const writes = publicVerbsOf("src/domain/write.ts");
+  expect(writes.length).toBeGreaterThan(10);
+  expect(writes).toContain("recordAnalysis");
+  for (const verb of writes) {
+    expect(typeof (WriteSurface.prototype as unknown as Record<string, unknown>)[verb]).toBe("function");
+  }
+
+  const unreachable = writes
+    .filter((v) => verbsReachedIn(code, "write", [v]).length === 0)
+    .filter((v) => !(v in NO_COMMAND_FOR));
+  expect(unreachable).toEqual([]);
+});
+
 test("the CLI hands the event log in rather than letting it default", () => {
   // `SessionCore` defaults `events` to `inMemoryEventLog()`. In a process that
-  // exits after one query that is an array nothing ever wrote to, so `happened`
-  // would report that nothing has ever happened -- a confidently wrong answer,
-  // not an empty one. Asserted on the source because the alternative is
+  // exits after one command that is an array nothing ever wrote to. On the read
+  // side `happened` reports that nothing has ever happened; on the write side a
+  // verb commits its graph changes durably while the event describing them dies
+  // at exit -- durable state with no record of the act that caused it.
+  //
+  // One sink, constructed once and handed to both, which is also what keeps the
+  // stream from fragmenting. Asserted on the source because the alternative is
   // standing up a database to observe an absence.
-  expect(code).toContain("pgEventLog(connection.db, ctx.tenantId)");
+  expect(code).toContain("const events = pgEventLog(connection.db, ctx.tenantId)");
+  expect(code).toMatch(/new ReadSurface\(graph, \{ events \}\)/);
+  expect(code).toMatch(/new WriteSurface\(graph, \{[\s\S]*?events,/);
   expect(code).not.toContain("inMemoryEventLog");
+});
+
+test("the CLI attributes writes to a real person and a real commit", () => {
+  // Not the mocks. `mockGitContext` answers forty zeros *designed to read as
+  // fake*, which is right for a stand-in and wrong in a permanent record --
+  // the first person to see a git_hash will try to check it out.
+  expect(code).toContain("commandContext(gitContext, personContext(");
+  expect(code).not.toContain("mockGitContext");
+  expect(code).not.toContain("mockSessionContext");
 });
 
 // ---------------------------------------------------------------------------
@@ -99,7 +147,7 @@ test("the CLI hands the event log in rather than letting it default", () => {
 // interpretation through five verbs would test that again rather than this.
 // ---------------------------------------------------------------------------
 
-import { main, parseArgs, renderEnquiry, renderWhy, renderKnown } from "../src/cli";
+import { flag, main, parseArgs, renderEnquiry, renderWhy, renderKnown } from "../src/cli";
 import type { EnquiryStatus, SupportExplanation, KnowledgeSurvey } from "../src/domain";
 
 test("flags may precede the positional argument", () => {
@@ -108,14 +156,32 @@ test("flags may precede the positional argument", () => {
   const before = parseArgs(["why", "--tenant", "acme", "the schedule moves convergence"]);
   expect(before.command).toBe("why");
   expect(before.positionals[0]).toBe("the schedule moves convergence");
-  expect(before.flags.tenant).toBe("acme");
+  expect(flag(before.flags, "tenant")).toBe("acme");
 
   const after = parseArgs(["why", "the schedule moves convergence", "--tenant", "acme"]);
   expect(after.positionals).toEqual(before.positionals);
   expect(after.flags).toEqual(before.flags);
 
   expect(parseArgs(["known", "--json", "--at", "2026-03-01T00:00:00.000Z"]).json).toBe(true);
-  expect(parseArgs(["known", "--json"]).flags.at).toBeUndefined();
+  expect(flag(parseArgs(["known", "--json"]).flags, "at")).toBeUndefined();
+});
+
+test("a flag given more than once keeps every value, in order", () => {
+  // Six write verbs take a list of handles. Repetition is how one is given;
+  // `flag()` takes the last, so the single-valued case reads the same
+  // structure rather than a second one kept beside it.
+  const parsed = parseArgs(["analyse", "LOE_1", "--from", "ART_1", "--from", "COMP_2"]);
+  expect(parsed.flags.from).toEqual(["ART_1", "COMP_2"]);
+  expect(flag(parsed.flags, "from")).toBe("COMP_2");
+});
+
+test("an unknown flag is refused, not ignored", () => {
+  // It used to be dropped silently, on the reasoning that a missing positional
+  // would surface the mistake. That held while every command was a read. A
+  // mistyped `--becuase` on a write would put a record on the permanent
+  // register with a field the caller believed they had set.
+  expect(parseArgs(["promote", "CLM_1", "--becuase", "it holds"]).unknown).toEqual(["--becuase"]);
+  expect(parseArgs(["promote", "CLM_1", "--because", "it holds"]).unknown).toEqual([]);
 });
 
 test("an enquiry accepted as unresolved does not render as merely open", () => {
@@ -462,18 +528,21 @@ test("a non-numeric --since or --limit is refused, not coerced", async () => {
   // parameter and comes back empty -- a wrong-shaped answer to a question the
   // caller mistyped. The MCP tool gets this from zod; a CLI has to say it.
   //
-  // This opens a database, because `main()` connects before it dispatches --
-  // the same as every other `usageError` path here. Measured, not assumed: the
-  // first version of this comment claimed it did not, and the `.labkit`
-  // directory it left behind said otherwise.
+  // `--db` points at a temporary directory, because `main()` connects before it
+  // dispatches -- the same as every other `usageError` path here, so this test
+  // opens a real database. Measured, not assumed: the first version of this
+  // comment claimed it did not, and the `.labkit` directory it left in the repo
+  // root said otherwise. It doubles as the only test of `--db`.
+  const db = mkdtempSync(join(tmpdir(), "labkit-cli-test-"));
   const said: string[] = [];
   const stderr = console.error;
   console.error = (...args: unknown[]) => void said.push(args.join(" "));
   try {
-    expect(await main(["happened", "--limit", "abc"])).toBe(2);
-    expect(await main(["happened", "--since", "1.5"])).toBe(2);
+    expect(await main(["happened", "--db", db, "--limit", "abc"])).toBe(2);
+    expect(await main(["happened", "--db", db, "--since", "1.5"])).toBe(2);
   } finally {
     console.error = stderr;
+    rmSync(db, { recursive: true, force: true });
   }
   expect(said.join("\n")).toContain("--limit takes a whole number");
   expect(said.join("\n")).toContain("--since takes a whole number");
