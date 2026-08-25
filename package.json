@@ -48,6 +48,7 @@
     "@electric-sql/pglite-prepopulatedfs": "^0.5.7",
     "@electric-sql/pglite-socket": "^0.2.10",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "commander": "^15.0.0",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0",
     "zod": "^4.4.3"

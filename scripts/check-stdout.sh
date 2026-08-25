@@ -25,19 +25,23 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
-# src/cli.ts is the exception and the only one: printing to stdout is its whole
-# job. It is never imported by the MCP server.
+# The CLI composition roots are the exception: printing to stdout is their whole
+# job, and neither is ever imported by the MCP server. There are two while the
+# monolithic `src/cli.ts` is being ported to `src/cli/`, and the exemption names
+# both **entry points** rather than the whole `src/cli/` tree -- the views under
+# it return strings, and one of them printing instead of returning is a defect
+# this check should still catch.
 #
 # Comment lines are dropped before matching. Naming the banned call in prose is
 # not making it -- the first version of this script failed on its own docstring,
 # which is the same trap tests/cli.test.ts already strips comments to avoid.
 matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' src/ \
   --include='*.ts' 2>/dev/null \
-  | grep -v '^src/cli\.ts:' \
+  | grep -vE '^src/cli\.ts:|^src/cli/cli\.ts:' \
   | grep -vE '^[^:]+:[0-9]+: *(\*|//|/\*)' || true)"
 
 if [ -n "$matches" ]; then
-  echo "❌ check-stdout ERROR: writes to stdout under src/, outside src/cli.ts:"
+  echo "❌ check-stdout ERROR: writes to stdout under src/, outside the CLI entry points:"
   echo
   echo "$matches"
   echo
@@ -47,4 +51,4 @@ if [ -n "$matches" ]; then
   exit 1
 fi
 
-echo "✅ check-stdout OK: nothing under src/ writes to stdout except the CLI."
+echo "✅ check-stdout OK: nothing under src/ writes to stdout except the CLI entry points."
