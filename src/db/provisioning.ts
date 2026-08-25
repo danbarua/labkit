@@ -12,7 +12,14 @@
  * module-private.
  */
 
-import { NODE_LABELS, EDGE_LABELS, NODE_TYPES, INDEXED_PROPS, type NodeLabel, type EdgeLabel } from "./domain";
+import {
+  NODE_LABELS,
+  EDGE_LABELS,
+  NODE_TYPES,
+  INDEXED_PROPS,
+  type NodeLabel,
+  type EdgeLabel,
+} from "./domain";
 import { LABKIT_SCHEMA } from "./schema";
 import type { LabKitDB } from "./client";
 
@@ -43,7 +50,11 @@ import type { LabKitDB } from "./client";
  * single-writer), but the code path is identical across backends —
  * `pg_advisory_xact_lock` is a normal Postgres builtin either way.
  */
-export async function provisionTenantGraph(db: LabKitDB, tenantId: number, graphName: string): Promise<void> {
+export async function provisionTenantGraph(
+  db: LabKitDB,
+  tenantId: number,
+  graphName: string,
+): Promise<void> {
   await db.query("BEGIN");
   try {
     await db.query("SELECT pg_advisory_xact_lock($1)", [tenantId]);
@@ -142,10 +153,12 @@ class TenantGraphProvisioner {
     const indexes = await this.existingIndexes();
 
     for (const label of NODE_LABELS) {
-      if (!labels.has(label)) await this.db.query(`SELECT ag_catalog.create_vlabel($1, $2)`, [this.graphName, label]);
+      if (!labels.has(label))
+        await this.db.query(`SELECT ag_catalog.create_vlabel($1, $2)`, [this.graphName, label]);
     }
     for (const edge of EDGE_LABELS) {
-      if (!labels.has(edge)) await this.db.query(`SELECT ag_catalog.create_elabel($1, $2)`, [this.graphName, edge]);
+      if (!labels.has(edge))
+        await this.db.query(`SELECT ag_catalog.create_elabel($1, $2)`, [this.graphName, edge]);
     }
     for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label, indexes);
     for (const label of NODE_LABELS) await this.ensurePropertyIndexes(label, indexes);
@@ -153,7 +166,9 @@ class TenantGraphProvisioner {
   }
 
   private async ensureGraph(): Promise<void> {
-    const existing = await this.db.query(`SELECT 1 FROM ag_catalog.ag_graph WHERE name = $1`, [this.graphName]);
+    const existing = await this.db.query(`SELECT 1 FROM ag_catalog.ag_graph WHERE name = $1`, [
+      this.graphName,
+    ]);
     if (existing.rows.length === 0) {
       await this.db.query(`SELECT ag_catalog.create_graph($1)`, [this.graphName]);
     }
@@ -238,7 +253,8 @@ class TenantGraphProvisioner {
   private async ensureEdgeUniqueIndex(edge: EdgeLabel, existing: Set<string>): Promise<void> {
     const indexName = `${edge.toLowerCase()}_start_end_idx`;
     if (existing.has(indexName)) return;
-    await this.db.query(`CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${edge}" (start_id, end_id)`);
+    await this.db.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${edge}" (start_id, end_id)`,
+    );
   }
-
 }

@@ -25,21 +25,32 @@ let session: ResearchSession;
 let events: EventSink;
 
 let tick = 0;
-const clock: Clock = { now: () => new Date(Date.UTC(2026, 7, 20, 9, tick++)).toISOString() };
+const clock: Clock = {
+  now: () => new Date(Date.UTC(2026, 7, 20, 9, tick++)).toISOString(),
+};
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const QUESTION = "does the pruning schedule change the convergence point?";
@@ -62,7 +73,12 @@ async function scratchExploration() {
     enquiry,
     method: "notebook-sweep",
     from: [observations],
-    concludes: [{ proposition: PROPOSITION, finding: "convergence point moves by ~3 steps" }],
+    concludes: [
+      {
+        proposition: PROPOSITION,
+        finding: "convergence point moves by ~3 steps",
+      },
+    ],
   });
   return { enquiry, observations, analysis, analysisClaims };
 }
@@ -87,7 +103,10 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    */
   test("Afterward 1: a question settled on scratch is answered provisionally, not established", async () => {
     const { enquiry, analysis, analysisClaims } = await scratchExploration();
-    await session.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, PROPOSITION) });
+    await session.closeEnquiry({
+      enquiry,
+      answeredBy: claimOf(analysisClaims, PROPOSITION),
+    });
 
     const reader = await afterwards();
     const status = await reader.enquiryStatus(enquiry);
@@ -121,7 +140,10 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       "re-run under seed control on the held-out split, same direction and magnitude",
     );
 
-    await session.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, PROPOSITION) });
+    await session.closeEnquiry({
+      enquiry,
+      answeredBy: claimOf(analysisClaims, PROPOSITION),
+    });
     const known = await (await afterwards()).whatIsKnown();
     expect(known.established.map((q) => q.asks)).toEqual([QUESTION]);
     expect(known.provisional).toEqual([]);
@@ -141,7 +163,10 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
 
     const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
     expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
-      { finding: "convergence point moves by ~3 steps", method: "notebook-sweep" },
+      {
+        finding: "convergence point moves by ~3 steps",
+        method: "notebook-sweep",
+      },
     ]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["lunchtime sweep"]);
     // And promoting must not read as retracting. `CHANGES: Decision -> Claim`
@@ -176,7 +201,9 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   test("promoting one line of enquiry's finding does not promote another's", async () => {
     const { analysis, analysisClaims } = await scratchExploration();
 
-    const other = await session.openEnquiry("does the pruning schedule change convergence on the small model?");
+    const other = await session.openEnquiry(
+      "does the pruning schedule change convergence on the small model?",
+    );
     const otherObservations = await session.recordObservations({
       enquiry: other,
       name: "small-model sweep",
@@ -186,7 +213,12 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       enquiry: other,
       method: "notebook-sweep",
       from: [otherObservations],
-      concludes: [{ proposition: PROPOSITION, finding: "convergence point moves by ~1 step" }],
+      concludes: [
+        {
+          proposition: PROPOSITION,
+          finding: "convergence point moves by ~1 step",
+        },
+      ],
     });
 
     await session.promote({
@@ -195,7 +227,9 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     });
 
     const reader = await afterwards();
-    expect((await reader.whySupported(claimOf(analysisClaims, PROPOSITION))).standing).toBe("confirmatory");
+    expect((await reader.whySupported(claimOf(analysisClaims, PROPOSITION))).standing).toBe(
+      "confirmatory",
+    );
     expect((await reader.whySupported(claimOf(otherAnalysisClaims, PROPOSITION))).standing).toBe(
       "exploratory",
     );

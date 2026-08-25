@@ -22,13 +22,19 @@ let scenario: Scenario;
 let graph: TenantGraph;
 let session: ResearchSession;
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   graph = await scenario.begin();
   session = new ResearchSession(graph);
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /**
  * `Artefact.invalidated` is optional, so "not invalidated" has two spellings --
@@ -40,7 +46,11 @@ afterEach(async () => { await scenario.end(); });
  */
 test("whySupported treats an explicit invalidated:false the same as an absent one", async () => {
   const enquiry = await session.openEnquiry("q");
-  const observations = await session.recordObservations({ enquiry, name: "obs", finding: "raw" });
+  const observations = await session.recordObservations({
+    enquiry,
+    name: "obs",
+    finding: "raw",
+  });
   await session.recordAnalysis({
     enquiry,
     method: "m",
@@ -62,7 +72,6 @@ test("whySupported treats an explicit invalidated:false the same as an absent on
   expect(explicit.supported).toBe(true);
 });
 
-
 /**
  * Compound verbs must be all-or-nothing.
  *
@@ -79,7 +88,11 @@ test("whySupported treats an explicit invalidated:false the same as an absent on
  * both leave a demonstrably wrong record when interrupted -- so they get the
  * boundary too, tested from here.
  */
-function failingOn(graph: TenantGraph, method: "createEdge" | "createNode", nth: number): TenantGraph {
+function failingOn(
+  graph: TenantGraph,
+  method: "createEdge" | "createNode",
+  nth: number,
+): TenantGraph {
   let seen = 0;
   return new Proxy(graph, {
     get(target, prop, receiver) {
@@ -155,23 +168,37 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
  */
 test("an interrupted amendDesign leaves the gate governed by its original condition alone", async () => {
   const criterion = await session.stateCriterion("solver converges within 500 iterations");
-  const work = await session.planWork({ objective: "fit the tertiary model", acceptance: "converges" });
+  const work = await session.planWork({
+    objective: "fit the tertiary model",
+    acceptance: "converges",
+  });
   const gate = await session.declareGate({
     governedBy: [criterion],
     consequence: "the tertiary model may be fitted",
     protecting: [work],
   });
   const enquiry = await session.openEnquiry("does the solver converge?");
-  const observations = await session.recordObservations({ enquiry, name: "solver traces", finding: "iteration counts" });
+  const observations = await session.recordObservations({
+    enquiry,
+    name: "solver traces",
+    finding: "iteration counts",
+  });
   const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "feasibility",
     from: [observations],
-    concludes: [{ proposition: "500 iterations is unreachable", finding: "median 1,800 iterations" }],
+    concludes: [
+      {
+        proposition: "500 iterations is unreachable",
+        finding: "median 1,800 iterations",
+      },
+    ],
   });
 
   const before = await session.gateStatus(gate);
-  expect(before.checks.map((c) => c.proposition)).toEqual(["solver converges within 500 iterations"]);
+  expect(before.checks.map((c) => c.proposition)).toEqual([
+    "solver converges within 500 iterations",
+  ]);
 
   // Second edge: GOVERNS for the replacement, then the CHANGES that retires
   // the original.
@@ -188,7 +215,9 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
   // One condition, not two. A gate governed by both the retired and the
   // proposed condition is a control-plane object nobody agreed to.
   const after = await session.gateStatus(gate);
-  expect(after.checks.map((c) => c.proposition)).toEqual(["solver converges within 500 iterations"]);
+  expect(after.checks.map((c) => c.proposition)).toEqual([
+    "solver converges within 500 iterations",
+  ]);
   expect(after).toEqual(before);
 });
 
@@ -237,15 +266,13 @@ test("recordObservations writes the unit and the evidence together or not at all
 
   // Nothing survives -- not the artefact written before the failure, and not
   // the evidence that would otherwise stand with no unit behind it.
-  const orphans = await graph.query(
-    `MATCH (e:Evidence) RETURN e`,
-    { e: vertexProps<{ statement: string }>() },
-  );
+  const orphans = await graph.query(`MATCH (e:Evidence) RETURN e`, {
+    e: vertexProps<{ statement: string }>(),
+  });
   expect(orphans.map((r) => r.e.statement)).toEqual([]);
-  const artefacts = await graph.query(
-    `MATCH (a:Artefact) RETURN a`,
-    { a: vertexProps<{ logical_name: string }>() },
-  );
+  const artefacts = await graph.query(`MATCH (a:Artefact) RETURN a`, {
+    a: vertexProps<{ logical_name: string }>(),
+  });
   expect(artefacts.map((r) => r.a.logical_name)).toEqual([]);
 
   // And the verb still works afterwards -- the rollback released the
@@ -299,13 +326,23 @@ test("recordObservations writes the unit and the evidence together or not at all
 test("an interrupted sharpen leaves nothing at all", async () => {
   const enquiry = await session.openEnquiry("does the coating hold?");
   const obs = await session.recordObservations({
-    enquiry, name: "run A", finding: "no delamination",
+    enquiry,
+    name: "run A",
+    finding: "no delamination",
   });
   await session.recordAnalysis({
-    enquiry, method: "cycling", from: [obs],
+    enquiry,
+    method: "cycling",
+    from: [obs],
     concludes: [
-      { proposition: "the coating survives cycling", finding: "no delamination at 200 cycles" },
-      { proposition: "the coating survives heat", finding: "no delamination at 200C" },
+      {
+        proposition: "the coating survives cycling",
+        finding: "no delamination at 200 cycles",
+      },
+      {
+        proposition: "the coating survives heat",
+        finding: "no delamination at 200C",
+      },
     ],
   });
   const original = await session.pose("is the coating durable?");
@@ -321,17 +358,20 @@ test("an interrupted sharpen leaves nothing at all", async () => {
   }) as typeof graph.createEdge;
 
   await expect(
-    session.sharpen({ from: original, into: "is it durable at 200C?", because: "too vague" }),
+    session.sharpen({
+      from: original,
+      into: "is it durable at 200C?",
+      because: "too vague",
+    }),
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
   // No decision at all. This used to assert the opposite -- a half-built
   // decision keeping one finding of three, harmless only because no reader
   // could reach it. The rollback means there is nothing to reach.
-  const decisions = await graph.query(
-    `MATCH (d:Decision) RETURN d`,
-    { d: vertexProps<{ reason: string }>() },
-  );
+  const decisions = await graph.query(`MATCH (d:Decision) RETURN d`, {
+    d: vertexProps<{ reason: string }>(),
+  });
   expect(decisions).toEqual([]);
 
   // And so `originOf` answers null because the question genuinely has no
@@ -358,18 +398,25 @@ test("an interrupted sharpen leaves nothing at all", async () => {
 const aGatedCheck = async () => {
   const enquiry = await session.openEnquiry("does the solver converge?");
   const obs = await session.recordObservations({
-    enquiry, name: "sweep", finding: "residuals recorded",
+    enquiry,
+    name: "sweep",
+    finding: "residuals recorded",
   });
   const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
-    enquiry, method: "convergence", from: [obs],
+    enquiry,
+    method: "convergence",
+    from: [obs],
     concludes: [{ proposition: "the solver converges", finding: "residual 1e-9" }],
   });
   const work = await session.planWork({
-    objective: "scale to the full grid", acceptance: "convergence holds",
+    objective: "scale to the full grid",
+    acceptance: "convergence holds",
   });
   const criterion = await session.stateCriterion("residual below 1e-8");
   const gate = await session.declareGate({
-    governedBy: [criterion], consequence: "do not scale up", protecting: [work],
+    governedBy: [criterion],
+    consequence: "do not scale up",
+    protecting: [work],
   });
   return { enquiry, obs, analysis, analysisClaims, criterion, gate };
 };
@@ -401,16 +448,18 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
 
     await expect(
       session.evaluateCriterion({
-        criterion, gate, value: "9e-9", outcome: "fail",
+        criterion,
+        gate,
+        value: "9e-9",
+        outcome: "fail",
         citing: claimOf(analysisClaims, "the solver converges"),
       }),
     ).rejects.toThrow(/injected/);
     graph.createEdge = realCreateEdge;
 
-    const left = await graph.query(
-      `MATCH (ev:CriterionEvaluation) RETURN ev`,
-      { ev: vertexProps<{ outcome: string }>() },
-    );
+    const left = await graph.query(`MATCH (ev:CriterionEvaluation) RETURN ev`, {
+      ev: vertexProps<{ outcome: string }>(),
+    });
     expect(left).toEqual([]);
 
     const status = await session.gateStatus(gate);
@@ -434,14 +483,21 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
 test("a close interrupted before BASED_ON, then retried, leaves two resolving decisions", async () => {
   const enquiry = await session.openEnquiry("does the coating fail under load?");
   const obs = await session.recordObservations({
-    enquiry, name: "load runs", finding: "cracks at 40MPa",
+    enquiry,
+    name: "load runs",
+    finding: "cracks at 40MPa",
   });
   const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
-    enquiry, method: "load-test", from: [obs],
-    concludes: [{
-      proposition: "the coating survives load",
-      finding: "cracks at 40MPa", bearing: "challenges",
-    }],
+    enquiry,
+    method: "load-test",
+    from: [obs],
+    concludes: [
+      {
+        proposition: "the coating survives load",
+        finding: "cracks at 40MPa",
+        bearing: "challenges",
+      },
+    ],
   });
   const answeredBy = claimOf(analysisClaims, "the coating survives load");
 
@@ -457,10 +513,9 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
   // The caller saw a throw, so it retries. This one succeeds.
   await session.closeEnquiry({ enquiry, answeredBy });
 
-  const resolving = await graph.query(
-    `MATCH (d:Decision)-[:RESOLVES]->(:Question) RETURN d`,
-    { d: vertexProps<{ natural_id: string; reason: string }>() },
-  );
+  const resolving = await graph.query(`MATCH (d:Decision)-[:RESOLVES]->(:Question) RETURN d`, {
+    d: vertexProps<{ natural_id: string; reason: string }>(),
+  });
   const status = await session.enquiryStatus(enquiry);
   console.log("CLOSE resolving decisions:", resolving.length);
   console.log("CLOSE closure:", status.question!.closure, "answer:", status.question!.answer);
@@ -488,7 +543,10 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
   const { enquiry, obs, analysis, analysisClaims, criterion, gate } = await aGatedCheck();
 
   await session.evaluateCriterion({
-    criterion, gate, value: "9e-9", outcome: "fail",
+    criterion,
+    gate,
+    value: "9e-9",
+    outcome: "fail",
     citing: claimOf(analysisClaims, "the solver converges"),
   });
   const before = await session.gateStatus(gate);
@@ -496,11 +554,15 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
   expect(before.state).toBe("blocked");
 
   const review = await session.recordReview({
-    of: analysis, verdict: "the sweep dropped the last decade",
+    of: analysis,
+    verdict: "the sweep dropped the last decade",
   });
   await session.replaceAnalysis({
-    supersedes: analysis, because: review, enquiry,
-    method: "convergence, all decades", from: [obs],
+    supersedes: analysis,
+    because: review,
+    enquiry,
+    method: "convergence, all decades",
+    from: [obs],
     concludes: [{ proposition: "the solver converges", finding: "residual 4e-9" }],
   });
 
@@ -528,17 +590,32 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   const s = session;
 
   const enquiry = await s.openEnquiry("does pruning move convergence?");
-  const observations = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
+  const observations = await s.recordObservations({
+    enquiry,
+    name: "readings",
+    finding: "twelve runs",
+  });
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "paired comparison", from: [observations],
-    concludes: [{ proposition: "pruning moves convergence", finding: "no effect", bearing: "challenges" }],
+    enquiry,
+    method: "paired comparison",
+    from: [observations],
+    concludes: [
+      {
+        proposition: "pruning moves convergence",
+        finding: "no effect",
+        bearing: "challenges",
+      },
+    ],
   });
 
   await s.closeEnquiry({ enquiry });
   expect((await s.enquiryStatus(enquiry)).question!.closure).toBe("abandoned");
 
   await expect(
-    s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, "pruning moves convergence") }),
+    s.closeEnquiry({
+      enquiry,
+      answeredBy: claimOf(analysisClaims, "pruning moves convergence"),
+    }),
   ).rejects.toThrow(/already closed by decision DEC_\d+/);
 
   // And the record is unchanged rather than half-updated: one close, the one
@@ -561,10 +638,21 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
 test("a question accepted as unresolved can still be closed when evidence arrives", async () => {
   const s = session;
   const enquiry = await s.openEnquiry("does depth move convergence?");
-  const observations = await s.recordObservations({ enquiry, name: "sweep", finding: "runs" });
+  const observations = await s.recordObservations({
+    enquiry,
+    name: "sweep",
+    finding: "runs",
+  });
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "paired comparison", from: [observations],
-    concludes: [{ proposition: "depth moves convergence", finding: "moves by ~2 steps" }],
+    enquiry,
+    method: "paired comparison",
+    from: [observations],
+    concludes: [
+      {
+        proposition: "depth moves convergence",
+        finding: "moves by ~2 steps",
+      },
+    ],
   });
 
   await s.acceptAsUnresolved({
@@ -578,7 +666,10 @@ test("a question accepted as unresolved can still be closed when evidence arrive
   expect(accepted.question!.open).toBe(true);
 
   // Evidence arrives. This must be allowed -- DEFERS is not RESOLVES.
-  await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, "depth moves convergence") });
+  await s.closeEnquiry({
+    enquiry,
+    answeredBy: claimOf(analysisClaims, "depth moves convergence"),
+  });
   const closed = await s.enquiryStatus(enquiry);
   expect(closed.question!.closure).toBe("answered");
   expect(closed.question!.answer).toBe("yes");
@@ -610,32 +701,32 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
     return realCreateEdge(from as never, edge as never, to as never);
   }) as typeof graph.createEdge;
 
-  await expect(
-    session.pursue({ question, approach: "thermal cycling" }),
-  ).rejects.toThrow(/injected/);
+  await expect(session.pursue({ question, approach: "thermal cycling" })).rejects.toThrow(
+    /injected/,
+  );
   graph.createEdge = realCreateEdge;
 
   // No enquiry at all. This used to assert that an orphan survived carrying no
   // inbound edge -- unreachable, therefore harmless. Since the event store made
   // every write verb transactional, the orphan does not exist to be reasoned
   // about.
-  const orphans = await graph.query(
-    `MATCH (loe:LineOfEnquiry) RETURN loe`,
-    { loe: vertexProps<{ natural_id: string; name: string }>() },
-  );
+  const orphans = await graph.query(`MATCH (loe:LineOfEnquiry) RETURN loe`, {
+    loe: vertexProps<{ natural_id: string; name: string }>(),
+  });
   expect(orphans).toEqual([]);
 
   // The question is reported untested, which is true: it is on the books and
   // nothing has been run against it. Same answer `pose()` alone would give.
   const survey = await session.whatIsKnown();
-  expect(survey.untested.map((q) => q.asks)).toEqual([
-    "does the coating hold at temperature?",
-  ]);
+  expect(survey.untested.map((q) => q.asks)).toEqual(["does the coating hold at temperature?"]);
   expect(survey.unresolved).toEqual([]);
 
   // And pursuing again works — no phantom blocks it, and two enquiries on one
   // question would be legitimate anyway.
-  const retried = await session.pursue({ question, approach: "thermal cycling" });
+  const retried = await session.pursue({
+    question,
+    approach: "thermal cycling",
+  });
   expect((await session.enquiryStatus(retried)).question!.open).toBe(true);
 });
 
@@ -658,7 +749,10 @@ test("stateCriterion and planWork have no interruption window to have", async ()
   }) as typeof graph.createEdge;
 
   const criterion = await session.stateCriterion("residual below 1e-8");
-  const work = await session.planWork({ objective: "scale up", acceptance: "converges" });
+  const work = await session.planWork({
+    objective: "scale up",
+    acceptance: "converges",
+  });
 
   graph.createEdge = realCreateEdge;
 
@@ -674,9 +768,15 @@ test("stateCriterion and planWork have no interruption window to have", async ()
  */
 test("an interrupted recordReview leaves a review nothing can reach", async () => {
   const enquiry = await session.openEnquiry("does it hold?");
-  const obs = await session.recordObservations({ enquiry, name: "run", finding: "data" });
+  const obs = await session.recordObservations({
+    enquiry,
+    name: "run",
+    finding: "data",
+  });
   const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
-    enquiry, method: "m", from: [obs],
+    enquiry,
+    method: "m",
+    from: [obs],
     concludes: [{ proposition: "it holds", finding: "f" }],
   });
 
@@ -687,14 +787,16 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
   }) as typeof graph.createEdge;
 
   await expect(
-    session.recordReview({ of: analysis, verdict: "the aggregation dropped a fold" }),
+    session.recordReview({
+      of: analysis,
+      verdict: "the aggregation dropped a fold",
+    }),
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
-  const attached = await graph.query(
-    `MATCH (r:Review)-[:EVALUATES]->() RETURN r`,
-    { r: vertexProps<{ natural_id: string }>() },
-  );
+  const attached = await graph.query(`MATCH (r:Review)-[:EVALUATES]->() RETURN r`, {
+    r: vertexProps<{ natural_id: string }>(),
+  });
   expect(attached).toEqual([]);
 
   // The finding still stands: no review reaches it, so nothing retracts it.
@@ -722,7 +824,10 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
 test("an interrupted declareGate leaves no gate at all", async () => {
   const c1 = await session.stateCriterion("residual below 1e-8");
   const c2 = await session.stateCriterion("runtime under an hour");
-  const work = await session.planWork({ objective: "scale up", acceptance: "both hold" });
+  const work = await session.planWork({
+    objective: "scale up",
+    acceptance: "both hold",
+  });
 
   const realCreateEdge = graph.createEdge.bind(graph);
   let governs = 0;
@@ -735,7 +840,9 @@ test("an interrupted declareGate leaves no gate at all", async () => {
 
   await expect(
     session.declareGate({
-      governedBy: [c1, c2], consequence: "do not scale up", protecting: [work],
+      governedBy: [c1, c2],
+      consequence: "do not scale up",
+      protecting: [work],
     }),
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
@@ -744,10 +851,9 @@ test("an interrupted declareGate leaves no gate at all", async () => {
   // governed by one of its two criteria and protecting nothing -- safe only
   // because every Gate reader is keyed by natural_id and the caller held none.
   // That guarantee is no longer load-bearing.
-  const gateReaders = await graph.query(
-    `MATCH (g:Gate) RETURN g`,
-    { g: vertexProps<{ natural_id: string }>() },
-  );
+  const gateReaders = await graph.query(`MATCH (g:Gate) RETURN g`, {
+    g: vertexProps<{ natural_id: string }>(),
+  });
   expect(gateReaders).toEqual([]);
 
   // The work the gate would have protected is untouched, which is the half of
@@ -794,8 +900,5 @@ test("a task planned with no readable inputs reports an empty contract, not a mi
     acceptance: "all seeds complete",
     mayRead: ["seeds.csv", "config.toml"],
   });
-  expect((await session.contractFor(populated)).mayRead).toEqual([
-    "seeds.csv",
-    "config.toml",
-  ]);
+  expect((await session.contractFor(populated)).mayRead).toEqual(["seeds.csv", "config.toml"]);
 });

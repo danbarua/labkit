@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI guard: fail if any symlink is tracked in git.
+# Refuses a symlink tracked in git.
 #
 # A symlink committed from a build sandbox points at a path that exists on
 # exactly one machine. Everywhere else the checkout produces a dangling
@@ -39,7 +39,7 @@ if [ -n "$found" ]; then
   done
 
   if [ -n "$filtered" ]; then
-    echo "❌ check-no-tracked-symlinks ERROR: symlink(s) tracked in git"
+    echo "FAILED: symlink(s) tracked in git"
     echo
     while IFS= read -r path; do
       [ -z "$path" ] && continue
@@ -59,4 +59,4 @@ if [ -n "$found" ]; then
   fi
 fi
 
-echo "✅ check-no-tracked-symlinks OK: No tracked symlinks"
+echo "OK: no tracked symlinks."

@@ -29,14 +29,20 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 const PREFERENTIAL = "the encoding preferentially preserves discriminative signal";
 const NARROWER = "discriminative signal attenuates less than non-discriminative signal";
@@ -49,7 +55,9 @@ const NARROWER = "discriminative signal attenuates less than non-discriminative 
  * withdraw all of it.
  */
 async function assertedTwice() {
-  const enquiry = await session.openEnquiry("does the encoding preferentially preserve discriminative signal?");
+  const enquiry = await session.openEnquiry(
+    "does the encoding preferentially preserve discriminative signal?",
+  );
 
   const firstReadings = await session.recordObservations({
     enquiry,
@@ -60,7 +68,12 @@ async function assertedTwice() {
     enquiry,
     method: "attenuation-ratio",
     from: [firstReadings],
-    concludes: [{ proposition: PREFERENTIAL, finding: "discriminative amplitude ratio 0.81, non-discriminative 0.44" }],
+    concludes: [
+      {
+        proposition: PREFERENTIAL,
+        finding: "discriminative amplitude ratio 0.81, non-discriminative 0.44",
+      },
+    ],
   });
 
   const secondReadings = await session.recordObservations({
@@ -72,10 +85,23 @@ async function assertedTwice() {
     enquiry,
     method: "attenuation-ratio",
     from: [secondReadings],
-    concludes: [{ proposition: PREFERENTIAL, finding: "discriminative amplitude ratio 0.79, non-discriminative 0.41" }],
+    concludes: [
+      {
+        proposition: PREFERENTIAL,
+        finding: "discriminative amplitude ratio 0.79, non-discriminative 0.41",
+      },
+    ],
   });
 
-  return { enquiry, first, firstClaims, second, secondClaims, firstReadings, secondReadings };
+  return {
+    enquiry,
+    first,
+    firstClaims,
+    second,
+    secondClaims,
+    firstReadings,
+    secondReadings,
+  };
 }
 
 describe("S-12 — the numbers are right; the sentence about them is wrong", () => {
@@ -134,7 +160,10 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       because: "both types attenuate",
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const withdrawn = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(withdrawn.supported).toBe(false);
 
@@ -176,7 +205,10 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       because: "both types attenuate",
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const now = await later.whySupported(await claimNamed(later, NARROWER));
     expect(now.supported).toBe(true);
     expect(now.support.map((s) => s.finding).sort()).toEqual([
@@ -225,7 +257,10 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       "does the encoding preferentially preserve discriminative signal?",
     ]);
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const history = await later.interpretationHistory(await claimNamed(later, NARROWER));
     expect(history.revisions[0]!.restingOnTheOldReading.map((q) => q.asks)).toEqual([
       "does the encoding preferentially preserve discriminative signal?",
@@ -242,11 +277,22 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     const programme = await assertedTwice();
     const EVEN_NARROWER = "discriminative signal attenuates less in cohort A only";
 
-    await session.reinterpret({ of: claimOf(programme.firstClaims, PREFERENTIAL), as: NARROWER, because: "both types attenuate" });
-    await session.reinterpret({ of: await claimNamed(session, NARROWER), as: EVEN_NARROWER, because: "the cohort B ratio does not separate" });
+    await session.reinterpret({
+      of: claimOf(programme.firstClaims, PREFERENTIAL),
+      as: NARROWER,
+      because: "both types attenuate",
+    });
+    await session.reinterpret({
+      of: await claimNamed(session, NARROWER),
+      as: EVEN_NARROWER,
+      because: "the cohort B ratio does not separate",
+    });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    expect((await later.events.all())).toHaveLength(0);
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
+    expect(await later.events.all()).toHaveLength(0);
 
     const history = await later.interpretationHistory(await claimNamed(later, EVEN_NARROWER));
     expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
@@ -280,14 +326,19 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       enquiry: programme.enquiry,
       method: "attenuation-ratio",
       from: [contrary],
-      concludes: [{
-        proposition: PREFERENTIAL,
-        finding: "cohort C shows no separation between signal types",
-        bearing: "challenges",
-      }],
+      concludes: [
+        {
+          proposition: PREFERENTIAL,
+          finding: "cohort C shows no separation between signal types",
+          bearing: "challenges",
+        },
+      ],
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const standing = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(standing.challenged).toBe(true);
     // Challenged, but nobody withdrew it -- the two states must not collapse.
@@ -312,7 +363,11 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    */
   test("recording the withdrawn sentence again does not quietly restore it", async () => {
     const programme = await assertedTwice();
-    await session.reinterpret({ of: claimOf(programme.firstClaims, PREFERENTIAL), as: NARROWER, because: "both types attenuate" });
+    await session.reinterpret({
+      of: claimOf(programme.firstClaims, PREFERENTIAL),
+      as: NARROWER,
+      because: "both types attenuate",
+    });
 
     const moreReadings = await session.recordObservations({
       enquiry: programme.enquiry,
@@ -324,11 +379,21 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
         enquiry: programme.enquiry,
         method: "attenuation-ratio",
         from: [moreReadings],
-        concludes: [{ proposition: PREFERENTIAL, finding: "discriminative amplitude ratio 0.80, non-discriminative 0.43" }],
+        concludes: [
+          {
+            proposition: PREFERENTIAL,
+            finding: "discriminative amplitude ratio 0.80, non-discriminative 0.43",
+          },
+        ],
       }),
-    ).rejects.toThrow(/"the encoding preferentially preserves discriminative signal" was withdrawn/);
+    ).rejects.toThrow(
+      /"the encoding preferentially preserves discriminative signal" was withdrawn/,
+    );
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const still = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(still.withdrawn).toBe(true);
     expect(still.replacedBy?.asserts).toBe(NARROWER);
@@ -348,7 +413,10 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       }),
     ).rejects.toThrow(/no claim CLM_9999/);
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     expect(await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL))).toEqual(before);
   });
 });

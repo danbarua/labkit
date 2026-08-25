@@ -193,6 +193,9 @@ npx depcruise src tests --output-type err   # layering rules (errors) + cycles
 bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
 bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool declarations
 bun run typecheck              # tsc --noEmit
+bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
+bun run check:all-checks       # every check script must introduce itself in one plain sentence
+bun run check:format           # biome, formatting only — `bun run format` writes
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
@@ -201,7 +204,7 @@ bun run check:stdout          # nothing under src/ writes to stdout except the C
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
-bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
+bun run probe:pglite-concurrency  # asks whether a known pglite-socket bug is still there — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
@@ -210,8 +213,9 @@ bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
-There is no lint script yet. `bun run build` compiles `src/cli/cli.ts` to a
-binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
+Formatting is `bun run format` (biome — see below); there is no *linting*
+script yet, biome's linter being off until its findings have been read.
+`bun run build` compiles `src/cli/cli.ts` to a binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
 resolves `drizzle/` from `import.meta.url`, which inside a compiled bundle is
 `/$bunfs/root/…`, so it dies with `Can't find meta/_journal.json file`.
 Measured 2026-08-25 against both the old and new entry points, so it predates
@@ -309,6 +313,14 @@ The general lesson, which cost more than the script did: **a rule that tells
 readers to ignore a signal removes the only watcher that signal had.** If a
 signal is unreliable, fix it or delete it — do not annotate it.
 
+**`\s` is not a character class in BSD `sed` or `grep`, and this userland is
+BSD.** It does not error — it matches a literal `s`, so a substitution silently
+does nothing. Cost a wrong measurement on 2026-08-25: a comparison meant to
+prove biome had not reflowed any comment stripped no indentation, compared
+indented text against indented text, and reported 38 differences that were not
+there. `[[:space:]]` is the portable form. The same applies to `\d`, `\w` and
+`\+`.
+
 Note also that `$?` after a pipeline reports the *last* command's status, so
 `bun ... | tail` will happily report success that isn't there. This has now
 caught someone twice: the second time with `${PIPESTATUS[1]:-$?}`, which is
@@ -323,13 +335,101 @@ single failing test — or to tell a real regression from a teardown cascade.
 Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
 about the pipe, not about that incident.
 
-**Nothing runs these for you** — there is no CI workflow and no git hook. Before
-committing, run `bun test`, `bun run typecheck` and
-`npx depcruise src tests --output-type err`; add `check:migrations` if you
-touched `drizzle/`, `check:tests-assert` if you touched tests,
-`check:prop-classes` if you touched a `*Props` interface, and
-`check:no-stringly-typed` if you touched a signature in `src/domain/`. Do not pipe
-`bun test` — that trap is above, and is still live.
+**Nothing runs these for you** — there is no CI workflow and no git hook.
+Before committing, run **`bun run check`**: it runs `bun test`, `typecheck`,
+`depcruise` and every `check:*` script, prints a table, and exits non-zero if
+any of them failed. About ninety seconds, most of it `bun test`.
+
+This paragraph used to be a list of conditionals — *add `check:migrations` if
+you touched `drizzle/`, `check:tests-assert` if you touched tests, …* — which
+is a rule held in a person's head and therefore the kind that gets skipped.
+`bun run check` derives its list from `package.json`, so a `check:*` added
+later is picked up without anyone editing anything.
+
+**`check:` means green is fine and red is yours to fix.** Anything that does
+not mean that needs a different prefix — see `probe:pglite-concurrency`, whose
+exit 0 means an upstream bug *still reproduces*.
+
+**An exclusion list is a tell.** That probe sat under `check:` and the first
+version of `check-all.ts` excluded it by name, with a paragraph explaining why.
+The paragraph was the signal: the script was fine and the *name* was wrong.
+Renaming it out of the namespace deleted the exclusion rather than documenting
+it. When a derived list needs a hand-written exception, check whether the thing
+being excepted is misnamed before writing the exception down.
+
+**The sweep does not run everything, and each absence has a reason.**
+`bun run example` is for reading rather than checking;
+`probe:pglite-concurrency` has an inverted exit code and takes minutes. Two is
+a considered set; a third omission needs its own reason rather than joining a
+habit.
+
+**A check announces `OK:` or `FAILED:` and does not repeat its own name** —
+`bun run check` already said which one is running. `FAILED:` means the check ran
+and the codebase is wrong; an `ERROR:` would mean the check itself broke, which
+is a different thing and none of them currently distinguish. Plain words, not
+emoji, because they are what you grep for; the emoji summary is `check-all`'s.
+
+**A check script introduces itself in one plain sentence**, and `bun run check`
+prints that sentence before running it — so a reader looking at a failure from
+a script they have never opened is told what it checks rather than
+`check:prop-classes`. `check:all-checks` enforces the shape:
+
+```
+#!/usr/bin/env bun                 #!/usr/bin/env bash
+/**                                # One sentence: what this checks.
+ * One sentence: what this checks. #
+ *                                 # Then the prose: why it exists.
+ * Then the prose: why it exists.
+ */
+```
+
+Shell has no block opener, so its sentence is a line higher. That is why
+`check-all.ts` calls `summaryOf()` rather than printing a fixed line number —
+the two of us picked "line 4" and then "line 2" while designing this, and both
+were wrong for one of the two languages.
+
+Do not pipe `bun test` — that trap is above, and is still live. `bun run check`
+passes each step's output straight through for the same reason.
+
+**Formatting is biome** (`biome.jsonc`), and it is **formatting only** — the
+linter is off until its 96 errors and 376 warnings have been read rather than
+bulk-suppressed. `bun run format` writes; `check:format` is in the sweep.
+
+Two things learnt adopting it, both the hard way:
+
+- **The config file must be `biome.jsonc`.** `biome.json` rejects comments, and
+  `biome format --write` then falls back to its defaults **silently** — no parse
+  error, just "Formatted N files". It re-indented 121 files to tabs at width 80
+  before anyone noticed. `biome check` does report the parse error; the writing
+  command does not.
+- **Comments are re-indented and never reflowed.** Verified rather than assumed:
+  formatting the whole repo changed 108 files and **zero** comment-text lines,
+  compared with leading whitespace stripped. That matters more here than in most
+  repos, because the comments are argued paragraphs.
+
+And one thing it broke, worth knowing before writing another test that reads
+source text: **a formatter can split a call across lines.** Biome turned
+`write.pursue({…})` into `write` newline `.pursue({…})` in five tools, and
+`tests/helpers/surface-coverage.ts`'s `\bwrite\.pursue\s*\(` stopped
+matching — five verbs reported unreachable that were reached fine.
+
+**That helper reads the AST now, not the text.** Two `check:*` scripts already
+did (`check-no-stringly-typed.ts`, `check-prop-classes.ts`) and this one had
+argued its way to *"the declaration is the only place the distinction survives"*
+while implementing it with a regex. `publicVerbsOf` walks method declarations
+and reads `private`/`protected` off the modifiers; `verbsCalledOn` matches the
+call as a node, so line breaks and chaining are invisible. Derived lists came
+out identical — 17 reads, 18 writes, nothing gained or lost — which is the point:
+it is the same claim, made in a way a formatter cannot break. Comment-stripping
+at the call sites went with it, an AST having no comments in it.
+
+The other text-reading checks were surveyed and left alone deliberately.
+`check-all-checks` reads the first four lines, which is inherently textual;
+`check-doc-comments` is about comments, which are trivia the AST drops;
+`check-tests-assert` and `check-test-teardown` match plain substrings
+(`expect(`, `openScenario(`) that a line break cannot separate. The rule is not
+*use the compiler everywhere* — it is **a pattern spanning a token boundary
+needs a parser**.
 
 ## Architecture: two persistence halves, deliberately not one
 
@@ -888,8 +988,8 @@ see the postgres-age skill's "Upstream filing" and PJ-006): two connections
 racing, where one errors, can permanently corrupt the connection(s)
 involved. Corruption stays contained to the connection that hit it, so a
 fresh connection per test contains the blast radius even though the
-underlying bug isn't fixed. `scripts/check-pglite-concurrency.sh`
-(`bun run check:pglite-concurrency`) regression-checks this — see the
+underlying bug isn't fixed. `scripts/probe-pglite-concurrency.sh`
+(`bun run probe:pglite-concurrency`) asks whether it is still there — see the
 script's header for its (inverted) exit-code meaning.
 
 A test that needs to exercise "a query loses a race and hits a constraint

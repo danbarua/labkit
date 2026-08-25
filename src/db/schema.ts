@@ -47,17 +47,17 @@ export const LABKIT_SCHEMA = "public";
  * applied together via src/db/migrate.ts's runMigrations()).
  */
 export const tenants = p.pgTable("tenants", {
-    id: p.serial().primaryKey(),
-    // User-facing short name (e.g. "labkit"). NEVER used to derive
-    // graph_name directly — a user-controlled string must not become an AGE
-    // graph identifier (PJ-003 §5).
-    slug: p.text().notNull().unique(),
-    display_name: p.text().notNull(),
-    // Single source of truth: derived from the trusted internal `id`, not a
-    // second value an application could accidentally desync from it.
-    // "labkit_t1", not "labkit_t<uuid>" — boring, hyphen-free, debuggable.
-    graph_name: p.text().notNull().generatedAlwaysAs(sql`'labkit_t' || id`),
-    created_at: p.timestamp().defaultNow().notNull(),
+  id: p.serial().primaryKey(),
+  // User-facing short name (e.g. "labkit"). NEVER used to derive
+  // graph_name directly — a user-controlled string must not become an AGE
+  // graph identifier (PJ-003 §5).
+  slug: p.text().notNull().unique(),
+  display_name: p.text().notNull(),
+  // Single source of truth: derived from the trusted internal `id`, not a
+  // second value an application could accidentally desync from it.
+  // "labkit_t1", not "labkit_t<uuid>" — boring, hyphen-free, debuggable.
+  graph_name: p.text().notNull().generatedAlwaysAs(sql`'labkit_t' || id`),
+  created_at: p.timestamp().defaultNow().notNull(),
 });
 
 export type Tenant = typeof tenants.$inferSelect;
@@ -77,7 +77,9 @@ export type Tenant = typeof tenants.$inferSelect;
  * table for everyone — and this is the first place that difference has to be
  * paid for. Every read filters on it.
  */
-export const labkitEvents = p.pgTable("labkit_event", {
+export const labkitEvents = p.pgTable(
+  "labkit_event",
+  {
     /**
      * The stream's order, and the reason it is a sequence rather than `at`.
      *
@@ -89,7 +91,10 @@ export const labkitEvents = p.pgTable("labkit_event", {
      * fact, which is the distinction worth holding on to.
      */
     seq: p.bigserial({ mode: "number" }).primaryKey(),
-    tenant_id: p.integer().notNull().references(() => tenants.id),
+    tenant_id: p
+      .integer()
+      .notNull()
+      .references(() => tenants.id),
     /**
      * Verbatim what the `Clock` said — text, not `timestamptz`.
      *
@@ -126,13 +131,15 @@ export const labkitEvents = p.pgTable("labkit_event", {
     attribution_id: p.text().notNull(),
     git_hash: p.text().notNull(),
     detail: p.jsonb(),
-}, (t) => [
+  },
+  (t) => [
     // The stream, per tenant. Every read is tenant-scoped, so every index is.
     p.index("labkit_event_tenant_seq_idx").on(t.tenant_id, t.seq),
     // "What happened to this record" -- the only lookup keyed by a handle.
     p.index("labkit_event_tenant_subject_idx").on(t.tenant_id, t.subject),
     // "What has this agent been doing", in order.
     p.index("labkit_event_tenant_agent_idx").on(t.tenant_id, t.attribution_id, t.seq),
-]);
+  ],
+);
 
 export type LabkitEvent = typeof labkitEvents.$inferSelect;

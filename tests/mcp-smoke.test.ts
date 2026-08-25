@@ -31,8 +31,12 @@ import { TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
 let scenario: Scenario;
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 /** Every tool this file has actually called, accumulated across the sessions below. */
 const called = new Set<string>();
@@ -51,7 +55,11 @@ async function connectServer(
   const events = inMemoryEventLog();
   await buildServer(
     new ReadSurface(graph, { events }),
-    () => new WriteSurface(graph, { ...commandContext(mockGitContext, mockSessionContext), events }),
+    () =>
+      new WriteSurface(graph, {
+        ...commandContext(mockGitContext, mockSessionContext),
+        events,
+      }),
   ).connect(transport);
   return events;
 }
@@ -102,18 +110,23 @@ describe("every tool answers when an agent actually calls it", () => {
   test("ask, sharpen, plan, gate, measure, conclude", async () => {
     const { client: c, events } = await client();
     try {
-      const broad = await call(c, "pose", { question: "is the solver faster?" });
+      const broad = await call(c, "pose", {
+        question: "is the solver faster?",
+      });
       const sharp = await call(c, "sharpen", {
         from: id(broad),
         into: "is the solver faster on sparse instances?",
         because: "faster overall hides which instances moved",
       });
       const origin = await call(c, "origin_of", { question: id(sharp) });
-      expect((origin.origin as Json | null)).not.toBeNull();
+      expect(origin.origin as Json | null).not.toBeNull();
 
-      const enquiry = await call(c, "pursue", { question: id(sharp), approach: "paired timing runs" });
+      const enquiry = await call(c, "pursue", {
+        question: id(sharp),
+        approach: "paired timing runs",
+      });
       const pursuits = await call(c, "pursuits_of", { question: id(sharp) });
-      expect((pursuits.enquiries as unknown[])).toHaveLength(1);
+      expect(pursuits.enquiries as unknown[]).toHaveLength(1);
 
       const work = await call(c, "plan_work", {
         objective: "time the solver on the sparse set",
@@ -132,46 +145,66 @@ describe("every tool answers when an agent actually calls it", () => {
         protecting: [id(work)],
       });
       const governing = await call(c, "criteria_governing", { gate: id(gate) });
-      expect((governing.criteria as unknown[])).toHaveLength(1);
+      expect(governing.criteria as unknown[]).toHaveLength(1);
 
       const observations = await call(c, "record_observations", {
-        enquiry: id(enquiry), name: "sparse timings", finding: "three runs per instance",
+        enquiry: id(enquiry),
+        name: "sparse timings",
+        finding: "three runs per instance",
         content_hash: "sha256:sparse",
       });
       const analysis = await call(c, "record_analysis", {
-        enquiry: id(enquiry), method: "paired timing", from: [id(observations)],
+        enquiry: id(enquiry),
+        method: "paired timing",
+        from: [id(observations)],
         concludes: [{ proposition: SPARSE, finding: "median speedup 1.4x" }],
-        implementing: id(work), held_to: [id(criterion)],
+        implementing: id(work),
+        held_to: [id(criterion)],
       });
       const claim = claimIn(analysis, SPARSE);
 
       await call(c, "evaluate_criterion", {
-        criterion: id(criterion), value: "1.4", outcome: "pass",
-        gate: id(gate), citing: claim,
+        criterion: id(criterion),
+        value: "1.4",
+        outcome: "pass",
+        gate: id(gate),
+        citing: claim,
       });
       const status = await call(c, "gate_status", { gate: id(gate) });
       expect(status.state).toBe("satisfied");
 
-      await call(c, "promote", { claim, because: "re-timed on a quiet machine" });
+      await call(c, "promote", {
+        claim,
+        because: "re-timed on a quiet machine",
+      });
       // `known` partitions by how well a question is *answered*, so the
       // enquiry has to be closed before the question can be established.
-      await call(c, "close_enquiry", { enquiry: id(enquiry), answered_by: claim });
+      await call(c, "close_enquiry", {
+        enquiry: id(enquiry),
+        answered_by: claim,
+      });
       const survey = await call(c, "known", {});
-      expect((survey.established as Array<{ asks: string }>).map((q) => q.asks))
-        .toContain("is the solver faster on sparse instances?");
+      expect((survey.established as Array<{ asks: string }>).map((q) => q.asks)).toContain(
+        "is the solver faster on sparse instances?",
+      );
 
       const why = await call(c, "why_supported", { claim });
       expect(why.supported).toBe(true);
-      const depends = await call(c, "what_depends_on", { artefact: "sparse timings" });
+      const depends = await call(c, "what_depends_on", {
+        artefact: "sparse timings",
+      });
       expect((depends.claims as unknown[]).length).toBeGreaterThan(0);
       const rebuilt = await call(c, "reproducibility_of", {
-        analysis: id(analysis.analysis as Json), rebuilt: [{ part: id(observations), hash: "sha256:sparse" }],
+        analysis: id(analysis.analysis as Json),
+        rebuilt: [{ part: id(observations), hash: "sha256:sparse" }],
       });
       expect(rebuilt.reproducible).toBe(true);
 
       const amendment = await call(c, "amend_design", {
-        criterion: id(criterion), now_requires: "median speedup above 1.2x on sparse instances",
-        because: "the condition never said which set", citing: claim,
+        criterion: id(criterion),
+        now_requires: "median speedup above 1.2x on sparse instances",
+        because: "the condition never said which set",
+        citing: claim,
       });
       // `scientific`, not `mechanical`: the finding was promoted to
       // confirmatory two calls ago, so rewording the condition it answers to
@@ -180,7 +213,7 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(amendment.nature).toBe("scientific");
       expect((amendment.confirmatoryAffected as unknown[]).length).toBeGreaterThan(0);
       const history = await call(c, "design_history", { gate: id(gate) });
-      expect((history.amendments as unknown[])).toHaveLength(1);
+      expect(history.amendments as unknown[]).toHaveLength(1);
 
       // Attribution over the full MCP path, not just a direct surface call.
       // The server builds a fresh `WriteSurface` per tool call, so this also
@@ -194,7 +227,7 @@ describe("every tool answers when an agent actually calls it", () => {
       expect((happened.events as unknown[]).length).toBeGreaterThan(0);
 
       const expected = commandContext(mockGitContext, mockSessionContext).attribution;
-      const written = (await events.all());
+      const written = await events.all();
       expect(written.length).toBeGreaterThan(1);
       expect(written.map((e) => e.attribution)).toEqual(written.map(() => expected));
 
@@ -207,28 +240,43 @@ describe("every tool answers when an agent actually calls it", () => {
   test("review, replace, re-verify, reinterpret, close", async () => {
     const { client: c } = await client();
     try {
-      const enquiry = await call(c, "open_enquiry", { question: "does the coating slow corrosion?" });
+      const enquiry = await call(c, "open_enquiry", {
+        question: "does the coating slow corrosion?",
+      });
       const observations = await call(c, "record_observations", {
-        enquiry: id(enquiry), name: "immersion series", finding: "mass loss at six intervals",
+        enquiry: id(enquiry),
+        name: "immersion series",
+        finding: "mass loss at six intervals",
       });
       const first = await call(c, "record_analysis", {
-        enquiry: id(enquiry), method: "linear fit", from: [id(observations)],
+        enquiry: id(enquiry),
+        method: "linear fit",
+        from: [id(observations)],
         concludes: [{ proposition: COATING, finding: "rate down 40%" }],
       });
       const review = await call(c, "record_review", {
-        of: id(first.analysis as Json), verdict: "the fit ignores the induction period",
+        of: id(first.analysis as Json),
+        verdict: "the fit ignores the induction period",
       });
       const replacement = await call(c, "replace_analysis", {
-        supersedes: id(first.analysis as Json), because: id(review), enquiry: id(enquiry),
-        method: "segmented fit", from: [id(observations)],
+        supersedes: id(first.analysis as Json),
+        because: id(review),
+        enquiry: id(enquiry),
+        method: "segmented fit",
+        from: [id(observations)],
         concludes: [{ proposition: COATING, finding: "rate down 25% after induction" }],
       });
-      expect((replacement.changed as unknown[])).toHaveLength(1);
+      expect(replacement.changed as unknown[]).toHaveLength(1);
 
       const verification = await call(c, "reverify", {
-        historical: id(replacement.replacement as Json), enquiry: id(enquiry),
-        method: "segmented fit, second batch", under: [id(observations)],
-        concludes: { proposition: COATING, finding: "rate down 27% after induction" },
+        historical: id(replacement.replacement as Json),
+        enquiry: id(enquiry),
+        method: "segmented fit, second batch",
+        under: [id(observations)],
+        concludes: {
+          proposition: COATING,
+          finding: "rate down 27% after induction",
+        },
       });
       const reproduction = await call(c, "reproduction_of", {
         analysis: id(verification.verification as Json),
@@ -236,16 +284,26 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(reproduction.conclusion).toBe("agrees");
 
       const narrowed = await call(c, "reinterpret", {
-        claim: claimIn(replacement, COATING), as: NARROWER,
+        claim: claimIn(replacement, COATING),
+        as: NARROWER,
         because: "the reduction is in the post-induction rate, not overall",
       });
       const narrowedClaim = id((narrowed.nowClaims as Json).claim);
-      const revisions = await call(c, "interpretation_history", { claim: narrowedClaim });
-      expect((revisions.revisions as unknown[])).toHaveLength(1);
-      const found = await call(c, "claims_asserting", { proposition: NARROWER });
-      expect((found.claims as Array<{ claim: string }>).map((x) => x.claim)).toEqual([narrowedClaim]);
+      const revisions = await call(c, "interpretation_history", {
+        claim: narrowedClaim,
+      });
+      expect(revisions.revisions as unknown[]).toHaveLength(1);
+      const found = await call(c, "claims_asserting", {
+        proposition: NARROWER,
+      });
+      expect((found.claims as Array<{ claim: string }>).map((x) => x.claim)).toEqual([
+        narrowedClaim,
+      ]);
 
-      await call(c, "close_enquiry", { enquiry: id(enquiry), answered_by: narrowedClaim });
+      await call(c, "close_enquiry", {
+        enquiry: id(enquiry),
+        answered_by: narrowedClaim,
+      });
       const closed = await call(c, "enquiry_status", { enquiry: id(enquiry) });
       expect((closed.question as Json).closure).toBe("answered");
       await c.close();
@@ -257,28 +315,47 @@ describe("every tool answers when an agent actually calls it", () => {
   test("two enquiries asserting one sentence, and one left deliberately open", async () => {
     const { client: c } = await client();
     try {
-      const sparse = await call(c, "open_enquiry", { question: "does it hold on sparse instances?" });
-      const dense = await call(c, "open_enquiry", { question: "does it hold on dense instances?" });
+      const sparse = await call(c, "open_enquiry", {
+        question: "does it hold on sparse instances?",
+      });
+      const dense = await call(c, "open_enquiry", {
+        question: "does it hold on dense instances?",
+      });
 
       const sparseObs = await call(c, "record_observations", {
-        enquiry: id(sparse), name: "sparse runs", finding: "forty instances",
+        enquiry: id(sparse),
+        name: "sparse runs",
+        finding: "forty instances",
       });
       const sparseAnalysis = await call(c, "record_analysis", {
-        enquiry: id(sparse), method: "paired timing", from: [id(sparseObs)],
+        enquiry: id(sparse),
+        method: "paired timing",
+        from: [id(sparseObs)],
         concludes: [{ proposition: HOLDS, finding: "speedup 1.4x" }],
       });
       const denseObs = await call(c, "record_observations", {
-        enquiry: id(dense), name: "dense runs", finding: "forty instances",
+        enquiry: id(dense),
+        name: "dense runs",
+        finding: "forty instances",
       });
       const denseAnalysis = await call(c, "record_analysis", {
-        enquiry: id(dense), method: "paired timing", from: [id(denseObs)],
-        concludes: [{ proposition: HOLDS, finding: "speedup 0.98x", bearing: "challenges" }],
+        enquiry: id(dense),
+        method: "paired timing",
+        from: [id(denseObs)],
+        concludes: [
+          {
+            proposition: HOLDS,
+            finding: "speedup 0.98x",
+            bearing: "challenges",
+          },
+        ],
       });
 
       // The same sentence, two enquiries, opposite bearing — and not a
       // contradiction, because they asked about different instance sets.
       const verdict = await call(c, "do_these_conflict", {
-        a: claimIn(sparseAnalysis, HOLDS), b: claimIn(denseAnalysis, HOLDS),
+        a: claimIn(sparseAnalysis, HOLDS),
+        b: claimIn(denseAnalysis, HOLDS),
       });
       expect(verdict.conflict).toBe(false);
       expect(verdict.relation).toBe("dissociation");

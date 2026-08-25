@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI guard: nothing under src/ may write to stdout except the CLI.
+# Nothing under src/ may write to stdout except the CLI.
 #
 # This became load-bearing on 2026-08-21, when src/mcp/server.ts started
 # speaking MCP over stdio. stdout IS the protocol channel there: one stray
@@ -42,7 +42,7 @@ matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' 
   | grep -vE '^[^:]+:[0-9]+: *(\*|//|/\*)' || true)"
 
 if [ -n "$matches" ]; then
-  echo "❌ check-stdout ERROR: writes to stdout under src/, outside src/cli/cli.ts:"
+  echo "FAILED: writes to stdout under src/, outside src/cli/cli.ts:"
   echo
   echo "$matches"
   echo
@@ -52,4 +52,4 @@ if [ -n "$matches" ]; then
   exit 1
 fi
 
-echo "✅ check-stdout OK: nothing under src/ writes to stdout except the CLI."
+echo "OK: nothing under src/ writes to stdout except the CLI."

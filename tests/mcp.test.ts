@@ -24,7 +24,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ReadSurface, ResearchSession, WriteSurface, inMemoryEventLog, type Clock } from "../src/domain";
+import {
+  ReadSurface,
+  ResearchSession,
+  WriteSurface,
+  inMemoryEventLog,
+  type Clock,
+} from "../src/domain";
 import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
 import { TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
@@ -33,7 +39,7 @@ import { DOCS_FILE, DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { ref } from "../src/domain/report";
-import { NOT_EXPOSED, publicVerbsOf, verbsReachedIn } from "./helpers/surface-coverage";
+import { NOT_EXPOSED, publicVerbsOf, verbsCalledOn } from "./helpers/surface-coverage";
 import { readFileSync } from "node:fs";
 import { claimNamed, claimOf } from "./helpers/claims";
 
@@ -57,7 +63,10 @@ const id = (v: unknown): string =>
  * per-call surface defaulting to its own log would fragment the stream and
  * leave the read half holding an empty one.
  */
-async function connectServer(graph: TenantGraph, transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0]) {
+async function connectServer(
+  graph: TenantGraph,
+  transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0],
+) {
   const events = inMemoryEventLog();
   return buildServer(
     new ReadSurface(graph, { events }),
@@ -66,10 +75,19 @@ async function connectServer(graph: TenantGraph, transport: Parameters<ReturnTyp
 }
 
 let scenario: Scenario;
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
-const clock: Clock = (() => { let t = 0; return { now: () => new Date(Date.UTC(2026, 2, 1) + t++ * 60_000).toISOString() }; })();
+const clock: Clock = (() => {
+  let t = 0;
+  return {
+    now: () => new Date(Date.UTC(2026, 2, 1) + t++ * 60_000).toISOString(),
+  };
+})();
 
 describe("structure", () => {
   /**
@@ -87,7 +105,6 @@ describe("structure", () => {
     // The check that would have caught six reads shipping unreachable. Both
     // lists are derived: the verbs from the surface declarations, the reached
     // set from the adapter's source. Nothing here names a tool.
-    const toolSource = readFileSync("src/mcp/tools.ts", "utf8");
     const reads = publicVerbsOf("src/domain/read.ts");
     const writes = publicVerbsOf("src/domain/write.ts");
 
@@ -98,9 +115,12 @@ describe("structure", () => {
     expect(reads).toContain("gateStatus");
     expect(writes).toContain("recordAnalysis");
 
+    const TOOLS_FILE = ["src/mcp/tools.ts"];
+    const readsCalled = verbsCalledOn(TOOLS_FILE, "read");
+    const writesCalled = verbsCalledOn(TOOLS_FILE, "write");
     const unreachable = [
-      ...reads.filter((v) => verbsReachedIn(toolSource, "read", [v]).length === 0),
-      ...writes.filter((v) => verbsReachedIn(toolSource, "write", [v]).length === 0),
+      ...reads.filter((v) => !readsCalled.has(v)),
+      ...writes.filter((v) => !writesCalled.has(v)),
     ].filter((v) => !(v in NOT_EXPOSED));
 
     expect(unreachable).toEqual([]);
@@ -192,16 +212,22 @@ describe("an agent can track work through the tools alone", () => {
         concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
       });
 
-      const claimId = (analysis.claims as Array<{ claim: string; asserts: string }>)
-        .find((x) => x.asserts === PROP)!.claim;
-      await call(c, "close_enquiry", { enquiry: id(enquiry), answered_by: claimId });
+      const claimId = (analysis.claims as Array<{ claim: string; asserts: string }>).find(
+        (x) => x.asserts === PROP,
+      )!.claim;
+      await call(c, "close_enquiry", {
+        enquiry: id(enquiry),
+        answered_by: claimId,
+      });
 
       // Now the reads, which had nothing to say before any of the above.
       const status = await call(c, "enquiry_status", { enquiry: id(enquiry) });
-      expect((status.question as {open:boolean}).open).toBe(false);
-      expect((status.question as {closure:string}).closure).toBe("answered");
+      expect((status.question as { open: boolean }).open).toBe(false);
+      expect((status.question as { closure: string }).closure).toBe("answered");
 
-      const why = await call(c, "why_supported", { claim: await claimIdFor(c, PROP) });
+      const why = await call(c, "why_supported", {
+        claim: await claimIdFor(c, PROP),
+      });
       expect(why.supported).toBe(true);
 
       // **`provisional` before promotion, `established` after** — the whole of
@@ -215,7 +241,10 @@ describe("an agent can track work through the tools alone", () => {
       expect(asks(before.provisional)).toContain("does the pruning schedule move convergence?");
       expect(asks(before.established)).toEqual([]);
 
-      await call(c, "promote", { claim: claimId, because: "checked against the held-out split" });
+      await call(c, "promote", {
+        claim: claimId,
+        because: "checked against the held-out split",
+      });
 
       const after = await call(c, "known", {});
       expect(asks(after.established)).toContain("does the pruning schedule move convergence?");
@@ -231,7 +260,9 @@ describe("an agent can track work through the tools alone", () => {
     // from `known` and no way to reach the enquiries beneath them.
     const c = await client();
     try {
-      const question = await call(c, "pose", { question: "does depth move convergence?" });
+      const question = await call(c, "pose", {
+        question: "does depth move convergence?",
+      });
       const before = await call(c, "pursuits_of", { question: id(question) });
       expect(before.enquiries).toEqual([]);
 
@@ -266,22 +297,34 @@ describe("an agent can track work through the tools alone", () => {
         protecting: [id(work)],
       });
 
-      const enquiry = await call(c, "open_enquiry", { question: "does it hold at five seeds?" });
+      const enquiry = await call(c, "open_enquiry", {
+        question: "does it hold at five seeds?",
+      });
       const observations = await call(c, "record_observations", {
-        enquiry: id(enquiry), name: "seed sweep", finding: "five seeds, consistent",
+        enquiry: id(enquiry),
+        name: "seed sweep",
+        finding: "five seeds, consistent",
       });
       await call(c, "record_analysis", {
         enquiry: id(enquiry),
         method: "seed sweep",
         from: [id(observations)],
-        concludes: [{ proposition: HOLDS, finding: "holds at all five", standing: "confirmatory" }],
+        concludes: [
+          {
+            proposition: HOLDS,
+            finding: "holds at all five",
+            standing: "confirmatory",
+          },
+        ],
         implementing: id(work),
         held_to: [id(criterion)],
       });
 
       // Unmet before the check is run -- an unrun check counts against the
       // finding it qualifies, which is why the criterion is stated up front.
-      const beforeCheck = await call(c, "why_supported", { claim: await claimIdFor(c, HOLDS) });
+      const beforeCheck = await call(c, "why_supported", {
+        claim: await claimIdFor(c, HOLDS),
+      });
       expect(beforeCheck.unmet).not.toEqual([]);
 
       await call(c, "evaluate_criterion", {
@@ -291,7 +334,9 @@ describe("an agent can track work through the tools alone", () => {
         outcome: "pass",
       });
 
-      const afterCheck = await call(c, "why_supported", { claim: await claimIdFor(c, HOLDS) });
+      const afterCheck = await call(c, "why_supported", {
+        claim: await claimIdFor(c, HOLDS),
+      });
       expect(afterCheck.unmet).toEqual([]);
       await c.close();
     } finally {
@@ -302,12 +347,17 @@ describe("an agent can track work through the tools alone", () => {
   test("a claim's reading can be narrowed, and the history says so", async () => {
     const c = await client();
     try {
-      const enquiry = await call(c, "open_enquiry", { question: "is the gain general?" });
+      const enquiry = await call(c, "open_enquiry", {
+        question: "is the gain general?",
+      });
       const observations = await call(c, "record_observations", {
-        enquiry: id(enquiry), name: "benchmark run", finding: "faster on the suite",
+        enquiry: id(enquiry),
+        name: "benchmark run",
+        finding: "faster on the suite",
       });
       const analysis = await call(c, "record_analysis", {
-        enquiry: id(enquiry), method: "benchmark",
+        enquiry: id(enquiry),
+        method: "benchmark",
         from: [id(observations)],
         concludes: [{ proposition: GENERAL, finding: "12% faster overall" }],
       });
@@ -321,7 +371,10 @@ describe("an agent can track work through the tools alone", () => {
       // Over the wire the pairs survive as objects, not sentences -- the
       // schema mirror in src/mcp/schemas.ts is held to the report interface at
       // compile time, and this checks the same thing at run time.
-      const previously = report.previously as Array<{ claim: string; asserts: string }>;
+      const previously = report.previously as Array<{
+        claim: string;
+        asserts: string;
+      }>;
       const nowClaims = report.nowClaims as { claim: string; asserts: string };
       expect(previously.map((c) => c.asserts)).toEqual([GENERAL]);
       expect(nowClaims.asserts).toBe("the method is faster on this benchmark suite");
@@ -329,7 +382,9 @@ describe("an agent can track work through the tools alone", () => {
 
       // Asked with the handle `reinterpret` just returned, not by looking the
       // sentence back up.
-      const history = await call(c, "interpretation_history", { claim: nowClaims.claim });
+      const history = await call(c, "interpretation_history", {
+        claim: nowClaims.claim,
+      });
       expect((history.originally as Array<{ asserts: string }>).map((c) => c.asserts)).toEqual([
         GENERAL,
       ]);
@@ -353,25 +408,39 @@ describe("an agent can track work through the tools alone", () => {
   test("a replacement can read an earlier analysis's output, by that analysis's id", async () => {
     const c = await client();
     try {
-      const enquiry = await call(c, "open_enquiry", { question: "does the calibration hold?" });
+      const enquiry = await call(c, "open_enquiry", {
+        question: "does the calibration hold?",
+      });
       const raw = await call(c, "record_observations", {
-        enquiry: id(enquiry), name: "raw series", finding: "uncalibrated instrument output",
+        enquiry: id(enquiry),
+        name: "raw series",
+        finding: "uncalibrated instrument output",
       });
       const calibration = await call(c, "record_analysis", {
-        enquiry: id(enquiry), method: "calibrate", from: [id(raw)],
-        concludes: [{ proposition: "the series is calibrated", finding: "offset removed" }],
+        enquiry: id(enquiry),
+        method: "calibrate",
+        from: [id(raw)],
+        concludes: [
+          {
+            proposition: "the series is calibrated",
+            finding: "offset removed",
+          },
+        ],
       });
       const trend = await call(c, "record_analysis", {
-        enquiry: id(enquiry), method: "trend", from: [(calibration.analysis as string)],
+        enquiry: id(enquiry),
+        method: "trend",
+        from: [calibration.analysis as string],
         concludes: [{ proposition: TRENDS, finding: "slope 0.4" }],
       });
       const review = await call(c, "record_review", {
-        of: (trend.analysis as string), verdict: "the slope test was one-sided",
+        of: trend.analysis as string,
+        verdict: "the slope test was one-sided",
       });
 
-      const stageOne = (calibration.analysis as string);
+      const stageOne = calibration.analysis as string;
       const report = await call(c, "replace_analysis", {
-        supersedes: (trend.analysis as string),
+        supersedes: trend.analysis as string,
         because: id(review),
         enquiry: id(enquiry),
         method: "trend, two-sided",
@@ -383,7 +452,9 @@ describe("an agent can track work through the tools alone", () => {
       // artefact relabelled "observations" -- and `named` is the output's own
       // name, which needed the same dereference the CONSUMES edge needs.
       const unaffected = report.unaffected as Array<{
-        what: string; named: string; why: string;
+        what: string;
+        named: string;
+        why: string;
       }>;
       expect(unaffected).toHaveLength(1);
       expect(unaffected[0]!.what).toEqual(stageOne);
@@ -392,27 +463,38 @@ describe("an agent can track work through the tools alone", () => {
       // The observations branch of the same field, which had never been
       // asserted either and was returning its id too.
       const other = await call(c, "replace_analysis", {
-        supersedes: (calibration.analysis as string),
-        because: id(await call(c, "record_review", {
-          of: (calibration.analysis as string), verdict: "offset table was stale",
-        })),
+        supersedes: calibration.analysis as string,
+        because: id(
+          await call(c, "record_review", {
+            of: calibration.analysis as string,
+            verdict: "offset table was stale",
+          }),
+        ),
         enquiry: id(enquiry),
         method: "calibrate, current offsets",
         from: [id(raw)],
-        concludes: [{ proposition: "the series is calibrated", finding: "offset removed, current table" }],
+        concludes: [
+          {
+            proposition: "the series is calibrated",
+            finding: "offset removed, current table",
+          },
+        ],
       });
       expect((other.unaffected as Array<{ named: string }>)[0]!.named).toBe("raw series");
 
       // And the same id is accepted by the third verb, which also took
       // observations alone.
       const verified = await call(c, "reverify", {
-        historical: (trend.analysis as string),
+        historical: trend.analysis as string,
         enquiry: id(enquiry),
         method: "trend, held-out split",
         under: [stageOne],
-        concludes: { proposition: TRENDS, finding: "slope 0.38 on the held-out split" },
+        concludes: {
+          proposition: TRENDS,
+          finding: "slope 0.38 on the held-out split",
+        },
       });
-      expect(String((verified.verification as string)).startsWith("COMP_")).toBe(true);
+      expect(String(verified.verification as string).startsWith("COMP_")).toBe(true);
       await c.close();
     } finally {
       await scenario.end();
@@ -422,7 +504,9 @@ describe("an agent can track work through the tools alone", () => {
   test("closing an enquiry twice is refused, not recorded twice", async () => {
     const c = await client();
     try {
-      const enquiry = await call(c, "open_enquiry", { question: "does width matter?" });
+      const enquiry = await call(c, "open_enquiry", {
+        question: "does width matter?",
+      });
       await call(c, "close_enquiry", { enquiry: id(enquiry) });
 
       const again = await c.callTool({
@@ -435,7 +519,6 @@ describe("an agent can track work through the tools alone", () => {
       await scenario.end();
     }
   });
-
 
   const PROP = "the pruning schedule moves convergence";
   const HOLDS = "the effect holds at five seeds";
@@ -568,13 +651,20 @@ describe("behaviour — the same answers, over the wire", () => {
     const enquiry = await s.openEnquiry("does the pruning schedule move convergence?");
     await s.pose("does depth move convergence?");
     const observations = await s.recordObservations({
-      enquiry, name: "sweep readings", finding: "twelve runs at five seeds",
+      enquiry,
+      name: "sweep readings",
+      finding: "twelve runs at five seeds",
     });
     const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-      enquiry, method: "paired comparison", from: [observations],
+      enquiry,
+      method: "paired comparison",
+      from: [observations],
       concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
     });
-    await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, PROP) });
+    await s.closeEnquiry({
+      enquiry,
+      answeredBy: claimOf(analysisClaims, PROP),
+    });
 
     const current = await scenario.current();
     const read = new ReadSurface(current);
@@ -603,9 +693,11 @@ describe("behaviour — the same answers, over the wire", () => {
       expect(await structured(client, "why_supported", { claim: claim })).toEqual(
         JSON.parse(JSON.stringify(await read.whySupported(claim))),
       );
-      expect(await structured(client, "what_depends_on", { artefact: "sweep readings" })).toEqual(
-        JSON.parse(JSON.stringify(await read.whatDependsOn("sweep readings"))),
-      );
+      expect(
+        await structured(client, "what_depends_on", {
+          artefact: "sweep readings",
+        }),
+      ).toEqual(JSON.parse(JSON.stringify(await read.whatDependsOn("sweep readings"))));
       expect(await structured(client, "enquiry_status", { enquiry: enquiry })).toEqual(
         JSON.parse(JSON.stringify(await read.enquiryStatus(enquiry))),
       );
@@ -621,12 +713,16 @@ describe("behaviour — the same answers, over the wire", () => {
       // Everything above happened in March 2026. Asked about February, the
       // programme had not begun -- and a question posed later is absent, not
       // open. See tests/consumer/historical_survey.test.ts.
-      const february = await structured(client, "known", { at: "2026-02-01T00:00:00.000Z" });
+      const february = await structured(client, "known", {
+        at: "2026-02-01T00:00:00.000Z",
+      });
       expect(february.open).toEqual([]);
       expect(february.established).toEqual([]);
 
       // Offered with an offset, the answer echoes the instant it compared.
-      const offset = await structured(client, "known", { at: "2026-04-01T00:00:00+02:00" });
+      const offset = await structured(client, "known", {
+        at: "2026-04-01T00:00:00+02:00",
+      });
       expect(offset.at).toBe("2026-03-31T22:00:00.000Z");
       await client.close();
     } finally {
@@ -642,7 +738,9 @@ describe("behaviour — the same answers, over the wire", () => {
     try {
       const claim = await claimNamed(read, PROP);
       const direct = JSON.parse(JSON.stringify(await read.whySupported(claim)));
-      const overWire = await structured(client, "why_supported", { claim: claim });
+      const overWire = await structured(client, "why_supported", {
+        claim: claim,
+      });
       expect(Object.keys(overWire).sort()).toEqual(Object.keys(direct).sort());
       await client.close();
     } finally {
@@ -671,13 +769,17 @@ describe("behaviour — the same answers, over the wire", () => {
         if (!result.success) throw new Error(`${name}: ${JSON.stringify(result.error.issues)}`);
       };
 
-      await parsed("why_supported", { claim: (await read.claimsAsserting(PROP))[0]!.claim });
+      await parsed("why_supported", {
+        claim: (await read.claimsAsserting(PROP))[0]!.claim,
+      });
       await parsed("what_depends_on", { artefact: "sweep readings" });
       await parsed("enquiry_status", { enquiry: enquiry });
 
       // `known` is the one tool with no declared schema -- the SDK cannot carry
       // a union (see src/mcp/tools.ts). Its two shapes are still checked, here.
-      expect(knowledgeSurveySchema.safeParse(await structured(client, "known", {})).success).toBe(true);
+      expect(knowledgeSurveySchema.safeParse(await structured(client, "known", {})).success).toBe(
+        true,
+      );
       expect(
         historicalSurveySchema.safeParse(
           await structured(client, "known", { at: "2026-04-01T00:00:00.000Z" }),

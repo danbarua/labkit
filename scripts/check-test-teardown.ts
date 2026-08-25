@@ -34,11 +34,7 @@ import { join } from "node:path";
 function testFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const path = join(dir, entry);
-    return statSync(path).isDirectory()
-      ? testFiles(path)
-      : path.endsWith(".test.ts")
-        ? [path]
-        : [];
+    return statSync(path).isDirectory() ? testFiles(path) : path.endsWith(".test.ts") ? [path] : [];
   });
 }
 
@@ -59,7 +55,7 @@ for (const file of testFiles("tests")) {
 }
 
 if (offenders.length > 0) {
-  console.error("❌ check-test-teardown ERROR: a scenario is opened and never reset:");
+  console.error("FAILED: a scenario is opened and never reset:");
   console.error();
   for (const { file, missing } of offenders) {
     console.error(`  ${file} — never calls ${missing.join(" or ")}`);
@@ -72,5 +68,5 @@ if (offenders.length > 0) {
 }
 
 console.log(
-  `✅ check-test-teardown OK: all ${testFiles("tests").filter((f) => code(readFileSync(f, "utf8")).includes("openScenario(")).length} scenario files reset the database.`,
+  `OK: all ${testFiles("tests").filter((f) => code(readFileSync(f, "utf8")).includes("openScenario(")).length} scenario files reset the database.`,
 );

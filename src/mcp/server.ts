@@ -239,7 +239,10 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
 }
 
 /** Waits for every request already in hand to be answered, then shuts down. */
-async function drainThenExit(server: McpServer, connection: { close(): Promise<void> }): Promise<void> {
+async function drainThenExit(
+  server: McpServer,
+  connection: { close(): Promise<void> },
+): Promise<void> {
   // One tick before counting: a request that arrived in the same chunk as the
   // EOF may not have reached its handler yet, so a count of zero right now
   // proves nothing.

@@ -1,5 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { buildAsClause, parseAgtype, validateIdentifier, type AgtypeNumeric, type AgtypeUnknown } from "../src/db/agtype";
+import {
+  buildAsClause,
+  parseAgtype,
+  validateIdentifier,
+  type AgtypeNumeric,
+  type AgtypeUnknown,
+} from "../src/db/agtype";
 import { TenantGraph } from "../src/db/graph";
 import { agtypeValue } from "../src/db/cypher";
 import type { LabKitDB } from "../src/db/client";
@@ -18,13 +24,29 @@ import { setupTestDb, type TestDb } from "./helpers/db";
 
 describe("parseAgtype — pure parsing", () => {
   test("parses a vertex", () => {
-    const v = parseAgtype(`{"id": 1, "label": "Test", "properties": {"x": 1, "name": "a"}}::vertex`);
-    expect(v).toEqual({ kind: "vertex", id: 1, label: "Test", properties: { x: 1, name: "a" } });
+    const v = parseAgtype(
+      `{"id": 1, "label": "Test", "properties": {"x": 1, "name": "a"}}::vertex`,
+    );
+    expect(v).toEqual({
+      kind: "vertex",
+      id: 1,
+      label: "Test",
+      properties: { x: 1, name: "a" },
+    });
   });
 
   test("parses an edge", () => {
-    const e = parseAgtype(`{"id": 5, "label": "REL", "start_id": 1, "end_id": 2, "properties": {}}::edge`);
-    expect(e).toEqual({ kind: "edge", id: 5, label: "REL", start_id: 1, end_id: 2, properties: {} });
+    const e = parseAgtype(
+      `{"id": 5, "label": "REL", "start_id": 1, "end_id": 2, "properties": {}}::edge`,
+    );
+    expect(e).toEqual({
+      kind: "edge",
+      id: 5,
+      label: "REL",
+      start_id: 1,
+      end_id: 2,
+      properties: {},
+    });
   });
 
   test("parses a flat vertex-edge-vertex path", () => {
@@ -49,7 +71,9 @@ describe("parseAgtype — pure parsing", () => {
   });
 
   test("a string property value containing a literal '::vertex,' is not corrupted", () => {
-    const v = parseAgtype(`{"id": 1, "label": "T", "properties": {"name": "a string with \\"::vertex,\\" inside"}}::vertex`);
+    const v = parseAgtype(
+      `{"id": 1, "label": "T", "properties": {"name": "a string with \\"::vertex,\\" inside"}}::vertex`,
+    );
     expect(v.kind).toBe("vertex");
     if (v.kind !== "vertex") throw new Error("unreachable");
     expect(v.properties).toEqual({ name: 'a string with "::vertex," inside' });
@@ -63,7 +87,8 @@ describe("parseAgtype — pure parsing", () => {
   // string" as "the whole thing's tag" misparses this as a single vertex.
   test("an untagged array of two vertices is not misparsed as a path or a vertex", () => {
     const raw =
-      `[{"id": 1, "label": "A", "properties": {}}::vertex,` + `{"id": 2, "label": "A", "properties": {}}::vertex]`;
+      `[{"id": 1, "label": "A", "properties": {}}::vertex,` +
+      `{"id": 2, "label": "A", "properties": {}}::vertex]`;
     const result = parseAgtype(raw);
     expect(result.kind).toBe("scalar");
     if (result.kind !== "scalar") throw new Error("unreachable");
@@ -79,7 +104,9 @@ describe("parseAgtype — pure parsing", () => {
   // recursively with the same flag), so a numeric property value inside a
   // vertex's properties map is ALSO tagged — not just top-level results.
   test("a ::numeric tag nested inside a vertex's properties doesn't break the outer parse", () => {
-    const v = parseAgtype(`{"id": 1, "label": "T", "properties": {"score": 1.5::numeric, "name": "a"}}::vertex`);
+    const v = parseAgtype(
+      `{"id": 1, "label": "T", "properties": {"score": 1.5::numeric, "name": "a"}}::vertex`,
+    );
     expect(v.kind).toBe("vertex");
     if (v.kind !== "vertex") throw new Error("unreachable");
     expect((v.properties as Record<string, unknown>).name).toBe("a");
@@ -96,8 +123,14 @@ describe("parseAgtype — pure parsing", () => {
   });
 
   test("Infinity, -Infinity, and NaN parse as their JS equivalents, at any depth", () => {
-    expect(parseAgtype("Infinity")).toEqual({ kind: "scalar", value: Infinity });
-    expect(parseAgtype("-Infinity")).toEqual({ kind: "scalar", value: -Infinity });
+    expect(parseAgtype("Infinity")).toEqual({
+      kind: "scalar",
+      value: Infinity,
+    });
+    expect(parseAgtype("-Infinity")).toEqual({
+      kind: "scalar",
+      value: -Infinity,
+    });
     expect(Number.isNaN((parseAgtype("NaN") as { value: number }).value)).toBe(true);
 
     const nested = parseAgtype(`{"id": 1, "label": "T", "properties": {"x": Infinity}}::vertex`);
@@ -118,7 +151,9 @@ describe("parseAgtype — pure parsing", () => {
   });
 
   test("a large integer inside a vertex's id/properties parses correctly", () => {
-    const v = parseAgtype(`{"id": 9007199254740993, "label": "T", "properties": {"count": 9007199254740993}}::vertex`);
+    const v = parseAgtype(
+      `{"id": 9007199254740993, "label": "T", "properties": {"count": 9007199254740993}}::vertex`,
+    );
     expect(v.kind).toBe("vertex");
     if (v.kind !== "vertex") throw new Error("unreachable");
     expect(v.id).toBe(9007199254740993n);
@@ -130,12 +165,20 @@ describe("parseAgtype — pure parsing", () => {
   // could add one; parsing must degrade, not crash.
   test("an unrecognized tag doesn't throw — degrades to a visible unknown-kind node", () => {
     const result = parseAgtype(`"foo"::somefuturetype`);
-    expect(result).toEqual({ kind: "scalar", value: { kind: "unknown", tag: "somefuturetype", value: "foo" } as AgtypeUnknown });
+    expect(result).toEqual({
+      kind: "scalar",
+      value: {
+        kind: "unknown",
+        tag: "somefuturetype",
+        value: "foo",
+      } as AgtypeUnknown,
+    });
   });
 
   test("a malformed ::path (even length, non-alternating) throws — a real invariant violation, not an unmodeled feature", () => {
     const raw =
-      `[{"id": 1, "label": "A", "properties": {}}::vertex,` + `{"id": 2, "label": "A", "properties": {}}::vertex]::path`;
+      `[{"id": 1, "label": "A", "properties": {}}::vertex,` +
+      `{"id": 2, "label": "A", "properties": {}}::vertex]::path`;
     expect(() => parseAgtype(raw)).toThrow(/odd length/);
   });
 
@@ -178,13 +221,20 @@ describe("parseAgtype — against live pglite-age", () => {
     const ctx = await resolveTenantContext(db, "labkit");
     const graph = new TenantGraph(ctx, db);
 
-    const a = await graph.createNode("Question", { name: "q", posed_at: "2026-01-01T00:00:00.000Z" });
+    const a = await graph.createNode("Question", {
+      name: "q",
+      posed_at: "2026-01-01T00:00:00.000Z",
+    });
     const b = await graph.createNode("LineOfEnquiry", { name: "loe" });
     await graph.createEdge(a.natural_id, "MOTIVATES", b.natural_id);
 
-    const vertexRows = await graph.query(`MATCH (n:Question {natural_id: $id}) RETURN n`, { n: agtypeValue() }, {
-      id: a.natural_id,
-    });
+    const vertexRows = await graph.query(
+      `MATCH (n:Question {natural_id: $id}) RETURN n`,
+      { n: agtypeValue() },
+      {
+        id: a.natural_id,
+      },
+    );
     const parsedVertex = vertexRows[0]!.n;
     expect(parsedVertex.kind).toBe("vertex");
 
@@ -225,11 +275,21 @@ describe("parseAgtype — against live pglite-age", () => {
     const ctx = await resolveTenantContext(db, "labkit");
     const graph = new TenantGraph(ctx, db);
 
-    const d1 = await graph.createNode("Decision", { reason: "r1", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
-    const d2 = await graph.createNode("Decision", { reason: "r2", invalidation_check: "x", decided_at: "2026-01-01T00:00:00.000Z" });
+    const d1 = await graph.createNode("Decision", {
+      reason: "r1",
+      invalidation_check: "x",
+      decided_at: "2026-01-01T00:00:00.000Z",
+    });
+    const d2 = await graph.createNode("Decision", {
+      reason: "r2",
+      invalidation_check: "x",
+      decided_at: "2026-01-01T00:00:00.000Z",
+    });
     await graph.createEdge(d2.natural_id, "SUPERSEDES", d1.natural_id);
 
-    const rawIdRows = await db.query<{ id: string }>(`SELECT id::text FROM "${ctx.graphName}"."SUPERSEDES"`);
+    const rawIdRows = await db.query<{ id: string }>(
+      `SELECT id::text FROM "${ctx.graphName}"."SUPERSEDES"`,
+    );
     const rawId = rawIdRows.rows[0]!.id;
     expect(Number.isSafeInteger(Number(rawId))).toBe(false); // confirms this test is actually exercising the unsafe case
 
@@ -262,7 +322,9 @@ describe("buildAsClause rejects names that would decode as null", () => {
   });
 
   test("lower-case and snake_case names are unaffected", () => {
-    expect(buildAsClause([{ name: "c" }, { name: "basis_out" }])).toBe("c agtype, basis_out agtype");
+    expect(buildAsClause([{ name: "c" }, { name: "basis_out" }])).toBe(
+      "c agtype, basis_out agtype",
+    );
   });
 
   /**

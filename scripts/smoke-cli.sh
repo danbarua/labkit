@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#
 # The CLI against a real database, asserted — the end-to-end check.
 #
 # **Split out of `examples/full-lifecycle.sh`, which is now what its name says.**
@@ -54,7 +53,7 @@ expect() {
   local what="$1" haystack="$2" needle="$3"
   step=$((step + 1))
   if [[ "$haystack" != *"$needle"* ]]; then
-    printf '\nFAIL (%d) %s\n  expected to find: %s\n  in:\n%s\n' \
+    printf '\nFAILED: (%d) %s\n  expected to find: %s\n  in:\n%s\n' \
       "$step" "$what" "$needle" "$haystack" >&2
     exit 1
   fi
@@ -68,7 +67,7 @@ refute() {
   local what="$1" haystack="$2" needle="$3"
   step=$((step + 1))
   if [[ "$haystack" == *"$needle"* ]]; then
-    printf '\nFAIL (%d) %s\n  expected NOT to find: %s\n  in:\n%s\n' \
+    printf '\nFAILED: (%d) %s\n  expected NOT to find: %s\n  in:\n%s\n' \
       "$step" "$what" "$needle" "$haystack" >&2
     exit 1
   fi
@@ -91,7 +90,7 @@ pluck() {
 handle() {
   local prefix="$1" value="$2"
   if [[ "$value" != "$prefix"_* ]]; then
-    printf '\nFAIL expected a %s_ handle, got: %s\n' "$prefix" "$value" >&2
+    printf '\nFAILED: expected a %s_ handle, got: %s\n' "$prefix" "$value" >&2
     exit 1
   fi
   printf '%s' "$value"
@@ -192,4 +191,4 @@ expect "attribution names the script, not the account it ran under" "$log" "full
 expect "an act is findable by what it minted" "$(lab happened "$claim")" "recordAnalysis"
 
 echo
-echo "full lifecycle: $step assertions, all passed"
+echo "OK: $step assertions over a real database, all passed."

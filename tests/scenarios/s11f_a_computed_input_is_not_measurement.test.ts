@@ -49,12 +49,21 @@ let session: ResearchSession;
 
 const clock: Clock = { now: () => "2026-08-24T12:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 const TREND = "the response trends upward with dose";
 
@@ -62,15 +71,21 @@ const TREND = "the response trends upward with dose";
 async function twoStages() {
   const enquiry = await session.openEnquiry("does the response trend upward?");
   const raw = await session.recordObservations({
-    enquiry, name: "raw series", finding: "uncalibrated instrument output",
+    enquiry,
+    name: "raw series",
+    finding: "uncalibrated instrument output",
     contentHash: "sha256:raw",
   });
   const calibration = await session.recordAnalysis({
-    enquiry, method: "calibrate", from: [raw],
+    enquiry,
+    method: "calibrate",
+    from: [raw],
     concludes: [{ proposition: "the series is calibrated", finding: "offset removed" }],
   });
   const trend = await session.recordAnalysis({
-    enquiry, method: "trend", from: [calibration.analysis],
+    enquiry,
+    method: "trend",
+    from: [calibration.analysis],
     concludes: [{ proposition: TREND, finding: "slope 0.4" }],
   });
   return { enquiry, raw, calibration, trend };
@@ -79,7 +94,10 @@ async function twoStages() {
 describe("S-11f — a computed input, asked about by the reads that touch inputs", () => {
   test("the handle says observations; the record it names is an analysis output", async () => {
     const { trend } = await twoStages();
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const why = await later.whySupported(claimOf(trend.claims, TREND));
 
     expect(why.restingOn).toHaveLength(1);
@@ -94,7 +112,10 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
 
   test("accounting for a computed input declines, and does not report it unequal", async () => {
     const { raw, calibration, trend } = await twoStages();
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
 
     // Stage one is fully accounted for: a hash was recorded and it matches.
     const stageOne = await later.reproducibilityOf(calibration.analysis, [

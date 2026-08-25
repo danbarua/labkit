@@ -111,9 +111,7 @@ export function conclusion(raw: string): Conclusion {
   const result = conclusionShape.safeParse(parsed);
   if (!result.success) {
     const first = result.error.issues[0]!;
-    throw new InvalidArgumentError(
-      `${first.path.join(".") || "value"}: ${first.message}`,
-    );
+    throw new InvalidArgumentError(`${first.path.join(".") || "value"}: ${first.message}`);
   }
   return result.data;
 }
@@ -128,5 +126,8 @@ export function conclusion(raw: string): Conclusion {
 export function rebuilt(raw: string): { part: ObservationsRef; hash: string } {
   const at = raw.indexOf("=");
   if (at < 1) throw new InvalidArgumentError(`\`${raw}\` is not <part-id>=<hash>`);
-  return { part: handle("observations")(raw.slice(0, at)), hash: raw.slice(at + 1) };
+  return {
+    part: handle("observations")(raw.slice(0, at)),
+    hash: raw.slice(at + 1),
+  };
 }

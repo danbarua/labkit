@@ -28,15 +28,27 @@ let scenario: Scenario;
 let session: ResearchSession;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const CALIBRATION = "the calibration is stable across the run";
@@ -59,22 +71,35 @@ const TREND = "the response trends upward with dose";
 async function aTwoStagePipeline(s: ResearchSession) {
   const enquiry = await s.openEnquiry("does the response trend upward with dose?");
   const raw = await s.recordObservations({
-    enquiry, name: "raw sensor series", finding: "eleven dose levels, uncalibrated",
+    enquiry,
+    name: "raw sensor series",
+    finding: "eleven dose levels, uncalibrated",
     contentHash: "sha256:raw",
   });
   const { analysis: calibration, claims: calibrationClaims } = await s.recordAnalysis({
-    enquiry, method: "calibrate", from: [raw],
-    concludes: [{ proposition: CALIBRATION, finding: "drift under 0.2% across the run" }],
+    enquiry,
+    method: "calibrate",
+    from: [raw],
+    concludes: [
+      {
+        proposition: CALIBRATION,
+        finding: "drift under 0.2% across the run",
+      },
+    ],
   });
 
   // Stage two. The calibrated series is re-recorded because nothing on the
   // surface hands stage one's output to stage two.
   const calibrated = await s.recordObservations({
-    enquiry, name: "calibrated series", finding: "eleven dose levels, calibrated",
+    enquiry,
+    name: "calibrated series",
+    finding: "eleven dose levels, calibrated",
     contentHash: "sha256:calibrated",
   });
   const { analysis: trend, claims: trendClaims } = await s.recordAnalysis({
-    enquiry, method: "dose-response-fit", from: [calibrated],
+    enquiry,
+    method: "dose-response-fit",
+    from: [calibrated],
     concludes: [{ proposition: TREND, finding: "monotonic increase, p < 0.01" }],
   });
   return { enquiry, raw, calibration, calibrated, trend };
@@ -119,7 +144,9 @@ describe("S-11c: nothing found is not nothing there", () => {
   test("an empty answer says it is a lower bound rather than a finding of independence", async () => {
     const { raw, enquiry } = await aTwoStagePipeline(session);
     const unrelated = await session.recordObservations({
-      enquiry, name: "lab humidity log", finding: "42% throughout, nothing read it",
+      enquiry,
+      name: "lab humidity log",
+      finding: "42% throughout, nothing read it",
     });
 
     const reader = await afterwards();

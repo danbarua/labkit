@@ -23,15 +23,28 @@ import { claimOf } from "../helpers/claims";
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;
 
-beforeAll(async () => { scenario = await openScenario(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
 // `begin()` in a hook, not a test body: bun runs beforeEach/afterEach OUTSIDE
 // the 5000ms per-test budget, so setup paid here does not count against the
 // ceiling. `end()` was already off-budget for the same reason.
-beforeEach(async () => { graph = await scenario.begin(); });
-afterEach(async () => { await scenario.end(); });
-afterAll(async () => { await scenario.close(); });
+beforeEach(async () => {
+  graph = await scenario.begin();
+});
+afterEach(async () => {
+  await scenario.end();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
-const asked = (survey: { established: Array<{ asks: string }>; provisional: Array<{ asks: string }>; accepted: Array<{ asks: string }>; open: Array<{ asks: string }> }) => ({
+const asked = (survey: {
+  established: Array<{ asks: string }>;
+  provisional: Array<{ asks: string }>;
+  accepted: Array<{ asks: string }>;
+  open: Array<{ asks: string }>;
+}) => ({
   established: survey.established.map((q) => q.asks),
   provisional: survey.provisional.map((q) => q.asks),
   accepted: survey.accepted.map((q) => q.asks),
@@ -87,11 +100,20 @@ describe("what was known, as of an instant", () => {
 
     const enquiry = await s.openEnquiry("does the schedule move convergence?");
     const observations = await s.recordObservations({
-      enquiry, name: "sweep readings", finding: "twelve runs",
+      enquiry,
+      name: "sweep readings",
+      finding: "twelve runs",
     });
     const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-      enquiry, from: [observations], method: "paired comparison",
-      concludes: [{ proposition: "the schedule moves convergence", finding: "moves by ~3 steps" }],
+      enquiry,
+      from: [observations],
+      method: "paired comparison",
+      concludes: [
+        {
+          proposition: "the schedule moves convergence",
+          finding: "moves by ~3 steps",
+        },
+      ],
     });
     clock.windTo("2026-03-01T10:00:00.000Z");
     await s.closeEnquiry({

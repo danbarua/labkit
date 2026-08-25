@@ -27,21 +27,32 @@ let session: ResearchSession;
 let events: EventSink;
 
 let tick = 0;
-const clock: Clock = { now: () => new Date(Date.UTC(2026, 7, 19, 9, tick++)).toISOString() };
+const clock: Clock = {
+  now: () => new Date(Date.UTC(2026, 7, 19, 9, tick++)).toISOString(),
+};
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const PROPOSITION = "the annealed protocol converges below tolerance";
@@ -103,7 +114,10 @@ describe("S-10: rerunning is not reproducing", () => {
     // Two findings, presented alike, with nothing saying one re-checked the
     // other or that their executions differ.
     expect(why.support).toHaveLength(2);
-    expect(why.support.map((s) => s.method).sort()).toEqual(["annealing-v1", "annealing-v1, re-run"]);
+    expect(why.support.map((s) => s.method).sort()).toEqual([
+      "annealing-v1",
+      "annealing-v1, re-run",
+    ]);
   });
 
   /**
@@ -123,7 +137,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [conditions],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -153,12 +170,18 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [conditions],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
     expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
-      { what: "initial conditions, newly specified", standing: "unrecorded-in-the-original" },
+      {
+        what: "initial conditions, newly specified",
+        standing: "unrecorded-in-the-original",
+      },
     ]);
   });
 
@@ -180,7 +203,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [conditions],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -221,7 +247,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [conditions],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -243,7 +272,9 @@ describe("S-10: rerunning is not reproducing", () => {
    * or it is just a blanket caveat on every second run.
    */
   test("two runs over the same recorded inputs are a reproduction, and comparable", async () => {
-    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+    const enquiry = await session.openEnquiry(
+      "does the annealed protocol converge below tolerance?",
+    );
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions",
@@ -260,7 +291,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [conditions],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 3.1e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 3.1e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -268,9 +302,7 @@ describe("S-10: rerunning is not reproducing", () => {
     // differs, and the report says so without calling that a reproduction --
     // whether it is one depends on what the method does.
     expect(report.differs).toEqual([]);
-    expect(report.verificationRead.map((i) => i.part)).toEqual(
-      report.ofRead.map((i) => i.part),
-    );
+    expect(report.verificationRead.map((i) => i.part)).toEqual(report.ofRead.map((i) => i.part));
     expect(report.ofRead).toHaveLength(1);
   });
 
@@ -282,7 +314,9 @@ describe("S-10: rerunning is not reproducing", () => {
    * Two runs can each record "initial conditions" and mean different data.
    */
   test("two inputs sharing a name are not the same input", async () => {
-    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+    const enquiry = await session.openEnquiry(
+      "does the annealed protocol converge below tolerance?",
+    );
     const theirs = await session.recordObservations({
       enquiry,
       name: "initial conditions",
@@ -304,7 +338,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [mine],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -343,7 +380,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -359,9 +399,19 @@ describe("S-10: rerunning is not reproducing", () => {
    * `not-reproduced` with nothing named as differing.
    */
   test("an input the original used and the re-run did not is named", async () => {
-    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
-    const a = await session.recordObservations({ enquiry, name: "conditions A", finding: "seed 4" });
-    const b = await session.recordObservations({ enquiry, name: "conditions B", finding: "warm start" });
+    const enquiry = await session.openEnquiry(
+      "does the annealed protocol converge below tolerance?",
+    );
+    const a = await session.recordObservations({
+      enquiry,
+      name: "conditions A",
+      finding: "seed 4",
+    });
+    const b = await session.recordObservations({
+      enquiry,
+      name: "conditions B",
+      finding: "warm start",
+    });
     const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
@@ -373,7 +423,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [a],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -388,12 +441,20 @@ describe("S-10: rerunning is not reproducing", () => {
    * *against* the proposition were reported as disagreeing with each other.
    */
   test("two runs that both find against the proposition agree with each other", async () => {
-    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+    const enquiry = await session.openEnquiry(
+      "does the annealed protocol converge below tolerance?",
+    );
     const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [],
-      concludes: [{ proposition: PROPOSITION, finding: "did not converge", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: PROPOSITION,
+          finding: "did not converge",
+          bearing: "challenges",
+        },
+      ],
     });
     const conditions = await session.recordObservations({
       enquiry,
@@ -405,7 +466,11 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [conditions],
-      concludes: { proposition: PROPOSITION, finding: "did not converge either", bearing: "challenges" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "did not converge either",
+        bearing: "challenges",
+      },
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
@@ -422,8 +487,14 @@ describe("S-10: rerunning is not reproducing", () => {
    * report had just said was not an independent supporting finding.
    */
   test("the claim does not rest on the re-run's inputs", async () => {
-    const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
-    const original = await session.recordObservations({ enquiry, name: "original conditions", finding: "seed 1" });
+    const enquiry = await session.openEnquiry(
+      "does the annealed protocol converge below tolerance?",
+    );
+    const original = await session.recordObservations({
+      enquiry,
+      name: "original conditions",
+      finding: "seed 1",
+    });
     const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
@@ -440,7 +511,10 @@ describe("S-10: rerunning is not reproducing", () => {
       enquiry,
       method: "annealing-v1, re-run",
       under: [fresh],
-      concludes: { proposition: PROPOSITION, finding: "converged, residual 2.9e-4" },
+      concludes: {
+        proposition: PROPOSITION,
+        finding: "converged, residual 2.9e-4",
+      },
     });
 
     const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));

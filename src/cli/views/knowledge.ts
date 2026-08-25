@@ -91,24 +91,45 @@ export function renderWhy(why: SupportExplanation): string {
     why.replacedBy ? `  replaced by: "${why.replacedBy.asserts}"  (${why.replacedBy.claim})` : "",
     "",
     "Resting on",
-    bullets(why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis})`), "nothing"),
+    bullets(
+      why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis})`),
+      "nothing",
+    ),
     why.against.length
-      ? `\nBearing against\n${bullets(why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis})`), "")}`
+      ? `\nBearing against\n${bullets(
+          why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis})`),
+          "",
+        )}`
       : "",
     why.reverifiedBy.length
-      ? `\nRe-checked by\n${bullets(why.reverifiedBy.map((r) => `${r.method}  (${r.analysis})`), "")}`
+      ? `\nRe-checked by\n${bullets(
+          why.reverifiedBy.map((r) => `${r.method}  (${r.analysis})`),
+          "",
+        )}`
       : "",
     why.standard.length
-      ? `\nHeld to\n${bullets(why.standard.map((c) => `${c.proposition} — ${c.state}`), "")}`
+      ? `\nHeld to\n${bullets(
+          why.standard.map((c) => `${c.proposition} — ${c.state}`),
+          "",
+        )}`
       : "\nHeld to no prespecified standard.",
     why.unmet.length
-      ? `\nNot currently met\n${bullets(why.unmet.map((u) => `${u.requires}  (${u.criterion})`), "")}`
+      ? `\nNot currently met\n${bullets(
+          why.unmet.map((u) => `${u.requires}  (${u.criterion})`),
+          "",
+        )}`
       : "",
     why.restingOn.length
-      ? `\nUltimately resting on\n${bullets(why.restingOn.map((a) => `${a.name}  [${a.part}]`), "")}`
+      ? `\nUltimately resting on\n${bullets(
+          why.restingOn.map((a) => `${a.name}  [${a.part}]`),
+          "",
+        )}`
       : "",
     why.superseded.length
-      ? `\nSuperseded\n${bullets(why.superseded.map((s) => `${s.finding} — ${s.reason}`), "")}`
+      ? `\nSuperseded\n${bullets(
+          why.superseded.map((s) => `${s.finding} — ${s.reason}`),
+          "",
+        )}`
       : "",
   ]
     .filter(Boolean)

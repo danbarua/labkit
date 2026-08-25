@@ -1,0 +1,44 @@
+{
+  // **This file is `.jsonc`, not `.json`, and that is load-bearing.** Biome's
+  // JSON config rejects comments, and `biome format --write` then falls back to
+  // its defaults **silently** -- no parse error, just "Formatted N files". It
+  // re-indented 121 files to tabs at width 80 before anyone noticed. `biome
+  // check` does report the parse error; the writing command does not.
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+
+  // Formatting only, for now. The linter is enabled separately once its 96
+  // errors and 376 warnings have been read rather than bulk-suppressed — most
+  // will be fine and some will disagree with a deliberate choice here, and
+  // telling those apart is not a thing to do in the same commit as a
+  // whitespace sweep.
+  "linter": { "enabled": false },
+
+  // Comments are re-indented and never reflowed — verified, not assumed:
+  // formatting the whole repo changed 101 files and **zero** comment-text
+  // lines, compared with leading whitespace stripped. That matters here more
+  // than in most repos, because the comments are argued paragraphs and a
+  // reflow would rewrite the arguments' line breaks.
+  "files": {
+    "includes": ["src/**", "tests/**", "scripts/**", "examples/**", "*.ts"],
+    "ignoreUnknown": true
+  },
+
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    // Matches what the codebase was already hand-wrapped to.
+    "lineWidth": 100
+  },
+
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
+  },
+
+  // Import order is a diff-churn machine and settles nothing. Left alone.
+  "assist": { "actions": { "source": { "organizeImports": "off" } } }
+}

@@ -125,7 +125,11 @@ export async function openScenario(): Promise<Scenario> {
     async close() {
       // Anything a test never ended -- an abandoned body that was still
       // running when the file finished.
-      while (open.length > 0) await open.shift()?.close().catch(() => {});
+      while (open.length > 0)
+        await open
+          .shift()
+          ?.close()
+          .catch(() => {});
       await testDb.close();
     },
   };

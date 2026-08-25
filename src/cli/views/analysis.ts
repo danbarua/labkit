@@ -19,10 +19,16 @@ export function renderAffects(report: DependencyReport): string {
     "Claims that would be affected",
     // Id and wording both. A person reading this needs the sentence; a person
     // acting on it needs the handle every other command takes.
-    bullets(report.claims.map((c) => `${c.asserts}  (${c.claim})`), "none found"),
+    bullets(
+      report.claims.map((c) => `${c.asserts}  (${c.claim})`),
+      "none found",
+    ),
     "",
     "Lines of enquiry",
-    bullets(report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry})`), "none found"),
+    bullets(
+      report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry})`),
+      "none found",
+    ),
     "",
     "Routes walked",
     bullets(report.routesWalked, ""),
@@ -54,7 +60,10 @@ export function renderReproduction(report: ReproductionReport): string {
     "The original read",
     bullets(report.ofRead.map(partLine), "nothing on the record"),
     report.differs.length
-      ? `\nDiffering\n${bullets(report.differs.map((d) => `${partLine(d.what)} — ${d.standing}`), "")}`
+      ? `\nDiffering\n${bullets(
+          report.differs.map((d) => `${partLine(d.what)} — ${d.standing}`),
+          "",
+        )}`
       : "\nNothing differs in what the two runs read.",
     "",
     "This does not say the original was reproduced. Whether reading the same",

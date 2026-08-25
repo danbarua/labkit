@@ -1,58 +1,63 @@
 {
-  "name": "labkit",
-  "description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
-  "license": "MIT",
-  "version": "0.0.1",
-  "main": "src/index.ts",
-  "type": "module",
-  "bin": {
-    "labkit": "src/cli/cli.ts"
-  },
-  "scripts": {
-    "dev": "bun run src/cli/cli.ts",
-    "mcp": "bun run src/mcp/server.ts",
-    "dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
-    "docs:tools": "bun scripts/render-tool-docs.ts",
-    "build": "bun build --compile --outfile bin/labkit src/cli/cli.ts",
-    "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "check:doc-comments": "bun scripts/check-doc-comments.ts",
-    "check:migrations": "bun scripts/check-migrations.ts",
-    "check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
-    "check:no-stringly-typed": "bun scripts/check-no-stringly-typed.ts",
-    "check:prop-classes": "bun scripts/check-prop-classes.ts",
-    "check:stdout": "bash scripts/check-stdout.sh",
-    "check:pglite-concurrency": "bash scripts/check-pglite-concurrency.sh",
-    "check:tests-assert": "bun scripts/check-tests-assert.ts",
-    "check:test-teardown": "bun scripts/check-test-teardown.ts",
-    "check:cli": "bash scripts/smoke-cli.sh",
-    "example": "bash examples/full-lifecycle.sh",
-    "db:generate": "drizzle-kit generate",
-    "db:generate:custom": "drizzle-kit generate --custom"
-  },
-  "private": true,
-  "devDependencies": {
-    "@types/bun": "latest",
-    "@types/pg": "^8.21.0",
-    "dependency-cruiser": "^18.2.0",
-    "drizzle-kit": "^0.30.6"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "engines": {
-    "bun": ">=1.3.10"
-  },
-  "dependencies": {
-    "@electric-sql/pglite": "^0.5.7",
-    "@electric-sql/pglite-age": "^0.0.8",
-    "@electric-sql/pglite-pgvector": "^0.0.8",
-    "@electric-sql/pglite-prepopulatedfs": "^0.5.7",
-    "@electric-sql/pglite-socket": "^0.2.10",
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "commander": "^15.0.0",
-    "drizzle-orm": "^0.45.2",
-    "pg": "^8.23.0",
-    "zod": "^4.4.3"
-  }
+	"name": "labkit",
+	"description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
+	"license": "MIT",
+	"version": "0.0.1",
+	"main": "src/index.ts",
+	"type": "module",
+	"bin": {
+		"labkit": "src/cli/cli.ts"
+	},
+	"scripts": {
+		"dev": "bun run src/cli/cli.ts",
+		"mcp": "bun run src/mcp/server.ts",
+		"dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
+		"docs:tools": "bun scripts/render-tool-docs.ts",
+		"build": "bun build --compile --outfile bin/labkit src/cli/cli.ts",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit",
+		"check": "bun scripts/check-all.ts",
+		"check:all-checks": "bun scripts/check-all-checks.ts",
+		"check:format": "biome format .",
+		"format": "biome format --write .",
+		"check:doc-comments": "bun scripts/check-doc-comments.ts",
+		"check:migrations": "bun scripts/check-migrations.ts",
+		"check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
+		"check:no-stringly-typed": "bun scripts/check-no-stringly-typed.ts",
+		"check:prop-classes": "bun scripts/check-prop-classes.ts",
+		"check:stdout": "bash scripts/check-stdout.sh",
+		"probe:pglite-concurrency": "bash scripts/probe-pglite-concurrency.sh",
+		"check:tests-assert": "bun scripts/check-tests-assert.ts",
+		"check:test-teardown": "bun scripts/check-test-teardown.ts",
+		"check:cli": "bash scripts/smoke-cli.sh",
+		"example": "bash examples/full-lifecycle.sh",
+		"db:generate": "drizzle-kit generate",
+		"db:generate:custom": "drizzle-kit generate --custom"
+	},
+	"private": true,
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.10",
+		"@types/bun": "latest",
+		"@types/pg": "^8.21.0",
+		"dependency-cruiser": "^18.2.0",
+		"drizzle-kit": "^0.30.6"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"engines": {
+		"bun": ">=1.3.10"
+	},
+	"dependencies": {
+		"@electric-sql/pglite": "^0.5.7",
+		"@electric-sql/pglite-age": "^0.0.8",
+		"@electric-sql/pglite-pgvector": "^0.0.8",
+		"@electric-sql/pglite-prepopulatedfs": "^0.5.7",
+		"@electric-sql/pglite-socket": "^0.2.10",
+		"@modelcontextprotocol/sdk": "^1.30.0",
+		"commander": "^15.0.0",
+		"drizzle-orm": "^0.45.2",
+		"pg": "^8.23.0",
+		"zod": "^4.4.3"
+	}
 }

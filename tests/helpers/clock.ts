@@ -56,7 +56,9 @@ export function windableClock(start = "2026-01-01T00:00:00.000Z"): WindableClock
       const next = Date.parse(iso);
       if (Number.isNaN(next)) throw new Error(`windableClock.windTo: unparseable "${iso}"`);
       if (next < t)
-        throw new Error(`windableClock.windTo: ${iso} is before the current time ${new Date(t).toISOString()}`);
+        throw new Error(
+          `windableClock.windTo: ${iso} is before the current time ${new Date(t).toISOString()}`,
+        );
       t = next;
     },
   };

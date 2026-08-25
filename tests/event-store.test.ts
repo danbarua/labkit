@@ -22,10 +22,19 @@ import type { LabKitDB } from "../src/db/client";
 let testDb: TestDb;
 let db: LabKitDB & { close(): Promise<void> };
 
-beforeAll(async () => { testDb = await setupTestDb(); });
-afterAll(async () => { await testDb.close(); });
-beforeEach(async () => { db = await testDb.openClient(); });
-afterEach(async () => { await testDb.reset(); await db.close(); });
+beforeAll(async () => {
+  testDb = await setupTestDb();
+});
+afterAll(async () => {
+  await testDb.close();
+});
+beforeEach(async () => {
+  db = await testDb.openClient();
+});
+afterEach(async () => {
+  await testDb.reset();
+  await db.close();
+});
 
 /** Frozen on purpose — several of these turn on `at` being unable to order anything. */
 const clock: Clock = { now: () => "2026-08-25T09:00:00.000Z" };
@@ -33,7 +42,14 @@ const clock: Clock = { now: () => "2026-08-25T09:00:00.000Z" };
 const surfaceFor = async (slug: string) => {
   const ctx = await resolveTenantContext(db, slug);
   const graph = new TenantGraph(ctx, db);
-  return { graph, ctx, write: new WriteSurface(graph, { clock, events: pgEventLog(db, ctx.tenantId) }) };
+  return {
+    graph,
+    ctx,
+    write: new WriteSurface(graph, {
+      clock,
+      events: pgEventLog(db, ctx.tenantId),
+    }),
+  };
 };
 
 describe("the event log outlives the process that wrote it", () => {
@@ -150,10 +166,11 @@ describe("the log answers what the graph cannot", () => {
     const enquiry = await write.openEnquiry("does the coating hold?");
     await write.closeEnquiry({ enquiry });
 
-    const decisions = await graph.query(
-      `MATCH (d:Decision) RETURN d`,
-      { d: (await import("../src/db/cypher")).vertexProps<{ natural_id: string }>() },
-    );
+    const decisions = await graph.query(`MATCH (d:Decision) RETURN d`, {
+      d: (await import("../src/db/cypher")).vertexProps<{
+        natural_id: string;
+      }>(),
+    });
     const decision = decisions[0]!.d.natural_id;
 
     // Not the subject of any event...

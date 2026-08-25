@@ -96,7 +96,10 @@ import type { Ref } from "../domain/report";
 const ref = <K extends string>(_kind: K) => z.string() as unknown as z.ZodType<Ref<K>>;
 
 /** `{claim, asserts}` — the report convention's pair for a claim, in one place. */
-const concludedClaim = z.strictObject({ claim: ref("claim"), asserts: z.string() });
+const concludedClaim = z.strictObject({
+  claim: ref("claim"),
+  asserts: z.string(),
+});
 
 /** `claims_asserting` — an array, wrapped because structuredContent must be an object. */
 export const claimsAssertingSchema = z.strictObject({
@@ -139,7 +142,10 @@ const identifiedArtefact = z.strictObject({
   invalidated: z.literal(true).optional(),
 });
 
-const citedFinding = z.strictObject({ evidence: ref("evidence"), states: z.string() });
+const citedFinding = z.strictObject({
+  evidence: ref("evidence"),
+  states: z.string(),
+});
 
 const evaluationRecord = z.strictObject({
   evaluation: ref("evaluation"),
@@ -158,7 +164,10 @@ const bearingFinding = z.strictObject({
   analysis: ref("analysis"),
 });
 
-const unmetCheck = z.strictObject({ criterion: ref("criterion"), requires: z.string() });
+const unmetCheck = z.strictObject({
+  criterion: ref("criterion"),
+  requires: z.string(),
+});
 const condition = unmetCheck;
 const gatedWork = z.strictObject({ work: ref("work"), objective: z.string() });
 
@@ -303,7 +312,9 @@ export const questionOriginSchema = z.strictObject({
   reason: z.string(),
   knownAtTheTime: z.array(citedFinding),
 });
-export const originOfSchema = z.strictObject({ origin: questionOriginSchema.nullable() });
+export const originOfSchema = z.strictObject({
+  origin: questionOriginSchema.nullable(),
+});
 
 export const taskContractSchema = z.strictObject({
   work: ref("work"),
@@ -370,7 +381,8 @@ export const reproducibilityReportSchema = z.strictObject({
  * id is *for* in this reply, where `kind` only ever repeated what the prefix
  * already carried, and could contradict it.
  */
-const minted = <K extends string>(kind: K) => z.strictObject({ [kind]: ref(kind) } as { [P in K]: z.ZodType<Ref<K>> });
+const minted = <K extends string>(kind: K) =>
+  z.strictObject({ [kind]: ref(kind) } as { [P in K]: z.ZodType<Ref<K>> });
 
 export const questionRefSchema = minted("question");
 export const enquiryRefSchema = minted("enquiry");
@@ -489,42 +501,80 @@ type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 type Assert<T extends true> = T;
 
 export type _QuestionStanding = Assert<Exact<z.infer<typeof questionStanding>, QuestionStanding>>;
-export type _IdentifiedArtefact = Assert<Exact<z.infer<typeof identifiedArtefact>, IdentifiedArtefact>>;
+export type _IdentifiedArtefact = Assert<
+  Exact<z.infer<typeof identifiedArtefact>, IdentifiedArtefact>
+>;
 export type _EvaluationRecord = Assert<Exact<z.infer<typeof evaluationRecord>, EvaluationRecord>>;
 export type _CheckStatus = Assert<Exact<z.infer<typeof checkStatus>, CheckStatus>>;
 export type _AmendmentRecord = Assert<Exact<z.infer<typeof amendmentRecord>, AmendmentRecord>>;
 export type _Revision = Assert<Exact<z.infer<typeof revision>, Revision>>;
-export type _KnowledgeSurvey = Assert<Exact<z.infer<typeof knowledgeSurveySchema>, KnowledgeSurvey>>;
-export type _HistoricalSurvey = Assert<Exact<z.infer<typeof historicalSurveySchema>, HistoricalSurvey>>;
-export type _SupportExplanation = Assert<Exact<z.infer<typeof supportExplanationSchema>, SupportExplanation>>;
-export type _DependencyReport = Assert<Exact<z.infer<typeof dependencyReportSchema>, DependencyReport>>;
-export type _QuestionClosure = Assert<Exact<z.infer<typeof questionClosureSchema>, QuestionClosure>>;
+export type _KnowledgeSurvey = Assert<
+  Exact<z.infer<typeof knowledgeSurveySchema>, KnowledgeSurvey>
+>;
+export type _HistoricalSurvey = Assert<
+  Exact<z.infer<typeof historicalSurveySchema>, HistoricalSurvey>
+>;
+export type _SupportExplanation = Assert<
+  Exact<z.infer<typeof supportExplanationSchema>, SupportExplanation>
+>;
+export type _DependencyReport = Assert<
+  Exact<z.infer<typeof dependencyReportSchema>, DependencyReport>
+>;
+export type _QuestionClosure = Assert<
+  Exact<z.infer<typeof questionClosureSchema>, QuestionClosure>
+>;
 export type _EnquiryStatus = Assert<Exact<z.infer<typeof enquiryStatusSchema>, EnquiryStatus>>;
 export type _DesignHistory = Assert<Exact<z.infer<typeof designHistorySchema>, DesignHistory>>;
 export type _InterpretationHistory = Assert<
   Exact<z.infer<typeof interpretationHistorySchema>, InterpretationHistory>
 >;
-export type _ReproductionReport = Assert<Exact<z.infer<typeof reproductionReportSchema>, ReproductionReport>>;
-export type _QuestionRef = Assert<Exact<z.infer<typeof questionRefSchema>["question"], QuestionRef>>;
+export type _ReproductionReport = Assert<
+  Exact<z.infer<typeof reproductionReportSchema>, ReproductionReport>
+>;
+export type _QuestionRef = Assert<
+  Exact<z.infer<typeof questionRefSchema>["question"], QuestionRef>
+>;
 export type _EnquiryRef = Assert<Exact<z.infer<typeof enquiryRefSchema>["enquiry"], EnquiryRef>>;
-export type _ObservationsRef = Assert<Exact<z.infer<typeof observationsRefSchema>["observations"], ObservationsRef>>;
-export type _RecordedAnalysis = Assert<Exact<z.infer<typeof recordedAnalysisSchema>, RecordedAnalysis>>;
+export type _ObservationsRef = Assert<
+  Exact<z.infer<typeof observationsRefSchema>["observations"], ObservationsRef>
+>;
+export type _RecordedAnalysis = Assert<
+  Exact<z.infer<typeof recordedAnalysisSchema>, RecordedAnalysis>
+>;
 export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, AnalysisRef>>;
 export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;
 export type _QuestionOrigin = Assert<Exact<z.infer<typeof questionOriginSchema>, QuestionOrigin>>;
 export type _TaskContract = Assert<Exact<z.infer<typeof taskContractSchema>, TaskContract>>;
-export type _CriteriaGoverning = Assert<Exact<z.infer<typeof criteriaGoverningSchema>["criteria"], CriterionRef[]>>;
+export type _CriteriaGoverning = Assert<
+  Exact<z.infer<typeof criteriaGoverningSchema>["criteria"], CriterionRef[]>
+>;
 export type _GateStatus = Assert<Exact<z.infer<typeof gateStatusSchema>, GateStatus>>;
 export type _ConflictSide = Assert<Exact<z.infer<typeof conflictSide>, ConflictSide>>;
-export type _ConflictVerdict = Assert<Exact<z.infer<typeof conflictVerdictSchema>, ConflictVerdict>>;
-export type _ReproducibilityReport = Assert<Exact<z.infer<typeof reproducibilityReportSchema>, ReproducibilityReport>>;
+export type _ConflictVerdict = Assert<
+  Exact<z.infer<typeof conflictVerdictSchema>, ConflictVerdict>
+>;
+export type _ReproducibilityReport = Assert<
+  Exact<z.infer<typeof reproducibilityReportSchema>, ReproducibilityReport>
+>;
 export type _ReviewRef = Assert<Exact<z.infer<typeof reviewRefSchema>["review"], ReviewRef>>;
 export type _WorkRef = Assert<Exact<z.infer<typeof workRefSchema>["work"], WorkRef>>;
-export type _CriterionRef2 = Assert<Exact<z.infer<typeof criterionRefSchema>["criterion"], CriterionRef>>;
+export type _CriterionRef2 = Assert<
+  Exact<z.infer<typeof criterionRefSchema>["criterion"], CriterionRef>
+>;
 export type _GateRef = Assert<Exact<z.infer<typeof gateRefSchema>["gate"], GateRef>>;
-export type _ChangedConclusion = Assert<Exact<z.infer<typeof changedConclusion>, ChangedConclusion>>;
+export type _ChangedConclusion = Assert<
+  Exact<z.infer<typeof changedConclusion>, ChangedConclusion>
+>;
 export type _UnaffectedRecord = Assert<Exact<z.infer<typeof unaffectedRecord>, UnaffectedRecord>>;
-export type _VerificationReport = Assert<Exact<z.infer<typeof verificationReportSchema>, VerificationReport>>;
-export type _AmendmentReport = Assert<Exact<z.infer<typeof amendmentReportSchema>, AmendmentReport>>;
-export type _ReplacementReport = Assert<Exact<z.infer<typeof replacementReportSchema>, ReplacementReport>>;
-export type _ReinterpretationReport = Assert<Exact<z.infer<typeof reinterpretationReportSchema>, ReinterpretationReport>>;
+export type _VerificationReport = Assert<
+  Exact<z.infer<typeof verificationReportSchema>, VerificationReport>
+>;
+export type _AmendmentReport = Assert<
+  Exact<z.infer<typeof amendmentReportSchema>, AmendmentReport>
+>;
+export type _ReplacementReport = Assert<
+  Exact<z.infer<typeof replacementReportSchema>, ReplacementReport>
+>;
+export type _ReinterpretationReport = Assert<
+  Exact<z.infer<typeof reinterpretationReportSchema>, ReinterpretationReport>
+>;

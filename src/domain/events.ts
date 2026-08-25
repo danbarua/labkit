@@ -250,7 +250,9 @@ export function inMemoryEventLog(): EventSink {
     (f.since === undefined || (e.seq ?? 0) > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
-    (f.touching === undefined || e.subject === f.touching || (e.created ?? []).includes(f.touching));
+    (f.touching === undefined ||
+      e.subject === f.touching ||
+      (e.created ?? []).includes(f.touching));
   return {
     record: async (event) => void events.push(event),
     all: async () => events,

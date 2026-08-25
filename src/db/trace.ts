@@ -86,21 +86,24 @@ let watchdog: ReturnType<typeof setInterval> | undefined;
  */
 function ensureWatchdog(stuckMs: number): void {
   if (watchdog) return;
-  watchdog = setInterval(() => {
-    const now = performance.now();
-    for (const [id, q] of inFlight) {
-      const age = now - q.startedAt;
-      if (age >= stuckMs) {
-        emit({
-          trace: "stuck",
-          id,
-          connection: q.connection,
-          ageMs: Math.round(age),
-          sql: q.sql,
-        });
+  watchdog = setInterval(
+    () => {
+      const now = performance.now();
+      for (const [id, q] of inFlight) {
+        const age = now - q.startedAt;
+        if (age >= stuckMs) {
+          emit({
+            trace: "stuck",
+            id,
+            connection: q.connection,
+            ageMs: Math.round(age),
+            sql: q.sql,
+          });
+        }
       }
-    }
-  }, Math.max(250, stuckMs / 4));
+    },
+    Math.max(250, stuckMs / 4),
+  );
   watchdog.unref?.();
 }
 
@@ -117,15 +120,27 @@ function ensureWatchdog(stuckMs: number): void {
  *
  * A copy, not the map: a caller holding the live map could clear it.
  */
-export function tracedInFlight(): Array<{ id: number; connection: string; sql: string }> {
-  return [...inFlight].map(([id, q]) => ({ id, connection: q.connection, sql: q.sql }));
+export function tracedInFlight(): Array<{
+  id: number;
+  connection: string;
+  sql: string;
+}> {
+  return [...inFlight].map(([id, q]) => ({
+    id,
+    connection: q.connection,
+    sql: q.sql,
+  }));
 }
 
 /** Per-connection totals, for answering "how much work was this test doing?". */
 const counts = new Map<string, { queries: number; totalMs: number }>();
 
 /** What each traced connection has run so far. Empty when tracing is off. */
-export function traceTotals(): Array<{ connection: string; queries: number; totalMs: number }> {
+export function traceTotals(): Array<{
+  connection: string;
+  queries: number;
+  totalMs: number;
+}> {
   return [...counts].map(([connection, c]) => ({ connection, ...c }));
 }
 
@@ -155,7 +170,13 @@ export function traced(db: LabKitDB, label = "db"): LabKitDB {
         const c = counts.get(label) ?? { queries: 0, totalMs: 0 };
         counts.set(label, { queries: c.queries + 1, totalMs: c.totalMs + ms });
         if (opts.all || ms >= opts.slowMs) {
-          emit({ trace: "query", id, connection: label, ms: Math.round(ms), sql: short });
+          emit({
+            trace: "query",
+            id,
+            connection: label,
+            ms: Math.round(ms),
+            sql: short,
+          });
         }
         return result;
       } catch (err) {

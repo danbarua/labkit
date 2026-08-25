@@ -41,10 +41,16 @@ export function renderGate(status: GateStatus): string {
     "Conditions",
     bullets(status.checks.map(check), "none"),
     status.unmet.length
-      ? `\nNot currently met\n${bullets(status.unmet.map((u) => `${u.requires}  (${u.criterion})`), "")}`
+      ? `\nNot currently met\n${bullets(
+          status.unmet.map((u) => `${u.requires}  (${u.criterion})`),
+          "",
+        )}`
       : "",
     status.gating.length
-      ? `\nGating\n${bullets(status.gating.map((w) => `${w.objective}  (${w.work})`), "")}`
+      ? `\nGating\n${bullets(
+          status.gating.map((w) => `${w.objective}  (${w.work})`),
+          "",
+        )}`
       : "",
     status.evaluations.length
       ? `\nEvaluations\n${bullets(

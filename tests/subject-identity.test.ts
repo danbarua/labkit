@@ -43,7 +43,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ReadSurface, ResearchSession, WriteSurface, inMemoryEventLog, type Clock } from "../src/domain";
+import {
+  ReadSurface,
+  ResearchSession,
+  WriteSurface,
+  inMemoryEventLog,
+  type Clock,
+} from "../src/domain";
 import { buildServer } from "../src/mcp/server";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
@@ -63,16 +69,25 @@ const id = (v: unknown): string =>
   typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
 let scenario: Scenario;
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 const clock: Clock = (() => {
   let t = 0;
-  return { now: () => new Date(Date.UTC(2026, 2, 1) + t++ * 60_000).toISOString() };
+  return {
+    now: () => new Date(Date.UTC(2026, 2, 1) + t++ * 60_000).toISOString(),
+  };
 })();
 
 const session = async () =>
-  new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 
 /** A client over the real server, for the ambiguities only a consumer can see. */
 async function overTheWire() {
@@ -113,13 +128,20 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       const brunosAblation = await s.pursue({ question, approach: "ablation" });
 
       const readings = await s.recordObservations({
-        enquiry: anasSweep, name: "seed sweep readings", finding: "five seeds, consistent",
+        enquiry: anasSweep,
+        name: "seed sweep readings",
+        finding: "five seeds, consistent",
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry: anasSweep, method: "paired comparison", from: [readings],
+        enquiry: anasSweep,
+        method: "paired comparison",
+        from: [readings],
         concludes: [{ proposition: MOVES, finding: "about three steps" }],
       });
-      await s.closeEnquiry({ enquiry: anasSweep, answeredBy: claimOf(analysisClaims, MOVES) });
+      await s.closeEnquiry({
+        enquiry: anasSweep,
+        answeredBy: claimOf(analysisClaims, MOVES),
+      });
 
       const later = new ResearchSession(await scenario.current(), { clock });
       const ana = await later.enquiryStatus(anasSweep);
@@ -163,16 +185,26 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
     try {
       const question = await s.pose("does width matter?");
       const worked = await s.pursue({ question, approach: "width sweep" });
-      const untouched = await s.pursue({ question, approach: "second opinion" });
+      const untouched = await s.pursue({
+        question,
+        approach: "second opinion",
+      });
 
       const readings = await s.recordObservations({
-        enquiry: worked, name: "width readings", finding: "it does",
+        enquiry: worked,
+        name: "width readings",
+        finding: "it does",
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry: worked, method: "sweep", from: [readings],
+        enquiry: worked,
+        method: "sweep",
+        from: [readings],
         concludes: [{ proposition: WIDTH, finding: "it does" }],
       });
-      await s.closeEnquiry({ enquiry: worked, answeredBy: claimOf(analysisClaims, WIDTH) });
+      await s.closeEnquiry({
+        enquiry: worked,
+        answeredBy: claimOf(analysisClaims, WIDTH),
+      });
 
       const later = new ResearchSession(await scenario.current(), { clock });
       const status = await later.enquiryStatus(untouched);
@@ -201,16 +233,25 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
     try {
       const enquiry = await s.openEnquiry("does it hold?");
       const observations = await s.recordObservations({
-        enquiry, name: "raw readings", finding: "twelve runs",
+        enquiry,
+        name: "raw readings",
+        finding: "twelve runs",
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "stage one", from: [observations],
+        enquiry,
+        method: "stage one",
+        from: [observations],
         concludes: [{ proposition: HOLDS, finding: "it holds" }],
       });
 
       const later = new ReadSurface(await scenario.current());
       const parts = await later.reproducibilityOf(analysis, []);
-      const consumed = [...parts.exact, ...parts.differing, ...parts.unverifiable, ...parts.notRebuilt];
+      const consumed = [
+        ...parts.exact,
+        ...parts.differing,
+        ...parts.unverifiable,
+        ...parts.notRebuilt,
+      ];
 
       // Raw measurement is an artefact.
       expect(observations.startsWith("ART_")).toBe(true);
@@ -237,13 +278,21 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
     const s = await session();
     try {
       const enquiry = await s.openEnquiry("two stage?");
-      const raw = await s.recordObservations({ enquiry, name: "raw", finding: "f" });
+      const raw = await s.recordObservations({
+        enquiry,
+        name: "raw",
+        finding: "f",
+      });
       const { analysis: stageOne, claims: stageOneClaims } = await s.recordAnalysis({
-        enquiry, method: "stage one", from: [raw],
+        enquiry,
+        method: "stage one",
+        from: [raw],
         concludes: [{ proposition: "p1", finding: "f1" }],
       });
       const { analysis: viaAnalysis, claims: viaAnalysisClaims } = await s.recordAnalysis({
-        enquiry, method: "stage two, by analysis ref", from: [stageOne],
+        enquiry,
+        method: "stage two, by analysis ref",
+        from: [stageOne],
         concludes: [{ proposition: "p2a", finding: "f2" }],
       });
 
@@ -290,24 +339,54 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     const question = await s.pose("does depth move convergence?");
     const enquiry = await s.pursue({ question, approach: "seed sweep" });
     const criterion = await s.stateCriterion("holds at five seeds");
-    const work = await s.planWork({ objective: "publish the result", acceptance: "the check passes" });
+    const work = await s.planWork({
+      objective: "publish the result",
+      acceptance: "the check passes",
+    });
     const gate = await s.declareGate({
-      governedBy: [criterion], consequence: "may it be published?", protecting: [work],
+      governedBy: [criterion],
+      consequence: "may it be published?",
+      protecting: [work],
     });
     const observations = await s.recordObservations({
-      enquiry, name: "sweep readings", finding: "five seeds, consistent",
+      enquiry,
+      name: "sweep readings",
+      finding: "five seeds, consistent",
     });
     const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-      enquiry, method: "paired comparison", from: [observations],
-      concludes: [{ proposition: MOVES, finding: "about three steps", standing: "confirmatory" }],
-      implementing: work, heldTo: [criterion],
+      enquiry,
+      method: "paired comparison",
+      from: [observations],
+      concludes: [
+        {
+          proposition: MOVES,
+          finding: "about three steps",
+          standing: "confirmatory",
+        },
+      ],
+      implementing: work,
+      heldTo: [criterion],
     });
     await s.evaluateCriterion({
-      criterion, gate, value: "5/5 seeds", outcome: "pass",
+      criterion,
+      gate,
+      value: "5/5 seeds",
+      outcome: "pass",
       citing: claimOf(analysisClaims, MOVES),
     });
-    await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, MOVES) });
-    return { read: new ReadSurface(await scenario.current()), question, enquiry, gate, work, analysis, analysisClaims };
+    await s.closeEnquiry({
+      enquiry,
+      answeredBy: claimOf(analysisClaims, MOVES),
+    });
+    return {
+      read: new ReadSurface(await scenario.current()),
+      question,
+      enquiry,
+      gate,
+      work,
+      analysis,
+      analysisClaims,
+    };
   }
 
   test("the template: an id beside the wording, in the three reports that do it", async () => {
@@ -322,7 +401,12 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
       // reproducibilityOf: `part` is the id, `name` is the text.
       const parts = await read.reproducibilityOf(analysis, []);
-      const inputs = [...parts.exact, ...parts.differing, ...parts.unverifiable, ...parts.notRebuilt];
+      const inputs = [
+        ...parts.exact,
+        ...parts.differing,
+        ...parts.unverifiable,
+        ...parts.notRebuilt,
+      ];
       expect(inputs.length).toBeGreaterThan(0);
       expect(inputs.every((p) => looksLikeAnId(p.part))).toBe(true);
       expect(inputs.every((p) => looksLikeAnId(p.name))).toBe(false);
@@ -464,38 +548,56 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
     const client = await overTheWire();
     try {
       const enquiry = (await call(client, "open_enquiry", { question: "two stage?" })).body;
-      const raw = (await call(client, "record_observations", {
-        enquiry: id(enquiry), name: "raw", finding: "f",
-      })).body;
-      const stageOne = ((await call(client, "record_analysis", {
-        enquiry: id(enquiry), method: "stage one", from: [id(raw)],
-        concludes: [{ proposition: "p1", finding: "f1" }],
-      })).body.analysis) as string;
-      const stageTwoResult = (await call(client, "record_analysis", {
-        enquiry: id(enquiry), method: "stage two", from: [stageOne],
-        concludes: [{ proposition: "p2", finding: "f2" }],
-      })).body;
+      const raw = (
+        await call(client, "record_observations", {
+          enquiry: id(enquiry),
+          name: "raw",
+          finding: "f",
+        })
+      ).body;
+      const stageOne = (
+        await call(client, "record_analysis", {
+          enquiry: id(enquiry),
+          method: "stage one",
+          from: [id(raw)],
+          concludes: [{ proposition: "p1", finding: "f1" }],
+        })
+      ).body.analysis as string;
+      const stageTwoResult = (
+        await call(client, "record_analysis", {
+          enquiry: id(enquiry),
+          method: "stage two",
+          from: [stageOne],
+          concludes: [{ proposition: "p2", finding: "f2" }],
+        })
+      ).body;
       const stageTwo = stageTwoResult.analysis as string;
-      const p2 = (stageTwoResult.claims as Array<{ claim: string; asserts: string }>)
-        .find((c) => c.asserts === "p2")!.claim;
-      const review = (await call(client, "record_review", {
-        of: stageTwo, verdict: "stage two mis-specified",
-      })).body;
+      const p2 = (stageTwoResult.claims as Array<{ claim: string; asserts: string }>).find(
+        (c) => c.asserts === "p2",
+      )!.claim;
+      const review = (
+        await call(client, "record_review", {
+          of: stageTwo,
+          verdict: "stage two mis-specified",
+        })
+      ).body;
 
       // Recording stage two on stage one was accepted all along.
       expect(String(stageOne).startsWith("COMP_")).toBe(true);
 
       // Repairing it, on the same input, is now accepted too.
       const repair = await call(client, "replace_analysis", {
-        supersedes: stageTwo, because: id(review), enquiry: id(enquiry),
-        method: "stage two, corrected", from: [stageOne],
+        supersedes: stageTwo,
+        because: id(review),
+        enquiry: id(enquiry),
+        method: "stage two, corrected",
+        from: [stageOne],
         concludes: [{ proposition: "p2", finding: "f2 corrected" }],
       });
       expect(repair.failed).toBe(false);
       // And the report names the input as the caller named it, rather than as
       // an artefact relabelled "observations".
-      expect((repair.body.unaffected as Array<{ what: string }>)[0]!.what)
-        .toEqual(stageOne);
+      expect((repair.body.unaffected as Array<{ what: string }>)[0]!.what).toEqual(stageOne);
 
       // The detour still works and is no longer the only route. It is what a
       // consumer had to do: ask why a claim was supported in order to learn

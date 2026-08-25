@@ -27,11 +27,18 @@ let scenario: Scenario;
 /** Frozen: two worlds a read could separate only by elapsed time are not separated. */
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 async function inOneWorld<T>(build: (s: ResearchSession) => Promise<T>): Promise<T> {
@@ -64,14 +71,21 @@ const CONFIRMING = "numbers check out; independently recomputed the same values"
 async function anAnalysisWithTwoReviews(s: ResearchSession) {
   const enquiry = await s.openEnquiry("does the coating shift the onset temperature?");
   const readings = await s.recordObservations({
-    enquiry, name: "onset sweep", finding: "onset across twelve coatings",
+    enquiry,
+    name: "onset sweep",
+    finding: "onset across twelve coatings",
   });
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "linear-onset-fit", from: [readings],
+    enquiry,
+    method: "linear-onset-fit",
+    from: [readings],
     concludes: [{ proposition: SHIFTS, finding: "onset moves by 4.2 K" }],
   });
   const critical = await s.recordReview({ of: analysis, verdict: UNSOUND });
-  const confirming = await s.recordReview({ of: analysis, verdict: CONFIRMING });
+  const confirming = await s.recordReview({
+    of: analysis,
+    verdict: CONFIRMING,
+  });
   return { enquiry, readings, analysis, analysisClaims, critical, confirming };
 }
 
@@ -85,8 +99,11 @@ describe("S-11b: which review retracted it?", () => {
     const build = (finding: string) => async (s: ResearchSession) => {
       const { enquiry, readings, analysis, critical } = await anAnalysisWithTwoReviews(s);
       const report = await s.replaceAnalysis({
-        supersedes: analysis, because: critical, enquiry,
-        method: "sigmoid-onset-fit", from: [readings],
+        supersedes: analysis,
+        because: critical,
+        enquiry,
+        method: "sigmoid-onset-fit",
+        from: [readings],
         concludes: [{ proposition: SHIFTS, finding }],
       });
       const why = await (await afterwards()).whySupported(claimOf(report.claims, SHIFTS));
@@ -115,14 +132,17 @@ describe("S-11b: which review retracted it?", () => {
     const build = (pick: "critical" | "confirming") => async (s: ResearchSession) => {
       const w = await anAnalysisWithTwoReviews(s);
       const report = await s.replaceAnalysis({
-        supersedes: w.analysis, because: pick === "critical" ? w.critical : w.confirming,
-        enquiry: w.enquiry, method: "sigmoid-onset-fit", from: [w.readings],
+        supersedes: w.analysis,
+        because: pick === "critical" ? w.critical : w.confirming,
+        enquiry: w.enquiry,
+        method: "sigmoid-onset-fit",
+        from: [w.readings],
         concludes: [{ proposition: SHIFTS, finding: "onset moves by 2.8 K" }],
       });
       const why = await (await afterwards()).whySupported(claimOf(report.claims, SHIFTS));
-      return why.superseded.map((x) => ({ finding: x.finding, reason: x.reason })).sort(
-        (p, q) => p.reason.localeCompare(q.reason),
-      );
+      return why.superseded
+        .map((x) => ({ finding: x.finding, reason: x.reason }))
+        .sort((p, q) => p.reason.localeCompare(q.reason));
     };
 
     const { a, b } = await inTwoWorlds(build("critical"), build("confirming"));
@@ -152,8 +172,11 @@ describe("S-11b: which review retracted it?", () => {
     const reasons = await inOneWorld(async (s) => {
       const w = await anAnalysisWithTwoReviews(s);
       const report = await s.replaceAnalysis({
-        supersedes: w.analysis, because: w.critical, enquiry: w.enquiry,
-        method: "sigmoid-onset-fit", from: [w.readings],
+        supersedes: w.analysis,
+        because: w.critical,
+        enquiry: w.enquiry,
+        method: "sigmoid-onset-fit",
+        from: [w.readings],
         concludes: [{ proposition: SHIFTS, finding: "onset moves by 2.8 K" }],
       });
       const why = await (await afterwards()).whySupported(claimOf(report.claims, SHIFTS));

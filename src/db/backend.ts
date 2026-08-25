@@ -1,4 +1,12 @@
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
@@ -29,7 +37,12 @@ async function openPglite(dataDir: string): Promise<PGlite> {
 }
 
 async function tryClient(host: string, port: number): Promise<Client> {
-  const client = new Client({ host, port, database: "postgres", user: "postgres" });
+  const client = new Client({
+    host,
+    port,
+    database: "postgres",
+    user: "postgres",
+  });
   await client.connect();
   return client;
 }
@@ -41,7 +54,9 @@ async function waitForClient(host: string, port: number, timeoutMs = 10_000): Pr
       return await tryClient(host, port);
     } catch (err) {
       if (Date.now() - start > timeoutMs) {
-        throw new Error(`timed out waiting for ledger primary to start listening on ${host}:${port}`);
+        throw new Error(
+          `timed out waiting for ledger primary to start listening on ${host}:${port}`,
+        );
       }
       await Bun.sleep(25);
     }
@@ -143,7 +158,12 @@ export function pgliteLeaderElectionBackend(opts: {
 
         // maxConnections defaults to 1 (no concurrency) in this library — we
         // need at least 2 (the primary's own selfClient, plus every secondary).
-        const server = new PGLiteSocketServer({ db: rawDb, port, host, maxConnections: 16 });
+        const server = new PGLiteSocketServer({
+          db: rawDb,
+          port,
+          host,
+          maxConnections: 16,
+        });
         await server.start();
         const selfClient = await tryClient(host, port);
         await bootstrapSession(selfClient);

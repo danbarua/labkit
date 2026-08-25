@@ -30,12 +30,7 @@
 import { spawnSync } from "node:child_process";
 import { userInfo } from "node:os";
 
-import {
-  type AttributionContext,
-  type Clock,
-  type CommandContext,
-  systemClock,
-} from "./domain";
+import { type AttributionContext, type Clock, type CommandContext, systemClock } from "./domain";
 
 /** The commit a command ran against. */
 export interface GitContextProvider {
@@ -97,7 +92,9 @@ export const mockSessionContext: SessionContextProvider = {
 export const gitContext: GitContextProvider = {
   head: () => {
     try {
-      const result = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
+      const result = spawnSync("git", ["rev-parse", "HEAD"], {
+        encoding: "utf8",
+      });
       return result.status === 0 ? result.stdout.trim() : "";
     } catch {
       // `spawnSync` throws rather than returning a status when the binary is

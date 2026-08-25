@@ -112,9 +112,7 @@ export class ReadSurface extends SessionCore {
       { loe: vertexProps<{ natural_id: string }>() },
       { id: question },
     );
-    return rows.map(
-      (r) => (ref("enquiry", r.loe.natural_id)) as EnquiryRef,
-    );
+    return rows.map((r) => ref("enquiry", r.loe.natural_id) as EnquiryRef);
   }
 
   /**
@@ -149,7 +147,10 @@ export class ReadSurface extends SessionCore {
       fromAsks: row.origin.name,
       reason: row.d.reason,
       knownAtTheTime: dedupeById(
-        knew.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+        knew.map((r) => ({
+          evidence: ref("evidence", r.e.natural_id),
+          states: r.e.statement,
+        })),
         (f) => f.evidence,
       ).sort((a, b) => a.evidence.localeCompare(b.evidence)),
     };
@@ -190,8 +191,7 @@ export class ReadSurface extends SessionCore {
    */
   async whatWasKnown(at: Timestamp): Promise<HistoricalSurvey> {
     const parsed = Date.parse(at);
-    if (Number.isNaN(parsed))
-      throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
+    if (Number.isNaN(parsed)) throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
     const asOf = new Date(parsed).toISOString();
 
     const rows = await this.graph.query(
@@ -230,10 +230,16 @@ export class ReadSurface extends SessionCore {
     // decide which *bucket* a row lands in, and there are three of them across
     // five OPTIONAL MATCHes — pushing those down would mean an OPTIONAL MATCH
     // per predicate for no change in the result.
-    const by = new Map<QuestionRef, { asks: Prose; resolved: boolean; promoted: boolean; accepted: boolean }>();
+    const by = new Map<
+      QuestionRef,
+      { asks: Prose; resolved: boolean; promoted: boolean; accepted: boolean }
+    >();
     for (const row of rows) {
       const entry = by.get(ref("question", row.q.natural_id)) ?? {
-        asks: row.q.name, resolved: false, promoted: false, accepted: false,
+        asks: row.q.name,
+        resolved: false,
+        promoted: false,
+        accepted: false,
       };
       const resolvedByThen = row.resolving !== null && row.resolving.decided_at <= asOf;
       entry.resolved ||= resolvedByThen && row.cited !== null;
@@ -252,9 +258,18 @@ export class ReadSurface extends SessionCore {
     // The canonical instant, not the caller's text: it is what every comparison
     // above actually used, and echoing back a form that was not compared would
     // describe an answer nobody computed.
-    const survey: HistoricalSurvey = { at: asOf, established: [], provisional: [], accepted: [], open: [] };
+    const survey: HistoricalSurvey = {
+      at: asOf,
+      established: [],
+      provisional: [],
+      accepted: [],
+      open: [],
+    };
     for (const [question, e] of by) {
-      const standing: QuestionStanding = { question: ref("question", question), asks: e.asks };
+      const standing: QuestionStanding = {
+        question: ref("question", question),
+        asks: e.asks,
+      };
       if (e.resolved && e.promoted) survey.established.push(standing);
       else if (e.resolved) survey.provisional.push(standing);
       else if (e.accepted) survey.accepted.push(standing);
@@ -299,7 +314,13 @@ export class ReadSurface extends SessionCore {
 
     const byQuestion = new Map<
       string,
-      { asks: string; cited: boolean; worked: boolean; accepted: boolean; promoted: boolean }
+      {
+        asks: string;
+        cited: boolean;
+        worked: boolean;
+        accepted: boolean;
+        promoted: boolean;
+      }
     >();
     for (const row of rows) {
       const entry = byQuestion.get(row.q.natural_id) ?? {
@@ -324,7 +345,10 @@ export class ReadSurface extends SessionCore {
       accepted: [],
     };
     for (const [question, entry] of byQuestion) {
-      const standing: QuestionStanding = { question: ref("question", question), asks: entry.asks };
+      const standing: QuestionStanding = {
+        question: ref("question", question),
+        asks: entry.asks,
+      };
       // Settled beats accepted: a question answered after being accepted is
       // answered. Accepted beats worked, because a reader scanning for what
       // still needs doing must not find a deliberately-parked question there.
@@ -362,7 +386,13 @@ export class ReadSurface extends SessionCore {
       {
         q: vertexProps<{ name: string; natural_id: string }>(),
         resolving: optional(vertexProps<{ natural_id: string }>()),
-        deferring: optional(vertexProps<{ natural_id: string; reason: string; invalidation_check: string }>()),
+        deferring: optional(
+          vertexProps<{
+            natural_id: string;
+            reason: string;
+            invalidation_check: string;
+          }>(),
+        ),
       },
       { id: enquiry },
     );
@@ -379,7 +409,10 @@ export class ReadSurface extends SessionCore {
       { id: enquiry },
     );
     const contributed = dedupeById(
-      mine.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+      mine.map((r) => ({
+        evidence: ref("evidence", r.e.natural_id),
+        states: r.e.statement,
+      })),
       (f) => f.evidence,
     );
 
@@ -431,7 +464,10 @@ export class ReadSurface extends SessionCore {
           closure: "accepted-as-unresolved",
           answer: null,
           evidence: dedupeById(
-            inLightOf.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+            inLightOf.map((r) => ({
+              evidence: ref("evidence", r.e.natural_id),
+              states: r.e.statement,
+            })),
             (f) => f.evidence,
           ),
           acceptedBecause: accepting.reason,
@@ -514,7 +550,10 @@ export class ReadSurface extends SessionCore {
         closure: "answered",
         answer: challenges ? "no" : "yes",
         evidence: dedupeById(
-          cited.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
+          cited.map((r) => ({
+            evidence: ref("evidence", r.e.natural_id),
+            states: r.e.statement,
+          })),
           (f) => f.evidence,
         ),
         restsOn: promoted.some((r) => (r.sc ?? r.cc)?.kind === "confirmatory")
@@ -631,8 +670,7 @@ export class ReadSurface extends SessionCore {
       { id: verification },
     );
     const found = link[0];
-    if (!found)
-      throw new Error(`analysis ${verification} re-verifies nothing`);
+    if (!found) throw new Error(`analysis ${verification} re-verifies nothing`);
 
     const method = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
@@ -660,7 +698,10 @@ export class ReadSurface extends SessionCore {
     // arbitrary. An absent position is not position zero.
     const inputs = async (
       computation: string,
-    ): Promise<{ read: IdentifiedArtefact[]; bySubject: Map<ObservationsRef, IdentifiedArtefact> }> => {
+    ): Promise<{
+      read: IdentifiedArtefact[];
+      bySubject: Map<ObservationsRef, IdentifiedArtefact>;
+    }> => {
       const rows = await this.graph.query(
         `MATCH (:Computation {natural_id: $id})-[c:CONSUMES]->(a:Artefact) RETURN a, c`,
         {
@@ -670,7 +711,10 @@ export class ReadSurface extends SessionCore {
         { id: computation },
       );
       const occurrences = rows.flatMap((r) =>
-        (r.c.positions ?? [Number.MAX_SAFE_INTEGER]).map((position) => ({ position, a: r.a })),
+        (r.c.positions ?? [Number.MAX_SAFE_INTEGER]).map((position) => ({
+          position,
+          a: r.a,
+        })),
       );
       occurrences.sort(
         (x, y) => x.position - y.position || x.a.natural_id.localeCompare(y.a.natural_id),
@@ -778,8 +822,7 @@ export class ReadSurface extends SessionCore {
       },
       { id: gate },
     );
-    if (conditions.length === 0)
-      throw new Error(`gate ${gate} is governed by no condition`);
+    if (conditions.length === 0) throw new Error(`gate ${gate} is governed by no condition`);
 
     // The two maps used to say `Map<string, string>` with `// decision ->
     // criterion it replaced` beside one of them. The comment was a type written
@@ -789,7 +832,8 @@ export class ReadSurface extends SessionCore {
     const current: CriterionRef[] = [];
     for (const row of conditions) {
       propositionOf.set(ref("criterion", row.c.natural_id), row.c.proposition);
-      if (row.d) changedBy.set(ref("decision", row.d.natural_id), ref("criterion", row.c.natural_id));
+      if (row.d)
+        changedBy.set(ref("decision", row.d.natural_id), ref("criterion", row.c.natural_id));
       else current.push(ref("criterion", row.c.natural_id));
     }
 
@@ -806,17 +850,12 @@ export class ReadSurface extends SessionCore {
     const chain = await this.amendmentChain(gate);
     const rerun = await this.workGatedBy([gate]);
     const confirmatory = await this.confirmatoryResultsBehind([gate]);
-    const nature =
-      confirmatory.length > 0
-        ? ("scientific" as const)
-        : ("mechanical" as const);
+    const nature = confirmatory.length > 0 ? ("scientific" as const) : ("mechanical" as const);
 
     const amendments: AmendmentRecord[] = chain.map((step, i) => {
       const wasCriterion = changedBy.get(step.decision);
       const nextCriterion =
-        i + 1 < chain.length
-          ? changedBy.get(chain[i + 1]!.decision)
-          : inForce[0];
+        i + 1 < chain.length ? changedBy.get(chain[i + 1]!.decision) : inForce[0];
       return {
         amendment: step.decision,
         replaced: {
@@ -873,7 +912,11 @@ export class ReadSurface extends SessionCore {
     // happening in the wrong place.
     const nodes = new Map<
       DecisionRef,
-      { reason: Prose; older: DecisionRef | null; citing: Map<EvidenceRef, CitedFinding> }
+      {
+        reason: Prose;
+        older: DecisionRef | null;
+        citing: Map<EvidenceRef, CitedFinding>;
+      }
     >();
     for (const row of rows) {
       const decision = ref("decision", row.d.natural_id);
@@ -989,9 +1032,7 @@ export class ReadSurface extends SessionCore {
     // Order matters. Absence is checked before satisfaction so a gate nobody
     // evaluated can never fall through to "satisfied" (S-17); failure is
     // checked before incompleteness because a failure is decisive (S-3).
-    const state: GateStatus["state"] = checks.every(
-      (c) => c.state === "never-run",
-    )
+    const state: GateStatus["state"] = checks.every((c) => c.state === "never-run")
       ? "never-evaluated"
       : checks.some((c) => c.state === "failed")
         ? "blocked"
@@ -1076,10 +1117,7 @@ export class ReadSurface extends SessionCore {
       cited: number;
       standing: number;
     };
-    const byCriterion = new Map<
-      string,
-      { proposition: string; evaluations: TimedEvaluation[] }
-    >();
+    const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
     for (const row of rows) {
       const id = row.c.natural_id;
       const entry = byCriterion.get(id) ?? {
@@ -1103,7 +1141,10 @@ export class ReadSurface extends SessionCore {
         if (row.basis) {
           // By id, not by statement: two findings can say the same sentence.
           if (!record.basis.some((b) => b.evidence === row.basis!.natural_id))
-            record.basis.push({ evidence: ref("evidence", row.basis.natural_id), states: row.basis.statement });
+            record.basis.push({
+              evidence: ref("evidence", row.basis.natural_id),
+              states: row.basis.statement,
+            });
           record.cited += 1;
           if (!row.basisout?.invalidated) record.standing += 1;
         }
@@ -1118,8 +1159,7 @@ export class ReadSurface extends SessionCore {
      * is nothing to retract — which is what keeps S-8's asserted-versus-
      * measured distinction (row W) from becoming a loophole.
      */
-    const isWithdrawn = (e: TimedEvaluation): boolean =>
-      e.cited > 0 && e.standing === 0;
+    const isWithdrawn = (e: TimedEvaluation): boolean => e.cited > 0 && e.standing === 0;
 
     const strip = (e: TimedEvaluation): EvaluationRecord => ({
       evaluation: e.evaluation,
@@ -1159,8 +1199,7 @@ export class ReadSurface extends SessionCore {
       // in doubt, and re-running a check that nobody faulted still cannot
       // clear it, because nothing withdraws it.
       const standing = ordered.filter((e) => !isWithdrawn(e));
-      const decisive =
-        standing.find((e) => e.outcome === "fail") ?? standing[0];
+      const decisive = standing.find((e) => e.outcome === "fail") ?? standing[0];
       // Three ways to have no decisive verdict, and only one of them is
       // "nobody ran this". A check every one of whose verdicts has been
       // withdrawn *ran*, and saying `never-run` contradicted the evaluations
@@ -1252,20 +1291,24 @@ export class ReadSurface extends SessionCore {
       // reading are withdrawn together.
       const withdrew: ConcludedClaim[] = [
         ...new Map(rows.map((r) => [r.was.natural_id, r.was] as const)).values(),
-      ].map((was) => ({ claim: ref("claim", was.natural_id), asserts: was.name }));
+      ].map((was) => ({
+        claim: ref("claim", was.natural_id),
+        asserts: was.name,
+      }));
 
       for (const w of withdrew) {
         if (seen.has(w.claim))
-          throw new Error(
-            `interpretation history for "${proposition}" loops at "${w.asserts}"`,
-          );
+          throw new Error(`interpretation history for "${proposition}" loops at "${w.asserts}"`);
         seen.add(w.claim);
       }
 
       steps.unshift({
         revision: ref("decision", step.d.natural_id),
         previously: withdrew,
-        nowClaims: { claim: ref("claim", step.nxt.natural_id), asserts: step.nxt.name },
+        nowClaims: {
+          claim: ref("claim", step.nxt.natural_id),
+          asserts: step.nxt.name,
+        },
         reason: step.d.reason,
         // Scoped to the withdrawn claim's own line of enquiry. Passing the
         // bare proposition asked "what was decided on the strength of this
@@ -1292,10 +1335,7 @@ export class ReadSurface extends SessionCore {
    * the way its evidence bears — never from comparing the two sentences. In
    * S-5 the sentences are identical and the answer is "no".
    */
-  async doTheseConflict(
-    a: ClaimRef,
-    b: ClaimRef,
-  ): Promise<ConflictVerdict> {
+  async doTheseConflict(a: ClaimRef, b: ClaimRef): Promise<ConflictVerdict> {
     const sides = [await this.sideOf(a), await this.sideOf(b)];
     const [left, right] = sides;
 
@@ -1328,9 +1368,7 @@ export class ReadSurface extends SessionCore {
       sides: sides.map(({ enquiry: _enquiry, ...side }) => side),
     };
   }
-  private async sideOf(
-    conclusion: ClaimRef,
-  ): Promise<ConflictSide & { enquiry: EnquiryRef }> {
+  private async sideOf(conclusion: ClaimRef): Promise<ConflictSide & { enquiry: EnquiryRef }> {
     const resolved = await this.scopeOf(conclusion);
     const enquiry = resolved.enquiry!;
 
@@ -1404,10 +1442,9 @@ export class ReadSurface extends SessionCore {
     // reaching the same conclusion say the same sentence by construction.
     const reverifying = new Set(
       (
-        await this.graph.query(
-          `MATCH (e:Evidence)-[:REVERIFIES]->(:Evidence) RETURN e`,
-          { e: vertexProps<{ natural_id: string }>() },
-        )
+        await this.graph.query(`MATCH (e:Evidence)-[:REVERIFIES]->(:Evidence) RETURN e`, {
+          e: vertexProps<{ natural_id: string }>(),
+        })
       ).map((r) => r.e.natural_id),
     );
 
@@ -1416,13 +1453,10 @@ export class ReadSurface extends SessionCore {
     // why the reader still falls back rather than assuming the edge is there.
     const retractedBy = new Map(
       (
-        await this.graph.query(
-          `MATCH (a:Artefact)-[:INVALIDATED_BY]->(r:Review) RETURN a, r`,
-          {
-            a: vertexProps<{ natural_id: string }>(),
-            r: vertexProps<{ verdict: string }>(),
-          },
-        )
+        await this.graph.query(`MATCH (a:Artefact)-[:INVALIDATED_BY]->(r:Review) RETURN a, r`, {
+          a: vertexProps<{ natural_id: string }>(),
+          r: vertexProps<{ verdict: string }>(),
+        })
       ).map((row) => [row.a.natural_id, row.r.verdict] as const),
     );
 
@@ -1453,15 +1487,15 @@ export class ReadSurface extends SessionCore {
               bearing,
               reason: retractedBy.get(row.a.natural_id) ?? "its analysis was replaced",
             });
-        } else if (
-          bearing === "supports" &&
-          reverifying.has(row.e.natural_id)
-        ) {
+        } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
           // A re-verification is not a second independent finding. Counting it
           // as one reported a proposition established once as corroborated
           // twice -- S-10, and the reason `REVERIFIES` exists.
           if (!reverifiedBy.some((r) => r.analysis === row.comp.natural_id))
-            reverifiedBy.push({ analysis: ref("analysis", row.comp.natural_id), method: row.comp.kind });
+            reverifiedBy.push({
+              analysis: ref("analysis", row.comp.natural_id),
+              method: row.comp.kind,
+            });
         } else {
           live.push(entry);
         }
@@ -1654,7 +1688,13 @@ export class ReadSurface extends SessionCore {
 
     const parts = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
-      { a: vertexProps<{ natural_id: string; logical_name: string; content_hash?: string }>() },
+      {
+        a: vertexProps<{
+          natural_id: string;
+          logical_name: string;
+          content_hash?: string;
+        }>(),
+      },
       { id: analysis },
     );
 
@@ -1674,7 +1714,10 @@ export class ReadSurface extends SessionCore {
       // Keyed by natural id, never by name. An original and its regeneration
       // legitimately share a `logical_name` (S-9), and reporting bare names put
       // that one string in `exact` and `differing` at once -- see S-9c.
-      const entry = { part: ref("observations", a.natural_id), name: a.logical_name };
+      const entry = {
+        part: ref("observations", a.natural_id),
+        name: a.logical_name,
+      };
       if (!a.content_hash) unverifiable.push(entry);
       else if (candidate === undefined) notRebuilt.push(entry);
       else if (candidate === a.content_hash) exact.push(entry);
@@ -1739,9 +1782,7 @@ export class ReadSurface extends SessionCore {
    * about the union, because the union is exactly the "inferred provenance
    * silently inheriting the original's standing" the scenario exists to prevent.
    */
-  async whatDependsOn(
-    subject: IndexedString | ObservationsRef,
-  ): Promise<DependencyReport> {
+  async whatDependsOn(subject: IndexedString | ObservationsRef): Promise<DependencyReport> {
     // **`typeof` cannot tell these apart any more, and that is the trap.** A
     // handle is a branded string now, so `typeof subject === "string"` is true
     // for both arms of the union and sent every handle off to be looked up by
@@ -1790,7 +1831,9 @@ export class ReadSurface extends SessionCore {
     const claims = new Map<ClaimRef, AffectedClaim>();
     const enquiries = new Map<EnquiryRef, AffectedEnquiry>();
     for (const artefact of reached) {
-      const { claims: c, enquiries: e } = await this.restingOnArtefact(ref("observations", artefact));
+      const { claims: c, enquiries: e } = await this.restingOnArtefact(
+        ref("observations", artefact),
+      );
       for (const found of c) claims.set(found.claim, found);
       for (const found of e) enquiries.set(found.enquiry, found);
     }
@@ -1857,7 +1900,14 @@ export class ReadSurface extends SessionCore {
           .map((c) => ({ claim: ref("claim", c.natural_id), asserts: c.name })),
       ),
       enquiries: all.flatMap((r) =>
-        r.loe ? [{ enquiry: ref("enquiry", r.loe.natural_id), pursuing: r.loe.name }] : [],
+        r.loe
+          ? [
+              {
+                enquiry: ref("enquiry", r.loe.natural_id),
+                pursuing: r.loe.name,
+              },
+            ]
+          : [],
       ),
     };
   }
@@ -1884,5 +1934,4 @@ export class ReadSurface extends SessionCore {
     }
     return ref("observations", rows[0]!.a.natural_id);
   }
-
 }

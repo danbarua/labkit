@@ -22,14 +22,20 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-18T12:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /**
  * A second reader over the same graph, with an event log of its own.
@@ -41,7 +47,10 @@ afterEach(async () => { await scenario.end(); });
  * prove.
  */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 /** The state the agent describes as "the verification gate is implemented". */
@@ -50,7 +59,9 @@ async function aDeclaredButUnevaluatedGate() {
     objective: "promote the accelerated implementation to reference",
     acceptance: "protected artefact matches its recorded hash",
   });
-  const criterion = await session.stateCriterion("the protected artefact matches its recorded hash");
+  const criterion = await session.stateCriterion(
+    "the protected artefact matches its recorded hash",
+  );
   const gate = await session.declareGate({
     governedBy: [criterion],
     consequence: "block promotion unless the artefact verifies",
@@ -83,7 +94,9 @@ describe("S-17: does the guard actually guard?", () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
     const status = await session.gateStatus(gate);
-    expect(status.gating.map((g) => g.objective)).toEqual(["promote the accelerated implementation to reference"]);
+    expect(status.gating.map((g) => g.objective)).toEqual([
+      "promote the accelerated implementation to reference",
+    ]);
 
     expect((await (await afterwards()).gateStatus(gate)).gating.map((g) => g.objective)).toEqual([
       "promote the accelerated implementation to reference",
@@ -95,7 +108,12 @@ describe("S-17: does the guard actually guard?", () => {
 
     // The guard runs and reports a pass. It has still never been shown able
     // to fail, which is exactly what the reviewer demanded evidence of.
-    await session.evaluateCriterion({ criterion, gate, value: "hash matches", outcome: "pass" });
+    await session.evaluateCriterion({
+      criterion,
+      gate,
+      value: "hash matches",
+      outcome: "pass",
+    });
 
     const status = await session.gateStatus(gate);
     expect(status.state).toBe("satisfied");
@@ -108,7 +126,12 @@ describe("S-17: does the guard actually guard?", () => {
 
   test("a failing evaluation blocks the gate rather than leaving it unevaluated", async () => {
     const { criterion, gate } = await aDeclaredButUnevaluatedGate();
-    await session.evaluateCriterion({ criterion, gate, value: "hash differs", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion,
+      gate,
+      value: "hash differs",
+      outcome: "fail",
+    });
 
     const status = await session.gateStatus(gate);
     expect(status.state).toBe("blocked");
@@ -128,9 +151,17 @@ describe("S-17: does the guard actually guard?", () => {
    * those that happened to trigger this particular gate.
    */
   test("a criterion shown to fail on one gate counts as demonstrated for another it governs", async () => {
-    const criterion = await session.stateCriterion("the protected artefact matches its recorded hash");
-    const stagingWork = await session.planWork({ objective: "publish to staging", acceptance: "verified" });
-    const releaseWork = await session.planWork({ objective: "publish to release", acceptance: "verified" });
+    const criterion = await session.stateCriterion(
+      "the protected artefact matches its recorded hash",
+    );
+    const stagingWork = await session.planWork({
+      objective: "publish to staging",
+      acceptance: "verified",
+    });
+    const releaseWork = await session.planWork({
+      objective: "publish to release",
+      acceptance: "verified",
+    });
 
     const stagingGate = await session.declareGate({
       governedBy: [criterion],
@@ -144,7 +175,12 @@ describe("S-17: does the guard actually guard?", () => {
     });
 
     // The check demonstrably fires on staging.
-    await session.evaluateCriterion({ criterion, gate: stagingGate, value: "hash differs", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion,
+      gate: stagingGate,
+      value: "hash differs",
+      outcome: "fail",
+    });
 
     const release = await session.gateStatus(releaseGate);
     // Release itself has never been evaluated -- that must not read as passed.
@@ -163,7 +199,10 @@ describe("S-17: does the guard actually guard?", () => {
   test("a criterion cannot be evaluated against a gate it does not govern", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
     const unrelated = await session.stateCriterion("an unrelated condition");
-    const otherWork = await session.planWork({ objective: "other work", acceptance: "n/a" });
+    const otherWork = await session.planWork({
+      objective: "other work",
+      acceptance: "n/a",
+    });
     await session.declareGate({
       governedBy: [unrelated],
       consequence: "block other work",
@@ -171,7 +210,12 @@ describe("S-17: does the guard actually guard?", () => {
     });
 
     await expect(
-      session.evaluateCriterion({ criterion: unrelated, gate, value: "irrelevant", outcome: "fail" }),
+      session.evaluateCriterion({
+        criterion: unrelated,
+        gate,
+        value: "irrelevant",
+        outcome: "fail",
+      }),
     ).rejects.toThrow(/does not govern gate/);
 
     // Rejected before anything was written: the gate is untouched, and no

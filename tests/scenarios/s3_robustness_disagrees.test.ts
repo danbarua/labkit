@@ -25,14 +25,20 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-19T09:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /**
  * A second reader over the same graph, with an event log of its own. Every
@@ -41,7 +47,10 @@ afterEach(async () => { await scenario.end(); });
  * memory, and "Afterward" means reconstructible from durable state.
  */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const PRIMARY = "Holm-corrected pairwise test is significant";
@@ -72,9 +81,24 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
   test("Afterward 1: the result is inconclusive — neither effect confirmed nor null confirmed", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
 
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002, Holm-corrected", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median aggregation p = 0.21", outcome: "fail" });
-    await session.evaluateCriterion({ criterion: seed, gate, value: "MCSE exceeds the effect", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002, Holm-corrected",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median aggregation p = 0.21",
+      outcome: "fail",
+    });
+    await session.evaluateCriterion({
+      criterion: seed,
+      gate,
+      value: "MCSE exceeds the effect",
+      outcome: "fail",
+    });
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
@@ -87,9 +111,24 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
   test("Afterward 2: the unmet condition is named before anyone spends the compute", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.21", outcome: "fail" });
-    await session.evaluateCriterion({ criterion: seed, gate, value: "MCSE exceeds the effect", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
+    await session.evaluateCriterion({
+      criterion: seed,
+      gate,
+      value: "MCSE exceeds the effect",
+      outcome: "fail",
+    });
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
@@ -105,8 +144,18 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
   test("Afterward 3: checks are itemised, and a failure is distinguishable from a check never run", async () => {
     const { primary, median, gate } = await aPrespecifiedRobustnessDesign();
 
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.21", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
     // Seed stability is never evaluated at all.
 
     const status = await session.gateStatus(gate);
@@ -123,7 +172,12 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
   test("some checks run, none failing, is not the same as all of them passing", async () => {
     const { primary, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002",
+      outcome: "pass",
+    });
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
@@ -138,12 +192,32 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    */
   test("Afterward 4: establishing one outstanding check does not silently unblock the work", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.21", outcome: "fail" });
-    await session.evaluateCriterion({ criterion: seed, gate, value: "MCSE exceeds the effect", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
+    await session.evaluateCriterion({
+      criterion: seed,
+      gate,
+      value: "MCSE exceeds the effect",
+      outcome: "fail",
+    });
 
     // Seed stability is later established on a re-run.
-    await session.evaluateCriterion({ criterion: seed, gate, value: "MCSE now within tolerance", outcome: "pass" });
+    await session.evaluateCriterion({
+      criterion: seed,
+      gate,
+      value: "MCSE now within tolerance",
+      outcome: "pass",
+    });
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
@@ -176,13 +250,33 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       enquiry,
       method: "holm-pairwise",
       from: [observations],
-      concludes: [{ proposition: "T differs from rewired", finding: "p = 0.002, Holm-corrected" }],
+      concludes: [
+        {
+          proposition: "T differs from rewired",
+          finding: "p = 0.002, Holm-corrected",
+        },
+      ],
       heldTo: [primary, median, seed],
     });
 
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.21", outcome: "fail" });
-    await session.evaluateCriterion({ criterion: seed, gate, value: "MCSE exceeds the effect", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
+    await session.evaluateCriterion({
+      criterion: seed,
+      gate,
+      value: "MCSE exceeds the effect",
+      outcome: "fail",
+    });
 
     // The gate knows the checks disagreed.
     const status = await session.gateStatus(gate);
@@ -214,7 +308,10 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    * project so far (PJ-012 §1).
    */
   test("two criteria worded identically are two separate checks", async () => {
-    const work = await session.planWork({ objective: "downstream work", acceptance: "both hold" });
+    const work = await session.planWork({
+      objective: "downstream work",
+      acceptance: "both hold",
+    });
     const first = await session.stateCriterion("seed stability is adequate");
     const second = await session.stateCriterion("seed stability is adequate");
     const gate = await session.declareGate({
@@ -223,7 +320,12 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       protecting: [work],
     });
 
-    await session.evaluateCriterion({ criterion: first, gate, value: "within tolerance", outcome: "pass" });
+    await session.evaluateCriterion({
+      criterion: first,
+      gate,
+      value: "within tolerance",
+      outcome: "pass",
+    });
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
@@ -241,25 +343,68 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    */
   test("the evaluation that decided a failed check is the failing one, deterministically", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: seed, gate, value: "within tolerance", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.21", outcome: "fail" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.04 on a second run", outcome: "pass" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: seed,
+      gate,
+      value: "within tolerance",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.04 on a second run",
+      outcome: "pass",
+    });
 
     const check = (await session.gateStatus(gate)).checks.find((c) => c.proposition === MEDIAN)!;
     expect(check.state).toBe("failed");
     // The decisive record is the failure, not whichever row came back last.
-    expect(check.decidedBy).toMatchObject({ value: "median p = 0.21", outcome: "fail" });
+    expect(check.decidedBy).toMatchObject({
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
     // ...and the history is retained rather than overwritten.
     expect(check.evaluations).toHaveLength(2);
   });
 
   test("re-running a failed check until it passes does not clear it", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({ criterion: primary, gate, value: "p = 0.002", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: seed, gate, value: "within tolerance", outcome: "pass" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.21", outcome: "fail" });
-    await session.evaluateCriterion({ criterion: median, gate, value: "median p = 0.04 on a second run", outcome: "pass" });
+    await session.evaluateCriterion({
+      criterion: primary,
+      gate,
+      value: "p = 0.002",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: seed,
+      gate,
+      value: "within tolerance",
+      outcome: "pass",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
+    await session.evaluateCriterion({
+      criterion: median,
+      gate,
+      value: "median p = 0.04 on a second run",
+      outcome: "pass",
+    });
 
     const status = await session.gateStatus(gate);
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);

@@ -30,12 +30,21 @@ let session: ResearchSession;
 const NOW = "2026-08-24T14:00:00.000Z";
 const clock: Clock = { now: () => NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 const ASKS = "does the coating reduce fatigue cracking?";
 const PROP = "the coating reduces fatigue cracking";
@@ -44,14 +53,27 @@ const PROP = "the coating reduces fatigue cracking";
 async function aVouchedForNo() {
   const enquiry = await session.openEnquiry(ASKS);
   const observations = await session.recordObservations({
-    enquiry, name: "cycle counts", finding: "forty coupons, coated and bare",
+    enquiry,
+    name: "cycle counts",
+    finding: "forty coupons, coated and bare",
   });
   const { claims } = await session.recordAnalysis({
-    enquiry, method: "survival comparison", from: [observations],
-    concludes: [{ proposition: PROP, finding: "no separation at any cycle count", bearing: "challenges" }],
+    enquiry,
+    method: "survival comparison",
+    from: [observations],
+    concludes: [
+      {
+        proposition: PROP,
+        finding: "no separation at any cycle count",
+        bearing: "challenges",
+      },
+    ],
   });
   const claim = claimOf(claims, PROP);
-  await session.promote({ claim, because: "re-counted blind by a second reader" });
+  await session.promote({
+    claim,
+    because: "re-counted blind by a second reader",
+  });
   await session.closeEnquiry({ enquiry, answeredBy: claim });
   return { enquiry, claim };
 }
@@ -59,7 +81,10 @@ async function aVouchedForNo() {
 describe("S-18b — a negative result that somebody vouched for", () => {
   test("the enquiry reports it answered no, resting on confirmatory work", async () => {
     const { enquiry } = await aVouchedForNo();
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
 
     const status = await later.enquiryStatus(enquiry);
     expect(status.question?.answer).toBe("no");
@@ -70,7 +95,10 @@ describe("S-18b — a negative result that somebody vouched for", () => {
 
   test("the survey counts it as established, not as resting on scratch", async () => {
     await aVouchedForNo();
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
 
     const known = await later.whatIsKnown();
     expect(known.established.map((q) => q.asks)).toContain(ASKS);
@@ -79,7 +107,10 @@ describe("S-18b — a negative result that somebody vouched for", () => {
 
   test("and the historical survey agrees with the current one", async () => {
     await aVouchedForNo();
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
 
     // Same SUPPORTS-only shape, one query over. Asked at an instant after the
     // promotion and the closure.
@@ -95,15 +126,31 @@ describe("S-18b — a negative result that somebody vouched for", () => {
   test("an unpromoted negative result still reads as provisional", async () => {
     const enquiry = await session.openEnquiry("does the sealant reduce cracking?");
     const observations = await session.recordObservations({
-      enquiry, name: "sealant counts", finding: "forty coupons",
+      enquiry,
+      name: "sealant counts",
+      finding: "forty coupons",
     });
     const { claims } = await session.recordAnalysis({
-      enquiry, method: "survival comparison", from: [observations],
-      concludes: [{ proposition: "the sealant reduces cracking", finding: "no separation", bearing: "challenges" }],
+      enquiry,
+      method: "survival comparison",
+      from: [observations],
+      concludes: [
+        {
+          proposition: "the sealant reduces cracking",
+          finding: "no separation",
+          bearing: "challenges",
+        },
+      ],
     });
-    await session.closeEnquiry({ enquiry, answeredBy: claimOf(claims, "the sealant reduces cracking") });
+    await session.closeEnquiry({
+      enquiry,
+      answeredBy: claimOf(claims, "the sealant reduces cracking"),
+    });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const status = await later.enquiryStatus(enquiry);
     expect(status.question?.answer).toBe("no");
     expect(status.question?.restsOn).toBe("exploratory");

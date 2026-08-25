@@ -1,31 +1,36 @@
-// scripts/check-pglite-concurrency.ts
-//
-// Regression check for a confirmed, open upstream bug in pglite-socket's
-// QueryQueueManager (electric-sql/pglite#1046): two connections issuing
-// concurrent queries, where at least one errors (e.g. a unique-constraint
-// violation), can permanently corrupt the connection(s) involved — a
-// wire-protocol desync, or silently wrong rows. We reproduced this
-// independently (2026-08-18) before finding it already tracked upstream;
-// see .claude/skills/postgres-age/SKILL.md's "Upstream filing" for the
-// full writeup. It's why tests/helpers/db.ts opens a fresh `pg.Client` per
-// test instead of sharing one for a whole file — corruption is confirmed
-// to stay contained to the connection that hit it, so a fresh connection
-// per test contains the blast radius even though the underlying bug isn't
-// fixed.
-//
-// Exit code semantics are inverted from a normal lint check:
-//   exit 0 = the bug still reproduces. This is the EXPECTED, current
-//            state — the workaround in tests/helpers/db.ts is still
-//            necessary, nothing to do.
-//   exit 1 = the bug did NOT reproduce. That's the interesting result:
-//            @electric-sql/pglite-socket may have been fixed. Check the
-//            installed version against electric-sql/pglite#1046, and if
-//            it's genuinely fixed, tests/helpers/db.ts's per-connection
-//            design (and this script's own docs) can be relaxed.
-//
-// Run manually / periodically, especially after bumping
-// @electric-sql/pglite-socket — not wired into `bun test` or CI, since a
-// passing (bug-fixed) run would otherwise look like a failure.
+#!/usr/bin/env bun
+/**
+ * Asks whether a known pglite-socket concurrency bug is still there.
+ *
+ * **A probe, not a check, and the exit codes are inverted because of it:**
+ *   - exit 0 — the bug still reproduces. The expected, current state. The
+ *     workaround in `tests/helpers/db.ts` is still necessary; nothing to do.
+ *   - exit 1 — it did *not* reproduce, which is the interesting result.
+ *     `@electric-sql/pglite-socket` may have been fixed. Check the installed
+ *     version against electric-sql/pglite#1046, and if it genuinely is,
+ *     `tests/helpers/db.ts`'s per-connection design can be relaxed.
+ *
+ * It lived under `check:` until 2026-08-25 and had to be excluded by name from
+ * `bun run check`, with a paragraph explaining why — a namespace where green
+ * means fine, holding one script where green means the bug is still there. The
+ * name was the defect, not the script. Renaming it deleted the exclusion list.
+ *
+ * The bug: two connections issuing concurrent queries, where at least one
+ * errors (a unique-constraint violation, say), can permanently corrupt the
+ * connection(s) involved — a wire-protocol desync, or silently wrong rows. We
+ * reproduced it independently on 2026-08-18 before finding it already tracked
+ * upstream; `.claude/skills/postgres-age/SKILL.md`'s "Upstream filing" has the
+ * writeup. It is why `tests/helpers/db.ts` opens a fresh `pg.Client` per test
+ * rather than sharing one for a whole file: corruption is confirmed to stay
+ * contained to the connection that hit it, so a connection per test contains
+ * the blast radius even though the bug itself is not fixed.
+ *
+ * Run it by hand, especially after bumping `@electric-sql/pglite-socket`. It is
+ * deliberately not in `bun test`, in `bun run check`, or in CI — a passing
+ * (bug-fixed) run would look like a failure everywhere that matters.
+ *
+ * Usage: bun run probe:pglite-concurrency
+ */
 
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
@@ -66,7 +71,12 @@ async function insertOrIgnore(c: Client, v: string): Promise<void> {
 
 async function main(): Promise<void> {
   const rawDb = new PGlite();
-  const server = new PGLiteSocketServer({ db: rawDb, port: 0, host: "127.0.0.1", maxConnections: 8 });
+  const server = new PGLiteSocketServer({
+    db: rawDb,
+    port: 0,
+    host: "127.0.0.1",
+    maxConnections: 8,
+  });
   await server.start();
   const [host, portStr] = server.getServerConn().split(":") as [string, string];
   const port = Number(portStr);
@@ -110,14 +120,14 @@ async function main(): Promise<void> {
 
   if (reproducedAt !== -1) {
     console.log(
-      `✅ check-pglite-concurrency: bug still reproduces (iteration ${reproducedAt}/${ITERATIONS}) — matches ` +
+      `✅ probe-pglite-concurrency: bug still reproduces (iteration ${reproducedAt}/${ITERATIONS}) — matches ` +
         `electric-sql/pglite#1046. tests/helpers/db.ts's per-test-connection design is still necessary.`,
     );
     process.exit(0);
   }
 
   console.log(
-    `⚠️  check-pglite-concurrency: bug did NOT reproduce across ${ITERATIONS} iterations.\n` +
+    `⚠️  probe-pglite-concurrency: bug did NOT reproduce across ${ITERATIONS} iterations.\n` +
       `   This might mean @electric-sql/pglite-socket has fixed electric-sql/pglite#1046 — check the installed\n` +
       `   version against that issue. Could also just be this run got lucky; re-run a few times before\n` +
       `   concluding it's fixed. If it really is fixed, tests/helpers/db.ts's per-connection workaround and\n` +
@@ -131,7 +141,7 @@ main().catch((err) => {
   // looks for, just in a shape neither the try/catch nor the 'error'
   // listener caught — still a reproduction, not a script bug.
   console.log(
-    `✅ check-pglite-concurrency: bug still reproduces (uncaught: ${(err as Error).message}) — matches ` +
+    `✅ probe-pglite-concurrency: bug still reproduces (uncaught: ${(err as Error).message}) — matches ` +
       `electric-sql/pglite#1046. tests/helpers/db.ts's per-test-connection design is still necessary.`,
   );
   process.exit(0);

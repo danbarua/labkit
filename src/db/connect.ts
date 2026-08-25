@@ -1,6 +1,10 @@
 import { traced } from "./trace";
 import { join } from "node:path";
-import { directPostgresBackend, pgliteLeaderElectionBackend, type LabKitDBConnection } from "./backend";
+import {
+  directPostgresBackend,
+  pgliteLeaderElectionBackend,
+  type LabKitDBConnection,
+} from "./backend";
 
 export type { LabKitDBConnection };
 

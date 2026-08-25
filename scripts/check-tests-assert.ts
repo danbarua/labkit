@@ -68,11 +68,11 @@ for await (const path of glob.scan(".")) {
 }
 
 if (silent.length === 0 && tautologies.length === 0) {
-  console.log("✅ check-tests-assert OK: every test file asserts something, and no assertion compares two literals.");
+  console.log("OK: every test file asserts something, and no assertion compares two literals.");
   process.exit(0);
 }
 
-console.error("❌ check-tests-assert FAILED: these tests cannot fail for the reason they exist.");
+console.error("FAILED: these tests cannot fail for the reason they exist.");
 console.error(
   "   A test name is a claim; the body is the check on it. Where the body checks\n" +
     "   nothing, the passing tick is a second copy of the claim -- see PJ-028.\n",

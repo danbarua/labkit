@@ -34,10 +34,18 @@ import type { TenantGraph } from "../src/db/graph";
 let scenario: Scenario;
 let graph: TenantGraph;
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => { graph = await scenario.begin(); });
-afterEach(async () => { await scenario.end(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  graph = await scenario.begin();
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 const clock: Clock = { now: () => "2026-08-24T09:00:00.000Z" };
 
@@ -56,7 +64,7 @@ describe("an event says who caused it", () => {
 
     await write.pose("does the coating slow corrosion?");
 
-    const [recorded] = (await events.all());
+    const [recorded] = await events.all();
     expect(recorded?.operation).toBe("pose");
     expect(recorded?.attribution).toEqual(attribution);
   });
@@ -95,10 +103,12 @@ describe("an event says who caused it", () => {
     const dan = agent("dan", "human-1", "b".repeat(40));
     const claude = agent("claude-opus-5", "agent-1", "b".repeat(40));
 
-    await new WriteSurface(graph, { clock, attribution: dan, events })
-      .pose("does the coating slow corrosion?");
-    await new WriteSurface(graph, { clock, attribution: claude, events })
-      .pose("is the solver faster?");
+    await new WriteSurface(graph, { clock, attribution: dan, events }).pose(
+      "does the coating slow corrosion?",
+    );
+    await new WriteSurface(graph, { clock, attribution: claude, events }).pose(
+      "is the solver faster?",
+    );
 
     expect((await events.all()).map((e) => e.attribution.attribution_id)).toEqual([
       "human-1",

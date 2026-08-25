@@ -28,14 +28,20 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /**
  * The same sentence, meant two different ways. This wording is deliberate: if
@@ -56,7 +62,10 @@ const EXTERNAL = "does the graph construction matter for external classification
  */
 async function twoStages() {
   const internal = await session.pose(INTERNAL);
-  const internalWork = await session.pursue({ question: internal, approach: "internal mapping-strength comparison" });
+  const internalWork = await session.pursue({
+    question: internal,
+    approach: "internal mapping-strength comparison",
+  });
   const internalReadings = await session.recordObservations({
     enquiry: internalWork,
     name: "mapping-strength readings across constructions",
@@ -66,11 +75,19 @@ async function twoStages() {
     enquiry: internalWork,
     method: "mapping-strength-comparison",
     from: [internalReadings],
-    concludes: [{ proposition: IMMATERIAL, finding: "all five constructions within 0.02 of each other on mapping strength" }],
+    concludes: [
+      {
+        proposition: IMMATERIAL,
+        finding: "all five constructions within 0.02 of each other on mapping strength",
+      },
+    ],
   });
 
   const external = await session.pose(EXTERNAL);
-  const externalWork = await session.pursue({ question: external, approach: "downstream classification comparison" });
+  const externalWork = await session.pursue({
+    question: external,
+    approach: "downstream classification comparison",
+  });
   const externalReadings = await session.recordObservations({
     enquiry: externalWork,
     name: "downstream classification readings",
@@ -80,14 +97,25 @@ async function twoStages() {
     enquiry: externalWork,
     method: "downstream-classification",
     from: [externalReadings],
-    concludes: [{
-      proposition: IMMATERIAL,
-      finding: "constructions separate by 11 points of held-out accuracy",
-      bearing: "challenges",
-    }],
+    concludes: [
+      {
+        proposition: IMMATERIAL,
+        finding: "constructions separate by 11 points of held-out accuracy",
+        bearing: "challenges",
+      },
+    ],
   });
 
-  return { internal, internalWork, earlier, earlierClaims, external, externalWork, later, laterClaims };
+  return {
+    internal,
+    internalWork,
+    earlier,
+    earlierClaims,
+    external,
+    externalWork,
+    later,
+    laterClaims,
+  };
 }
 
 describe("S-5 — contradiction or dissociation?", () => {
@@ -123,7 +151,10 @@ describe("S-5 — contradiction or dissociation?", () => {
   test("each claim carries its own question and its own evidence", async () => {
     const programme = await twoStages();
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const verdict = await later.doTheseConflict(
       claimOf(programme.earlierClaims, IMMATERIAL),
       claimOf(programme.laterClaims, IMMATERIAL),
@@ -135,10 +166,14 @@ describe("S-5 — contradiction or dissociation?", () => {
     expect(first!.asks).toBe(INTERNAL);
     expect(second!.asks).toBe(EXTERNAL);
 
-    expect(first!.supportedBy.map((f) => f.states)).toEqual(["all five constructions within 0.02 of each other on mapping strength"]);
+    expect(first!.supportedBy.map((f) => f.states)).toEqual([
+      "all five constructions within 0.02 of each other on mapping strength",
+    ]);
     expect(first!.challengedBy).toEqual([]);
     expect(second!.supportedBy).toEqual([]);
-    expect(second!.challengedBy.map((f) => f.states)).toEqual(["constructions separate by 11 points of held-out accuracy"]);
+    expect(second!.challengedBy.map((f) => f.states)).toEqual([
+      "constructions separate by 11 points of held-out accuracy",
+    ]);
   });
 
   /**
@@ -159,11 +194,13 @@ describe("S-5 — contradiction or dissociation?", () => {
       enquiry: programme.internalWork,
       method: "mapping-strength-comparison",
       from: [rerun],
-      concludes: [{
-        proposition: IMMATERIAL,
-        finding: "two of the twelve constructions fall 0.3 below the rest on mapping strength",
-        bearing: "challenges",
-      }],
+      concludes: [
+        {
+          proposition: IMMATERIAL,
+          finding: "two of the twelve constructions fall 0.3 below the rest on mapping strength",
+          bearing: "challenges",
+        },
+      ],
     });
 
     const verdict = await session.doTheseConflict(
@@ -176,7 +213,10 @@ describe("S-5 — contradiction or dissociation?", () => {
     expect(verdict.differsBy).toBeNull();
     expect(verdict.sides.map((s) => s.asks)).toEqual([INTERNAL, INTERNAL]);
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const durable = await later.doTheseConflict(
       claimOf(programme.earlierClaims, IMMATERIAL),
       claimOf(dissentingClaims, IMMATERIAL),
@@ -202,7 +242,10 @@ describe("S-5 — contradiction or dissociation?", () => {
       because: "immaterial overstates it; the measurement was of mapping strength alone",
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
 
     const withdrawn = await later.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
     expect(withdrawn.withdrawn).toBe(true);
@@ -226,8 +269,13 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
 
     // A third line of work asserting the same sentence, and settling on it.
-    const alsoInternal = await session.pose("does the graph construction matter for reconstruction error?");
-    const work = await session.pursue({ question: alsoInternal, approach: "reconstruction-error comparison" });
+    const alsoInternal = await session.pose(
+      "does the graph construction matter for reconstruction error?",
+    );
+    const work = await session.pursue({
+      question: alsoInternal,
+      approach: "reconstruction-error comparison",
+    });
     const readings = await session.recordObservations({
       enquiry: work,
       name: "reconstruction-error readings",
@@ -237,9 +285,17 @@ describe("S-5 — contradiction or dissociation?", () => {
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
-      concludes: [{ proposition: IMMATERIAL, finding: "reconstruction error within 0.01 across constructions" }],
+      concludes: [
+        {
+          proposition: IMMATERIAL,
+          finding: "reconstruction error within 0.01 across constructions",
+        },
+      ],
     });
-    await session.closeEnquiry({ enquiry: work, answeredBy: claimOf(settledClaims, IMMATERIAL) });
+    await session.closeEnquiry({
+      enquiry: work,
+      answeredBy: claimOf(settledClaims, IMMATERIAL),
+    });
 
     const report = await session.reinterpret({
       of: claimOf(programme.earlierClaims, IMMATERIAL),
@@ -251,7 +307,10 @@ describe("S-5 — contradiction or dissociation?", () => {
     // on this one.
     expect(report.restingOnTheOldReading).toEqual([]);
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const settledStill = await later.whySupported(claimOf(settledClaims, IMMATERIAL));
     expect(settledStill.withdrawn).toBe(false);
     expect(settledStill.supported).toBe(true);
@@ -273,8 +332,13 @@ describe("S-5 — contradiction or dissociation?", () => {
       because: "immaterial overstates it",
     });
 
-    const elsewhere = await session.pose("does the graph construction matter for reconstruction error?");
-    const work = await session.pursue({ question: elsewhere, approach: "reconstruction-error comparison" });
+    const elsewhere = await session.pose(
+      "does the graph construction matter for reconstruction error?",
+    );
+    const work = await session.pursue({
+      question: elsewhere,
+      approach: "reconstruction-error comparison",
+    });
     const readings = await session.recordObservations({
       enquiry: work,
       name: "reconstruction-error readings",
@@ -284,10 +348,18 @@ describe("S-5 — contradiction or dissociation?", () => {
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
-      concludes: [{ proposition: IMMATERIAL, finding: "reconstruction error within 0.01 across constructions" }],
+      concludes: [
+        {
+          proposition: IMMATERIAL,
+          finding: "reconstruction error within 0.01 across constructions",
+        },
+      ],
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const here = await later.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
     const there = await later.whySupported(claimOf(freshClaims, IMMATERIAL));
     expect(here.withdrawn).toBe(true);
@@ -299,9 +371,9 @@ describe("S-5 — contradiction or dissociation?", () => {
   test("naming a claim that does not exist is refused", async () => {
     const programme = await twoStages();
 
-    await expect(
-      session.whySupported(ref("claim", "CLM_9999")),
-    ).rejects.toThrow(/no claim CLM_9999/);
+    await expect(session.whySupported(ref("claim", "CLM_9999"))).rejects.toThrow(
+      /no claim CLM_9999/,
+    );
 
     await expect(
       session.reinterpret({
@@ -353,7 +425,10 @@ describe("S-5 — contradiction or dissociation?", () => {
     const solo = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
 
     const enquiryOnly = await session.pose("does the encoding respond nonlinearly?");
-    const work = await session.pursue({ question: enquiryOnly, approach: "curvature sweep" });
+    const work = await session.pursue({
+      question: enquiryOnly,
+      approach: "curvature sweep",
+    });
     const readings = await session.recordObservations({
       enquiry: work,
       name: "curvature readings",
@@ -363,10 +438,17 @@ describe("S-5 — contradiction or dissociation?", () => {
       enquiry: work,
       method: "curvature-fit",
       from: [readings],
-      concludes: [{ proposition: "the encoding responds nonlinearly", finding: "departure from linearity across the sweep" }],
+      concludes: [
+        {
+          proposition: "the encoding responds nonlinearly",
+          finding: "departure from linearity across the sweep",
+        },
+      ],
     });
 
-    const byText = await session.whySupported(await claimNamed(session, "the encoding responds nonlinearly"));
+    const byText = await session.whySupported(
+      await claimNamed(session, "the encoding responds nonlinearly"),
+    );
     expect(byText.supported).toBe(true);
     expect(solo.supported).toBe(true);
   });

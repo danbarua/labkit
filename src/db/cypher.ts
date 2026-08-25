@@ -41,13 +41,21 @@ import type { LabKitDB } from "./client";
 export type ColumnDecoder<T> = (raw: string | null, column: string) => T;
 
 function decode(raw: string | null, column: string): AgtypeValue {
-  if (raw === null) throw new Error(`column "${column}" was NULL; wrap its decoder in optional() if that's expected`);
+  if (raw === null)
+    throw new Error(
+      `column "${column}" was NULL; wrap its decoder in optional() if that's expected`,
+    );
   return parseAgtype(raw);
 }
 
-function expectKind<K extends AgtypeValue["kind"]>(kind: K, raw: string | null, column: string): Extract<AgtypeValue, { kind: K }> {
+function expectKind<K extends AgtypeValue["kind"]>(
+  kind: K,
+  raw: string | null,
+  column: string,
+): Extract<AgtypeValue, { kind: K }> {
   const value = decode(raw, column);
-  if (value.kind !== kind) throw new Error(`expected a ${kind} in column "${column}", got ${value.kind}`);
+  if (value.kind !== kind)
+    throw new Error(`expected a ${kind} in column "${column}", got ${value.kind}`);
   return value as Extract<AgtypeValue, { kind: K }>;
 }
 
@@ -135,9 +143,17 @@ export class CypherRunner {
    * referenced as `$name` inside the query text, so caller-supplied values
    * are never interpolated into SQL.
    */
-  async query<S extends RowSpec>(cypher: string, columns: S, params?: Record<string, unknown>): Promise<DecodedRow<S>[]> {
+  async query<S extends RowSpec>(
+    cypher: string,
+    columns: S,
+    params?: Record<string, unknown>,
+  ): Promise<DecodedRow<S>[]> {
     const names = Object.keys(columns);
-    const rows = await this.run<Record<string, string | null>>(cypher, buildAsClause(names.map((name) => ({ name }))), params);
+    const rows = await this.run<Record<string, string | null>>(
+      cypher,
+      buildAsClause(names.map((name) => ({ name }))),
+      params,
+    );
 
     return rows.map((row) => {
       const decoded: Record<string, unknown> = {};
@@ -158,7 +174,11 @@ export class CypherRunner {
     await this.run(cypher, buildAsClause([{ name: "unused" }]), params);
   }
 
-  private async run<T>(cypher: string, columnList: string, params?: Record<string, unknown>): Promise<T[]> {
+  private async run<T>(
+    cypher: string,
+    columnList: string,
+    params?: Record<string, unknown>,
+  ): Promise<T[]> {
     const quoted = cypherDollarQuote(cypher);
     const sql = params
       ? `SELECT * FROM ag_catalog.cypher('${this.graphName}', ${quoted}, $1) AS (${columnList});`

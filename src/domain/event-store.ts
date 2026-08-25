@@ -21,13 +21,7 @@
 
 import type { LabKitDB } from "../db/client";
 import { LABKIT_SCHEMA } from "../db/schema";
-import type {
-  AttributionContext,
-  DomainEvent,
-  EventFilter,
-  EventSink,
-  Operation,
-} from "./events";
+import type { AttributionContext, DomainEvent, EventFilter, EventSink, Operation } from "./events";
 
 /** The row shape, as Postgres hands it back. */
 interface EventRow {

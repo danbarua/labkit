@@ -20,8 +20,12 @@ import { TenantGraph } from "../src/db/graph";
 import { scalar } from "../src/db/cypher";
 
 let testDb: TestDb;
-beforeAll(async () => { testDb = await setupTestDb(); });
-afterAll(async () => { await testDb.close(); });
+beforeAll(async () => {
+  testDb = await setupTestDb();
+});
+afterAll(async () => {
+  await testDb.close();
+});
 
 test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re-resolve", async () => {
   const db = await testDb.openClient();
@@ -32,7 +36,9 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
   await db.query(`SELECT ag_catalog.drop_label($1, $2)`, [ctx.graphName, "CONSUMES"]);
   const gone = await db.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM ag_catalog.ag_label WHERE name = 'CONSUMES'
-     AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`, [ctx.graphName]);
+     AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
+    [ctx.graphName],
+  );
   expect(gone.rows[0]!.n).toBe("0");
 
   // The production path: resolving the tenant again reconciles it.
@@ -40,17 +46,26 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
 
   const back = await db.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM ag_catalog.ag_label WHERE name = 'CONSUMES'
-     AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`, [ctx.graphName]);
+     AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
+    [ctx.graphName],
+  );
   expect(back.rows[0]!.n).toBe("1");
 
   // ...and the edge is actually usable, plus its uniqueness index is back.
   const graph = new TenantGraph(ctx, db);
-  const comp = await graph.createNode("Computation", { kind: "k", status: "done" });
-  const art = await graph.createNode("Artefact", { kind: "observations", logical_name: "obs" });
+  const comp = await graph.createNode("Computation", {
+    kind: "k",
+    status: "done",
+  });
+  const art = await graph.createNode("Artefact", {
+    kind: "observations",
+    logical_name: "obs",
+  });
   await graph.createEdge(comp.natural_id, "CONSUMES", art.natural_id);
   await graph.createEdge(comp.natural_id, "CONSUMES", art.natural_id); // idempotent
-  const n = await graph.query(`MATCH (:Computation)-[e:CONSUMES]->(:Artefact) RETURN count(e)`,
-    { count: scalar<number>() });
+  const n = await graph.query(`MATCH (:Computation)-[e:CONSUMES]->(:Artefact) RETURN count(e)`, {
+    count: scalar<number>(),
+  });
   expect(n[0]!.count).toBe(1);
   await db.close();
 });
@@ -82,10 +97,12 @@ test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", 
   const ctx = await resolveTenantContext(db, "drop-me");
 
   const present = async () =>
-    (await db.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM ag_catalog.ag_graph WHERE name = $1`,
-      [ctx.graphName],
-    )).rows[0]!.n;
+    (
+      await db.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM ag_catalog.ag_graph WHERE name = $1`,
+        [ctx.graphName],
+      )
+    ).rows[0]!.n;
 
   expect(await present()).toBe("1");
   await dropTenantGraph(db, ctx.graphName);

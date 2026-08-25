@@ -21,15 +21,27 @@ let scenario: Scenario;
 let session: ResearchSession;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const NAME = "control series";
@@ -44,13 +56,21 @@ const NAME = "control series";
 async function anAnalysisComparingBothControls(s: ResearchSession) {
   const enquiry = await s.openEnquiry("do the two controls agree?");
   const original = await s.recordObservations({
-    enquiry, name: NAME, finding: "the historical series", contentHash: "sha256:orig",
+    enquiry,
+    name: NAME,
+    finding: "the historical series",
+    contentHash: "sha256:orig",
   });
   const regenerated = await s.recordObservations({
-    enquiry, name: NAME, finding: "regenerated from an inferred algorithm", contentHash: "sha256:regen",
+    enquiry,
+    name: NAME,
+    finding: "regenerated from an inferred algorithm",
+    contentHash: "sha256:regen",
   });
   const { analysis: comparison, claims: comparisonClaims } = await s.recordAnalysis({
-    enquiry, method: "compare-controls", from: [original, regenerated],
+    enquiry,
+    method: "compare-controls",
+    from: [original, regenerated],
     concludes: [{ proposition: "the controls agree", finding: "within tolerance" }],
   });
   return { enquiry, original, regenerated, comparison };
@@ -90,11 +110,20 @@ describe("S-9c: two parts, one name", () => {
   test("unverifiable and not-rebuilt stay distinguishable under a shared name", async () => {
     const { enquiry } = await anAnalysisComparingBothControls(session);
     const noHash = await session.recordObservations({
-      enquiry, name: NAME, finding: "a third copy, no hash recorded",
+      enquiry,
+      name: NAME,
+      finding: "a third copy, no hash recorded",
     });
     const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
-      enquiry, method: "second-look", from: [noHash],
-      concludes: [{ proposition: "the third copy is unrecoverable", finding: "no hash" }],
+      enquiry,
+      method: "second-look",
+      from: [noHash],
+      concludes: [
+        {
+          proposition: "the third copy is unrecoverable",
+          finding: "no hash",
+        },
+      ],
     });
 
     const report = await (await afterwards()).reproducibilityOf(analysis, []);

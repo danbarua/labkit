@@ -20,15 +20,27 @@ let scenario: Scenario;
 let session: ResearchSession;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const NAME = "control series";
@@ -45,23 +57,39 @@ const HOLDS = "the effect holds against the control";
 async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
   const enquiry = await s.openEnquiry("does the effect hold against the control?");
   const original = await s.recordObservations({
-    enquiry, name: NAME, finding: "the original series", contentHash: "sha256:original",
+    enquiry,
+    name: NAME,
+    finding: "the original series",
+    contentHash: "sha256:original",
   });
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "effect-test", from: [original],
+    enquiry,
+    method: "effect-test",
+    from: [original],
     concludes: [{ proposition: HOLDS, finding: "effect survives the control" }],
   });
 
   const regenerated = await s.recordObservations({
-    enquiry, name: NAME, finding: "regenerated from an inferred algorithm",
+    enquiry,
+    name: NAME,
+    finding: "regenerated from an inferred algorithm",
     contentHash: "sha256:regenerated",
   });
   const { verification } = await s.reverify({
-    historical: analysis, enquiry, method: "effect-test, re-run",
+    historical: analysis,
+    enquiry,
+    method: "effect-test, re-run",
     under: [regenerated],
     concludes: { proposition: HOLDS, finding: "effect survives the control" },
   });
-  return { enquiry, original, regenerated, analysis, analysisClaims, verification };
+  return {
+    enquiry,
+    original,
+    regenerated,
+    analysis,
+    analysisClaims,
+    verification,
+  };
 }
 
 describe("S-10c: which input changed?", () => {
@@ -92,14 +120,13 @@ describe("S-10c: which input changed?", () => {
    * that is the point, and it is why the name was never identity.
    */
   test("the two entries name the same thing and mean different artefacts", async () => {
-    const { original, regenerated, verification } = await aReVerificationAgainstTheRegeneratedControl(session);
+    const { original, regenerated, verification } =
+      await aReVerificationAgainstTheRegeneratedControl(session);
 
     const report = await (await afterwards()).reproductionOf(verification);
 
     expect(report.differs.map((d) => d.what.name)).toEqual([NAME, NAME]);
-    expect(report.differs.map((d) => d.what.part).sort()).toEqual(
-      [original, regenerated].sort(),
-    );
+    expect(report.differs.map((d) => d.what.part).sort()).toEqual([original, regenerated].sort());
 
     // And each is paired with the standing that belongs to it: the regenerated
     // series is what the re-run introduced, the original is what it stopped
