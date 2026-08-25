@@ -89,7 +89,7 @@ describe("S-4: a negative result that closes the question", () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
 
     // Agent: no detectable evidence of that. All five form a tight cluster.
-    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
+    const { claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -115,7 +115,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 1 & 2: closed, and specifically ANSWERED — not abandoned, not deferred", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
+    const { claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -143,7 +143,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 2, polarity: answered NEGATIVELY, and that is queryable", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
+    const { claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -167,7 +167,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 3: the neighbouring supported claim is untouched, and LabKit says so", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
+    const { claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -196,7 +196,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 4: the null result is cited AS evidence, not as an absence of it", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: nullResult, claims: nullResultClaims } = await session.recordAnalysis({
+    const { claims: nullResultClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -286,7 +286,7 @@ describe("S-4: a negative result that closes the question", () => {
       name: "unrelated measurements",
       finding: "unrelated",
     });
-    const { analysis: unrelated, claims: unrelatedClaims } = await session.recordAnalysis({
+    const { claims: unrelatedClaims } = await session.recordAnalysis({
       enquiry: established,
       method: "unrelated-analysis",
       from: [elsewhere],
@@ -316,7 +316,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("a question cannot be answered on a proposition the analysis never concluded", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+    await session.recordAnalysis({
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -348,7 +348,7 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("polarity comes from the answering finding, not from any finding in the analysis", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: mixed, claims: mixedClaims } = await session.recordAnalysis({
+    const { claims: mixedClaims } = await session.recordAnalysis({
       enquiry: specificity,
       method: "mixed-analysis",
       from: [observations],

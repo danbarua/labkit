@@ -195,7 +195,8 @@ bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool 
 bun run typecheck              # tsc --noEmit
 bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
 bun run check:all-checks       # every check script must introduce itself in one plain sentence
-bun run check:format           # biome, formatting only — `bun run format` writes
+bun run check:format           # biome formatting — `bun run format` writes
+bun run check:lint             # biome lint — rules that are off are off by name, in biome.jsonc
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
@@ -213,9 +214,8 @@ bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
-Formatting is `bun run format` (biome — see below); there is no *linting*
-script yet, biome's linter being off until its findings have been read.
-`bun run build` compiles `src/cli/cli.ts` to a binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
+Formatting and linting are both biome — `bun run format` writes,
+`check:format` and `check:lint` are in the sweep. `bun run build` compiles `src/cli/cli.ts` to a binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
 resolves `drizzle/` from `import.meta.url`, which inside a compiled bundle is
 `/$bunfs/root/…`, so it dies with `Can't find meta/_journal.json file`.
 Measured 2026-08-25 against both the old and new entry points, so it predates
@@ -391,9 +391,24 @@ were wrong for one of the two languages.
 Do not pipe `bun test` — that trap is above, and is still live. `bun run check`
 passes each step's output straight through for the same reason.
 
-**Formatting is biome** (`biome.jsonc`), and it is **formatting only** — the
-linter is off until its 96 errors and 376 warnings have been read rather than
-bulk-suppressed. `bun run format` writes; `check:format` is in the sweep.
+**Formatting and linting are biome** (`biome.jsonc`). `bun run format` writes;
+`check:format` and `check:lint` are both in the sweep.
+
+**Two rules are off, by name and with their reason in the config**, which is the
+form to follow if a third is ever needed — a blanket `"recommended": false` or a
+wall of `biome-ignore` comments loses the difference between a finding to act on
+and a rule that disagrees with a deliberate choice.
+
+`noNonNullAssertion` is off **because its autofix breaks the build**:
+`tsconfig.json` runs `noUncheckedIndexedAccess`, so `rows[0]` is `T | undefined`
+and `rows[0]!` after a proven-non-empty check is the idiom the compiler asks
+for. Running biome's own unsafe fix over the 148 of them produced `TS2322`s
+immediately. That was the discriminator, and it is a good one: **if a lint
+rule's fix contradicts the typechecker, the rule is wrong for the project, not
+the code.**
+
+`noExplicitAny` is off for two sites in `src/db/backend.ts`, casting through
+`any` to reach `pglite-socket`'s untyped internals.
 
 Two things learnt adopting it, both the hard way:
 

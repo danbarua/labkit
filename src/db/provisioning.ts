@@ -12,15 +12,7 @@
  * module-private.
  */
 
-import {
-  NODE_LABELS,
-  EDGE_LABELS,
-  NODE_TYPES,
-  INDEXED_PROPS,
-  type NodeLabel,
-  type EdgeLabel,
-} from "./domain";
-import { LABKIT_SCHEMA } from "./schema";
+import { NODE_LABELS, EDGE_LABELS, INDEXED_PROPS, type NodeLabel, type EdgeLabel } from "./domain";
 import type { LabKitDB } from "./client";
 
 /**

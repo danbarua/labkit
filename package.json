@@ -19,6 +19,7 @@
 		"check": "bun scripts/check-all.ts",
 		"check:all-checks": "bun scripts/check-all-checks.ts",
 		"check:format": "biome format .",
+    "check:lint": "biome lint .",
 		"format": "biome format --write .",
 		"check:doc-comments": "bun scripts/check-doc-comments.ts",
 		"check:migrations": "bun scripts/check-migrations.ts",

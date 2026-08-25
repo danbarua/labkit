@@ -132,7 +132,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
         name: "seed sweep readings",
         finding: "five seeds, consistent",
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await s.recordAnalysis({
         enquiry: anasSweep,
         method: "paired comparison",
         from: [readings],
@@ -195,7 +195,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
         name: "width readings",
         finding: "it does",
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await s.recordAnalysis({
         enquiry: worked,
         method: "sweep",
         from: [readings],
@@ -237,7 +237,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
         name: "raw readings",
         finding: "twelve runs",
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { analysis } = await s.recordAnalysis({
         enquiry,
         method: "stage one",
         from: [observations],
@@ -283,13 +283,13 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
         name: "raw",
         finding: "f",
       });
-      const { analysis: stageOne, claims: stageOneClaims } = await s.recordAnalysis({
+      const { analysis: stageOne } = await s.recordAnalysis({
         enquiry,
         method: "stage one",
         from: [raw],
         concludes: [{ proposition: "p1", finding: "f1" }],
       });
-      const { analysis: viaAnalysis, claims: viaAnalysisClaims } = await s.recordAnalysis({
+      const { analysis: viaAnalysis } = await s.recordAnalysis({
         enquiry,
         method: "stage two, by analysis ref",
         from: [stageOne],
@@ -301,7 +301,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
       expect(outputOfStageOne?.startsWith("ART_")).toBe(true);
 
-      const { analysis: viaArtefact, claims: viaArtefactClaims } = await s.recordAnalysis({
+      const { analysis: viaArtefact } = await s.recordAnalysis({
         enquiry,
         method: "stage two, by artefact id",
         from: [outputOfStageOne!],
@@ -353,7 +353,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       name: "sweep readings",
       finding: "five seeds, consistent",
     });
-    const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+    const { analysis, claims: analysisClaims } = await s.recordAnalysis({
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -391,7 +391,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
   test("the template: an id beside the wording, in the three reports that do it", async () => {
     try {
-      const { read, analysis, analysisClaims } = await programme();
+      const { read, analysis } = await programme();
 
       // whatIsKnown: `question` is the id, `asks` is the text.
       const known = await read.whatIsKnown();

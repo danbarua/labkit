@@ -69,7 +69,7 @@ async function scratchExploration() {
     name: "lunchtime sweep",
     finding: "twelve runs, no seed control",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "notebook-sweep",
     from: [observations],
@@ -102,7 +102,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    * in silently.
    */
   test("Afterward 1: a question settled on scratch is answered provisionally, not established", async () => {
-    const { enquiry, analysis, analysisClaims } = await scratchExploration();
+    const { enquiry, analysisClaims } = await scratchExploration();
     await session.closeEnquiry({
       enquiry,
       answeredBy: claimOf(analysisClaims, PROPOSITION),
@@ -126,7 +126,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    * know it mattered.
    */
   test("Afterward 2: promoting is an act taken later, with a reason", async () => {
-    const { enquiry, analysis, analysisClaims } = await scratchExploration();
+    const { enquiry, analysisClaims } = await scratchExploration();
 
     await session.promote({
       claim: claimOf(analysisClaims, PROPOSITION),
@@ -155,7 +155,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    * record must not pretend it was always careful work.
    */
   test("Afterward 3: promotion does not erase what the finding actually rests on", async () => {
-    const { analysis, analysisClaims } = await scratchExploration();
+    const { analysisClaims } = await scratchExploration();
     await session.promote({
       claim: claimOf(analysisClaims, PROPOSITION),
       because: "re-run under seed control on the held-out split, same direction and magnitude",
@@ -183,7 +183,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    * other side of S-14.
    */
   test("scratch that nobody promotes is provisional, not wrong", async () => {
-    const { analysis, analysisClaims } = await scratchExploration();
+    const { analysisClaims } = await scratchExploration();
 
     const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
     expect(why.supported).toBe(true);
@@ -199,7 +199,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    * explore the same sentence, and promoting one must not promote the other.
    */
   test("promoting one line of enquiry's finding does not promote another's", async () => {
-    const { analysis, analysisClaims } = await scratchExploration();
+    const { analysisClaims } = await scratchExploration();
 
     const other = await session.openEnquiry(
       "does the pruning schedule change convergence on the small model?",
@@ -209,7 +209,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       name: "small-model sweep",
       finding: "eight runs, small model",
     });
-    const { analysis: otherAnalysis, claims: otherAnalysisClaims } = await session.recordAnalysis({
+    const { claims: otherAnalysisClaims } = await session.recordAnalysis({
       enquiry: other,
       method: "notebook-sweep",
       from: [otherObservations],

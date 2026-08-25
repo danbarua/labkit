@@ -7,7 +7,29 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ---
 
-## The compiled binary cannot migrate
+## 1. Colour in the CLI
+
+`labkit known`, `labkit why`, `labkit gate` are walls of white text. Every one
+of them is *structured* — buckets, states, handles, wording — and none of that
+structure survives to the terminal.
+
+The distinctions the renderers already keep apart, and which a colour would
+carry without costing a line: a gate's four states (`passed`, `failed`,
+`never-run`, `no-standing-verdict`), *established* against *provisional*,
+`supported` against `challenged` against `withdrawn`, and a handle against the
+prose beside it.
+
+**`--no-ansi` arrives with this and not before.** It was deliberately left out
+of the CLI port on the grounds that a flag switching off something the program
+does not do is a promise rather than a feature. It also needs to be automatic:
+no colour when stdout is not a TTY, so `$(labkit analyse …)` still yields a bare
+handle and `--json` is never touched. `NO_COLOR` is the convention to honour.
+
+The views are pure functions returning strings and are tested as such
+(`tests/cli/views.test.ts`), so whatever carries the colour has to be visible to
+those fixtures or the tests stop checking what they check.
+
+## 2. The compiled binary cannot migrate
 
 `bun run build` produces `bin/labkit`, and against a database that does not
 exist yet it dies with `Can't find meta/_journal.json file`. `runMigrations()`
@@ -28,20 +50,6 @@ as data and makes the binary a two-file artefact.
 
 Not urgent — nothing ships the binary — but `bun run build` currently exits 0
 on something that cannot work, which is the shape CLAUDE.md warns about.
-
-## Biome's linter is unread
-
-`biome.jsonc` has `linter.enabled: false`. Turning it on reports **96 errors and
-376 warnings** (2026-08-25, biome 2.5.10, `recommended` rules).
-
-Not suppressed in bulk, deliberately. Some of those will be real, some will
-disagree with a choice this repo made on purpose, and a blanket
-`"rules": { "recommended": false }` or a wall of `biome-ignore` comments loses
-the difference — which is the whole reason the linter was left off in the same
-commit that adopted the formatter.
-
-The work is to read them in groups, fix what should be fixed, and disable each
-remaining rule *by name with a reason* in `biome.jsonc`.
 
 ## Deliberately not being done
 

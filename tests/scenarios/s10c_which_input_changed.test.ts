@@ -62,7 +62,7 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
     finding: "the original series",
     contentHash: "sha256:original",
   });
-  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry,
     method: "effect-test",
     from: [original],

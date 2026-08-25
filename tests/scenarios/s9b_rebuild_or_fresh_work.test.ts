@@ -27,7 +27,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { claimNamed, claimOf, whyOf } from "../helpers/claims";
+import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 
@@ -102,7 +102,7 @@ async function theCachedConstruction(s: ResearchSession) {
     name: CONTROL,
     finding: "randomised control series",
   });
-  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry,
     method: "stage2-construction",
     from: [control],
@@ -140,7 +140,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         finding: "control series, second pass",
         contentHash: recorded,
       });
-      const { analysis: rebuilt, claims: rebuiltClaims } = await s.recordAnalysis({
+      const { analysis: rebuilt } = await s.recordAnalysis({
         enquiry,
         method: "stage2-construction, second control",
         from: [second],

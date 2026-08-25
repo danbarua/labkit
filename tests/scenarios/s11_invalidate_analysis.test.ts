@@ -21,7 +21,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { claimNamed, claimOf, whyOf } from "../helpers/claims";
+import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -69,7 +69,7 @@ async function bootstrapAnalysisAsShipped() {
     finding: "per-image accuracy for all five constructions, 10,000 images",
     contentHash: "sha256:obs",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "bootstrap-pairwise",
     from: [observations],
@@ -115,7 +115,7 @@ const SIGN_FLIP_CONCLUSIONS = [
 
 describe("S-11: the analysis was wrong; the observations were fine", () => {
   test("the conversation runs end to end through research verbs alone", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
 
     // Reviewer: your bootstrap is centred on the observed effect. It isn't a null test.
     const review = await session.recordReview({
@@ -158,7 +158,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -195,7 +195,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -222,7 +222,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 4: the replacement conclusion is supported via a different inference", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -246,7 +246,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 5: what the superseded inference claimed is still readable", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -316,7 +316,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("why support was withdrawn is answerable from the graph, not just the event log", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({
       of: analysis,
       verdict:
@@ -360,7 +360,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       from: [observations],
       concludes: [{ proposition: "T beats rewired", finding: "p = 0.002 (bootstrap)" }],
     });
-    const { analysis: unrelated, claims: unrelatedClaims } = await session.recordAnalysis({
+    const { analysis: unrelated } = await session.recordAnalysis({
       enquiry,
       method: "unrelated-analysis",
       from: [observations],
@@ -393,12 +393,12 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("the temporal seam records the invalidation, with its time and what it moved", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
-    const report = await session.replaceAnalysis({
+    const _report = await session.replaceAnalysis({
       supersedes: analysis,
       because: review,
       enquiry,

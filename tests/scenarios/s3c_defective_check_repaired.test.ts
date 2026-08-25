@@ -82,7 +82,7 @@ async function aResultHeldToARobustnessCheck() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -119,10 +119,10 @@ describe("S-3c: the check was wrong, not the result", () => {
    * stand, and none of what follows may weaken it.
    */
   test("re-running the same check until it comes back green does not clear the failure", async () => {
-    const { robustness, enquiry, observations, analysis, analysisClaims } =
+    const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
 
-    const { analysis: firstRun, claims: firstRunClaims } = await theCheckIsRun(
+    const { claims: firstRunClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -140,7 +140,7 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     // Same check, run again, unchanged. Nobody found anything wrong with the
     // first run — they just ran it a second time.
-    const { analysis: secondRun, claims: secondRunClaims } = await theCheckIsRun(
+    const { claims: secondRunClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -184,7 +184,7 @@ describe("S-3c: the check was wrong, not the result", () => {
    * old.
    */
   test("a check that was itself defective, corrected and re-run, no longer disqualifies the finding", async () => {
-    const { robustness, enquiry, observations, analysis, analysisClaims } =
+    const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
 
     const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(
@@ -213,7 +213,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    const corrected = await session.replaceAnalysis({
+    const _corrected = await session.replaceAnalysis({
       supersedes: defective,
       because: review,
       enquiry,
@@ -285,7 +285,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    const corrected = await session.replaceAnalysis({
+    const _corrected = await session.replaceAnalysis({
       supersedes: defective,
       because: review,
       enquiry,
@@ -317,7 +317,7 @@ describe("S-3c: the check was wrong, not the result", () => {
    * order, same clock.
    */
   test("what separates the two cases is whether the failed verdict's basis was withdrawn", async () => {
-    const { robustness, enquiry, observations, analysis, analysisClaims } =
+    const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
     const { analysis: failed, claims: failedClaims } = await theCheckIsRun(
       enquiry,
@@ -334,7 +334,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       outcome: "fail",
       citing: claimOf(failedClaims, DISAGREES),
     });
-    const { analysis: rerun, claims: rerunClaims } = await theCheckIsRun(
+    const { claims: rerunClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -380,7 +380,7 @@ describe("S-3c: the check was wrong, not the result", () => {
    * because one of them can now be retired.
    */
   test("a failure that cited nothing cannot be cleared by withdrawing something else", async () => {
-    const { robustness, enquiry, observations, analysis, analysisClaims } =
+    const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
     await session.evaluateCriterion({
       criterion: robustness,
@@ -388,7 +388,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       outcome: "fail",
     });
 
-    const { analysis: unrelated, claims: unrelatedClaims } = await theCheckIsRun(
+    const { analysis: unrelated } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -426,7 +426,7 @@ describe("S-3c: the check was wrong, not the result", () => {
    * failure. The check certainly ran; what it has is no verdict that stands.
    */
   test("a check whose every verdict has been withdrawn has no standing verdict, and did not never-run", async () => {
-    const { robustness, enquiry, observations, analysis, analysisClaims } =
+    const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
     const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(
       enquiry,
@@ -485,7 +485,7 @@ describe("S-3c: the check was wrong, not the result", () => {
    * `recordAnalysis()` refuses to re-assert a withdrawn proposition.
    */
   test("a replacement that cannot be completed leaves the earlier failure standing", async () => {
-    const { robustness, enquiry, observations, analysis, analysisClaims } =
+    const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
     const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(
       enquiry,

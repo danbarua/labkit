@@ -32,12 +32,11 @@ import {
   ResearchSession,
   inMemoryEventLog,
   type AnalysisRef,
-  type Clock,
   type EnquiryRef,
 } from "../../src/domain";
 import type { ClaimRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { windableClock, minutes, days, type WindableClock } from "../helpers/clock";
+import { windableClock, minutes, days } from "../helpers/clock";
 import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
@@ -84,7 +83,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
         name: "sweep readings",
         finding: "twelve runs",
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await s.recordAnalysis({
         enquiry,
         method: "convergence-fit",
         from: [observations],
@@ -190,7 +189,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         name: "readings",
         finding: "twelve runs",
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await s.recordAnalysis({
         enquiry,
         method: "paired-comparison",
         from: [obs],
@@ -239,7 +238,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         name: `${prop} readings`,
         finding: `runs for ${prop}`,
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { analysis, claims: analysisClaims } = await s.recordAnalysis({
         enquiry,
         method: "paired-comparison",
         from: [obs],
@@ -357,7 +356,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
           name: `${q.prop} readings`,
           finding: `runs for ${q.prop}`,
         });
-        const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+        const { analysis } = await s.recordAnalysis({
           enquiry,
           method: "paired-comparison",
           from: [obs],
@@ -435,7 +434,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         name: "readings",
         finding: "twelve runs",
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await s.recordAnalysis({
         enquiry,
         method: "paired-comparison",
         from: [obs],
@@ -507,7 +506,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         name: "readings",
         finding: "runs",
       });
-      const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await s.recordAnalysis({
         enquiry,
         method: "pc",
         from: [obs],

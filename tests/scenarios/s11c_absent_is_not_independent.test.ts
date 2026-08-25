@@ -76,7 +76,7 @@ async function aTwoStagePipeline(s: ResearchSession) {
     finding: "eleven dose levels, uncalibrated",
     contentHash: "sha256:raw",
   });
-  const { analysis: calibration, claims: calibrationClaims } = await s.recordAnalysis({
+  const { analysis: calibration } = await s.recordAnalysis({
     enquiry,
     method: "calibrate",
     from: [raw],
@@ -96,7 +96,7 @@ async function aTwoStagePipeline(s: ResearchSession) {
     finding: "eleven dose levels, calibrated",
     contentHash: "sha256:calibrated",
   });
-  const { analysis: trend, claims: trendClaims } = await s.recordAnalysis({
+  const { analysis: trend } = await s.recordAnalysis({
     enquiry,
     method: "dose-response-fit",
     from: [calibrated],

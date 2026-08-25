@@ -73,7 +73,7 @@ async function aFindingHeldToAgreedChecks() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -103,7 +103,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * up by the standard set for it".
    */
   test("Afterward 1: the finding does not stand, and the numbers are still good", async () => {
-    const { primary, median, analysis, analysisClaims } = await aFindingHeldToAgreedChecks();
+    const { primary, median, analysisClaims } = await aFindingHeldToAgreedChecks();
     await session.evaluateCriterion({
       criterion: primary,
       value: "p = 0.002",
@@ -138,7 +138,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * are different answers to "why doesn't this stand", and both are unmet.
    */
   test("Afterward 2: the agreed checks are itemised, disagreement apart from never-run", async () => {
-    const { primary, median, analysis, analysisClaims } = await aFindingHeldToAgreedChecks();
+    const { primary, median, analysisClaims } = await aFindingHeldToAgreedChecks();
     await session.evaluateCriterion({
       criterion: primary,
       value: "p = 0.002",
@@ -198,7 +198,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * the standard is a state of its own, distinct from having been held to none.
    */
   test("Afterward 4: a finding that meets its agreed checks stands", async () => {
-    const { primary, median, seed, analysis, analysisClaims } = await aFindingHeldToAgreedChecks();
+    const { primary, median, seed, analysisClaims } = await aFindingHeldToAgreedChecks();
     for (const criterion of [primary, median, seed]) {
       await session.evaluateCriterion({
         criterion,
@@ -271,8 +271,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * undone from a direction S-11 could not see.
    */
   test("a superseded analysis's failed checks do not disqualify its replacement", async () => {
-    const { median, analysis, analysisClaims, enquiry, observations } =
-      await aFindingHeldToAgreedChecks();
+    const { median, analysis, enquiry, observations } = await aFindingHeldToAgreedChecks();
     await session.evaluateCriterion({
       criterion: median,
       value: "median p = 0.21",
@@ -308,7 +307,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * and a standard agreed in one must not disqualify the other's finding.
    */
   test("a standard belongs to the analysis it was agreed for, not to the wording", async () => {
-    const { primary, median, analysis, analysisClaims } = await aFindingHeldToAgreedChecks();
+    const { primary, median, analysisClaims } = await aFindingHeldToAgreedChecks();
     await session.evaluateCriterion({
       criterion: primary,
       value: "p = 0.002",
@@ -327,7 +326,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       name: "held-out results",
       finding: "per-image accuracy, held-out split",
     });
-    const { analysis: otherAnalysis, claims: otherAnalysisClaims } = await session.recordAnalysis({
+    const { claims: otherAnalysisClaims } = await session.recordAnalysis({
       enquiry: other,
       method: "holm-pairwise",
       from: [otherObservations],

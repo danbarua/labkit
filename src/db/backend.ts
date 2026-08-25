@@ -52,7 +52,7 @@ async function waitForClient(host: string, port: number, timeoutMs = 10_000): Pr
   for (;;) {
     try {
       return await tryClient(host, port);
-    } catch (err) {
+    } catch (_err) {
       if (Date.now() - start > timeoutMs) {
         throw new Error(
           `timed out waiting for ledger primary to start listening on ${host}:${port}`,

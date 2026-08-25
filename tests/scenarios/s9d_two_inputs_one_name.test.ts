@@ -73,7 +73,7 @@ async function anAnalysisRestingOnBothControls(s: ResearchSession) {
     finding: "the remainder, regenerated from an inferred algorithm",
     contentHash: "sha256:regenerated",
   });
-  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry,
     method: "arm-comparison",
     from: [surviving, regenerated],
