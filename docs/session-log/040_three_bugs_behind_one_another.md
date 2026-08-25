@@ -40,7 +40,18 @@ pglite#414 and bun#15032 are the same `ENOENT … /$bunfs/root/pglite.data`, ope
 since Bun 1.1.33 and labelled outside the maintainers' control. Cited in
 `src/db/extensions.ts` and CLAUDE.md so the next reader does not re-derive it.
 
-**`430bfdb`** and this commit are the entry.
+**`ef941bb` — cull pgvector.** Two references under `src/`, nothing else: no
+column, no query, no `CREATE EXTENSION`. It cost a dependency, an embedded
+tarball, and half of `streamable()`'s reason to exist. Confirmed against the
+container, which does not offer `vector` at all. Dated records keep their
+finding; only live statements moved.
+
+**`395749f` — `docs/db-layering-plan.md`**, for review, nothing built. The
+`src/db/` map, the superuser/application split, the lock-not-socket connection
+model, drizzle via `pg-proxy`, RLS, a five-step sequence and four open
+questions. It says to delete itself when the work lands.
+
+**`430bfdb`, `c8901cd`** and this commit are the entry.
 
 Working tree clean.
 
@@ -56,6 +67,24 @@ Working tree clean.
   name the missing tag and reddens all three migration tests.
 - Each of the three bugs was confirmed fixed by rebuilding and re-running, not
   by inspection.
+
+**Measured for the plan, all today, none quoted from memory:**
+
+- **72ms** for a full acquire → query → release cycle; **67ms** warm open;
+  **1031ms** cold; **2ms** no-op migrate. These are what make killing the socket
+  viable.
+- **What happens when the primary dies**: the secondary takes an uncaught
+  `'error'` event from `pg` — `Connection terminated unexpectedly`, the same
+  string CLAUDE.md attributes to teardown races — and the process is gone before
+  a `catch` runs. Stale lock reclaimed correctly for new processes.
+- **RLS on both backends.** Superusers bypass it unconditionally and `FORCE` is
+  not enough; under a non-superuser role, PGlite showed only the scoped tenant
+  and real Postgres showed 5 of 6 then 1 of 6, refusing a cross-tenant insert.
+- **`pg-proxy` is a callback, not a socket** — drizzle over a raw in-process
+  PGlite, one invocation, zero sockets, correct typed result.
+- **The full CLI lifecycle against real Postgres 18.1 + AGE 1.7.0**, with the
+  embedded migrations applied out-of-band. First time the CLI has ever been run
+  against Postgres.
 - **Drizzle's documented advice was tested, not argued about.** Its docs say to
   copy `drizzle/` alongside the build output. A binary built that way, with
   `migrationsFolder` resolved next to `process.execPath`, finds the folder
@@ -74,6 +103,12 @@ declared `pgTable` in `src/db/schema.ts` with **zero readers**: `grep` finds its
 own definition and an `$inferSelect` type and nothing else. The table drizzle
 would need already exists and the event store ignores it.
 
+**The plan is unreviewed and nothing in it is built.** Four questions are open
+in it deliberately: the barrel, the `client.ts` name, where transaction
+ownership lives, and how the isolation tests survive session-scoped tenancy.
+Three more are named as out of scope, including deriving the tenant slug from the
+project path.
+
 **Migrations are not hand-rolled**, which is worth stating because the change
 looks like it. `dialect.migrate()` is drizzle's — its ledger, transaction and
 skip logic, untouched — and the SQL is still drizzle-kit's under `drizzle/`.
@@ -88,10 +123,9 @@ of `docs/mcp-tools.md`, and shell completions from the same surface.
 
 PR #29 awaits review.
 
-The next job is the one Dan named: sort out the DB abstractions so `LabKitDB`
-keeps its raw-SQL `query()` **and** offers drizzle for dynamic query building
-and type coercion, then move `src/domain/event-store.ts` onto it. The
-`labkitEvents` table is already declared and unread, so that is where to start.
+`docs/db-layering-plan.md` awaits review. Its four open questions want answers
+before step 1; the sequence after that is naming and cruft, then killing the
+socket, then the pipeline, then RLS, then the four SQL sites.
 
 `docs/TASKS.md` is empty of actionable work for the first time in this run of
 sessions; the domain modelling behind PJ-008 §3's open rows is still the larger
