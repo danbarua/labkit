@@ -43,6 +43,8 @@ import type {
   EnquiryRef,
   EvidenceRef,
   GateRef,
+  QuestionRef,
+  WorkRef,
   ConfirmatoryResult,
   ReplacementClaim,
   DecidedQuestion,
@@ -184,7 +186,7 @@ export class SessionCore {
     // two tasks; deduping on the text reported one piece of work to re-run
     // where there were two. Same traversal `gateStatus` reports as
     // `{work, objective}` -- one was converted and this was not (PJ-030 §7).
-    const found = new Map<string, GatedWork>();
+    const found = new Map<WorkRef, GatedWork>();
     for (const gate of gates) {
       const rows = await this.graph.query(
         `MATCH (:Gate {natural_id: $id})-[:GATES]->(t:Task) RETURN t`,
@@ -192,7 +194,7 @@ export class SessionCore {
         { id: gate },
       );
       for (const row of rows)
-        found.set(row.t.natural_id, { work: ref("work", row.t.natural_id), objective: row.t.objective });
+        found.set(ref("work", row.t.natural_id), { work: ref("work", row.t.natural_id), objective: row.t.objective });
     }
     return [...found.values()].sort((a, b) => a.work.localeCompare(b.work));
   }
@@ -211,7 +213,7 @@ export class SessionCore {
     // Keyed by id. S-5's literal case: one sentence asserted in two lines of
     // enquiry is two claims, and merging them understated the blast radius of
     // a scientific amendment.
-    const affected = new Map<string, ConfirmatoryResult>();
+    const affected = new Map<ClaimRef, ConfirmatoryResult>();
     for (const gate of gates) {
       for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
         const rows = await this.graph.query(
@@ -223,7 +225,7 @@ export class SessionCore {
         );
         for (const row of rows)
           if (row.c.kind === "confirmatory")
-            affected.set(row.c.natural_id, { claim: ref("claim", row.c.natural_id), asserts: row.c.name });
+            affected.set(ref("claim", row.c.natural_id), { claim: ref("claim", row.c.natural_id), asserts: row.c.name });
       }
     }
     return [...affected.values()].sort((a, b) => a.claim.localeCompare(b.claim));
@@ -276,7 +278,7 @@ export class SessionCore {
     // Keyed by id. Two identically-worded questions are two questions -- S-1
     // poses exactly that pair, and `report.ts` says neither may be resolved by
     // comparing text. This helper was doing it anyway.
-    const asked = new Map<string, DecidedQuestion>();
+    const asked = new Map<QuestionRef, DecidedQuestion>();
     // Both bearings: a question can be settled "no" on a finding that
     // challenges the proposition, and that closure rests on this reading just
     // as much as a supporting one does.
@@ -291,7 +293,7 @@ export class SessionCore {
         { name: scope.proposition, ...this.scopeParams(scope) },
       );
       for (const row of rows)
-        asked.set(row.q.natural_id, { question: ref("question", row.q.natural_id), asks: row.q.name });
+        asked.set(ref("question", row.q.natural_id), { question: ref("question", row.q.natural_id), asks: row.q.name });
     }
     return [...asked.values()].sort((a, b) => a.question.localeCompare(b.question));
   }

@@ -39,6 +39,7 @@ import type {
   EvaluationRecord,
   CriterionRef,
   DecisionRef,
+  EvidenceRef,
   GateRef,
   GateStatus,
   WorkRef,
@@ -204,9 +205,9 @@ export class ReadSurface extends SessionCore {
     // decide which *bucket* a row lands in, and there are three of them across
     // five OPTIONAL MATCHes — pushing those down would mean an OPTIONAL MATCH
     // per predicate for no change in the result.
-    const by = new Map<string, { asks: string; resolved: boolean; promoted: boolean; accepted: boolean }>();
+    const by = new Map<QuestionRef, { asks: Prose; resolved: boolean; promoted: boolean; accepted: boolean }>();
     for (const row of rows) {
-      const entry = by.get(row.q.natural_id) ?? {
+      const entry = by.get(ref("question", row.q.natural_id)) ?? {
         asks: row.q.name, resolved: false, promoted: false, accepted: false,
       };
       const resolvedByThen = row.resolving !== null && row.resolving.decided_at <= asOf;
@@ -220,7 +221,7 @@ export class ReadSurface extends SessionCore {
       const vouched = row.promoting ?? row.denying;
       entry.promoted ||= resolvedByThen && vouched !== null && vouched.decided_at <= asOf;
       entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= asOf;
-      by.set(row.q.natural_id, entry);
+      by.set(ref("question", row.q.natural_id), entry);
     }
 
     // The canonical instant, not the caller's text: it is what every comparison
@@ -634,7 +635,7 @@ export class ReadSurface extends SessionCore {
     // arbitrary. An absent position is not position zero.
     const inputs = async (
       computation: string,
-    ): Promise<{ read: IdentifiedArtefact[]; bySubject: Map<string, IdentifiedArtefact> }> => {
+    ): Promise<{ read: IdentifiedArtefact[]; bySubject: Map<ObservationsRef, IdentifiedArtefact> }> => {
       const rows = await this.graph.query(
         `MATCH (:Computation {natural_id: $id})-[c:CONSUMES]->(a:Artefact) RETURN a, c`,
         {
@@ -655,7 +656,7 @@ export class ReadSurface extends SessionCore {
       });
       return {
         read: occurrences.map((o) => identify(o.a)),
-        bySubject: new Map(rows.map((r) => [r.a.natural_id, identify(r.a)])),
+        bySubject: new Map(rows.map((r) => [ref("observations", r.a.natural_id), identify(r.a)])),
       };
     };
     const mine = await inputs(verification);
@@ -755,13 +756,16 @@ export class ReadSurface extends SessionCore {
     if (conditions.length === 0)
       throw new Error(`gate ${gate} is governed by no condition`);
 
-    const changedBy = new Map<string, string>(); // decision -> criterion it replaced
-    const propositionOf = new Map<string, string>();
-    const current: string[] = [];
+    // The two maps used to say `Map<string, string>` with `// decision ->
+    // criterion it replaced` beside one of them. The comment was a type written
+    // as prose; it is a type now.
+    const changedBy = new Map<DecisionRef, CriterionRef>();
+    const propositionOf = new Map<CriterionRef, Prose>();
+    const current: CriterionRef[] = [];
     for (const row of conditions) {
-      propositionOf.set(row.c.natural_id, row.c.proposition);
-      if (row.d) changedBy.set(row.d.natural_id, row.c.natural_id);
-      else current.push(row.c.natural_id);
+      propositionOf.set(ref("criterion", row.c.natural_id), row.c.proposition);
+      if (row.d) changedBy.set(ref("decision", row.d.natural_id), ref("criterion", row.c.natural_id));
+      else current.push(ref("criterion", row.c.natural_id));
     }
 
     // A design history needs one condition in force. A gate governed by
@@ -838,27 +842,35 @@ export class ReadSurface extends SessionCore {
       { id: gate },
     );
 
+    // Handles are minted once, at the row, and everything downstream carries
+    // them. Minting at each use instead put four `ref("decision", …)` calls in
+    // this loop for one decision, which is the shape that says a conversion is
+    // happening in the wrong place.
     const nodes = new Map<
-      string,
-      { reason: string; older: string | null; citing: Map<string, CitedFinding> }
+      DecisionRef,
+      { reason: Prose; older: DecisionRef | null; citing: Map<EvidenceRef, CitedFinding> }
     >();
     for (const row of rows) {
-      const node = nodes.get(row.d.natural_id) ?? {
+      const decision = ref("decision", row.d.natural_id);
+      const node = nodes.get(decision) ?? {
         reason: row.d.reason,
         older: null,
-        citing: new Map<string, CitedFinding>(),
+        citing: new Map<EvidenceRef, CitedFinding>(),
       };
-      if (row.older) node.older = row.older.natural_id;
+      if (row.older) node.older = ref("decision", row.older.natural_id);
       // By id: two citations can say the same sentence and be two findings.
-      if (row.e) node.citing.set(row.e.natural_id, { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
-      nodes.set(row.d.natural_id, node);
+      if (row.e) {
+        const evidence = ref("evidence", row.e.natural_id);
+        node.citing.set(evidence, { evidence, states: row.e.statement });
+      }
+      nodes.set(decision, node);
     }
 
-    const followedBy = new Map<string, string>();
-    let root: string | undefined;
-    for (const [id, node] of nodes) {
-      if (node.older === null) root = id;
-      else followedBy.set(node.older, id);
+    const followedBy = new Map<DecisionRef, DecisionRef>();
+    let root: DecisionRef | undefined;
+    for (const [decision, node] of nodes) {
+      if (node.older === null) root = decision;
+      else followedBy.set(node.older, decision);
     }
 
     const ordered: Array<{
@@ -870,7 +882,7 @@ export class ReadSurface extends SessionCore {
     while (cursor) {
       const node = nodes.get(cursor)!;
       ordered.push({
-        decision: ref("decision", cursor),
+        decision: cursor,
         reason: node.reason,
         citing: [...node.citing.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
       });
@@ -1180,7 +1192,7 @@ export class ReadSurface extends SessionCore {
     // Seeded with the entry claim now that it holds ids. It could not be while
     // it held wording -- a set of names cannot be primed with a claim -- so a
     // self-loop was caught one step late.
-    const seen = new Set<string>([claim]);
+    const seen = new Set<ClaimRef>([claim]);
 
     for (;;) {
       const rows = await this.graph.query(
@@ -1601,7 +1613,7 @@ export class ReadSurface extends SessionCore {
     analysis: AnalysisRef,
     rebuilt: Array<{ part: ObservationsRef; hash: IdentityString }>,
   ): Promise<ReproducibilityReport> {
-    const offered = new Map<string, IdentityString>(rebuilt.map((r) => [r.part, r.hash]));
+    const offered = new Map<ObservationsRef, IdentityString>(rebuilt.map((r) => [r.part, r.hash]));
 
     // An absent subject and an empty one are different states, and answering
     // them alike is what let this report say `reproducible: true` about nothing
@@ -1626,7 +1638,7 @@ export class ReadSurface extends SessionCore {
     const unverifiable: IdentifiedArtefact[] = [];
     const notRebuilt: IdentifiedArtefact[] = [];
     for (const { a } of parts) {
-      const candidate = offered.get(a.natural_id);
+      const candidate = offered.get(ref("observations", a.natural_id));
       // Two ways for no comparison to happen, and neither is inequality:
       // the record has no hash (permanent, about the artefact), or this
       // attempt did not rebuild the part (about the attempt). `differing` is a
@@ -1726,7 +1738,7 @@ export class ReadSurface extends SessionCore {
     // CONSUMES and PRODUCES, and AGE has no edge-type alternation at all
     // (see CLAUDE.md's gotchas). Visited-set rather than a depth cap, so a
     // cycle terminates without silently truncating a legitimate long pipeline.
-    const reached = new Set<string>([start]);
+    const reached = new Set<ObservationsRef>([start]);
     for (let frontier = [start]; frontier.length > 0; ) {
       const next: ObservationsRef[] = [];
       for (const id of frontier) {
@@ -1737,8 +1749,8 @@ export class ReadSurface extends SessionCore {
           { id },
         );
         for (const row of downstream) {
-          if (reached.has(row.out.natural_id)) continue;
-          reached.add(row.out.natural_id);
+          if (reached.has(ref("observations", row.out.natural_id))) continue;
+          reached.add(ref("observations", row.out.natural_id));
           next.push(ref("observations", row.out.natural_id));
         }
       }
@@ -1750,8 +1762,8 @@ export class ReadSurface extends SessionCore {
     // previous version -- a `Set<string>` of names -- silently merged them, so
     // invalidating a record under one reported one affected claim where there
     // were two.
-    const claims = new Map<string, AffectedClaim>();
-    const enquiries = new Map<string, AffectedEnquiry>();
+    const claims = new Map<ClaimRef, AffectedClaim>();
+    const enquiries = new Map<EnquiryRef, AffectedEnquiry>();
     for (const artefact of reached) {
       const { claims: c, enquiries: e } = await this.restingOnArtefact(ref("observations", artefact));
       for (const found of c) claims.set(found.claim, found);

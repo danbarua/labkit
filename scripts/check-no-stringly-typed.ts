@@ -22,9 +22,16 @@
  * parameters are bound as `Record<string, unknown>`, so nothing — this script
  * or `tsc` — catches `{ id: gate }` where `{ id: gate.id }` was meant. Three of
  * those shipped during the refactor this script was written for and were found
- * by the test suite, not by a type. Same for `===` between two handles: `Ref`
- * is an object, so reference equality compiles and is always false. S-5 caught
- * that one. A signature rule buys signatures; the bodies still need tests.
+ * by the test suite, not by a type. Same for `===` between two handles under
+ * that shape: reference equality compiled and was always false. S-5 caught that
+ * one. A signature rule buys signatures; the bodies still need tests.
+ *
+ * **It scans class members only**, which is a scope rather than an oversight. A
+ * local arrow function inside a method body is an implementation detail, not a
+ * surface a caller reads — so `bySubject: Map<string, IdentifiedArtefact>` on
+ * one of those was out of reach here and was fixed by hand. What *is* in scope
+ * is a `Map` or `Set` in a real signature; the wrapper list below was widened
+ * after that case showed the walker stopping at `Promise` and `Array`.
  */
 
 import ts from "typescript";
@@ -92,13 +99,17 @@ function bareStringIn(node: ts.TypeNode | undefined, source: ts.SourceFile): str
     }
     return undefined;
   }
-  // `Promise<T>`, `Array<T>` — look through one level.
   if (ts.isTypeReferenceNode(node) && node.typeArguments) {
     const name = node.typeName.getText(source);
-    if (name === "Promise" || name === "Array") {
+    // Wrappers to look through. `Map`/`Set` are here because a collection keyed
+    // by a bare `string` is the same defect one level in: `bySubject:
+    // Map<string, IdentifiedArtefact>` sat in a return type and this script
+    // walked straight past it, because the first version looked only through
+    // `Promise` and `Array`.
+    if (["Promise", "Array", "ReadonlyArray", "Map", "Set", "ReadonlyMap", "ReadonlySet"].includes(name)) {
       for (const a of node.typeArguments) {
         const inner = bareStringIn(a, source);
-        if (inner) return inner;
+        if (inner) return `${name}<… ${inner} …>`;
       }
     }
     if (VALUE_TYPES.has(name)) return undefined;
