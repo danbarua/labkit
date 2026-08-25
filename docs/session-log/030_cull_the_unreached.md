@@ -1,12 +1,12 @@
 # 030: cull the unreached, name the strings, make a handle the id
 
-**Session wrap, 2026-08-24 into 08-25, on `refactor/internal-handles`.** Not a
-decision record — the reasoning is in five commit messages and PRs #13-#17.
+**Session wrap, 2026-08-24 into 08-25, on `refactor/mint-once`.** Not a
+decision record — the reasoning is in six commit messages and PRs #13-#18.
 
 **The baseline is much wider than this entry.** It is still pinned at `72dbe15`
 from the start of a long session; everything up to `3ca3cd0` belongs to entries
 022-028, and `eb431c3`/`ed8ef3a` to entry 029. This entry covers `ec852d0`,
-`65e8064`, `9173db4`, `2ae3370` and `9d37ec9`.
+`65e8064`, `9173db4`, `2ae3370`, `9d37ec9` and `c38374e`.
 
 ## Goal
 
@@ -32,9 +32,14 @@ PR #14. Five names on every property of all thirteen `*Props`; `INDEXED_PROPS`,
 `string & { readonly [KIND]: K }`; `ref()` gained a prefix check; the wire
 format became `"GATE_1"`, and `docs/mcp-tools.md` regenerated 112/319.
 
-**`9d37ec9` — internal collections key on handles.** Open as PR #17. Twenty-two
+**`9d37ec9` — internal collections key on handles.** Merged, PR #17. Twenty-two
 `Map`/`Set`/array locals; the checker widened to walk into `Map`/`Set` type
 arguments.
+
+**`c38374e` — mint each handle once.** Open as PR #18. Four lines minted the
+same handle twice — map key and object field — because the minting script in
+#17 worked line by line and could not see it. A scan for the shape now comes
+back empty.
 
 **Branch cleanup.** 19 local and 15 remote branches deleted, each verified
 merged into `origin/main` first — including one that looked unmerged and was
@@ -45,8 +50,8 @@ Working tree clean.
 
 ## Verified
 
-Each commit, none of it piped: `bun test` **323 / 324 / 324 / 325 / 325 pass, 0
-fail, exit 0**; `typecheck`; `depcruise` (101 modules); every `check:*` script,
+Each commit, none of it piped: `bun test` **323 / 324 / 324 / 325 / 325 / 325
+pass, 0 fail, exit 0**; `typecheck`; `depcruise` (101 modules); every `check:*` script,
 including the two added here.
 
 **Both new checkers found something on their first run**, which is this repo's
@@ -96,9 +101,22 @@ type.
 
 ## Next
 
-PR #17 awaits review. Then the persisted event store: `labkit_event` in
-`src/db/schema.ts`, `emit` made async and moved inside each verb's
-`inTransaction`, and the minted-ids collector on `TenantGraph` whose residue
-guard is one line in `inTransaction`'s existing `finally`. `emit`'s `subject`
-gets its type there — allowlisted in `check:no-stringly-typed` for exactly that
-reason, and the handle shape it will store is now settled.
+PR #18 awaits review. **The refactoring arc is complete** — #13-#18 were all
+"make the existing thing say what it means", and the next work is a feature.
+
+The persisted event store, whose plan predates all of this and needs revising
+first. Five things in it are now settled rather than open:
+
+- **`emit`'s `subject` type.** Deliberately deferred; a handle is a branded
+  string now, so the column is `text` holding a natural id and `subject` can be
+  typed. Its entry in `check:no-stringly-typed`'s allowlist comes out in the
+  same change — that entry exists only to hold this open.
+- **The event columns' types come from the taxonomy.** `git_hash` is an
+  `IdentityString`, `attribution_label` a `ReadOnlyString`, `at` a `Timestamp`.
+- **`created text[]` has a precedent.** The plan argued for it against an
+  untested assumption; `Task.mayRead` and `CONSUMES.positions` now demonstrate
+  native agtype arrays end to end.
+- **The minted-ids collector's residue guard** is one line in `inTransaction`'s
+  existing `finally`, read closely twice.
+- **`labkit_event` is the first LabKit table besides `tenants`**, so it needs a
+  `tenant_id` — the one genuinely new architectural fact, unchanged.

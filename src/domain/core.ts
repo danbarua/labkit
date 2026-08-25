@@ -193,8 +193,10 @@ export class SessionCore {
         { t: vertexProps<{ objective: string; natural_id: string }>() },
         { id: gate },
       );
-      for (const row of rows)
-        found.set(ref("work", row.t.natural_id), { work: ref("work", row.t.natural_id), objective: row.t.objective });
+      for (const row of rows) {
+        const work = ref("work", row.t.natural_id);
+        found.set(work, { work, objective: row.t.objective });
+      }
     }
     return [...found.values()].sort((a, b) => a.work.localeCompare(b.work));
   }
@@ -223,9 +225,11 @@ export class SessionCore {
           { c: vertexProps<{ name: string; kind?: string; natural_id: string }>() },
           { id: gate },
         );
-        for (const row of rows)
-          if (row.c.kind === "confirmatory")
-            affected.set(ref("claim", row.c.natural_id), { claim: ref("claim", row.c.natural_id), asserts: row.c.name });
+        for (const row of rows) {
+          if (row.c.kind !== "confirmatory") continue;
+          const claim = ref("claim", row.c.natural_id);
+          affected.set(claim, { claim, asserts: row.c.name });
+        }
       }
     }
     return [...affected.values()].sort((a, b) => a.claim.localeCompare(b.claim));
@@ -292,8 +296,10 @@ export class SessionCore {
         { q: vertexProps<{ name: string; natural_id: string }>() },
         { name: scope.proposition, ...this.scopeParams(scope) },
       );
-      for (const row of rows)
-        asked.set(ref("question", row.q.natural_id), { question: ref("question", row.q.natural_id), asks: row.q.name });
+      for (const row of rows) {
+        const question = ref("question", row.q.natural_id);
+        asked.set(question, { question, asks: row.q.name });
+      }
     }
     return [...asked.values()].sort((a, b) => a.question.localeCompare(b.question));
   }
