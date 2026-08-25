@@ -1035,9 +1035,11 @@ queries and happens **once per file**; provisioning is 8-18% of query time in
 the files that actually fail.
 
 The predictor is **queries per test**. Files cluster from 6 to ~280 and
-individual tests reach ~380, which is the band that straddles 5000ms once
-per-round-trip latency degrades under load — and that threshold effect, not one
-broken test, is why 7-15 *different* tests fail each run.
+individual tests reach ~380, which is the band that straddled 5000ms once
+per-round-trip latency degraded under load — and that threshold effect, not one
+broken test, is why 7-15 *different* tests failed each run. Those figures are of
+2026-08-24 and describe the suite as it was; see the re-measurement below for
+what it does now.
 
 **The per-round-trip figure everyone quotes is `311 queries / 4.955s` ≈ 16ms,
 measured 2026-08-21 and not since.** It is not today's rate and should not be
@@ -1056,16 +1058,52 @@ hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
 `timed out after 5000ms`, the body wording. So in the files that set up from
 `beforeEach`, setup cost is not the mechanism.
 
-**Three changes have been made against it and none moved the failure rate.**
-Measured 2026-08-24, twelve runs each, ABBA-interleaved under saturated CPU:
-cutting query counts ~30%, moving setup off the per-test clock, and booting one
-PGlite instead of 44. All three bought wall time — 5%, 7% and **40%** — and left
-the failure median where it was. Making the suite faster does not make it less
-flaky, because the ceiling is crossed by whichever test is unlucky rather than
-by the slowest one.
+**It stopped happening, and the honest version is that nobody knows which
+change did it.** Re-measured 2026-08-25 by the method below — five full runs
+under saturated CPU on a 10-core machine — **0 failures in all five**, 352 tests,
+128-147s each. Against a documented 7-15 per run, that is not noise.
+
+What the margin actually is, same load, ceiling lowered deliberately:
+
+| ceiling | failures |
+| --- | --- |
+| 500ms | 41 |
+| 1000ms | 103 |
+| 2000ms | 2 |
+| 3000ms | 1 |
+| **5000ms** (bun's default) | **0, five times** |
+
+So roughly **2.5× headroom**, not infinite. One test still crosses at 3000ms.
+A slower machine, or a few more query-heavy tests, would put it back — this is
+a suite that now fits, not a mechanism that was removed. (The 500-vs-1000
+inversion is the cascade being chaotic at absurd settings, not a measurement
+error; do not read a trend into it.)
+
+**Three changes were each measured against this and none moved it at the time.**
+2026-08-24, twelve runs each, ABBA-interleaved under the same load: cutting
+query counts ~30%, moving setup off the per-test clock, and booting one PGlite
+instead of 44. All three bought wall time — 5%, 7% and **40%** — and left the
+failure median where it was. The suite is now far faster than when any of them
+was measured alone, and PGlite 0.5.7 landed the same day; which of those closed
+it is not established and would need a bisect nobody has run. **Do not write
+down a cause for this.**
 
 **Before profiling, ask what the profiler cannot see.** `LABKIT_TRACE`
 instruments the `LabKitDB` seam and therefore cannot observe anything before a
 connection exists. WASM boot was 44-110s of a ~200s suite and invisible to it,
-so three rounds of hypotheses were all downstream of the largest cost. `docs/TASKS.md` carries the method and what has been refuted; session-log
-entries 022, 024 and 026 carry the numbers.
+so three rounds of hypotheses were all downstream of the largest cost.
+
+**The method, kept because the next re-measurement needs it.** Saturate
+`sysctl -n hw.ncpu` cores with busy loops, run `bun test` redirected to a file,
+kill the loops, count `^\(fail\)` lines. A clean machine passes on every arm —
+run-to-run wall time varied **4× on identical code** when idle, so induced load
+*reduces* variance rather than adding it, and a green run on a quiet laptop is
+not evidence of anything. To measure the margin rather than the rate, lower
+`--timeout` instead of adding load. Do not use `grep -c … || echo 0`: grep
+prints `0` **and** exits 1, so the field doubles.
+
+**Refuted with evidence, so nobody re-investigates from scratch:** advisory-lock
+contention; the pglite-socket desync bug as primary mechanism; fd/socket
+exhaustion; WASM heap growth; `afterAll` not awaited; bun's runner; provisioning
+cost; query count per test. Session-log entries 022, 024, 026 and 028 carry the
+numbers.
