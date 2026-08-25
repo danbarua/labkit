@@ -136,10 +136,14 @@ handle() {
 
 # ---------------------------------------------------------------------------
 
+# The document's own title is a heading, not prose. It was inside the prose
+# block until someone noticed the one header on the page that was not styled as
+# one.
+printf '%s%s%s\n' "$S_HEAD" "LabKit, by worked example" "$S_OFF"
+printf '%s%s%s\n' "$S_RULE" "=========================" "$S_OFF"
+
 printf '%s' "$S_PROSE"
 cat <<'INTRO'
-LabKit, by worked example
-=========================
 
 LabKit is a research control plane. It records why a computation was run, what
 evidence came out of it, which claims and decisions rest on that evidence, and
