@@ -878,12 +878,31 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
         // capped. The cap is here and not in the surface for the same reason
         // the MCP tool carries its own: a terminal that scrolls a thousand
         // events has answered nothing.
+        // Refused rather than coerced. `Number("abc")` is `NaN`, which reaches
+        // `pgEventLog` as a bound SQL parameter and comes back as an empty
+        // result -- a wrong-shaped answer to a question the caller mistyped.
+        // The MCP tool gets this from zod; a CLI has to say it.
+        const whole = (name: string): number | undefined => {
+          const raw = flags[name];
+          if (raw === undefined) return undefined;
+          const n = Number(raw);
+          if (!Number.isInteger(n)) throw new Error(`--${name} takes a whole number, not \`${raw}\``);
+          return n;
+        };
+        let since: number | undefined;
+        let limit: number | undefined;
+        try {
+          since = whole("since");
+          limit = whole("limit");
+        } catch (e) {
+          return usageError((e as Error).message);
+        }
         const filter: EventFilter = {
           ...(positionals[0] === undefined ? {} : { touching: positionals[0] }),
-          ...(flags.since === undefined ? {} : { since: Number(flags.since) }),
+          ...(since === undefined ? {} : { since }),
           ...(flags.by === undefined ? {} : { by: flags.by }),
           ...(flags.operation === undefined ? {} : { operation: flags.operation }),
-          limit: flags.limit === undefined ? 50 : Number(flags.limit),
+          limit: limit ?? 50,
         };
         const events = await read.whatHappened(filter);
         return show(json, { events }, () => renderHappened(events)), 0;

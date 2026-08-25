@@ -99,7 +99,7 @@ test("the CLI hands the event log in rather than letting it default", () => {
 // interpretation through five verbs would test that again rather than this.
 // ---------------------------------------------------------------------------
 
-import { parseArgs, renderEnquiry, renderWhy, renderKnown } from "../src/cli";
+import { main, parseArgs, renderEnquiry, renderWhy, renderKnown } from "../src/cli";
 import type { EnquiryStatus, SupportExplanation, KnowledgeSurvey } from "../src/domain";
 
 test("flags may precede the positional argument", () => {
@@ -455,4 +455,26 @@ test("an empty event log does not read as an empty record", () => {
   expect(out).toContain("claude-opus-5");
   expect(out).toContain("@01234567");
   expect(out).toContain("CLM_1");
+});
+
+test("a non-numeric --since or --limit is refused, not coerced", async () => {
+  // `Number("abc")` is `NaN`, which reaches `pgEventLog` as a bound SQL
+  // parameter and comes back empty -- a wrong-shaped answer to a question the
+  // caller mistyped. The MCP tool gets this from zod; a CLI has to say it.
+  //
+  // This opens a database, because `main()` connects before it dispatches --
+  // the same as every other `usageError` path here. Measured, not assumed: the
+  // first version of this comment claimed it did not, and the `.labkit`
+  // directory it left behind said otherwise.
+  const said: string[] = [];
+  const stderr = console.error;
+  console.error = (...args: unknown[]) => void said.push(args.join(" "));
+  try {
+    expect(await main(["happened", "--limit", "abc"])).toBe(2);
+    expect(await main(["happened", "--since", "1.5"])).toBe(2);
+  } finally {
+    console.error = stderr;
+  }
+  expect(said.join("\n")).toContain("--limit takes a whole number");
+  expect(said.join("\n")).toContain("--since takes a whole number");
 });
