@@ -1422,7 +1422,8 @@ export class WriteSurface extends SessionCore {
           "SUPPORTS",
           narrower.natural_id,
         );
-        carried.set(ref("evidence", row.e.natural_id), { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
+        const evidence = ref("evidence", row.e.natural_id);
+        carried.set(evidence, { evidence, states: row.e.statement });
       }
 
       return { narrower, carried };
