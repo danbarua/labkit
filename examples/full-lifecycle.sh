@@ -56,7 +56,15 @@ quoted() {
 LAST=""
 lab() {
   printf '\n$ labkit %s\n' "$(quoted "$@")"
-  LAST="$(bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@")"
+  # `FORCE_COLOR=1` because `$( )` is a pipe: the CLI correctly turns colour off
+  # when stdout is not a terminal, so without this an example about what LabKit
+  # *shows you* would print in white the moment it captured anything.
+  #
+  # Safe only because a handle-only answer is never coloured, even forced — see
+  # `asHandles` in `src/cli/output.ts`. A write verb's `$LAST` is therefore a
+  # bare id that `handle()` can prefix-check and the next command can consume,
+  # while a read's `$LAST` carries the colour a reader is here to see.
+  LAST="$(FORCE_COLOR=1 bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@")"
   printf '%s\n' "$LAST"
 }
 
