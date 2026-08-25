@@ -42,7 +42,14 @@ matching the call as a node. Callers in `tests/mcp.test.ts` and
 `tests/cli/coverage.test.ts` updated; comment-stripping dropped where the AST
 made it unnecessary.
 
-**`0ab2850`, `6845934`, `fa3b8d2`, and this commit** are the entry.
+**`f080144` — `CLAUDE.md`, `docs/TASKS.md`, and this entry.** Line 216 said
+"There is no lint script yet" in the pull request that adds one. And the larger
+version of it: three findings that had been written into this entry's `## Open`
+moved to CLAUDE.md, where a standing fact gets read — an exclusion list is a
+tell, `\s` is not a character class in BSD `sed`, and the sweep's two
+deliberate omissions. The linter triage went to `docs/TASKS.md`.
+
+**`0ab2850`, `6845934`, `fa3b8d2`, `2957ae1` and this commit** are the entry.
 
 Working tree clean.
 
