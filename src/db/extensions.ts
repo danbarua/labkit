@@ -37,6 +37,21 @@
  * `import.meta.url` does not name a directory on disk once the code is in a
  * bundle — and the only way to find them was to run the binary again after each
  * fix. {@link pgliteAssets} covers the third.
+ *
+ * **Known upstream, and unfixed.** PGlite #414 and Bun #15032 are the same
+ * `ENOENT … /$bunfs/root/pglite.data`, open since Bun 1.1.33 / PGlite 0.2.12
+ * and labelled `bundlers-nextjs/emsdk` — outside the maintainers' control. So
+ * this is not a local oddity and there is no version to wait for.
+ *
+ * https://github.com/electric-sql/pglite/issues/414
+ * https://github.com/oven-sh/bun/issues/15032
+ *
+ * **{@link pgliteAssets} is PGlite's own documented answer**, not a workaround
+ * invented here: https://pglite.dev/docs/bundler-support tells esbuild users to
+ * "manually provide `pgliteWasmModule`, `initdbWasmModule` and `fsBundle`",
+ * which is exactly what it does. The extension tarballs are **not** covered
+ * there — that page says nothing about `.tar.gz` bundles — so {@link streamable}
+ * is the part with no prior art, and the part worth reporting upstream.
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

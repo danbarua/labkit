@@ -238,6 +238,20 @@ through `zlib`, and `$bunfs` does not implement streaming. `existsSync` returns
 true and `open` then fails `ENOENT` — a confusing pair. Those two tarballs are
 written once to a temp file; everything else is read in place.
 
+**Known upstream and unfixed**, so this is not a local oddity and there is no
+version to wait for: [pglite#414](https://github.com/electric-sql/pglite/issues/414)
+and [bun#15032](https://github.com/oven-sh/bun/issues/15032) are the same
+`ENOENT … /$bunfs/root/pglite.data`, open since Bun 1.1.33. The asset handover
+is PGlite's own documented answer for restricted environments
+([bundler support](https://pglite.dev/docs/bundler-support)); the extension
+tarballs are not covered there and are the part with no prior art.
+
+**Drizzle's documented advice does not fix this**, and that was measured rather
+than assumed. Its docs say to copy `drizzle/` alongside the build output — which
+is right for a `dist` deployment run by Node, and insufficient here: a binary
+built that way finds the folder and then dies on `pglite.data`, because two of
+the three bugs are PGlite's, not drizzle's.
+
 The general lesson, which cost three rounds of build-and-run: **each fix moved
 the failure one step later rather than removing it**, and the only way to find
 the next was to run the binary again. Nothing had ever run it.
