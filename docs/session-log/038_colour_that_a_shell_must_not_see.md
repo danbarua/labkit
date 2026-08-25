@@ -32,6 +32,17 @@ One commit, open as **PR #27**.
 - `docs/TASKS.md` — Task 1 deleted, the binary renumbered to 1.
 - `CLAUDE.md`, `package.json`, `bun.lock`.
 
+**`32f0ca9` — the example forces colour.** `bun run example` was still a wall of
+white: it captures each command with `$( )`, so the CLI saw a pipe and correctly
+turned colour off. `FORCE_COLOR=1` in `lab()`, which is safe **only** because a
+handle-only answer is never coloured even when forced — so a write verb's
+`$LAST` is still a bare id the next command can consume while a read's carries
+the colour. `scripts/smoke-cli.sh` deliberately unchanged: it asserts on
+substrings of the same output, and checking versus showing is why the two were
+split.
+
+**`b86918d`** and this commit are the entry.
+
 Working tree clean.
 
 ## Verified
@@ -44,11 +55,19 @@ Working tree clean.
   `node:util`'s `styleText` and `ansis` both write escapes into a pipe;
   picocolors does not. picocolors also survives `bun build --compile`, checked
   rather than assumed.
+- `bun run example` — exit 0, and **53 escape sequences in a transcript that had
+  none**. Both properties confirmed in the same run: `LOE_1`, `CRIT_1`, `COMP_1`
+  and `CLM_1` appear as bare lines, and `labkit gate` shows `never-evaluated`
+  dim, `satisfied` green, handles cyan.
 
 ## Open
 
 **Nothing from this work.** Task 1 is closed and `docs/TASKS.md` is down to one
 item: the compiled binary that cannot migrate.
+
+One thing worth a reader's attention rather than an action: the CLI shipped
+correct and the *example* was wrong, and neither `bun run check` nor any test
+would ever have said so. A transcript being white is not a failing assertion.
 
 ## Next
 
