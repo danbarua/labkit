@@ -25,19 +25,24 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
-# src/cli.ts is the exception and the only one: printing to stdout is its whole
-# job. It is never imported by the MCP server.
+# `src/cli/cli.ts` is the exception and the only one: printing to stdout is its
+# whole job, and it is never imported by the MCP server.
+#
+# It names the **entry point**, not the `src/cli/` tree. The views under it
+# return strings, and one of them printing instead of returning is a defect this
+# check should still catch -- demonstrated on 2026-08-25 by adding a console.log
+# to `src/cli/views/format.ts` and watching this go red.
 #
 # Comment lines are dropped before matching. Naming the banned call in prose is
 # not making it -- the first version of this script failed on its own docstring,
-# which is the same trap tests/cli.test.ts already strips comments to avoid.
+# which is the same trap tests/cli/coverage.test.ts already strips comments to avoid.
 matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' src/ \
   --include='*.ts' 2>/dev/null \
-  | grep -v '^src/cli\.ts:' \
+  | grep -v '^src/cli/cli\.ts:' \
   | grep -vE '^[^:]+:[0-9]+: *(\*|//|/\*)' || true)"
 
 if [ -n "$matches" ]; then
-  echo "❌ check-stdout ERROR: writes to stdout under src/, outside src/cli.ts:"
+  echo "❌ check-stdout ERROR: writes to stdout under src/, outside src/cli/cli.ts:"
   echo
   echo "$matches"
   echo

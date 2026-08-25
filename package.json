@@ -6,14 +6,14 @@
   "main": "src/index.ts",
   "type": "module",
   "bin": {
-    "labkit": "src/cli.ts"
+    "labkit": "src/cli/cli.ts"
   },
   "scripts": {
-    "dev": "bun run src/cli.ts",
+    "dev": "bun run src/cli/cli.ts",
     "mcp": "bun run src/mcp/server.ts",
     "dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
     "docs:tools": "bun scripts/render-tool-docs.ts",
-    "build": "bun build --compile --outfile bin/labkit src/cli.ts",
+    "build": "bun build --compile --outfile bin/labkit src/cli/cli.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "check:doc-comments": "bun scripts/check-doc-comments.ts",
@@ -24,6 +24,8 @@
     "check:stdout": "bash scripts/check-stdout.sh",
     "check:pglite-concurrency": "bash scripts/check-pglite-concurrency.sh",
     "check:tests-assert": "bun scripts/check-tests-assert.ts",
+    "check:test-teardown": "bun scripts/check-test-teardown.ts",
+    "check:cli": "bash scripts/smoke-cli.sh",
     "example": "bash examples/full-lifecycle.sh",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom"
@@ -48,6 +50,7 @@
     "@electric-sql/pglite-prepopulatedfs": "^0.5.7",
     "@electric-sql/pglite-socket": "^0.2.10",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "commander": "^15.0.0",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0",
     "zod": "^4.4.3"

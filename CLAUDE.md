@@ -137,6 +137,12 @@ nothing for a sentence in a reply — the user hit unexplained shorthand three
 times in one session, twice after it was noticed and once in the same message
 that announced the glossary.
 
+`docs/persistence-spikes.md` holds dated AGE findings from 2026-08-17/18 —
+what `pglite-age` does and does not support, established by direct probe. Read
+it before changing tenancy, natural ids or provisioning. It lived at the top of
+`examples/full-lifecycle.md` until 2026-08-25, above an example nobody scrolled
+far enough to reach.
+
 `docs/GLOSSARY.md` is a pointer table for the shorthand this repo uses across
 documents — `D2`, `§5`, `bar 4`, the rungs, the ledger status words. It defines
 nothing itself; every entry names where the real definition lives, because a
@@ -190,6 +196,7 @@ bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
+bun run check:test-teardown    # a test file that opens a scenario must also reset the database
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
@@ -197,14 +204,29 @@ bun run check:no-stringly-typed  # no bare `string` in a core/read/write signatu
 bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
-bun run example               # examples/full-lifecycle.sh — a research lifecycle through the CLI
-bun run dev                    # the CLI (src/cli.ts)
+bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
+bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted
+bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
-There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
-binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is the
-full surface, reads *and* writes (`bun run dev`).
+There is no lint script yet. `bun run build` compiles `src/cli/cli.ts` to a
+binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
+resolves `drizzle/` from `import.meta.url`, which inside a compiled bundle is
+`/$bunfs/root/…`, so it dies with `Can't find meta/_journal.json file`.
+Measured 2026-08-25 against both the old and new entry points, so it predates
+the CLI split and is not caused by it. `bun run dev` and `bun test` are
+unaffected; nothing has ever run the binary against an empty database.
+`docs/TASKS.md` carries it.
+
+`src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
+surface, reads *and* writes (`bun run dev`). It is a composition root and
+nothing else: `program.ts` assembles the commands, `commands/` declares them,
+`args.ts` turns text into domain values on zod, `views/` turns reports into
+pages, and `session.ts` is the wrap that hands a command its surfaces. It
+replaced a 1435-line `src/cli.ts` whose `switch` was five hundred of them; the
+port was verified by running `examples/full-lifecycle.sh` against both and
+diffing the transcripts, which were byte-identical.
 
 **It was read-only by construction and is not any more**, and that is the same
 correction the MCP server got. Read-only was never a shipping goal; what it
@@ -217,7 +239,7 @@ with the commit that added write commands, not worked around, and
 `tests/helpers/read-only.ts` went with them.
 
 **Every public verb on either surface has a command**, derived in
-`tests/cli.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
+`tests/cli/coverage.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
 `tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
 `NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
 this paragraph deliberately does not count them. What survives from the
@@ -243,7 +265,8 @@ driving LabKit is not the account it runs under.
 **`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
 the project root by another route. `derivePort` hashes that path, so a temporary
 directory gets its own file *and* its own port, which is what makes
-`examples/full-lifecycle.sh` hermetic. `LABKIT_DB_URL` still wins over both.
+`examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic.
+`LABKIT_DB_URL` still wins over both.
 
 **`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
 one batch of work and that is not a design position: a record nothing can write
@@ -257,23 +280,30 @@ this paragraph deliberately does not count them.
 failure.** It returned 99 on a passing suite until PGlite 0.5.7 (2026-08-24)
 fixed the WASM teardown interaction behind it.
 
-`bun run example` (`examples/full-lifecycle.sh`) had the same defect in its
-predecessor and is where the lesson below was learnt. `full-lifecycle.ts` exited
-99 on a success, so this file told everyone to ignore its exit code and read the
-output instead — and the script had been dead since `af5a1d2` deleted the views
-it read back through, dying at `relation "labkit_t1.claim" does not exist` for
-221 commits. The rule was added *the same day, after the break*, by the commit
-whose subject was closing out the last verification step. Declaring the exit code
-meaningless left the genuine failure with no watcher either.
+`bun run check:cli` (`scripts/smoke-cli.sh`) is where the lesson below was
+learnt, by its predecessor. `examples/full-lifecycle.ts` exited 99 on a success,
+so this file told everyone to ignore its exit code and read the output instead —
+and the script had been dead since `af5a1d2` deleted the views it read back
+through, dying at `relation "labkit_t1.claim" does not exist` for 221 commits.
+The rule was added *the same day, after the break*, by the commit whose subject
+was closing out the last verification step. Declaring the exit code meaningless
+left the genuine failure with no watcher either.
 
-The shell version keeps what that cost bought: **0 means it worked and nothing
-else does**, it asserts on the answers rather than on whether the commands ran,
-and each assertion is one a person could check by hand. It is hermetic —
-`--db` points it at a temporary directory removed on exit — so it can neither
-touch a working database nor contend with one. It also **drives the CLI and
-nothing else**, where `full-lifecycle.ts` wrote by calling
-`TenantGraph.createNode` underneath the domain layer: a writer that put nodes on
-the record no verb had recorded making.
+**0 means it worked and nothing else does.** It asserts on the answers rather
+than on whether the commands ran, it is hermetic (`--db` into a temporary
+directory removed on exit), and it **drives the CLI and nothing else** — where
+`full-lifecycle.ts` wrote by calling `TenantGraph.createNode` underneath the
+domain layer, putting nodes on the record no verb had recorded making. It is the
+only thing that runs the CLI process against a real database.
+
+**`bun run example` is the other half of that split, and it is for reading.** It
+was one script until 2026-08-25, and being both made it neither: it captured
+every answer into a variable and printed `ok <label>`, so someone running
+something called *example* watched fifteen assertions pass and learnt nothing
+about what LabKit is or what a command prints. It now shows each command as
+typed with its real output. The two are expected to diverge — the example shows
+a happy path a person would follow; the check is free to assert an absence, a
+bucket boundary or a refusal, which nobody wants narrated.
 
 The general lesson, which cost more than the script did: **a rule that tells
 readers to ignore a signal removes the only watcher that signal had.** If a

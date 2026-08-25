@@ -66,9 +66,8 @@ One trap in this repo, which has caught someone already (see CLAUDE.md):
   reports `tail`'s success. Don't pipe a command whose status you intend to
   report — redirect to a file and read the file.
 
-Exit codes are otherwise trustworthy: `bun test` and `bun run example`
-(`examples/full-lifecycle.sh`) both return 0 on success and non-zero on
-failure.
+Exit codes are otherwise trustworthy: `bun test` and `bun run check:cli`
+(`scripts/smoke-cli.sh`) both return 0 on success and non-zero on failure.
 
 ## 3. Write the entry
 
