@@ -13,6 +13,7 @@
 
 import { Command } from "commander";
 import { registerReads } from "./commands/reads";
+import { registerWrites } from "./commands/writes";
 import type { Globals, Run } from "./session";
 
 /**
@@ -50,5 +51,6 @@ export function buildProgram(run: Run): Command {
     .showHelpAfterError();
   globalOptions(program);
   registerReads(program, run);
+  registerWrites(program, run);
   return program;
 }

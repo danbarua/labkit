@@ -21,7 +21,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ReadSurface } from "../../src/domain";
+import { ReadSurface, WriteSurface } from "../../src/domain";
 import { publicVerbsOf, verbsReachedIn } from "../helpers/surface-coverage";
 
 const COMMANDS_DIR = "src/cli/commands";
@@ -49,6 +49,7 @@ test("the command modules were found at all", () => {
   // would otherwise make every test below pass by having nothing to read.
   expect(commandSource.length).toBeGreaterThan(1000);
   expect(commandSource).toContain("read.whatIsKnown(");
+  expect(commandSource).toContain("write.recordAnalysis(");
 });
 
 test("every read verb the domain exposes has a CLI command", () => {
@@ -63,6 +64,22 @@ test("every read verb the domain exposes has a CLI command", () => {
 
   const unreachable = reads
     .filter((v) => verbsReachedIn(commandSource, "read", [v]).length === 0)
+    .filter((v) => !(v in NO_COMMAND_FOR));
+  expect(unreachable).toEqual([]);
+});
+
+test("every write verb the domain exposes has a CLI command", () => {
+  const writes = publicVerbsOf("src/domain/write.ts");
+  expect(writes.length).toBeGreaterThan(10);
+  expect(writes).toContain("recordAnalysis");
+  for (const verb of writes) {
+    expect(typeof (WriteSurface.prototype as unknown as Record<string, unknown>)[verb]).toBe(
+      "function",
+    );
+  }
+
+  const unreachable = writes
+    .filter((v) => verbsReachedIn(commandSource, "write", [v]).length === 0)
     .filter((v) => !(v in NO_COMMAND_FOR));
   expect(unreachable).toEqual([]);
 });
