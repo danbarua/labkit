@@ -88,6 +88,7 @@ import type {
   DecisionRef,
   EvidenceRef,
   InputRef,
+  Ref,
   GateRef,
   UnitRef,
   WorkRef,
@@ -125,6 +126,7 @@ import type {
   SharpenCommand,
 } from "./commands";
 import { SessionCore } from "./core";
+import type { Operation } from "./events";
 
 /**
  * A conclusion **already on the record**, as read back from the graph.
@@ -155,9 +157,11 @@ export class WriteSurface extends SessionCore {
    * different reasons and only the asker knows whether they meant one.
    */
   async pose(question: Prose): Promise<QuestionRef> {
-    const asked = await this.posed(question);
-    this.emit("pose", asked, { question });
-    return asked;
+    return this.graph.inTransaction(async () => {
+      const asked = await this.posed(question);
+      await this.emit("pose", asked, { question });
+      return asked;
+    });
   }
 
   /**
@@ -182,12 +186,14 @@ export class WriteSurface extends SessionCore {
    * of the same question has no effect on identity either way.
    */
   async pursue(input: PursueCommand): Promise<EnquiryRef> {
-    const enquiry = await this.pursued(input);
-    this.emit("pursue", enquiry, {
-      question: input.question,
-      approach: input.approach,
+    return this.graph.inTransaction(async () => {
+      const enquiry = await this.pursued(input);
+      await this.emit("pursue", enquiry, {
+        question: input.question,
+        approach: input.approach,
+      });
+      return enquiry;
     });
-    return enquiry;
   }
 
   /** The write, without the event — see `posed`. */
@@ -215,10 +221,12 @@ export class WriteSurface extends SessionCore {
    * existed. See PJ-008 row Q.
    */
   async openEnquiry(question: Prose): Promise<EnquiryRef> {
-    const asked = await this.posed(question);
-    const enquiry = await this.pursued({ question: asked, approach: question });
-    this.emit("openEnquiry", enquiry, { question, asked: asked });
-    return enquiry;
+    return this.graph.inTransaction(async () => {
+      const asked = await this.posed(question);
+      const enquiry = await this.pursued({ question: asked, approach: question });
+      await this.emit("openEnquiry", enquiry, { question, asked: asked });
+      return enquiry;
+    });
   }
 
   /**
@@ -241,34 +249,36 @@ export class WriteSurface extends SessionCore {
    * exactly that reason.
    */
   async sharpen(input: SharpenCommand): Promise<QuestionRef> {
-    const original = await this.graph.query(
-      `MATCH (q:Question {natural_id: $id}) RETURN q`,
-      { q: vertexProps<{ name: string }>() },
-      { id: input.from },
-    );
-    if (original.length === 0)
-      throw new Error(`no question ${input.from} to sharpen`);
+    return this.graph.inTransaction(async () => {
+      const original = await this.graph.query(
+        `MATCH (q:Question {natural_id: $id}) RETURN q`,
+        { q: vertexProps<{ name: string }>() },
+        { id: input.from },
+      );
+      if (original.length === 0)
+        throw new Error(`no question ${input.from} to sharpen`);
 
-    const decision = await this.graph.createNode("Decision", {
-      decided_at: this.clock.now(),
-      reason: input.because,
-      invalidation_check:
-        "evidence that the sharper question was the wrong one to ask",
+      const decision = await this.graph.createNode("Decision", {
+        decided_at: this.clock.now(),
+        reason: input.because,
+        invalidation_check:
+          "evidence that the sharper question was the wrong one to ask",
+      });
+      await this.graph.createEdge(decision.natural_id, "NARROWS", input.from);
+
+      for (const finding of await this.standingFindings()) {
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", finding);
+      }
+
+      const sharper = await this.posed(input.into);
+      await this.graph.createEdge(decision.natural_id, "MOTIVATES", sharper);
+      await this.emit("sharpen", sharper, {
+        from: input.from,
+        because: input.because,
+        via: decision.natural_id,
+      });
+      return sharper;
     });
-    await this.graph.createEdge(decision.natural_id, "NARROWS", input.from);
-
-    for (const finding of await this.standingFindings()) {
-      await this.graph.createEdge(decision.natural_id, "BASED_ON", finding);
-    }
-
-    const sharper = await this.posed(input.into);
-    await this.graph.createEdge(decision.natural_id, "MOTIVATES", sharper);
-    this.emit("sharpen", sharper, {
-      from: input.from,
-      because: input.because,
-      via: decision.natural_id,
-    });
-    return sharper;
   }
 
   /** Every finding currently on the record — what "we knew at the time" means when an act is recorded. */
@@ -315,65 +325,67 @@ export class WriteSurface extends SessionCore {
    * neither of, or through a required `USES -> Computation`.
    */
   async recordObservations(input: RecordObservationsCommand): Promise<ObservationsRef> {
-    // Atomic, and this is the sharper half of row AD's fix. Before the unit
-    // existed there was nothing an interrupted call could leave behind that the
-    // model called impossible; now a failure between the evidence and the unit
-    // would write *precisely* the invariant this verb was changed to stop --
-    // durably, and looking exactly like the eighteen scenarios of records that
-    // predate the fix. See TenantGraph.inTransaction.
-    const artefact = await this.graph.inTransaction(async () => {
-      const artefact = await this.graph.createNode("Artefact", {
-        kind: "observations",
-        logical_name: input.name,
-        ...(input.contentHash ? { content_hash: input.contentHash } : {}),
+    return this.graph.inTransaction(async () => {
+      // Atomic, and this is the sharper half of row AD's fix. Before the unit
+      // existed there was nothing an interrupted call could leave behind that the
+      // model called impossible; now a failure between the evidence and the unit
+      // would write *precisely* the invariant this verb was changed to stop --
+      // durably, and looking exactly like the eighteen scenarios of records that
+      // predate the fix. See TenantGraph.inTransaction.
+      const artefact = await this.graph.inTransaction(async () => {
+        const artefact = await this.graph.createNode("Artefact", {
+          kind: "observations",
+          logical_name: input.name,
+          ...(input.contentHash ? { content_hash: input.contentHash } : {}),
+        });
+        const evidence = await this.graph.createNode("Evidence", {
+          statement: input.finding,
+        });
+        // `role` is recorded because the property is not optional, not because
+        // anything reads it: `EvidenceUnitRole` has nine values, and until this
+        // call one writer and no readers anywhere in `src/`. An "observation"
+        // value was the obvious move and was declined -- adding vocabulary to a
+        // union nothing consumes is the dead shape PJ-007 found in
+        // `buildAsClause`, and the no-cull policy does not cover it: that policy
+        // protects labels and edges, which are claims about the domain, and the
+        // CQRS views were removed on exactly this distinction. `experiment` is
+        // the nearest existing value for a measurement taken rather than
+        // inferred, and it is a placeholder until something reads the field.
+        const unit = await this.graph.createNode("EvidenceUnit", {
+          role: "experiment",
+        });
+        await this.graph.createEdge(
+          evidence.natural_id,
+          "RECORDED_IN",
+          artefact.natural_id,
+        );
+        await this.graph.createEdge(
+          unit.natural_id,
+          "PRODUCES",
+          evidence.natural_id,
+        );
+        await this.graph.createEdge(
+          unit.natural_id,
+          "ADDRESSES",
+          input.enquiry,
+        );
+        // The enquiry requires these observations -- a statement about the
+        // enquiry, not about any analysis. What a given analysis actually read is
+        // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
+        // it. Kept alongside ADDRESSES rather than replaced by it: REQUIRES says
+        // the enquiry depends on this evidence, ADDRESSES says this work was done
+        // towards the enquiry, and `whatDependsOn()` reads the first.
+        await this.graph.createEdge(
+          input.enquiry,
+          "REQUIRES",
+          evidence.natural_id,
+        );
+        return artefact;
       });
-      const evidence = await this.graph.createNode("Evidence", {
-        statement: input.finding,
-      });
-      // `role` is recorded because the property is not optional, not because
-      // anything reads it: `EvidenceUnitRole` has nine values, and until this
-      // call one writer and no readers anywhere in `src/`. An "observation"
-      // value was the obvious move and was declined -- adding vocabulary to a
-      // union nothing consumes is the dead shape PJ-007 found in
-      // `buildAsClause`, and the no-cull policy does not cover it: that policy
-      // protects labels and edges, which are claims about the domain, and the
-      // CQRS views were removed on exactly this distinction. `experiment` is
-      // the nearest existing value for a measurement taken rather than
-      // inferred, and it is a placeholder until something reads the field.
-      const unit = await this.graph.createNode("EvidenceUnit", {
-        role: "experiment",
-      });
-      await this.graph.createEdge(
-        evidence.natural_id,
-        "RECORDED_IN",
-        artefact.natural_id,
-      );
-      await this.graph.createEdge(
-        unit.natural_id,
-        "PRODUCES",
-        evidence.natural_id,
-      );
-      await this.graph.createEdge(
-        unit.natural_id,
-        "ADDRESSES",
-        input.enquiry,
-      );
-      // The enquiry requires these observations -- a statement about the
-      // enquiry, not about any analysis. What a given analysis actually read is
-      // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
-      // it. Kept alongside ADDRESSES rather than replaced by it: REQUIRES says
-      // the enquiry depends on this evidence, ADDRESSES says this work was done
-      // towards the enquiry, and `whatDependsOn()` reads the first.
-      await this.graph.createEdge(
-        input.enquiry,
-        "REQUIRES",
-        evidence.natural_id,
-      );
-      return artefact;
-    });
 
-    this.emit("recordObservations", artefact.natural_id, { name: input.name });
-    return ref("observations", artefact.natural_id);
+      await this.emit("recordObservations", ref("observations", artefact.natural_id), { name: input.name });
+      return ref("observations", artefact.natural_id);
+    });
   }
 
   /**
@@ -388,13 +400,15 @@ export class WriteSurface extends SessionCore {
    * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
-    const analysis = await this.graph.inTransaction(() => this.recorded(input));
-    this.emit("recordAnalysis", analysis.analysis, {
-      enquiry: input.enquiry,
-      method: input.method,
-      concludes: input.concludes.map((c) => c.proposition),
+    return this.graph.inTransaction(async () => {
+      const analysis = await this.graph.inTransaction(() => this.recorded(input));
+      await this.emit("recordAnalysis", analysis.analysis, {
+        enquiry: input.enquiry,
+        method: input.method,
+        concludes: input.concludes.map((c) => c.proposition),
+      });
+      return analysis;
     });
-    return analysis;
   }
 
   /**
@@ -567,19 +581,21 @@ export class WriteSurface extends SessionCore {
    * method, and nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
   async recordReview(input: RecordReviewCommand): Promise<ReviewRef> {
-    const review = await this.graph.createNode("Review", {
-      verdict: input.verdict,
+    return this.graph.inTransaction(async () => {
+      const review = await this.graph.createNode("Review", {
+        verdict: input.verdict,
+      });
+      await this.graph.createEdge(
+        review.natural_id,
+        "EVALUATES",
+        await this.unitOf(input.of).then((u) => u),
+      );
+      await this.emit("recordReview", ref("review", review.natural_id), {
+        of: input.of,
+        verdict: input.verdict,
+      });
+      return ref("review", review.natural_id);
     });
-    await this.graph.createEdge(
-      review.natural_id,
-      "EVALUATES",
-      await this.unitOf(input.of).then((u) => u),
-    );
-    this.emit("recordReview", review.natural_id, {
-      of: input.of,
-      verdict: input.verdict,
-    });
-    return ref("review", review.natural_id);
   }
 
   // -------------------------------------------------------------------------
@@ -594,112 +610,114 @@ export class WriteSurface extends SessionCore {
    * not read alike.
    */
   async closeEnquiry(input: CloseEnquiryCommand): Promise<void> {
-    // Everything is validated before anything is written. A rejected close
-    // must leave no Decision behind, and an analysis from some other enquiry
-    // must not become the stated basis for resolving this question.
-    const question = await this.questionBehind(input.enquiry);
-    if (!question)
-      throw new Error(
-        `enquiry ${input.enquiry} has no motivating question to resolve`,
-      );
-
-    // **Closing a closed question is refused, not recorded.** A second close
-    // writes a second `RESOLVES`, and `enquiryStatus()` picks between them with
-    // `.find()` over rows AGE returns in no defined order — so which close a
-    // reader sees is arbitrary. Demonstrated through the public API with no
-    // interruption at all: abandon an enquiry, later find a result and close it
-    // citing the evidence, and the record still reports `abandoned`,
-    // `answer: null`, `evidence: []`. The answer is erased, and `abandoned` is a
-    // positive classification, so PJ-011 §5 does not excuse it.
-    //
-    // This is a *different route* to the wrong answer `043` found by
-    // interruption, and it survives that fix untouched, because nothing here
-    // fails halfway. Two clean calls are enough.
-    //
-    // **Refused rather than resolved in the reader**, and the choice is not
-    // arbitrary: `closeEnquiry` is the only writer of `RESOLVES`, so with this
-    // guard two resolving decisions cannot exist, and a reader-side tie-break
-    // would be a branch nothing can reach — the `DEFERS` shape PJ-011 §6
-    // describes, where an unreachable branch was not merely dead but wrong.
-    //
-    // The refusal has something real to refuse (S-5, S-10): a caller closing a
-    // question that is already closed. Re-opening a settled question on new
-    // evidence is a *different research act* and has no verb; when a scenario
-    // needs one it gets built, rather than being smuggled in as a second close.
-    const alreadyResolved = await this.graph.query(
-      `MATCH (d:Decision)-[:RESOLVES]->(:Question {natural_id: $id}) RETURN d`,
-      { d: vertexProps<{ natural_id: string; reason: string }>() },
-      { id: question },
-    );
-    if (alreadyResolved.length > 0) {
-      throw new Error(
-        `enquiry ${input.enquiry} is already closed by decision ` +
-          `${alreadyResolved[0]!.d.natural_id} (${alreadyResolved[0]!.d.reason}); ` +
-          `closing it again would leave two decisions resolving one question`,
-      );
-    }
-
-    let answerBearing: EvidenceRef | undefined;
-    let answeredProposition: string | undefined;
-    if (input.answeredBy) {
-      // The claim identifies itself; what still has to be checked is that it
-      // belongs to THIS enquiry. One hop from the claim rather than a search
-      // for a proposition.
-      // BOTH bearings. A question answered "no" is answered on a finding that
-      // CHALLENGES its proposition -- S-4's whole case -- and checking only
-      // SUPPORTS rejected exactly the closure the scenario exists for.
-      const addresses: unknown[] = [];
-      for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-        addresses.push(
-          ...(await this.graph.query(
-            `MATCH (:Claim {natural_id: $claim})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
-             RETURN 1`,
-            { ok: scalar<number>() },
-            { claim: input.answeredBy, enquiry: input.enquiry },
-          )),
-        );
-      }
-      if (addresses.length === 0) {
+    return this.graph.inTransaction(async () => {
+      // Everything is validated before anything is written. A rejected close
+      // must leave no Decision behind, and an analysis from some other enquiry
+      // must not become the stated basis for resolving this question.
+      const question = await this.questionBehind(input.enquiry);
+      if (!question)
         throw new Error(
-          `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question`,
+          `enquiry ${input.enquiry} has no motivating question to resolve`,
+        );
+
+      // **Closing a closed question is refused, not recorded.** A second close
+      // writes a second `RESOLVES`, and `enquiryStatus()` picks between them with
+      // `.find()` over rows AGE returns in no defined order — so which close a
+      // reader sees is arbitrary. Demonstrated through the public API with no
+      // interruption at all: abandon an enquiry, later find a result and close it
+      // citing the evidence, and the record still reports `abandoned`,
+      // `answer: null`, `evidence: []`. The answer is erased, and `abandoned` is a
+      // positive classification, so PJ-011 §5 does not excuse it.
+      //
+      // This is a *different route* to the wrong answer `043` found by
+      // interruption, and it survives that fix untouched, because nothing here
+      // fails halfway. Two clean calls are enough.
+      //
+      // **Refused rather than resolved in the reader**, and the choice is not
+      // arbitrary: `closeEnquiry` is the only writer of `RESOLVES`, so with this
+      // guard two resolving decisions cannot exist, and a reader-side tie-break
+      // would be a branch nothing can reach — the `DEFERS` shape PJ-011 §6
+      // describes, where an unreachable branch was not merely dead but wrong.
+      //
+      // The refusal has something real to refuse (S-5, S-10): a caller closing a
+      // question that is already closed. Re-opening a settled question on new
+      // evidence is a *different research act* and has no verb; when a scenario
+      // needs one it gets built, rather than being smuggled in as a second close.
+      const alreadyResolved = await this.graph.query(
+        `MATCH (d:Decision)-[:RESOLVES]->(:Question {natural_id: $id}) RETURN d`,
+        { d: vertexProps<{ natural_id: string; reason: string }>() },
+        { id: question },
+      );
+      if (alreadyResolved.length > 0) {
+        throw new Error(
+          `enquiry ${input.enquiry} is already closed by decision ` +
+            `${alreadyResolved[0]!.d.natural_id} (${alreadyResolved[0]!.d.reason}); ` +
+            `closing it again would leave two decisions resolving one question`,
         );
       }
-      const found = await this.findingOn(input.answeredBy);
-      if (!found) throw new Error(`no finding bears on claim ${input.answeredBy}`);
-      answerBearing = found.evidence;
-      answeredProposition = found.asserts;
-    }
 
-    // Transactional, demonstrated — `docs/consumer-contract/043`.
-    //
-    // `RESOLVES` is written before `BASED_ON`, so an interrupted close leaves a
-    // resolving decision with nothing cited. That is *indistinguishable from a
-    // deliberate close without a cited result*, which is a legitimate call — and
-    // that shape-level similarity is exactly what made it look safe.
-    //
-    // What it is not safe from is the retry. The caller saw a throw and closes
-    // again; two decisions then resolve one question, `enquiryStatus` picks
-    // between them with `.find()` over unordered rows, and the orphan can win.
-    // The question then reports `closure: "abandoned"`, `answer: null` for a
-    // question that was answered "no" on cited evidence. The answer is not
-    // inverted — it is erased, and PJ-011 §5 does not cover it, because
-    // "abandoned" is a positive classification and not an empty result.
-    await this.graph.inTransaction(async () => {
-      const decision = await this.graph.createNode("Decision", {
-        decided_at: this.clock.now(),
-        reason: answeredProposition
-          ? `answered on "${answeredProposition}"`
-          : "closed without a cited result",
-        invalidation_check: "new evidence bearing on the question",
+      let answerBearing: EvidenceRef | undefined;
+      let answeredProposition: string | undefined;
+      if (input.answeredBy) {
+        // The claim identifies itself; what still has to be checked is that it
+        // belongs to THIS enquiry. One hop from the claim rather than a search
+        // for a proposition.
+        // BOTH bearings. A question answered "no" is answered on a finding that
+        // CHALLENGES its proposition -- S-4's whole case -- and checking only
+        // SUPPORTS rejected exactly the closure the scenario exists for.
+        const addresses: unknown[] = [];
+        for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+          addresses.push(
+            ...(await this.graph.query(
+              `MATCH (:Claim {natural_id: $claim})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
+               RETURN 1`,
+              { ok: scalar<number>() },
+              { claim: input.answeredBy, enquiry: input.enquiry },
+            )),
+          );
+        }
+        if (addresses.length === 0) {
+          throw new Error(
+            `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question`,
+          );
+        }
+        const found = await this.findingOn(input.answeredBy);
+        if (!found) throw new Error(`no finding bears on claim ${input.answeredBy}`);
+        answerBearing = found.evidence;
+        answeredProposition = found.asserts;
+      }
+
+      // Transactional, demonstrated — `docs/consumer-contract/043`.
+      //
+      // `RESOLVES` is written before `BASED_ON`, so an interrupted close leaves a
+      // resolving decision with nothing cited. That is *indistinguishable from a
+      // deliberate close without a cited result*, which is a legitimate call — and
+      // that shape-level similarity is exactly what made it look safe.
+      //
+      // What it is not safe from is the retry. The caller saw a throw and closes
+      // again; two decisions then resolve one question, `enquiryStatus` picks
+      // between them with `.find()` over unordered rows, and the orphan can win.
+      // The question then reports `closure: "abandoned"`, `answer: null` for a
+      // question that was answered "no" on cited evidence. The answer is not
+      // inverted — it is erased, and PJ-011 §5 does not cover it, because
+      // "abandoned" is a positive classification and not an empty result.
+      await this.graph.inTransaction(async () => {
+        const decision = await this.graph.createNode("Decision", {
+          decided_at: this.clock.now(),
+          reason: answeredProposition
+            ? `answered on "${answeredProposition}"`
+            : "closed without a cited result",
+          invalidation_check: "new evidence bearing on the question",
+        });
+        await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
+        if (answerBearing)
+          await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
       });
-      await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
-      if (answerBearing)
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
-    });
 
-    this.emit("closeEnquiry", input.enquiry, {
-      answeredBy: input.answeredBy ?? null,
-      proposition: answeredProposition ?? null,
+      await this.emit("closeEnquiry", input.enquiry, {
+        answeredBy: input.answeredBy ?? null,
+        proposition: answeredProposition ?? null,
+      });
     });
   }
 
@@ -721,22 +739,26 @@ export class WriteSurface extends SessionCore {
 
   /** Records a piece of work whose start a gate may protect. */
   async planWork(input: PlanWorkCommand): Promise<WorkRef> {
-    const task = await this.graph.createNode("Task", {
-      objective: input.objective,
-      mayRead: input.mayRead ?? [],
-      outputs: "",
-      acceptance: input.acceptance,
-      is_open: true,
+    return this.graph.inTransaction(async () => {
+      const task = await this.graph.createNode("Task", {
+        objective: input.objective,
+        mayRead: input.mayRead ?? [],
+        outputs: "",
+        acceptance: input.acceptance,
+        is_open: true,
+      });
+      await this.emit("planWork", ref("work", task.natural_id), { objective: input.objective });
+      return ref("work", task.natural_id);
     });
-    this.emit("planWork", task.natural_id, { objective: input.objective });
-    return ref("work", task.natural_id);
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<CriterionRef> {
-    const criterion = await this.graph.createNode("Criterion", { proposition });
-    this.emit("stateCriterion", criterion.natural_id, { proposition });
-    return ref("criterion", criterion.natural_id);
+    return this.graph.inTransaction(async () => {
+      const criterion = await this.graph.createNode("Criterion", { proposition });
+      await this.emit("stateCriterion", ref("criterion", criterion.natural_id), { proposition });
+      return ref("criterion", criterion.natural_id);
+    });
   }
 
   /**
@@ -745,30 +767,32 @@ export class WriteSurface extends SessionCore {
    * subject of S-17.
    */
   async declareGate(input: DeclareGateCommand): Promise<GateRef> {
-    if (input.governedBy.length === 0)
-      throw new Error("a gate governed by no condition is not a gate");
-    // And a gate protecting nothing is not a gate either. Before S-3b there
-    // was no way to record a check that qualifies a finding without minting
-    // one: `gateStatus()` then answered "what is blocked?" with `blocked` and
-    // an empty `gating` list -- a control-plane object asserting a consequence
-    // for work that does not exist. `recordAnalysis({ heldTo })` is how a
-    // standard with nothing downstream is recorded now.
-    if (input.protecting.length === 0)
-      throw new Error("a gate protecting nothing is not a gate");
-    const gate = await this.graph.createNode("Gate", {
-      consequence: input.consequence,
+    return this.graph.inTransaction(async () => {
+      if (input.governedBy.length === 0)
+        throw new Error("a gate governed by no condition is not a gate");
+      // And a gate protecting nothing is not a gate either. Before S-3b there
+      // was no way to record a check that qualifies a finding without minting
+      // one: `gateStatus()` then answered "what is blocked?" with `blocked` and
+      // an empty `gating` list -- a control-plane object asserting a consequence
+      // for work that does not exist. `recordAnalysis({ heldTo })` is how a
+      // standard with nothing downstream is recorded now.
+      if (input.protecting.length === 0)
+        throw new Error("a gate protecting nothing is not a gate");
+      const gate = await this.graph.createNode("Gate", {
+        consequence: input.consequence,
+      });
+      for (const criterion of input.governedBy) {
+        await this.graph.createEdge(criterion, "GOVERNS", gate.natural_id);
+      }
+      for (const work of input.protecting) {
+        await this.graph.createEdge(gate.natural_id, "GATES", work);
+      }
+      await this.emit("declareGate", ref("gate", gate.natural_id), {
+        governedBy: input.governedBy.map((c) => c),
+        protecting: input.protecting.map((w) => w),
+      });
+      return ref("gate", gate.natural_id);
     });
-    for (const criterion of input.governedBy) {
-      await this.graph.createEdge(criterion, "GOVERNS", gate.natural_id);
-    }
-    for (const work of input.protecting) {
-      await this.graph.createEdge(gate.natural_id, "GATES", work);
-    }
-    this.emit("declareGate", gate.natural_id, {
-      governedBy: input.governedBy.map((c) => c),
-      protecting: input.protecting.map((w) => w),
-    });
-    return ref("gate", gate.natural_id);
   }
 
   /**
@@ -788,56 +812,58 @@ export class WriteSurface extends SessionCore {
    * anything is written so a rejected command leaves no partial state.
    */
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<void> {
-    if (input.gate)
-      await this.assertCriterionGovernsGate(input.criterion, input.gate);
-    // Same invariant class as `assertCriterionGovernsGate`, for the other job
-    // a criterion can do: an evaluation that neither triggers a gate nor bears
-    // on a finding held to it is durable nonsense no reader would ever surface.
-    else await this.assertCriterionQualifiesSomething(input.criterion);
-    let basis: EvidenceRef | undefined;
-    if (input.citing) {
-      const found = await this.findingOn(input.citing);
-      if (!found) throw new Error(`no finding bears on claim ${input.citing}`);
-      basis = found.evidence;
-    }
-    const at = this.clock.now();
-    // Transactional, demonstrated rather than assumed — `docs/consumer-contract/041`.
-    //
-    // The docstring above argues against exactly one durable state, and guards
-    // it on the caller-error path only. Interruption is the other side of the
-    // same operation, and it was open: `EVALUATED_AS` is written *second*, so
-    // from that point the evaluation is reachable and the edges after it are
-    // the ones that say what it means.
-    //
-    // The window that earned this is `BASED_ON`. A verdict that lost it reads
-    // as reached against nothing — `basis: []`, an empty result, which PJ-011
-    // §5 says is not a wrong answer. But `isWithdrawn` is
-    // `cited > 0 && standing === 0`, so a verdict that cited nothing can never
-    // be withdrawn. Retract the evidence it was actually reached against and
-    // the gate stays **blocked** by a `fail` the record insists still stands.
-    // That is a positively false answer, not an absence, and it is what
-    // separates this verb from `sharpen` (`039`), whose partial states no
-    // reader can reach.
-    const evaluation = await this.graph.inTransaction(async () => {
-      const ev = await this.graph.createNode("CriterionEvaluation", {
-        value: input.value,
-        outcome: input.outcome,
-        evaluated_at: at,
-      });
-      await this.graph.createEdge(input.criterion, "EVALUATED_AS", ev.natural_id);
+    return this.graph.inTransaction(async () => {
       if (input.gate)
-        await this.graph.createEdge(ev.natural_id, "TRIGGERS", input.gate);
-      // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
-      // Evidence` was declared in PJ-004 and never written until S-8; without
-      // it, a condition established by measurement and one asserted by an agent
-      // returned identical records. See PJ-008 row W.
-      if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
-      return ev;
-    });
-    this.emit("evaluateCriterion", evaluation.natural_id, {
-      criterion: input.criterion,
-      ...(input.gate ? { gate: input.gate } : {}),
-      outcome: input.outcome,
+        await this.assertCriterionGovernsGate(input.criterion, input.gate);
+      // Same invariant class as `assertCriterionGovernsGate`, for the other job
+      // a criterion can do: an evaluation that neither triggers a gate nor bears
+      // on a finding held to it is durable nonsense no reader would ever surface.
+      else await this.assertCriterionQualifiesSomething(input.criterion);
+      let basis: EvidenceRef | undefined;
+      if (input.citing) {
+        const found = await this.findingOn(input.citing);
+        if (!found) throw new Error(`no finding bears on claim ${input.citing}`);
+        basis = found.evidence;
+      }
+      const at = this.clock.now();
+      // Transactional, demonstrated rather than assumed — `docs/consumer-contract/041`.
+      //
+      // The docstring above argues against exactly one durable state, and guards
+      // it on the caller-error path only. Interruption is the other side of the
+      // same operation, and it was open: `EVALUATED_AS` is written *second*, so
+      // from that point the evaluation is reachable and the edges after it are
+      // the ones that say what it means.
+      //
+      // The window that earned this is `BASED_ON`. A verdict that lost it reads
+      // as reached against nothing — `basis: []`, an empty result, which PJ-011
+      // §5 says is not a wrong answer. But `isWithdrawn` is
+      // `cited > 0 && standing === 0`, so a verdict that cited nothing can never
+      // be withdrawn. Retract the evidence it was actually reached against and
+      // the gate stays **blocked** by a `fail` the record insists still stands.
+      // That is a positively false answer, not an absence, and it is what
+      // separates this verb from `sharpen` (`039`), whose partial states no
+      // reader can reach.
+      const evaluation = await this.graph.inTransaction(async () => {
+        const ev = await this.graph.createNode("CriterionEvaluation", {
+          value: input.value,
+          outcome: input.outcome,
+          evaluated_at: at,
+        });
+        await this.graph.createEdge(input.criterion, "EVALUATED_AS", ev.natural_id);
+        if (input.gate)
+          await this.graph.createEdge(ev.natural_id, "TRIGGERS", input.gate);
+        // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
+        // Evidence` was declared in PJ-004 and never written until S-8; without
+        // it, a condition established by measurement and one asserted by an agent
+        // returned identical records. See PJ-008 row W.
+        if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
+        return ev;
+      });
+      await this.emit("evaluateCriterion", ref("evaluation", evaluation.natural_id), {
+        criterion: input.criterion,
+        ...(input.gate ? { gate: input.gate } : {}),
+        outcome: input.outcome,
+      });
     });
   }
 
@@ -858,48 +884,50 @@ export class WriteSurface extends SessionCore {
    * One event, not two: a researcher who re-verified a result did one thing.
    */
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    const at = this.clock.now();
-    // Atomic: without the second write the durable state is precisely S-10's
-    // demonstrated wrong answer -- a second independent support standing where
-    // a re-verification was meant. See TenantGraph.inTransaction.
-    const verification = await this.graph.inTransaction(async () => {
-      const original = await this.findingFor(
-        input.historical,
-        input.concludes.proposition,
-      );
-      if (!original) {
-        throw new Error(
-          `analysis ${input.historical} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
+    return this.graph.inTransaction(async () => {
+      const at = this.clock.now();
+      // Atomic: without the second write the durable state is precisely S-10's
+      // demonstrated wrong answer -- a second independent support standing where
+      // a re-verification was meant. See TenantGraph.inTransaction.
+      const verification = await this.graph.inTransaction(async () => {
+        const original = await this.findingFor(
+          input.historical,
+          input.concludes.proposition,
         );
-      }
-      const recorded = await this.recorded({
-        enquiry: input.enquiry,
-        method: input.method,
-        from: input.under,
-        concludes: [input.concludes],
+        if (!original) {
+          throw new Error(
+            `analysis ${input.historical} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
+          );
+        }
+        const recorded = await this.recorded({
+          enquiry: input.enquiry,
+          method: input.method,
+          from: input.under,
+          concludes: [input.concludes],
+        });
+        const restated = await this.findingFor(
+          recorded.analysis,
+          input.concludes.proposition,
+        );
+        if (!restated)
+          throw new Error(
+            "unreachable: the analysis just recorded this conclusion",
+          );
+        await this.graph.createEdge(restated, "REVERIFIES", original);
+        return recorded;
       });
-      const restated = await this.findingFor(
-        recorded.analysis,
-        input.concludes.proposition,
-      );
-      if (!restated)
-        throw new Error(
-          "unreachable: the analysis just recorded this conclusion",
-        );
-      await this.graph.createEdge(restated, "REVERIFIES", original);
-      return recorded;
-    });
 
-    this.emit("reverify", verification.analysis, {
-      of: input.historical,
-      proposition: input.concludes.proposition,
+      await this.emit("reverify", verification.analysis, {
+        of: input.historical,
+        proposition: input.concludes.proposition,
+      });
+      return {
+        at,
+        verification: verification.analysis,
+        of: input.historical,
+        claims: verification.claims,
+      };
     });
-    return {
-      at,
-      verification: verification.analysis,
-      of: input.historical,
-      claims: verification.claims,
-    };
   }
 
   /**
@@ -926,27 +954,29 @@ export class WriteSurface extends SessionCore {
    * CLAUDE.md's standing example of a reader with no writer, now walked.
    */
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<void> {
-    const at = this.clock.now();
-    await this.graph.inTransaction(async () => {
-      const question = await this.questionBehind(input.enquiry);
-      if (!question) throw new Error(`enquiry ${input.enquiry} pursues no question`);
+    return this.graph.inTransaction(async () => {
+      const at = this.clock.now();
+      await this.graph.inTransaction(async () => {
+        const question = await this.questionBehind(input.enquiry);
+        if (!question) throw new Error(`enquiry ${input.enquiry} pursues no question`);
 
-      const found = await this.findingOn(input.inLightOf);
-      if (!found) throw new Error(`no finding bears on claim ${input.inLightOf}`);
-      const basis = found.evidence;
+        const found = await this.findingOn(input.inLightOf);
+        if (!found) throw new Error(`no finding bears on claim ${input.inLightOf}`);
+        const basis = found.evidence;
 
-      const decision = await this.graph.createNode("Decision", {
-      decided_at: this.clock.now(),
-        reason: input.because,
-        invalidation_check: input.until,
+        const decision = await this.graph.createNode("Decision", {
+        decided_at: this.clock.now(),
+          reason: input.because,
+          invalidation_check: input.until,
+        });
+        await this.graph.createEdge(decision.natural_id, "DEFERS", question);
+        // What was known when the call was made -- S-1's requirement, and the
+        // reason `evidence` is answerable afterwards rather than only now.
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
       });
-      await this.graph.createEdge(decision.natural_id, "DEFERS", question);
-      // What was known when the call was made -- S-1's requirement, and the
-      // reason `evidence` is answerable afterwards rather than only now.
-      await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
-    });
 
-    this.emit("acceptAsUnresolved", input.enquiry, { because: input.because, until: input.until, at });
+      await this.emit("acceptAsUnresolved", input.enquiry, { because: input.because, until: input.until, at });
+    });
   }
 
   /**
@@ -977,26 +1007,28 @@ export class WriteSurface extends SessionCore {
    * check would miss a scientific change. Promotion is an act with a reason.
    */
   async promote(input: PromoteCommand): Promise<void> {
-    await this.graph.inTransaction(async () => {
-      const claim = input.claim;
-      // `invalidation_check` is the verb's own sentence about what would make a
-      // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
-      // `amendDesign` and `reinterpret`. S-14 is the one place the researcher
-      // supplies it, because there naming the condition *is* the act. Taking an
-      // `until:` here that no scenario reads would be the ceremony S-14 forbids.
-      const decision = await this.graph.createNode("Decision", {
-      decided_at: this.clock.now(),
-        reason: input.because,
-        invalidation_check: "evidence that the promoted result does not replicate",
+    return this.graph.inTransaction(async () => {
+      await this.graph.inTransaction(async () => {
+        const claim = input.claim;
+        // `invalidation_check` is the verb's own sentence about what would make a
+        // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
+        // `amendDesign` and `reinterpret`. S-14 is the one place the researcher
+        // supplies it, because there naming the condition *is* the act. Taking an
+        // `until:` here that no scenario reads would be the ceremony S-14 forbids.
+        const decision = await this.graph.createNode("Decision", {
+        decided_at: this.clock.now(),
+          reason: input.because,
+          invalidation_check: "evidence that the promoted result does not replicate",
+        });
+        await this.graph.createEdge(decision.natural_id, "PROMOTES", claim);
+        await this.graph.query(
+          `MATCH (c:Claim {natural_id: $id}) SET c.kind = 'confirmatory' RETURN c`,
+          { c: vertexProps<ClaimProps>() },
+          { id: claim },
+        );
       });
-      await this.graph.createEdge(decision.natural_id, "PROMOTES", claim);
-      await this.graph.query(
-        `MATCH (c:Claim {natural_id: $id}) SET c.kind = 'confirmatory' RETURN c`,
-        { c: vertexProps<ClaimProps>() },
-        { id: claim },
-      );
+      await this.emit("promote", input.claim, { proposition: await this.assertedBy(input.claim) });
     });
-    this.emit("promote", input.claim, { proposition: await this.assertedBy(input.claim) });
   }
 
   /**
@@ -1021,107 +1053,109 @@ export class WriteSurface extends SessionCore {
    * remembering to pass the right handle is not an ordering.
    */
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
-    const at = this.clock.now();
+    return this.graph.inTransaction(async () => {
+      const at = this.clock.now();
 
-    // Everything validated before anything is written -- a rejected amendment
-    // must not leave a decision recording a change that never happened.
-    const existing = await this.graph.query(
-      `MATCH (c:Criterion {natural_id: $id}) RETURN c`,
-      { c: vertexProps<{ proposition: string }>() },
-      { id: input.criterion },
-    );
-    const replaced = existing[0]?.c.proposition;
-    if (!replaced)
-      throw new Error(`no condition ${input.criterion} to amend`);
-
-    const cited = await this.findingOn(input.citing);
-    if (!cited) throw new Error(`no finding bears on claim ${input.citing}`);
-    const diagnosis = cited.evidence;
-
-    const gates = await this.gatesGovernedBy(input.criterion);
-    if (gates.length === 0) {
-      throw new Error(
-        `condition ${input.criterion} governs nothing; there is no locked design to amend`,
+      // Everything validated before anything is written -- a rejected amendment
+      // must not leave a decision recording a change that never happened.
+      const existing = await this.graph.query(
+        `MATCH (c:Criterion {natural_id: $id}) RETURN c`,
+        { c: vertexProps<{ proposition: string }>() },
+        { id: input.criterion },
       );
-    }
+      const replaced = existing[0]?.c.proposition;
+      if (!replaced)
+        throw new Error(`no condition ${input.criterion} to amend`);
 
-    // Amending a setting that has already been amended forks the design, and
-    // the fork is not readable: two conditions end up in force at once and
-    // `designHistory()` can no longer say what the design requires. Rejected
-    // at the write rather than thrown at the read -- state that cannot be read
-    // back is worse than a command that refuses.
-    const alreadyAmended = await this.graph.query(
-      `MATCH (:Decision)-[:CHANGES]->(c:Criterion {natural_id: $id}) RETURN c`,
-      { c: vertexProps<{ natural_id: string }>() },
-      { id: input.criterion },
-    );
-    if (alreadyAmended.length > 0) {
-      throw new Error(
-        `condition ${input.criterion} has already been amended; amend the one now in force`,
-      );
-    }
+      const cited = await this.findingOn(input.citing);
+      if (!cited) throw new Error(`no finding bears on claim ${input.citing}`);
+      const diagnosis = cited.evidence;
 
-    const prior = await this.latestAmendmentOn(gates);
-
-    // Atomic, for the same reason: interrupted after the replacement condition
-    // governs the gate but before the original is retired, the gate is governed
-    // by two conditions, one of which nobody agreed to. See
-    // TenantGraph.inTransaction.
-    const { replacement, decision } = await this.graph.inTransaction(
-      async () => {
-        const replacement = await this.graph.createNode("Criterion", {
-          proposition: input.nowRequires,
-        });
-        for (const gate of gates)
-          await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
-
-        const decision = await this.graph.createNode("Decision", {
-      decided_at: this.clock.now(),
-          reason: input.because,
-          invalidation_check:
-            "evidence that the amended setting was not the constraint after all",
-        });
-        await this.graph.createEdge(
-          decision.natural_id,
-          "CHANGES",
-          input.criterion,
+      const gates = await this.gatesGovernedBy(input.criterion);
+      if (gates.length === 0) {
+        throw new Error(
+          `condition ${input.criterion} governs nothing; there is no locked design to amend`,
         );
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
-        if (prior)
-          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
-        return { replacement, decision };
-      },
-    );
+      }
 
-    const rerun = await this.workGatedBy(gates);
-    const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
+      // Amending a setting that has already been amended forks the design, and
+      // the fork is not readable: two conditions end up in force at once and
+      // `designHistory()` can no longer say what the design requires. Rejected
+      // at the write rather than thrown at the read -- state that cannot be read
+      // back is worse than a command that refuses.
+      const alreadyAmended = await this.graph.query(
+        `MATCH (:Decision)-[:CHANGES]->(c:Criterion {natural_id: $id}) RETURN c`,
+        { c: vertexProps<{ natural_id: string }>() },
+        { id: input.criterion },
+      );
+      if (alreadyAmended.length > 0) {
+        throw new Error(
+          `condition ${input.criterion} has already been amended; amend the one now in force`,
+        );
+      }
 
-    this.emit("amendDesign", decision.natural_id, {
-      criterion: input.criterion,
-      replaced,
-      nowRequires: input.nowRequires,
-      supersedes: prior ?? null,
+      const prior = await this.latestAmendmentOn(gates);
+
+      // Atomic, for the same reason: interrupted after the replacement condition
+      // governs the gate but before the original is retired, the gate is governed
+      // by two conditions, one of which nobody agreed to. See
+      // TenantGraph.inTransaction.
+      const { replacement, decision } = await this.graph.inTransaction(
+        async () => {
+          const replacement = await this.graph.createNode("Criterion", {
+            proposition: input.nowRequires,
+          });
+          for (const gate of gates)
+            await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
+
+          const decision = await this.graph.createNode("Decision", {
+        decided_at: this.clock.now(),
+            reason: input.because,
+            invalidation_check:
+              "evidence that the amended setting was not the constraint after all",
+          });
+          await this.graph.createEdge(
+            decision.natural_id,
+            "CHANGES",
+            input.criterion,
+          );
+          await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
+          if (prior)
+            await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
+          return { replacement, decision };
+        },
+      );
+
+      const rerun = await this.workGatedBy(gates);
+      const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
+
+      await this.emit("amendDesign", ref("decision", decision.natural_id), {
+        criterion: input.criterion,
+        replaced,
+        nowRequires: input.nowRequires,
+        supersedes: prior ?? null,
+      });
+
+      return {
+        at,
+        amendment: ref("decision", decision.natural_id),
+        // `void replacement;` stood here: the amended criterion was created and
+        // its handle thrown away, so the report named both conditions by wording
+        // and a caller could reach neither.
+        replaced: { criterion: input.criterion, requires: replaced ?? "" },
+        nowRequires: {
+          criterion: ref("criterion", replacement.natural_id),
+          requires: input.nowRequires,
+        },
+        rerun,
+        confirmatoryAffected,
+        // Derived, never declared. An amendment is scientific exactly when
+        // something the confirmatory boundary rests on is in its blast radius --
+        // which is the difference between repairing a solver and moving the
+        // goalposts, and is not a thing the person amending gets to assert.
+        nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
+      };
     });
-
-    return {
-      at,
-      amendment: ref("decision", decision.natural_id),
-      // `void replacement;` stood here: the amended criterion was created and
-      // its handle thrown away, so the report named both conditions by wording
-      // and a caller could reach neither.
-      replaced: { criterion: input.criterion, requires: replaced ?? "" },
-      nowRequires: {
-        criterion: ref("criterion", replacement.natural_id),
-        requires: input.nowRequires,
-      },
-      rerun,
-      confirmatoryAffected,
-      // Derived, never declared. An amendment is scientific exactly when
-      // something the confirmatory boundary rests on is in its blast radius --
-      // which is the difference between repairing a solver and moving the
-      // goalposts, and is not a thing the person amending gets to assert.
-      nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
-    };
   }
 
   private async gatesGovernedBy(criterion: CriterionRef): Promise<GateRef[]> {
@@ -1170,160 +1204,162 @@ export class WriteSurface extends SessionCore {
    * point of S-11.
    */
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
-    const at = this.clock.now();
-    // Atomic, and this is the one that made transactions necessary rather than
-    // tidy. Invalidating the superseded output is not an isolated write: since
-    // S-3c it withdraws the criterion evaluations that cited it, so a failure
-    // between the halves leaves an earlier failure no longer deciding its check
-    // and no corrected check in existence. External review named it the
-    // blocking finding; S-3c carries the negative test. See
-    // TenantGraph.inTransaction.
-    const { before, replacement } = await this.graph.inTransaction(async () => {
-      await this.assertReviewOf(input.because, input.supersedes);
-      const before = await this.conclusionsOf(input.supersedes);
+    return this.graph.inTransaction(async () => {
+      const at = this.clock.now();
+      // Atomic, and this is the one that made transactions necessary rather than
+      // tidy. Invalidating the superseded output is not an isolated write: since
+      // S-3c it withdraws the criterion evaluations that cited it, so a failure
+      // between the halves leaves an earlier failure no longer deciding its check
+      // and no corrected check in existence. External review named it the
+      // blocking finding; S-3c carries the negative test. See
+      // TenantGraph.inTransaction.
+      const { before, replacement } = await this.graph.inTransaction(async () => {
+        await this.assertReviewOf(input.because, input.supersedes);
+        const before = await this.conclusionsOf(input.supersedes);
 
-      const output = await this.outputArtefactOf(input.supersedes);
-      await this.graph.query(
-        `MATCH (a:Artefact {natural_id: $id}) SET a.invalidated = true RETURN a`,
-        { a: vertexProps<ArtefactProps>() },
-        { id: output },
-      );
-      // Which review this rested on, recorded rather than validated and
-      // discarded (row O). `because` was checked against the analysis and then
-      // written nowhere, so a reader asking why the finding no longer stands
-      // got the verdict of an arbitrary review of the same unit -- and with a
-      // critical review and a confirming one on one analysis, reported the
-      // approval as the reason for the retraction. See
-      // EDGE_SCHEMA.INVALIDATED_BY.
-      await this.graph.createEdge(output, "INVALIDATED_BY", input.because);
-
-      // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
-      //
-      // Not a Decision. An earlier draft minted one ("we replaced X because of
-      // review Y") and linked it BASED_ON to the REPLACEMENT's evidence, which
-      // points causality backwards -- the decision to replace preceded that
-      // evidence and cannot rest on it. No assertion used it. S-11 contains an
-      // invalidated analysis and a replacement, both of which the graph
-      // represents directly; it does not contain a researcher decision. S-7,
-      // which turns on an explicit decision to amend a locked procedure, is
-      // where a Decision should be earned.
-      //
-      // Nor supersession. Invalidating the replaced analysis's output plus the
-      // replacement's own support answers every question this scenario asks.
-      // That is not the same as concluding invalidation *is* supersession:
-      // `invalidated = true` means "no longer valid as a source of current
-      // inference", and the two merely coincide here. S-12 is the
-      // discriminator -- there the numbers stay valid and only the
-      // interpretation changes, which invalidation cannot honestly carry.
-      const replacement = await this.recorded({
-        enquiry: input.enquiry,
-        method: input.method,
-        from: input.from,
-        concludes: input.concludes,
-      });
-      return { before, replacement };
-    });
-
-    // Both sides carry a handle. After a replacement two records assert each
-    // sentence -- the withdrawn one and the fresh one -- so a report naming
-    // only the wording leaves a reader unable to say which it means. `was`
-    // comes from the superseded analysis, `claim` from the replacement, and
-    // the replacement's claims are taken BY INDEX: `recorded()` mints one per
-    // conclusion in order, so position is identity and a lookup keyed by the
-    // sentence would collapse two conclusions phrased alike.
-    //
-    // The `before` match is by wording because it has to be -- the superseded
-    // analysis's claims and the replacement's share no handle, and "the same
-    // proposition, re-derived" is precisely what the caller asserts by passing
-    // them.
-    const changed: ChangedConclusion[] = [];
-    const unchanged: ConcludedClaim[] = [];
-    for (const [i, now] of input.concludes.entries()) {
-      const was = before.find((b) => b.proposition === now.proposition);
-      const claim = replacement.claims[i]?.claim;
-      if (!was || !claim) continue;
-      if (was.finding === now.finding)
-        unchanged.push({ claim, asserts: now.proposition });
-      else
-        changed.push({
-          proposition: now.proposition,
-          was: was.claim,
-          before: was.finding,
-          claim,
-          after: now.finding,
-        });
-    }
-
-    // The wording half. `what` was a naked id -- the inverse of the convention
-    // every other pair follows, and unreadable without a second lookup.
-    //
-    // An analysis handle has to be dereferenced to its output artefact first:
-    // the id is a `COMP_`, and looking THAT up as an artefact matches nothing
-    // and silently fell back to printing the id. Same one hop `recorded()`
-    // makes to write the CONSUMES edge.
-    const inputNames = new Map<InputRef, IndexedString>();
-    // Read after the transaction above, so it sees this act's own invalidation.
-    const retracted = new Set<InputRef>();
-    // One query for every input, not one per input. `logical_name` is what an
-    // Artefact carries; this read `.name` -- a property no Artefact has -- so it
-    // set `undefined` and printed the id instead.
-    const artefactFor = new Map<InputRef, ObservationsRef>();
-    for (const o of input.from) {
-      artefactFor.set(
-        o,
-        labelForNaturalId(o) === "Computation"
-          ? await this.outputArtefactOf(o as AnalysisRef)
-          : (o as ObservationsRef),
-      );
-    }
-    const found = new Map(
-      (
+        const output = await this.outputArtefactOf(input.supersedes);
         await this.graph.query(
-          `MATCH (a:Artefact) WHERE a.natural_id IN $ids RETURN a`,
-          { a: vertexProps<ArtefactProps & { natural_id: string }>() },
-          { ids: [...new Set(artefactFor.values())] },
-        )
-      ).map((r) => [r.a.natural_id, r.a] as const),
-    );
-    for (const [handle, artefact] of artefactFor) {
-      const a = found.get(artefact);
-      if (!a) continue;
-      inputNames.set(handle, a.logical_name);
-      if (a.invalidated) retracted.add(handle);
-    }
+          `MATCH (a:Artefact {natural_id: $id}) SET a.invalidated = true RETURN a`,
+          { a: vertexProps<ArtefactProps>() },
+          { id: output },
+        );
+        // Which review this rested on, recorded rather than validated and
+        // discarded (row O). `because` was checked against the analysis and then
+        // written nowhere, so a reader asking why the finding no longer stands
+        // got the verdict of an arbitrary review of the same unit -- and with a
+        // critical review and a confirming one on one analysis, reported the
+        // approval as the reason for the retraction. See
+        // EDGE_SCHEMA.INVALIDATED_BY.
+        await this.graph.createEdge(output, "INVALIDATED_BY", input.because);
 
-    // `why` is computed, not asserted. Two things had been wrong with the fixed
-    // sentence: it said "observations" while `what` reports `kind: "analysis"`
-    // for an analysis input, and for an input that IS the replaced analysis it
-    // asserted the opposite of what the record says (S-11e).
-    const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
-      what: o,
-      ...(retracted.has(o) ? { invalidated: true as const } : {}),
-      named: inputNames.get(o) ?? o,
-      why: retracted.has(o)
-        ? "produced by the replaced analysis and retracted by this replacement, which rests on it anyway"
-        : "not produced by the replaced analysis, and the replacement rests on it",
-    }));
+        // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
+        //
+        // Not a Decision. An earlier draft minted one ("we replaced X because of
+        // review Y") and linked it BASED_ON to the REPLACEMENT's evidence, which
+        // points causality backwards -- the decision to replace preceded that
+        // evidence and cannot rest on it. No assertion used it. S-11 contains an
+        // invalidated analysis and a replacement, both of which the graph
+        // represents directly; it does not contain a researcher decision. S-7,
+        // which turns on an explicit decision to amend a locked procedure, is
+        // where a Decision should be earned.
+        //
+        // Nor supersession. Invalidating the replaced analysis's output plus the
+        // replacement's own support answers every question this scenario asks.
+        // That is not the same as concluding invalidation *is* supersession:
+        // `invalidated = true` means "no longer valid as a source of current
+        // inference", and the two merely coincide here. S-12 is the
+        // discriminator -- there the numbers stay valid and only the
+        // interpretation changes, which invalidation cannot honestly carry.
+        const replacement = await this.recorded({
+          enquiry: input.enquiry,
+          method: input.method,
+          from: input.from,
+          concludes: input.concludes,
+        });
+        return { before, replacement };
+      });
 
-    const report: ReplacementReport = {
-      at,
-      replacement: replacement.analysis,
-      claims: replacement.claims,
-      affected: before.map((b) => ({ claim: b.claim, asserts: b.proposition })),
-      unaffected,
-      changed,
-      unchanged,
-    };
-    this.emit("replaceAnalysis", replacement.analysis, {
-      supersedes: input.supersedes,
-      because: input.because,
-      // Sentences, not handles. `detail` is Record<string, unknown>, so
-      // nothing would have complained had this silently become objects when
-      // `affected` grew handles -- the one shape PJ-030 §5 warns tsc misses.
-      affected: report.affected.map((a) => a.asserts),
-      changed: report.changed.map((c) => c.proposition),
+      // Both sides carry a handle. After a replacement two records assert each
+      // sentence -- the withdrawn one and the fresh one -- so a report naming
+      // only the wording leaves a reader unable to say which it means. `was`
+      // comes from the superseded analysis, `claim` from the replacement, and
+      // the replacement's claims are taken BY INDEX: `recorded()` mints one per
+      // conclusion in order, so position is identity and a lookup keyed by the
+      // sentence would collapse two conclusions phrased alike.
+      //
+      // The `before` match is by wording because it has to be -- the superseded
+      // analysis's claims and the replacement's share no handle, and "the same
+      // proposition, re-derived" is precisely what the caller asserts by passing
+      // them.
+      const changed: ChangedConclusion[] = [];
+      const unchanged: ConcludedClaim[] = [];
+      for (const [i, now] of input.concludes.entries()) {
+        const was = before.find((b) => b.proposition === now.proposition);
+        const claim = replacement.claims[i]?.claim;
+        if (!was || !claim) continue;
+        if (was.finding === now.finding)
+          unchanged.push({ claim, asserts: now.proposition });
+        else
+          changed.push({
+            proposition: now.proposition,
+            was: was.claim,
+            before: was.finding,
+            claim,
+            after: now.finding,
+          });
+      }
+
+      // The wording half. `what` was a naked id -- the inverse of the convention
+      // every other pair follows, and unreadable without a second lookup.
+      //
+      // An analysis handle has to be dereferenced to its output artefact first:
+      // the id is a `COMP_`, and looking THAT up as an artefact matches nothing
+      // and silently fell back to printing the id. Same one hop `recorded()`
+      // makes to write the CONSUMES edge.
+      const inputNames = new Map<InputRef, IndexedString>();
+      // Read after the transaction above, so it sees this act's own invalidation.
+      const retracted = new Set<InputRef>();
+      // One query for every input, not one per input. `logical_name` is what an
+      // Artefact carries; this read `.name` -- a property no Artefact has -- so it
+      // set `undefined` and printed the id instead.
+      const artefactFor = new Map<InputRef, ObservationsRef>();
+      for (const o of input.from) {
+        artefactFor.set(
+          o,
+          labelForNaturalId(o) === "Computation"
+            ? await this.outputArtefactOf(o as AnalysisRef)
+            : (o as ObservationsRef),
+        );
+      }
+      const found = new Map(
+        (
+          await this.graph.query(
+            `MATCH (a:Artefact) WHERE a.natural_id IN $ids RETURN a`,
+            { a: vertexProps<ArtefactProps & { natural_id: string }>() },
+            { ids: [...new Set(artefactFor.values())] },
+          )
+        ).map((r) => [r.a.natural_id, r.a] as const),
+      );
+      for (const [handle, artefact] of artefactFor) {
+        const a = found.get(artefact);
+        if (!a) continue;
+        inputNames.set(handle, a.logical_name);
+        if (a.invalidated) retracted.add(handle);
+      }
+
+      // `why` is computed, not asserted. Two things had been wrong with the fixed
+      // sentence: it said "observations" while `what` reports `kind: "analysis"`
+      // for an analysis input, and for an input that IS the replaced analysis it
+      // asserted the opposite of what the record says (S-11e).
+      const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
+        what: o,
+        ...(retracted.has(o) ? { invalidated: true as const } : {}),
+        named: inputNames.get(o) ?? o,
+        why: retracted.has(o)
+          ? "produced by the replaced analysis and retracted by this replacement, which rests on it anyway"
+          : "not produced by the replaced analysis, and the replacement rests on it",
+      }));
+
+      const report: ReplacementReport = {
+        at,
+        replacement: replacement.analysis,
+        claims: replacement.claims,
+        affected: before.map((b) => ({ claim: b.claim, asserts: b.proposition })),
+        unaffected,
+        changed,
+        unchanged,
+      };
+      await this.emit("replaceAnalysis", replacement.analysis, {
+        supersedes: input.supersedes,
+        because: input.because,
+        // Sentences, not handles. `detail` is Record<string, unknown>, so
+        // nothing would have complained had this silently become objects when
+        // `affected` grew handles -- the one shape PJ-030 §5 warns tsc misses.
+        affected: report.affected.map((a) => a.asserts),
+        changed: report.changed.map((c) => c.proposition),
+      });
+      return report;
     });
-    return report;
   }
 
   // -------------------------------------------------------------------------
@@ -1339,115 +1375,117 @@ export class WriteSurface extends SessionCore {
    * the numbers were right and only the sentence about them was wrong.
    */
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
-    const at = this.clock.now();
+    return this.graph.inTransaction(async () => {
+      const at = this.clock.now();
 
-    // A reinterpretation narrows a READING, not one node. Two analyses in one
-    // line of enquiry concluding the same sentence share a reading, and S-12
-    // requires both to stop standing -- so the scope is still (proposition,
-    // enquiry). What changed is that both now come FROM THE NAMED CLAIM
-    // instead of being searched for, so nothing is guessed and the caller
-    // cannot be surprised about which reading was narrowed.
-    const scope = await this.scopeOf(input.of);
-    const previously = scope.proposition;
-    const claims = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       ${this.withinScope(scope)}
-       RETURN c`,
-      { c: vertexProps<{ natural_id: string }>() },
-      {
-        name: scope.proposition,
-        ...this.scopeParams(scope),
-      },
-    );
-    // Every record this act withdraws, by handle. The reading is one sentence
-    // and the records asserting it are several -- reporting the sentence alone
-    // left a caller unable to name which claims stopped standing, and reporting
-    // one handle would have picked between them arbitrarily.
-    const withdrawn: ConcludedClaim[] = [
-      ...new Set(claims.map((c) => c.c.natural_id)),
-    ].map((id) => ({ claim: ref("claim", id), asserts: previously }));
-    if (claims.length === 0)
-      throw new Error(`no claim ${input.of} to reinterpret`);
-
-    // Atomic. Interrupted between withdrawing the original and carrying its
-    // evidence across, this retracts a finding and puts nothing in its place.
-    // Demonstrated in tests/domain-session.test.ts, which is where the harm is
-    // reachable -- "does this roll back?" is not a researcher's question, so it
-    // is not a scenario. See TenantGraph.inTransaction.
-    const { narrower, carried } = await this.graph.inTransaction(async () => {
-      const review = await this.graph.createNode("Review", {
-        verdict: input.because,
-      });
-      const narrower = await this.graph.createNode("Claim", {
-        name: input.as,
-        kind: "exploratory",
-      });
-      // The review records that someone objected; the decision records that the
-      // objection was acted on. Reviews also confirm, so a review alone cannot
-      // mean "withdrawn" without reading its prose.
-      const decision = await this.graph.createNode("Decision", {
-      decided_at: this.clock.now(),
-        reason: input.because,
-        invalidation_check:
-          "evidence that the original reading was right after all",
-      });
-      await this.graph.createEdge(
-        decision.natural_id,
-        "MOTIVATES",
-        narrower.natural_id,
+      // A reinterpretation narrows a READING, not one node. Two analyses in one
+      // line of enquiry concluding the same sentence share a reading, and S-12
+      // requires both to stop standing -- so the scope is still (proposition,
+      // enquiry). What changed is that both now come FROM THE NAMED CLAIM
+      // instead of being searched for, so nothing is guessed and the caller
+      // cannot be surprised about which reading was narrowed.
+      const scope = await this.scopeOf(input.of);
+      const previously = scope.proposition;
+      const claims = await this.graph.query(
+        `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+         ${this.withinScope(scope)}
+         RETURN c`,
+        { c: vertexProps<{ natural_id: string }>() },
+        {
+          name: scope.proposition,
+          ...this.scopeParams(scope),
+        },
       );
+      // Every record this act withdraws, by handle. The reading is one sentence
+      // and the records asserting it are several -- reporting the sentence alone
+      // left a caller unable to name which claims stopped standing, and reporting
+      // one handle would have picked between them arbitrarily.
+      const withdrawn: ConcludedClaim[] = [
+        ...new Set(claims.map((c) => c.c.natural_id)),
+      ].map((id) => ({ claim: ref("claim", id), asserts: previously }));
+      if (claims.length === 0)
+        throw new Error(`no claim ${input.of} to reinterpret`);
 
-      // Keyed by id. The query below selects natural_id AND statement and only
-      // the statement was kept, so two findings phrased alike merged -- in the
-      // field whose whole job is showing the findings survived unchanged.
-      const carried = new Map<EvidenceRef, CitedFinding>();
-      const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
-      for (const id of withdrawnIds) {
-        await this.graph.createEdge(review.natural_id, "EVALUATES", id);
-        await this.graph.createEdge(decision.natural_id, "CHANGES", id);
-      }
-      // One query for every withdrawn claim's evidence, not one per claim.
-      // Deduplicated by the Map below, as before: the query selects
-      // `natural_id` AND `statement` and keying on the statement merged two
-      // findings phrased alike -- in the field whose whole job is showing the
-      // findings survived unchanged.
-      const evidence = await this.graph.query(
-        `MATCH (e:Evidence)-[:SUPPORTS]->(c:Claim) WHERE c.natural_id IN $ids RETURN e`,
-        { e: vertexProps<{ natural_id: string; statement: string }>() },
-        { ids: withdrawnIds },
-      );
-      for (const row of evidence) {
+      // Atomic. Interrupted between withdrawing the original and carrying its
+      // evidence across, this retracts a finding and puts nothing in its place.
+      // Demonstrated in tests/domain-session.test.ts, which is where the harm is
+      // reachable -- "does this roll back?" is not a researcher's question, so it
+      // is not a scenario. See TenantGraph.inTransaction.
+      const { narrower, carried } = await this.graph.inTransaction(async () => {
+        const review = await this.graph.createNode("Review", {
+          verdict: input.because,
+        });
+        const narrower = await this.graph.createNode("Claim", {
+          name: input.as,
+          kind: "exploratory",
+        });
+        // The review records that someone objected; the decision records that the
+        // objection was acted on. Reviews also confirm, so a review alone cannot
+        // mean "withdrawn" without reading its prose.
+        const decision = await this.graph.createNode("Decision", {
+        decided_at: this.clock.now(),
+          reason: input.because,
+          invalidation_check:
+            "evidence that the original reading was right after all",
+        });
         await this.graph.createEdge(
-          row.e.natural_id,
-          "SUPPORTS",
+          decision.natural_id,
+          "MOTIVATES",
           narrower.natural_id,
         );
-        const evidence = ref("evidence", row.e.natural_id);
-        carried.set(evidence, { evidence, states: row.e.statement });
-      }
 
-      return { narrower, carried };
+        // Keyed by id. The query below selects natural_id AND statement and only
+        // the statement was kept, so two findings phrased alike merged -- in the
+        // field whose whole job is showing the findings survived unchanged.
+        const carried = new Map<EvidenceRef, CitedFinding>();
+        const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
+        for (const id of withdrawnIds) {
+          await this.graph.createEdge(review.natural_id, "EVALUATES", id);
+          await this.graph.createEdge(decision.natural_id, "CHANGES", id);
+        }
+        // One query for every withdrawn claim's evidence, not one per claim.
+        // Deduplicated by the Map below, as before: the query selects
+        // `natural_id` AND `statement` and keying on the statement merged two
+        // findings phrased alike -- in the field whose whole job is showing the
+        // findings survived unchanged.
+        const evidence = await this.graph.query(
+          `MATCH (e:Evidence)-[:SUPPORTS]->(c:Claim) WHERE c.natural_id IN $ids RETURN e`,
+          { e: vertexProps<{ natural_id: string; statement: string }>() },
+          { ids: withdrawnIds },
+        );
+        for (const row of evidence) {
+          await this.graph.createEdge(
+            row.e.natural_id,
+            "SUPPORTS",
+            narrower.natural_id,
+          );
+          const evidence = ref("evidence", row.e.natural_id);
+          carried.set(evidence, { evidence, states: row.e.statement });
+        }
+
+        return { narrower, carried };
+      });
+
+      const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
+
+      await this.emit("reinterpret", ref("claim", narrower.natural_id), {
+        previously,
+        because: input.because,
+      });
+
+      return {
+        at,
+        previously: withdrawn,
+        // The narrower claim was minted here and its handle discarded -- the
+        // eighth thing CLAUDE.md's "does the act record what it produced, or
+        // only what it acted on?" has caught. A caller had to go back through
+        // `claimsAsserting` to name what this very call had just created.
+        nowClaims: { claim: ref("claim", narrower.natural_id), asserts: input.as },
+        evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
+        restingOnTheOldReading,
+        requiresRecomputation: false,
+      };
     });
-
-    const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
-
-    this.emit("reinterpret", narrower.natural_id, {
-      previously,
-      because: input.because,
-    });
-
-    return {
-      at,
-      previously: withdrawn,
-      // The narrower claim was minted here and its handle discarded -- the
-      // eighth thing CLAUDE.md's "does the act record what it produced, or
-      // only what it acted on?" has caught. A caller had to go back through
-      // `claimsAsserting` to name what this very call had just created.
-      nowClaims: { claim: ref("claim", narrower.natural_id), asserts: input.as },
-      evidenceStanding: [...carried.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
-      restingOnTheOldReading,
-      requiresRecomputation: false,
-    };
   }
 
   /**
@@ -1460,16 +1498,21 @@ export class WriteSurface extends SessionCore {
    * construction, so a surface built per command reports that command's clock
    * and that command's attribution.
    */
-  private emit(
-    operation: string,
-    subject: string,
+  private async emit(
+    operation: Operation,
+    subject: Ref<string>,
     detail?: Record<string, unknown>,
-  ): void {
-    this.events.record({
+  ): Promise<void> {
+    await this.events.record({
       at: this.clock.now(),
       attribution: this.attribution,
       operation,
       subject,
+      // Drained, not listed. Every id `TenantGraph` minted since the last
+      // event, which is the set this act brought into existence -- and the
+      // question `subject` cannot answer, since most verbs are *about*
+      // something other than what they created.
+      created: this.graph.drainMinted(),
       detail,
     });
   }

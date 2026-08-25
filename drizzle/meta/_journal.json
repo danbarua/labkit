@@ -22,6 +22,13 @@
       "when": 1787021655893,
       "tag": "0002_natural_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787622442204,
+      "tag": "0003_tense_hawkeye",
+      "breakpoints": true
     }
   ]
 }

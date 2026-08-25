@@ -188,8 +188,13 @@ describe("every tool answers when an agent actually calls it", () => {
       // one log, each stamped by the mock providers. Asserted against
       // `commandContext` rather than literals -- a test restating the mock's
       // constants would agree with itself and notice nothing.
+      // `what_happened` over the wire, which is also what keeps this file's
+      // last test honest: a tool nothing calls fails it.
+      const happened = await call(c, "what_happened", { limit: 5 });
+      expect((happened.events as unknown[]).length).toBeGreaterThan(0);
+
       const expected = commandContext(mockGitContext, mockSessionContext).attribution;
-      const written = events.all();
+      const written = (await events.all());
       expect(written.length).toBeGreaterThan(1);
       expect(written.map((e) => e.attribution)).toEqual(written.map(() => expected));
 

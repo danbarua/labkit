@@ -34,6 +34,7 @@ import { ref } from "../domain/report";
 import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
   claimsAssertingSchema,
+  whatHappenedSchema,
   conflictVerdictSchema,
   criteriaGoverningSchema,
   gateStatusSchema,
@@ -241,6 +242,48 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: { analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`) },
     outputSchema: reproductionReportSchema,
     handler: (read, { analysis }) => read.reproductionOf(ref("analysis", analysis)),
+  }),
+
+  tool({
+    name: "what_happened",
+    title: "What was done, and by whom",
+    description:
+      "The acts themselves, oldest first — **the only tool that answers from the event log " +
+      "rather than the record**. Every other read tells you what is true now; this tells you " +
+      "what was done to make it so, when, and by which agent against which commit. Use it for " +
+      "'what have we been working on', 'what did this session do', or 'who recorded this'. " +
+      "`seq` is both the order and the cursor: pass the last one back as `since_seq` to page. " +
+      "`touching` matches an act *about* a record or one that *created* it — most verbs are " +
+      "about something other than what they minted, so both are needed.",
+    inputSchema: {
+      since_seq: z.number().optional().describe("only acts after this seq — the cursor"),
+      by: z.string().optional().describe("one agent's acts, by attribution id"),
+      operation: z.string().optional().describe("one verb, e.g. `record_analysis`"),
+      touching: z.string().optional().describe("acts about, or minting, this id"),
+      limit: z.number().optional().describe("how many at most (default 50)"),
+    },
+    outputSchema: whatHappenedSchema,
+    handler: async (read, { since_seq, by, operation, touching, limit }) => ({
+      events: (
+        await read.whatHappened({
+          ...(since_seq === undefined ? {} : { since: since_seq }),
+          ...(by === undefined ? {} : { by }),
+          ...(operation === undefined ? {} : { operation }),
+          ...(touching === undefined ? {} : { touching }),
+          limit: limit ?? 50,
+        })
+      ).map((e) => ({
+        seq: e.seq ?? 0,
+        at: e.at,
+        operation: e.operation,
+        subject: e.subject,
+        created: [...(e.created ?? [])],
+        attribution_label: e.attribution.attribution_label,
+        attribution_id: e.attribution.attribution_id,
+        git_hash: e.attribution.git_hash,
+        detail: e.detail ?? null,
+      })),
+    }),
   }),
 
   tool({

@@ -56,7 +56,7 @@ describe("an event says who caused it", () => {
 
     await write.pose("does the coating slow corrosion?");
 
-    const [recorded] = events.all();
+    const [recorded] = (await events.all());
     expect(recorded?.operation).toBe("pose");
     expect(recorded?.attribution).toEqual(attribution);
   });
@@ -77,7 +77,7 @@ describe("an event says who caused it", () => {
 
     await session.pose("is the solver faster?");
 
-    expect(events.all()[0]?.attribution).toEqual(UNATTRIBUTED);
+    expect((await events.all())[0]?.attribution).toEqual(UNATTRIBUTED);
   });
 
   /**
@@ -100,7 +100,7 @@ describe("an event says who caused it", () => {
     await new WriteSurface(graph, { clock, attribution: claude, events })
       .pose("is the solver faster?");
 
-    expect(events.all().map((e) => e.attribution.attribution_id)).toEqual([
+    expect((await events.all()).map((e) => e.attribution.attribution_id)).toEqual([
       "human-1",
       "agent-1",
     ]);
@@ -125,7 +125,7 @@ describe("an event says who caused it", () => {
     await new WriteSurface(graph, { ...ctx, events }).pose("first question");
     await new WriteSurface(graph, { ...ctx, events }).pose("second question");
 
-    expect(events.all().map((e) => e.detail?.question)).toEqual([
+    expect((await events.all()).map((e) => e.detail?.question)).toEqual([
       "first question",
       "second question",
     ]);

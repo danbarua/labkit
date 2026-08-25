@@ -352,7 +352,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    const replacement = events.all().filter((e) => e.operation === "replaceAnalysis");
+    const replacement = (await events.all()).filter((e) => e.operation === "replaceAnalysis");
     expect(replacement).toHaveLength(1);
     expect(replacement[0]!.at).toBe(FIXED_NOW);
     expect(replacement[0]!.detail).toMatchObject({
@@ -369,7 +369,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // it was here as well. A researcher who replaced an analysis did one
     // thing, and a log that also records the analysis underneath describes the
     // implementation.
-    expect(events.all().map((e) => e.operation)).toEqual([
+    expect((await events.all()).map((e) => e.operation)).toEqual([
       "openEnquiry",
       "recordObservations",
       "recordAnalysis",

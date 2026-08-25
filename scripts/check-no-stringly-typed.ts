@@ -60,9 +60,6 @@ const ALLOWED = new Map<string, string>([
   ["withinScope", "returns a Cypher fragment, not a value"],
   // Binds Cypher params, which are `Record<string, unknown>` by construction.
   ["scopeParams", "returns Cypher parameter bindings"],
-  // The event stream's own vocabulary. Typing `subject` reaches into the
-  // persisted event row, and that is decided with the event store.
-  ["emit", "operation and subject belong to the event shape"],
   // Takes decoded `graph.query` rows. A `natural_id` there is the raw string a
   // decoder produced -- this is where a handle is *made*, not somewhere one is
   // passed, and typing the row shape would be typing the database's answer.

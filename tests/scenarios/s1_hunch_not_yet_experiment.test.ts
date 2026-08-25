@@ -282,7 +282,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // empty. The historical answer is reconstructed from durable scientific
     // state, not replayed from the stream of what this session happened to do.
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    expect(later.events.all()).toHaveLength(0);
+    expect((await later.events.all())).toHaveLength(0);
     expect((await later.originOf(first))?.knownAtTheTime).not.toContain(LATE);
     expect((await later.originOf(second))?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
   });

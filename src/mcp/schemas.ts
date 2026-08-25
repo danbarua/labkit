@@ -103,6 +103,31 @@ export const claimsAssertingSchema = z.strictObject({
   claims: z.array(concludedClaim),
 });
 
+/**
+ * `what_happened` — the acts themselves, which is the one thing the graph does
+ * not hold.
+ *
+ * `attribution` is flattened rather than nested, because a caller reading this
+ * is asking *who* and would otherwise have to reach through a wrapper to find
+ * out. `seq` is the order and the cursor: pass the last one back as
+ * `since_seq`.
+ */
+export const whatHappenedSchema = z.strictObject({
+  events: z.array(
+    z.strictObject({
+      seq: z.number(),
+      at: z.string(),
+      operation: z.string(),
+      subject: z.string(),
+      created: z.array(z.string()),
+      attribution_label: z.string(),
+      attribution_id: z.string(),
+      git_hash: z.string(),
+      detail: z.record(z.string(), z.unknown()).nullable(),
+    }),
+  ),
+});
+
 const questionStanding = z.strictObject({
   question: ref("question"),
   asks: z.string(),
