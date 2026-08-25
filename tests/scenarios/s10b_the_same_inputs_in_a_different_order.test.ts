@@ -19,7 +19,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { claimOf, whyOf } from "../helpers/claims";
+import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -76,7 +76,7 @@ async function anAlignmentRunInOneOrder(
     contentHash: "sha256:B",
   });
   const inputs = order === "first-then-second" ? [first, second] : [second, first];
-  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry,
     method: "pairwise-alignment",
     from: inputs,

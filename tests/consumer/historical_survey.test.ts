@@ -104,7 +104,7 @@ describe("what was known, as of an instant", () => {
       name: "sweep readings",
       finding: "twelve runs",
     });
-    const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+    const { claims: analysisClaims } = await s.recordAnalysis({
       enquiry,
       from: [observations],
       method: "paired comparison",

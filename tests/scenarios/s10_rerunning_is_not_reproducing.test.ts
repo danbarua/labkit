@@ -20,7 +20,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { claimOf, whyOf } from "../helpers/claims";
+import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -95,7 +95,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * different answer; that difference is the whole finding.
    */
   test("recorded as two analyses, the re-run reads as independent confirmation", async () => {
-    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
 
     const conditions = await session.recordObservations({
       enquiry,
@@ -126,7 +126,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * boolean is the mistake the scenario is named after.
    */
   test("Afterward 1: the conclusion may be reproduced; the execution is not", async () => {
-    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
@@ -159,7 +159,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * of execution instead of evidence.
    */
   test("Afterward 2: the difference is named as unrecorded, not as equal", async () => {
-    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
@@ -236,7 +236,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * to travel with the report a reader already asks for.
    */
   test("Afterward 4: the record says the original never recorded what it read", async () => {
-    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
     const conditions = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
@@ -280,7 +280,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const { analysis: first, claims: firstClaims } = await session.recordAnalysis({
+    const { analysis: first } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [conditions],
@@ -327,7 +327,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 91, tolerance 1e-3, 64 steps",
     });
-    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
+    const { analysis: historical } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [theirs],
@@ -374,7 +374,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * provenance was never captured, not that the run consumed nothing.
    */
   test("two runs that both recorded no inputs have not reproduced anything", async () => {
-    const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
+    const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
     const rerun = await session.reverify({
       historical,
       enquiry,
@@ -412,7 +412,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "conditions B",
       finding: "warm start",
     });
-    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
+    const { analysis: historical } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [a, b],
@@ -444,7 +444,7 @@ describe("S-10: rerunning is not reproducing", () => {
     const enquiry = await session.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
+    const { analysis: historical } = await session.recordAnalysis({
       enquiry,
       method: "annealing-v1",
       from: [],

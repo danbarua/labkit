@@ -6,12 +6,33 @@
   // check` does report the parse error; the writing command does not.
   "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
 
-  // Formatting only, for now. The linter is enabled separately once its 96
-  // errors and 376 warnings have been read rather than bulk-suppressed — most
-  // will be fine and some will disagree with a deliberate choice here, and
-  // telling those apart is not a thing to do in the same commit as a
-  // whitespace sweep.
-  "linter": { "enabled": false },
+  // Every rule turned off below is off **by name, with a reason**, which is the
+  // whole point: a blanket `"recommended": false` or a wall of `biome-ignore`
+  // comments loses the difference between a finding this repo should act on and
+  // a rule that disagrees with a deliberate choice.
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        // **Off because its fix breaks the build.** `tsconfig.json` runs
+        // `noUncheckedIndexedAccess`, so `rows[0]` is `T | undefined` and
+        // `rows[0]!` after a proven-non-empty check is the idiom the compiler
+        // asks for — 148 of them. Running biome's own unsafe fix over those
+        // produced `TS2322`s immediately: it strips the assertion the type
+        // system requires. A rule whose autofix contradicts the typechecker is
+        // not one this project can hold.
+        "noNonNullAssertion": "off"
+      },
+      "suspicious": {
+        // **Off for two sites, both in `src/db/backend.ts`**, casting through
+        // `any` to reach `pglite-socket`'s untyped internals. That is the seam
+        // where a third party's missing types stop being ours; `unknown` plus a
+        // cast at every use is the same hole with more ceremony.
+        "noExplicitAny": "off"
+      }
+    }
+  },
 
   // Comments are re-indented and never reflowed — verified, not assumed:
   // formatting the whole repo changed 101 files and **zero** comment-text

@@ -129,7 +129,7 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
     name: "per-image results",
     finding: "per-image accuracy",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -183,7 +183,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
     name: "solver traces",
     finding: "iteration counts",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "feasibility",
     from: [observations],
@@ -402,7 +402,7 @@ const aGatedCheck = async () => {
     name: "sweep",
     finding: "residuals recorded",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "convergence",
     from: [obs],
@@ -438,7 +438,7 @@ const aGatedCheck = async () => {
  */
 for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
   test(`evaluateCriterion interrupted at ${edge} writes no verdict at all`, async () => {
-    const { analysis, analysisClaims, criterion, gate } = await aGatedCheck();
+    const { analysisClaims, criterion, gate } = await aGatedCheck();
 
     const realCreateEdge = graph.createEdge.bind(graph);
     graph.createEdge = (async (from: string, e: string, to: string) => {
@@ -487,7 +487,7 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
     name: "load runs",
     finding: "cracks at 40MPa",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "load-test",
     from: [obs],
@@ -595,7 +595,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
     name: "readings",
     finding: "twelve runs",
   });
-  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { claims: analysisClaims } = await s.recordAnalysis({
     enquiry,
     method: "paired comparison",
     from: [observations],
@@ -643,7 +643,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     name: "sweep",
     finding: "runs",
   });
-  const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { claims: analysisClaims } = await s.recordAnalysis({
     enquiry,
     method: "paired comparison",
     from: [observations],
@@ -773,7 +773,7 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
     name: "run",
     finding: "data",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis } = await session.recordAnalysis({
     enquiry,
     method: "m",
     from: [obs],

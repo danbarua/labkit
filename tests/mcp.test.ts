@@ -38,7 +38,6 @@ import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schema
 import { DOCS_FILE, DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { ref } from "../src/domain/report";
 import { NOT_EXPOSED, publicVerbsOf, verbsCalledOn } from "./helpers/surface-coverage";
 import { readFileSync } from "node:fs";
 import { claimNamed, claimOf } from "./helpers/claims";
@@ -655,7 +654,7 @@ describe("behaviour — the same answers, over the wire", () => {
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     });
-    const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
+    const { analysis, claims: analysisClaims } = await s.recordAnalysis({
       enquiry,
       method: "paired comparison",
       from: [observations],

@@ -43,7 +43,6 @@ import type {
   GateRef,
   GateStatus,
   WorkRef,
-  ConclusionRef,
   DesignHistory,
   EnquiryRef,
   KnowledgeSurvey,
@@ -421,8 +420,8 @@ export class ReadSurface extends SessionCore {
     // enquiry's own name when no question stood behind it. Two entities' text
     // in one field, and no way for a caller to reach the question at all.
     const behind = rows[0]?.q ?? null;
-    const question = behind?.natural_id ?? null;
-    const asks = behind?.name ?? null;
+    const _question = behind?.natural_id ?? null;
+    const _asks = behind?.name ?? null;
     const resolving = rows.find((r) => r.resolving)?.resolving ?? null;
     const deferred = rows.some((r) => r.deferring);
 

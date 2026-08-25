@@ -28,7 +28,9 @@ import type { Run } from "../../src/cli/session";
  */
 async function parse(argv: string[]): Promise<{ globals: Record<string, unknown>; ran: boolean }> {
   let ran = false;
-  const run: Run = async () => void (ran = true);
+  const run: Run = async () => {
+    ran = true;
+  };
   const program = buildProgram(run);
   program.exitOverride();
   await program.parseAsync(argv, { from: "user" });

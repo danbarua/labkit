@@ -120,7 +120,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       name: "feasibility slice timings",
       finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
     });
-    const { analysis: measured, claims: measuredClaims } = await session.recordAnalysis({
+    const { claims: measuredClaims } = await session.recordAnalysis({
       enquiry: programme.enquiry,
       method: "throughput-and-convergence",
       implementing: programme.feasibility,
@@ -161,7 +161,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("the condition blocking the expensive run is named, and 'some checked' is not 'all passed'", async () => {
     const programme = await aStagedProgramme();
-    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
+    const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     await session.evaluateCriterion({
       criterion: programme.throughput,
@@ -194,7 +194,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("an evidence-backed evaluation is distinguishable from a bare assertion", async () => {
     const programme = await aStagedProgramme();
-    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
+    const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     await session.evaluateCriterion({
       criterion: programme.throughput,
@@ -256,7 +256,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("the projected cost is a finding with provenance, not a number in a comment", async () => {
     const programme = await aStagedProgramme();
-    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
+    const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     const later = await afterwards();
     const why = await later.whySupported(claimOf(measuredClaims, COST));
@@ -277,7 +277,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
    */
   test("gating work does not change the standing of the findings involved", async () => {
     const programme = await aStagedProgramme();
-    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
+    const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     const before = await session.whySupported(claimOf(measuredClaims, THROUGHPUT));
 
@@ -302,7 +302,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
   /** A citation must be one the cited analysis actually reached. */
   test("an evaluation cannot cite a claim that does not exist", async () => {
     const programme = await aStagedProgramme();
-    const { analysis: measured, claims: measuredClaims } = await aPassingFeasibilityStep(programme);
+    await aPassingFeasibilityStep(programme);
 
     await expect(
       session.evaluateCriterion({

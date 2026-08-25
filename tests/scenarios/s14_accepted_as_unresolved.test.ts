@@ -70,7 +70,7 @@ async function aMarginalComparisonWithNothingLeftToRunIt() {
     name: "marginal split results",
     finding: "per-image accuracy on the marginal split",
   });
-  const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
     method: "paired-comparison",
     from: [observations],
@@ -89,7 +89,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * it, so an accepted question and an untouched one returned the same answer.
    */
   test("Afterward 1: accepted-as-open is a state of its own, not 'still being worked'", async () => {
-    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
 
     const stillWorking = await session.enquiryStatus(enquiry);
     expect(stillWorking.question!.open).toBe(true);
@@ -115,7 +115,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * purpose is turning the survey green.
    */
   test("Afterward 2: accepting creates no work, and the survey stops calling it pending", async () => {
-    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
@@ -146,7 +146,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * be about the world rather than about running the same analysis again.
    */
   test("Afterward 3: the condition that would reopen it is recorded, and is not 'more analysis'", async () => {
-    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
@@ -166,7 +166,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * a reason that survives only in the event stream has not been recorded.
    */
   test("Afterward 4: the reasoning survives, and so does what was known at the time", async () => {
-    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
@@ -208,7 +208,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * has been answered — but the acceptance must not have pre-empted it.
    */
   test("an accepted question can still be answered later, and then reads as answered", async () => {
-    const { enquiry, analysis, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
+    const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
     await session.acceptAsUnresolved({
       enquiry,
       because: "the confirmatory dataset is spent and there is no larger held-out sample",
@@ -222,7 +222,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
       name: "external replication cohort",
       finding: "per-image accuracy, independent cohort",
     });
-    const { analysis: settled, claims: settledClaims } = await session.recordAnalysis({
+    const { claims: settledClaims } = await session.recordAnalysis({
       enquiry,
       method: "paired-comparison, external cohort",
       from: [fresh],

@@ -69,13 +69,11 @@
  * mechanisms wrong in `042`.
  */
 
-import type { TenantGraph } from "../db/graph";
 import { optional, scalar, vertexProps } from "../db/cypher";
 import type { ArtefactProps, ClaimProps, EvidenceProps, IndexedString, Prose } from "../db/domain";
 import { labelForNaturalId } from "../db/domain";
 import type {
   VerificationReport,
-  TaskContract,
   AmendmentReport,
   AnalysisRef,
   CriterionRef,
@@ -92,7 +90,6 @@ import type {
   RecordedAnalysis,
   CitedFinding,
   Conclusion,
-  ConclusionRef,
   EnquiryRef,
   ObservationsRef,
   QuestionRef,

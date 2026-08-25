@@ -190,7 +190,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "mapping-strength readings, wider construction set",
       finding: "mapping strength measured for twelve graph constructions",
     });
-    const { analysis: dissenting, claims: dissentingClaims } = await session.recordAnalysis({
+    const { claims: dissentingClaims } = await session.recordAnalysis({
       enquiry: programme.internalWork,
       method: "mapping-strength-comparison",
       from: [rerun],
@@ -281,7 +281,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured for the same five constructions",
     });
-    const { analysis: settled, claims: settledClaims } = await session.recordAnalysis({
+    const { claims: settledClaims } = await session.recordAnalysis({
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
@@ -344,7 +344,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured across constructions",
     });
-    const { analysis: fresh, claims: freshClaims } = await session.recordAnalysis({
+    const { claims: freshClaims } = await session.recordAnalysis({
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
@@ -369,7 +369,7 @@ describe("S-5 — contradiction or dissociation?", () => {
 
   /** A citation must be one the cited analysis actually made. */
   test("naming a claim that does not exist is refused", async () => {
-    const programme = await twoStages();
+    const _programme = await twoStages();
 
     await expect(session.whySupported(ref("claim", "CLM_9999"))).rejects.toThrow(
       /no claim CLM_9999/,

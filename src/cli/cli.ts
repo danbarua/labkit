@@ -23,7 +23,7 @@
  * is a caller's typo and prints as one.
  */
 
-import { buildProgram, globalsOf } from "./program";
+import { buildProgram } from "./program";
 import { runner } from "./session";
 
 /**

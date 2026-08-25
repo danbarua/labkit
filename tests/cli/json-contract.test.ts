@@ -21,7 +21,7 @@
  */
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { z } from "zod";
+import type { z } from "zod";
 import { ReadSurface, WriteSurface, inMemoryEventLog } from "../../src/domain";
 import { buildProgram } from "../../src/cli/program";
 import type { Answer } from "../../src/cli/output";
@@ -250,7 +250,9 @@ afterAll(async () => {
  */
 async function invoke(argv: string[]): Promise<Answer> {
   let captured: Answer | undefined;
-  const run: Run = async (work) => void (captured = await work(surfaces));
+  const run: Run = async (work) => {
+    captured = await work(surfaces);
+  };
   const program = buildProgram(run);
   program.exitOverride();
   await program.parseAsync(argv, { from: "user" });
