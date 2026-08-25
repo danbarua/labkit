@@ -22,14 +22,25 @@ import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ReadSurface, WriteSurface } from "../../src/domain";
-import { publicVerbsOf, verbsReachedIn } from "../helpers/surface-coverage";
+import { publicVerbsOf, verbsCalledOn } from "../helpers/surface-coverage";
 
 const COMMANDS_DIR = "src/cli/commands";
 
-/** Every command module's source, comments stripped — naming a verb in prose is not calling it. */
-const commandSource = readdirSync(COMMANDS_DIR)
+/** Every command module. */
+const commandFiles = readdirSync(COMMANDS_DIR)
   .filter((f) => f.endsWith(".ts"))
-  .map((f) => readFileSync(join(COMMANDS_DIR, f), "utf8"))
+  .map((f) => join(COMMANDS_DIR, f));
+
+/**
+ * The same files as text, comments stripped, for the bypass check only.
+ *
+ * The verb coverage below goes through the compiler and needs none of this —
+ * an AST has no comments in it, so naming a verb in prose was never going to
+ * look like calling one. The bypass check is a search for a *name*, not a call,
+ * so it still reads text and still has to drop the comments that discuss it.
+ */
+const commandSource = commandFiles
+  .map((f) => readFileSync(f, "utf8"))
   .join("\n")
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/^\s*\/\/.*$/gm, "");
@@ -47,9 +58,10 @@ const NO_COMMAND_FOR: Readonly<Record<string, string>> = {};
 test("the command modules were found at all", () => {
   // Guards the derivation rather than the thing derived. A moved directory
   // would otherwise make every test below pass by having nothing to read.
+  expect(commandFiles.length).toBeGreaterThan(1);
   expect(commandSource.length).toBeGreaterThan(1000);
-  expect(commandSource).toContain("read.whatIsKnown(");
-  expect(commandSource).toContain("write.recordAnalysis(");
+  expect(verbsCalledOn(commandFiles, "read")).toContain("whatIsKnown");
+  expect(verbsCalledOn(commandFiles, "write")).toContain("recordAnalysis");
 });
 
 test("every read verb the domain exposes has a CLI command", () => {
@@ -62,9 +74,8 @@ test("every read verb the domain exposes has a CLI command", () => {
     );
   }
 
-  const unreachable = reads
-    .filter((v) => verbsReachedIn(commandSource, "read", [v]).length === 0)
-    .filter((v) => !(v in NO_COMMAND_FOR));
+  const called = verbsCalledOn(commandFiles, "read");
+  const unreachable = reads.filter((v) => !called.has(v) && !(v in NO_COMMAND_FOR));
   expect(unreachable).toEqual([]);
 });
 
@@ -78,9 +89,8 @@ test("every write verb the domain exposes has a CLI command", () => {
     );
   }
 
-  const unreachable = writes
-    .filter((v) => verbsReachedIn(commandSource, "write", [v]).length === 0)
-    .filter((v) => !(v in NO_COMMAND_FOR));
+  const called = verbsCalledOn(commandFiles, "write");
+  const unreachable = writes.filter((v) => !called.has(v) && !(v in NO_COMMAND_FOR));
   expect(unreachable).toEqual([]);
 });
 

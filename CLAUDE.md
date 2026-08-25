@@ -390,9 +390,26 @@ Two things learnt adopting it, both the hard way:
 And one thing it broke, worth knowing before writing another test that reads
 source text: **a formatter can split a call across lines.** Biome turned
 `write.pursue({…})` into `write` newline `.pursue({…})` in five tools, and
-`tests/helpers/surface-coverage.ts`'s pattern stopped matching — five verbs
-reported unreachable that were reached fine. It now tolerates whitespace either
-side of the dot.
+`tests/helpers/surface-coverage.ts`'s `\bwrite\.pursue\s*\(` stopped
+matching — five verbs reported unreachable that were reached fine.
+
+**That helper reads the AST now, not the text.** Two `check:*` scripts already
+did (`check-no-stringly-typed.ts`, `check-prop-classes.ts`) and this one had
+argued its way to *"the declaration is the only place the distinction survives"*
+while implementing it with a regex. `publicVerbsOf` walks method declarations
+and reads `private`/`protected` off the modifiers; `verbsCalledOn` matches the
+call as a node, so line breaks and chaining are invisible. Derived lists came
+out identical — 17 reads, 18 writes, nothing gained or lost — which is the point:
+it is the same claim, made in a way a formatter cannot break. Comment-stripping
+at the call sites went with it, an AST having no comments in it.
+
+The other text-reading checks were surveyed and left alone deliberately.
+`check-all-checks` reads the first four lines, which is inherently textual;
+`check-doc-comments` is about comments, which are trivia the AST drops;
+`check-tests-assert` and `check-test-teardown` match plain substrings
+(`expect(`, `openScenario(`) that a line break cannot separate. The rule is not
+*use the compiler everywhere* — it is **a pattern spanning a token boundary
+needs a parser**.
 
 ## Architecture: two persistence halves, deliberately not one
 

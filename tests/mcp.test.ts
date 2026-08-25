@@ -39,7 +39,7 @@ import { DOCS_FILE, DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { ref } from "../src/domain/report";
-import { NOT_EXPOSED, publicVerbsOf, verbsReachedIn } from "./helpers/surface-coverage";
+import { NOT_EXPOSED, publicVerbsOf, verbsCalledOn } from "./helpers/surface-coverage";
 import { readFileSync } from "node:fs";
 import { claimNamed, claimOf } from "./helpers/claims";
 
@@ -105,7 +105,6 @@ describe("structure", () => {
     // The check that would have caught six reads shipping unreachable. Both
     // lists are derived: the verbs from the surface declarations, the reached
     // set from the adapter's source. Nothing here names a tool.
-    const toolSource = readFileSync("src/mcp/tools.ts", "utf8");
     const reads = publicVerbsOf("src/domain/read.ts");
     const writes = publicVerbsOf("src/domain/write.ts");
 
@@ -116,9 +115,12 @@ describe("structure", () => {
     expect(reads).toContain("gateStatus");
     expect(writes).toContain("recordAnalysis");
 
+    const TOOLS_FILE = ["src/mcp/tools.ts"];
+    const readsCalled = verbsCalledOn(TOOLS_FILE, "read");
+    const writesCalled = verbsCalledOn(TOOLS_FILE, "write");
     const unreachable = [
-      ...reads.filter((v) => verbsReachedIn(toolSource, "read", [v]).length === 0),
-      ...writes.filter((v) => verbsReachedIn(toolSource, "write", [v]).length === 0),
+      ...reads.filter((v) => !readsCalled.has(v)),
+      ...writes.filter((v) => !writesCalled.has(v)),
     ].filter((v) => !(v in NOT_EXPOSED));
 
     expect(unreachable).toEqual([]);
