@@ -31,7 +31,14 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ReadSurface, ResearchSession, inMemoryEventLog, type AnalysisRef, type Clock, type EnquiryRef } from "../../src/domain";
+import {
+  ReadSurface,
+  ResearchSession,
+  inMemoryEventLog,
+  type AnalysisRef,
+  type Clock,
+  type EnquiryRef,
+} from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 
@@ -49,8 +56,12 @@ let scenario: Scenario;
  */
 const clock: Clock = { now: () => "2026-08-20T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 /**
  * Runs two worlds in sequence, each against a genuinely fresh graph, and hands
@@ -96,16 +107,28 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
       const enquiry = await s.openEnquiry("does the pruning schedule move convergence?");
       const seedStability = await s.stateCriterion("stable across five seeds");
       const observations = await s.recordObservations({
-        enquiry, name: "sweep readings", finding: "twelve runs across the schedule",
+        enquiry,
+        name: "sweep readings",
+        finding: "twelve runs across the schedule",
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "convergence-fit", from: [observations],
-        concludes: [{ proposition: CONVERGES, finding: "convergence moves by ~3 steps" }],
+        enquiry,
+        method: "convergence-fit",
+        from: [observations],
+        concludes: [
+          {
+            proposition: CONVERGES,
+            finding: "convergence moves by ~3 steps",
+          },
+        ],
         heldTo: [seedStability],
       });
       await s.evaluateCriterion({
         criterion: seedStability,
-        value: outcome === "pass" ? "spread 0.4 steps across five seeds" : "spread 11 steps across five seeds",
+        value:
+          outcome === "pass"
+            ? "spread 0.4 steps across five seeds"
+            : "spread 11 steps across five seeds",
         outcome,
         citing: claimOf(analysisClaims, CONVERGES),
       });
@@ -141,20 +164,36 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
    * artefact CLAUDE.md forbids reading meaning into — which is a different and
    * more precise claim than "the record cannot say".
    */
-  const FIRST = { asks: "does pruning move convergence?", prop: "pruning moves convergence" };
-  const SECOND = { asks: "does depth move convergence?", prop: "depth moves convergence" };
+  const FIRST = {
+    asks: "does pruning move convergence?",
+    prop: "pruning moves convergence",
+  };
+  const SECOND = {
+    asks: "does depth move convergence?",
+    prop: "depth moves convergence",
+  };
 
   const settle = async (s: ResearchSession, asks: string, proposition: string) => {
     const enquiry = await s.openEnquiry(asks);
     const observations = await s.recordObservations({
-      enquiry, name: `${proposition} readings`, finding: `measurements for ${proposition}`,
+      enquiry,
+      name: `${proposition} readings`,
+      finding: `measurements for ${proposition}`,
     });
     const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-      enquiry, method: "paired-comparison", from: [observations],
+      enquiry,
+      method: "paired-comparison",
+      from: [observations],
       concludes: [{ proposition, finding: `result for ${proposition}` }],
     });
-    await s.promote({ claim: await claimNamed(s, proposition), because: "re-run under seed control" });
-    await s.closeEnquiry({ enquiry, answeredBy: await claimNamed(s, proposition) });
+    await s.promote({
+      claim: await claimNamed(s, proposition),
+      because: "re-run under seed control",
+    });
+    await s.closeEnquiry({
+      enquiry,
+      answeredBy: await claimNamed(s, proposition),
+    });
   };
 
   const inOrder = (first: typeof FIRST, second: typeof FIRST) => async (s: ResearchSession) => {
@@ -206,7 +245,9 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
   test("the ordering survives only as a natural-id artefact, which is not a modelled read", async () => {
     const { a, b } = await inTwoWorlds(inOrder(FIRST, SECOND), inOrder(SECOND, FIRST));
     const bySequence = (rows: typeof a) =>
-      [...rows].sort((x, y) => Number(x.question.slice(2)) - Number(y.question.slice(2))).map((q) => q.asks);
+      [...rows]
+        .sort((x, y) => Number(x.question.slice(2)) - Number(y.question.slice(2)))
+        .map((q) => q.asks);
 
     // The two histories ARE recoverable -- from id order, which tracks
     // allocation. Recorded because the earlier claim that they were not was
@@ -252,17 +293,29 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
   test("reproducibility is a read the caller must already know the answer to", async () => {
     const graph = await scenario.begin();
     try {
-      const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
+      const s = new ResearchSession(graph, {
+        clock,
+        events: inMemoryEventLog(),
+      });
       const enquiry = await s.openEnquiry("does the encoding beat the historical control?");
 
       // The historical control, as it survives: recorded, hashed.
       const historical = await s.recordObservations({
-        enquiry, name: "random control", finding: "the 2024 control, as archived",
+        enquiry,
+        name: "random control",
+        finding: "the 2024 control, as archived",
         contentHash: "sha256:1111",
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "paired-comparison", from: [historical],
-        concludes: [{ proposition: "the encoding beats the control", finding: "difference 2.1%" }],
+        enquiry,
+        method: "paired-comparison",
+        from: [historical],
+        concludes: [
+          {
+            proposition: "the encoding beats the control",
+            finding: "difference 2.1%",
+          },
+        ],
       });
 
       // A regeneration that does NOT match -- coherent, unlike the first draft.
@@ -319,16 +372,27 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
     const build = (closer: string) => async (s: ResearchSession) => {
       const enquiry = await s.openEnquiry("is the marginal split difference real?");
       const observations = await s.recordObservations({
-        enquiry, name: "marginal split results",
+        enquiry,
+        name: "marginal split results",
         // The only place a name can go. It is evidence prose, not attribution.
         finding: `difference 2.1%, CI excludes zero (adjudicated by ${closer})`,
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "paired-comparison", from: [observations],
-        concludes: [{ proposition: "the difference is real", finding: `difference 2.1% (${closer})` }],
+        enquiry,
+        method: "paired-comparison",
+        from: [observations],
+        concludes: [
+          {
+            proposition: "the difference is real",
+            finding: `difference 2.1% (${closer})`,
+          },
+        ],
       });
       // No actor may be supplied here. That is the whole finding.
-      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, "the difference is real") });
+      await s.closeEnquiry({
+        enquiry,
+        answeredBy: claimOf(analysisClaims, "the difference is real"),
+      });
       return s.enquiryStatus(enquiry);
     };
 

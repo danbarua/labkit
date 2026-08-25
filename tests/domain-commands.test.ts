@@ -30,16 +30,26 @@ import { claimNamed, claimOf } from "./helpers/claims";
 
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;
-beforeAll(async () => { scenario = await openScenario(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
 // In hooks, not test bodies: bun runs beforeEach/afterEach OUTSIDE the
 // 5000ms per-test budget, so this setup no longer counts against the ceiling.
-beforeEach(async () => { graph = await scenario.begin(); });
-afterEach(async () => { await scenario.end(); });
-afterAll(async () => { await scenario.close(); });
+beforeEach(async () => {
+  graph = await scenario.begin();
+});
+afterEach(async () => {
+  await scenario.end();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 const clock: Clock = (() => {
   let t = 0;
-  return { now: () => new Date(Date.UTC(2026, 2, 1) + t++ * 60_000).toISOString() };
+  return {
+    now: () => new Date(Date.UTC(2026, 2, 1) + t++ * 60_000).toISOString(),
+  };
 })();
 
 describe("commands are values a caller can hold", () => {

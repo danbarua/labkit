@@ -97,8 +97,7 @@ function fieldsOf(s: JsonSchema): Record<string, JsonSchema> | undefined {
   const keys = Object.keys(first.properties);
   const alike = branches.every(
     (b) =>
-      Object.keys(b.properties!).length === keys.length &&
-      keys.every((k) => k in b.properties!),
+      Object.keys(b.properties!).length === keys.length && keys.every((k) => k in b.properties!),
   );
   if (!alike) return first.properties;
   return Object.fromEntries(

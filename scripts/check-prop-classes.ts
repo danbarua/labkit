@@ -87,17 +87,21 @@ for (const label of [...labels].sort()) {
   const have = new Set(INDEXED_PROPS[label as keyof typeof INDEXED_PROPS] ?? []);
   for (const p of [...want].sort())
     if (!have.has(p))
-      problems.push(`${label}.${p} is IndexedString/Timestamp but missing from INDEXED_PROPS — it gets no index, silently`);
+      problems.push(
+        `${label}.${p} is IndexedString/Timestamp but missing from INDEXED_PROPS — it gets no index, silently`,
+      );
   for (const p of [...have].sort())
     if (!want.has(p))
-      problems.push(`INDEXED_PROPS lists ${label}.${p}, which is not annotated IndexedString or Timestamp — an index nothing reads`);
+      problems.push(
+        `INDEXED_PROPS lists ${label}.${p}, which is not annotated IndexedString or Timestamp — an index nothing reads`,
+      );
 }
 
 if (problems.length > 0) {
-  console.error("❌ check-prop-classes: INDEXED_PROPS and the string taxonomy disagree\n");
+  console.error("FAILED: INDEXED_PROPS and the string taxonomy disagree\n");
   for (const p of problems) console.error(`   ${p}`);
   process.exit(1);
 }
 
 const total = [...annotated.values()].reduce((n, ps) => n + ps.length, 0);
-console.log(`✅ check-prop-classes OK: ${total} indexed properties, and INDEXED_PROPS names exactly those.`);
+console.log(`OK: ${total} indexed properties, and INDEXED_PROPS names exactly those.`);

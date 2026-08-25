@@ -31,12 +31,21 @@ let session: ResearchSession;
 
 const clock: Clock = { now: () => "2026-08-24T10:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 const PROP = "the treatment shortens recovery";
 
@@ -44,16 +53,27 @@ const PROP = "the treatment shortens recovery";
 async function aDefectiveAnalysis() {
   const enquiry = await session.openEnquiry("does the treatment shorten recovery?");
   const observations = await session.recordObservations({
-    enquiry, name: "recovery times", finding: "sixty patients, two arms",
+    enquiry,
+    name: "recovery times",
+    finding: "sixty patients, two arms",
   });
   const { analysis, claims } = await session.recordAnalysis({
-    enquiry, method: "unadjusted comparison", from: [observations],
+    enquiry,
+    method: "unadjusted comparison",
+    from: [observations],
     concludes: [{ proposition: PROP, finding: "three days shorter" }],
   });
   const review = await session.recordReview({
-    of: analysis, verdict: "unadjusted for baseline severity",
+    of: analysis,
+    verdict: "unadjusted for baseline severity",
   });
-  return { enquiry, observations, analysis, review, claim: claimOf(claims, PROP) };
+  return {
+    enquiry,
+    observations,
+    analysis,
+    review,
+    claim: claimOf(claims, PROP),
+  };
 }
 
 describe("S-11e — a replacement that consumes the output it invalidated", () => {
@@ -61,7 +81,9 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     const { enquiry, analysis, review } = await aDefectiveAnalysis();
 
     const report = await session.replaceAnalysis({
-      supersedes: analysis, because: review, enquiry,
+      supersedes: analysis,
+      because: review,
+      enquiry,
       method: "severity-adjusted comparison",
       // The analysis being replaced, named as the replacement's input.
       from: [analysis],
@@ -81,8 +103,11 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // relabelling of every row.
     const clean = await aDefectiveAnalysis();
     const ordinary = await session.replaceAnalysis({
-      supersedes: clean.analysis, because: clean.review, enquiry: clean.enquiry,
-      method: "severity-adjusted comparison", from: [clean.observations],
+      supersedes: clean.analysis,
+      because: clean.review,
+      enquiry: clean.enquiry,
+      method: "severity-adjusted comparison",
+      from: [clean.observations],
       concludes: [{ proposition: PROP, finding: "one day shorter, adjusted" }],
     });
     expect(ordinary.unaffected[0]!.invalidated).toBeUndefined();
@@ -92,13 +117,18 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
   test("the replacement's conclusion does not stand on a retracted record", async () => {
     const { enquiry, analysis, review } = await aDefectiveAnalysis();
     const report = await session.replaceAnalysis({
-      supersedes: analysis, because: review, enquiry,
+      supersedes: analysis,
+      because: review,
+      enquiry,
       method: "severity-adjusted comparison",
       from: [analysis],
       concludes: [{ proposition: PROP, finding: "one day shorter, adjusted" }],
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const why = await later.whySupported(report.claims[0]!.claim);
 
     // `supported: true` stays, and that is the design rather than an oversight:

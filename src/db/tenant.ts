@@ -29,8 +29,12 @@ export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promi
   );
   const row =
     inserted.rows[0] ??
-    (await db.query<{ id: number; graph_name: string }>(`select id, graph_name from ${LABKIT_SCHEMA}.tenants where slug = $1`, [slug]))
-      .rows[0];
+    (
+      await db.query<{ id: number; graph_name: string }>(
+        `select id, graph_name from ${LABKIT_SCHEMA}.tenants where slug = $1`,
+        [slug],
+      )
+    ).rows[0];
   if (!row) throw new Error(`tenant "${slug}" not found after insert-or-fetch race`);
 
   await provisionTenantGraph(db, row.id, row.graph_name);

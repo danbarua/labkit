@@ -195,6 +195,7 @@ bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool 
 bun run typecheck              # tsc --noEmit
 bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
 bun run check:all-checks       # every check script must introduce itself in one plain sentence
+bun run check:format           # biome, formatting only — `bun run format` writes
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
@@ -342,6 +343,12 @@ exit 0 means an upstream bug *still reproduces*. It sat under `check:` and had
 to be excluded from the sweep by name; renaming it deleted the exclusion list
 rather than documenting it.
 
+**A check announces `OK:` or `FAILED:` and does not repeat its own name** —
+`bun run check` already said which one is running. `FAILED:` means the check ran
+and the codebase is wrong; an `ERROR:` would mean the check itself broke, which
+is a different thing and none of them currently distinguish. Plain words, not
+emoji, because they are what you grep for; the emoji summary is `check-all`'s.
+
 **A check script introduces itself in one plain sentence**, and `bun run check`
 prints that sentence before running it — so a reader looking at a failure from
 a script they have never opened is told what it checks rather than
@@ -363,6 +370,29 @@ were wrong for one of the two languages.
 
 Do not pipe `bun test` — that trap is above, and is still live. `bun run check`
 passes each step's output straight through for the same reason.
+
+**Formatting is biome** (`biome.jsonc`), and it is **formatting only** — the
+linter is off until its 96 errors and 376 warnings have been read rather than
+bulk-suppressed. `bun run format` writes; `check:format` is in the sweep.
+
+Two things learnt adopting it, both the hard way:
+
+- **The config file must be `biome.jsonc`.** `biome.json` rejects comments, and
+  `biome format --write` then falls back to its defaults **silently** — no parse
+  error, just "Formatted N files". It re-indented 121 files to tabs at width 80
+  before anyone noticed. `biome check` does report the parse error; the writing
+  command does not.
+- **Comments are re-indented and never reflowed.** Verified rather than assumed:
+  formatting the whole repo changed 108 files and **zero** comment-text lines,
+  compared with leading whitespace stripped. That matters more here than in most
+  repos, because the comments are argued paragraphs.
+
+And one thing it broke, worth knowing before writing another test that reads
+source text: **a formatter can split a call across lines.** Biome turned
+`write.pursue({…})` into `write` newline `.pursue({…})` in five tools, and
+`tests/helpers/surface-coverage.ts`'s pattern stopped matching — five verbs
+reported unreachable that were reached fine. It now tolerates whitespace either
+side of the dot.
 
 ## Architecture: two persistence halves, deliberately not one
 

@@ -43,12 +43,21 @@ let session: ResearchSession;
 
 const clock: Clock = { now: () => "2026-08-24T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** The sentence both chains pass through. Two claims, two enquiries, one wording. */
 const SHARED = "the effect holds under condition X";
@@ -69,19 +78,32 @@ async function twoChains() {
   const chain = async (opens: string, first: string, middle: string, last: string) => {
     const enquiry = await session.openEnquiry(opens);
     const observations = await session.recordObservations({
-      enquiry, name: `${opens} readings`, finding: "measured",
+      enquiry,
+      name: `${opens} readings`,
+      finding: "measured",
     });
     const { claims } = await session.recordAnalysis({
-      enquiry, method: "fit", from: [observations],
+      enquiry,
+      method: "fit",
+      from: [observations],
       concludes: [{ proposition: first, finding: `${first}, on the fit` }],
     });
     const narrowed = await session.reinterpret({
-      of: claimOf(claims, first), as: middle, because: "the fit only covers condition X",
+      of: claimOf(claims, first),
+      as: middle,
+      because: "the fit only covers condition X",
     });
     const narrower = await session.reinterpret({
-      of: narrowed.nowClaims.claim, as: last, because: "and only in that subgroup",
+      of: narrowed.nowClaims.claim,
+      as: last,
+      because: "and only in that subgroup",
     });
-    return { enquiry, first: claimOf(claims, first), middle: narrowed.nowClaims, last: narrower.nowClaims };
+    return {
+      enquiry,
+      first: claimOf(claims, first),
+      middle: narrowed.nowClaims,
+      last: narrower.nowClaims,
+    };
   };
 
   const a = await chain("does the effect hold?", A1, SHARED, A3);
@@ -99,7 +121,10 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
 
   test("each history reads back its own chain, and none of the other's", async () => {
     const { a, b } = await twoChains();
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
 
     const historyA = await later.interpretationHistory(a.last.claim);
     expect(historyA.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, A3]);

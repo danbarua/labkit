@@ -14,7 +14,13 @@
 
 import { LABKIT_SCHEMA } from "./schema";
 import { buildPropertyClause, validateIdentifier } from "./agtype";
-import { CypherRunner, edge as edgeColumn, vertex as vertexColumn, type DecodedRow, type RowSpec } from "./cypher";
+import {
+  CypherRunner,
+  edge as edgeColumn,
+  vertex as vertexColumn,
+  type DecodedRow,
+  type RowSpec,
+} from "./cypher";
 import {
   EDGE_SCHEMA,
   NODE_TYPES,
@@ -144,7 +150,11 @@ export class TenantGraph {
    * that one declaration produces both the SQL `AS` clause AGE requires and
    * the row type this resolves to.
    */
-  async query<S extends RowSpec>(cypher: string, columns: S, params?: Record<string, unknown>): Promise<DecodedRow<S>[]> {
+  async query<S extends RowSpec>(
+    cypher: string,
+    columns: S,
+    params?: Record<string, unknown>,
+  ): Promise<DecodedRow<S>[]> {
     return this.runner.query(cypher, columns, params);
   }
 
@@ -163,7 +173,10 @@ export class TenantGraph {
    * resolve a `(text, text)` function overload against `agtype` arguments —
    * confirmed empirically against pglite-age before this was written this way.
    */
-  async createNode<L extends NodeLabel>(label: L, props: NodePropsByLabel[L]): Promise<PublicNode<L>> {
+  async createNode<L extends NodeLabel>(
+    label: L,
+    props: NodePropsByLabel[L],
+  ): Promise<PublicNode<L>> {
     const nodeType = NODE_TYPES[label];
     const validated = nodeType.validate ? nodeType.validate(props) : props;
     const naturalIdClause = `natural_id: ${LABKIT_SCHEMA}.labkit_next_natural_id('${label.toLowerCase()}'::text, '${nodeType.prefix}'::text)`;
@@ -180,7 +193,11 @@ export class TenantGraph {
 
     const { natural_id, ...properties } = created.n.properties;
     this.minted.push(natural_id);
-    return { natural_id, label, properties: properties as unknown as NodePropsByLabel[L] };
+    return {
+      natural_id,
+      label,
+      properties: properties as unknown as NodePropsByLabel[L],
+    };
   }
 
   /**
@@ -270,7 +287,9 @@ export class TenantGraph {
 
     const allowed = EDGE_SCHEMA[edge].some(([f, t]) => f === fromLabel && t === toLabel);
     if (!allowed) {
-      throw new Error(`${edge} does not allow ${fromLabel} -> ${toLabel} (natural ids ${fromId} -> ${toId})`);
+      throw new Error(
+        `${edge} does not allow ${fromLabel} -> ${toLabel} (natural ids ${fromId} -> ${toId})`,
+      );
     }
 
     // **The endpoints are not checked up front.** They used to be, one query
@@ -334,11 +353,21 @@ export class TenantGraph {
     // Nothing was created, so one of the endpoints did not match. Only now is
     // it worth two queries to say which -- this is the slow path, and it ends
     // in a throw.
-    const fromRows = await this.query(`MATCH (n:${fromLabel} {natural_id: $id}) RETURN n`, { n: vertexColumn() }, { id: fromId });
-    if (fromRows.length === 0) throw new Error(`source ${fromId} not found in tenant ${this.ctx.graphName}`);
+    const fromRows = await this.query(
+      `MATCH (n:${fromLabel} {natural_id: $id}) RETURN n`,
+      { n: vertexColumn() },
+      { id: fromId },
+    );
+    if (fromRows.length === 0)
+      throw new Error(`source ${fromId} not found in tenant ${this.ctx.graphName}`);
 
-    const toRows = await this.query(`MATCH (n:${toLabel} {natural_id: $id}) RETURN n`, { n: vertexColumn() }, { id: toId });
-    if (toRows.length === 0) throw new Error(`target ${toId} not found in tenant ${this.ctx.graphName}`);
+    const toRows = await this.query(
+      `MATCH (n:${toLabel} {natural_id: $id}) RETURN n`,
+      { n: vertexColumn() },
+      { id: toId },
+    );
+    if (toRows.length === 0)
+      throw new Error(`target ${toId} not found in tenant ${this.ctx.graphName}`);
 
     // Both endpoints are there and the CREATE still matched nothing. Nothing
     // known produces this; say so loudly rather than returning as though the

@@ -72,7 +72,11 @@ export interface AgtypeScalar<T = AgtypeJSON> {
 }
 
 /** What `parseAgtype` returns for a top-level `RETURN` result. */
-export type AgtypeValue<T = Record<string, AgtypeJSON>> = AgtypeVertex<T> | AgtypeEdge<T> | AgtypePath | AgtypeScalar;
+export type AgtypeValue<T = Record<string, AgtypeJSON>> =
+  | AgtypeVertex<T>
+  | AgtypeEdge<T>
+  | AgtypePath
+  | AgtypeScalar;
 
 // ---------------------------------------------------------------------------
 // Parser
@@ -197,8 +201,10 @@ class Scanner {
    * in between.
    */
   private parseNumberTagged(): AgtypeJSON {
-    if (this.s.startsWith("Infinity", this.i)) return this.afterNumber(this.consume("Infinity", Infinity));
-    if (this.s.startsWith("-Infinity", this.i)) return this.afterNumber(this.consume("-Infinity", -Infinity));
+    if (this.s.startsWith("Infinity", this.i))
+      return this.afterNumber(this.consume("Infinity", Infinity));
+    if (this.s.startsWith("-Infinity", this.i))
+      return this.afterNumber(this.consume("-Infinity", -Infinity));
     if (this.s.startsWith("NaN", this.i)) return this.afterNumber(this.consume("NaN", NaN));
 
     const start = this.i;
@@ -306,8 +312,12 @@ class Scanner {
    */
   private applyTag(tag: string, value: AgtypeJSON): AgtypeJSON {
     if (tag === "vertex" || tag === "edge") {
-      if (typeof value !== "object" || value === null || Array.isArray(value)) this.fail(`::${tag} on a non-object value`);
-      return { kind: tag, ...(value as Record<string, AgtypeJSON>) } as unknown as AgtypeJSON;
+      if (typeof value !== "object" || value === null || Array.isArray(value))
+        this.fail(`::${tag} on a non-object value`);
+      return {
+        kind: tag,
+        ...(value as Record<string, AgtypeJSON>),
+      } as unknown as AgtypeJSON;
     }
     if (tag === "path") {
       if (!Array.isArray(value)) this.fail("::path on a non-array value");
@@ -315,11 +325,13 @@ class Scanner {
       // this alternating shape (age.c's is_array_path) — a mismatch here
       // means a real invariant violation, not an unmodeled feature, so
       // this throws rather than degrading like an unrecognized tag would.
-      if (value.length === 0 || value.length % 2 !== 1) this.fail("::path array must have an odd length");
+      if (value.length === 0 || value.length % 2 !== 1)
+        this.fail("::path array must have an odd length");
       for (let i = 0; i < value.length; i++) {
         const expectKind = i % 2 === 0 ? "vertex" : "edge";
         const el = value[i] as { kind?: string };
-        if (el.kind !== expectKind) this.fail(`::path element ${i} expected ${expectKind}, got ${el.kind ?? typeof el}`);
+        if (el.kind !== expectKind)
+          this.fail(`::path element ${i} expected ${expectKind}, got ${el.kind ?? typeof el}`);
       }
       return { kind: "path", elements: value } as unknown as AgtypeJSON;
     }
@@ -336,7 +348,8 @@ export function parseAgtype<T = Record<string, AgtypeJSON>>(raw: string): Agtype
   const value = new Scanner(raw).parseTagged();
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     const kind = (value as { kind?: string }).kind;
-    if (kind === "vertex" || kind === "edge" || kind === "path") return value as unknown as AgtypeValue<T>;
+    if (kind === "vertex" || kind === "edge" || kind === "path")
+      return value as unknown as AgtypeValue<T>;
   }
   return { kind: "scalar", value } as AgtypeValue<T>;
 }

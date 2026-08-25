@@ -36,7 +36,12 @@ import { runner } from "./session";
  * printed, so they pass straight through.
  */
 export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> {
-  const program = buildProgram(runner(() => program.opts(), (line) => console.log(line)));
+  const program = buildProgram(
+    runner(
+      () => program.opts(),
+      (line) => console.log(line),
+    ),
+  );
   program.exitOverride();
   try {
     await program.parseAsync(argv, { from: "user" });

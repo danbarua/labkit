@@ -32,18 +32,27 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts on what this proves. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const THROUGHPUT = "the pipeline sustains 40 images per second on the feasibility slice";
@@ -58,7 +67,9 @@ const COST = "a full run costs roughly 9,000 GPU-hours at the current throughput
  * them, which is the whole point of this scenario.
  */
 async function aStagedProgramme() {
-  const enquiry = await session.openEnquiry("does the learned topology classify better than the baseline?");
+  const enquiry = await session.openEnquiry(
+    "does the learned topology classify better than the baseline?",
+  );
 
   const feasibility = await session.planWork({
     objective: "feasibility slice: 1,000 training images",
@@ -79,7 +90,14 @@ async function aStagedProgramme() {
     protecting: [fullRun],
   });
 
-  return { enquiry, feasibility, fullRun, throughput, solverHealth, advancement };
+  return {
+    enquiry,
+    feasibility,
+    fullRun,
+    throughput,
+    solverHealth,
+    advancement,
+  };
 }
 
 describe("S-8 — don't spend the whole budget discovering the pipeline is broken", () => {
@@ -108,8 +126,14 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       implementing: programme.feasibility,
       from: [readings],
       concludes: [
-        { proposition: THROUGHPUT, finding: "sustained 44 images per second across the slice" },
-        { proposition: COST, finding: "9,100 GPU-hours projected from the measured rate" },
+        {
+          proposition: THROUGHPUT,
+          finding: "sustained 44 images per second across the slice",
+        },
+        {
+          proposition: COST,
+          finding: "9,100 GPU-hours projected from the measured rate",
+        },
       ],
     });
 
@@ -237,7 +261,9 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const later = await afterwards();
     const why = await later.whySupported(claimOf(measuredClaims, COST));
     expect(why.supported).toBe(true);
-    expect(why.support.map((s) => s.finding)).toEqual(["9,100 GPU-hours projected from the measured rate"]);
+    expect(why.support.map((s) => s.finding)).toEqual([
+      "9,100 GPU-hours projected from the measured rate",
+    ]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["feasibility slice timings"]);
   });
 
@@ -306,8 +332,14 @@ async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aSta
     implementing: programme.feasibility,
     from: [readings],
     concludes: [
-      { proposition: THROUGHPUT, finding: "sustained 44 images per second across the slice" },
-      { proposition: COST, finding: "9,100 GPU-hours projected from the measured rate" },
+      {
+        proposition: THROUGHPUT,
+        finding: "sustained 44 images per second across the slice",
+      },
+      {
+        proposition: COST,
+        finding: "9,100 GPU-hours projected from the measured rate",
+      },
     ],
   });
 }

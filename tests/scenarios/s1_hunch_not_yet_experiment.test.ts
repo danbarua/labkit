@@ -19,7 +19,13 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock, type EventSink, type QuestionRef } from "../../src/domain";
+import {
+  ResearchSession,
+  inMemoryEventLog,
+  type Clock,
+  type EventSink,
+  type QuestionRef,
+} from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
@@ -31,14 +37,20 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 const NONLINEAR = "the encoding responds nonlinearly to its input";
 const SMEAR = "the internal response is more than a nonlinear smear";
@@ -56,7 +68,10 @@ const SMEAR = "the internal response is more than a nonlinear smear";
  */
 async function priorState() {
   const nonlinearity = await session.pose("does the encoding respond nonlinearly at all?");
-  const nlEnquiry = await session.pursue({ question: nonlinearity, approach: "response curvature sweep" });
+  const nlEnquiry = await session.pursue({
+    question: nonlinearity,
+    approach: "response curvature sweep",
+  });
   const nlObs = await session.recordObservations({
     enquiry: nlEnquiry,
     name: "curvature sweep readings",
@@ -77,7 +92,11 @@ async function priorState() {
     // `promote()`, is for findings whose standing was not knowable when they
     // were recorded, which is not this one.
     concludes: [
-      { proposition: NONLINEAR, finding: "departure from linearity well outside the fit interval", standing: "confirmatory" },
+      {
+        proposition: NONLINEAR,
+        finding: "departure from linearity well outside the fit interval",
+        standing: "confirmatory",
+      },
     ],
   });
   await session.closeEnquiry({
@@ -86,7 +105,10 @@ async function priorState() {
   });
 
   const smear = await session.pose("does the encoding do anything beyond a nonlinear smear?");
-  const smearEnquiry = await session.pursue({ question: smear, approach: "response-map inspection" });
+  const smearEnquiry = await session.pursue({
+    question: smear,
+    approach: "response-map inspection",
+  });
   const smearObs = await session.recordObservations({
     enquiry: smearEnquiry,
     name: "response-map readings",
@@ -96,7 +118,12 @@ async function priorState() {
     enquiry: smearEnquiry,
     method: "response-map-inspection",
     from: [smearObs],
-    concludes: [{ proposition: SMEAR, finding: "map differs by family, but the pattern flips between initial conditions" }],
+    concludes: [
+      {
+        proposition: SMEAR,
+        finding: "map differs by family, but the pattern flips between initial conditions",
+      },
+    ],
   });
 
   // Written down and never pursued. This is what makes "untested" a state of
@@ -113,7 +140,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
     // Researcher: the learned topology seems to be doing something
     //             computationally interesting.
-    const hunch = await session.pose("is the learned topology doing something computationally interesting?");
+    const hunch = await session.pose(
+      "is the learned topology doing something computationally interesting?",
+    );
 
     // Agent:      what do we already know?
     // LabKit:     nonlinearity is established; the smear question is
@@ -202,7 +231,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
    * been closed by an act that only said "narrow".
    */
   test("the sharper question is traceable to the hunch, which is neither rewritten nor closed", async () => {
-    const hunch = await session.pose("is the learned topology doing something computationally interesting?");
+    const hunch = await session.pose(
+      "is the learned topology doing something computationally interesting?",
+    );
     const sharper = await session.sharpen({
       from: hunch,
       into: "do different inputs map to reproducibly different internal responses?",
@@ -217,14 +248,18 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const later = new ResearchSession(await scenario.current(), { clock });
     const durable = await later.originOf(sharper);
     expect(durable?.from).toBe(hunch);
-    expect(durable?.fromAsks).toBe("is the learned topology doing something computationally interesting?");
+    expect(durable?.fromAsks).toBe(
+      "is the learned topology doing something computationally interesting?",
+    );
 
     // Narrowing is not answering. Nothing has been shown about the hunch, so
     // it is still on the books untested -- not established, and not a failure.
     const known = await later.whatIsKnown();
     expect(known.established.map((q) => q.question)).not.toContain(hunch);
     expect(known.untested.map((q) => q.question)).toContain(hunch);
-    expect(known.untested.map((q) => q.asks)).toContain("is the learned topology doing something computationally interesting?");
+    expect(known.untested.map((q) => q.asks)).toContain(
+      "is the learned topology doing something computationally interesting?",
+    );
   });
 
   /**
@@ -238,7 +273,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
    */
   test("the knowledge behind a sharpening is the knowledge that existed then", async () => {
     const prior = await priorState();
-    const hunch = await session.pose("is the learned topology doing something computationally interesting?");
+    const hunch = await session.pose(
+      "is the learned topology doing something computationally interesting?",
+    );
 
     const first = await session.sharpen({
       from: hunch,
@@ -257,7 +294,12 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
       enquiry: prior.smearEnquiry,
       method: "seed-controlled-inspection",
       from: [lateObs],
-      concludes: [{ proposition: SMEAR, finding: "family separation survives when initial conditions are held fixed" }],
+      concludes: [
+        {
+          proposition: SMEAR,
+          finding: "family separation survives when initial conditions are held fixed",
+        },
+      ],
     });
 
     const second = await session.sharpen({
@@ -281,8 +323,11 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // Afterward, from a second reader with an event log of its own -- which is
     // empty. The historical answer is reconstructed from durable scientific
     // state, not replayed from the stream of what this session happened to do.
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
-    expect((await later.events.all())).toHaveLength(0);
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
+    expect(await later.events.all()).toHaveLength(0);
     expect((await later.originOf(first))?.knownAtTheTime).not.toContain(LATE);
     expect((await later.originOf(second))?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
   });
@@ -307,7 +352,11 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // up-front guard produces this wording, so a rejection that stops saying
     // it is a rejection that started writing first.
     await expect(
-      session.sharpen({ from: absent, into: "a sharper form of nothing", because: "it should not get this far" }),
+      session.sharpen({
+        from: absent,
+        into: "a sharper form of nothing",
+        because: "it should not get this far",
+      }),
     ).rejects.toThrow(/no question Q_404 to sharpen/);
 
     const later = new ResearchSession(await scenario.current(), { clock });
@@ -331,9 +380,17 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
    * the handle the caller holds, never the text.
    */
   test("a second pursuit of one question does not mint a second question", async () => {
-    const question = await session.pose("do different inputs map to reproducibly different internal responses?");
-    const byMapping = await session.pursue({ question, approach: "response-map separation" });
-    const byProbe = await session.pursue({ question, approach: "response-map separation, probe variant" });
+    const question = await session.pose(
+      "do different inputs map to reproducibly different internal responses?",
+    );
+    const byMapping = await session.pursue({
+      question,
+      approach: "response-map separation",
+    });
+    const byProbe = await session.pursue({
+      question,
+      approach: "response-map separation, probe variant",
+    });
 
     expect(byMapping).not.toBe(byProbe);
 

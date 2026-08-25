@@ -40,7 +40,16 @@ export function publicVerbsOf(sourcePath: string): string[] {
  */
 export const NOT_EXPOSED: Readonly<Record<string, string>> = {};
 
-/** Verbs a body calls as `surface.verb(`. */
+/**
+ * Verbs a body calls as `surface.verb(`.
+ *
+ * **Whitespace-tolerant, and that is not defensive programming.** The pattern
+ * was `\bwrite\.pursue\s*\(` until a formatter arrived and split five calls
+ * onto their own lines — `write\n  .pursue({…})` — at which point this reported
+ * five verbs unreachable that were reached fine. A derivation that reads source
+ * text has to survive the source text being re-wrapped, or it is a test of the
+ * formatter's preferences.
+ */
 export function verbsReachedIn(code: string, receiver: string, verbs: string[]): string[] {
-  return verbs.filter((v) => new RegExp(`\\b${receiver}\\.${v}\\s*\\(`).test(code));
+  return verbs.filter((v) => new RegExp(`\\b${receiver}\\s*\\.\\s*${v}\\s*\\(`).test(code));
 }

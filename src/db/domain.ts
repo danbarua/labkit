@@ -63,7 +63,6 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
   Computation: ["started_at", "finished_at"],
 };
 
-
 export const EDGE_LABELS = [
   "MOTIVATES", // Question -> LineOfEnquiry
   "REQUIRES", // LineOfEnquiry -> Evidence
@@ -138,7 +137,11 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * live on the decision. The two models are not equally capable here, so
    * PJ-011's record-both-pick-neither rule does not apply — see PJ-008 row D.
    */
-  MOTIVATES: [["Question", "LineOfEnquiry"], ["Decision", "Question"], ["Decision", "Claim"]],
+  MOTIVATES: [
+    ["Question", "LineOfEnquiry"],
+    ["Decision", "Question"],
+    ["Decision", "Claim"],
+  ],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
   ADDRESSES: [["EvidenceUnit", "LineOfEnquiry"]],
   SUPPORTS: [["Evidence", "Claim"]],
@@ -214,7 +217,10 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   QUALIFIES: [["Criterion", "EvidenceUnit"]],
   EVALUATED_AS: [["Criterion", "CriterionEvaluation"]],
   TRIGGERS: [["CriterionEvaluation", "Gate"]],
-  GATES: [["Gate", "Task"], ["Gate", "Computation"]],
+  GATES: [
+    ["Gate", "Task"],
+    ["Gate", "Computation"],
+  ],
   /**
    * "Re-checked that finding, without reproducing the run behind it." Earned
    * by S-10.
@@ -273,8 +279,14 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * confirm, and telling the two apart from a free-text verdict would be
    * text-matching.
    */
-  CHANGES: [["Decision", "Criterion"], ["Decision", "Claim"]],
-  BASED_ON: [["Decision", "Evidence"], ["CriterionEvaluation", "Evidence"]],
+  CHANGES: [
+    ["Decision", "Criterion"],
+    ["Decision", "Claim"],
+  ],
+  BASED_ON: [
+    ["Decision", "Evidence"],
+    ["CriterionEvaluation", "Evidence"],
+  ],
   RESOLVES: [["Decision", "Question"]],
   NARROWS: [["Decision", "Question"]],
   DEFERS: [["Decision", "Question"]],
@@ -293,7 +305,12 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * it was executed. `Review -> Computation` may well be earned later by a
    * scenario reviewing an execution, but S-11 did not earn it.
    */
-  EVALUATES: [["Review", "Claim"], ["Review", "Decision"], ["Review", "Evidence"], ["Review", "EvidenceUnit"]],
+  EVALUATES: [
+    ["Review", "Claim"],
+    ["Review", "Decision"],
+    ["Review", "Evidence"],
+    ["Review", "EvidenceUnit"],
+  ],
   /**
    * Which review a retraction actually rested on. Earned by S-11b, row O.
    *

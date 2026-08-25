@@ -25,21 +25,32 @@ let session: ResearchSession;
 let events: EventSink;
 
 let tick = 0;
-const clock: Clock = { now: () => new Date(Date.UTC(2026, 7, 20, 9, tick++)).toISOString() };
+const clock: Clock = {
+  now: () => new Date(Date.UTC(2026, 7, 20, 9, tick++)).toISOString(),
+};
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const MARGINAL = "does the accelerated variant beat the reference on the marginal split?";
@@ -167,7 +178,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(status.question!.acceptedBecause).toBe(
       "the confirmatory dataset is spent and there is no larger held-out sample",
     );
-    expect(status.question!.evidence.map((e) => e.states)).toEqual(["difference 0.4%, CI spans zero"]);
+    expect(status.question!.evidence.map((e) => e.states)).toEqual([
+      "difference 0.4%, CI spans zero",
+    ]);
   });
 
   /**
@@ -213,9 +226,17 @@ describe("S-14: deliberately leaving something unresolved", () => {
       enquiry,
       method: "paired-comparison, external cohort",
       from: [fresh],
-      concludes: [{ proposition: PROPOSITION, finding: "difference 2.1%, CI excludes zero" }],
+      concludes: [
+        {
+          proposition: PROPOSITION,
+          finding: "difference 2.1%, CI excludes zero",
+        },
+      ],
     });
-    await session.closeEnquiry({ enquiry, answeredBy: claimOf(settledClaims, PROPOSITION) });
+    await session.closeEnquiry({
+      enquiry,
+      answeredBy: claimOf(settledClaims, PROPOSITION),
+    });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
     expect(status.question!.open).toBe(false);

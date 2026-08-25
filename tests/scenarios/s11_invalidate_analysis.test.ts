@@ -51,7 +51,10 @@ afterEach(async () => {
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts on what this proves. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 /**
@@ -73,9 +76,18 @@ async function bootstrapAnalysisAsShipped() {
     concludes: [
       { proposition: "T beats lattice", finding: "p = 0.001 (bootstrap)" },
       { proposition: "T beats rewired", finding: "p = 0.002 (bootstrap)" },
-      { proposition: "T beats curr_random", finding: "p = 0.003 (bootstrap)" },
-      { proposition: "lattice beats curr_random", finding: "p = 0.004 (bootstrap)" },
-      { proposition: "rewired beats curr_random", finding: "p = 0.005 (bootstrap)" },
+      {
+        proposition: "T beats curr_random",
+        finding: "p = 0.003 (bootstrap)",
+      },
+      {
+        proposition: "lattice beats curr_random",
+        finding: "p = 0.004 (bootstrap)",
+      },
+      {
+        proposition: "rewired beats curr_random",
+        finding: "p = 0.005 (bootstrap)",
+      },
       { proposition: "T beats static", finding: "p = 0.006 (bootstrap)" },
     ],
   });
@@ -85,10 +97,19 @@ async function bootstrapAnalysisAsShipped() {
 /** The replacement: same observations, correct null test, one conclusion weakens. */
 const SIGN_FLIP_CONCLUSIONS = [
   { proposition: "T beats lattice", finding: "p = 0.001 (bootstrap)" },
-  { proposition: "T beats rewired", finding: "p = 0.049 (sign-flip permutation)" },
+  {
+    proposition: "T beats rewired",
+    finding: "p = 0.049 (sign-flip permutation)",
+  },
   { proposition: "T beats curr_random", finding: "p = 0.003 (bootstrap)" },
-  { proposition: "lattice beats curr_random", finding: "p = 0.004 (bootstrap)" },
-  { proposition: "rewired beats curr_random", finding: "p = 0.005 (bootstrap)" },
+  {
+    proposition: "lattice beats curr_random",
+    finding: "p = 0.004 (bootstrap)",
+  },
+  {
+    proposition: "rewired beats curr_random",
+    finding: "p = 0.005 (bootstrap)",
+  },
   { proposition: "T beats static", finding: "p = 0.006 (bootstrap)" },
 ];
 
@@ -99,7 +120,8 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // Reviewer: your bootstrap is centred on the observed effect. It isn't a null test.
     const review = await session.recordReview({
       of: analysis,
-      verdict: "bootstrap is centred on the observed effect; it does not implement the intended null",
+      verdict:
+        "bootstrap is centred on the observed effect; it does not implement the intended null",
     });
 
     // Researcher: replace the analysis, mark the prior inference superseded,
@@ -137,7 +159,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
     const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({ of: analysis, verdict: "not a null test" });
+    const review = await session.recordReview({
+      of: analysis,
+      verdict: "not a null test",
+    });
 
     const report = await session.replaceAnalysis({
       supersedes: analysis,
@@ -171,7 +196,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {
     const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({ of: analysis, verdict: "not a null test" });
+    const review = await session.recordReview({
+      of: analysis,
+      verdict: "not a null test",
+    });
 
     const report = await session.replaceAnalysis({
       supersedes: analysis,
@@ -187,13 +215,18 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // Durable check: the replacement conclusion still rests on the same
     // observations, and those observations were never invalidated.
     const why = await session.whySupported(claimOf(report.claims, "T beats rewired"));
-    expect(await (await afterwards()).whySupported(claimOf(report.claims, "T beats rewired"))).toEqual(why);
+    expect(
+      await (await afterwards()).whySupported(claimOf(report.claims, "T beats rewired")),
+    ).toEqual(why);
     expect(why.restingOn.map((a) => a.name)).toContain("per-image classification results");
   });
 
   test("Afterward 4: the replacement conclusion is supported via a different inference", async () => {
     const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({ of: analysis, verdict: "not a null test" });
+    const review = await session.recordReview({
+      of: analysis,
+      verdict: "not a null test",
+    });
     const report = await session.replaceAnalysis({
       supersedes: analysis,
       because: review,
@@ -204,7 +237,9 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
 
     const why = await session.whySupported(claimOf(report.claims, "T beats rewired"));
-    expect(await (await afterwards()).whySupported(claimOf(report.claims, "T beats rewired"))).toEqual(why);
+    expect(
+      await (await afterwards()).whySupported(claimOf(report.claims, "T beats rewired")),
+    ).toEqual(why);
     expect(why.supported).toBe(true);
     expect(why.support.map((s) => s.method)).toEqual(["sign-flip-permutation"]);
     expect(why.support[0]!.finding).toBe("p = 0.049 (sign-flip permutation)");
@@ -212,7 +247,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 5: what the superseded inference claimed is still readable", async () => {
     const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({ of: analysis, verdict: "not a null test" });
+    const review = await session.recordReview({
+      of: analysis,
+      verdict: "not a null test",
+    });
     const report = await session.replaceAnalysis({
       supersedes: analysis,
       because: review,
@@ -223,7 +261,9 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
 
     const why = await session.whySupported(claimOf(report.claims, "T beats rewired"));
-    expect(await (await afterwards()).whySupported(claimOf(report.claims, "T beats rewired"))).toEqual(why);
+    expect(
+      await (await afterwards()).whySupported(claimOf(report.claims, "T beats rewired")),
+    ).toEqual(why);
     expect(why.superseded).toHaveLength(1);
     expect(why.superseded[0]).toMatchObject({
       finding: "p = 0.002 (bootstrap)",
@@ -269,7 +309,9 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     const onMnist = await session.whySupported(claimOf(mnistClaims, "T beats lattice on MNIST"));
     expect(onMnist.restingOn.map((a) => a.name)).toEqual(["mnist per-image results"]);
 
-    const onFashion = await session.whySupported(claimOf(fashionClaims, "T beats lattice on Fashion"));
+    const onFashion = await session.whySupported(
+      claimOf(fashionClaims, "T beats lattice on Fashion"),
+    );
     expect(onFashion.restingOn.map((a) => a.name)).toEqual(["fashion-mnist per-image results"]);
   });
 
@@ -277,7 +319,8 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
     const review = await session.recordReview({
       of: analysis,
-      verdict: "bootstrap is centred on the observed effect; it does not implement the intended null",
+      verdict:
+        "bootstrap is centred on the observed effect; it does not implement the intended null",
     });
     const report = await session.replaceAnalysis({
       supersedes: analysis,
@@ -305,7 +348,11 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    */
   test("a replacement cannot cite a review of some other analysis", async () => {
     const enquiry = await session.openEnquiry("which construction classifies best?");
-    const observations = await session.recordObservations({ enquiry, name: "obs", finding: "raw" });
+    const observations = await session.recordObservations({
+      enquiry,
+      name: "obs",
+      finding: "raw",
+    });
 
     const { analysis: target, claims: targetClaims } = await session.recordAnalysis({
       enquiry,
@@ -319,7 +366,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       from: [observations],
       concludes: [{ proposition: "something else entirely", finding: "n/a" }],
     });
-    const reviewOfUnrelated = await session.recordReview({ of: unrelated, verdict: "a verdict about other work" });
+    const reviewOfUnrelated = await session.recordReview({
+      of: unrelated,
+      verdict: "a verdict about other work",
+    });
 
     await expect(
       session.replaceAnalysis({
@@ -335,14 +385,19 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // ...and nothing was invalidated on the way to failing.
     // The replacement was refused, so the original claim is the only one.
     const why = await session.whySupported(claimOf(targetClaims, "T beats rewired"));
-    expect(await (await afterwards()).whySupported(claimOf(targetClaims, "T beats rewired"))).toEqual(why);
+    expect(
+      await (await afterwards()).whySupported(claimOf(targetClaims, "T beats rewired")),
+    ).toEqual(why);
     expect(why.supported).toBe(true);
     expect(why.superseded).toHaveLength(0);
   });
 
   test("the temporal seam records the invalidation, with its time and what it moved", async () => {
     const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({ of: analysis, verdict: "not a null test" });
+    const review = await session.recordReview({
+      of: analysis,
+      verdict: "not a null test",
+    });
     const report = await session.replaceAnalysis({
       supersedes: analysis,
       because: review,

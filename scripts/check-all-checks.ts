@@ -134,7 +134,7 @@ if (import.meta.main) {
     .filter(({ problems }) => problems.length > 0);
 
   if (failures.length > 0) {
-    console.error("❌ check-all-checks ERROR: a check script does not introduce itself.\n");
+    console.error("FAILED: a script does not introduce itself.\n");
     for (const { path, problems } of failures) {
       const kind = path.endsWith(".sh") ? "sh" : "ts";
       console.error(`  ${path}`);
@@ -154,7 +154,5 @@ if (import.meta.main) {
   }
 
   const paths = checkScriptPaths();
-  console.log(
-    `✅ check-all-checks OK: all ${paths.length} check scripts introduce themselves in one line.`,
-  );
+  console.log(`OK: all ${paths.length} scripts introduce themselves in one line.`);
 }

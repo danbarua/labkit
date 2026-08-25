@@ -33,12 +33,21 @@ let session: ResearchSession;
 
 const clock: Clock = { now: () => "2026-08-24T13:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 const PROP = "the series does not differ from itself";
 
@@ -46,22 +55,32 @@ describe("S-10e — the same record, read twice by one run", () => {
   test("a run that read one record twice is not reported as having read it once", async () => {
     const enquiry = await session.openEnquiry("does the series differ from itself?");
     const series = await session.recordObservations({
-      enquiry, name: "series", finding: "twelve points", contentHash: "sha256:series",
+      enquiry,
+      name: "series",
+      finding: "twelve points",
+      contentHash: "sha256:series",
     });
 
     // The null test: the same series on both sides of a difference.
     const { analysis } = await session.recordAnalysis({
-      enquiry, method: "difference of the two series", from: [series, series],
+      enquiry,
+      method: "difference of the two series",
+      from: [series, series],
       concludes: [{ proposition: PROP, finding: "difference 0.0" }],
     });
     // And a re-run that read it once, so the two are genuinely different.
     const rerun = await session.reverify({
-      historical: analysis, enquiry, method: "difference of the two series",
+      historical: analysis,
+      enquiry,
+      method: "difference of the two series",
       under: [series],
       concludes: { proposition: PROP, finding: "difference 0.0" },
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const report = await later.reproductionOf(rerun.verification);
 
     expect(report.ofRead.map((i) => i.part)).toEqual([series, series]);
@@ -70,20 +89,35 @@ describe("S-10e — the same record, read twice by one run", () => {
 
   test("and the order of a repeat is kept, not just its count", async () => {
     const enquiry = await session.openEnquiry("does the sandwich cancel?");
-    const a = await session.recordObservations({ enquiry, name: "series A", finding: "twelve points" });
-    const b = await session.recordObservations({ enquiry, name: "series B", finding: "twelve points" });
+    const a = await session.recordObservations({
+      enquiry,
+      name: "series A",
+      finding: "twelve points",
+    });
+    const b = await session.recordObservations({
+      enquiry,
+      name: "series B",
+      finding: "twelve points",
+    });
 
     const { analysis } = await session.recordAnalysis({
-      enquiry, method: "a minus b plus a", from: [a, b, a],
+      enquiry,
+      method: "a minus b plus a",
+      from: [a, b, a],
       concludes: [{ proposition: PROP, finding: "residual 0.1" }],
     });
     const rerun = await session.reverify({
-      historical: analysis, enquiry, method: "a minus b plus a",
+      historical: analysis,
+      enquiry,
+      method: "a minus b plus a",
       under: [a, b, a],
       concludes: { proposition: PROP, finding: "residual 0.1" },
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const report = await later.reproductionOf(rerun.verification);
 
     expect(report.ofRead.map((i) => i.name)).toEqual(["series A", "series B", "series A"]);

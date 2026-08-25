@@ -27,21 +27,32 @@ let session: ResearchSession;
 let events: EventSink;
 
 let tick = 0;
-const clock: Clock = { now: () => new Date(Date.UTC(2026, 7, 20, 9, tick++)).toISOString() };
+const clock: Clock = {
+  now: () => new Date(Date.UTC(2026, 7, 20, 9, tick++)).toISOString(),
+};
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const CONTROL = "historical random control";
@@ -57,10 +68,29 @@ const PROPOSITION = "the accelerated path matches the reference";
 async function aCachedConstructionWithOneUnrecordedPart() {
   const enquiry = await session.openEnquiry("does the accelerated path match the reference?");
   const parts = [
-    await session.recordObservations({ enquiry, name: "weights", finding: "layer weights", contentHash: "sha256:aaa" }),
-    await session.recordObservations({ enquiry, name: "splits", finding: "fold assignment", contentHash: "sha256:bbb" }),
-    await session.recordObservations({ enquiry, name: "priors", finding: "prior draws", contentHash: "sha256:ccc" }),
-    await session.recordObservations({ enquiry, name: CONTROL, finding: "randomised control series" }),
+    await session.recordObservations({
+      enquiry,
+      name: "weights",
+      finding: "layer weights",
+      contentHash: "sha256:aaa",
+    }),
+    await session.recordObservations({
+      enquiry,
+      name: "splits",
+      finding: "fold assignment",
+      contentHash: "sha256:bbb",
+    }),
+    await session.recordObservations({
+      enquiry,
+      name: "priors",
+      finding: "prior draws",
+      contentHash: "sha256:ccc",
+    }),
+    await session.recordObservations({
+      enquiry,
+      name: CONTROL,
+      finding: "randomised control series",
+    }),
   ];
   const { analysis: analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
@@ -106,7 +136,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
 
     const dependents = await (await afterwards()).whatDependsOn(CONTROL);
     expect(dependents.claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
-    expect(dependents.enquiries.map((e) => e.pursuing)).toEqual(["does the accelerated path match the reference?"]);
+    expect(dependents.enquiries.map((e) => e.pursuing)).toEqual([
+      "does the accelerated path match the reference?",
+    ]);
   });
 
   /**
@@ -136,7 +168,12 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       enquiry,
       method: "stage2-construction, rebuilt",
       from: [regenerated],
-      concludes: [{ proposition: "the rebuild agrees with the cache", finding: "agreement within 1e-6" }],
+      concludes: [
+        {
+          proposition: "the rebuild agrees with the cache",
+          finding: "agreement within 1e-6",
+        },
+      ],
     });
 
     const reader = await afterwards();
@@ -172,8 +209,12 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     // only that regenerating the part does not move the question out of the
     // open set by side effect.
     const known = await (await afterwards()).whatIsKnown();
-    expect(known.untested.map((q) => q.asks)).toContain("what generated the historical random control?");
-    expect(known.established.map((q) => q.asks)).not.toContain("what generated the historical random control?");
+    expect(known.untested.map((q) => q.asks)).toContain(
+      "what generated the historical random control?",
+    );
+    expect(known.established.map((q) => q.asks)).not.toContain(
+      "what generated the historical random control?",
+    );
     expect(unresolved).toBeDefined();
   });
 
@@ -190,7 +231,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     const { enquiry } = await aCachedConstructionWithOneUnrecordedPart();
 
     // Before regenerating, the name is unambiguous and the question answerable.
-    expect((await session.whatDependsOn(CONTROL)).claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
+    expect((await session.whatDependsOn(CONTROL)).claims.map((c) => c.asserts)).toEqual([
+      PROPOSITION,
+    ]);
 
     await session.recordObservations({
       enquiry,
@@ -199,7 +242,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       contentHash: "sha256:regenerated",
     });
 
-    await expect((await afterwards()).whatDependsOn(CONTROL)).rejects.toThrow(/2 artefacts are named/);
+    await expect((await afterwards()).whatDependsOn(CONTROL)).rejects.toThrow(
+      /2 artefacts are named/,
+    );
   });
 
   /**
@@ -296,6 +341,8 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     // What S-9 did establish, and all this test claims to pin:
     expect(regenerated).not.toBe(original);
     expect((await reader.whatDependsOn(regenerated)).claims).toEqual([]);
-    expect((await reader.whatDependsOn(original)).claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
+    expect((await reader.whatDependsOn(original)).claims.map((c) => c.asserts)).toEqual([
+      PROPOSITION,
+    ]);
   });
 });

@@ -66,7 +66,13 @@ const ALLOWED = new Map<string, string>([
   ["checksFrom", "takes decoded query rows, not handles"],
 ]);
 
-type Finding = { file: string; line: number; member: string; what: string; type: string };
+type Finding = {
+  file: string;
+  line: number;
+  member: string;
+  what: string;
+  type: string;
+};
 const findings: Finding[] = [];
 
 /** `string`, `string[]`, `string | undefined`, and objects containing them. */
@@ -103,7 +109,11 @@ function bareStringIn(node: ts.TypeNode | undefined, source: ts.SourceFile): str
     // Map<string, IdentifiedArtefact>` sat in a return type and this script
     // walked straight past it, because the first version looked only through
     // `Promise` and `Array`.
-    if (["Promise", "Array", "ReadonlyArray", "Map", "Set", "ReadonlyMap", "ReadonlySet"].includes(name)) {
+    if (
+      ["Promise", "Array", "ReadonlyArray", "Map", "Set", "ReadonlyMap", "ReadonlySet"].includes(
+        name,
+      )
+    ) {
       for (const a of node.typeArguments) {
         const inner = bareStringIn(a, source);
         if (inner) return `${name}<… ${inner} …>`;
@@ -115,7 +125,12 @@ function bareStringIn(node: ts.TypeNode | undefined, source: ts.SourceFile): str
 }
 
 for (const file of FILES) {
-  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+  );
   const at = (n: ts.Node) => source.getLineAndCharacterOfPosition(n.getStart(source)).line + 1;
 
   const visit = (node: ts.Node): void => {
@@ -125,10 +140,23 @@ for (const file of FILES) {
         for (const p of node.parameters) {
           const found = bareStringIn(p.type, source);
           if (found)
-            findings.push({ file, line: at(p), member, what: `parameter \`${p.name.getText(source)}\``, type: found });
+            findings.push({
+              file,
+              line: at(p),
+              member,
+              what: `parameter \`${p.name.getText(source)}\``,
+              type: found,
+            });
         }
         const ret = bareStringIn(node.type, source);
-        if (ret) findings.push({ file, line: at(node), member, what: "return type", type: ret });
+        if (ret)
+          findings.push({
+            file,
+            line: at(node),
+            member,
+            what: "return type",
+            type: ret,
+          });
       }
     }
     ts.forEachChild(node, visit);
@@ -137,12 +165,18 @@ for (const file of FILES) {
 }
 
 if (findings.length > 0) {
-  console.error(`❌ check-no-stringly-typed: ${findings.length} bare \`string\` position(s) in the domain service layer\n`);
+  console.error(
+    `FAILED: ${findings.length} bare \`string\` position(s) in the domain service layer\n`,
+  );
   for (const f of findings)
     console.error(`   ${f.file}:${f.line} — ${f.member}: ${f.what} is \`${f.type}\``);
   console.error("\n   A handle (GateRef, ClaimRef, …) if it names a record; a taxonomy alias");
-  console.error("   (IndexedString, Timestamp, IdentityString, ReadOnlyString, Prose) if it carries a value.");
+  console.error(
+    "   (IndexedString, Timestamp, IdentityString, ReadOnlyString, Prose) if it carries a value.",
+  );
   process.exit(1);
 }
 
-console.log("✅ check-no-stringly-typed OK: every parameter and return in core/read/write names a handle or a classified value.");
+console.log(
+  "OK: every parameter and return in core/read/write names a handle or a classified value.",
+);

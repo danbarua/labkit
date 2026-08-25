@@ -32,15 +32,27 @@ let scenario: Scenario;
 let session: ResearchSession;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const HOLDS = "the simulation converges";
@@ -56,7 +68,9 @@ const HOLDS = "the simulation converges";
 async function anAnalysisThatConsumedNothing(s: ResearchSession) {
   const enquiry = await s.openEnquiry("does the simulation converge?");
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "pure-sim", from: [],
+    enquiry,
+    method: "pure-sim",
+    from: [],
     concludes: [{ proposition: HOLDS, finding: "it converges" }],
   });
   return { enquiry, analysis, analysisClaims };
@@ -96,9 +110,9 @@ describe("S-9e: reproducing nothing", () => {
    * there is a real caller error to refuse.
    */
   test("an analysis that does not exist is refused, not reported on", async () => {
-    await expect(
-      session.reproducibilityOf(ref("analysis", "COMP_999999"), []),
-    ).rejects.toThrow(/COMP_999999/);
+    await expect(session.reproducibilityOf(ref("analysis", "COMP_999999"), [])).rejects.toThrow(
+      /COMP_999999/,
+    );
   });
 
   /**

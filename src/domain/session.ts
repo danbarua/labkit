@@ -40,7 +40,10 @@ export class ResearchSession {
     // One options object, so both halves share a clock and an event sink; and
     // one `TenantGraph`, so `inTransaction`'s re-entrancy depth is shared.
     this.writes = new WriteSurface(graph, options);
-    this.reads = new ReadSurface(graph, { ...options, events: this.writes.events });
+    this.reads = new ReadSurface(graph, {
+      ...options,
+      events: this.writes.events,
+    });
     this.events = this.writes.events;
   }
 
@@ -51,31 +54,50 @@ export class ResearchSession {
   readonly sharpen: WriteSurface["sharpen"] = (...args) => this.writes.sharpen(...args);
   readonly originOf: ReadSurface["originOf"] = (...args) => this.reads.originOf(...args);
   readonly whatIsKnown: ReadSurface["whatIsKnown"] = (...args) => this.reads.whatIsKnown(...args);
-  readonly whatWasKnown: ReadSurface["whatWasKnown"] = (...args) => this.reads.whatWasKnown(...args);
-  readonly recordObservations: WriteSurface["recordObservations"] = (...args) => this.writes.recordObservations(...args);
-  readonly recordAnalysis: WriteSurface["recordAnalysis"] = (...args) => this.writes.recordAnalysis(...args);
-  readonly recordReview: WriteSurface["recordReview"] = (...args) => this.writes.recordReview(...args);
-  readonly closeEnquiry: WriteSurface["closeEnquiry"] = (...args) => this.writes.closeEnquiry(...args);
-  readonly enquiryStatus: ReadSurface["enquiryStatus"] = (...args) => this.reads.enquiryStatus(...args);
+  readonly whatWasKnown: ReadSurface["whatWasKnown"] = (...args) =>
+    this.reads.whatWasKnown(...args);
+  readonly recordObservations: WriteSurface["recordObservations"] = (...args) =>
+    this.writes.recordObservations(...args);
+  readonly recordAnalysis: WriteSurface["recordAnalysis"] = (...args) =>
+    this.writes.recordAnalysis(...args);
+  readonly recordReview: WriteSurface["recordReview"] = (...args) =>
+    this.writes.recordReview(...args);
+  readonly closeEnquiry: WriteSurface["closeEnquiry"] = (...args) =>
+    this.writes.closeEnquiry(...args);
+  readonly enquiryStatus: ReadSurface["enquiryStatus"] = (...args) =>
+    this.reads.enquiryStatus(...args);
   readonly planWork: WriteSurface["planWork"] = (...args) => this.writes.planWork(...args);
   readonly contractFor: ReadSurface["contractFor"] = (...args) => this.reads.contractFor(...args);
-  readonly stateCriterion: WriteSurface["stateCriterion"] = (...args) => this.writes.stateCriterion(...args);
+  readonly stateCriterion: WriteSurface["stateCriterion"] = (...args) =>
+    this.writes.stateCriterion(...args);
   readonly declareGate: WriteSurface["declareGate"] = (...args) => this.writes.declareGate(...args);
-  readonly evaluateCriterion: WriteSurface["evaluateCriterion"] = (...args) => this.writes.evaluateCriterion(...args);
-  readonly criteriaGoverning: ReadSurface["criteriaGoverning"] = (...args) => this.reads.criteriaGoverning(...args);
+  readonly evaluateCriterion: WriteSurface["evaluateCriterion"] = (...args) =>
+    this.writes.evaluateCriterion(...args);
+  readonly criteriaGoverning: ReadSurface["criteriaGoverning"] = (...args) =>
+    this.reads.criteriaGoverning(...args);
   readonly reverify: WriteSurface["reverify"] = (...args) => this.writes.reverify(...args);
-  readonly reproductionOf: ReadSurface["reproductionOf"] = (...args) => this.reads.reproductionOf(...args);
-  readonly acceptAsUnresolved: WriteSurface["acceptAsUnresolved"] = (...args) => this.writes.acceptAsUnresolved(...args);
+  readonly reproductionOf: ReadSurface["reproductionOf"] = (...args) =>
+    this.reads.reproductionOf(...args);
+  readonly acceptAsUnresolved: WriteSurface["acceptAsUnresolved"] = (...args) =>
+    this.writes.acceptAsUnresolved(...args);
   readonly promote: WriteSurface["promote"] = (...args) => this.writes.promote(...args);
   readonly amendDesign: WriteSurface["amendDesign"] = (...args) => this.writes.amendDesign(...args);
-  readonly designHistory: ReadSurface["designHistory"] = (...args) => this.reads.designHistory(...args);
+  readonly designHistory: ReadSurface["designHistory"] = (...args) =>
+    this.reads.designHistory(...args);
   readonly gateStatus: ReadSurface["gateStatus"] = (...args) => this.reads.gateStatus(...args);
-  readonly replaceAnalysis: WriteSurface["replaceAnalysis"] = (...args) => this.writes.replaceAnalysis(...args);
+  readonly replaceAnalysis: WriteSurface["replaceAnalysis"] = (...args) =>
+    this.writes.replaceAnalysis(...args);
   readonly reinterpret: WriteSurface["reinterpret"] = (...args) => this.writes.reinterpret(...args);
-  readonly interpretationHistory: ReadSurface["interpretationHistory"] = (...args) => this.reads.interpretationHistory(...args);
-  readonly doTheseConflict: ReadSurface["doTheseConflict"] = (...args) => this.reads.doTheseConflict(...args);
-  readonly claimsAsserting: ReadSurface["claimsAsserting"] = (...args) => this.reads.claimsAsserting(...args);
-  readonly whySupported: ReadSurface["whySupported"] = (...args) => this.reads.whySupported(...args);
-  readonly reproducibilityOf: ReadSurface["reproducibilityOf"] = (...args) => this.reads.reproducibilityOf(...args);
-  readonly whatDependsOn: ReadSurface["whatDependsOn"] = (...args) => this.reads.whatDependsOn(...args);
+  readonly interpretationHistory: ReadSurface["interpretationHistory"] = (...args) =>
+    this.reads.interpretationHistory(...args);
+  readonly doTheseConflict: ReadSurface["doTheseConflict"] = (...args) =>
+    this.reads.doTheseConflict(...args);
+  readonly claimsAsserting: ReadSurface["claimsAsserting"] = (...args) =>
+    this.reads.claimsAsserting(...args);
+  readonly whySupported: ReadSurface["whySupported"] = (...args) =>
+    this.reads.whySupported(...args);
+  readonly reproducibilityOf: ReadSurface["reproducibilityOf"] = (...args) =>
+    this.reads.reproducibilityOf(...args);
+  readonly whatDependsOn: ReadSurface["whatDependsOn"] = (...args) =>
+    this.reads.whatDependsOn(...args);
 }

@@ -79,12 +79,14 @@ export interface TestDb {
  * deliberately (see `reset()`), so the second file onward finds provisioning's
  * six-query steady path instead of its 83-query cold one.
  */
-let shared: Promise<{
-  rawDb: PGlite;
-  server: PGLiteSocketServer;
-  host: string;
-  port: number;
-}> | undefined;
+let shared:
+  | Promise<{
+      rawDb: PGlite;
+      server: PGLiteSocketServer;
+      host: string;
+      port: number;
+    }>
+  | undefined;
 
 async function boot() {
   const rawDb = new PGlite({ extensions: { age, vector } });
@@ -97,7 +99,12 @@ async function boot() {
   await runMigrations(rawDb);
   await bootstrapSession(rawDb);
 
-  const server = new PGLiteSocketServer({ db: rawDb, port: 0, host: "127.0.0.1", maxConnections: 16 });
+  const server = new PGLiteSocketServer({
+    db: rawDb,
+    port: 0,
+    host: "127.0.0.1",
+    maxConnections: 16,
+  });
   await server.start();
   const [host, portStr] = server.getServerConn().split(":");
   return { rawDb, server, host: host!, port: Number(portStr) };
@@ -109,7 +116,12 @@ export async function setupTestDb(): Promise<TestDb> {
 
   let opened = 0;
   async function openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }> {
-    const c = new Client({ host, port, database: "postgres", user: "postgres" });
+    const c = new Client({
+      host,
+      port,
+      database: "postgres",
+      user: "postgres",
+    });
     await c.connect();
     await bootstrapSession(c);
     // Traced only when LABKIT_TRACE is set; otherwise `traced()` hands back the
@@ -152,7 +164,10 @@ export async function setupTestDb(): Promise<TestDb> {
      * did not, at seventy-seven times the price.
      */
     async reset() {
-      const tables = await admin.query<{ table_schema: string; table_name: string }>(`
+      const tables = await admin.query<{
+        table_schema: string;
+        table_name: string;
+      }>(`
         select table_schema, table_name
         from information_schema.tables
         where table_schema not in ('pg_catalog', 'information_schema', 'ag_catalog', 'drizzle')

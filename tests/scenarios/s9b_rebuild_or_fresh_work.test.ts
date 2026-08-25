@@ -39,12 +39,19 @@ let scenario: Scenario;
  */
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 /**
@@ -91,10 +98,14 @@ async function inTwoWorlds<T>(
 async function theCachedConstruction(s: ResearchSession) {
   const enquiry = await s.openEnquiry("does the accelerated path match the reference?");
   const control = await s.recordObservations({
-    enquiry, name: CONTROL, finding: "randomised control series",
+    enquiry,
+    name: CONTROL,
+    finding: "randomised control series",
   });
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "stage2-construction", from: [control],
+    enquiry,
+    method: "stage2-construction",
+    from: [control],
     concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
   });
   return { enquiry, control, analysis, analysisClaims };
@@ -124,12 +135,21 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     const build = (recorded: string) => async (s: ResearchSession) => {
       const { enquiry } = await theCachedConstruction(s);
       const second = await s.recordObservations({
-        enquiry, name: "second control", finding: "control series, second pass",
+        enquiry,
+        name: "second control",
+        finding: "control series, second pass",
         contentHash: recorded,
       });
       const { analysis: rebuilt, claims: rebuiltClaims } = await s.recordAnalysis({
-        enquiry, method: "stage2-construction, second control", from: [second],
-        concludes: [{ proposition: "the second control agrees", finding: "agreement within 1e-6" }],
+        enquiry,
+        method: "stage2-construction, second control",
+        from: [second],
+        concludes: [
+          {
+            proposition: "the second control agrees",
+            finding: "agreement within 1e-6",
+          },
+        ],
       });
       // The same rebuild offered in both worlds; only what the record holds
       // differs.
@@ -165,10 +185,15 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     const build = (finding: string) => async (s: ResearchSession) => {
       const { enquiry } = await theCachedConstruction(s);
       const second = await s.recordObservations({
-        enquiry, name: CONTROL, finding, contentHash: "sha256:second",
+        enquiry,
+        name: CONTROL,
+        finding,
+        contentHash: "sha256:second",
       });
       const { analysis: rebuilt, claims: rebuiltClaims } = await s.recordAnalysis({
-        enquiry, method: "stage2-construction, second control", from: [second],
+        enquiry,
+        method: "stage2-construction, second control",
+        from: [second],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
       const reader = await afterwards();
@@ -189,7 +214,6 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       build("randomised control series, regenerated from an inferred algorithm"),
       build("randomised control series for stage 3, generated afresh"),
     );
-
 
     // Everything a reader can ask is identical except the sentence the
     // researcher happened to type. Attribution of a rebuild is currently
@@ -216,11 +240,15 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     const why = await inOneWorld(async (s) => {
       const { enquiry } = await theCachedConstruction(s);
       const regenerated = await s.recordObservations({
-        enquiry, name: CONTROL, contentHash: "sha256:second",
+        enquiry,
+        name: CONTROL,
+        contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
       const { claims: secondClaims } = await s.recordAnalysis({
-        enquiry, method: "stage2-construction, rebuilt", from: [regenerated],
+        enquiry,
+        method: "stage2-construction, rebuilt",
+        from: [regenerated],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
       return (await afterwards()).whySupported(claimOf(secondClaims, MATCHES));
@@ -247,11 +275,15 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     const why = await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
       const regenerated = await s.recordObservations({
-        enquiry, name: CONTROL, contentHash: "sha256:second",
+        enquiry,
+        name: CONTROL,
+        contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
       const verified = await s.reverify({
-        historical: analysis, enquiry, method: "stage2-construction, rebuilt",
+        historical: analysis,
+        enquiry,
+        method: "stage2-construction, rebuilt",
         under: [regenerated],
         concludes: { proposition: MATCHES, finding: "agreement within 1e-6" },
       });
@@ -297,13 +329,16 @@ describe("S-9b: was this a rebuild, or new work?", () => {
 
       // The attempt, recorded against the question it is an attempt to answer.
       await s.recordObservations({
-        enquiry: provenance, name: "regeneration attempt",
+        enquiry: provenance,
+        name: "regeneration attempt",
         finding: "three candidate algorithms tried; none reproduces the recorded series",
       });
       // And an unrelated regeneration on the original enquiry, so the two
       // enquiries are not trivially distinguishable by having any work at all.
       await s.recordObservations({
-        enquiry, name: CONTROL, contentHash: "sha256:second",
+        enquiry,
+        name: CONTROL,
+        contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
 
@@ -341,7 +376,9 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
       const regenerated = await s.recordObservations({
-        enquiry, name: CONTROL, contentHash: "sha256:second",
+        enquiry,
+        name: CONTROL,
+        contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
 
@@ -350,7 +387,9 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // target insists on a conclusion to re-check.
       await expect(
         s.reverify({
-          historical: analysis, enquiry, method: "control regeneration",
+          historical: analysis,
+          enquiry,
+          method: "control regeneration",
           under: [regenerated],
           concludes: {
             proposition: "the control was regenerated from an inferred algorithm",
@@ -373,12 +412,17 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
       const regenerated = await s.recordObservations({
-        enquiry, name: CONTROL, contentHash: "sha256:second",
+        enquiry,
+        name: CONTROL,
+        contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
       await s.reverify({
-        historical: analysis, enquiry, method: "stage2-construction, rebuilt",
-        under: [regenerated], concludes: { proposition: MATCHES, finding: "agreement within 1e-6" },
+        historical: analysis,
+        enquiry,
+        method: "stage2-construction, rebuilt",
+        under: [regenerated],
+        concludes: { proposition: MATCHES, finding: "agreement within 1e-6" },
       });
 
       const reader = await afterwards();
@@ -400,7 +444,11 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // is for and why the list is updated rather than loosened.
       const exact = await reader.whatDependsOn(regenerated);
       expect(Object.keys(exact).sort()).toEqual([
-        "claims", "complete", "enquiries", "routesWalked", "subject",
+        "claims",
+        "complete",
+        "enquiries",
+        "routesWalked",
+        "subject",
       ]);
       // And the echo is of the record asked about, not merely of its wording.
       expect(exact.subject).toEqual(regenerated);
@@ -415,7 +463,12 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // `analysis` here is likewise the construction handed in, not an answer
       // to what any part was rebuilding.
       expect(Object.keys(report).sort()).toEqual([
-        "analysis", "differing", "exact", "notRebuilt", "reproducible", "unverifiable",
+        "analysis",
+        "differing",
+        "exact",
+        "notRebuilt",
+        "reproducible",
+        "unverifiable",
       ]);
       expect(report.analysis).toEqual(analysis);
     });

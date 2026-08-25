@@ -24,7 +24,13 @@ import { handle, rebuilt, whole } from "../args";
 import { answer } from "../output";
 import type { Run } from "../session";
 import type { ClaimRef, EventFilter } from "../../domain";
-import { renderHistorical, renderKnown, renderWhy, renderClaims, renderConflict } from "../views/knowledge";
+import {
+  renderHistorical,
+  renderKnown,
+  renderWhy,
+  renderClaims,
+  renderConflict,
+} from "../views/knowledge";
 import { renderEnquiry, renderOrigin, renderPursuits } from "../views/enquiry";
 import { renderContract, renderCriteria, renderDesign, renderGate } from "../views/gates";
 import {
@@ -222,7 +228,9 @@ export function registerReads(program: Command, run: Run): void {
     )
     .argument("<claim-id>", "e.g. CLM_4", handle("claim"))
     .action(async (claim) =>
-      run(async ({ read }) => answer(await read.interpretationHistory(claim), renderInterpretation)),
+      run(async ({ read }) =>
+        answer(await read.interpretationHistory(claim), renderInterpretation),
+      ),
     );
 
   program
@@ -250,10 +258,7 @@ export function registerReads(program: Command, run: Run): void {
     .argument("[parts...]", "<part-id>=<hash> pairs for what you rebuilt")
     .action(async (analysis, parts: string[]) =>
       run(async ({ read }) =>
-        answer(
-          await read.reproducibilityOf(analysis, parts.map(rebuilt)),
-          renderReproducibility,
-        ),
+        answer(await read.reproducibilityOf(analysis, parts.map(rebuilt)), renderReproducibility),
       ),
     );
 
@@ -293,7 +298,12 @@ export function registerReads(program: Command, run: Run): void {
     .action(
       async (
         id: string | undefined,
-        opts: { since?: number; by?: string; operation?: string; limit: number },
+        opts: {
+          since?: number;
+          by?: string;
+          operation?: string;
+          limit: number;
+        },
       ) =>
         run(async ({ read }) => {
           const filter: EventFilter = {

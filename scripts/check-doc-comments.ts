@@ -48,7 +48,7 @@ for await (const path of glob.scan(".")) {
     const displaced = after.startsWith("/**") && !leading;
     if (orphaned || displaced) {
       if (strays === 0) {
-        console.error("❌ check-doc-comments FAILED: comments have come loose from the code they describe.");
+        console.error("FAILED: comments have come loose from the code they describe.");
         console.error(
           "   Usually caused by moving code between files, or inserting a declaration\n" +
             "   between a comment and what it documented.\n",
@@ -71,4 +71,4 @@ if (strays > 0) {
   );
   process.exit(1);
 }
-console.log("✅ check-doc-comments OK: every doc comment sits directly above the thing it describes.");
+console.log("OK: every doc comment sits directly above the thing it describes.");

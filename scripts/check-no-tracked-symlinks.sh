@@ -39,7 +39,7 @@ if [ -n "$found" ]; then
   done
 
   if [ -n "$filtered" ]; then
-    echo "❌ check-no-tracked-symlinks ERROR: symlink(s) tracked in git"
+    echo "FAILED: symlink(s) tracked in git"
     echo
     while IFS= read -r path; do
       [ -z "$path" ] && continue
@@ -59,4 +59,4 @@ if [ -n "$found" ]; then
   fi
 fi
 
-echo "✅ check-no-tracked-symlinks OK: No tracked symlinks"
+echo "OK: no tracked symlinks."

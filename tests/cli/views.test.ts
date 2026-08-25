@@ -20,7 +20,12 @@
 
 import { expect, test } from "bun:test";
 import { ref } from "../../src/domain/report";
-import { renderKnown, renderWhy, renderClaims, renderConflict } from "../../src/cli/views/knowledge";
+import {
+  renderKnown,
+  renderWhy,
+  renderClaims,
+  renderConflict,
+} from "../../src/cli/views/knowledge";
 import { renderEnquiry, renderOrigin } from "../../src/cli/views/enquiry";
 import { renderContract, renderGate } from "../../src/cli/views/gates";
 import { renderReproducibility, renderReproduction } from "../../src/cli/views/analysis";
@@ -61,25 +66,49 @@ test("an enquiry accepted as unresolved does not render as merely open", () => {
 
 test("an answered enquiry says whether its closure rests on promoted work", () => {
   const q = {
-    question: ref("question", "Q_2"), asks: "does depth move convergence?",
-    open: false, closure: "answered" as const, answer: "yes" as const,
+    question: ref("question", "Q_2"),
+    asks: "does depth move convergence?",
+    open: false,
+    closure: "answered" as const,
+    answer: "yes" as const,
     evidence: [{ evidence: ref("evidence", "EV_1"), states: "a result" }],
   };
   const base: EnquiryStatus = {
-    enquiry: ref("enquiry", "LOE_2"), pursuing: "depth sweep", contributed: [], question: q,
+    enquiry: ref("enquiry", "LOE_2"),
+    pursuing: "depth sweep",
+    contributed: [],
+    question: q,
   };
-  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "exploratory" } })).toContain("exploratory");
-  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "confirmatory" } })).toContain("confirmatory");
+  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "exploratory" } })).toContain(
+    "exploratory",
+  );
+  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "confirmatory" } })).toContain(
+    "confirmatory",
+  );
 });
 
 test("withdrawn, challenged and never-examined render apart", () => {
   const base: SupportExplanation = {
     claim: ref("claim", "CLM_9"),
     proposition: "the schedule moves convergence",
-    supported: false, standing: "exploratory",
-    support: [{ finding: "moves by ~3 steps", evidence: ref("evidence", "EV_1"), method: "paired comparison", analysis: ref("analysis", "COMP_1") }],
-    reverifiedBy: [], standard: [], unmet: [], restingOn: [], superseded: [],
-    challenged: false, against: [], withdrawn: false,
+    supported: false,
+    standing: "exploratory",
+    support: [
+      {
+        finding: "moves by ~3 steps",
+        evidence: ref("evidence", "EV_1"),
+        method: "paired comparison",
+        analysis: ref("analysis", "COMP_1"),
+      },
+    ],
+    reverifiedBy: [],
+    standard: [],
+    unmet: [],
+    restingOn: [],
+    superseded: [],
+    challenged: false,
+    against: [],
+    withdrawn: false,
   };
 
   // Nobody has examined it: no qualifier, and that is correct.
@@ -90,7 +119,16 @@ test("withdrawn, challenged and never-examined render apart", () => {
 
   // Evidence bears against it.
   const challenged = renderWhy({
-    ...base, challenged: true, against: [{ finding: "no effect at n=5", evidence: ref("evidence", "EV_2"), method: "replication", analysis: ref("analysis", "COMP_2") }],
+    ...base,
+    challenged: true,
+    against: [
+      {
+        finding: "no effect at n=5",
+        evidence: ref("evidence", "EV_2"),
+        method: "replication",
+        analysis: ref("analysis", "COMP_2"),
+      },
+    ],
   });
   expect(challenged).toContain("challenged by evidence");
   expect(challenged).toContain("no effect at n=5");
@@ -98,7 +136,12 @@ test("withdrawn, challenged and never-examined render apart", () => {
   // Nobody asserts this wording any more -- and the findings underneath are
   // untouched, which is exactly why the old rendering was misleading.
   const withdrawn = renderWhy({
-    ...base, withdrawn: true, replacedBy: { claim: ref("claim", "CLM_9"), asserts: "the schedule moves convergence at depth 8" },
+    ...base,
+    withdrawn: true,
+    replacedBy: {
+      claim: ref("claim", "CLM_9"),
+      asserts: "the schedule moves convergence at depth 8",
+    },
   });
   expect(withdrawn).toContain("withdrawn");
   expect(withdrawn).toContain("the schedule moves convergence at depth 8");
@@ -206,7 +249,12 @@ test("a dissociation is not reported as a disagreement", () => {
         proposition: "the schedule moves convergence",
         asks: "does it move convergence at depth 12?",
         supportedBy: [],
-        challengedBy: [{ evidence: ref("evidence", "EV_2"), states: "no effect at depth 12" }],
+        challengedBy: [
+          {
+            evidence: ref("evidence", "EV_2"),
+            states: "no effect at depth 12",
+          },
+        ],
       },
     ],
   };
@@ -300,7 +348,12 @@ test("a work contract always says it is not enforced", () => {
 
 test("two claims asserting one sentence are not rendered as a duplicate", () => {
   const one = renderClaims(
-    [{ claim: ref("claim", "CLM_1"), asserts: "the schedule moves convergence" }],
+    [
+      {
+        claim: ref("claim", "CLM_1"),
+        asserts: "the schedule moves convergence",
+      },
+    ],
     "the schedule moves convergence",
   );
   expect(one).toContain("CLM_1");
@@ -308,8 +361,14 @@ test("two claims asserting one sentence are not rendered as a duplicate", () => 
 
   const two = renderClaims(
     [
-      { claim: ref("claim", "CLM_1"), asserts: "the schedule moves convergence" },
-      { claim: ref("claim", "CLM_2"), asserts: "the schedule moves convergence" },
+      {
+        claim: ref("claim", "CLM_1"),
+        asserts: "the schedule moves convergence",
+      },
+      {
+        claim: ref("claim", "CLM_2"),
+        asserts: "the schedule moves convergence",
+      },
     ],
     "the schedule moves convergence",
   );

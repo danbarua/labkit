@@ -47,10 +47,16 @@ export function renderEnquiry(status: EnquiryStatus): string {
     q?.answer ? `  answer: ${q.answer}` : "",
     q?.restsOn ? `  resting on ${q.restsOn} work` : "",
     status.contributed.length
-      ? `\nThis enquiry's findings\n${bullets(status.contributed.map((e) => `${e.states}  (${e.evidence})`), "")}`
+      ? `\nThis enquiry's findings\n${bullets(
+          status.contributed.map((e) => `${e.states}  (${e.evidence})`),
+          "",
+        )}`
       : "",
     q?.evidence.length
-      ? `\nThe question's answer rests on\n${bullets(q.evidence.map((e) => `${e.states}  (${e.evidence})`), "")}`
+      ? `\nThe question's answer rests on\n${bullets(
+          q.evidence.map((e) => `${e.states}  (${e.evidence})`),
+          "",
+        )}`
       : "",
   ]
     .filter(Boolean)

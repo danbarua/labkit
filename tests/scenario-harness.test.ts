@@ -26,12 +26,20 @@ import { vertexProps } from "../src/db/cypher";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
 let scenario: Scenario;
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 const posed = { posed_at: "2026-01-01T00:00:00.000Z" };
 const questions = async (graph: Awaited<ReturnType<Scenario["begin"]>>) =>
-  (await graph.query(`MATCH (q:Question) RETURN q`, { q: vertexProps<{ name: string }>() }))
+  (
+    await graph.query(`MATCH (q:Question) RETURN q`, {
+      q: vertexProps<{ name: string }>(),
+    })
+  )
     .map((r) => r.q.name)
     .sort();
 

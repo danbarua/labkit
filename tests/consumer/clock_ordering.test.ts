@@ -28,7 +28,13 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type AnalysisRef, type Clock, type EnquiryRef } from "../../src/domain";
+import {
+  ResearchSession,
+  inMemoryEventLog,
+  type AnalysisRef,
+  type Clock,
+  type EnquiryRef,
+} from "../../src/domain";
 import type { ClaimRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, minutes, days, type WindableClock } from "../helpers/clock";
@@ -36,8 +42,12 @@ import { claimNamed, claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 /** Shared with the paired-world probes next door; kept in both because neither file owns the other. */
 const CONVERGES = "the pruning schedule shifts the convergence point";
@@ -62,15 +72,22 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
     const graph = await scenario.begin();
     try {
       const winding = windableClock("2026-03-01T09:00:00.000Z");
-      const s = new ResearchSession(graph, { clock: winding, events: inMemoryEventLog() });
+      const s = new ResearchSession(graph, {
+        clock: winding,
+        events: inMemoryEventLog(),
+      });
 
       const enquiry = await s.openEnquiry("does the schedule move convergence?");
       const check = await s.stateCriterion("stable across five seeds");
       const observations = await s.recordObservations({
-        enquiry, name: "sweep readings", finding: "twelve runs",
+        enquiry,
+        name: "sweep readings",
+        finding: "twelve runs",
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "convergence-fit", from: [observations],
+        enquiry,
+        method: "convergence-fit",
+        from: [observations],
         concludes: [{ proposition: CONVERGES, finding: "moves by ~3 steps" }],
         heldTo: [check],
       });
@@ -78,17 +95,23 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       winding.wind(days(30));
       const whenEvaluated = winding.peek();
       await s.evaluateCriterion({
-        criterion: check, value: "spread 0.4 steps", outcome: "pass",
+        criterion: check,
+        value: "spread 0.4 steps",
+        outcome: "pass",
         citing: claimOf(analysisClaims, CONVERGES),
       });
 
       // A month later the question is closed -- a Decision, and the act that
       // changes what the programme believes.
       winding.wind(days(30));
-      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, CONVERGES) });
+      await s.closeEnquiry({
+        enquiry,
+        answeredBy: claimOf(analysisClaims, CONVERGES),
+      });
 
       const reader = new ResearchSession(await scenario.current(), {
-        clock: winding, events: inMemoryEventLog(),
+        clock: winding,
+        events: inMemoryEventLog(),
       });
 
       // The evaluation kept its instant, and it is the wound one rather than
@@ -136,14 +159,17 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
    * probe implements exactly that, using only public reads, and asks it to
    * separate two programmes that settled the same questions in opposite orders.
    */
-  const FIRST = { asks: "does pruning move convergence?", prop: "pruning moves convergence" };
-  const SECOND = { asks: "does depth move convergence?", prop: "depth moves convergence" };
+  const FIRST = {
+    asks: "does pruning move convergence?",
+    prop: "pruning moves convergence",
+  };
+  const SECOND = {
+    asks: "does depth move convergence?",
+    prop: "depth moves convergence",
+  };
 
   /** A lower bound on when a question was settled, from evidence alone. Null when none exists. */
-  async function settledNoEarlierThan(
-    s: ResearchSession,
-    claim: ClaimRef,
-  ): Promise<string | null> {
+  async function settledNoEarlierThan(s: ResearchSession, claim: ClaimRef): Promise<string | null> {
     const why = await s.whySupported(claim);
     const stamps = why.standard.flatMap((c) => c.evaluations.map((e) => e.at)).sort();
     return stamps.at(-1) ?? null;
@@ -153,19 +179,32 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
     const graph = await scenario.begin();
     try {
       const c = windableClock("2026-03-01T09:00:00.000Z");
-      const s = new ResearchSession(graph, { clock: c, events: inMemoryEventLog() });
+      const s = new ResearchSession(graph, {
+        clock: c,
+        events: inMemoryEventLog(),
+      });
 
       const enquiry = await s.openEnquiry(FIRST.asks);
-      const obs = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
+      const obs = await s.recordObservations({
+        enquiry,
+        name: "readings",
+        finding: "twelve runs",
+      });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "paired-comparison", from: [obs],
+        enquiry,
+        method: "paired-comparison",
+        from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
       c.wind(days(40));
-      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, FIRST.prop) });
+      await s.closeEnquiry({
+        enquiry,
+        answeredBy: claimOf(analysisClaims, FIRST.prop),
+      });
 
       const reader = new ResearchSession(await scenario.current(), {
-        clock: c, events: inMemoryEventLog(),
+        clock: c,
+        events: inMemoryEventLog(),
       });
 
       // Forty days passed between the analysis and the closure. Nothing recorded
@@ -195,14 +234,22 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
     const prepare = async (s: ResearchSession, asks: string, prop: string) => {
       const enquiry = await s.openEnquiry(asks);
       const check = await s.stateCriterion(`prespecified check for ${prop}`);
-      const obs = await s.recordObservations({ enquiry, name: `${prop} readings`, finding: `runs for ${prop}` });
+      const obs = await s.recordObservations({
+        enquiry,
+        name: `${prop} readings`,
+        finding: `runs for ${prop}`,
+      });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "paired-comparison", from: [obs],
+        enquiry,
+        method: "paired-comparison",
+        from: [obs],
         concludes: [{ proposition: prop, finding: `result for ${prop}` }],
         heldTo: [check],
       });
       await s.evaluateCriterion({
-        criterion: check, value: "within tolerance", outcome: "pass",
+        criterion: check,
+        value: "within tolerance",
+        outcome: "pass",
         citing: claimOf(analysisClaims, prop),
       });
       return { enquiry, analysis, analysisClaims, prop };
@@ -212,7 +259,10 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
       const graph = await scenario.begin();
       try {
         const c = windableClock("2026-03-01T09:00:00.000Z");
-        const s = new ResearchSession(graph, { clock: c, events: inMemoryEventLog() });
+        const s = new ResearchSession(graph, {
+          clock: c,
+          events: inMemoryEventLog(),
+        });
 
         // Identical in both worlds: FIRST checked on 1 March, SECOND on 2 March.
         const a = await prepare(s, FIRST.asks, FIRST.prop);
@@ -222,12 +272,19 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         // The only difference: which of them the programme settles first.
         c.wind(days(30));
         const [early, late] = closeFirstThenSecond ? [a, b] : [b, a];
-        await s.closeEnquiry({ enquiry: early.enquiry, answeredBy: await claimNamed(s, early.prop) });
+        await s.closeEnquiry({
+          enquiry: early.enquiry,
+          answeredBy: await claimNamed(s, early.prop),
+        });
         c.wind(days(60));
-        await s.closeEnquiry({ enquiry: late.enquiry, answeredBy: await claimNamed(s, late.prop) });
+        await s.closeEnquiry({
+          enquiry: late.enquiry,
+          answeredBy: await claimNamed(s, late.prop),
+        });
 
         const reader = new ResearchSession(await scenario.current(), {
-          clock: c, events: inMemoryEventLog(),
+          clock: c,
+          events: inMemoryEventLog(),
         });
         return {
           first: await settledNoEarlierThan(reader, await claimNamed(reader, a.prop)),
@@ -266,8 +323,14 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
    * *different* as-of answers, each correct, from durable state — with the event
    * log empty beside it, as S-1 established.
    */
-  const FIRST = { asks: "does pruning move convergence?", prop: "pruning moves convergence" };
-  const SECOND = { asks: "does depth move convergence?", prop: "depth moves convergence" };
+  const FIRST = {
+    asks: "does pruning move convergence?",
+    prop: "pruning moves convergence",
+  };
+  const SECOND = {
+    asks: "does depth move convergence?",
+    prop: "depth moves convergence",
+  };
 
   const MARCH = "2026-03-01T09:00:00.000Z";
 
@@ -276,14 +339,28 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
     const graph = await scenario.begin();
     try {
       const c = windableClock(MARCH);
-      const s = new ResearchSession(graph, { clock: c, events: inMemoryEventLog() });
+      const s = new ResearchSession(graph, {
+        clock: c,
+        events: inMemoryEventLog(),
+      });
 
-      const prepared: Array<{ asks: string; prop: string; enquiry: EnquiryRef; analysis: AnalysisRef }> = [];
+      const prepared: Array<{
+        asks: string;
+        prop: string;
+        enquiry: EnquiryRef;
+        analysis: AnalysisRef;
+      }> = [];
       for (const q of [FIRST, SECOND]) {
         const enquiry = await s.openEnquiry(q.asks);
-        const obs = await s.recordObservations({ enquiry, name: `${q.prop} readings`, finding: `runs for ${q.prop}` });
+        const obs = await s.recordObservations({
+          enquiry,
+          name: `${q.prop} readings`,
+          finding: `runs for ${q.prop}`,
+        });
         const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-          enquiry, method: "paired-comparison", from: [obs],
+          enquiry,
+          method: "paired-comparison",
+          from: [obs],
           concludes: [{ proposition: q.prop, finding: `result for ${q.prop}` }],
         });
         prepared.push({ ...q, enquiry, analysis });
@@ -293,15 +370,22 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       // Thirty days in, the first of them is settled. Sixty days in, the other.
       c.wind(days(30));
       const early = find(order[0]);
-      await s.closeEnquiry({ enquiry: early.enquiry, answeredBy: await claimNamed(s, early.prop) });
+      await s.closeEnquiry({
+        enquiry: early.enquiry,
+        answeredBy: await claimNamed(s, early.prop),
+      });
       c.wind(days(30));
       const late = find(order[1]);
-      await s.closeEnquiry({ enquiry: late.enquiry, answeredBy: await claimNamed(s, late.prop) });
+      await s.closeEnquiry({
+        enquiry: late.enquiry,
+        answeredBy: await claimNamed(s, late.prop),
+      });
 
       // A second reader over the same graph, and an empty event log: whatever it
       // answers is reconstructed from what was written down.
       const reader = new ResearchSession(await scenario.current(), {
-        clock: c, events: inMemoryEventLog(),
+        clock: c,
+        events: inMemoryEventLog(),
       });
       const atDay45 = await reader.whatWasKnown("2026-04-15T09:00:00.000Z");
       return {
@@ -340,21 +424,37 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
     const graph = await scenario.begin();
     try {
       const c = windableClock(MARCH);
-      const s = new ResearchSession(graph, { clock: c, events: inMemoryEventLog() });
+      const s = new ResearchSession(graph, {
+        clock: c,
+        events: inMemoryEventLog(),
+      });
 
       const enquiry = await s.openEnquiry(FIRST.asks);
-      const obs = await s.recordObservations({ enquiry, name: "readings", finding: "twelve runs" });
+      const obs = await s.recordObservations({
+        enquiry,
+        name: "readings",
+        finding: "twelve runs",
+      });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "paired-comparison", from: [obs],
+        enquiry,
+        method: "paired-comparison",
+        from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
       c.wind(days(10));
-      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, FIRST.prop) });
+      await s.closeEnquiry({
+        enquiry,
+        answeredBy: claimOf(analysisClaims, FIRST.prop),
+      });
       c.wind(days(40));
-      await s.promote({ claim: claimOf(analysisClaims, FIRST.prop), because: "replicated under seed control" });
+      await s.promote({
+        claim: claimOf(analysisClaims, FIRST.prop),
+        because: "replicated under seed control",
+      });
 
       const reader = new ResearchSession(await scenario.current(), {
-        clock: c, events: inMemoryEventLog(),
+        clock: c,
+        events: inMemoryEventLog(),
       });
 
       // Day 25: settled, and resting on nothing anyone had promoted.
@@ -397,17 +497,32 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
     const graph = await scenario.begin();
     try {
       const c = windableClock(MARCH);
-      const s = new ResearchSession(graph, { clock: c, events: inMemoryEventLog() });
+      const s = new ResearchSession(graph, {
+        clock: c,
+        events: inMemoryEventLog(),
+      });
       const enquiry = await s.openEnquiry(FIRST.asks);
-      const obs = await s.recordObservations({ enquiry, name: "readings", finding: "runs" });
+      const obs = await s.recordObservations({
+        enquiry,
+        name: "readings",
+        finding: "runs",
+      });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "pc", from: [obs],
+        enquiry,
+        method: "pc",
+        from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "a result" }],
       });
       c.wind(days(10));
-      await s.closeEnquiry({ enquiry, answeredBy: claimOf(analysisClaims, FIRST.prop) });
+      await s.closeEnquiry({
+        enquiry,
+        answeredBy: claimOf(analysisClaims, FIRST.prop),
+      });
 
-      const reader = new ResearchSession(await scenario.current(), { clock: c, events: inMemoryEventLog() });
+      const reader = new ResearchSession(await scenario.current(), {
+        clock: c,
+        events: inMemoryEventLog(),
+      });
 
       // February: the question had not been posed. Absent, not open.
       const before = await reader.whatWasKnown("2026-02-01T00:00:00.000Z");

@@ -24,18 +24,27 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts on what this proves. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const SPECIFICITY = "the learned construction is special on the internal mapping measure";
@@ -56,10 +65,17 @@ async function aProgrammeWithOneOpenQuestion() {
     enquiry: established,
     method: "response-map-analysis",
     from: [priorObs],
-    concludes: [{ proposition: TRANSFORMATION, finding: "structured response, reproducible across seeds" }],
+    concludes: [
+      {
+        proposition: TRANSFORMATION,
+        finding: "structured response, reproducible across seeds",
+      },
+    ],
   });
 
-  const specificity = await session.openEnquiry("is the learned construction special on the internal measure?");
+  const specificity = await session.openEnquiry(
+    "is the learned construction special on the internal measure?",
+  );
   const observations = await session.recordObservations({
     enquiry: specificity,
     name: "five-construction comparison",
@@ -87,7 +103,10 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // Researcher: then close that question for this endpoint.
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
+    await session.closeEnquiry({
+      enquiry: specificity,
+      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+    });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
@@ -100,9 +119,18 @@ describe("S-4: a negative result that closes the question", () => {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
-      concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "no separation detectable",
+          bearing: "challenges",
+        },
+      ],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
+    await session.closeEnquiry({
+      enquiry: specificity,
+      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+    });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
@@ -119,9 +147,18 @@ describe("S-4: a negative result that closes the question", () => {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
-      concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "no separation detectable",
+          bearing: "challenges",
+        },
+      ],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
+    await session.closeEnquiry({
+      enquiry: specificity,
+      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+    });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
@@ -134,9 +171,18 @@ describe("S-4: a negative result that closes the question", () => {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
-      concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "no separation detectable",
+          bearing: "challenges",
+        },
+      ],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
+    await session.closeEnquiry({
+      enquiry: specificity,
+      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+    });
 
     // Reconstructible from a fresh reader, not from a value we kept.
     const reader = new ResearchSession(await scenario.current(), { clock });
@@ -162,7 +208,10 @@ describe("S-4: a negative result that closes the question", () => {
         },
       ],
     });
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(nullResultClaims, SPECIFICITY) });
+    await session.closeEnquiry({
+      enquiry: specificity,
+      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+    });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
@@ -200,7 +249,13 @@ describe("S-4: a negative result that closes the question", () => {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
-      concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "no separation detectable",
+          bearing: "challenges",
+        },
+      ],
     });
 
     const refuted = await session.whySupported(await claimNamed(session, SPECIFICITY));
@@ -235,11 +290,20 @@ describe("S-4: a negative result that closes the question", () => {
       enquiry: established,
       method: "unrelated-analysis",
       from: [elsewhere],
-      concludes: [{ proposition: SPECIFICITY, finding: "irrelevant", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "irrelevant",
+          bearing: "challenges",
+        },
+      ],
     });
 
     await expect(
-      session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(unrelatedClaims, SPECIFICITY) }),
+      session.closeEnquiry({
+        enquiry: specificity,
+        answeredBy: claimOf(unrelatedClaims, SPECIFICITY),
+      }),
     ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
     // Nothing was written on the way to failing.
@@ -256,11 +320,20 @@ describe("S-4: a negative result that closes the question", () => {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
-      concludes: [{ proposition: SPECIFICITY, finding: "no separation", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "no separation",
+          bearing: "challenges",
+        },
+      ],
     });
 
     await expect(
-      session.closeEnquiry({ enquiry: specificity, answeredBy: ref("claim", "CLM_99999") }),
+      session.closeEnquiry({
+        enquiry: specificity,
+        answeredBy: ref("claim", "CLM_99999"),
+      }),
     ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
     const status = await session.enquiryStatus(specificity);
@@ -280,12 +353,22 @@ describe("S-4: a negative result that closes the question", () => {
       method: "mixed-analysis",
       from: [observations],
       concludes: [
-        { proposition: SPECIFICITY, finding: "clear separation between constructions" },
-        { proposition: "a secondary side-proposition", finding: "not borne out", bearing: "challenges" },
+        {
+          proposition: SPECIFICITY,
+          finding: "clear separation between constructions",
+        },
+        {
+          proposition: "a secondary side-proposition",
+          finding: "not borne out",
+          bearing: "challenges",
+        },
       ],
     });
 
-    await session.closeEnquiry({ enquiry: specificity, answeredBy: claimOf(mixedClaims, SPECIFICITY) });
+    await session.closeEnquiry({
+      enquiry: specificity,
+      answeredBy: claimOf(mixedClaims, SPECIFICITY),
+    });
 
     const status = await session.enquiryStatus(specificity);
     expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
@@ -293,7 +376,9 @@ describe("S-4: a negative result that closes the question", () => {
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
     expect(status.question!.answer).toBe("yes");
-    expect(status.question!.evidence.map((e) => e.states)).toEqual(["clear separation between constructions"]);
+    expect(status.question!.evidence.map((e) => e.states)).toEqual([
+      "clear separation between constructions",
+    ]);
   });
 
   /**
@@ -306,21 +391,36 @@ describe("S-4: a negative result that closes the question", () => {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
-      concludes: [{ proposition: SPECIFICITY, finding: "no separation detectable", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "no separation detectable",
+          bearing: "challenges",
+        },
+      ],
     });
 
     const before = await session.whySupported(claimOf(refutationClaims, SPECIFICITY));
     expect(before.challenged).toBe(true);
     expect(before.against).toHaveLength(1);
 
-    const review = await session.recordReview({ of: refutation, verdict: "the clustering metric was misapplied" });
+    const review = await session.recordReview({
+      of: refutation,
+      verdict: "the clustering metric was misapplied",
+    });
     const report = await session.replaceAnalysis({
       supersedes: refutation,
       because: review,
       enquiry: specificity,
       method: "corrected-cluster-comparison",
       from: [observations],
-      concludes: [{ proposition: SPECIFICITY, finding: "still no separation, corrected metric", bearing: "challenges" }],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "still no separation, corrected metric",
+          bearing: "challenges",
+        },
+      ],
     });
 
     // conclusionsOf() saw nothing at all when an analysis only challenged.

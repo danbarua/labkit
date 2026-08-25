@@ -122,7 +122,10 @@ beforeAll(async () => {
   scenario = await openScenario();
   const graph = await scenario.begin();
   const events = inMemoryEventLog();
-  surfaces = { read: new ReadSurface(graph, { events }), write: new WriteSurface(graph, { events }) };
+  surfaces = {
+    read: new ReadSurface(graph, { events }),
+    write: new WriteSurface(graph, { events }),
+  };
 
   const out = async (argv: string[]): Promise<Record<string, unknown>> => {
     const answered = await invoke(argv);
@@ -134,19 +137,26 @@ beforeAll(async () => {
   const enquiry = id(await out(["open", "does the schedule move convergence?"]), "enquiry");
   const observations = id(
     await out([
-      "observe", enquiry,
-      "--name", "depth-sweep-raw",
-      "--finding", "step counts at depths 4..20",
-      "--hash", "sha256:9f2b",
+      "observe",
+      enquiry,
+      "--name",
+      "depth-sweep-raw",
+      "--finding",
+      "step counts at depths 4..20",
+      "--hash",
+      "sha256:9f2b",
     ]),
     "observations",
   );
   const work = id(
     await out([
       "plan",
-      "--objective", "sweep depth 4 through 20",
-      "--acceptance", "n>=20 at each depth",
-      "--may-read", "depth-sweep-raw",
+      "--objective",
+      "sweep depth 4 through 20",
+      "--acceptance",
+      "n>=20 at each depth",
+      "--may-read",
+      "depth-sweep-raw",
     ]),
     "work",
   );
@@ -154,18 +164,26 @@ beforeAll(async () => {
   const gate = id(
     await out([
       "declare",
-      "--governed-by", criterion,
-      "--consequence", "the result may not be built on until this holds",
-      "--protecting", work,
+      "--governed-by",
+      criterion,
+      "--consequence",
+      "the result may not be built on until this holds",
+      "--protecting",
+      work,
     ]),
     "gate",
   );
   const recorded = await out([
-    "analyse", enquiry,
-    "--method", "paired comparison",
-    "--from", observations,
-    "--implementing", work,
-    "--held-to", criterion,
+    "analyse",
+    enquiry,
+    "--method",
+    "paired comparison",
+    "--from",
+    observations,
+    "--implementing",
+    work,
+    "--held-to",
+    criterion,
     "--concludes",
     JSON.stringify({
       proposition: "the schedule moves convergence",
@@ -179,10 +197,14 @@ beforeAll(async () => {
   await out(["promote", claim, "--because", "the prespecified check passed"]);
   const review = id(await out(["review", analysis, "--verdict", "sound"]), "review");
   const verified = await out([
-    "reverify", analysis,
-    "--enquiry", enquiry,
-    "--method", "replication at n=24",
-    "--under", observations,
+    "reverify",
+    analysis,
+    "--enquiry",
+    enquiry,
+    "--method",
+    "replication at n=24",
+    "--under",
+    observations,
     "--concludes",
     JSON.stringify({
       proposition: "the schedule moves convergence",

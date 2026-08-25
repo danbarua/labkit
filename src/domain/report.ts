@@ -317,7 +317,6 @@ export interface EnquiryStatus {
   question: QuestionClosure | null;
 }
 
-
 /**
  * A proposition whose support changed when an analysis was replaced.
  *
@@ -1174,7 +1173,6 @@ export interface InterpretationHistory {
   nowClaims: ConcludedClaim;
   revisions: Revision[];
 }
-
 
 /** One side of a comparison between two findings. */
 export interface ConflictSide {

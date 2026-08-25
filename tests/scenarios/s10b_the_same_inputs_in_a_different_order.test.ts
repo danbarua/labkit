@@ -25,15 +25,27 @@ let scenario: Scenario;
 let session: ResearchSession;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const SHIFTED = "the second series is shifted relative to the first";
@@ -52,14 +64,22 @@ async function anAlignmentRunInOneOrder(
 ) {
   const enquiry = await s.openEnquiry("is the second series shifted relative to the first?");
   const first = await s.recordObservations({
-    enquiry, name: "series A", finding: "baseline trace", contentHash: "sha256:A",
+    enquiry,
+    name: "series A",
+    finding: "baseline trace",
+    contentHash: "sha256:A",
   });
   const second = await s.recordObservations({
-    enquiry, name: "series B", finding: "comparison trace", contentHash: "sha256:B",
+    enquiry,
+    name: "series B",
+    finding: "comparison trace",
+    contentHash: "sha256:B",
   });
   const inputs = order === "first-then-second" ? [first, second] : [second, first];
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "pairwise-alignment", from: inputs,
+    enquiry,
+    method: "pairwise-alignment",
+    from: inputs,
     concludes: [{ proposition: SHIFTED, finding: "offset of +4.1 units" }],
   });
   return { enquiry, first, second, analysis, analysisClaims };

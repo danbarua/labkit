@@ -71,7 +71,12 @@ async function insertOrIgnore(c: Client, v: string): Promise<void> {
 
 async function main(): Promise<void> {
   const rawDb = new PGlite();
-  const server = new PGLiteSocketServer({ db: rawDb, port: 0, host: "127.0.0.1", maxConnections: 8 });
+  const server = new PGLiteSocketServer({
+    db: rawDb,
+    port: 0,
+    host: "127.0.0.1",
+    maxConnections: 8,
+  });
   await server.start();
   const [host, portStr] = server.getServerConn().split(":") as [string, string];
   const port = Number(portStr);

@@ -29,18 +29,27 @@ let events: EventSink;
 const FIXED_NOW = "2026-08-19T09:00:00.000Z";
 const clock: Clock = { now: () => FIXED_NOW };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
   session = new ResearchSession(graph, { clock, events });
 });
-afterEach(async () => { await scenario.end(); });
+afterEach(async () => {
+  await scenario.end();
+});
 
 /** A second reader over the same graph — see tests/helpers/scenario.ts. */
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const PRIMARY = "Holm-corrected pairwise test is significant";
@@ -71,7 +80,15 @@ async function aFindingHeldToAgreedChecks() {
     concludes: [{ proposition: PROPOSITION, finding: "p = 0.002, Holm-corrected" }],
     heldTo: [primary, median, seed],
   });
-  return { primary, median, seed, enquiry, observations, analysis, analysisClaims };
+  return {
+    primary,
+    median,
+    seed,
+    enquiry,
+    observations,
+    analysis,
+    analysisClaims,
+  };
 }
 
 describe("S-3b: the same design with nothing downstream", () => {
@@ -93,7 +110,11 @@ describe("S-3b: the same design with nothing downstream", () => {
       outcome: "pass",
       citing: claimOf(analysisClaims, PROPOSITION),
     });
-    await session.evaluateCriterion({ criterion: median, value: "median p = 0.21", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: median,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
     // Seed stability is never run at all.
 
     const why = await session.whySupported(await claimNamed(session, PROPOSITION));
@@ -124,7 +145,11 @@ describe("S-3b: the same design with nothing downstream", () => {
       outcome: "pass",
       citing: claimOf(analysisClaims, PROPOSITION),
     });
-    await session.evaluateCriterion({ criterion: median, value: "median p = 0.21", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: median,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
 
     const why = await session.whySupported(await claimNamed(session, PROPOSITION));
     expect(await whyOf(await afterwards(), PROPOSITION)).toEqual(why);
@@ -155,7 +180,11 @@ describe("S-3b: the same design with nothing downstream", () => {
   test("Afterward 3: a standard with nothing downstream needs no gate, and cannot fake one", async () => {
     const { primary } = await aFindingHeldToAgreedChecks();
     await expect(
-      session.declareGate({ governedBy: [primary], consequence: "the finding stands", protecting: [] }),
+      session.declareGate({
+        governedBy: [primary],
+        consequence: "the finding stands",
+        protecting: [],
+      }),
     ).rejects.toThrow(/protecting nothing/);
 
     // And nothing in the record is gating anything: the only control-plane
@@ -223,7 +252,11 @@ describe("S-3b: the same design with nothing downstream", () => {
   test("a check that qualifies nothing and gates nothing cannot be evaluated", async () => {
     const orphan = await session.stateCriterion("the pipeline was sane");
     await expect(
-      session.evaluateCriterion({ criterion: orphan, value: "looked fine", outcome: "pass" }),
+      session.evaluateCriterion({
+        criterion: orphan,
+        value: "looked fine",
+        outcome: "pass",
+      }),
     ).rejects.toThrow(/qualifies no finding/);
   });
 
@@ -238,11 +271,21 @@ describe("S-3b: the same design with nothing downstream", () => {
    * undone from a direction S-11 could not see.
    */
   test("a superseded analysis's failed checks do not disqualify its replacement", async () => {
-    const { median, analysis, analysisClaims, enquiry, observations } = await aFindingHeldToAgreedChecks();
-    await session.evaluateCriterion({ criterion: median, value: "median p = 0.21", outcome: "fail" });
-    expect((await session.whySupported(await claimNamed(session, PROPOSITION))).supported).toBe(false);
+    const { median, analysis, analysisClaims, enquiry, observations } =
+      await aFindingHeldToAgreedChecks();
+    await session.evaluateCriterion({
+      criterion: median,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
+    expect((await session.whySupported(await claimNamed(session, PROPOSITION))).supported).toBe(
+      false,
+    );
 
-    const review = await session.recordReview({ of: analysis, verdict: "the aggregation was the wrong one" });
+    const review = await session.recordReview({
+      of: analysis,
+      verdict: "the aggregation was the wrong one",
+    });
     const replacement = await session.replaceAnalysis({
       supersedes: analysis,
       because: review,
@@ -272,7 +315,11 @@ describe("S-3b: the same design with nothing downstream", () => {
       outcome: "pass",
       citing: claimOf(analysisClaims, PROPOSITION),
     });
-    await session.evaluateCriterion({ criterion: median, value: "median p = 0.21", outcome: "fail" });
+    await session.evaluateCriterion({
+      criterion: median,
+      value: "median p = 0.21",
+      outcome: "fail",
+    });
 
     const other = await session.openEnquiry("does T differ from rewired on the held-out split?");
     const otherObservations = await session.recordObservations({

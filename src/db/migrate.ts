@@ -15,5 +15,7 @@ import type { PGlite } from "@electric-sql/pglite";
  * ledger to reason about here.
  */
 export async function runMigrations(db: PGlite): Promise<void> {
-  await migrate(drizzle(db), { migrationsFolder: new URL("../../drizzle", import.meta.url).pathname });
+  await migrate(drizzle(db), {
+    migrationsFolder: new URL("../../drizzle", import.meta.url).pathname,
+  });
 }

@@ -24,15 +24,27 @@ let scenario: Scenario;
 let session: ResearchSession;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const NAME = "control series";
@@ -50,15 +62,21 @@ const DIVERGE = "the treated and control arms diverge";
 async function anAnalysisRestingOnBothControls(s: ResearchSession) {
   const enquiry = await s.openEnquiry("do the treated and control arms diverge?");
   const surviving = await s.recordObservations({
-    enquiry, name: NAME, finding: "the surviving fragment of the original series",
+    enquiry,
+    name: NAME,
+    finding: "the surviving fragment of the original series",
     contentHash: "sha256:surviving",
   });
   const regenerated = await s.recordObservations({
-    enquiry, name: NAME, finding: "the remainder, regenerated from an inferred algorithm",
+    enquiry,
+    name: NAME,
+    finding: "the remainder, regenerated from an inferred algorithm",
     contentHash: "sha256:regenerated",
   });
   const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-    enquiry, method: "arm-comparison", from: [surviving, regenerated],
+    enquiry,
+    method: "arm-comparison",
+    from: [surviving, regenerated],
     concludes: [{ proposition: DIVERGE, finding: "divergence beyond the noise floor" }],
   });
   return { enquiry, surviving, regenerated, analysis, analysisClaims };
@@ -107,9 +125,7 @@ describe("S-9d: resting on one thing, or two?", () => {
     const why = await whyOf(await afterwards(), DIVERGE);
 
     expect(why.restingOn).toHaveLength(2);
-    expect(why.restingOn.map((a) => a.part).sort()).toEqual(
-      [surviving, regenerated].sort(),
-    );
+    expect(why.restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
     expect(why.restingOn.map((a) => a.name)).toEqual([NAME, NAME]);
     expect(why.supported).toBe(true);
   });

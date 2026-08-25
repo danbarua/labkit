@@ -12,7 +12,11 @@ import { afterEach, expect, test } from "bun:test";
 import { traced, traceTotals, tracedInFlight } from "../src/db/trace";
 import type { LabKitDB } from "../src/db/client";
 
-const stub: LabKitDB = { async query() { return { rows: [] }; } };
+const stub: LabKitDB = {
+  async query() {
+    return { rows: [] };
+  },
+};
 
 afterEach(() => {
   delete process.env.LABKIT_TRACE;
@@ -56,7 +60,10 @@ test("a throwing query is still cleared from the in-flight set", async () => {
   // is empty afterwards is satisfied by a tracker that never records at all.
   let release!: () => void;
   const pending: LabKitDB = {
-    query: () => new Promise((resolve) => { release = () => resolve({ rows: [] }); }),
+    query: () =>
+      new Promise((resolve) => {
+        release = () => resolve({ rows: [] });
+      }),
   };
   const slow = traced(pending, "conn-pending");
   const inProgress = slow.query("SELECT waiting");
@@ -70,7 +77,11 @@ test("a throwing query is still cleared from the in-flight set", async () => {
   // would make this module lie. Until PJ-028 it was described in a comment
   // above `expect(true).toBe(true)` -- and moving `inFlight.delete(id)` out of
   // traced()'s `finally` left the whole suite green.
-  const boom: LabKitDB = { async query() { throw new Error("nope"); } };
+  const boom: LabKitDB = {
+    async query() {
+      throw new Error("nope");
+    },
+  };
   const t = traced(boom, "conn-boom");
   await expect(t.query("SELECT bad")).rejects.toThrow(/nope/);
   expect(tracedInFlight().filter((q) => q.connection === "conn-boom")).toEqual([]);
@@ -85,10 +96,9 @@ test("parameters are never emitted", async () => {
     return true;
   }) as typeof process.stderr.write;
   try {
-    await traced(stub, "conn-secret").query(
-      "MATCH (c:Claim {name: $name}) RETURN c",
-      ["a proposition nobody should find in a trace file"],
-    );
+    await traced(stub, "conn-secret").query("MATCH (c:Claim {name: $name}) RETURN c", [
+      "a proposition nobody should find in a trace file",
+    ]);
   } finally {
     process.stderr.write = realWrite;
   }

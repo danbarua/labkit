@@ -21,8 +21,7 @@ export function claimOf(claims: ConcludedClaim[], proposition: string): ClaimRef
     );
   // One analysis asserting the same sentence twice would make this ambiguous,
   // and no verb allows it. Refuse rather than pick, the way the domain does.
-  if (found.length > 1)
-    throw new Error(`this analysis concluded "${proposition}" more than once`);
+  if (found.length > 1) throw new Error(`this analysis concluded "${proposition}" more than once`);
   return found[0]!.claim;
 }
 
@@ -47,7 +46,10 @@ export async function claimNamed(
 
 /** `whySupported`, given a proposition — resolves the handle first. */
 export async function whyOf<T>(
-  read: { claimsAsserting(p: string): Promise<ConcludedClaim[]>; whySupported(c: ClaimRef): Promise<T> },
+  read: {
+    claimsAsserting(p: string): Promise<ConcludedClaim[]>;
+    whySupported(c: ClaimRef): Promise<T>;
+  },
   proposition: string,
 ): Promise<T> {
   return read.whySupported(await claimNamed(read, proposition));

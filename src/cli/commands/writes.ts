@@ -82,9 +82,7 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<question-id>", "e.g. Q_12", handle("question"))
     .requiredOption("--approach <text>", "how this line of enquiry will go about it")
     .action(async (question, { approach }: { approach: string }) =>
-      run(async ({ write }) =>
-        mintedOne("enquiry", await write.pursue({ question, approach })),
-      ),
+      run(async ({ write }) => mintedOne("enquiry", await write.pursue({ question, approach }))),
     );
 
   program
@@ -99,9 +97,7 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--into <question>", "the sharper question")
     .requiredOption("--because <text>", "what prompted the narrowing")
     .action(async (from, { into, because }: { into: string; because: string }) =>
-      run(async ({ write }) =>
-        mintedOne("question", await write.sharpen({ from, into, because })),
-      ),
+      run(async ({ write }) => mintedOne("question", await write.sharpen({ from, into, because }))),
     );
 
   program
@@ -111,19 +107,18 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--name <text>", "the artefact's logical name")
     .requiredOption("--finding <text>", "what was observed, in the observer's words")
     .option("--hash <text>", "a content hash, if there is one")
-    .action(
-      async (enquiry, opts: { name: string; finding: string; hash?: string }) =>
-        run(async ({ write }) =>
-          mintedOne(
-            "observations",
-            await write.recordObservations({
-              enquiry,
-              name: opts.name,
-              finding: opts.finding,
-              ...(opts.hash === undefined ? {} : { contentHash: opts.hash }),
-            }),
-          ),
+    .action(async (enquiry, opts: { name: string; finding: string; hash?: string }) =>
+      run(async ({ write }) =>
+        mintedOne(
+          "observations",
+          await write.recordObservations({
+            enquiry,
+            name: opts.name,
+            finding: opts.finding,
+            ...(opts.hash === undefined ? {} : { contentHash: opts.hash }),
+          }),
         ),
+      ),
     );
 
   program
@@ -162,9 +157,7 @@ export function registerWrites(program: Command, run: Run): void {
           ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
           ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
         });
-        return answer(recorded, (r) =>
-          asHandles([r.analysis, ...r.claims.map((c) => c.claim)]),
-        );
+        return answer(recorded, (r) => asHandles([r.analysis, ...r.claims.map((c) => c.claim)]));
       }),
     );
 
@@ -205,7 +198,11 @@ export function registerWrites(program: Command, run: Run): void {
     .summary("state an objective and what would count as meeting it")
     .requiredOption("--objective <text>", "what the work is for")
     .requiredOption("--acceptance <text>", "what would count as meeting it")
-    .option("--may-read <text>", "what this work is permitted to read (repeatable)", collect(String))
+    .option(
+      "--may-read <text>",
+      "what this work is permitted to read (repeatable)",
+      collect(String),
+    )
     .action(async (opts: { objective: string; acceptance: string; mayRead?: string[] }) =>
       run(async ({ write }) =>
         mintedOne(
@@ -229,9 +226,7 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<proposition>", "what must hold")
     .action(async (proposition: string) =>
-      run(async ({ write }) =>
-        mintedOne("criterion", await write.stateCriterion(proposition)),
-      ),
+      run(async ({ write }) => mintedOne("criterion", await write.stateCriterion(proposition))),
     );
 
   program
@@ -271,14 +266,22 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<criterion-id>", "the condition being checked", handle("criterion"))
     .requiredOption("--value <text>", "what was measured")
     .addOption(
-      program.createOption("--outcome <pass|fail>", "the verdict").choices(["pass", "fail"]).makeOptionMandatory(),
+      program
+        .createOption("--outcome <pass|fail>", "the verdict")
+        .choices(["pass", "fail"])
+        .makeOptionMandatory(),
     )
     .option("--gate <gate-id>", "the gate this verdict is reached for", handle("gate"))
     .option("--citing <claim-id>", "the finding that decided it", handle("claim"))
     .action(
       async (
         criterion,
-        opts: { value: string; outcome: "pass" | "fail"; gate?: GateRef; citing?: ClaimRef },
+        opts: {
+          value: string;
+          outcome: "pass" | "fail";
+          gate?: GateRef;
+          citing?: ClaimRef;
+        },
       ) =>
         run(async ({ write }) => {
           await write.evaluateCriterion({
@@ -302,11 +305,7 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<analysis-id>", "the analysis being re-checked", handle("analysis"))
     .requiredOption("--enquiry <id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what the re-check did")
-    .requiredOption(
-      "--under <id>",
-      "an input the re-check read (repeatable)",
-      collect(inputRef),
-    )
+    .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(inputRef))
     .requiredOption("--concludes <json>", `'{"proposition": "…", "finding": "…"}'`, conclusion)
     .action(async (historical, opts) =>
       run(async ({ write }) => {
@@ -317,9 +316,7 @@ export function registerWrites(program: Command, run: Run): void {
           under: opts.under,
           concludes: opts.concludes,
         });
-        return answer(report, (r) =>
-          asHandles([r.verification, ...r.claims.map((c) => c.claim)]),
-        );
+        return answer(report, (r) => asHandles([r.verification, ...r.claims.map((c) => c.claim)]));
       }),
     );
 
@@ -334,18 +331,21 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<enquiry-id>", "the line of enquiry", handle("enquiry"))
     .requiredOption("--because <text>", "why it is being left open")
     .requiredOption("--until <text>", "what would reopen it")
-    .requiredOption("--in-light-of <claim-id>", "the finding this is taken in light of", handle("claim"))
-    .action(
-      async (enquiry, opts: { because: string; until: string; inLightOf: ClaimRef }) =>
-        run(async ({ write }) => {
-          await write.acceptAsUnresolved({
-            enquiry,
-            because: opts.because,
-            until: opts.until,
-            inLightOf: opts.inLightOf,
-          });
-          return acknowledged(enquiry);
-        }),
+    .requiredOption(
+      "--in-light-of <claim-id>",
+      "the finding this is taken in light of",
+      handle("claim"),
+    )
+    .action(async (enquiry, opts: { because: string; until: string; inLightOf: ClaimRef }) =>
+      run(async ({ write }) => {
+        await write.acceptAsUnresolved({
+          enquiry,
+          because: opts.because,
+          until: opts.until,
+          inLightOf: opts.inLightOf,
+        });
+        return acknowledged(enquiry);
+      }),
     );
 
   program
@@ -376,17 +376,16 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--now-requires <text>", "the replacement condition")
     .requiredOption("--because <text>", "what prompted the amendment")
     .requiredOption("--citing <claim-id>", "the diagnosis it rests on", handle("claim"))
-    .action(
-      async (criterion, opts: { nowRequires: string; because: string; citing: ClaimRef }) =>
-        run(async ({ write }) => {
-          const report = await write.amendDesign({
-            criterion,
-            nowRequires: opts.nowRequires,
-            because: opts.because,
-            citing: opts.citing,
-          });
-          return answer(report, (r) => asHandles([r.amendment]));
-        }),
+    .action(async (criterion, opts: { nowRequires: string; because: string; citing: ClaimRef }) =>
+      run(async ({ write }) => {
+        const report = await write.amendDesign({
+          criterion,
+          nowRequires: opts.nowRequires,
+          because: opts.because,
+          citing: opts.citing,
+        });
+        return answer(report, (r) => asHandles([r.amendment]));
+      }),
     );
 
   program
@@ -413,9 +412,7 @@ export function registerWrites(program: Command, run: Run): void {
           from: opts.from,
           concludes: opts.concludes,
         });
-        return answer(report, (r) =>
-          asHandles([r.replacement, ...r.claims.map((c) => c.claim)]),
-        );
+        return answer(report, (r) => asHandles([r.replacement, ...r.claims.map((c) => c.claim)]));
       }),
     );
 
@@ -432,7 +429,11 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--because <text>", "what prompted the narrowing")
     .action(async (of, opts: { as: string; because: string }) =>
       run(async ({ write }) => {
-        const report = await write.reinterpret({ of, as: opts.as, because: opts.because });
+        const report = await write.reinterpret({
+          of,
+          as: opts.as,
+          because: opts.because,
+        });
         return answer(report, (r) => asHandles([r.nowClaims.claim]));
       }),
     );

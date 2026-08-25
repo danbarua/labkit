@@ -35,13 +35,24 @@ let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-beforeEach(async () => { graph = await scenario.begin(); });
-afterEach(async () => { await scenario.end(); });
-afterAll(async () => { await scenario.close(); });
+beforeAll(async () => {
+  scenario = await openScenario();
+});
+beforeEach(async () => {
+  graph = await scenario.begin();
+});
+afterEach(async () => {
+  await scenario.end();
+});
+afterAll(async () => {
+  await scenario.close();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 /**
@@ -73,24 +84,34 @@ describe("S-8b: there is no who, only what ran", () => {
     const result = await inOneWorld(async (s) => {
       const enquiry = await s.openEnquiry("does the pruning schedule move convergence?");
       const readings = await s.recordObservations({
-        enquiry, name: "sweep readings", finding: "twelve runs across the schedule",
+        enquiry,
+        name: "sweep readings",
+        finding: "twelve runs across the schedule",
         contentHash: "sha256:sweep",
       });
       const older = await s.recordObservations({
-        enquiry, name: CONFIG, finding: "opus-5, temperature 0, prompt v3",
+        enquiry,
+        name: CONFIG,
+        finding: "opus-5, temperature 0, prompt v3",
         contentHash: "sha256:cfg-v3",
       });
       const { analysis: first, claims: firstClaims } = await s.recordAnalysis({
-        enquiry, method: "convergence-fit", from: [readings, older],
+        enquiry,
+        method: "convergence-fit",
+        from: [readings, older],
         concludes: [{ proposition: MOVES, finding: "convergence moves by ~3 steps" }],
       });
 
       const newer = await s.recordObservations({
-        enquiry, name: CONFIG, finding: "opus-5, temperature 0.7, prompt v4",
+        enquiry,
+        name: CONFIG,
+        finding: "opus-5, temperature 0.7, prompt v4",
         contentHash: "sha256:cfg-v4",
       });
       await s.recordAnalysis({
-        enquiry, method: "convergence-fit", from: [readings, newer],
+        enquiry,
+        method: "convergence-fit",
+        from: [readings, newer],
         concludes: [{ proposition: MOVES, finding: "convergence moves by ~3 steps" }],
       });
 
@@ -137,15 +158,26 @@ describe("S-8b: there is no who, only what ran", () => {
       const enquiry = await s.openEnquiry("should the run be scaled up?");
       const budget = await s.stateCriterion("projected cost under 40 GPU-hours");
       const readings = await s.recordObservations({
-        enquiry, name: "cost projection", finding: "projected 31 GPU-hours at target scale",
+        enquiry,
+        name: "cost projection",
+        finding: "projected 31 GPU-hours at target scale",
       });
       const { analysis: analysis, claims: analysisClaims } = await s.recordAnalysis({
-        enquiry, method: "cost-projection", from: [readings],
-        concludes: [{ proposition: "the scale-up fits the budget", finding: "31 GPU-hours projected" }],
+        enquiry,
+        method: "cost-projection",
+        from: [readings],
+        concludes: [
+          {
+            proposition: "the scale-up fits the budget",
+            finding: "31 GPU-hours projected",
+          },
+        ],
         heldTo: [budget],
       });
       await s.evaluateCriterion({
-        criterion: budget, value: "31 GPU-hours", outcome: "pass",
+        criterion: budget,
+        value: "31 GPU-hours",
+        outcome: "pass",
         citing: claimOf(analysisClaims, "the scale-up fits the budget"),
       });
       await s.closeEnquiry({

@@ -58,9 +58,7 @@ interface Step {
   readonly says: string;
 }
 
-const scripts: Record<string, string> = JSON.parse(
-  readFileSync("package.json", "utf8"),
-).scripts;
+const scripts: Record<string, string> = JSON.parse(readFileSync("package.json", "utf8")).scripts;
 
 /** The script file a `check:*` command runs, for `summaryOf` to read. */
 const fileFor = (name: string): string | undefined =>
@@ -72,7 +70,11 @@ const steps: Step[] = [
   // sentences are written here because they are not scripts in this repo and
   // have no header to read.
   { name: "test", argv: ["bun", "test"], says: "Every test in the suite." },
-  { name: "typecheck", argv: ["bun", "run", "typecheck"], says: "The types agree." },
+  {
+    name: "typecheck",
+    argv: ["bun", "run", "typecheck"],
+    says: "The types agree.",
+  },
   {
     name: "depcruise",
     argv: ["npx", "depcruise", "src", "tests", "--output-type", "err"],
@@ -101,8 +103,15 @@ for (const step of steps) {
   // Output goes straight through. A sweep that swallowed a failing test's
   // diagnosis and reported "test: FAIL" would cost the thing you actually
   // needed — the same loss CLAUDE.md records for `bun test | tail`.
-  const proc = Bun.spawnSync(step.argv, { stdout: "inherit", stderr: "inherit" });
-  results.push({ name: step.name, ok: proc.exitCode === 0, ms: performance.now() - started });
+  const proc = Bun.spawnSync(step.argv, {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  results.push({
+    name: step.name,
+    ok: proc.exitCode === 0,
+    ms: performance.now() - started,
+  });
 }
 
 const failed = results.filter((r) => !r.ok);
@@ -115,7 +124,9 @@ for (const { name, ok, ms } of results) {
 console.log("─".repeat(width + 16));
 
 if (failed.length > 0) {
-  console.log(`\n${failed.length} of ${results.length} failed: ${failed.map((f) => f.name).join(", ")}`);
+  console.log(
+    `\n${failed.length} of ${results.length} failed: ${failed.map((f) => f.name).join(", ")}`,
+  );
   process.exit(1);
 }
 console.log(`\nall ${results.length} passed.`);

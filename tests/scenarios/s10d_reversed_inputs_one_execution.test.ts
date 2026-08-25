@@ -37,12 +37,21 @@ let session: ResearchSession;
 
 const clock: Clock = { now: () => "2026-08-24T11:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 const METHOD = "difference of the two series";
 const PROP = "the two series differ in magnitude";
@@ -51,13 +60,21 @@ const PROP = "the two series differ in magnitude";
 async function aDifference() {
   const enquiry = await session.openEnquiry("do the two series differ?");
   const treated = await session.recordObservations({
-    enquiry, name: "treated series", finding: "twelve points", contentHash: "sha256:treated",
+    enquiry,
+    name: "treated series",
+    finding: "twelve points",
+    contentHash: "sha256:treated",
   });
   const control = await session.recordObservations({
-    enquiry, name: "control series", finding: "twelve points", contentHash: "sha256:control",
+    enquiry,
+    name: "control series",
+    finding: "twelve points",
+    contentHash: "sha256:control",
   });
   const { analysis } = await session.recordAnalysis({
-    enquiry, method: METHOD, from: [treated, control],
+    enquiry,
+    method: METHOD,
+    from: [treated, control],
     concludes: [{ proposition: PROP, finding: "difference 0.4" }],
   });
   return { enquiry, treated, control, analysis };
@@ -67,12 +84,17 @@ describe("S-10d — the order a run read its inputs in", () => {
   test("a rerun that read the same records in the other order is shown as such", async () => {
     const { enquiry, treated, control, analysis } = await aDifference();
     const rerun = await session.reverify({
-      historical: analysis, enquiry, method: METHOD,
+      historical: analysis,
+      enquiry,
+      method: METHOD,
       under: [control, treated],
       concludes: { proposition: PROP, finding: "difference 0.4" },
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const report = await later.reproductionOf(rerun.verification);
 
     // The same two records on both sides, so nothing differs...
@@ -81,25 +103,34 @@ describe("S-10d — the order a run read its inputs in", () => {
     // whole of what LabKit has to say about it. A reader who knows whether this
     // method is order-sensitive can now tell; before, the information was gone.
     expect(report.ofRead.map((i) => i.name)).toEqual(["treated series", "control series"]);
-    expect(report.verificationRead.map((i) => i.name)).toEqual(["control series", "treated series"]);
+    expect(report.verificationRead.map((i) => i.name)).toEqual([
+      "control series",
+      "treated series",
+    ]);
   });
 
   test("a rerun that read them in the same order is shown as that", async () => {
     const { enquiry, treated, control, analysis } = await aDifference();
     const rerun = await session.reverify({
-      historical: analysis, enquiry, method: METHOD,
+      historical: analysis,
+      enquiry,
+      method: METHOD,
       under: [treated, control],
       concludes: { proposition: PROP, finding: "difference 0.4" },
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const report = await later.reproductionOf(rerun.verification);
 
     expect(report.differs).toEqual([]);
-    expect(report.verificationRead.map((i) => i.name)).toEqual(["treated series", "control series"]);
-    expect(report.verificationRead.map((i) => i.part)).toEqual(
-      report.ofRead.map((i) => i.part),
-    );
+    expect(report.verificationRead.map((i) => i.name)).toEqual([
+      "treated series",
+      "control series",
+    ]);
+    expect(report.verificationRead.map((i) => i.part)).toEqual(report.ofRead.map((i) => i.part));
   });
 
   /**
@@ -112,12 +143,17 @@ describe("S-10d — the order a run read its inputs in", () => {
   test("the two orders are different sequences of the same records", async () => {
     const { enquiry, treated, control, analysis } = await aDifference();
     const rerun = await session.reverify({
-      historical: analysis, enquiry, method: METHOD,
+      historical: analysis,
+      enquiry,
+      method: METHOD,
       under: [control, treated],
       concludes: { proposition: PROP, finding: "difference 0.4" },
     });
 
-    const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
     const report = await later.reproductionOf(rerun.verification);
 
     expect(report.verificationRead.map((i) => i.part)).not.toEqual(
@@ -126,6 +162,7 @@ describe("S-10d — the order a run read its inputs in", () => {
     expect([...report.verificationRead].map((i) => i.part).sort()).toEqual(
       [...report.ofRead].map((i) => i.part).sort(),
     );
-    void treated; void control;
+    void treated;
+    void control;
   });
 });

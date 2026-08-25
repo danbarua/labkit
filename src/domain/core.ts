@@ -119,7 +119,11 @@ export class SessionCore {
         { id: claim },
       );
       const found = rows[0];
-      if (found) return { evidence: ref("evidence", found.e.natural_id), asserts: found.c.name };
+      if (found)
+        return {
+          evidence: ref("evidence", found.e.natural_id),
+          asserts: found.c.name,
+        };
     }
     return undefined;
   }
@@ -162,9 +166,7 @@ export class SessionCore {
    */
 
   protected withinScope(scope: { enquiry?: EnquiryRef }): string {
-    return scope.enquiry
-      ? `MATCH (u)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})`
-      : "";
+    return scope.enquiry ? `MATCH (u)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})` : "";
   }
 
   /**
@@ -222,7 +224,13 @@ export class SessionCore {
           `MATCH (:Gate {natural_id: $id})-[:GATES]->(:Task)-[:IMPLEMENTS]->(u:EvidenceUnit)
            MATCH (u)-[:PRODUCES]->(e:Evidence)-[:${bearing}]->(c:Claim)
            RETURN c`,
-          { c: vertexProps<{ name: string; kind?: string; natural_id: string }>() },
+          {
+            c: vertexProps<{
+              name: string;
+              kind?: string;
+              natural_id: string;
+            }>(),
+          },
           { id: gate },
         );
         for (const row of rows) {
@@ -258,9 +266,7 @@ export class SessionCore {
     // Every node asserting this proposition must have been withdrawn. One left
     // standing means the record still claims it -- which is exactly the
     // duplicate-claim case S-12 was built to catch.
-    const standing = new Set(
-      rows.filter((r) => !r.d).map((r) => r.c.natural_id),
-    );
+    const standing = new Set(rows.filter((r) => !r.d).map((r) => r.c.natural_id));
     if (standing.size > 0) return { withdrawn: false };
 
     // Identity as well as wording. This was the claim's NAME, picked from
@@ -269,7 +275,14 @@ export class SessionCore {
     const now = rows.find((r) => r.now)?.now;
     return {
       withdrawn: true,
-      ...(now ? { replacedBy: { claim: ref("claim", now.natural_id), asserts: now.name } } : {}),
+      ...(now
+        ? {
+            replacedBy: {
+              claim: ref("claim", now.natural_id),
+              asserts: now.name,
+            },
+          }
+        : {}),
     };
   }
 
@@ -328,6 +341,9 @@ export class SessionCore {
       enquiry ??= rows.find((r) => r.loe)?.loe?.natural_id;
     }
     if (name === undefined) throw new Error(`no claim ${claim}`);
-    return { proposition: name, ...(enquiry ? { enquiry: ref("enquiry", enquiry) } : {}) };
+    return {
+      proposition: name,
+      ...(enquiry ? { enquiry: ref("enquiry", enquiry) } : {}),
+    };
   }
 }

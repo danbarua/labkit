@@ -32,7 +32,6 @@ import type {
   ClaimRef,
 } from "./report";
 
-
 /** `pursue` — open a line of enquiry against a question already on the record. */
 export interface PursueCommand {
   question: QuestionRef;

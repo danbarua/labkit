@@ -21,15 +21,27 @@ let scenario: Scenario;
 let session: ResearchSession;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
-beforeAll(async () => { scenario = await openScenario(); });
-afterAll(async () => { await scenario.close(); });
-beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+beforeAll(async () => {
+  scenario = await openScenario();
 });
-afterEach(async () => { await scenario.end(); });
+afterAll(async () => {
+  await scenario.close();
+});
+beforeEach(async () => {
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
+});
+afterEach(async () => {
+  await scenario.end();
+});
 
 async function afterwards(): Promise<ResearchSession> {
-  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+  return new ResearchSession(await scenario.current(), {
+    clock,
+    events: inMemoryEventLog(),
+  });
 }
 
 const TRENDS = "the response trends upward with dose";
@@ -45,11 +57,20 @@ const TRENDS = "the response trends upward with dose";
 async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
   const enquiry = await s.openEnquiry("does the response trend upward with dose?");
   const raw = await s.recordObservations({
-    enquiry, name: "raw sensor series", finding: "eleven dose levels, instrument settings not logged",
+    enquiry,
+    name: "raw sensor series",
+    finding: "eleven dose levels, instrument settings not logged",
   });
   const { analysis: calibration, claims: calibrationClaims } = await s.recordAnalysis({
-    enquiry, method: "calibrate", from: [raw],
-    concludes: [{ proposition: "the calibration is stable", finding: "drift under 0.2%" }],
+    enquiry,
+    method: "calibrate",
+    from: [raw],
+    concludes: [
+      {
+        proposition: "the calibration is stable",
+        finding: "drift under 0.2%",
+      },
+    ],
   });
 
   // Stage two reads stage one's output directly. Before row AE this was not
@@ -57,7 +78,9 @@ async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
   // re-entered as if it were fresh measurement — severing the chain to the raw
   // series and making stage two look independently reproducible.
   const { analysis: trend, claims: trendClaims } = await s.recordAnalysis({
-    enquiry, method: "dose-response-fit", from: [calibration],
+    enquiry,
+    method: "dose-response-fit",
+    from: [calibration],
     concludes: [{ proposition: TRENDS, finding: "monotonic increase, p < 0.01" }],
   });
   return { enquiry, raw, calibration, trend };
@@ -108,7 +131,9 @@ describe("S-11d: a stage cannot read a stage", () => {
     const { raw } = await aPipelineOnUnverifiableRawData(session);
 
     const fromRaw = await (await afterwards()).whatDependsOn(raw);
-    expect(fromRaw.claims.map((c) => c.asserts).sort()).toEqual(["the calibration is stable", TRENDS].sort());
+    expect(fromRaw.claims.map((c) => c.asserts).sort()).toEqual(
+      ["the calibration is stable", TRENDS].sort(),
+    );
     // Still open-world -- the traversal is now transitive, not complete.
     expect(fromRaw.complete).toBe(false);
   });

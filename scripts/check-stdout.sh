@@ -42,7 +42,7 @@ matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' 
   | grep -vE '^[^:]+:[0-9]+: *(\*|//|/\*)' || true)"
 
 if [ -n "$matches" ]; then
-  echo "❌ check-stdout ERROR: writes to stdout under src/, outside src/cli/cli.ts:"
+  echo "FAILED: writes to stdout under src/, outside src/cli/cli.ts:"
   echo
   echo "$matches"
   echo
@@ -52,4 +52,4 @@ if [ -n "$matches" ]; then
   exit 1
 fi
 
-echo "✅ check-stdout OK: nothing under src/ writes to stdout except the CLI."
+echo "OK: nothing under src/ writes to stdout except the CLI."
