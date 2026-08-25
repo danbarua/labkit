@@ -1,15 +1,27 @@
 # Full-lifecycle checklist
 
-`full-lifecycle.ts` is a runnable smoke test of LabKit's persistence layer
-end to end. Run it with:
+`full-lifecycle.sh` is a runnable smoke test of LabKit end to end. Run it with:
 
 ```sh
-bun examples/full-lifecycle.ts
+bash examples/full-lifecycle.sh
 ```
 
-It writes real state to `<projectRoot>/.labkit/pglite` (gitignored) — safe to
-run repeatedly, `resolveTenantContext` and the natural-id generator are both
-idempotent-or-incrementing by design.
+**Exit 0 means it worked and nothing else does.** It asserts on what came back,
+not on whether the commands ran, and it is hermetic: `--db` points it at a fresh
+temporary directory, removed on exit, so it can neither touch a working database
+nor contend with one.
+
+It replaced `full-lifecycle.ts`, which wrote by calling
+`TenantGraph.createNode` directly — underneath the domain layer, so it exercised
+the persistence machinery and said nothing about whether the research verbs were
+usable, and it put nodes on the record that no verb had recorded making. Every
+line of the shell version is a command a person could type.
+
+The spike outcomes below are **dated records of 2026-08-17/18** and are about
+the persistence layer, which is unchanged. They are why the machinery underneath
+is shaped as it is; read them before touching tenancy, natural ids or
+provisioning. Several sections mention the CQRS views, which were removed on
+2026-08-19 (`af5a1d2`) — see CLAUDE.md's "No relational read side".
 
 ## Spike outcomes this script's design depends on
 
@@ -74,7 +86,7 @@ assumptions:
 
 ## Scenarios another agent should try next
 
-Beyond what `full-lifecycle.ts` already exercises:
+Beyond what `full-lifecycle.sh` already exercises:
 
 - **Second tenant, natural ids keep incrementing globally.** Run the script
   twice with a different tenant slug (edit the `resolveTenantContext` call)
@@ -95,7 +107,7 @@ Beyond what `full-lifecycle.ts` already exercises:
   returned `Claim`/`Decision`/`LineOfEnquiry` are addressable by
   `natural_id` alone — no raw graphid should ever need to appear in that
   output.
-- **Kill and restart the leader.** Start `full-lifecycle.ts`, and while it's
+- **Kill and restart the leader.** Start `full-lifecycle.sh`, and while it's
   mid-run (or right after) start a second process connecting to the same
   `projectRoot` — confirm one becomes primary, the other secondary, and
   both see the same data (this is what `tests/helloworld.test.ts` already

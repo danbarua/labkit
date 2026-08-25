@@ -51,6 +51,8 @@ export type {
   UnaffectedRecord,
   DependencyReport,
   IdentifiedArtefact,
+  ReproductionReport,
+  ReproducibilityReport,
   SupportExplanation,
   GateStatus,
   CheckStatus,

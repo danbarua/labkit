@@ -24,6 +24,7 @@
     "check:stdout": "bash scripts/check-stdout.sh",
     "check:pglite-concurrency": "bash scripts/check-pglite-concurrency.sh",
     "check:tests-assert": "bun scripts/check-tests-assert.ts",
+    "example": "bash examples/full-lifecycle.sh",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom"
   },

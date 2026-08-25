@@ -1,15 +1,50 @@
 #!/usr/bin/env bun
 /**
- * A read-only CLI over the domain read surface (PJ-023's next phase).
+ * The CLI over the domain surfaces (PJ-023's next phase, grown up).
  *
- * **Read-only on purpose, and structurally rather than by discipline.** It
- * constructs a `ReadSurface`, never a `ResearchSession`, so there is no write
- * verb in scope to call by accident. `src/domain/index.ts` exports the two
- * halves separately for exactly this.
+ * **It was read-only, structurally, and that has been retired.** It built a
+ * `ReadSurface` and never a `WriteSurface`, so no write verb was in scope to
+ * call by accident — a real property, tested, and not a design goal anyone had
+ * chosen. What it produced was a record with no way to put anything into it
+ * short of wiring up an agent and an MCP server. Meanwhile the one script that
+ * wrote to a LabKit database wrote through `TenantGraph.createNode`, underneath
+ * the domain layer, which is the thing the read-only tests were protecting
+ * against, in the only writer there was.
  *
- * Four commands, not twenty. `023` set that bar and the reason holds: each one
- * is a question a researcher actually asks, and a surface that answers four
- * well is worth more than one that answers twenty at arm's length.
+ * So both halves are here now, held **separately** — a read command gets the
+ * read surface and a write command gets the write one, which is the same
+ * arrangement `src/mcp/server.ts` uses and what it calls the whole safety
+ * story. `ResearchSession`, which joins them, is still not constructed.
+ *
+ * The narrower property that survives, and is still tested: **this file reaches
+ * the graph only through domain verbs.** It constructs a `TenantGraph` because
+ * the surfaces need one and calls nothing on it.
+ *
+ * **It answers every question the MCP tools answer.** It did not for a while:
+ * it shipped with four commands against a read surface that had grown well past
+ * them, and the sentence here said four was the point. That was a position
+ * about a smaller surface, not a bar PJ-023 set — 023 asked for "the thinnest
+ * read-only MCP/CLI adapter", and thin means no logic of its own, not few
+ * questions. A human at a terminal and an agent over MCP are asking one record
+ * the same things, and there is no reason the terminal should get the subset.
+ * `tests/cli.test.ts` derives that from `src/domain/read.ts` and
+ * `src/domain/write.ts` rather than listing it, so a verb added later is
+ * covered without anyone remembering.
+ *
+ * **The event log is passed in, never defaulted, and both halves get the same
+ * one.** `SessionCore` falls back to `inMemoryEventLog()`, which in a process
+ * that exits after one command is an array nothing ever wrote to. On the read
+ * side `happened` then reports that nothing has ever happened against a
+ * database full of events; on the write side a verb commits its graph changes
+ * durably while the event describing them dies at exit — durable state with no
+ * record of the act that caused it. `main()` builds one `pgEventLog()` over the
+ * connection the graph already has.
+ *
+ * **Attribution here is real, not the mocks the MCP server runs on.** A person
+ * at a terminal has a name and the tree they are standing in has a HEAD, which
+ * is what finally gave `src/attribution.ts`'s stubs implementations —
+ * `gitContext` is the first subprocess under `src/`, exactly where that file
+ * predicted it would arrive.
  *
  * **Rendering is separate from fetching, and that is where this file has gone
  * wrong before.** An external review of the first version (2026-08-21) found
@@ -24,30 +59,120 @@
 import { connectDb } from "./db/connect";
 import { resolveTenantContext } from "./db/tenant";
 import { TenantGraph } from "./db/graph";
-import { ReadSurface } from "./domain";
+import { ReadSurface, WriteSurface } from "./domain";
+import { commandContext, gitContext, personContext } from "./attribution";
+import { pgEventLog } from "./domain/event-store";
 import { ref } from "./domain/report";
 import type {
+  AmendmentRecord,
+  AnalysisRef,
+  Conclusion,
+  CheckStatus,
   ClaimRef,
+  ConcludedClaim,
+  ConflictSide,
+  ConflictVerdict,
+  CriterionRef,
+  DomainEvent,
+  EnquiryRef,
   EnquiryStatus,
+  EventFilter,
+  GateRef,
+  GateStatus,
   HistoricalSurvey,
+  IdentifiedArtefact,
+  InterpretationHistory,
   KnowledgeSurvey,
+  ObservationsRef,
+  QuestionOrigin,
+  QuestionRef,
   QuestionStanding,
   DependencyReport,
+  DesignHistory,
+  ReproducibilityReport,
+  ReproductionReport,
+  Revision,
   SupportExplanation,
+  TaskContract,
 } from "./domain";
 
-const USAGE = `labkit — read-only queries over a research record
+const USAGE = `labkit — a research record, from the command line
 
+READS
+
+What is known
   labkit known [--at <iso-instant>]   what the programme knows, now or as of a moment
-  labkit why <proposition>            why a conclusion counts as supported
-  labkit affects <artefact-or-name>   what depends on a record, if it turns out wrong
+  labkit why <claim-id>               why a conclusion counts as supported
+  labkit claims <proposition>         which claims assert a sentence — text to handle
+  labkit conflict <claim-a> <claim-b> whether two conclusions actually disagree
+
+Questions and enquiries
+  labkit pursuits <question-id>       the lines of enquiry under a question
+  labkit origin <question-id>         where a question came from, if it was sharpened
   labkit enquiry <enquiry-id>         is this enquiry open, and how did it close
 
+Gates, conditions and planned work
+  labkit gate <gate-id>               is this gate satisfied, itemised per condition
+  labkit criteria <gate-id>           which conditions a gate is bound to
+  labkit design <gate-id>             how a gate's conditions were amended
+  labkit contract <work-id>           what a piece of planned work is for
+
+Analyses and what rests on them
+  labkit interpretation <claim-id>    how a claim's reading was narrowed
+  labkit reproduction <analysis-id>   what a re-run read, against what its original read
+  labkit reproducibility <analysis-id> [<part-id>=<hash> ...]
+                                      whether an analysis can be accounted for
+  labkit affects <artefact-or-name>   what depends on a record, if it turns out wrong
+
+What was done
+  labkit happened [<id>] [--since <seq>] [--by <id>] [--operation <verb>] [--limit <n>]
+                                      the acts themselves, oldest first, with who ran them
+
+WRITES
+
+Each prints what it minted, one handle per line, so \`$(labkit ...)\` composes.
+
+Asking and pursuing
+  labkit pose <question>
+  labkit open <question>              pose and pursue in one act
+  labkit pursue <question-id> --approach <text>
+  labkit sharpen <question-id> --into <question> --because <text>
+
+Recording work
+  labkit observe <enquiry-id> --name <text> --finding <text> [--hash <text>]
+  labkit analyse <enquiry-id> --method <text> --from <id> [--from <id> ...]
+                 --concludes <json> [--concludes <json> ...]
+                 [--implementing <work-id>] [--held-to <criterion-id> ...]
+  labkit review <analysis-id> --verdict <text>
+  labkit reverify <analysis-id> --enquiry <id> --method <text>
+                  --under <id> [--under <id> ...] --concludes <json>
+  labkit replace <analysis-id> --because <review-id> --enquiry <id> --method <text>
+                 --from <id> ... --concludes <json> ...
+  labkit reinterpret <claim-id> --as <text> --because <text>
+
+Settling
+  labkit promote <claim-id> --because <text>
+  labkit close <enquiry-id> [--answered-by <claim-id>]
+  labkit accept <enquiry-id> --because <text> --until <text> --in-light-of <claim-id>
+
+Prespecification
+  labkit plan --objective <text> --acceptance <text> [--may-read <text> ...]
+  labkit criterion <proposition>
+  labkit declare --governed-by <criterion-id> ... --consequence <text>
+                 --protecting <work-id> ...
+  labkit evaluate <criterion-id> --value <text> --outcome pass|fail
+                  [--gate <gate-id>] [--citing <claim-id>]
+
+A --concludes value is JSON, not a delimited string:
+  '{"proposition": "...", "finding": "...", "bearing": "supports",
+    "standing": "confirmatory"}'
+Only proposition and finding are required.
+
 Options
-  --tenant <slug>     which tenant to read (default: labkit)
+  --tenant <slug>     which tenant to read or write (default: labkit)
+  --db <dir>          the directory holding .labkit/ (default: \$LABKIT_HOME, else cwd)
+  --author <name>     who to attribute writes to (default: your username)
   --at <iso-instant>  for \`known\`: answer as of a moment rather than now
-  --analysis <id>     for \`why\`: which analysis concluded it, when one sentence
-                      is asserted in more than one line of enquiry
   --json              emit JSON instead of prose
 `;
 
@@ -61,19 +186,87 @@ Options
  * `acme` was supported. Order-sensitivity in an argument parser is the kind of
  * defect that looks like the user's mistake.
  */
-const VALUED_FLAGS = new Set(["tenant", "at", "analysis"]);
+const VALUED_FLAGS = new Set([
+  // Everywhere
+  "tenant",
+  "db",
+  "author",
+  // Reads
+  "at",
+  "since",
+  "by",
+  "operation",
+  "limit",
+  // Writes
+  "approach",
+  "into",
+  "because",
+  "name",
+  "finding",
+  "hash",
+  "method",
+  "from",
+  "concludes",
+  "implementing",
+  "held-to",
+  "verdict",
+  "answered-by",
+  "objective",
+  "acceptance",
+  "may-read",
+  "governed-by",
+  "consequence",
+  "protecting",
+  "value",
+  "outcome",
+  "gate",
+  "citing",
+  "enquiry",
+  "under",
+  "until",
+  "in-light-of",
+  "now-requires",
+  "as",
+]);
 
 export interface ParsedArgs {
   command?: string;
   positionals: string[];
-  flags: Record<string, string>;
+  /**
+   * Every occurrence of every flag, in the order given.
+   *
+   * A list rather than a single value because six write verbs take one — an
+   * analysis reads several inputs and concludes several things. `flag()` takes
+   * the last for the single-valued case, so one representation serves both;
+   * holding a scalar *and* a list would be two copies of one fact, failing in
+   * opposite directions the way `INDEXED_PROPS` and the type annotations do.
+   *
+   * Repetition is how a **list of handles** is given. A list of records —
+   * conclusions — is given as JSON per occurrence, and not as a delimited
+   * string: `PlanWorkCommand.mayRead`'s own doc comment records why, which is
+   * that an entry containing the delimiter splits silently.
+   */
+  flags: Record<string, string[]>;
+  /** Flags this parser does not know. Refused, not ignored — see {@link parseArgs}. */
+  unknown: string[];
   json: boolean;
 }
 
-/** Splits argv into a command, its positionals and its flags, in any order. */
+/**
+ * Splits argv into a command, its positionals and its flags, in any order.
+ *
+ * **An unrecognised flag is collected, not skipped.** It used to be dropped on
+ * the floor with a comment saying a missing positional would surface the
+ * mistake anyway. That was true while every command was a read: the worst case
+ * was an answer to a slightly different question, and the caller could see it.
+ * With writes in scope a mistyped `--becuase` would put a record on the
+ * permanent register with a field the caller believed they had set, so the
+ * caller has to be told.
+ */
 export function parseArgs(argv: string[]): ParsedArgs {
   const positionals: string[] = [];
-  const flags: Record<string, string> = {};
+  const flags: Record<string, string[]> = {};
+  const unknown: string[] = [];
   let json = false;
 
   for (let i = 0; i < argv.length; i++) {
@@ -87,15 +280,24 @@ export function parseArgs(argv: string[]): ParsedArgs {
       json = true;
     } else if (VALUED_FLAGS.has(name)) {
       const value = argv[++i];
-      if (value !== undefined) flags[name] = value;
+      if (value !== undefined) (flags[name] ??= []).push(value);
+    } else {
+      unknown.push(arg);
     }
-    // Anything else is ignored rather than guessed at; `--help` is handled
-    // before parsing, and an unknown flag falls through to the usage error the
-    // command itself raises when its positional is missing.
   }
 
   const [command, ...rest] = positionals;
-  return { command, positionals: rest, flags, json };
+  return { command, positionals: rest, flags, unknown, json };
+}
+
+/** The last value given for a flag, or `undefined`. */
+export function flag(flags: Record<string, string[]>, name: string): string | undefined {
+  return flags[name]?.at(-1);
+}
+
+/** Every value given for a flag, in order. */
+function all(flags: Record<string, string[]>, name: string): string[] {
+  return flags[name] ?? [];
 }
 
 /**
@@ -299,6 +501,444 @@ export function renderEnquiry(status: EnquiryStatus): string {
     .join("\n");
 }
 
+/**
+ * The acts themselves, oldest first.
+ *
+ * **The only renderer here reading the event log rather than the graph**, and
+ * the attribution is why it exists: who ran a command is not reconstructable
+ * from the record at all (PJ-031), so this line is the only place it can be
+ * read back. `seq` prints first because it is both the order and the cursor —
+ * a reader paging through hands the last one back as `--since`.
+ */
+export function renderHappened(events: readonly DomainEvent[]): string {
+  if (events.length === 0)
+    return [
+      "Nothing matching.",
+      "",
+      "An empty log is not an empty record: every other command answers from",
+      "the graph, and answers there are durable whether or not an act was logged.",
+    ].join("\n");
+  return events
+    .map((e) => {
+      const who = e.attribution.attribution_label || "unattributed";
+      // Short hash, because the full forty characters push the line past a
+      // terminal and the first eight are what anybody types back into `git`.
+      const commit = e.attribution.git_hash ? ` @${e.attribution.git_hash.slice(0, 8)}` : "";
+      const minted = e.created?.length ? `, minting ${e.created.join(", ")}` : "";
+      return [
+        `${String(e.seq ?? 0).padStart(5)}  ${e.at}  ${e.operation}  ${e.subject}`,
+        `         by ${who}${commit}${minted}`,
+      ].join("\n");
+    })
+    .join("\n");
+}
+
+/**
+ * Which claims assert a sentence — the one place text becomes a handle.
+ *
+ * Several matches is not a duplicate to be tidied away. Two lines of enquiry
+ * can assert the same sentence about different endpoints, and they are two
+ * claims (S-5); collapsing them reports one record that is simultaneously
+ * supported and challenged when each separately has a clean answer. So the
+ * multiple case gets a sentence saying so, rather than a list a reader might
+ * take for redundancy.
+ */
+export function renderClaims(claims: ConcludedClaim[], proposition: string): string {
+  return [
+    `Claims asserting "${proposition}"`,
+    bullets(
+      claims.map((c) => `${c.asserts}  (${c.claim})`),
+      "none — nothing on the record asserts this wording",
+    ),
+    claims.length > 1
+      ? "\nMore than one, and none of them is redundant: two lines of enquiry can\nassert the same sentence about different endpoints. Name the one you mean."
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** The lines of enquiry under a question. Handles only — the surface returns handles. */
+export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef): string {
+  return [
+    `Lines of enquiry pursuing ${question}`,
+    bullets(
+      [...enquiries],
+      "none — the question is on the books and nothing has been started on it",
+    ),
+    "",
+    "`labkit enquiry <id>` says whether one is still open and what it has produced.",
+  ].join("\n");
+}
+
+/**
+ * Where a question came from.
+ *
+ * `null` is an answer and prints as one. Most questions are simply asked;
+ * only a sharpened one has an earlier question behind it, and rendering the
+ * common case as an absence would read as a gap in the record.
+ *
+ * `knownAtTheTime` was frozen when the sharpening was recorded, not recomputed
+ * now — that is the whole of S-1, and the line says so, because a reader who
+ * assumes it is current will read later evidence into an earlier decision.
+ */
+export function renderOrigin(origin: QuestionOrigin | null, question: QuestionRef): string {
+  if (!origin)
+    return [
+      `${question} was posed directly.`,
+      "",
+      "That is an answer, not a gap: only a question sharpened from an earlier",
+      "one has an origin on the record.",
+    ].join("\n");
+  return [
+    `${question} narrowed "${origin.fromAsks}"  (${origin.from})`,
+    `  because: ${origin.reason}`,
+    "",
+    "Known at that moment",
+    bullets(
+      origin.knownAtTheTime.map((f) => `${f.states}  (${f.evidence})`),
+      "nothing",
+    ),
+    "",
+    "Frozen when the sharpening was recorded, not recomputed now. Evidence that",
+    "arrived later is deliberately absent from this list.",
+  ].join("\n");
+}
+
+/**
+ * A planned piece of work.
+ *
+ * The `enforced` caveat prints unconditionally rather than on a branch — the
+ * field is typed `false`, so there is no other case, and a reader who sees a
+ * `mayRead` list without it will take the list for a sandbox.
+ */
+export function renderContract(contract: TaskContract): string {
+  return [
+    `${contract.objective}  (${contract.work})`,
+    `  meeting it means: ${contract.acceptance}`,
+    "",
+    "May read",
+    bullets(contract.mayRead, "nothing named"),
+    "",
+    "Not enforced. The record states what this work may look at; nothing stops",
+    "a computation reading elsewhere.",
+  ].join("\n");
+}
+
+/** Which conditions a gate is bound to. Wording and standing are `labkit gate`. */
+export function renderCriteria(criteria: CriterionRef[], gate: GateRef): string {
+  return [
+    `Conditions governing ${gate}`,
+    bullets([...criteria], "none — this gate is bound to no prespecified condition"),
+    "",
+    "Handles only. `labkit gate` gives the same conditions with their wording and",
+    "their current standing.",
+  ].join("\n");
+}
+
+/**
+ * A gate, itemised per condition.
+ *
+ * Two things are deliberately not collapsed. The four states are printed as
+ * themselves — `never-run` and `no-standing-verdict` are different facts, and
+ * a boolean would report both as "not passed". And `everFailed` prints beside
+ * the state rather than being implied by it: a gate that failed and was
+ * re-checked is satisfied *now* and has failed, which is why the field
+ * survives a later pass at all (S-3c).
+ *
+ * Withdrawn evaluations are listed rather than dropped, marked as withdrawn.
+ * A check that was decided and then withdrawn is not a check nobody ran.
+ */
+export function renderGate(status: GateStatus): string {
+  const check = (c: CheckStatus): string => {
+    const decided = c.decidedBy ? `  decided ${c.decidedBy.outcome} on "${c.decidedBy.value}"` : "";
+    return `${c.state.padEnd(19)} ${c.proposition}  (${c.criterion})${decided}`;
+  };
+  return [
+    `${status.gate} — ${status.state}${status.everFailed ? "  (has failed at least once)" : ""}`,
+    `  consequence: ${status.consequence}`,
+    "",
+    "Conditions",
+    bullets(status.checks.map(check), "none"),
+    status.unmet.length
+      ? `\nNot currently met\n${bullets(status.unmet.map((u) => `${u.requires}  (${u.criterion})`), "")}`
+      : "",
+    status.gating.length
+      ? `\nGating\n${bullets(status.gating.map((w) => `${w.objective}  (${w.work})`), "")}`
+      : "",
+    status.evaluations.length
+      ? `\nEvaluations\n${bullets(
+          status.evaluations.map(
+            (e) =>
+              `${e.at}  ${e.outcome}  "${e.value}"  (${e.evaluation})${e.withdrawn ? "  withdrawn" : ""}`,
+          ),
+          "",
+        )}`
+      : "",
+    "",
+    "Computed, never stored. There is no value anyone can set to `satisfied`.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Whether two conclusions disagree.
+ *
+ * Three relations, three sentences, and `dissociation` is the one this verb
+ * exists for: two analyses reaching opposite-sounding results are not in
+ * conflict if they asked about different endpoints. Rendering that as a
+ * contradiction is precisely the defect the domain went to trouble to prevent
+ * (S-5), so the word never appears for it.
+ */
+export function renderConflict(verdict: ConflictVerdict): string {
+  const side = (s: ConflictSide): string =>
+    [
+      `"${s.proposition}"  (${s.claim})`,
+      `  asking "${s.asks}"  (${s.question})`,
+      s.supportedBy.length
+        ? `  supported by: ${s.supportedBy.map((f) => f.states).join("; ")}`
+        : "",
+      s.challengedBy.length
+        ? `  challenged by: ${s.challengedBy.map((f) => f.states).join("; ")}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  const verdictLine: Record<ConflictVerdict["relation"], string> = {
+    contradiction: "Contradiction — these disagree, and about the same thing.",
+    dissociation:
+      "Dissociation — these are about different things, so they do not disagree" +
+      (verdict.differsBy ? `; they differ by ${verdict.differsBy}.` : "."),
+    corroboration: "Corroboration — these agree.",
+  };
+  return [verdictLine[verdict.relation], "", verdict.sides.map(side).join("\n\n")].join("\n");
+}
+
+/** One input, named and flagged if the record has since invalidated it. */
+function partLine(a: IdentifiedArtefact): string {
+  return `${a.name}  (${a.part})${a.invalidated ? "  invalidated" : ""}`;
+}
+
+/**
+ * A re-run, against what its original read.
+ *
+ * It says `agrees`/`disagrees` and never `reproduced`, which is the word a
+ * reader most wants and the one the record cannot support: whether reading the
+ * same inputs constitutes the same execution depends on what the method does,
+ * and the record does not know that (PJ-019). The closing paragraph says so
+ * rather than leaving the reader to supply the stronger claim themselves.
+ */
+export function renderReproduction(report: ReproductionReport): string {
+  return [
+    `${report.verificationMethod}  (${report.verification})`,
+    `  re-checking ${report.ofMethod}  (${report.of})`,
+    `  the two runs' findings ${report.conclusion} — this ${report.bearing} confidence`,
+    "",
+    "The re-run read",
+    bullets(report.verificationRead.map(partLine), "nothing on the record"),
+    "",
+    "The original read",
+    bullets(report.ofRead.map(partLine), "nothing on the record"),
+    report.differs.length
+      ? `\nDiffering\n${bullets(report.differs.map((d) => `${partLine(d.what)} — ${d.standing}`), "")}`
+      : "\nNothing differs in what the two runs read.",
+    "",
+    "This does not say the original was reproduced. Whether reading the same",
+    "records is the same execution depends on what the method does, and the",
+    "record does not know that.",
+  ].join("\n");
+}
+
+/**
+ * Whether an analysis can be accounted for from what it read.
+ *
+ * `unverifiable` gets its own bucket and its own explanation. It is the record
+ * admitting it kept no hash, which is not the same answer as "differs" — and
+ * folding it in would report a failure nobody found.
+ */
+export function renderReproducibility(report: ReproducibilityReport): string {
+  return [
+    `${report.analysis} — ${report.reproducible ? "accounted for" : "not accounted for"}`,
+    "",
+    "Rebuilt and identical",
+    bullets(report.exact.map(partLine), "nothing"),
+    "",
+    "Rebuilt and different",
+    bullets(report.differing.map(partLine), "nothing"),
+    "",
+    "Unverifiable (the record kept no hash, so nothing can be said either way)",
+    bullets(report.unverifiable.map(partLine), "nothing"),
+    "",
+    "Not rebuilt",
+    bullets(report.notRebuilt.map(partLine), "nothing"),
+  ].join("\n");
+}
+
+/**
+ * How a gate's conditions reached their current wording.
+ *
+ * `nature` prints on every amendment, first. `mechanical` and `scientific` are
+ * what S-7 built `IMPLEMENTS` to tell apart — an amendment that moves a
+ * prespecified comparison is not a tidy-up — and it is the field a reader
+ * skims for.
+ */
+export function renderDesign(history: DesignHistory): string {
+  const amendment = (a: AmendmentRecord): string =>
+    [
+      `${a.nature}  (${a.amendment})`,
+      `  was: ${a.replaced.requires}`,
+      `  now: ${a.nowRequires.requires}`,
+      `  because: ${a.reason}`,
+      a.citing.length ? `  citing: ${a.citing.map((f) => f.states).join("; ")}` : "",
+      a.rerun.length
+        ? `  needs re-running: ${a.rerun.map((w) => `${w.objective} (${w.work})`).join("; ")}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  return [
+    `${history.gate}, on ${history.criterion}`,
+    `  originally: ${history.originally.requires}`,
+    `  now requires: ${history.nowRequires.requires}`,
+    "",
+    "Amendments",
+    history.amendments.length
+      ? history.amendments.map(amendment).join("\n\n")
+      : "  none — the condition still reads as it was first stated",
+    "",
+    "Ordered from the record itself, not from timestamps.",
+  ].join("\n");
+}
+
+/**
+ * How a claim's current reading was arrived at.
+ *
+ * Every step names records rather than a sentence, because one narrowing can
+ * withdraw several claims at once — two analyses reaching one reading are
+ * withdrawn together (S-12). A rendering keyed on wording would show one
+ * withdrawal where there were two.
+ */
+export function renderInterpretation(history: InterpretationHistory): string {
+  const revision = (r: Revision): string =>
+    [
+      `${r.revision}`,
+      `  withdrew: ${r.previously.map((c) => `"${c.asserts}" (${c.claim})`).join("; ")}`,
+      `  now claims: "${r.nowClaims.asserts}"  (${r.nowClaims.claim})`,
+      `  because: ${r.reason}`,
+      r.restingOnTheOldReading.length
+        ? `  resting on the old reading: ${r.restingOnTheOldReading
+            .map((q) => `"${q.asks}" (${q.question})`)
+            .join("; ")}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  return [
+    `Now claims "${history.nowClaims.asserts}"  (${history.nowClaims.claim})`,
+    "",
+    "Originally",
+    bullets(
+      history.originally.map((c) => `${c.asserts}  (${c.claim})`),
+      "nothing was withdrawn to reach this reading",
+    ),
+    "",
+    "Revisions",
+    history.revisions.length
+      ? history.revisions.map(revision).join("\n\n")
+      : "  none — this reading has not been narrowed",
+  ].join("\n");
+}
+
+/**
+ * A caller's mistake, as distinct from a refusal by the domain.
+ *
+ * Both reach the same person and they are not the same thing. A missing
+ * `--because` is a typo and gets the usage text; `closeEnquiry` declining to
+ * close on exploratory evidence (S-5) is the record working as designed, and
+ * printing thirty lines of usage under it would suggest the caller had
+ * mistyped something. This class is what separates them.
+ */
+class UsageProblem extends Error {}
+
+/** A required flag, by name. */
+function need(flags: Record<string, string[]>, name: string): string {
+  const value = flag(flags, name);
+  if (value === undefined) throw new UsageProblem(`--${name} is required`);
+  return value;
+}
+
+/** A required flag that may be given more than once. */
+function needAll(flags: Record<string, string[]>, name: string): string[] {
+  const values = all(flags, name);
+  if (values.length === 0) throw new UsageProblem(`--${name} is required, at least once`);
+  return values;
+}
+
+/**
+ * One id from the command line, resolved to the ref kind its prefix names.
+ *
+ * The same discrimination `TenantGraph.createEdge` makes, from the same table,
+ * and for the same reason: an analysis reads a mix of raw observations and
+ * earlier analyses, and the prefix is the only thing that says which is which.
+ */
+function inputRef(id: string): ObservationsRef | AnalysisRef {
+  if (id.startsWith("COMP_")) return ref("analysis", id);
+  if (id.startsWith("ART_")) return ref("observations", id);
+  throw new UsageProblem(`\`${id}\` is neither observations (ART_…) nor an analysis (COMP_…)`);
+}
+
+/**
+ * One conclusion, as JSON.
+ *
+ * JSON and not a delimited string, which is not a style choice:
+ * `PlanWorkCommand.mayRead` is stored as JSON inside the domain for the reason
+ * its doc comment gives — an entry containing the delimiter splits silently —
+ * and a conclusion carries two sentences of a researcher's prose, which is the
+ * worst possible thing to put either side of a separator character.
+ *
+ * Handle lists take the other route and repeat the flag (`--from A --from B`),
+ * because a natural id has no punctuation to collide with.
+ */
+function conclusion(raw: string): Conclusion {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new UsageProblem(
+      `--concludes takes JSON: '{"proposition": "…", "finding": "…"}'  (got \`${raw}\`)`,
+    );
+  }
+  const c = parsed as Record<string, unknown>;
+  if (typeof c.proposition !== "string" || typeof c.finding !== "string")
+    throw new UsageProblem(`--concludes needs a "proposition" and a "finding", both strings`);
+  if (c.bearing !== undefined && c.bearing !== "supports" && c.bearing !== "challenges")
+    throw new UsageProblem(`"bearing" is "supports" or "challenges"`);
+  if (c.standing !== undefined && c.standing !== "exploratory" && c.standing !== "confirmatory")
+    throw new UsageProblem(`"standing" is "exploratory" or "confirmatory"`);
+  return {
+    proposition: c.proposition,
+    finding: c.finding,
+    ...(c.bearing === undefined ? {} : { bearing: c.bearing }),
+    ...(c.standing === undefined ? {} : { standing: c.standing }),
+  };
+}
+
+/**
+ * What an act minted, for a person and for a shell script.
+ *
+ * Every write command prints handles and nothing else in prose form, because
+ * that is what the next command takes: `labkit close "$(labkit analyse …)"`
+ * only works if the id is the whole of stdout. The full report is `--json`.
+ *
+ * This is the transport half of the repo's rule that **a verb that mints
+ * something returns what it minted** — the verbs already do; a CLI that printed
+ * "done" would put the caller back to searching for what they had just made.
+ */
+function minted(...handles: string[]): string {
+  return handles.join("\n");
+}
+
 export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> {
   const first = argv[0];
   if (!first || first === "--help" || first === "-h") {
@@ -306,21 +946,48 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
     return first ? 0 : 1;
   }
 
-  const { command, positionals, flags, json } = parseArgs(argv);
+  const { command, positionals, flags, unknown, json } = parseArgs(argv);
   if (!command) {
     console.log(USAGE);
     return 1;
   }
+  // Before anything opens a database, and before any verb runs. A flag this
+  // parser does not know is a typo the caller believes they have set.
+  if (unknown.length) return usageError(`unknown flag${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}`);
 
-  const connection = await connectDb();
+  const connection = await connectDb(flag(flags, "db"));
   try {
-    const ctx = await resolveTenantContext(connection.db, flags.tenant ?? "labkit");
-    const read = new ReadSurface(new TenantGraph(ctx, connection.db));
+    const ctx = await resolveTenantContext(connection.db, flag(flags, "tenant") ?? "labkit");
+    // The sink is handed in, not defaulted, and **both** surfaces get the same
+    // one. `SessionCore` falls back to `inMemoryEventLog()`, which in a process
+    // that exits after one command is an array nothing has ever written to.
+    // On the read side that means `happened` reporting that nothing has ever
+    // happened; on the write side it means a verb committing its graph changes
+    // durably while the event describing them vanishes at exit. Both are
+    // confidently wrong rather than empty, and the second is worse: it leaves
+    // durable state with no record of the act that caused it.
+    const events = pgEventLog(connection.db, ctx.tenantId);
+    const graph = new TenantGraph(ctx, connection.db);
+    const read = new ReadSurface(graph, { events });
+    // One graph, so `inTransaction`'s re-entrancy depth is shared -- the
+    // composition `src/domain/session.ts` specifies for an adapter holding
+    // both halves, and the same one `src/mcp/server.ts` uses.
+    //
+    // Attribution is **real** here, not the mocks the MCP server runs on: a
+    // person at a terminal has a name and the tree they are standing in has a
+    // HEAD, which is why this is where `src/attribution.ts`'s stubs finally got
+    // implementations. `--author` overrides the username, because a script
+    // driving LabKit is not the account it runs under.
+    const write = new WriteSurface(graph, {
+      ...commandContext(gitContext, personContext(flag(flags, "author"))),
+      events,
+    });
 
     switch (command) {
       case "known": {
-        if (flags.at) {
-          const survey = await read.whatWasKnown(flags.at);
+        const at = flag(flags, "at");
+        if (at) {
+          const survey = await read.whatWasKnown(at);
           return show(json, survey, () => renderHistorical(survey)), 0;
         }
         const survey = await read.whatIsKnown();
@@ -368,9 +1035,373 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
         return show(json, status, () => renderEnquiry(status)), 0;
       }
 
+      case "claims": {
+        const proposition = positionals[0];
+        if (!proposition) return usageError("claims needs a proposition");
+        const found = await read.claimsAsserting(proposition);
+        return show(json, { claims: found }, () => renderClaims(found, proposition)), 0;
+      }
+
+      case "conflict": {
+        const [a, b] = positionals;
+        if (!a || !b) return usageError("conflict needs two claim ids");
+        const verdict = await read.doTheseConflict(ref("claim", a), ref("claim", b));
+        return show(json, verdict, () => renderConflict(verdict)), 0;
+      }
+
+      case "pursuits": {
+        const id = positionals[0];
+        if (!id) return usageError("pursuits needs a question id");
+        const question = ref("question", id);
+        const enquiries = await read.pursuitsOf(question);
+        return show(json, { enquiries }, () => renderPursuits(enquiries, question)), 0;
+      }
+
+      case "origin": {
+        const id = positionals[0];
+        if (!id) return usageError("origin needs a question id");
+        const question = ref("question", id);
+        const origin = await read.originOf(question);
+        return show(json, { origin }, () => renderOrigin(origin, question)), 0;
+      }
+
+      case "gate": {
+        const id = positionals[0];
+        if (!id) return usageError("gate needs a gate id");
+        const status = await read.gateStatus(ref("gate", id));
+        return show(json, status, () => renderGate(status)), 0;
+      }
+
+      case "criteria": {
+        const id = positionals[0];
+        if (!id) return usageError("criteria needs a gate id");
+        const gate = ref("gate", id);
+        const criteria = await read.criteriaGoverning(gate);
+        return show(json, { criteria }, () => renderCriteria(criteria, gate)), 0;
+      }
+
+      case "design": {
+        const id = positionals[0];
+        if (!id) return usageError("design needs a gate id");
+        const history = await read.designHistory(ref("gate", id));
+        return show(json, history, () => renderDesign(history)), 0;
+      }
+
+      case "contract": {
+        const id = positionals[0];
+        if (!id) return usageError("contract needs a work id");
+        const contract = await read.contractFor(ref("work", id));
+        return show(json, contract, () => renderContract(contract)), 0;
+      }
+
+      case "interpretation": {
+        const id = positionals[0];
+        if (!id) return usageError("interpretation needs a claim id");
+        const history = await read.interpretationHistory(ref("claim", id));
+        return show(json, history, () => renderInterpretation(history)), 0;
+      }
+
+      case "reproduction": {
+        const id = positionals[0];
+        // The verifying analysis, not the one being verified. Getting this the
+        // wrong way round is the easy mistake and the message says which.
+        if (!id) return usageError("reproduction needs the id of the analysis that did the verifying");
+        const report = await read.reproductionOf(ref("analysis", id));
+        return show(json, report, () => renderReproduction(report)), 0;
+      }
+
+      case "reproducibility": {
+        const id = positionals[0];
+        if (!id) return usageError("reproducibility needs an analysis id");
+        // `<part-id>=<hash>` positionals rather than a repeated flag: `flags`
+        // holds one value per name, and widening it to an array for one
+        // command would change how every other flag reads. Omitting them all
+        // is meaningful -- it asks what the record can account for on its own.
+        const rebuilt: Array<{ part: ObservationsRef; hash: string }> = [];
+        for (const pair of positionals.slice(1)) {
+          const at = pair.indexOf("=");
+          if (at < 1) return usageError(`\`${pair}\` is not <part-id>=<hash>`);
+          rebuilt.push({ part: ref("observations", pair.slice(0, at)), hash: pair.slice(at + 1) });
+        }
+        const report = await read.reproducibilityOf(ref("analysis", id), rebuilt);
+        return show(json, report, () => renderReproducibility(report)), 0;
+      }
+
+      case "happened": {
+        // Every field narrows; a bare `labkit happened` asks for everything,
+        // capped. The cap is here and not in the surface for the same reason
+        // the MCP tool carries its own: a terminal that scrolls a thousand
+        // events has answered nothing.
+        // Refused rather than coerced. `Number("abc")` is `NaN`, which reaches
+        // `pgEventLog` as a bound SQL parameter and comes back as an empty
+        // result -- a wrong-shaped answer to a question the caller mistyped.
+        // The MCP tool gets this from zod; a CLI has to say it.
+        const whole = (name: string): number | undefined => {
+          const raw = flag(flags, name);
+          if (raw === undefined) return undefined;
+          const n = Number(raw);
+          if (!Number.isInteger(n)) throw new Error(`--${name} takes a whole number, not \`${raw}\``);
+          return n;
+        };
+        let since: number | undefined;
+        let limit: number | undefined;
+        try {
+          since = whole("since");
+          limit = whole("limit");
+        } catch (e) {
+          return usageError((e as Error).message);
+        }
+        const filter: EventFilter = {
+          ...(positionals[0] === undefined ? {} : { touching: positionals[0] }),
+          ...(since === undefined ? {} : { since }),
+          ...(flag(flags, "by") === undefined ? {} : { by: flag(flags, "by")! }),
+          ...(flag(flags, "operation") === undefined ? {} : { operation: flag(flags, "operation")! }),
+          limit: limit ?? 50,
+        };
+        const events = await read.whatHappened(filter);
+        return show(json, { events }, () => renderHappened(events)), 0;
+      }
+
+      // -- writes ------------------------------------------------------------
+      //
+      // Handles in, handles out. Every one of these prints what it minted and
+      // nothing else, so `$(labkit …)` composes; `--json` gives the full report
+      // where a verb has one.
+
+      case "pose": {
+        const question = positionals[0];
+        if (!question) return usageError("pose needs a question");
+        const posed = await write.pose(question);
+        return show(json, { question: posed }, () => minted(posed)), 0;
+      }
+
+      case "open": {
+        const question = positionals[0];
+        if (!question) return usageError("open needs a question");
+        // One act, one event: `openEnquiry` is `pose` + `pursue` and the log
+        // records it as the single thing the researcher did.
+        const enquiry = await write.openEnquiry(question);
+        return show(json, { enquiry }, () => minted(enquiry)), 0;
+      }
+
+      case "pursue": {
+        const id = positionals[0];
+        if (!id) return usageError("pursue needs a question id");
+        const enquiry = await write.pursue({
+          question: ref("question", id),
+          approach: need(flags, "approach"),
+        });
+        return show(json, { enquiry }, () => minted(enquiry)), 0;
+      }
+
+      case "sharpen": {
+        const id = positionals[0];
+        if (!id) return usageError("sharpen needs a question id");
+        const sharper = await write.sharpen({
+          from: ref("question", id),
+          into: need(flags, "into"),
+          because: need(flags, "because"),
+        });
+        return show(json, { question: sharper }, () => minted(sharper)), 0;
+      }
+
+      case "observe": {
+        const id = positionals[0];
+        if (!id) return usageError("observe needs an enquiry id");
+        const hash = flag(flags, "hash");
+        const observations = await write.recordObservations({
+          enquiry: ref("enquiry", id),
+          name: need(flags, "name"),
+          finding: need(flags, "finding"),
+          ...(hash === undefined ? {} : { contentHash: hash }),
+        });
+        return show(json, { observations }, () => minted(observations)), 0;
+      }
+
+      case "analyse": {
+        const id = positionals[0];
+        if (!id) return usageError("analyse needs an enquiry id");
+        const implementing = flag(flags, "implementing");
+        const heldTo = all(flags, "held-to");
+        const recorded = await write.recordAnalysis({
+          enquiry: ref("enquiry", id),
+          method: need(flags, "method"),
+          from: needAll(flags, "from").map(inputRef),
+          concludes: needAll(flags, "concludes").map(conclusion),
+          ...(implementing === undefined ? {} : { implementing: ref("work", implementing) }),
+          ...(heldTo.length === 0 ? {} : { heldTo: heldTo.map((c) => ref("criterion", c)) }),
+        });
+        // The analysis first, then a claim per conclusion in the order given --
+        // which is what lets a script take line 2 and close an enquiry on it.
+        return (
+          show(json, recorded, () =>
+            minted(recorded.analysis, ...recorded.claims.map((c) => c.claim)),
+          ),
+          0
+        );
+      }
+
+      case "review": {
+        const id = positionals[0];
+        if (!id) return usageError("review needs an analysis id");
+        const review = await write.recordReview({
+          of: ref("analysis", id),
+          verdict: need(flags, "verdict"),
+        });
+        return show(json, { review }, () => minted(review)), 0;
+      }
+
+      case "close": {
+        const id = positionals[0];
+        if (!id) return usageError("close needs an enquiry id");
+        // No `answeredBy` is `abandoned`, not `answered` with an empty answer.
+        // The two are different closures and the verb reads the absence.
+        const answeredBy = flag(flags, "answered-by");
+        await write.closeEnquiry({
+          enquiry: ref("enquiry", id),
+          ...(answeredBy === undefined ? {} : { answeredBy: ref("claim", answeredBy) }),
+        });
+        return show(json, { enquiry: id }, () => minted(id)), 0;
+      }
+
+      case "plan": {
+        const mayRead = all(flags, "may-read");
+        const work = await write.planWork({
+          objective: need(flags, "objective"),
+          acceptance: need(flags, "acceptance"),
+          ...(mayRead.length === 0 ? {} : { mayRead }),
+        });
+        return show(json, { work }, () => minted(work)), 0;
+      }
+
+      case "criterion": {
+        const proposition = positionals[0];
+        if (!proposition) return usageError("criterion needs a proposition");
+        const stated = await write.stateCriterion(proposition);
+        return show(json, { criterion: stated }, () => minted(stated)), 0;
+      }
+
+      case "declare": {
+        const gate = await write.declareGate({
+          governedBy: needAll(flags, "governed-by").map((c) => ref("criterion", c)),
+          consequence: need(flags, "consequence"),
+          protecting: needAll(flags, "protecting").map((w) => ref("work", w)),
+        });
+        return show(json, { gate }, () => minted(gate)), 0;
+      }
+
+      case "evaluate": {
+        const id = positionals[0];
+        if (!id) return usageError("evaluate needs a criterion id");
+        const outcome = need(flags, "outcome");
+        if (outcome !== "pass" && outcome !== "fail")
+          return usageError(`--outcome is "pass" or "fail", not \`${outcome}\``);
+        // `--gate` is genuinely optional: S-3b's criteria qualify a finding and
+        // gate no work, and requiring one there forced the caller to mint a
+        // gate that protected nothing.
+        const gate = flag(flags, "gate");
+        const citing = flag(flags, "citing");
+        await write.evaluateCriterion({
+          criterion: ref("criterion", id),
+          value: need(flags, "value"),
+          outcome,
+          ...(gate === undefined ? {} : { gate: ref("gate", gate) }),
+          ...(citing === undefined ? {} : { citing: ref("claim", citing) }),
+        });
+        return show(json, { criterion: id, outcome }, () => minted(id)), 0;
+      }
+
+      case "reverify": {
+        const id = positionals[0];
+        if (!id) return usageError("reverify needs the id of the analysis being re-checked");
+        const report = await write.reverify({
+          historical: ref("analysis", id),
+          enquiry: ref("enquiry", need(flags, "enquiry")),
+          method: need(flags, "method"),
+          under: needAll(flags, "under").map(inputRef),
+          // One conclusion, not a list: a re-check reaches one verdict about
+          // the thing it re-checked.
+          concludes: conclusion(need(flags, "concludes")),
+        });
+        return (
+          show(json, report, () =>
+            minted(report.verification, ...report.claims.map((c) => c.claim)),
+          ),
+          0
+        );
+      }
+
+      case "accept": {
+        const id = positionals[0];
+        if (!id) return usageError("accept needs an enquiry id");
+        await write.acceptAsUnresolved({
+          enquiry: ref("enquiry", id),
+          because: need(flags, "because"),
+          until: need(flags, "until"),
+          inLightOf: ref("claim", need(flags, "in-light-of")),
+        });
+        return show(json, { enquiry: id }, () => minted(id)), 0;
+      }
+
+      case "promote": {
+        const id = positionals[0];
+        if (!id) return usageError("promote needs a claim id");
+        await write.promote({ claim: ref("claim", id), because: need(flags, "because") });
+        return show(json, { claim: id }, () => minted(id)), 0;
+      }
+
+      case "amend": {
+        const id = positionals[0];
+        if (!id) return usageError("amend needs a criterion id");
+        const report = await write.amendDesign({
+          criterion: ref("criterion", id),
+          nowRequires: need(flags, "now-requires"),
+          because: need(flags, "because"),
+          citing: ref("claim", need(flags, "citing")),
+        });
+        return show(json, report, () => minted(report.amendment)), 0;
+      }
+
+      case "replace": {
+        const id = positionals[0];
+        if (!id) return usageError("replace needs the id of the analysis being superseded");
+        const report = await write.replaceAnalysis({
+          supersedes: ref("analysis", id),
+          because: ref("review", need(flags, "because")),
+          enquiry: ref("enquiry", need(flags, "enquiry")),
+          method: need(flags, "method"),
+          from: needAll(flags, "from").map(inputRef),
+          concludes: needAll(flags, "concludes").map(conclusion),
+        });
+        return (
+          show(json, report, () =>
+            minted(report.replacement, ...report.claims.map((c) => c.claim)),
+          ),
+          0
+        );
+      }
+
+      case "reinterpret": {
+        const id = positionals[0];
+        if (!id) return usageError("reinterpret needs a claim id");
+        const report = await write.reinterpret({
+          of: ref("claim", id),
+          as: need(flags, "as"),
+          because: need(flags, "because"),
+        });
+        return show(json, report, () => minted(report.nowClaims.claim)), 0;
+      }
+
       default:
         return usageError(`unknown command: ${command}`);
     }
+  } catch (e) {
+    // A caller's mistake gets the usage text; anything else -- a refusal by the
+    // domain, a failed query -- is re-thrown to the top-level handler, which
+    // prints the message alone. Thirty lines of usage under an S-5 refusal
+    // would read as though the caller had mistyped something.
+    if (e instanceof UsageProblem) return usageError(e.message);
+    throw e;
   } finally {
     await connection.close();
   }
@@ -382,4 +1413,22 @@ function usageError(message: string): number {
   return 2;
 }
 
-if (import.meta.main) process.exit(await main());
+/**
+ * A thrown error is a message, not a stack.
+ *
+ * It could stay unhandled while every command was a read: the failures were
+ * connection problems and a stack was the useful output. Writes changed that —
+ * several verbs **refuse** on purpose (closing on exploratory evidence,
+ * reinterpreting into wording that changes nothing), and those refusals are
+ * the domain working. A researcher who reads "cannot close on exploratory
+ * evidence" has been told what to do next; the same sentence under twenty
+ * frames of `bun:internal` has not.
+ */
+if (import.meta.main) {
+  try {
+    process.exit(await main());
+  } catch (e) {
+    console.error(`labkit: ${(e as Error).message}`);
+    process.exit(1);
+  }
+}
