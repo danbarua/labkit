@@ -41,7 +41,14 @@ the colour. `scripts/smoke-cli.sh` deliberately unchanged: it asserts on
 substrings of the same output, and checking versus showing is why the two were
 split.
 
-**`b86918d`** and this commit are the entry.
+**`6182308` — the transcript colours its own text.** Four kinds of text share
+that page and only one was distinguishable. Heading in magenta between rules,
+prose in bright cyan, the typed command in bold yellow after a dim `$`, and
+LabKit's output **untouched**. No code is shared with the CLI's palette — the
+first draft used cyan `36` for prose, which is what LabKit uses for handles.
+`NO_COLOR` turns off the script's styling *and* stops it forcing the CLI's.
+
+**`b86918d`**, `f3aa479` and this commit are the entry.
 
 Working tree clean.
 
@@ -59,6 +66,10 @@ Working tree clean.
   none**. Both properties confirmed in the same run: `LOE_1`, `CRIT_1`, `COMP_1`
   and `CLM_1` appear as bare lines, and `labkit gate` shows `never-evaluated`
   dim, `satisfied` green, handles cyan.
+- **The two palettes were counted, not eyeballed**: over one run the script
+  emits `96`, `35`, `1;35`, `1;33`; LabKit emits `36`, `32`, `33`, `1`. No
+  overlap, which is why prose moved off `36`.
+- `NO_COLOR=1 bun run example` — exit 0, **zero** escape sequences.
 
 ## Open
 
@@ -66,8 +77,17 @@ Working tree clean.
 item: the compiled binary that cannot migrate.
 
 One thing worth a reader's attention rather than an action: the CLI shipped
-correct and the *example* was wrong, and neither `bun run check` nor any test
-would ever have said so. A transcript being white is not a failing assertion.
+correct and the *example* was wrong — twice, in different ways — and neither
+`bun run check` nor any test would ever have said so. A transcript being white
+is not a failing assertion, and neither is one where two kinds of text share a
+colour. Both were found by a person reading the output.
+
+A constraint worth knowing before anyone tries to restyle that transcript
+again: **text that carries its own colour resets cannot be cheaply tinted from
+outside.** The CLI emits `ESC[39m` between fields, which drops back to the
+terminal default and kills an outer tint partway along the line. That is why
+LabKit's output is left alone rather than wrapped, and the discrimination is
+carried by the *other* three categories not being default-coloured.
 
 ## Next
 
