@@ -87,6 +87,7 @@ import type {
   CriterionRef,
   DecisionRef,
   EvidenceRef,
+  InputRef,
   GateRef,
   UnitRef,
   WorkRef,
@@ -487,7 +488,7 @@ export class WriteSurface extends SessionCore {
     // itself, which is an ordinary thing to record, and declining it would be
     // LabKit deciding a legitimate run is not recordable -- exactly what S-10d
     // took out.
-    const positionsFor = new Map<string, number[]>();
+    const positionsFor = new Map<ObservationsRef, number[]>();
     for (const [position, source] of input.from.entries()) {
       // An analysis is named by its computation; what it *read* is that
       // computation's output artefact, which is what CONSUMES points at.
@@ -1260,13 +1261,13 @@ export class WriteSurface extends SessionCore {
     // the id is a `COMP_`, and looking THAT up as an artefact matches nothing
     // and silently fell back to printing the id. Same one hop `recorded()`
     // makes to write the CONSUMES edge.
-    const inputNames = new Map<string, string>();
+    const inputNames = new Map<InputRef, IndexedString>();
     // Read after the transaction above, so it sees this act's own invalidation.
-    const retracted = new Set<string>();
+    const retracted = new Set<InputRef>();
     // One query for every input, not one per input. `logical_name` is what an
     // Artefact carries; this read `.name` -- a property no Artefact has -- so it
     // set `undefined` and printed the id instead.
-    const artefactFor = new Map<string, string>();
+    const artefactFor = new Map<InputRef, ObservationsRef>();
     for (const o of input.from) {
       artefactFor.set(
         o,
@@ -1399,7 +1400,7 @@ export class WriteSurface extends SessionCore {
       // Keyed by id. The query below selects natural_id AND statement and only
       // the statement was kept, so two findings phrased alike merged -- in the
       // field whose whole job is showing the findings survived unchanged.
-      const carried = new Map<string, CitedFinding>();
+      const carried = new Map<EvidenceRef, CitedFinding>();
       const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
       for (const id of withdrawnIds) {
         await this.graph.createEdge(review.natural_id, "EVALUATES", id);
@@ -1421,7 +1422,7 @@ export class WriteSurface extends SessionCore {
           "SUPPORTS",
           narrower.natural_id,
         );
-        carried.set(row.e.natural_id, { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
+        carried.set(ref("evidence", row.e.natural_id), { evidence: ref("evidence", row.e.natural_id), states: row.e.statement });
       }
 
       return { narrower, carried };
