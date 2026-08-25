@@ -110,7 +110,7 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (proposition: string) =>
       run(async ({ read }) => {
         const claims = await read.claimsAsserting(proposition);
-        return answer(claims, (c) => renderClaims(c, proposition));
+        return answer(claims, (c, p) => renderClaims(c, proposition, p));
       }),
     );
 
@@ -139,7 +139,7 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (question) =>
       run(async ({ read }) => {
         const enquiries = await read.pursuitsOf(question);
-        return answer(enquiries, (e) => renderPursuits(e, question));
+        return answer(enquiries, (e, p) => renderPursuits(e, question, p));
       }),
     );
 
@@ -155,7 +155,7 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (question) =>
       run(async ({ read }) => {
         const origin = await read.originOf(question);
-        return answer(origin, (o) => renderOrigin(o, question));
+        return answer(origin, (o, p) => renderOrigin(o, question, p));
       }),
     );
 
@@ -191,7 +191,7 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (gate) =>
       run(async ({ read }) => {
         const criteria = await read.criteriaGoverning(gate);
-        return answer(criteria, (c) => renderCriteria(c, gate));
+        return answer(criteria, (c, p) => renderCriteria(c, gate, p));
       }),
     );
 

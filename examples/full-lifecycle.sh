@@ -18,18 +18,70 @@ db="$(mktemp -d "${TMPDIR:-/tmp}/labkit-lifecycle.XXXXXX")"
 trap 'rm -rf "$db"' EXIT
 
 # ---------------------------------------------------------------------------
+# The transcript's own styling
+# ---------------------------------------------------------------------------
+#
+# Four kinds of text share this page and a reader needs to tell them apart at a
+# glance:
+#
+#   heading    magenta, between rules
+#   prose      bright cyan -- the document's voice, not the terminal's default
+#   command    bold yellow after a dim `$` -- the line you would type
+#   output     **whatever LabKit printed, untouched**
+#
+# No code is shared with the CLI's palette, which was checked rather than
+# assumed: prose is bright cyan (96) because LabKit's *handles* are plain cyan
+# (36), and a reader should never have to work out which vocabulary a colour
+# belongs to. The command's bold yellow (1;33) and LabKit's `provisional` (33)
+# differ by the bold, and never appear in the same block.
+#
+# The fourth one is the rule the other three exist to serve. LabKit already
+# colours its own output by meaning, and re-tinting it here would either fight
+# that vocabulary or destroy it: the CLI emits `ESC[39m` between fields to reset
+# to the terminal's default foreground, so an outer tint dies partway along
+# every line, and chasing that with a post-processor is the kind of clever that
+# breaks on the first sequence nobody thought of. What LabKit spat out is what
+# appears.
+#
+# So the discrimination is carried by the other three being *not* default
+# colours. Output is the only text on the page in the reader's own foreground,
+# which is what makes it stand out rather than blend in.
+#
+# `NO_COLOR` turns off this script's styling *and* stops it forcing the CLI's,
+# so one variable gets a completely plain transcript. The structure survives it,
+# which is what keeps this readable by something that is not a person:
+# `=== ===` around a heading, `$ ` before a command, and output on its own lines.
+
+if [ -n "${NO_COLOR:-}" ]; then
+  S_RULE="" S_HEAD="" S_PROSE="" S_PROMPT="" S_CMD="" S_OFF=""
+  LAB_COLOUR=""
+else
+  esc=$(printf '\033')
+  S_RULE="${esc}[35m"    # the rules around a heading
+  S_HEAD="${esc}[1;35m"  # the heading itself
+  S_PROSE="${esc}[96m"   # the document's voice
+  S_PROMPT="${esc}[2m"   # the `$` — punctuation, not content
+  S_CMD="${esc}[1;33m"   # the command as typed: what you would copy
+  S_OFF="${esc}[0m"
+  LAB_COLOUR="1"
+fi
+
+# ---------------------------------------------------------------------------
 # Narration and running
 # ---------------------------------------------------------------------------
 
-say() { printf '\n'; printf '%s\n' "$@"; }
+say() {
+  printf '\n'
+  printf "${S_PROSE}%s${S_OFF}\n" "$@"
+}
 
 # A section heading with the researcher's intent under it. The intent is the
 # half a transcript cannot supply: a reader can see what was typed and cannot
 # see why it was worth typing.
 chapter() {
-  printf '\n\n=== %s ===\n' "$1"
+  printf '\n\n%s===%s %s %s===%s\n' "$S_RULE" "$S_HEAD" "$1" "$S_RULE" "$S_OFF"
   shift
-  [ $# -gt 0 ] && printf '%s\n' "$@"
+  [ $# -gt 0 ] && printf "${S_PROSE}%s${S_OFF}\n" "$@"
   return 0
 }
 
@@ -55,8 +107,16 @@ quoted() {
 # reader would lose the thing this script exists to show.
 LAST=""
 lab() {
-  printf '\n$ labkit %s\n' "$(quoted "$@")"
-  LAST="$(bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@")"
+  printf '\n%s$%s %slabkit %s%s\n' "$S_PROMPT" "$S_OFF" "$S_CMD" "$(quoted "$@")" "$S_OFF"
+  # `FORCE_COLOR=1` because `$( )` is a pipe: the CLI correctly turns colour off
+  # when stdout is not a terminal, so without this an example about what LabKit
+  # *shows you* would print in white the moment it captured anything.
+  #
+  # Safe only because a handle-only answer is never coloured, even forced — see
+  # `asHandles` in `src/cli/output.ts`. A write verb's `$LAST` is therefore a
+  # bare id that `handle()` can prefix-check and the next command can consume,
+  # while a read's `$LAST` carries the colour a reader is here to see.
+  LAST="$(FORCE_COLOR=$LAB_COLOUR bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@")"
   printf '%s\n' "$LAST"
 }
 
@@ -76,6 +136,7 @@ handle() {
 
 # ---------------------------------------------------------------------------
 
+printf '%s' "$S_PROSE"
 cat <<'INTRO'
 LabKit, by worked example
 =========================
@@ -90,6 +151,7 @@ only the CLI. Every command is shown as typed, with what it printed.
 
 It runs against a throwaway database, deleted when this exits.
 INTRO
+printf '%s' "$S_OFF"
 
 chapter "Asking a question" \
   "Research starts with a question and a line of enquiry pursuing it." \
@@ -202,6 +264,6 @@ say "A composed verb records one event, not one per node it wrote -- a" \
 
 lab happened "$claim"
 
-printf '\n\n=== done ===\n'
-printf 'That is the whole lifecycle. `labkit --help` has the rest, and\n'
-printf '`bun run check:cli` runs the same path with assertions on it.\n\n'
+printf '\n\n%s===%s done %s===%s\n' "$S_RULE" "$S_HEAD" "$S_RULE" "$S_OFF"
+printf "${S_PROSE}That is the whole lifecycle. \`labkit --help\` has the rest, and${S_OFF}\n"
+printf "${S_PROSE}\`bun run check:cli\` runs the same path with assertions on it.${S_OFF}\n\n"

@@ -36,8 +36,17 @@
  * a promise rather than a feature. It arrives with the first colour.
  */
 
-/** How one report reads. Pure — it returns text and prints nothing. */
-export type View<T> = (value: T) => string;
+import type { Palette } from "./palette";
+
+/**
+ * How one report reads. Pure — it returns text and prints nothing.
+ *
+ * The `Palette` is a parameter rather than a module-level global so a test can
+ * render the same report twice, coloured and plain, and assert on both. A
+ * global would resolve at import time to whatever `bun test`'s non-TTY stdout
+ * implies, and every fixture would silently check the uncoloured path only.
+ */
+export type View<T> = (value: T, palette: Palette) => string;
 
 /**
  * What a command answers with: the report, and how to read it.
@@ -57,16 +66,22 @@ export type View<T> = (value: T) => string;
  */
 export interface Answer<T = unknown> {
   value: T;
-  render(): string;
+  render(palette: Palette): string;
 }
 
 /** Pairs a report with its view. This is where the two are held to each other. */
 export function answer<T>(value: T, view: View<T>): Answer<T> {
-  return { value, render: () => view(value) };
+  return { value, render: (palette) => view(value, palette) };
 }
 
-/** The `--json` view. Indented, because a person reads this too when debugging. */
-export const asJson: View<unknown> = (value) => JSON.stringify(value, null, 2);
+/**
+ * The `--json` view. Indented, because a person reads this too when debugging.
+ *
+ * **Never coloured, and it does not take the palette to prove it.** `--json` is
+ * for a caller that is a program; an escape sequence inside a JSON string would
+ * be a bug in whatever parses it.
+ */
+export const asJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
 /**
  * The view for an act, as opposed to a question.
@@ -78,5 +93,13 @@ export const asJson: View<unknown> = (value) => JSON.stringify(value, null, 2);
  * mints something returns what it minted** — the verbs already do, and a CLI
  * printing "done" would put the caller back to searching for what they had
  * just made.
+ *
+ * **Never coloured, even in a terminal, and that is not an oversight.** This
+ * output is *data*: the whole of stdout is an id the next command consumes.
+ * Colouring it made `$(labkit criterion …)` capture
+ * `\u001b[36mCRIT_2\u001b[39m` under `FORCE_COLOR=1` — measured, not
+ * predicted — which turns a documented contract into something conditional on
+ * an environment variable. A report gets colour because a person reads it; a
+ * handle does not, because a shell does.
  */
 export const asHandles: View<readonly string[]> = (handles) => handles.join("\n");

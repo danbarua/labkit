@@ -6,6 +6,7 @@
  */
 
 import type { EnquiryRef, EnquiryStatus, QuestionOrigin, QuestionRef } from "../../domain";
+import type { Palette } from "../palette";
 import { bullets } from "./format";
 
 /**
@@ -22,25 +23,27 @@ import { bullets } from "./format";
  * promoted what it rests on, and a reader deciding whether to build on it
  * should not have to go and look.
  */
-export function renderEnquiry(status: EnquiryStatus): string {
+export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
   const q = status.question;
   const standing = !q
-    ? "no question behind this enquiry"
+    ? p.untested("no question behind this enquiry")
     : q.closure === "accepted-as-unresolved"
-      ? "open — accepted as unresolved, deliberately"
+      ? p.provisional("open — accepted as unresolved, deliberately")
       : q.open
-        ? "open"
-        : `closed — ${q.closure}`;
+        ? p.untested("open")
+        : p.settled(`closed — ${q.closure}`);
   return [
     // The enquiry first, because that is what was asked about. The question's
     // state is printed as the question's, not as this pursuit's -- PJ-030 §6:
     // flattened, every pursuit of an answered question read as answered itself.
-    `${status.pursuing}  (${status.enquiry})`,
+    `${p.heading(status.pursuing)}  ${p.handle(`(${status.enquiry})`)}`,
     status.contributed.length
       ? `  produced ${status.contributed.length} finding${status.contributed.length === 1 ? "" : "s"}`
-      : "  has produced nothing yet",
+      : `  ${p.untested("has produced nothing yet")}`,
     "",
-    q ? `Pursuing "${q.asks}"  (${q.question})` : "Pursuing nothing on the record",
+    q
+      ? `Pursuing "${q.asks}"  ${p.handle(`(${q.question})`)}`
+      : p.untested("Pursuing nothing on the record"),
     `  ${standing}`,
     q?.acceptedBecause ? `  accepted because: ${q.acceptedBecause}` : "",
     q?.reopensIf ? `  reopens if: ${q.reopensIf}` : "",
@@ -63,15 +66,15 @@ export function renderEnquiry(status: EnquiryStatus): string {
     .join("\n");
 }
 
-export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef): string {
+export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef, p: Palette): string {
   return [
-    `Lines of enquiry pursuing ${question}`,
+    p.heading(`Lines of enquiry pursuing ${p.handle(question)}`),
     bullets(
-      [...enquiries],
-      "none — the question is on the books and nothing has been started on it",
+      enquiries.map((e) => p.handle(e)),
+      p.untested("none — the question is on the books and nothing has been started on it"),
     ),
     "",
-    "`labkit enquiry <id>` says whether one is still open and what it has produced.",
+    p.quiet("`labkit enquiry <id>` says whether one is still open and what it has produced."),
   ].join("\n");
 }
 
@@ -86,25 +89,29 @@ export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef): 
  * now — that is the whole of S-1, and the line says so, because a reader who
  * assumes it is current will read later evidence into an earlier decision.
  */
-export function renderOrigin(origin: QuestionOrigin | null, question: QuestionRef): string {
+export function renderOrigin(
+  origin: QuestionOrigin | null,
+  question: QuestionRef,
+  p: Palette,
+): string {
   if (!origin)
     return [
-      `${question} was posed directly.`,
+      `${p.handle(question)} was posed directly.`,
       "",
-      "That is an answer, not a gap: only a question sharpened from an earlier",
-      "one has an origin on the record.",
+      p.quiet("That is an answer, not a gap: only a question sharpened from an earlier"),
+      p.quiet("one has an origin on the record."),
     ].join("\n");
   return [
-    `${question} narrowed "${origin.fromAsks}"  (${origin.from})`,
+    `${p.handle(question)} narrowed "${origin.fromAsks}"  ${p.handle(`(${origin.from})`)}`,
     `  because: ${origin.reason}`,
     "",
-    "Known at that moment",
+    p.heading("Known at that moment"),
     bullets(
-      origin.knownAtTheTime.map((f) => `${f.states}  (${f.evidence})`),
-      "nothing",
+      origin.knownAtTheTime.map((f) => `${f.states}  ${p.handle(`(${f.evidence})`)}`),
+      p.untested("nothing"),
     ),
     "",
-    "Frozen when the sharpening was recorded, not recomputed now. Evidence that",
-    "arrived later is deliberately absent from this list.",
+    p.quiet("Frozen when the sharpening was recorded, not recomputed now. Evidence that"),
+    p.quiet("arrived later is deliberately absent from this list."),
   ].join("\n");
 }

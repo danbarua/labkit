@@ -26,11 +26,17 @@ import type { Globals, Run } from "./session";
  * of those once already.
  */
 export function globalOptions(program: Command): Command {
-  return program
-    .option("--tenant <slug>", "which tenant to read or write", "labkit")
-    .option("--db <dir>", "the directory holding .labkit/ (default: $LABKIT_HOME, else cwd)")
-    .option("--author <name>", "who to attribute writes to (default: your username)")
-    .option("--json", "emit the report as JSON instead of prose");
+  return (
+    program
+      .option("--tenant <slug>", "which tenant to read or write", "labkit")
+      .option("--db <dir>", "the directory holding .labkit/ (default: $LABKIT_HOME, else cwd)")
+      .option("--author <name>", "who to attribute writes to (default: your username)")
+      .option("--json", "emit the report as JSON instead of prose")
+      // Negatable, so the flag reads as `--no-ansi` and defaults on. It only
+      // subtracts: colour is off already when stdout is not a terminal or
+      // `NO_COLOR` is set, and `--json` is never coloured at all.
+      .option("--no-ansi", "never colour the output")
+  );
 }
 
 /** Reads the parsed global options back off the root, for {@link runner}. */

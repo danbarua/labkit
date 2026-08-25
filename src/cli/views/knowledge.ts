@@ -18,50 +18,53 @@ import type {
   QuestionStanding,
   SupportExplanation,
 } from "../../domain";
+import type { Palette } from "../palette";
 import { allOf, bullets, questionLines } from "./format";
 
-export function renderKnown(survey: KnowledgeSurvey): string {
+export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
   const all = allOf(survey as unknown as { [k: string]: unknown });
-  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, all), "nothing");
+  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, all, p), "nothing");
   return [
-    "Established",
+    // The five headings carry the distinction the buckets exist for, so they
+    // are coloured by what the bucket means rather than uniformly.
+    p.settled("Established"),
     list(survey.established),
     "",
-    "Provisional (resting on work nobody promoted)",
+    p.provisional("Provisional (resting on work nobody promoted)"),
     list(survey.provisional),
     "",
-    "Accepted as unresolved",
+    p.provisional("Accepted as unresolved"),
     list(survey.accepted),
     "",
-    "Unresolved (worked on, no answer yet)",
+    p.untested("Unresolved (worked on, no answer yet)"),
     list(survey.unresolved),
     "",
-    "Untested (nothing has been run against these)",
+    p.untested("Untested (nothing has been run against these)"),
     list(survey.untested),
   ].join("\n");
 }
 
-export function renderHistorical(survey: HistoricalSurvey): string {
+export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
   const all = allOf(survey as unknown as { [k: string]: unknown });
-  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, all), "nothing");
+  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, all, p), "nothing");
   return [
-    `As of ${survey.at}:`,
+    p.heading(`As of ${survey.at}:`),
     "",
-    "Established (resolved on a promoted finding)",
+    p.settled("Established (resolved on a promoted finding)"),
     list(survey.established),
     "",
-    "Provisional (resolved, but on unpromoted work)",
+    p.provisional("Provisional (resolved, but on unpromoted work)"),
     list(survey.provisional),
     "",
-    "Accepted as unresolved",
+    p.provisional("Accepted as unresolved"),
     list(survey.accepted),
     "",
-    "Open",
+    p.untested("Open"),
     list(survey.open),
     "",
-    "A question posed after this instant is absent, not open. `open` is not",
-    "split into worked-on and untouched: nothing records when work began, so",
-    "that cannot be placed in time.",
+    p.quiet("A question posed after this instant is absent, not open. `open` is not"),
+    p.quiet("split into worked-on and untouched: nothing records when work began, so"),
+    p.quiet("that cannot be placed in time."),
   ].join("\n");
 }
 
@@ -76,23 +79,30 @@ export function renderHistorical(survey: HistoricalSurvey): string {
  * findings — which is the S-12 distinction being lost at the transport
  * boundary, after the read surface had got it right.
  */
-export function renderWhy(why: SupportExplanation): string {
+export function renderWhy(why: SupportExplanation, p: Palette): string {
+  // Three ways to be unsupported, three colours: withdrawn and challenged are
+  // different states and the page has always said so in words.
   const verdict = why.supported
-    ? "supported"
+    ? p.settled("supported")
     : why.withdrawn
-      ? "NOT supported — withdrawn; the record no longer asserts this wording"
+      ? p.provisional("NOT supported — withdrawn; the record no longer asserts this wording")
       : why.challenged
-        ? "NOT supported — challenged by evidence bearing against it"
-        : "NOT supported";
+        ? p.contested("NOT supported — challenged by evidence bearing against it")
+        : p.untested("NOT supported");
   return [
-    `"${why.proposition}"`,
+    p.heading(`"${why.proposition}"`),
     `  ${verdict}, ${why.standing}`,
     why.promotedBecause ? `  promoted because: ${why.promotedBecause}` : "",
-    why.replacedBy ? `  replaced by: "${why.replacedBy.asserts}"  (${why.replacedBy.claim})` : "",
+    why.replacedBy
+      ? `  replaced by: "${why.replacedBy.asserts}"  ${p.handle(`(${why.replacedBy.claim})`)}`
+      : "",
     "",
-    "Resting on",
+    p.heading("Resting on"),
     bullets(
-      why.support.map((s) => `${s.finding}  (via ${s.method}, ${s.analysis})`),
+      why.support.map(
+        (s) =>
+          `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${p.handle(s.analysis)}${p.quiet(")")}`,
+      ),
       "nothing",
     ),
     why.against.length
@@ -146,15 +156,17 @@ export function renderWhy(why: SupportExplanation): string {
  * multiple case gets a sentence saying so, rather than a list a reader might
  * take for redundancy.
  */
-export function renderClaims(claims: ConcludedClaim[], proposition: string): string {
+export function renderClaims(claims: ConcludedClaim[], proposition: string, p: Palette): string {
   return [
-    `Claims asserting "${proposition}"`,
+    p.heading(`Claims asserting "${proposition}"`),
     bullets(
-      claims.map((c) => `${c.asserts}  (${c.claim})`),
-      "none — nothing on the record asserts this wording",
+      claims.map((c) => `${c.asserts}  ${p.handle(`(${c.claim})`)}`),
+      p.untested("none — nothing on the record asserts this wording"),
     ),
     claims.length > 1
-      ? "\nMore than one, and none of them is redundant: two lines of enquiry can\nassert the same sentence about different endpoints. Name the one you mean."
+      ? p.quiet(
+          "\nMore than one, and none of them is redundant: two lines of enquiry can\nassert the same sentence about different endpoints. Name the one you mean.",
+        )
       : "",
   ]
     .filter(Boolean)
@@ -170,26 +182,27 @@ export function renderClaims(claims: ConcludedClaim[], proposition: string): str
  * contradiction is precisely the defect the domain went to trouble to prevent
  * (S-5), so the word never appears for it.
  */
-export function renderConflict(verdict: ConflictVerdict): string {
+export function renderConflict(verdict: ConflictVerdict, p: Palette): string {
   const side = (s: ConflictSide): string =>
     [
-      `"${s.proposition}"  (${s.claim})`,
-      `  asking "${s.asks}"  (${s.question})`,
+      `"${s.proposition}"  ${p.handle(`(${s.claim})`)}`,
+      `  asking "${s.asks}"  ${p.handle(`(${s.question})`)}`,
       s.supportedBy.length
-        ? `  supported by: ${s.supportedBy.map((f) => f.states).join("; ")}`
+        ? `  ${p.settled("supported by")}: ${s.supportedBy.map((f) => f.states).join("; ")}`
         : "",
       s.challengedBy.length
-        ? `  challenged by: ${s.challengedBy.map((f) => f.states).join("; ")}`
+        ? `  ${p.contested("challenged by")}: ${s.challengedBy.map((f) => f.states).join("; ")}`
         : "",
     ]
       .filter(Boolean)
       .join("\n");
   const verdictLine: Record<ConflictVerdict["relation"], string> = {
-    contradiction: "Contradiction — these disagree, and about the same thing.",
-    dissociation:
+    contradiction: p.contested("Contradiction — these disagree, and about the same thing."),
+    dissociation: p.provisional(
       "Dissociation — these are about different things, so they do not disagree" +
-      (verdict.differsBy ? `; they differ by ${verdict.differsBy}.` : "."),
-    corroboration: "Corroboration — these agree.",
+        (verdict.differsBy ? `; they differ by ${verdict.differsBy}.` : "."),
+    ),
+    corroboration: p.settled("Corroboration — these agree."),
   };
   return [verdictLine[verdict.relation], "", verdict.sides.map(side).join("\n\n")].join("\n");
 }

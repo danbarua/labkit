@@ -266,6 +266,38 @@ keeps the stubs, because *which agent* and *which session* are facts the
 protocol does not carry. `--author` overrides the username, because a script
 driving LabKit is not the account it runs under.
 
+**Colour is a `Palette` a view is handed, never a module-level global**
+(`src/cli/palette.ts`). Members are named for the record's distinctions —
+`settled`, `contested`, `untested`, `provisional`, `handle`, `heading`, `quiet`
+— so a view says `p.contested(state)` and the colour choice lives in one file.
+`PLAIN` is the identity function, so a plain run and a coloured one differ by
+escape sequences and never by which branch rendered the page.
+
+It is a parameter because of what a global would cost: `bun test`'s stdout is
+not a terminal, so every fixture in `tests/cli/views.test.ts` would silently
+check the uncoloured path and nothing would check the other. They now render
+both and assert `stripped(coloured) === plain`.
+
+**A handle-only answer is never coloured, even in a terminal.** The whole of a
+write command's stdout is an id the next command consumes. Colouring it made
+`$(labkit criterion 'x')` capture an id wrapped in escape sequences under
+`FORCE_COLOR=1` — measured, not predicted — turning a documented contract into
+something conditional on an environment variable. A report gets colour because a
+person reads it; a handle does not, because a shell does.
+
+Two more things the tests caught rather than review:
+
+- **Pad before colouring, and pick the colour from the unpadded value.** An
+  escape sequence has length, so padding a coloured string pads bytes nobody can
+  see. The first version padded first and then matched on the padded string, so
+  `"failed             "` matched no case and every gate state came out the same
+  colour.
+- picocolors was chosen **by measurement**: under Bun 1.3.14, `node:util`'s
+  `styleText` writes escapes into a pipe and ignores `NO_COLOR` entirely, and
+  `ansis` writes escapes into a pipe with no environment variables set at all.
+  Either would have broken `$(labkit …)`. `--no-ansi` only ever subtracts, and
+  picocolors' own `isColorSupported` is reused rather than reimplemented.
+
 **`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
 the project root by another route. `derivePort` hashes that path, so a temporary
 directory gets its own file *and* its own port, which is what makes
