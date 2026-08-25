@@ -1,3 +1,5 @@
+import { labelForNaturalId, type NodeLabel } from "../db/domain";
+
 /**
  * What the domain layer hands back — research answers, not graph rows.
  *
@@ -7,14 +9,97 @@
  * the bullet. Nothing here mentions a node or edge label.
  */
 
-/** A handle a caller passes back in. Opaque: the id inside is LabKit's short natural id, never AGE's internal graphid. */
-export interface Ref<K extends string> {
-  readonly kind: K;
-  readonly id: string;
+declare const KIND: unique symbol;
+
+/**
+ * A handle a caller passes back in — LabKit's short natural id, and nothing
+ * else. Never AGE's internal graphid.
+ *
+ * **It *is* the id.** The brand exists only at compile time; at runtime a
+ * `GateRef` is the string `"GATE_1"`. That was `{ kind, id }` until 2026-08-24,
+ * and the change is not cosmetic — the object shape had two failure modes that
+ * a string does not, both of which shipped in the one commit that introduced it
+ * (PR #15):
+ *
+ * - **`===` was reference equality.** `left.enquiry === right.enquiry` compiled,
+ *   type-checked, and was false for the same enquiry. It reported two claims in
+ *   one line of enquiry as being in different ones, turning a contradiction into
+ *   a dissociation, and only S-5 caught it. Here `===` is value equality, and
+ *   comparing two *different* kinds is a compile error rather than a permanent
+ *   `false`.
+ * - **A handle bound as a Cypher parameter matched nothing.** Params are
+ *   `Record<string, unknown>`, so `{ id: gate }` where `{ id: gate.id }` was
+ *   meant type-checked and silently found no rows. Three of those shipped.
+ *   Here `{ id: gate }` is simply correct.
+ *
+ * The brand is **non-optional**, which is what makes this nominal: a plain
+ * `string` is not assignable to a `Ref`, and a `GateRef` is not assignable to a
+ * `ClaimRef`. {@link ref} is the only way to mint one.
+ *
+ * What it costs: `kind` is no longer a field to read at runtime. Nothing is
+ * lost, because it never was the source of truth — `createEdge` has always
+ * resolved an endpoint's label from the id's prefix, and
+ * `ref("claim", "GATE_1")` was constructible under the old shape.
+ * Here that state cannot be written down.
+ */
+export type Ref<K extends string> = string & { readonly [KIND]: K };
+
+/**
+ * Which node label each handle kind names.
+ *
+ * Needed because the kinds are **research concepts, not labels** — a caller
+ * says *analysis* and means a `Computation`, *observations* and means an
+ * `Artefact`, *work* and means a `Task`. Five of the thirteen differ, so the
+ * mapping has to be written down rather than derived from the name.
+ */
+export const LABEL_BY_KIND: Record<string, NodeLabel> = {
+  question: "Question",
+  enquiry: "LineOfEnquiry",
+  unit: "EvidenceUnit",
+  evidence: "Evidence",
+  claim: "Claim",
+  decision: "Decision",
+  criterion: "Criterion",
+  evaluation: "CriterionEvaluation",
+  gate: "Gate",
+  review: "Review",
+  observations: "Artefact",
+  analysis: "Computation",
+  work: "Task",
+};
+
+/**
+ * Builds a handle, and **refuses one whose id does not match its kind**.
+ *
+ * The check is new with the branded form and is the point of keeping `kind` as
+ * an argument at all. Under `{ kind, id }` the two halves could disagree and
+ * nothing noticed; here they cannot disagree in the type, and this stops them
+ * disagreeing at the moment of minting. It costs one prefix lookup at each of
+ * the ~97 sites that mint a handle.
+ *
+ * It throws rather than returning a result type: every caller is inside the
+ * domain layer, mints from a `natural_id` it just read out of the graph, and
+ * has no sensible recovery. A throw here means the graph returned something the
+ * label it was matched on says it cannot be.
+ */
+export function isRefOfKind(kind: string, id: string): boolean {
+  const expected = LABEL_BY_KIND[kind];
+  if (!expected) return true;
+  try {
+    return labelForNaturalId(id) === expected;
+  } catch {
+    // An unrecognised prefix is not this kind either, and at the MCP boundary
+    // that has to be a `false` rather than a throw -- zod turns a `false` into
+    // a message naming the field, and a throw into a crash.
+    return false;
+  }
 }
 
-/** Builds a handle. Terser than the literal at the ~40 sites that mint one. */
-export const ref = <K extends string>(kind: K, id: string): Ref<K> => ({ kind, id });
+export const ref = <K extends string>(kind: K, id: string): Ref<K> => {
+  if (!isRefOfKind(kind, id))
+    throw new Error(`${kind} handle expected a ${LABEL_BY_KIND[kind]} id, got "${id}"`);
+  return id as Ref<K>;
+};
 
 export type ObservationsRef = Ref<"observations">;
 export type QuestionRef = Ref<"question">;

@@ -196,9 +196,9 @@ describe("S-17: does the guard actually guard?", () => {
     const { gate, criterion } = await aDeclaredButUnevaluatedGate();
 
     const governing = await session.criteriaGoverning(gate);
-    expect(governing.map((c) => c.id)).toEqual([criterion.id]);
+    expect(governing.map((c) => c)).toEqual([criterion]);
 
     const durable = await (await afterwards()).criteriaGoverning(gate);
-    expect(durable.map((c) => c.id)).toEqual([criterion.id]);
+    expect(durable.map((c) => c)).toEqual([criterion]);
   });
 });

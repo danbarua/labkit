@@ -141,6 +141,6 @@ describe("S-10b: the same inputs, in a different order", () => {
     // calls it a re-verification of the original finding. Nothing on the
     // surface distinguishes it from a re-run in the same order -- which is the
     // absence, stated once more from a second reader.
-    expect(first.id).not.toEqual(second.id);
+    expect(first).not.toEqual(second);
   });
 });

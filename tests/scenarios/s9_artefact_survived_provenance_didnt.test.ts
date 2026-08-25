@@ -294,7 +294,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
 
     const reader = await afterwards();
     // What S-9 did establish, and all this test claims to pin:
-    expect(regenerated.id).not.toBe(original.id);
+    expect(regenerated).not.toBe(original);
     expect((await reader.whatDependsOn(regenerated)).claims).toEqual([]);
     expect((await reader.whatDependsOn(original)).claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
   });

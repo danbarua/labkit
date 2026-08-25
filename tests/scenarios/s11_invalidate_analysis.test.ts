@@ -127,11 +127,11 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // act, so reporting those as unchanged would call a withdrawn record
     // current. `changed.was` names the superseded one, and the two sets are
     // disjoint even though every sentence appears in both.
-    const minted = new Set(report.claims.map((c) => c.claim.id));
-    const superseded = new Set(report.affected.map((a) => a.claim.id));
-    for (const u of report.unchanged) expect(minted.has(u.claim.id)).toBe(true);
-    expect(minted.has(report.changed[0]!.claim.id)).toBe(true);
-    expect(superseded.has(report.changed[0]!.was.id)).toBe(true);
+    const minted = new Set(report.claims.map((c) => c.claim));
+    const superseded = new Set(report.affected.map((a) => a.claim));
+    for (const u of report.unchanged) expect(minted.has(u.claim)).toBe(true);
+    expect(minted.has(report.changed[0]!.claim)).toBe(true);
+    expect(superseded.has(report.changed[0]!.was)).toBe(true);
     expect([...minted].some((id) => superseded.has(id))).toBe(false);
   });
 
@@ -164,8 +164,8 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // even if the query had returned the replacement's claims instead of the
     // superseded ones, which after a replacement assert every one of these.
     const downstream = await session.whatDependsOn("bootstrap-pairwise output");
-    expect(downstream.claims.map((c) => c.claim.id).sort()).toEqual(
-      report.affected.map((a) => a.claim.id).sort(),
+    expect(downstream.claims.map((c) => c.claim).sort()).toEqual(
+      report.affected.map((a) => a.claim).sort(),
     );
   });
 
@@ -182,7 +182,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    expect(report.unaffected.map((u) => u.what.id)).toContain(observations.id);
+    expect(report.unaffected.map((u) => u.what)).toContain(observations);
 
     // Durable check: the replacement conclusion still rests on the same
     // observations, and those observations were never invalidated.
@@ -356,7 +356,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     expect(replacement).toHaveLength(1);
     expect(replacement[0]!.at).toBe(FIXED_NOW);
     expect(replacement[0]!.detail).toMatchObject({
-      supersedes: analysis.id,
+      supersedes: analysis,
       changed: ["T beats rewired"],
     });
 

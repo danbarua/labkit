@@ -22,6 +22,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink, type QuestionRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
+import { ref } from "../../src/domain/report";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -118,9 +119,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // LabKit:     nonlinearity is established; the smear question is
     //             unresolved; external task utility has not been tested.
     const known = await session.whatIsKnown();
-    expect(known.established.map((q) => q.question.id)).toEqual([prior.nonlinearity.id]);
-    expect(known.unresolved.map((q) => q.question.id)).toContain(prior.smear.id);
-    expect(known.untested.map((q) => q.question.id)).toContain(prior.utility.id);
+    expect(known.established.map((q) => q.question)).toEqual([prior.nonlinearity]);
+    expect(known.unresolved.map((q) => q.question)).toContain(prior.smear);
+    expect(known.untested.map((q) => q.question)).toContain(prior.utility);
 
     // Researcher: fine. Let's pursue whether different inputs map to
     //             reproducibly different internal responses.
@@ -130,7 +131,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
       because: "the vague form is not testable; this one names what would count as an answer",
     });
 
-    expect(sharper.id).not.toBe(hunch.id);
+    expect(sharper).not.toBe(hunch);
   });
 
   /**
@@ -144,17 +145,17 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const prior = await priorState();
 
     const known = await session.whatIsKnown();
-    const ids = (qs: Array<{ question: { id: string } }>) => qs.map((q) => q.question.id);
+    const ids = (qs: Array<{ question: string }>) => qs.map((q) => q.question);
 
-    expect(ids(known.established)).toContain(prior.nonlinearity.id);
-    expect(ids(known.unresolved)).toContain(prior.smear.id);
-    expect(ids(known.untested)).toContain(prior.utility.id);
+    expect(ids(known.established)).toContain(prior.nonlinearity);
+    expect(ids(known.unresolved)).toContain(prior.smear);
+    expect(ids(known.untested)).toContain(prior.utility);
 
     // The three buckets are disjoint -- an entry appearing in two of them
     // would mean the reader is guessing.
-    expect(ids(known.unresolved)).not.toContain(prior.utility.id);
-    expect(ids(known.established)).not.toContain(prior.smear.id);
-    expect(ids(known.untested)).not.toContain(prior.smear.id);
+    expect(ids(known.unresolved)).not.toContain(prior.utility);
+    expect(ids(known.established)).not.toContain(prior.smear);
+    expect(ids(known.untested)).not.toContain(prior.smear);
 
     // Untested is not failure and not a negative result. The disjointness
     // above is what carries that; this pins the weaker companion claim -- that
@@ -190,7 +191,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(stronger.question!.closure).toBeNull();
 
     const known = await session.whatIsKnown();
-    expect(known.unresolved.map((q) => q.question.id)).toContain(prior.smear.id);
+    expect(known.unresolved.map((q) => q.question)).toContain(prior.smear);
   });
 
   /**
@@ -209,20 +210,20 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     });
 
     const origin = await session.originOf(sharper);
-    expect(origin?.from.id).toBe(hunch.id);
+    expect(origin?.from).toBe(hunch);
     expect(origin?.reason).toContain("not testable");
 
     // From a second reader: the original still asks what it originally asked.
     const later = new ResearchSession(await scenario.current(), { clock });
     const durable = await later.originOf(sharper);
-    expect(durable?.from.id).toBe(hunch.id);
+    expect(durable?.from).toBe(hunch);
     expect(durable?.fromAsks).toBe("is the learned topology doing something computationally interesting?");
 
     // Narrowing is not answering. Nothing has been shown about the hunch, so
     // it is still on the books untested -- not established, and not a failure.
     const known = await later.whatIsKnown();
-    expect(known.established.map((q) => q.question.id)).not.toContain(hunch.id);
-    expect(known.untested.map((q) => q.question.id)).toContain(hunch.id);
+    expect(known.established.map((q) => q.question)).not.toContain(hunch);
+    expect(known.untested.map((q) => q.question)).toContain(hunch);
     expect(known.untested.map((q) => q.asks)).toContain("is the learned topology doing something computationally interesting?");
   });
 
@@ -298,7 +299,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     await priorState();
     const before = await session.whatIsKnown();
 
-    const absent: QuestionRef = { kind: "question", id: "Q_404" };
+    const absent: QuestionRef = ref("question", "Q_404");
 
     // The message is the assertion. Sharpening a missing question would fail
     // either way -- but failing on the *second* write, when the narrowing edge
@@ -312,12 +313,12 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const later = new ResearchSession(await scenario.current(), { clock });
     const after = await later.whatIsKnown();
     const census = (k: Awaited<ReturnType<typeof later.whatIsKnown>>) =>
-      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question.id).sort();
+      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question).sort();
     expect(census(after)).toEqual(census(before));
 
     // Nothing on the record cites the sharpening that never happened.
     for (const question of census(after)) {
-      const origin = await later.originOf({ kind: "question", id: question });
+      const origin = await later.originOf(ref("question", question));
       expect(origin?.reason).not.toBe("it should not get this far");
     }
   });
@@ -334,16 +335,16 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const byMapping = await session.pursue({ question, approach: "response-map separation" });
     const byProbe = await session.pursue({ question, approach: "response-map separation, probe variant" });
 
-    expect(byMapping.id).not.toBe(byProbe.id);
+    expect(byMapping).not.toBe(byProbe);
 
     const later = new ResearchSession(await scenario.current(), { clock });
     const pursuits = await later.pursuitsOf(question);
-    expect(pursuits.map((p) => p.id).sort()).toEqual([byMapping.id, byProbe.id].sort());
+    expect(pursuits.map((p) => p).sort()).toEqual([byMapping, byProbe].sort());
 
     // One question on the books, not two.
     const known = await later.whatIsKnown();
     const all = [...known.established, ...known.unresolved, ...known.untested];
-    expect(all.filter((q) => q.question.id === question.id)).toHaveLength(1);
+    expect(all.filter((q) => q.question === question)).toHaveLength(1);
   });
 
   test("two questions worded identically are two questions", async () => {
@@ -351,7 +352,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const first = await session.pose(wording);
     const second = await session.pose(wording);
 
-    expect(second.id).not.toBe(first.id);
+    expect(second).not.toBe(first);
 
     const later = new ResearchSession(await scenario.current(), { clock });
     const known = await later.whatIsKnown();

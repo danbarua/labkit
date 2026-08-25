@@ -485,14 +485,27 @@ by `bun run check:no-stringly-typed`. A parameter either names a record — a
 taxonomy aliases. The taxonomy is what makes the rule satisfiable: without
 somewhere to put `pose(question: Prose)` there would be no answer for it.
 
-**Two things that rule cannot catch, both of which shipped while it was being
-written.** Cypher params are `Record<string, unknown>`, so `{ id: gate }` where
-`{ id: gate.id }` was meant compiles, binds a `{kind, id}` object as the
-parameter and matches nothing — three of those, all found by tests. And `Ref` is
-an object, so `left.enquiry === right.enquiry` is reference equality, always
-false, and type-correct; that turned a contradiction into a dissociation until
-S-5 caught it. **Compare `.id`, never handles.** A signature rule buys
-signatures; the bodies still need tests.
+**A handle is a branded string: `Ref<K> = string & { [KIND]: K }`.** It *is* the
+natural id, and the brand exists only at compile time. It was `{kind, id}` for
+one day, and both of that shape's failure modes shipped in the commit that
+introduced it: a handle bound as a Cypher param matched nothing (params are
+`Record<string, unknown>`, so `{ id: gate }` type-checks), and
+`left.enquiry === right.enquiry` was reference equality — always false,
+type-correct, and it turned a contradiction into a dissociation until S-5 caught
+it. Neither is expressible now.
+
+**The branded form has one failure mode of its own, and it is the mirror
+image.** A `string | Ref` union is invisible at runtime, so
+`typeof subject === "string"` is true for *both* arms — `whatDependsOn` sent
+every handle off to be looked up by logical name and threw `no artefact named
+"ART_21"`. **Discriminate on the prefix, never on `typeof`**: `isRefOfKind()`
+(`src/domain/report.ts`) asks whether an id's prefix names the label a kind
+expects, which is the same question `ref()` asks when minting and the same one
+`createEdge` has always asked of an endpoint.
+
+`ref(kind, id)` **refuses a mismatch** — `ref("gate", "CLM_1")` throws. That is
+what replaced the `kind` field, and it checks more: the field only recorded what
+a caller *said*, and could contradict the id beside it.
 
 **Every handle in a report is a `Ref`, and every verb takes one.** A value read
 out of a report goes straight back into a verb — `gateStatus().gate` into

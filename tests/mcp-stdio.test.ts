@@ -31,6 +31,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+/**
+ * A handle out of a tool's reply.
+ *
+ * A tool whose whole answer is one handle returns it under a field named for
+ * what it is — `{"question": "Q_1"}` — because MCP's `structuredContent` must
+ * be an object and a handle is a bare string now. This takes that sole value.
+ */
+const id = (v: unknown): string =>
+  // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
+  // reaches the server as a handle and is refused there -- loudly, but two
+  // layers from the mistake.
+  typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
+
 const SERVER = join(import.meta.dir, "..", "src", "mcp", "server.ts");
 
 let workdir: string;
@@ -72,8 +85,8 @@ test("it writes, and then reads back what it wrote", async () => {
   });
   expect(opened.isError ?? false).toBe(false);
   const enquiry = opened.structuredContent as { kind: string; id: string };
-  expect(enquiry.kind).toBe("enquiry");
-  expect(enquiry.id.startsWith("LOE_")).toBe(true);
+  expect(id(enquiry)).toMatch(/^LOE_/);
+  expect(id(enquiry).startsWith("LOE_")).toBe(true);
 
   // Read back through a different tool, so the answer comes from the graph
   // rather than from the value the write returned.

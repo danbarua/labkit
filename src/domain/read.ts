@@ -60,7 +60,7 @@ import type {
   IdentifiedArtefact,
   SupportExplanation,
 } from "./report";
-import { ref } from "./report";
+import { ref, isRefOfKind } from "./report";
 import { SessionCore } from "./core";
 
 /** Every node carries a natural id; this is how a projection asks for it. */
@@ -84,10 +84,10 @@ export class ReadSurface extends SessionCore {
     const rows = await this.graph.query(
       `MATCH (:Question {natural_id: $id})-[:MOTIVATES]->(loe:LineOfEnquiry) RETURN loe`,
       { loe: vertexProps<{ natural_id: string }>() },
-      { id: question.id },
+      { id: question },
     );
     return rows.map(
-      (r) => ({ kind: "enquiry", id: r.loe.natural_id }) as EnquiryRef,
+      (r) => (ref("enquiry", r.loe.natural_id)) as EnquiryRef,
     );
   }
 
@@ -107,7 +107,7 @@ export class ReadSurface extends SessionCore {
         d: vertexProps<{ natural_id: string; reason: string }>(),
         origin: vertexProps<{ natural_id: string; name: string }>(),
       },
-      { id: question.id },
+      { id: question },
     );
     if (rows.length === 0) return null;
 
@@ -124,8 +124,8 @@ export class ReadSurface extends SessionCore {
       reason: row.d.reason,
       knownAtTheTime: dedupeById(
         knew.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
-        (f) => f.evidence.id,
-      ).sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
+        (f) => f.evidence,
+      ).sort((a, b) => a.evidence.localeCompare(b.evidence)),
     };
   }
 
@@ -320,10 +320,10 @@ export class ReadSurface extends SessionCore {
     const named = await this.graph.query(
       `MATCH (loe:LineOfEnquiry {natural_id: $id}) RETURN loe`,
       { loe: vertexProps<{ name: string }>() },
-      { id: enquiry.id },
+      { id: enquiry },
     );
     const loe = named[0];
-    if (!loe) throw new Error(`no enquiry ${enquiry.id}`);
+    if (!loe) throw new Error(`no enquiry ${enquiry}`);
 
     // Closure attaches to the question the enquiry pursues, not to the
     // enquiry itself -- an enquiry is a way of pursuing a question, and it is
@@ -338,7 +338,7 @@ export class ReadSurface extends SessionCore {
         resolving: optional(vertexProps<{ natural_id: string }>()),
         deferring: optional(vertexProps<{ natural_id: string; reason: string; invalidation_check: string }>()),
       },
-      { id: enquiry.id },
+      { id: enquiry },
     );
 
     // What this pursuit itself produced. Evidence units address the line of
@@ -350,11 +350,11 @@ export class ReadSurface extends SessionCore {
        MATCH (u)-[:PRODUCES]->(e:Evidence)
        RETURN e`,
       { e: vertexProps<{ statement: string } & Identified>() },
-      { id: enquiry.id },
+      { id: enquiry },
     );
     const contributed = dedupeById(
       mine.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
-      (f) => f.evidence.id,
+      (f) => f.evidence,
     );
 
     // Identity and wording, kept apart. The old line was
@@ -406,7 +406,7 @@ export class ReadSurface extends SessionCore {
           answer: null,
           evidence: dedupeById(
             inLightOf.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
-            (f) => f.evidence.id,
+            (f) => f.evidence,
           ),
           acceptedBecause: accepting.reason,
           reopensIf: accepting.invalidation_check,
@@ -489,7 +489,7 @@ export class ReadSurface extends SessionCore {
         answer: challenges ? "no" : "yes",
         evidence: dedupeById(
           cited.map((r) => ({ evidence: ref("evidence", r.e.natural_id), states: r.e.statement })),
-          (f) => f.evidence.id,
+          (f) => f.evidence,
         ),
         restsOn: promoted.some((r) => (r.sc ?? r.cc)?.kind === "confirmatory")
           ? "confirmatory"
@@ -542,10 +542,10 @@ export class ReadSurface extends SessionCore {
           mayRead: string[];
         }>(),
       },
-      { id: work.id },
+      { id: work },
     );
     const task = rows[0]?.t;
-    if (!task) throw new Error(`no planned work ${work.id}`);
+    if (!task) throw new Error(`no planned work ${work}`);
 
     // No fallback, and that is checked rather than assumed. `planWork` writes
     // `mayRead: input.mayRead ?? []`, so the property is always present and an
@@ -579,12 +579,9 @@ export class ReadSurface extends SessionCore {
     const rows = await this.graph.query(
       `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
-      { id: gate.id },
+      { id: gate },
     );
-    return rows.map((r) => ({
-      kind: "criterion" as const,
-      id: r.c.natural_id,
-    }));
+    return rows.map((r) => ref("criterion", r.c.natural_id));
   }
 
   /**
@@ -605,16 +602,16 @@ export class ReadSurface extends SessionCore {
         old: vertexProps<{ natural_id: string }>(),
         oldcomp: vertexProps<{ natural_id: string; kind: string }>(),
       },
-      { id: verification.id },
+      { id: verification },
     );
     const found = link[0];
     if (!found)
-      throw new Error(`analysis ${verification.id} re-verifies nothing`);
+      throw new Error(`analysis ${verification} re-verifies nothing`);
 
     const method = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ kind: string }>() },
-      { id: verification.id },
+      { id: verification },
     );
 
     // Keyed by natural id, never by `logical_name`. Two runs can each record
@@ -661,7 +658,7 @@ export class ReadSurface extends SessionCore {
         bySubject: new Map(rows.map((r) => [r.a.natural_id, identify(r.a)])),
       };
     };
-    const mine = await inputs(verification.id);
+    const mine = await inputs(verification);
     const theirs = await inputs(found.oldcomp.natural_id);
     const mineBy = mine.bySubject;
     const theirsBy = theirs.bySubject;
@@ -694,7 +691,7 @@ export class ReadSurface extends SessionCore {
     // Sorted by name then identity: the name is what a reader scans, and the
     // identity is what breaks the tie when two inputs share one (S-10c).
     differs.sort(
-      (a, b) => a.what.name.localeCompare(b.what.name) || a.what.part.id.localeCompare(b.what.part.id),
+      (a, b) => a.what.name.localeCompare(b.what.name) || a.what.part.localeCompare(b.what.part),
     );
 
     // Which way each run cut, read from the bearing each finding was recorded
@@ -753,10 +750,10 @@ export class ReadSurface extends SessionCore {
         c: vertexProps<{ natural_id: string; proposition: string }>(),
         d: optional(vertexProps<{ natural_id: string }>()),
       },
-      { id: gate.id },
+      { id: gate },
     );
     if (conditions.length === 0)
-      throw new Error(`gate ${gate.id} is governed by no condition`);
+      throw new Error(`gate ${gate} is governed by no condition`);
 
     const changedBy = new Map<string, string>(); // decision -> criterion it replaced
     const propositionOf = new Map<string, string>();
@@ -773,7 +770,7 @@ export class ReadSurface extends SessionCore {
     const inForce = [...new Set(current)];
     if (inForce.length !== 1) {
       throw new Error(
-        `gate ${gate.id} has ${inForce.length} conditions in force; a design history needs exactly one`,
+        `gate ${gate} has ${inForce.length} conditions in force; a design history needs exactly one`,
       );
     }
 
@@ -786,10 +783,10 @@ export class ReadSurface extends SessionCore {
         : ("mechanical" as const);
 
     const amendments: AmendmentRecord[] = chain.map((step, i) => {
-      const wasCriterion = changedBy.get(step.decision.id);
+      const wasCriterion = changedBy.get(step.decision);
       const nextCriterion =
         i + 1 < chain.length
-          ? changedBy.get(chain[i + 1]!.decision.id)
+          ? changedBy.get(chain[i + 1]!.decision)
           : inForce[0];
       return {
         amendment: step.decision,
@@ -838,7 +835,7 @@ export class ReadSurface extends SessionCore {
         older: optional(vertexProps<{ natural_id: string }>()),
         e: optional(vertexProps<{ statement: string } & Identified>()),
       },
-      { id: gate.id },
+      { id: gate },
     );
 
     const nodes = new Map<
@@ -875,7 +872,7 @@ export class ReadSurface extends SessionCore {
       ordered.push({
         decision: ref("decision", cursor),
         reason: node.reason,
-        citing: [...node.citing.values()].sort((a, b) => a.evidence.id.localeCompare(b.evidence.id)),
+        citing: [...node.citing.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
       });
       cursor = followedBy.get(cursor);
     }
@@ -886,7 +883,7 @@ export class ReadSurface extends SessionCore {
     // refuses to render.
     if (ordered.length !== nodes.size) {
       throw new Error(
-        `gate ${gate.id} has ${nodes.size} amendments but only ${ordered.length} form a chain; its history is not a single line`,
+        `gate ${gate} has ${nodes.size} amendments but only ${ordered.length} form a chain; its history is not a single line`,
       );
     }
     return ordered;
@@ -903,10 +900,10 @@ export class ReadSurface extends SessionCore {
     const declared = await this.graph.query(
       `MATCH (g:Gate {natural_id: $id}) RETURN g`,
       { g: vertexProps<{ consequence: string }>() },
-      { id: gate.id },
+      { id: gate },
     );
     const found = declared[0];
-    if (!found) throw new Error(`no gate ${gate.id}`);
+    if (!found) throw new Error(`no gate ${gate}`);
 
     // Every governing criterion with the evaluations that pertain to THIS
     // gate. Two scopes are deliberately kept apart, and S-17 plus S-3
@@ -942,7 +939,7 @@ export class ReadSurface extends SessionCore {
         basis: optional(vertexProps<{ statement: string } & Identified>()),
         basisout: optional(vertexProps<{ invalidated?: boolean }>()),
       },
-      { id: gate.id },
+      { id: gate },
     );
 
     const checks = this.checksFrom(rows);
@@ -972,13 +969,13 @@ export class ReadSurface extends SessionCore {
        MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
        RETURN ev`,
       { ev: vertexProps<{ outcome: "pass" | "fail" }>() },
-      { id: gate.id },
+      { id: gate },
     );
 
     const gating = await this.graph.query(
       `MATCH (:Gate {natural_id: $id})-[:GATES]->(w) RETURN w`,
       { w: vertexProps<{ objective?: string; kind?: string } & Identified>() },
-      { id: gate.id },
+      { id: gate },
     );
 
     return {
@@ -1055,7 +1052,7 @@ export class ReadSurface extends SessionCore {
       if (row.ev) {
         // One row per (evaluation, basis) pair, so an evaluation citing several
         // findings arrives more than once. Accumulate rather than push.
-        const seen = entry.evaluations.find((e) => e.evaluation.id === row.ev!.natural_id);
+        const seen = entry.evaluations.find((e) => e.evaluation === row.ev!.natural_id);
         const record = seen ?? {
           evaluation: ref("evaluation", row.ev.natural_id),
           criterion: ref("criterion", id),
@@ -1068,7 +1065,7 @@ export class ReadSurface extends SessionCore {
         };
         if (row.basis) {
           // By id, not by statement: two findings can say the same sentence.
-          if (!record.basis.some((b) => b.evidence.id === row.basis!.natural_id))
+          if (!record.basis.some((b) => b.evidence === row.basis!.natural_id))
             record.basis.push({ evidence: ref("evidence", row.basis.natural_id), states: row.basis.statement });
           record.cited += 1;
           if (!row.basisout?.invalidated) record.standing += 1;
@@ -1093,7 +1090,7 @@ export class ReadSurface extends SessionCore {
       value: e.value,
       outcome: e.outcome,
       at: e.at,
-      basis: [...e.basis].sort((x, y) => x.evidence.id.localeCompare(y.evidence.id)),
+      basis: [...e.basis].sort((x, y) => x.evidence.localeCompare(y.evidence)),
       // Present only when true, so a record that stands is byte-identical to
       // what it was before this field existed.
       ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
@@ -1105,7 +1102,7 @@ export class ReadSurface extends SessionCore {
       // identity. Without this, which evaluation gets reported as "the" value
       // of a check is not a stable contract between runs.
       const ordered = entry.evaluations.sort(
-        (a, b) => a.at.localeCompare(b.at) || a.evaluation.id.localeCompare(b.evaluation.id),
+        (a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation),
       );
 
       // A failure sticks -- among verdicts that still stand. One failing
@@ -1176,14 +1173,14 @@ export class ReadSurface extends SessionCore {
     // the other chain's claim and its decision. Same text is not same claim,
     // which is this repo's oldest lesson arriving from an external review.
     const proposition = await this.assertedBy(claim);
-    if (proposition === undefined) throw new Error(`no claim ${claim.id}`);
+    if (proposition === undefined) throw new Error(`no claim ${claim}`);
     const steps: Revision[] = [];
     let current: ConcludedClaim[] = [{ claim, asserts: proposition }];
 
     // Seeded with the entry claim now that it holds ids. It could not be while
     // it held wording -- a set of names cannot be primed with a claim -- so a
     // self-loop was caught one step late.
-    const seen = new Set<string>([claim.id]);
+    const seen = new Set<string>([claim]);
 
     for (;;) {
       const rows = await this.graph.query(
@@ -1198,7 +1195,7 @@ export class ReadSurface extends SessionCore {
           was: vertexProps<{ name: string } & Identified>(),
           nxt: vertexProps<{ name: string } & Identified>(),
         },
-        { ids: current.map((c) => c.claim.id) },
+        { ids: current.map((c) => c.claim) },
       );
       // One decision per step. This is now a real structural statement -- the
       // history is a line rather than a merge -- where the old `replaced.size`
@@ -1221,11 +1218,11 @@ export class ReadSurface extends SessionCore {
       ].map((was) => ({ claim: ref("claim", was.natural_id), asserts: was.name }));
 
       for (const w of withdrew) {
-        if (seen.has(w.claim.id))
+        if (seen.has(w.claim))
           throw new Error(
             `interpretation history for "${proposition}" loops at "${w.asserts}"`,
           );
-        seen.add(w.claim.id);
+        seen.add(w.claim);
       }
 
       steps.unshift({
@@ -1271,7 +1268,7 @@ export class ReadSurface extends SessionCore {
     // into a dissociation, silently. The compiler accepts it: both sides have
     // the same type. Caught by S-5, which exists to catch exactly the class of
     // error where two records are wrongly told apart or run together.
-    const sameScope = left!.enquiry.id === right!.enquiry.id;
+    const sameScope = left!.enquiry === right!.enquiry;
     if (!sameScope) {
       // Support for equivalence on one endpoint says nothing about another.
       // Identical wording does not make them one claim.
@@ -1303,7 +1300,7 @@ export class ReadSurface extends SessionCore {
     const asked = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id}) RETURN q`,
       { q: vertexProps<{ name: string } & Identified>() },
-      { id: enquiry.id },
+      { id: enquiry },
     );
 
     const scope = resolved;
@@ -1317,8 +1314,8 @@ export class ReadSurface extends SessionCore {
           evidence: ref("evidence", r.e.natural_id),
           states: r.e.statement,
         })),
-        (f) => f.evidence.id,
-      ).sort((a, b) => a.evidence.id.localeCompare(b.evidence.id));
+        (f) => f.evidence,
+      ).sort((a, b) => a.evidence.localeCompare(b.evidence));
 
     const claim = conclusion;
 
@@ -1413,7 +1410,7 @@ export class ReadSurface extends SessionCore {
           // in one line before row O: a finding superseded once was reported
           // once per review of its unit, each with a different reason, and the
           // reasons contradicted each other.
-          if (!superseded.some((x) => x.evidence.id === entry.evidence.id && x.bearing === bearing))
+          if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
             superseded.push({
               ...entry,
               bearing,
@@ -1426,7 +1423,7 @@ export class ReadSurface extends SessionCore {
           // A re-verification is not a second independent finding. Counting it
           // as one reported a proposition established once as corroborated
           // twice -- S-10, and the reason `REVERIFIES` exists.
-          if (!reverifiedBy.some((r) => r.analysis.id === row.comp.natural_id))
+          if (!reverifiedBy.some((r) => r.analysis === row.comp.natural_id))
             reverifiedBy.push({ analysis: ref("analysis", row.comp.natural_id), method: row.comp.kind });
         } else {
           live.push(entry);
@@ -1604,7 +1601,7 @@ export class ReadSurface extends SessionCore {
     analysis: AnalysisRef,
     rebuilt: Array<{ part: ObservationsRef; hash: IdentityString }>,
   ): Promise<ReproducibilityReport> {
-    const offered = new Map(rebuilt.map((r) => [r.part.id, r.hash]));
+    const offered = new Map<string, IdentityString>(rebuilt.map((r) => [r.part, r.hash]));
 
     // An absent subject and an empty one are different states, and answering
     // them alike is what let this report say `reproducible: true` about nothing
@@ -1614,14 +1611,14 @@ export class ReadSurface extends SessionCore {
     const subject = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
-      { id: analysis.id },
+      { id: analysis },
     );
-    if (subject.length === 0) throw new Error(`no analysis ${analysis.id}`);
+    if (subject.length === 0) throw new Error(`no analysis ${analysis}`);
 
     const parts = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
       { a: vertexProps<{ natural_id: string; logical_name: string; content_hash?: string }>() },
-      { id: analysis.id },
+      { id: analysis },
     );
 
     const exact: IdentifiedArtefact[] = [];
@@ -1648,7 +1645,7 @@ export class ReadSurface extends SessionCore {
     }
 
     const byName = (a: IdentifiedArtefact, b: IdentifiedArtefact) =>
-      a.name.localeCompare(b.name) || a.part.id.localeCompare(b.part.id);
+      a.name.localeCompare(b.name) || a.part.localeCompare(b.part);
     return {
       analysis,
       exact: exact.sort(byName),
@@ -1708,8 +1705,16 @@ export class ReadSurface extends SessionCore {
   async whatDependsOn(
     subject: IndexedString | ObservationsRef,
   ): Promise<DependencyReport> {
-    const start =
-      typeof subject === "string" ? (await this.artefactNamed(subject)).id : subject.id;
+    // **`typeof` cannot tell these apart any more, and that is the trap.** A
+    // handle is a branded string now, so `typeof subject === "string"` is true
+    // for both arms of the union and sent every handle off to be looked up by
+    // logical name -- which threw `no artefact named "ART_21"`. The union is
+    // real to the type system and invisible at runtime, so the discrimination
+    // has to read the value: `isRefOfKind` asks whether the id's own prefix
+    // names an Artefact, which is the same question `ref()` asks when minting.
+    const start = isRefOfKind("observations", subject)
+      ? (subject as ObservationsRef)
+      : await this.artefactNamed(subject);
 
     // Walk the pipeline downstream before asking what rests on it. An analysis
     // can read another analysis's output (row AE), so invalidating a raw input
@@ -1723,7 +1728,7 @@ export class ReadSurface extends SessionCore {
     // cycle terminates without silently truncating a legitimate long pipeline.
     const reached = new Set<string>([start]);
     for (let frontier = [start]; frontier.length > 0; ) {
-      const next: string[] = [];
+      const next: ObservationsRef[] = [];
       for (const id of frontier) {
         const downstream = await this.graph.query(
           `MATCH (:Artefact {natural_id: $id})<-[:CONSUMES]-(:Computation)-[:PRODUCES]->(out:Artefact)
@@ -1734,7 +1739,7 @@ export class ReadSurface extends SessionCore {
         for (const row of downstream) {
           if (reached.has(row.out.natural_id)) continue;
           reached.add(row.out.natural_id);
-          next.push(row.out.natural_id);
+          next.push(ref("observations", row.out.natural_id));
         }
       }
       frontier = next;
@@ -1749,8 +1754,8 @@ export class ReadSurface extends SessionCore {
     const enquiries = new Map<string, AffectedEnquiry>();
     for (const artefact of reached) {
       const { claims: c, enquiries: e } = await this.restingOnArtefact(ref("observations", artefact));
-      for (const found of c) claims.set(found.claim.id, found);
-      for (const found of e) enquiries.set(found.enquiry.id, found);
+      for (const found of c) claims.set(found.claim, found);
+      for (const found of e) enquiries.set(found.enquiry, found);
     }
 
     return {
@@ -1784,7 +1789,7 @@ export class ReadSurface extends SessionCore {
         challenged: optional(vertexProps<ClaimProps & Identified>()),
         loe: optional(vertexProps<{ name: string } & Identified>()),
       },
-      { id: artefact.id },
+      { id: artefact },
     );
 
     // The input side. Separate query rather than more OPTIONAL MATCHes on the
@@ -1802,7 +1807,7 @@ export class ReadSurface extends SessionCore {
         challenged: optional(vertexProps<ClaimProps & Identified>()),
         loe: optional(vertexProps<{ name: string } & Identified>()),
       },
-      { id: artefact.id },
+      { id: artefact },
     );
 
     const all = [...rows, ...consumers];

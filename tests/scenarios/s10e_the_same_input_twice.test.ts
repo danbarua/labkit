@@ -64,8 +64,8 @@ describe("S-10e — the same record, read twice by one run", () => {
     const later = new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
     const report = await later.reproductionOf(rerun.verification);
 
-    expect(report.ofRead.map((i) => i.part.id)).toEqual([series.id, series.id]);
-    expect(report.verificationRead.map((i) => i.part.id)).toEqual([series.id]);
+    expect(report.ofRead.map((i) => i.part)).toEqual([series, series]);
+    expect(report.verificationRead.map((i) => i.part)).toEqual([series]);
   });
 
   test("and the order of a repeat is kept, not just its count", async () => {

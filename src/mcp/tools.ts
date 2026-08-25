@@ -30,6 +30,7 @@
 
 import { z } from "zod";
 import type { ReadSurface, WriteSurface } from "../domain";
+import { ref } from "../domain/report";
 import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
   claimsAssertingSchema,
@@ -170,7 +171,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
     },
     outputSchema: supportExplanationSchema,
-    handler: (read, { claim }) => read.whySupported({ kind: "claim", id: claim }),
+    handler: (read, { claim }) => read.whySupported(ref("claim", claim)),
   }),
 
   tool({
@@ -186,7 +187,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     outputSchema: dependencyReportSchema,
     handler: (read, { artefact }) =>
       read.whatDependsOn(
-        artefact.startsWith(ARTEFACT_PREFIX) ? { kind: "observations", id: artefact } : artefact,
+        artefact.startsWith(ARTEFACT_PREFIX) ? ref("observations", artefact) : artefact,
       ),
   }),
 
@@ -198,7 +199,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "abandoned, or deliberately left open — with the answer and the evidence behind it.",
     inputSchema: { enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`) },
     outputSchema: enquiryStatusSchema,
-    handler: (read, { enquiry }) => read.enquiryStatus({ kind: "enquiry", id: enquiry }),
+    handler: (read, { enquiry }) => read.enquiryStatus(ref("enquiry", enquiry)),
   }),
 
   tool({
@@ -211,7 +212,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "so that is the handle, not the design's name.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
     outputSchema: designHistorySchema,
-    handler: (read, { gate }) => read.designHistory({ kind: "gate", id: gate }),
+    handler: (read, { gate }) => read.designHistory(ref("gate", gate)),
   }),
 
   tool({
@@ -224,7 +225,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "together — so every step names records, not a sentence.",
     inputSchema: { claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4`) },
     outputSchema: interpretationHistorySchema,
-    handler: (read, { claim }) => read.interpretationHistory({ kind: "claim", id: claim }),
+    handler: (read, { claim }) => read.interpretationHistory(ref("claim", claim)),
   }),
 
   tool({
@@ -239,7 +240,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "of the analysis that did the verifying, not the one being verified.",
     inputSchema: { analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`) },
     outputSchema: reproductionReportSchema,
-    handler: (read, { analysis }) => read.reproductionOf({ kind: "analysis", id: analysis }),
+    handler: (read, { analysis }) => read.reproductionOf(ref("analysis", analysis)),
   }),
 
   tool({
@@ -269,7 +270,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: { question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`) },
     outputSchema: pursuitsSchema,
     handler: async (read, { question }) => ({
-      enquiries: await read.pursuitsOf({ kind: "question", id: question }),
+      enquiries: await read.pursuitsOf(ref("question", question)),
     }),
   }),
 
@@ -284,7 +285,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: { question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`) },
     outputSchema: originOfSchema,
     handler: async (read, { question }) => ({
-      origin: await read.originOf({ kind: "question", id: question }),
+      origin: await read.originOf(ref("question", question)),
     }),
   }),
 
@@ -297,7 +298,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "look at, and nothing stops a computation reading elsewhere.",
     inputSchema: { work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1`) },
     outputSchema: taskContractSchema,
-    handler: (read, { work }) => read.contractFor({ kind: "work", id: work }),
+    handler: (read, { work }) => read.contractFor(ref("work", work)),
   }),
 
   tool({
@@ -309,7 +310,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
     outputSchema: criteriaGoverningSchema,
     handler: async (read, { gate }) => ({
-      criteria: await read.criteriaGoverning({ kind: "gate", id: gate }),
+      criteria: await read.criteriaGoverning(ref("gate", gate)),
     }),
   }),
 
@@ -323,7 +324,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "gate that failed and was re-checked does not read as though it never failed.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
     outputSchema: gateStatusSchema,
-    handler: (read, { gate }) => read.gateStatus({ kind: "gate", id: gate }),
+    handler: (read, { gate }) => read.gateStatus(ref("gate", gate)),
   }),
 
   tool({
@@ -341,7 +342,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: conflictVerdictSchema,
     handler: (read, { a, b }) =>
-      read.doTheseConflict({ kind: "claim", id: a }, { kind: "claim", id: b }),
+      read.doTheseConflict(ref("claim", a), ref("claim", b)),
   }),
 
   tool({
@@ -368,9 +369,9 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     outputSchema: reproducibilityReportSchema,
     handler: (read, { analysis, rebuilt }) =>
       read.reproducibilityOf(
-        { kind: "analysis", id: analysis },
+        ref("analysis", analysis),
         ((rebuilt ?? []) as Array<{ part: string; hash: string }>).map((r) => ({
-          part: { kind: "observations" as const, id: r.part },
+          part: ref("observations", r.part),
           hash: r.hash,
         })),
       ),
@@ -391,8 +392,8 @@ const OBSERVATIONS_PREFIX = ARTEFACT_PREFIX;
 
 /** One id from the wire, resolved to the ref kind its prefix names. */
 function inputRef(id: string): ObservationsRef | AnalysisRef {
-  if (id.startsWith(ANALYSIS_PREFIX)) return { kind: "analysis", id };
-  if (id.startsWith(OBSERVATIONS_PREFIX)) return { kind: "observations", id };
+  if (id.startsWith(ANALYSIS_PREFIX)) return ref("analysis", id);
+  if (id.startsWith(OBSERVATIONS_PREFIX)) return ref("observations", id);
   throw new Error(
     `\`${id}\` is neither observations (${OBSERVATIONS_PREFIX}\u2026) nor an analysis (${ANALYSIS_PREFIX}\u2026)`,
   );
@@ -422,7 +423,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "inconclusive result. Use `open_enquiry` instead to ask and start in one act.",
     inputSchema: { question: z.string().describe("the question, as asked") },
     outputSchema: questionRefSchema,
-    handler: (write, { question }) => write.pose(question),
+    handler: async (write, { question }) => ({ question: await write.pose(question) }),
   }),
 
   writeTool({
@@ -437,7 +438,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: enquiryRefSchema,
     handler: (write, { question, approach }) =>
-      write.pursue({ question: { kind: "question", id: question }, approach }),
+      write.pursue({ question: ref("question", question), approach }).then((enquiry) => ({ enquiry })),
   }),
 
   writeTool({
@@ -448,7 +449,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "a researcher who opened an enquiry did one thing.",
     inputSchema: { question: z.string().describe("the question, as asked") },
     outputSchema: enquiryRefSchema,
-    handler: (write, { question }) => write.openEnquiry(question),
+    handler: async (write, { question }) => ({ enquiry: await write.openEnquiry(question) }),
   }),
 
   writeTool({
@@ -471,11 +472,11 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: observationsRefSchema,
     handler: (write, { enquiry, name, finding, content_hash }) =>
       write.recordObservations({
-        enquiry: { kind: "enquiry", id: enquiry },
+        enquiry: ref("enquiry", enquiry),
         name,
         finding,
         ...(content_hash === undefined ? {} : { contentHash: content_hash }),
-      }),
+      }).then((observations) => ({ observations })),
   }),
 
   writeTool({
@@ -504,7 +505,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: recordedAnalysisSchema,
     handler: (write, { enquiry, method, from, concludes, implementing, held_to }) =>
       write.recordAnalysis({
-        enquiry: { kind: "enquiry", id: enquiry },
+        enquiry: ref("enquiry", enquiry),
         method,
         from: (from as string[]).map(inputRef),
         concludes: concludes as Array<{
@@ -513,10 +514,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           bearing?: "supports" | "challenges";
           standing?: "exploratory" | "confirmatory";
         }>,
-        ...(implementing === undefined ? {} : { implementing: { kind: "work" as const, id: implementing } }),
+        ...(implementing === undefined ? {} : { implementing: ref("work", implementing) }),
         ...(held_to === undefined
           ? {}
-          : { heldTo: (held_to as string[]).map((id) => ({ kind: "criterion" as const, id })) }),
+          : { heldTo: (held_to as string[]).map((id) => ref("criterion", id)) }),
       }),
   }),
 
@@ -538,10 +539,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: acknowledgementSchema,
     handler: async (write, { enquiry, answered_by }) => {
       await write.closeEnquiry({
-        enquiry: { kind: "enquiry", id: enquiry },
+        enquiry: ref("enquiry", enquiry),
         ...(answered_by === undefined
           ? {}
-          : { answeredBy: { kind: "claim" as const, id: answered_by } }),
+          : { answeredBy: ref("claim", answered_by) }),
       });
       return { ok: true as const, acted: enquiry };
     },
@@ -562,7 +563,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: questionRefSchema,
     handler: (write, { from, into, because }) =>
-      write.sharpen({ from: { kind: "question", id: from }, into, because }),
+      write.sharpen({ from: ref("question", from), into, because }).then((question) => ({ question })),
   }),
 
   writeTool({
@@ -577,7 +578,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: reviewRefSchema,
     handler: (write, { of, verdict }) =>
-      write.recordReview({ of: { kind: "analysis", id: of }, verdict }),
+      write.recordReview({ of: ref("analysis", of), verdict }).then((review) => ({ review })),
   }),
 
   writeTool({
@@ -601,7 +602,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         objective,
         acceptance,
         ...(may_read === undefined ? {} : { mayRead: may_read as string[] }),
-      }),
+      }).then((work) => ({ work })),
   }),
 
   writeTool({
@@ -613,7 +614,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "matters, which is a check nobody ran still counting against the finding it qualifies.",
     inputSchema: { proposition: z.string().describe("the condition, as a sentence") },
     outputSchema: criterionRefSchema,
-    handler: (write, { proposition }) => write.stateCriterion(proposition),
+    handler: async (write, { proposition }) => ({ criterion: await write.stateCriterion(proposition) }),
   }),
 
   writeTool({
@@ -633,10 +634,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: gateRefSchema,
     handler: (write, { governed_by, consequence, protecting }) =>
       write.declareGate({
-        governedBy: (governed_by as string[]).map((id) => ({ kind: "criterion" as const, id })),
+        governedBy: (governed_by as string[]).map((id) => ref("criterion", id)),
         consequence,
-        protecting: (protecting as string[]).map((id) => ({ kind: "work" as const, id })),
-      }),
+        protecting: (protecting as string[]).map((id) => ref("work", id)),
+      }).then((gate) => ({ gate })),
   }),
 
   writeTool({
@@ -659,11 +660,11 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: acknowledgementSchema,
     handler: async (write, { criterion, value, outcome, gate, citing }) => {
       await write.evaluateCriterion({
-        criterion: { kind: "criterion", id: criterion },
+        criterion: ref("criterion", criterion),
         value,
         outcome: outcome as "pass" | "fail",
-        ...(gate === undefined ? {} : { gate: { kind: "gate" as const, id: gate } }),
-        ...(citing === undefined ? {} : { citing: { kind: "claim" as const, id: citing } }),
+        ...(gate === undefined ? {} : { gate: ref("gate", gate) }),
+        ...(citing === undefined ? {} : { citing: ref("claim", citing) }),
       });
       return { ok: true as const, acted: criterion };
     },
@@ -690,8 +691,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: verificationReportSchema,
     handler: (write, { historical, enquiry, method, under, concludes }) =>
       write.reverify({
-        historical: { kind: "analysis", id: historical },
-        enquiry: { kind: "enquiry", id: enquiry },
+        historical: ref("analysis", historical),
+        enquiry: ref("enquiry", enquiry),
         method,
         under: (under as string[]).map(inputRef),
         concludes: concludes as {
@@ -720,10 +721,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: acknowledgementSchema,
     handler: async (write, { enquiry, because, until, in_light_of }) => {
       await write.acceptAsUnresolved({
-        enquiry: { kind: "enquiry", id: enquiry },
+        enquiry: ref("enquiry", enquiry),
         because,
         until,
-        inLightOf: { kind: "claim", id: in_light_of },
+        inLightOf: ref("claim", in_light_of),
       });
       return { ok: true as const, acted: enquiry };
     },
@@ -743,7 +744,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: acknowledgementSchema,
     handler: async (write, { claim, because }) => {
-      await write.promote({ claim: { kind: "claim", id: claim }, because });
+      await write.promote({ claim: ref("claim", claim), because });
       return { ok: true as const, acted: claim };
     },
   }),
@@ -766,10 +767,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: amendmentReportSchema,
     handler: (write, { criterion, now_requires, because, citing }) =>
       write.amendDesign({
-        criterion: { kind: "criterion", id: criterion },
+        criterion: ref("criterion", criterion),
         nowRequires: now_requires,
         because,
-        citing: { kind: "claim", id: citing },
+        citing: ref("claim", citing),
       }),
   }),
 
@@ -797,9 +798,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: replacementReportSchema,
     handler: (write, { supersedes, because, enquiry, method, from, concludes }) =>
       write.replaceAnalysis({
-        supersedes: { kind: "analysis", id: supersedes },
-        because: { kind: "review", id: because },
-        enquiry: { kind: "enquiry", id: enquiry },
+        supersedes: ref("analysis", supersedes),
+        because: ref("review", because),
+        enquiry: ref("enquiry", enquiry),
         method,
         from: (from as string[]).map(inputRef),
         concludes: concludes as Array<{
@@ -827,7 +828,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: reinterpretationReportSchema,
     handler: (write, { claim, as: narrower, because }) =>
       write.reinterpret({
-        of: { kind: "claim", id: claim },
+        of: ref("claim", claim),
         as: narrower,
         because,
       }),

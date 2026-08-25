@@ -181,7 +181,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         // is only the counter moving. What the comparison is for is whether
         // anything *else* differs.
         depends: normaliseIds(await reader.whatDependsOn(second)),
-        rebuilt: rebuilt.id.replace(/\d+/, "N"),
+        rebuilt: rebuilt.replace(/\d+/, "N"),
       };
     };
 

@@ -82,9 +82,21 @@ async function call(c: Client, name: string, args: Json): Promise<Json> {
   return result.structuredContent as Json;
 }
 
-const id = (v: unknown) => (v as { id: string }).id;
+/**
+ * A handle out of a tool's reply.
+ *
+ * It was `(v as { id: string }).id` while a handle was `{kind, id}` on the
+ * wire. It is the id itself now, and a tool whose whole answer is one handle
+ * returns it under a field named for what it is — `{"question": "Q_1"}` — so
+ * this takes the sole value of that object.
+ */
+const id = (v: unknown): string =>
+  // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
+  // reaches the server as a handle and is refused there -- loudly, but two
+  // layers from the mistake.
+  typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 const claimIn = (r: Json, asserts: string) =>
-  (r.claims as Array<{ claim: { id: string }; asserts: string }>).find((c) => c.asserts === asserts)!.claim.id;
+  (r.claims as Array<{ claim: string; asserts: string }>).find((c) => c.asserts === asserts)!.claim;
 
 describe("every tool answers when an agent actually calls it", () => {
   test("ask, sharpen, plan, gate, measure, conclude", async () => {
@@ -226,7 +238,7 @@ describe("every tool answers when an agent actually calls it", () => {
       const revisions = await call(c, "interpretation_history", { claim: narrowedClaim });
       expect((revisions.revisions as unknown[])).toHaveLength(1);
       const found = await call(c, "claims_asserting", { proposition: NARROWER });
-      expect((found.claims as Array<{ claim: { id: string } }>).map((x) => x.claim.id)).toEqual([narrowedClaim]);
+      expect((found.claims as Array<{ claim: string }>).map((x) => x.claim)).toEqual([narrowedClaim]);
 
       await call(c, "close_enquiry", { enquiry: id(enquiry), answered_by: narrowedClaim });
       const closed = await call(c, "enquiry_status", { enquiry: id(enquiry) });

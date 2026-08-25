@@ -84,8 +84,11 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
 
     expect(why.restingOn).toHaveLength(1);
     // The vocabulary is wrong and the wording is right, which is the wrong way
-    // round for this repo — but nothing is decided from either.
-    expect(why.restingOn[0]!.part.kind).toBe("observations");
+    // round for this repo — but nothing is decided from either. Asserted on the
+    // prefix because that is where a handle's kind lives: `part.kind` was a
+    // field until handles became branded strings, and the field could disagree
+    // with the id it sat beside.
+    expect(why.restingOn[0]!.part).toMatch(/^ART_/);
     expect(why.restingOn[0]!.name).toBe("calibrate output");
   });
 

@@ -23,6 +23,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { ref } from "../../src/domain/report";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -283,7 +284,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
         gate: programme.advancement,
         value: "44 images per second",
         outcome: "pass",
-        citing: { kind: "claim", id: "CLM_99999" },
+        citing: ref("claim", "CLM_99999"),
       }),
     ).rejects.toThrow(/no finding bears on claim CLM_99999/);
 
