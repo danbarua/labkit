@@ -44,7 +44,7 @@ trap 'rm -rf "$db"' EXIT
 # One place that knows how to invoke the CLI. `--author` because a script is not
 # the account it runs under, and the record should say so rather than naming a
 # person who was asleep.
-lab() { bun "$root/src/cli.ts" --db "$db" --author full-lifecycle.sh "$@"; }
+lab() { bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@"; }
 
 # Asserts on the *content* of an answer, not on the exit code of the command
 # that produced it. A command that runs and answers wrongly is the failure this

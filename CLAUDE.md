@@ -196,6 +196,7 @@ bun run typecheck              # tsc --noEmit
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
+bun run check:test-teardown    # a test file that opens a scenario must also reset the database
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
@@ -205,13 +206,27 @@ bun run db:generate            # drizzle-kit generate, after editing src/db/sche
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
 bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted
-bun run dev                    # the CLI (src/cli.ts)
+bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
-There is no lint script yet. `bun run build` compiles `src/cli.ts` to a
-binary. `src/index.ts` is still a stub; **`src/cli.ts` is not** — it is the
-full surface, reads *and* writes (`bun run dev`).
+There is no lint script yet. `bun run build` compiles `src/cli/cli.ts` to a
+binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
+resolves `drizzle/` from `import.meta.url`, which inside a compiled bundle is
+`/$bunfs/root/…`, so it dies with `Can't find meta/_journal.json file`.
+Measured 2026-08-25 against both the old and new entry points, so it predates
+the CLI split and is not caused by it. `bun run dev` and `bun test` are
+unaffected; nothing has ever run the binary against an empty database.
+`docs/TASKS.md` carries it.
+
+`src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
+surface, reads *and* writes (`bun run dev`). It is a composition root and
+nothing else: `program.ts` assembles the commands, `commands/` declares them,
+`args.ts` turns text into domain values on zod, `views/` turns reports into
+pages, and `session.ts` is the wrap that hands a command its surfaces. It
+replaced a 1435-line `src/cli.ts` whose `switch` was five hundred of them; the
+port was verified by running `examples/full-lifecycle.sh` against both and
+diffing the transcripts, which were byte-identical.
 
 **It was read-only by construction and is not any more**, and that is the same
 correction the MCP server got. Read-only was never a shipping goal; what it
@@ -224,7 +239,7 @@ with the commit that added write commands, not worked around, and
 `tests/helpers/read-only.ts` went with them.
 
 **Every public verb on either surface has a command**, derived in
-`tests/cli.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
+`tests/cli/coverage.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
 `tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
 `NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
 this paragraph deliberately does not count them. What survives from the

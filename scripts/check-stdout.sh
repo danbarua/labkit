@@ -25,23 +25,24 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
-# The CLI composition roots are the exception: printing to stdout is their whole
-# job, and neither is ever imported by the MCP server. There are two while the
-# monolithic `src/cli.ts` is being ported to `src/cli/`, and the exemption names
-# both **entry points** rather than the whole `src/cli/` tree -- the views under
-# it return strings, and one of them printing instead of returning is a defect
-# this check should still catch.
+# `src/cli/cli.ts` is the exception and the only one: printing to stdout is its
+# whole job, and it is never imported by the MCP server.
+#
+# It names the **entry point**, not the `src/cli/` tree. The views under it
+# return strings, and one of them printing instead of returning is a defect this
+# check should still catch -- demonstrated on 2026-08-25 by adding a console.log
+# to `src/cli/views/format.ts` and watching this go red.
 #
 # Comment lines are dropped before matching. Naming the banned call in prose is
 # not making it -- the first version of this script failed on its own docstring,
-# which is the same trap tests/cli.test.ts already strips comments to avoid.
+# which is the same trap tests/cli/coverage.test.ts already strips comments to avoid.
 matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' src/ \
   --include='*.ts' 2>/dev/null \
-  | grep -vE '^src/cli\.ts:|^src/cli/cli\.ts:' \
+  | grep -v '^src/cli/cli\.ts:' \
   | grep -vE '^[^:]+:[0-9]+: *(\*|//|/\*)' || true)"
 
 if [ -n "$matches" ]; then
-  echo "❌ check-stdout ERROR: writes to stdout under src/, outside the CLI entry points:"
+  echo "❌ check-stdout ERROR: writes to stdout under src/, outside src/cli/cli.ts:"
   echo
   echo "$matches"
   echo
@@ -51,4 +52,4 @@ if [ -n "$matches" ]; then
   exit 1
 fi
 
-echo "✅ check-stdout OK: nothing under src/ writes to stdout except the CLI entry points."
+echo "✅ check-stdout OK: nothing under src/ writes to stdout except the CLI."

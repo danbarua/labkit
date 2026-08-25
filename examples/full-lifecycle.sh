@@ -56,7 +56,7 @@ quoted() {
 LAST=""
 lab() {
   printf '\n$ labkit %s\n' "$(quoted "$@")"
-  LAST="$(bun "$root/src/cli.ts" --db "$db" --author full-lifecycle.sh "$@")"
+  LAST="$(bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@")"
   printf '%s\n' "$LAST"
 }
 
