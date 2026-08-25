@@ -1,4 +1,4 @@
-// scripts/check-pglite-concurrency.ts
+// scripts/probe-pglite-concurrency.ts
 //
 // Regression check for a confirmed, open upstream bug in pglite-socket's
 // QueryQueueManager (electric-sql/pglite#1046): two connections issuing
@@ -12,6 +12,12 @@
 // to stay contained to the connection that hit it, so a fresh connection
 // per test contains the blast radius even though the underlying bug isn't
 // fixed.
+//
+// **It is a probe, not a check, and the name says so.** It lived under
+// `check:` until 2026-08-25 and had to be excluded by name from `bun run check`
+// with a paragraph explaining why — a namespace where green means fine, holding
+// one script where green means the bug is still there. Renaming it deleted the
+// exclusion list rather than documenting it.
 //
 // Exit code semantics are inverted from a normal lint check:
 //   exit 0 = the bug still reproduces. This is the EXPECTED, current
@@ -110,14 +116,14 @@ async function main(): Promise<void> {
 
   if (reproducedAt !== -1) {
     console.log(
-      `✅ check-pglite-concurrency: bug still reproduces (iteration ${reproducedAt}/${ITERATIONS}) — matches ` +
+      `✅ probe-pglite-concurrency: bug still reproduces (iteration ${reproducedAt}/${ITERATIONS}) — matches ` +
         `electric-sql/pglite#1046. tests/helpers/db.ts's per-test-connection design is still necessary.`,
     );
     process.exit(0);
   }
 
   console.log(
-    `⚠️  check-pglite-concurrency: bug did NOT reproduce across ${ITERATIONS} iterations.\n` +
+    `⚠️  probe-pglite-concurrency: bug did NOT reproduce across ${ITERATIONS} iterations.\n` +
       `   This might mean @electric-sql/pglite-socket has fixed electric-sql/pglite#1046 — check the installed\n` +
       `   version against that issue. Could also just be this run got lucky; re-run a few times before\n` +
       `   concluding it's fixed. If it really is fixed, tests/helpers/db.ts's per-connection workaround and\n` +
@@ -131,7 +137,7 @@ main().catch((err) => {
   // looks for, just in a shape neither the try/catch nor the 'error'
   // listener caught — still a reproduction, not a script bug.
   console.log(
-    `✅ check-pglite-concurrency: bug still reproduces (uncaught: ${(err as Error).message}) — matches ` +
+    `✅ probe-pglite-concurrency: bug still reproduces (uncaught: ${(err as Error).message}) — matches ` +
       `electric-sql/pglite#1046. tests/helpers/db.ts's per-test-connection design is still necessary.`,
   );
   process.exit(0);

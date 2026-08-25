@@ -342,7 +342,7 @@ not yet submitted anywhere:
   prepared statement mid-flight — no transaction needed to trigger it.
   Corruption stays contained to the connection that hit it, which is why
   `tests/helpers/db.ts` opens a fresh connection per test rather than
-  sharing one for a whole file; `scripts/check-pglite-concurrency.sh`
+  sharing one for a whole file; `scripts/probe-pglite-concurrency.sh`
   regression-checks it (inverted exit code — see the script's header).
   Real production exposure, not just a test artifact:
   `pgliteLeaderElectionBackend`'s whole design is every secondary process

@@ -193,6 +193,7 @@ npx depcruise src tests --output-type err   # layering rules (errors) + cycles
 bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
 bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool declarations
 bun run typecheck              # tsc --noEmit
+bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
@@ -201,7 +202,7 @@ bun run check:stdout          # nothing under src/ writes to stdout except the C
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
-bun run check:pglite-concurrency  # regression check for a known pglite-socket bug — see "Testing patterns"
+bun run probe:pglite-concurrency  # asks whether a known pglite-socket bug is still there — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
@@ -323,13 +324,25 @@ single failing test — or to tell a real regression from a teardown cascade.
 Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
 about the pipe, not about that incident.
 
-**Nothing runs these for you** — there is no CI workflow and no git hook. Before
-committing, run `bun test`, `bun run typecheck` and
-`npx depcruise src tests --output-type err`; add `check:migrations` if you
-touched `drizzle/`, `check:tests-assert` if you touched tests,
-`check:prop-classes` if you touched a `*Props` interface, and
-`check:no-stringly-typed` if you touched a signature in `src/domain/`. Do not pipe
-`bun test` — that trap is above, and is still live.
+**Nothing runs these for you** — there is no CI workflow and no git hook.
+Before committing, run **`bun run check`**: it runs `bun test`, `typecheck`,
+`depcruise` and every `check:*` script, prints a table, and exits non-zero if
+any of them failed. About ninety seconds, most of it `bun test`.
+
+This paragraph used to be a list of conditionals — *add `check:migrations` if
+you touched `drizzle/`, `check:tests-assert` if you touched tests, …* — which
+is a rule held in a person's head and therefore the kind that gets skipped.
+`bun run check` derives its list from `package.json`, so a `check:*` added
+later is picked up without anyone editing anything.
+
+**`check:` means green is fine and red is yours to fix.** Anything that does
+not mean that needs a different prefix — see `probe:pglite-concurrency`, whose
+exit 0 means an upstream bug *still reproduces*. It sat under `check:` and had
+to be excluded from the sweep by name; renaming it deleted the exclusion list
+rather than documenting it.
+
+Do not pipe `bun test` — that trap is above, and is still live. `bun run check`
+passes each step's output straight through for the same reason.
 
 ## Architecture: two persistence halves, deliberately not one
 
@@ -888,8 +901,8 @@ see the postgres-age skill's "Upstream filing" and PJ-006): two connections
 racing, where one errors, can permanently corrupt the connection(s)
 involved. Corruption stays contained to the connection that hit it, so a
 fresh connection per test contains the blast radius even though the
-underlying bug isn't fixed. `scripts/check-pglite-concurrency.sh`
-(`bun run check:pglite-concurrency`) regression-checks this — see the
+underlying bug isn't fixed. `scripts/probe-pglite-concurrency.sh`
+(`bun run probe:pglite-concurrency`) asks whether it is still there — see the
 script's header for its (inverted) exit-code meaning.
 
 A test that needs to exercise "a query loses a race and hits a constraint
