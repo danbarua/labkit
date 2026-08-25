@@ -30,6 +30,7 @@
 		"probe:pglite-concurrency": "bash scripts/probe-pglite-concurrency.sh",
 		"check:tests-assert": "bun scripts/check-tests-assert.ts",
 		"check:test-teardown": "bun scripts/check-test-teardown.ts",
+		"check:binary": "bash scripts/smoke-binary.sh",
 		"check:cli": "bash scripts/smoke-cli.sh",
 		"example": "bash examples/full-lifecycle.sh",
 		"db:generate": "drizzle-kit generate",

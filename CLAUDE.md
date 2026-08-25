@@ -210,18 +210,37 @@ bun run db:generate            # drizzle-kit generate, after editing src/db/sche
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
 bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted
+bun run check:binary          # builds bin/labkit and drives it against a fresh database
 bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
 Formatting and linting are both biome — `bun run format` writes,
-`check:format` and `check:lint` are in the sweep. `bun run build` compiles `src/cli/cli.ts` to a binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
-resolves `drizzle/` from `import.meta.url`, which inside a compiled bundle is
-`/$bunfs/root/…`, so it dies with `Can't find meta/_journal.json file`.
-Measured 2026-08-25 against both the old and new entry points, so it predates
-the CLI split and is not caused by it. `bun run dev` and `bun test` are
-unaffected; nothing has ever run the binary against an empty database.
-`docs/TASKS.md` carries it.
+`check:format` and `check:lint` are in the sweep. `bun run build` compiles `src/cli/cli.ts` to a binary, and
+**`bun run check:binary` proves it works** — it builds and drives the binary
+against a database that does not exist yet, which is the case that was broken.
+
+It was broken from the day the build script existed, in **three places, each
+hidden behind the last**: drizzle's migration folder, the two PGlite extension
+tarballs, and PGlite's own `pglite.data`. One root cause —
+**`import.meta.url` does not name a directory on disk once the code is inside a
+`bun build --compile` bundle**; it is `/$bunfs/root/…`, and nothing put a file
+there. Every one was invisible to `bun test` and `bun run dev`, which read those
+files off the real filesystem and work.
+
+The fix is to hand the assets over rather than let them be located
+(`src/db/migrations.ts`, `src/db/extensions.ts`) — Bun embeds a file imported
+`with { type: "file" }`, and `node:fs` can read it back out of `$bunfs`.
+
+**One asset could not stay embedded, and the reason is worth knowing before
+trying again**: PGlite reads an extension bundle with `createReadStream` piped
+through `zlib`, and `$bunfs` does not implement streaming. `existsSync` returns
+true and `open` then fails `ENOENT` — a confusing pair. Those two tarballs are
+written once to a temp file; everything else is read in place.
+
+The general lesson, which cost three rounds of build-and-run: **each fix moved
+the failure one step later rather than removing it**, and the only way to find
+the next was to run the binary again. Nothing had ever run it.
 
 `src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
 surface, reads *and* writes (`bun run dev`). It is a composition root and

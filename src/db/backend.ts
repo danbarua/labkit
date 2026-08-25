@@ -9,11 +9,10 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import { vector } from "@electric-sql/pglite-pgvector";
-import { age } from "@electric-sql/pglite-age";
 import { Client } from "pg";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { bootstrapSession, type LabKitDB } from "./client";
+import { age, pgliteAssets, vector } from "./extensions";
 import { runMigrations } from "./migrate";
 
 export interface LabKitDBConnection {
@@ -33,7 +32,10 @@ export interface DbBackend {
 }
 
 async function openPglite(dataDir: string): Promise<PGlite> {
-  return new PGlite({ dataDir, extensions: { vector, age } });
+  // Assets handed in rather than located -- see `./extensions.ts`. Doing it
+  // unconditionally keeps one code path: an interpreted run reads the same
+  // files from `node_modules/`, a compiled one from inside the bundle.
+  return new PGlite({ dataDir, extensions: { vector, age }, ...(await pgliteAssets()) });
 }
 
 async function tryClient(host: string, port: number): Promise<Client> {
