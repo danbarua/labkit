@@ -1,6 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
 import { age } from "@electric-sql/pglite-age";
-import { vector } from "@electric-sql/pglite-pgvector";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { Client } from "pg";
 import { runMigrations } from "../../src/db/migrate";
@@ -14,7 +13,7 @@ import { traced } from "../../src/db/trace";
  * out its raw `PGlite` object either; it opens its own `selfClient` and
  * returns that. This file is the one place PGlite-specific setup/teardown
  * is allowed to live, so application-code test files never import
- * `@electric-sql/pglite`/`pglite-age`/`pglite-pgvector` themselves.
+ * `@electric-sql/pglite`/`pglite-age` themselves.
  *
  * `openClient()` opens a FRESH connection every call — `beforeEach` should
  * call it per test, not share one connection across a whole file. This is
@@ -89,7 +88,7 @@ let shared:
   | undefined;
 
 async function boot() {
-  const rawDb = new PGlite({ extensions: { age, vector } });
+  const rawDb = new PGlite({ extensions: { age } });
 
   // Migration ordering mirrors backend.ts's primary role exactly: migrate
   // the raw PGlite instance, then start serving it — runMigrations() is

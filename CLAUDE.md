@@ -1055,8 +1055,7 @@ provisioning internals.
 `tests/helpers/db.ts`'s `setupTestDb()` spins up one `PGlite` instance,
 runs migrations, and starts a `PGLiteSocketServer` once per file, in
 `beforeAll`. Application-code test files (`tests/domain-graph.test.ts`,
-`tests/agtype.test.ts`) never import `@electric-sql/pglite`/`pglite-age`/
-`pglite-pgvector` themselves — they only ever see a `LabKitDB`-shaped
+`tests/agtype.test.ts`) never import `@electric-sql/pglite`/`pglite-age` themselves — they only ever see a `LabKitDB`-shaped
 `pg.Client`, the same production talks through.
 
 **Each test opens its own fresh connection** (`testDb.openClient()` in

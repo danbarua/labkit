@@ -12,7 +12,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { Client } from "pg";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { bootstrapSession, type LabKitDB } from "./client";
-import { age, pgliteAssets, vector } from "./extensions";
+import { age, pgliteAssets } from "./extensions";
 import { runMigrations } from "./migrate";
 
 export interface LabKitDBConnection {
@@ -35,7 +35,7 @@ async function openPglite(dataDir: string): Promise<PGlite> {
   // Assets handed in rather than located -- see `./extensions.ts`. Doing it
   // unconditionally keeps one code path: an interpreted run reads the same
   // files from `node_modules/`, a compiled one from inside the bundle.
-  return new PGlite({ dataDir, extensions: { vector, age }, ...(await pgliteAssets()) });
+  return new PGlite({ dataDir, extensions: { age }, ...(await pgliteAssets()) });
 }
 
 async function tryClient(host: string, port: number): Promise<Client> {

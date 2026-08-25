@@ -1,6 +1,11 @@
 /**
  * Every asset PGlite needs, embedded rather than looked up.
  *
+ * **AGE only.** pgvector was loaded into every instance and used by nothing —
+ * no column, no query, no migration — and the `apache/age` image does not even
+ * ship it. Culling it removed a dependency, an embedded tarball, and half the
+ * reason {@link streamable} exists.
+ *
  * **The second half of the same bug**, and the first half was hiding it. Both
  * extension packages locate their tarball with
  * `new URL("./age.tar.gz", import.meta.url)`, which inside a
@@ -60,7 +65,6 @@ import { basename, join } from "node:path";
 
 import type { Extension } from "@electric-sql/pglite";
 import { age as ageExtension } from "@electric-sql/pglite-age";
-import { vector as vectorExtension } from "@electric-sql/pglite-pgvector";
 
 import initdbWasmPath from "../../node_modules/@electric-sql/pglite/dist/initdb.wasm" with {
   type: "file",
@@ -72,9 +76,6 @@ import pgliteWasmPath from "../../node_modules/@electric-sql/pglite/dist/pglite.
   type: "file",
 };
 import agePath from "../../node_modules/@electric-sql/pglite-age/dist/age.tar.gz" with {
-  type: "file",
-};
-import vectorPath from "../../node_modules/@electric-sql/pglite-pgvector/dist/vector.tar.gz" with {
   type: "file",
 };
 
@@ -127,7 +128,6 @@ function embedded(extension: Extension, bundle: string): Extension {
 }
 
 export const age = embedded(ageExtension, agePath);
-export const vector = embedded(vectorExtension, vectorPath);
 
 /**
  * The three core assets PGlite would otherwise locate for itself.
