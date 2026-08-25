@@ -20,7 +20,7 @@ Open as **PR #24**.
 keeps going after a failure, prints a table with timings. The list is derived
 from `package.json`; no exclusion list.
 `scripts/check-pglite-concurrency.{ts,sh}` → `probe-pglite-concurrency.{ts,sh}`,
-and `check:` → `probe:`.
+`check:` → `probe:`.
 
 **`0f9394f` — every check script introduces itself.**
 `scripts/check-all-checks.ts` enforces the header shape and exports
@@ -29,32 +29,36 @@ before running it. Scope is any script wired under `check`, `check:*` or
 `probe:*`. Fixed `check-migrations.ts` (no header at all), `smoke-cli.sh` (a
 stray `#`), the probe (`//`-per-line), and "CI guard" in two summaries.
 
-**`2a6c95a` — biome, and terser announcements.**
+**`2a6c95a` — biome, and terser announcements.** `biome.jsonc`,
+`bun run format` / `check:format`; **formatting only**, linter off pending a
+read of its 96 errors and 376 warnings. 108 files reformatted. Every check now
+says `OK:` / `FAILED:` and not its own name.
 
-- `biome.jsonc` **new**, `bun run format` / `check:format`. **Formatting only**;
-  the linter is off pending a read of its 96 errors and 376 warnings. 108 files
-  reformatted.
-- Every check now says `OK:` / `FAILED:` and not its own name — `bun run check`
-  already said which is running. Plain words, not emoji, because those are what
-  you grep; the emoji summary stays in `check-all`.
-- `tests/helpers/surface-coverage.ts` — `verbsReachedIn` tolerates whitespace
-  either side of the dot.
-- `CLAUDE.md` throughout.
+**`bae34e2` — surface coverage reads the AST.**
+`tests/helpers/surface-coverage.ts` on the TypeScript compiler:
+`publicVerbsOf` walks method declarations and reads `private`/`protected` off
+the modifiers, `verbsReachedIn` becomes `verbsCalledOn(paths, receiver)`
+matching the call as a node. Callers in `tests/mcp.test.ts` and
+`tests/cli/coverage.test.ts` updated; comment-stripping dropped where the AST
+made it unnecessary.
 
-**`0ab2850`, `6845934`, and this commit** are the entry.
+**`0ab2850`, `6845934`, `fa3b8d2`, and this commit** are the entry.
 
 Working tree clean.
 
 ## Verified
 
 - `bun run check` — **all 14 pass, exit 0**.
-- **Watched to fail, three times.** A `console.log` in `src/cli/views/format.ts`
+- **Watched to fail, four times.** A `console.log` in `src/cli/views/format.ts`
   reddens two steps and the sweep runs the rest. `check:all-checks`, the moment
   it was written, named both offending files with the line, what was expected,
   and the shape for that language. Removing an `afterAll` reddens
-  `check:test-teardown` by name.
+  `check:test-teardown` by name. Stubbing out `read.gateStatus(…)` in a tool
+  handler still reports `gateStatus` unreachable through the AST derivation.
 - **Comment integrity measured, not assumed**: 108 files reformatted, **zero**
   comment-text lines changed, compared with leading whitespace stripped.
+- **The AST derivation was measured against the regex it replaced**: 17 reads,
+  18 writes, nothing gained or lost.
 
 `probe:pglite-concurrency` not run — it is a probe, takes minutes, and its exit
 code means the opposite of a check's.
@@ -75,23 +79,27 @@ at width 80 and touched `tsconfig.json`, `.dependency-cruiser.cjs` and drizzle's
 generated snapshots, all of which the intended config excludes. `biome check`
 does report the parse error; the writing command does not.
 
-**A formatter can split a call across lines, and a source-reading test will not
-survive it.** Biome turned `write.pursue({…})` into `write` + newline +
-`.pursue({…})` in five tools, and `surface-coverage.ts`'s
-`\bwrite\.pursue\s*\(` stopped matching — five verbs reported unreachable that
-were reached fine. A derivation over source text has to survive the text being
-re-wrapped, or it is a test of the formatter's preferences.
+**A pattern spanning a token boundary needs a parser.** Biome split
+`write.pursue({…})` across lines and `\bwrite\.pursue\s*\(` stopped matching —
+five verbs reported unreachable that were reached fine. The first fix was a
+whitespace-tolerant regex, which was a patch on the wrong layer:
+`surface-coverage.ts` had already argued in its own header that *"the
+declaration is the only place the distinction survives, so this reads it"*, and
+then read it with a regex, while two `check:*` scripts in the same repo were
+already on the compiler. The other text-reading checks were surveyed and left
+alone — first-four-lines, comments-as-trivia, and plain substrings are all
+genuinely textual. The rule is not *use the compiler everywhere*.
 
 **`\s` is not supported by BSD `sed`.** The first comment-integrity comparison
 used it, silently compared indented text, and "found" 38 differences that were
-not there. `[[:space:]]` is the portable form. The userland here is BSD.
+not there. `[[:space:]]` is the portable form.
 
 **A line number is a fact that differs by language**, and the header convention
 was specified as "line 4", then "line 2" — each wrong for one of the two.
 `check-all.ts` calls `summaryOf()` rather than counting.
 
 **The biome linter is unread.** 96 errors, 376 warnings. Some will be fine, some
-will disagree with a deliberate choice here, and bulk-suppressing would lose the
+will disagree with a deliberate choice here, and bulk-suppressing loses the
 difference.
 
 **The sweep does not run everything.** `bun run example` and
