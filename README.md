@@ -15,14 +15,18 @@ The primary interface is an **MCP server**, so the caller is usually an agent.
 
 ```sh
 bun install
-bun run mcp        # speaks MCP over stdio
+bun run build        # compiles bin/labkit
+./bin/labkit mcp     # speaks MCP over stdio
 ```
 
-That is the whole setup. On first run it creates `.labkit/` **in the working
-directory**, holding an embedded PostgreSQL (PGlite, with Apache AGE for the
-graph), and runs its migrations. That directory is the database, so where you
-launch the server from decides which record you are working in — the `--cwd`
-in the client configurations below is what pins it.
+**One binary.** `labkit mcp` is the server; everything else `labkit` does is a
+command for a person. Two executables would have been two copies of the same
+77MB runtime.
+
+On first run it creates `.labkit/` — an embedded PostgreSQL (PGlite, with Apache
+AGE for the graph) — and runs its migrations. **That directory is the database.**
+It goes wherever `LABKIT_HOME` points, or in the working directory if that is
+unset.
 
 The file is single-writer, so a process takes an exclusive lock for the length
 of a unit of work and gives it back: several agents can share one project, and
@@ -32,36 +36,54 @@ Three environment variables, and all have working defaults:
 
 | variable | default | what it does |
 | --- | --- | --- |
-| `LABKIT_HOME` | the working directory | which directory holds `.labkit/`. The CLI's `--db` says the same thing. |
+| `LABKIT_HOME` | the working directory | which directory holds `.labkit/`. The CLI's `--db` says the same thing; `labkit mcp` takes no such flag. |
 | `LABKIT_TENANT` | `labkit` | which tenant's graph to open, within one database. |
 | `LABKIT_DB_URL` | unset | connect to a real PostgreSQL instead of the embedded one. **Migrations are not run** on this path — an out-of-band deploy step by design. |
 
-**Most projects never touch `LABKIT_TENANT`.** A directory is already a
-database, so one project is one record and the default tenant is all of it.
-Tenants matter when several programmes share *one* database — which is the
-`LABKIT_DB_URL` case, not the `.labkit/` one.
+**Most projects never touch `LABKIT_TENANT`**, provided each has its own
+`.labkit/`. A directory is a database, so one project is one record and the
+default tenant is all of it. Tenants separate programmes that share *one*
+database — a real PostgreSQL over `LABKIT_DB_URL`, or two clients deliberately
+pointed at one directory.
 
 ### Wiring it into a client
 
-Claude Code:
-
-```sh
-claude mcp add labkit -- bun run --cwd /path/to/labkit mcp
-```
-
-Anything that reads an `mcpServers` block:
+Put `labkit` on your `PATH`, then:
 
 ```json
 {
   "mcpServers": {
     "labkit": {
-      "command": "bun",
-      "args": ["run", "--cwd", "/path/to/labkit", "mcp"],
-      "env": { "LABKIT_TENANT": "my-programme" }
+      "command": "labkit",
+      "args": ["mcp"]
     }
   }
 }
 ```
+
+**No paths and no environment.** That is the point of the binary: there is
+nothing in this block for a client to expand, mis-expand, or leave literal, and
+nothing that differs between your machine and a colleague's. It is safe to
+commit. If `labkit` is not on `PATH`, give `command` the absolute path to the
+binary and change nothing else.
+
+Or, for Claude Code, from the project directory:
+
+```sh
+claude mcp add labkit -- labkit mcp
+```
+
+**The record lands where the client starts the server.** With no `LABKIT_HOME`
+that is the working directory, and a client launched from a subdirectory of your
+project puts `.labkit/` in the subdirectory. Set `LABKIT_HOME` if you want it
+pinned regardless — but then it is a literal path, and a literal path in a
+committed file is right on one machine only.
+
+**Do not put LabKit in `user` scope**, or whatever your client calls a config
+that applies everywhere. One entry then makes every directory you open a LabKit
+record, including the ones with nothing to do with research. If you do want a
+shared record across projects, say so deliberately: a fixed `LABKIT_HOME`, and a
+`LABKIT_TENANT` per programme.
 
 The server reads and writes. Nothing is exposed that the domain layer does not
 already offer, and every tool is listed — with its arguments and its answer — at
@@ -85,9 +107,12 @@ they are two different claims.
 
 ## The CLI
 
+The same binary, without the `mcp` subcommand:
+
 ```sh
-bun run dev --help     # the CLI
-bun run build          # compiles it to bin/labkit
+labkit --help
+labkit known           # what does this programme know?
+bun run dev --help     # the same thing, from source
 bun run example        # a narrated lifecycle, for reading
 ```
 
@@ -95,6 +120,10 @@ It reads **and writes** — every verb the MCP server exposes has a command — 
 `--json` gives the same document an MCP client gets. `--db <dir>` picks the
 record; `--author` names who is acting, since a script driving LabKit is not the
 account it runs under.
+
+Running `labkit known` in a terminal while an agent session is open is the
+ordinary case, not an edge one: the server holds the database only for the
+length of a tool call, so the two take turns rather than colliding.
 
 ## Developing
 

@@ -10,7 +10,7 @@
 	},
 	"scripts": {
 		"dev": "bun run src/cli/cli.ts",
-		"mcp": "bun run src/mcp/server.ts",
+		"mcp": "bun run src/cli/cli.ts mcp",
 		"dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
 		"build": "bash scripts/build-binary.sh",
 		"test": "bun test",

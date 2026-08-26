@@ -14,6 +14,7 @@
 import { Command } from "commander";
 import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
+import { registerServe } from "./commands/serve";
 import type { Globals, Run } from "./session";
 
 /**
@@ -58,5 +59,8 @@ export function buildProgram(run: Run): Command {
   globalOptions(program);
   registerReads(program, run);
   registerWrites(program, run);
+  // Outside the two registries and without `run`: the server owns its own
+  // connection lifecycle and prints no report. See ./commands/serve.ts.
+  registerServe(program);
   return program;
 }
