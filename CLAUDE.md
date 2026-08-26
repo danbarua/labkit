@@ -100,12 +100,13 @@ tool, what it takes and what it returns — generated from the tool declarations
 by `bun run docs:tools`. The same document is served live at
 `labkit://docs/tools`.
 
-It is checked in because its **diff** is the useful part: a changed line means
-the API changed. Freshness is one assertion in `tests/mcp.test.ts` (the
-checked-in file equals what the generator produces), not a hook and not a
-`check:*` script — that test already renders the document, so the check rides a
-run that was happening anyway. The accepted cost is that a commit touching
-`src/mcp/tools.ts` also touches this file.
+**It is a snapshot and nothing holds it true.** An assertion in
+`tests/mcp.test.ts` did until 2026-08-26, so that the file's diff would show an
+API change. It went because the price was wrong: a test whose only failure mode
+was "someone regenerated late", and — once CI existed — a build that had to run
+on documentation in order to catch it. `bun run docs:tools` refreshes it; the
+live resource at `labkit://docs/tools` renders on every read and cannot be
+stale, which is the copy to trust.
 
 `docs/dependency-graph.mmd` is the module dependency graph, as text.
 `bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**

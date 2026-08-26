@@ -35,11 +35,10 @@ import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
 import { TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schemas";
-import { DOCS_FILE, DOCS_URI, renderToolDocs } from "../src/mcp/docs";
+import { DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { NOT_EXPOSED, publicVerbsOf, verbsCalledOn } from "./helpers/surface-coverage";
-import { readFileSync } from "node:fs";
 import { claimNamed, claimOf } from "./helpers/claims";
 
 /**
@@ -614,17 +613,6 @@ describe("the tool documentation resource", () => {
     } finally {
       await scenario.end();
     }
-  });
-
-  test("the checked-in copy matches what the generator produces", () => {
-    // The whole freshness mechanism: one assertion, in a file that already
-    // renders this document for other reasons. No hook, no check:* script.
-    // When it fails: `bun run docs:tools`.
-    //
-    // docs/mcp-tools.md is checked in because it is the only place this
-    // domain's API is reviewable as a single file, and its diff is the point --
-    // a changed line means the API changed.
-    expect(readFileSync(DOCS_FILE, "utf8")).toBe(renderToolDocs());
   });
 
   test("the document is generated, not stored", async () => {

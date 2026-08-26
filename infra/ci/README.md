@@ -113,18 +113,19 @@ adding anything to the gate: whatever it costs you, it costs CI double.
 ## What does not build
 
 `test-on-pr` carries an `ignored_files` denylist: a pull request touching only
-dated records, `CLAUDE.md`, `.claude/`, or prose no test reads does not run a
-build. A build cannot fail on prose, and one that can only ever be green trains
-you to stop reading it.
+`docs/`, `CLAUDE.md`, `README.md`, `.claude/` or `LICENSE` runs no build. A
+build cannot fail on prose, and one that can only ever be green trains you to
+stop reading it.
 
-**`docs/mcp-tools.md` is deliberately not ignored** — it is generated and
-`tests/mcp.test.ts` asserts the checked-in file matches the generator, so a
-hand-edit to it *should* fail. That is why the list names paths rather than
-saying `docs/**`.
+**`docs/**` wholesale, with no exceptions**, and the first version of this list
+had one. `docs/mcp-tools.md` is generated, and a test asserted the checked-in
+copy matched its generator — so the list named paths individually to keep that
+file building. Both are gone. A path filter with a load-bearing exception breaks
+silently the first time someone renames a file, and the breakage looks exactly
+like a trigger with nothing to do.
 
 A denylist rather than `included_files` on purpose: an allowlist gives no CI to
-whatever it forgets to name, and a trigger that does not fire looks exactly like
-one with nothing to do. This way anything new defaults to building.
+whatever it forgets to name. This way anything new defaults to building.
 
 **One thing to know about the semantics, and it is not verified here:** the
 filter is evaluated against the files a pull request changes, so a PR that

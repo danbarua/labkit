@@ -6,19 +6,19 @@
  * This renders the same declarations as documentation: what each tool answers,
  * what it takes, and what comes back, field by field.
  *
- * **Generated, in both places it appears.** The resource renders on each read,
- * so it cannot fall behind `TOOLS`. The checked-in copy at `DOCS_FILE` can, and
- * is held to the generator by an assertion in `tests/mcp.test.ts` rather than by
- * a hook or a `check:*` script — the test already renders this document, so
- * freshness is one more assertion in a run that was happening anyway.
+ * **The resource renders on each read, so it cannot fall behind `TOOLS`.** That
+ * is the copy that matters, and it is served live at `labkit://docs/tools`.
  *
- * The copy is checked in for one reason: it is the only place this domain's API
- * is reviewable as a single file, and its **diff** is the useful part — a
- * changed line means the API changed. That is the opposite of the dependency
- * graph, whose byte-stability existed to suppress noise and which was taken out
- * of self-maintenance on 2026-08-21 for putting a generated artefact in every
- * commit. The cost here is the same and is accepted rather than denied: a commit
- * touching `tools.ts` will also touch `docs/mcp-tools.md`.
+ * **The checked-in copy at `DOCS_FILE` is a snapshot and nothing holds it
+ * true.** It was held to the generator by an assertion in `tests/mcp.test.ts`
+ * until 2026-08-26; the assertion is gone. It existed so the file's *diff*
+ * would show an API change, and it bought that at the price of a test whose
+ * only failure mode was "someone regenerated late", plus a build that had to
+ * run on documentation to catch it. Run `bun run docs:tools` when you want the
+ * file current; read the resource when you want the truth.
+ *
+ * The dependency graph went the same way on 2026-08-21, for the same reason —
+ * a generated artefact in every commit's diff costs more than it pays.
  *
  * The types are rendered from **JSON Schema**, not from the Zod objects, for
  * the same reason `server.ts` ships the whole report rather than a chosen
