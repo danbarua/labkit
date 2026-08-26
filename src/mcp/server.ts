@@ -219,7 +219,7 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
       // One graph for both halves, so `inTransaction`'s re-entrancy depth is
       // shared. This is the composition `src/domain/session.ts` specifies for
       // an adapter that needs both.
-      const graph = new TenantGraph(tenantCtx, connection.db);
+      const graph = new TenantGraph(tenantCtx, connection.db, connection.tx);
 
       // **Durable, and on the same connection as the graph** — that is the
       // atomicity story: `emit` runs inside each verb's `inTransaction`, so an

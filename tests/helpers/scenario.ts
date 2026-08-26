@@ -12,7 +12,7 @@
 import { resolveTenantContext, type TenantContext } from "../../src/db/tenant";
 import { TenantGraph } from "../../src/db/graph";
 import type { LabKitDB } from "../../src/db/backend";
-import { setupTestDb, type TestDb } from "./db";
+import { setupTestDb, type TestClient, type TestDb } from "./db";
 
 export interface Scenario {
   /** A fresh, empty tenant graph for one test. */
@@ -66,7 +66,7 @@ export async function openScenario(): Promise<Scenario> {
    * test's late `end()` closed whatever `db` pointed at, and by then it pointed
    * at the *next* test's connection. See the header note below.
    */
-  const open: Array<LabKitDB & { close(): Promise<void> }> = [];
+  const open: TestClient[] = [];
 
   /**
    * The `TenantContext` the most recent `begin()` resolved. `current()`
@@ -93,12 +93,14 @@ export async function openScenario(): Promise<Scenario> {
       const db = await testDb.openClient(`test-${open.length + 1}`);
       open.push(db);
       ctx = await resolveTenantContext(db, "labkit");
-      return new TenantGraph(ctx, db);
+      return new TenantGraph(ctx, db, db.tx);
     },
     async current() {
       const db = open[open.length - 1];
       if (!db || !ctx) throw new Error("scenario not begun");
-      return new TenantGraph(ctx, db);
+      // The *same* transactor as `begin()`'s graph, not a second one: they are
+      // one connection, so they are one transaction. See src/db/transactor.ts.
+      return new TenantGraph(ctx, db, db.tx);
     },
     async end() {
       // Oldest first, which is the order `end()` calls arrive in even when one

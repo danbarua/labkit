@@ -534,6 +534,8 @@ dependency direction is enforced by `npx depcruise src tests --output-type err`
 | --- | --- |
 | `backend.ts` | `LabKitDB` (the connection seam) + `bootstrapSession`, and the two backends that satisfy it |
 | `connect.ts` | picks a backend and connects through it |
+| `transactor.ts` | the transaction boundary, one per connection |
+| `orm.ts` | drizzle, mounted **on** the seam via `pg-proxy` |
 | `agtype.ts` | agtype parsing, identifier validation, Cypher clause/quoting helpers |
 | `cypher.ts` | `CypherRunner` + column decoders — typed Cypher execution |
 | `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA`, `INDEXED_PROPS` |
@@ -602,9 +604,58 @@ does. It is re-entrant by depth, so a composed verb does not nest `BEGIN`. Note
 this is a transaction boundary, not an escape hatch: no caller gains the ability
 to issue Cypher this class would not otherwise run.
 
+**The boundary itself belongs to the connection, not to the graph**
+(`src/db/transactor.ts`). `TenantGraph` owned it because it was the only citizen
+of `src/db/` when `inTransaction` was written — not a decision, the only
+available place. The event store writes down the same connection and drizzle
+mounts on the same seam, and two objects issuing `BEGIN` down one connection are
+in one transaction whether they know it or not; a second depth counter is how
+they stop knowing. `LabKitDBConnection.tx` hands out the one, `TenantGraph`
+takes it as a **required** constructor argument, and `graph.inTransaction`
+delegates while keeping the one consequence only a graph knows about — clearing
+its minted-id list when the outermost transaction settles.
+
+Two traps, both found by the suite rather than by review:
+
+- **Ask "am I the outermost?" before entering, not inside.** Within the
+  transactor's closure the depth reads 1 for an outermost call *and* for one
+  nested in it, so testing it there makes an inner call clear the minted ids
+  before the outer verb's `emit` drains them — and the outer event then reports
+  creating nothing.
+- **Never default the transactor.** A `TenantGraph` that made its own would look
+  identical and be wrong the moment a second graph appeared over the same
+  connection, which is not hypothetical: `scenario.current()` builds exactly
+  that. Same failure shape as a per-call surface defaulting its own event sink.
+
 There is deliberately no raw-string escape hatch on `TenantGraph`. If a query
 needs a shape the decoders don't cover, add a decoder to `src/db/cypher.ts`
 rather than reintroducing one.
+
+**The relational half has a typed surface too, now.** `ormOver(db)`
+(`src/db/orm.ts`) mounts drizzle through `drizzle-orm/pg-proxy`, which takes a
+*callback* rather than a client — `LabKitDB.query` with one more argument — so
+the ORM sits **on** the seam beside `CypherRunner` instead of beside the
+connection. It inherits tracing, whatever the session was scoped to, and the
+open transaction, all for free; `drizzle(client)` would have inherited none of
+them and nothing would have said so. There is no socket involved.
+
+It replaced the only two places that assembled SQL by hand — `tenant.ts` and
+`src/domain/event-store.ts`, four call sites, one of them building a `WHERE`
+clause with `$${params.push(value)}` from MCP-supplied filters.
+
+**`rowMode: "array"` is not optional and its absence is silent.** The proxy
+driver decodes rows positionally; hand it objects and `select().from(t)` returns
+**`[{}, {}]`** — right row count, no error — or dies inside an array column's
+decoder with `undefined is not an object (evaluating 'value.map')`. That is why
+the option is on the seam (`QueryOptions`) rather than left to each call site,
+and why `directPostgresBackend` wraps its `pg.Client` instead of handing it
+over: `pg.Client.query`'s third positional argument is a *callback*, so the
+option has to travel in the config-object form. Forgetting to forward it in
+`tests/helpers/db.ts` is how the failure above was met, twice.
+
+One thing it buys beyond tidiness: **`bigserial` and `count(*)` come back as a
+string from `pg` and a number from a raw PGlite**, and drizzle's column mappers
+normalise that away. `event-store.ts` used to carry a `Number(r.seq)` for it.
 
 `TenantContext` (`{ tenantId, graphName }`) comes from
 `resolveTenantContext(db, slug)` (`src/db/tenant.ts`) — the CLI/MCP/bootstrap

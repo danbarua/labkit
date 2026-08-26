@@ -12,6 +12,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { Client } from "pg";
 import { age, pgliteAssets } from "./extensions";
 import { runMigrations } from "./migrate";
+import { type Transactor, transactor } from "./transactor";
 
 /**
  * The seam every other module talks to the database through: the minimum a
@@ -27,12 +28,34 @@ import { runMigrations } from "./migrate";
  * reader who went looking for the construction, which is `connect.ts`.
  *
  * It knows nothing about graphs, tenants or the domain model. That is what
- * lets tests hand application code a plain `pg.Client`, and what keeps every
- * importer of it outside this file a *type-only* importer: nothing under
- * `src/db/` or `src/domain/` pulls PGlite in by depending on the seam.
+ * keeps every importer of it outside this file a *type-only* importer: nothing
+ * under `src/db/` or `src/domain/` pulls PGlite in by depending on the seam.
  */
 export interface LabKitDB {
-  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  query<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+    opts?: QueryOptions,
+  ): Promise<{ rows: T[] }>;
+}
+
+/**
+ * The one thing a caller may ask of a query beyond its text and parameters.
+ *
+ * **`rowMode: "array"` exists for drizzle and nothing else** (`./orm.ts`). Its
+ * `pg-proxy` driver decodes rows itself, from positional values, and handing it
+ * objects instead does not fail — it returns **`[{}, {}]`**, one empty object
+ * per row, or throws `undefined is not an object (evaluating 'value.map')` the
+ * moment a `WHERE` is involved. Measured on both backends, 2026-08-26. A silent
+ * wrong answer is the failure mode this repo goes furthest to avoid, so the
+ * option is on the seam rather than left to each call site to remember.
+ *
+ * It is the reason `directPostgresBackend` wraps its `pg.Client` instead of
+ * handing it over: `pg.Client.query`'s third positional argument is a
+ * *callback*, so the option has to travel in the config-object form.
+ */
+export interface QueryOptions {
+  rowMode?: "array";
 }
 
 /**
@@ -49,6 +72,15 @@ export async function bootstrapSession(db: LabKitDB): Promise<void> {
 
 export interface LabKitDBConnection {
   db: LabKitDB;
+  /**
+   * The transaction boundary for this connection, and there is exactly one.
+   *
+   * It belongs to the connection because a transaction does: two objects
+   * issuing `BEGIN` down one connection are in one transaction whether they
+   * know it or not, and a second depth counter is how they stop knowing. See
+   * `./transactor.ts`.
+   */
+  tx: Transactor;
   close(): Promise<void>;
 }
 
@@ -192,13 +224,20 @@ export function pgliteBackend(opts: {
 
       await acquireLock(lockPath, lockTimeoutMs);
       try {
-        const db = await openPglite(dataDir);
-        await runMigrations(db);
+        const pglite = await openPglite(dataDir);
+        await runMigrations(pglite);
+        // Wrapped rather than handed over, so `QueryOptions` has exactly one
+        // shape at the seam. PGlite's own third argument is already an options
+        // object, so this is a rename and not a translation.
+        const db: LabKitDB = {
+          query: (sql, params, opts) => pglite.query(sql, params as unknown[], opts),
+        };
         await bootstrapSession(db);
         return {
           db,
+          tx: transactor(db),
           close: async () => {
-            await db.close();
+            await pglite.close();
             releaseLock(lockPath);
           },
         };
@@ -230,8 +269,22 @@ export function directPostgresBackend(opts: { connectionString: string }): DbBac
     async connect(): Promise<LabKitDBConnection> {
       const client = new Client({ connectionString: opts.connectionString });
       await client.connect();
-      await bootstrapSession(client);
-      return { db: client, close: () => client.end() };
+      // `pg.Client.query(sql, params, cb)` takes a *callback* third, so
+      // `QueryOptions` has to travel in the config-object form. That is why the
+      // client is wrapped here rather than handed over as the seam directly,
+      // which it was until `rowMode` existed.
+      const db: LabKitDB = {
+        query: async <T = Record<string, unknown>>(
+          sql: string,
+          params?: unknown[],
+          o?: QueryOptions,
+        ) => {
+          const r = await client.query({ text: sql, values: params, ...(o ?? {}) });
+          return { rows: r.rows as T[] };
+        },
+      };
+      await bootstrapSession(db);
+      return { db, tx: transactor(db), close: () => client.end() };
     },
   };
 }

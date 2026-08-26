@@ -2,8 +2,9 @@ import { PGlite } from "@electric-sql/pglite";
 import { age } from "@electric-sql/pglite-age";
 import { Client } from "pg";
 import { runMigrations, runMigrationsOnPostgres } from "../../src/db/migrate";
-import { bootstrapSession, type LabKitDB } from "../../src/db/backend";
+import { bootstrapSession, type LabKitDB, type QueryOptions } from "../../src/db/backend";
 import { traced } from "../../src/db/trace";
+import { type Transactor, transactor } from "../../src/db/transactor";
 
 /**
  * The database the suite runs against, and there are two of them.
@@ -73,9 +74,23 @@ export interface TestDb {
    * no-op. Under `LABKIT_DB_URL`, a real connection that `close()` really
    * closes. Either way, call it in `beforeEach` and close it in `afterEach`.
    */
-  openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }>;
+  openClient(label?: string): Promise<TestClient>;
   /** Truncates every LabKit-owned table and empties every tenant graph — call in `afterEach`. */
   reset(): Promise<void>;
+  close(): Promise<void>;
+}
+
+/**
+ * What a test is handed: the seam, its transaction boundary, and a way to give
+ * it back.
+ *
+ * `tx` is here rather than made on demand because a `TenantGraph` requires one
+ * and **two graphs over one connection must share it** — `scenario.current()`
+ * and the two-tenant cases in `tests/domain-graph.test.ts` both build a second
+ * graph. See `src/db/transactor.ts`.
+ */
+export interface TestClient extends LabKitDB {
+  tx: Transactor;
   close(): Promise<void>;
 }
 
@@ -118,7 +133,12 @@ async function bootPglite(): Promise<Booted> {
   return {
     async open() {
       return {
-        db: { query: (sql, params) => rawDb.query(sql, params as unknown[]) },
+        // `opts` forwarded, not dropped. PGlite's third argument is already an
+        // options object, so this is a rename — but dropping it is silent:
+        // drizzle asks for `rowMode: "array"` and, given objects instead,
+        // returns `[{}]` per row or dies inside an array column's decoder. It
+        // did the latter here first, which is the luckier of the two.
+        db: { query: (sql, params, opts) => rawDb.query(sql, params as unknown[], opts) },
         close: async () => {},
       };
     },
@@ -140,7 +160,20 @@ async function bootPostgres(connectionString: string): Promise<Booted> {
     async open() {
       const c = new Client({ connectionString });
       await c.connect();
-      return { db: c, close: () => c.end() };
+      // Wrapped rather than handed over: `pg.Client.query(sql, params, cb)`
+      // takes a *callback* third, so `QueryOptions` has to travel in the
+      // config-object form. Same wrap as `directPostgresBackend`.
+      const db: LabKitDB = {
+        query: async <T = Record<string, unknown>>(
+          sql: string,
+          params?: unknown[],
+          opts?: QueryOptions,
+        ) => {
+          const r = await c.query({ text: sql, values: params, ...(opts ?? {}) });
+          return { rows: r.rows as T[] };
+        },
+      };
+      return { db, close: () => c.end() };
     },
   };
 }
@@ -155,7 +188,7 @@ export async function setupTestDb(): Promise<TestDb> {
   const booted = await shared;
 
   let opened = 0;
-  async function openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }> {
+  async function openClient(label?: string): Promise<TestClient> {
     const { db: raw, close } = await booted.open();
     await bootstrapSession(raw);
     // Traced only when LABKIT_TRACE is set; otherwise `traced()` hands back the
@@ -163,10 +196,12 @@ export async function setupTestDb(): Promise<TestDb> {
     // telling two of them apart is most of what a trace is for — the teardown
     // race described above is invisible without it.
     const db = traced(
-      { query: (sql, params) => raw.query(sql, params) },
+      { query: (sql, params, opts) => raw.query(sql, params, opts) },
       label ?? `conn-${++opened}`,
     );
-    return { query: db.query, close };
+    // One transactor per opened client, over the *traced* object, so a BEGIN
+    // shows up in a trace like every other query.
+    return { query: db.query, tx: transactor(db), close };
   }
 
   // Dedicated to reset()/teardown and kept open for the whole file. Under

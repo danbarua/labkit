@@ -12,7 +12,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { setupTestDb, type TestDb } from "./helpers/db";
+import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, UNATTRIBUTED, type Clock } from "../src/domain";
@@ -20,7 +20,7 @@ import { pgEventLog } from "../src/domain/event-store";
 import type { LabKitDB } from "../src/db/backend";
 
 let testDb: TestDb;
-let db: LabKitDB & { close(): Promise<void> };
+let db: TestClient;
 
 beforeAll(async () => {
   testDb = await setupTestDb();
@@ -41,7 +41,7 @@ const clock: Clock = { now: () => "2026-08-25T09:00:00.000Z" };
 
 const surfaceFor = async (slug: string) => {
   const ctx = await resolveTenantContext(db, slug);
-  const graph = new TenantGraph(ctx, db);
+  const graph = new TenantGraph(ctx, db, db.tx);
   return {
     graph,
     ctx,

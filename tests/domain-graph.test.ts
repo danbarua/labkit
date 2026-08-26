@@ -14,7 +14,8 @@ import {
 } from "../src/db/domain";
 import type { LabKitDB } from "../src/db/backend";
 import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
-import { setupTestDb, type TestDb } from "./helpers/db";
+import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
+import { transactor } from "../src/db/transactor";
 
 /**
  * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
@@ -29,7 +30,7 @@ import { setupTestDb, type TestDb } from "./helpers/db";
  */
 
 let testDb: TestDb;
-let db: LabKitDB & { close(): Promise<void> };
+let db: TestClient;
 let ctx: TenantContext;
 let graph: TenantGraph;
 
@@ -49,7 +50,7 @@ beforeEach(async () => {
   // defect — see tests/helpers/db.ts.
   db = await testDb.openClient();
   ctx = await resolveTenantContext(db, "labkit");
-  graph = new TenantGraph(ctx, db);
+  graph = new TenantGraph(ctx, db, db.tx);
 });
 
 afterEach(async () => {
@@ -462,8 +463,8 @@ describe("tenant isolation", () => {
     const ctxA = await resolveTenantContext(db, "tenant-a");
     const ctxB = await resolveTenantContext(db, "tenant-b");
     expect(ctxA.graphName).not.toBe(ctxB.graphName);
-    const graphA = new TenantGraph(ctxA, db);
-    const graphB = new TenantGraph(ctxB, db);
+    const graphA = new TenantGraph(ctxA, db, db.tx);
+    const graphB = new TenantGraph(ctxB, db, db.tx);
 
     const claimA = await graphA.createNode("Claim", { name: "x" });
     const claimB = await graphB.createNode("Claim", { name: "x" });
@@ -479,8 +480,8 @@ describe("tenant isolation", () => {
   test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {
     const ctxA = await resolveTenantContext(db, "tenant-a");
     const ctxB = await resolveTenantContext(db, "tenant-b");
-    const graphA = new TenantGraph(ctxA, db);
-    const graphB = new TenantGraph(ctxB, db);
+    const graphA = new TenantGraph(ctxA, db, db.tx);
+    const graphB = new TenantGraph(ctxB, db, db.tx);
 
     const questionA = await graphA.createNode("Question", {
       name: "q-in-a",
@@ -606,7 +607,7 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
         return db.query(sql, params);
       },
     };
-    const flakyGraph = new TenantGraph(ctx, flakyDb);
+    const flakyGraph = new TenantGraph(ctx, flakyDb, transactor(flakyDb));
 
     await expect(
       flakyGraph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
@@ -756,7 +757,7 @@ test("a failing COMMIT does not corrupt the transaction depth", async () => {
       return db.query(sql, params);
     },
   };
-  const brittle = new TenantGraph(ctx, brittleDb);
+  const brittle = new TenantGraph(ctx, brittleDb, transactor(brittleDb));
 
   await expect(brittle.inTransaction(async () => "done")).rejects.toThrow(/injected/);
 
@@ -789,7 +790,7 @@ test("a failing ROLLBACK does not replace the original error", async () => {
       return { rows: [] } as never;
     },
   } as LabKitDB;
-  const brittle = new TenantGraph(ctx, brittleDb);
+  const brittle = new TenantGraph(ctx, brittleDb, transactor(brittleDb));
 
   await expect(
     brittle.inTransaction(async () => {

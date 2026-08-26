@@ -88,7 +88,7 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
     try {
       const ctx = await resolveTenantContext(connection.db, opts.tenant ?? "labkit");
       const events = pgEventLog(connection.db, ctx.tenantId);
-      const graph = new TenantGraph(ctx, connection.db);
+      const graph = new TenantGraph(ctx, connection.db, connection.tx);
       const answered = await work({
         read: new ReadSurface(graph, { events }),
         write: new WriteSurface(graph, {
