@@ -24,7 +24,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 db="$(mktemp -d "${TMPDIR:-/tmp}/labkit-binary.XXXXXX")"
 trap 'rm -rf "$db"' EXIT
 
-bun build --compile --outfile "$root/bin/labkit" "$root/src/cli/cli.ts" > /dev/null
+bash "$root/scripts/build-binary.sh" > /dev/null
 
 lab() { "$root/bin/labkit" --db "$db" --author check:binary "$@"; }
 

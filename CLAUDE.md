@@ -216,8 +216,23 @@ bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
 Formatting and linting are both biome — `bun run format` writes,
-`check:format` and `check:lint` are in the sweep. `bun run build` compiles `src/cli/cli.ts` to a binary, and
-**`bun run check:binary` proves it works** — it builds and drives the binary
+`check:format` and `check:lint` are in the sweep.
+
+`bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
+directory** (`scripts/build-binary.sh`), and that is not tidiness:
+`bun build --compile` leaves a **byte-identical copy of the `bun` binary
+itself** — 61MB, `.<hash>-00000000.bun-build` — in the current working
+directory on every *successful* run, and never removes it. Verified by sha256
+against bun 1.3.14. The hash differs per build so they accumulate, and they are
+`.gitignore`d so nothing complains; thirty-two of them had reached **1.9GB** in
+the repo root before anyone read a directory listing. The staging path follows
+the **CWD, not `--outfile`** — measured — so building from a `mktemp -d` that is
+removed on exit leaves the leak nowhere to go. There is no flag for it.
+
+That is also why `build` is a script rather than the `package.json` one-liner it
+was, the same reason `dev:dependency-cruiser` is one.
+
+**`bun run check:binary` proves the binary works** — it builds and drives the binary
 against a database that does not exist yet, which is the case that was broken.
 
 It was broken from the day the build script existed, in **three places, each

@@ -13,7 +13,7 @@
 		"mcp": "bun run src/mcp/server.ts",
 		"dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
 		"docs:tools": "bun scripts/render-tool-docs.ts",
-		"build": "bun build --compile --outfile bin/labkit src/cli/cli.ts",
+		"build": "bash scripts/build-binary.sh",
 		"test": "bun test",
 		"test:pg": "bash scripts/test-postgres.sh",
 		"typecheck": "tsc --noEmit",
