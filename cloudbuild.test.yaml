@@ -90,8 +90,15 @@ steps:
 options:
   logging: CLOUD_LOGGING_ONLY
 
-# **Unmeasured.** Locally the gate is ~112s in this image and `test:pg` ~55s,
-# but nothing here has run on Cloud Build yet and a worker is slower than a Mac
-# Studio. Generous on purpose; replace it with a measured figure once there are
-# builds to measure, the way `docker/postgres` and CLAUDE.md carry dated ones.
+# **Measured on the first green run, 2026-08-26** (build `9907cb31`, 394s total,
+# 1s queued):
+#
+#   ci-image    20s
+#   postgres    12s
+#   check      208s   -- ~112s for the same work locally
+#   test-pg    153s   -- ~55s locally
+#
+# A worker is roughly **2x slower than a Mac Studio** on both suites, which is
+# the number worth carrying: the gate is the cost here, and it is `bun test`
+# inside it. 1800s leaves better than 4x headroom over the whole build.
 timeout: 1800s

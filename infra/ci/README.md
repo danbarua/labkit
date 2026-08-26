@@ -101,6 +101,15 @@ Deliberately absent, both present in the repo this came from:
 Also absent: Secret Manager. Nothing reads a secret, and an API enabled "for
 later" is a surface nobody watches.
 
+## What it costs
+
+Measured on the first green run, 2026-08-26 (build `9907cb31`): **394s total**,
+1s queued. `ci-image` 20s, `postgres` 12s, `check` 208s, `test-pg` 153s.
+
+A Cloud Build worker is roughly **twice as slow as a developer's machine** on
+both suites — the same work is ~112s and ~55s locally. Worth knowing before
+adding anything to the gate: whatever it costs you, it costs CI double.
+
 ## Known gap
 
 A pull-request trigger catches **your** changes breaking the build. It cannot
