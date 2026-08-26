@@ -2,17 +2,20 @@
 
 **Session wrap, 2026-08-26, on `fix/binary-migrations`.** Not a decision record
 — the arguments live in `tests/helpers/db.ts`'s header, `src/db/transactor.ts`,
-`src/db/orm.ts`, `src/db/scoped.ts` and `drizzle/0004_rls.sql`.
+`src/db/orm.ts`, `src/db/scoped.ts`, `drizzle/0002_natural_ids.sql` and
+`docker/postgres/Dockerfile`.
 
-Baseline `a5f1fa6`, where entry 040 was closed. Five commits, on **PR #29**.
-This entry was written when the session was only the second backend and is
-rewritten here to cover what followed.
+Baseline `a5f1fa6`, where entry 040 was closed. Eight commits, on **PR #29**.
+This entry was written when the session was only the second backend and has been
+rewritten twice since to cover what followed.
 
 ## Goal
 
-Two, in sequence. First: Dan asked whether to add an optional bun task running
+Three, in sequence. First: Dan asked whether to add an optional bun task running
 the suite against the docker container. Then: steps 3, 4 and 5 of
 `docs/db-layering-plan.md` — the pipeline, RLS, and the four raw-SQL sites.
+Then, after he asked why the RLS migration was a *generated* file I had
+hand-edited: split it by ownership, and own the Postgres image.
 
 ## Changed
 
@@ -64,7 +67,37 @@ either: that is the name a real deployment would pick.
 - `tests/tenancy-isolation.test.ts` **new**.
 - `docs/db-layering-plan.md` **deleted**, as it asked to be.
 
-Working tree clean at `87409b7`; pushed.
+### The migration split, and the image
+
+**`ae25e4f` — one hand-rolled migration for the hand-rolled things.** Dan
+supplied the principle that settles it: drizzle cannot migrate what it does not
+manage, so the split is by ownership, and `0002_natural_ids.sql` was already the
+hand-written file.
+
+- `drizzle/0002_natural_ids.sql` — absorbs the role, the seven grants, and a new
+  `ALTER DEFAULT PRIVILEGES IN SCHEMA public`.
+- `drizzle/0004_rls.sql` **deleted**; `drizzle/0004_typical_bloodstrike.sql`
+  **new** — generator-named, unedited, regenerable.
+- `src/db/schema.ts` — `pgRole(APP_ROLE).existing()`.
+- `drizzle.config.ts` — `entities: { roles: true }`.
+- `scripts/check-migrations.ts` — a narrow exemption for `ALTER TABLE … ENABLE
+  ROW LEVEL SECURITY`, because a generator emits it and cannot write a comment.
+- `src/db/migrations.ts`, `src/db/scoped.ts`,
+  `tests/tenancy-isolation.test.ts`, `CLAUDE.md`.
+
+**`b02f4f8` — own the Postgres image.**
+
+- `docker/postgres/Dockerfile` **new** — `FROM apache/age:release_PG18_1.7.0`,
+  the tag pinned there rather than in compose.
+- `docker/postgres/initdb/10-create-databases.sql` **new** — `CREATE DATABASE
+  labkit_tests`, and deliberately nothing else.
+- `docker-compose.yml` — `build:` in place of `image:`.
+- `scripts/test-postgres.sh` — the check-then-`CREATE DATABASE` block goes;
+  `up -d --build db`.
+- `drizzle/0002_natural_ids.sql`, `src/db/scoped.ts`, `CLAUDE.md` — the
+  login-role correction below.
+
+Working tree clean at `b02f4f8`; pushed.
 
 ## Verified
 
@@ -94,6 +127,27 @@ Working tree clean at `87409b7`; pushed.
 - Migrations via the node-postgres dialect **22ms**; `resolveTenantContext`
   **74ms cold / 5ms warm** against the container.
 
+**Measured for the migration split and the image, same day:**
+
+- **Drizzle models privileges not at all** — the string `GRANT ` appears **zero
+  times** in drizzle-kit's bundle. That half of `0004` genuinely had to be
+  hand-written; only its location was wrong.
+- **`entities.roles.exclude` cannot do what it looks like here**, which cost a
+  round. Read in drizzle-kit 0.30.6: `prepareRoles`' `excludeRoles` is consumed
+  only by `fromDatabase`, the *introspection* path, and `generatePgSnapshot`
+  takes no config at all. Setting it changed nothing. The schema-side lever is
+  `pgRole(...).existing()` — `if (!role._existing)` inside the serializer.
+- **`ALTER DEFAULT PRIVILEGES` works**: a table created afterwards reports
+  `has_table_privilege` and `has_sequence_privilege` true for `labkit_app` with
+  no grant naming it. One caveat found by trying it — a table with a foreign key
+  generates an `ALTER TABLE … ADD CONSTRAINT` and `check:migrations` then wants a
+  `-- lock-strategy:` line, so one comment is still prepended by hand.
+- **The image is not a requirement**: the suite passes against a **raw upstream**
+  `apache/age` container on another port with `labkit_tests` created by hand —
+  365 pass, 4 skip, 0 fail.
+- **The new `check:migrations` exemption has a negative control**: an
+  `ADD COLUMN` in the same file still fails.
+
 **Three defects the tests found rather than review:**
 
 1. A **nested** `graph.inTransaction` cleared the minted-id list before the
@@ -122,9 +176,30 @@ address a node in B", which needs one connection holding both graphs to say
 anything about `createEdge`. The two files divide by what isolates: AGE by
 schema, the relational side by policy.
 
-**A genuine login boundary is noted and not built.** It needs
-`ALTER ROLE labkit_app SET session_preload_libraries = 'age'` so the library
-arrives without a `LOAD`. Written down in `drizzle/0004_rls.sql`, unmeasured.
+**A correction to something asserted three times earlier the same day.** I had
+it that `LOAD 'age'` being refused to a non-superuser (42501) meant every Cypher
+query fails for one, *reads included*, so a login-role boundary was impossible.
+The refusal is of **issuing** `LOAD`, not of needing it. The `apache/age` image
+runs `postgres -c shared_preload_libraries=age`, so AGE is in every backend at
+server start — and measured on it, a plain LOGIN role that never issues `LOAD`
+resolves `agtype` and reads through Cypher fine. A genuine login boundary
+therefore needs a preloading server and a `bootstrapSession` that does not issue
+`LOAD`, not the per-role `session_preload_libraries` those comments named.
+PGlite still needs the step-down, having no preload and one superuser session.
+Corrected in `0002`, `src/db/scoped.ts` and CLAUDE.md; **not built** — a third
+design change on a branch that has had two. The write half of that probe hit a
+grant gap in the probe itself and was not re-verified, which the comments say
+rather than rounding up.
+
+**Drizzle v1 is at `1.0.0-rc.4`** (`rc` tag); `latest` is still `0.45.2`, so we
+wait for the release. When we take it: `.enableRLS()` becomes
+`pgTable.withRLS()`, and the surfaces most likely to break are
+`src/db/migrate.ts` (it casts through the private `dialect`/`session` fields)
+and `src/db/orm.ts` (it depends on `pg-proxy`'s callback shape). Separately,
+`drizzle-kit@latest` is `0.31.10` against our `0.30.6`.
+
+**A LabKit application image** was considered and declined — different
+lifecycle, no consumer yet.
 
 **`provisionTenantGraph()` still opens its own transaction** with raw
 `BEGIN`/`COMMIT` rather than the transactor. It is admin DDL that runs before
@@ -137,12 +212,13 @@ hook, so this is convention, and convention is what this repo distrusts. Nothing
 checks it.
 
 **Nothing runs `test:pg` for you** — no CI, no hook, and `bun run check` does
-not include it. Steps 4 to 6 are the ones only that backend can settle, so it is
-worth running before anything else touching roles or tenancy lands.
+not include it. It is the only backend that can settle anything about roles,
+tenancy or privileges, so run it before landing work that touches them.
 
 ## Next
 
-PR #29 carries fourteen commits and awaits review.
+PR #29 carries seventeen commits and awaits review. Nothing on the layering
+plan is left; it was deleted when it landed.
 
 `docs/TASKS.md` still has no actionable items. The domain modelling behind
 PJ-008 §3's open rows is the larger thing waiting, and is what Dan named as the
