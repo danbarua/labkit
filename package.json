@@ -29,6 +29,7 @@
 		"check:prop-classes": "bun scripts/check-prop-classes.ts",
 		"check:stdout": "bash scripts/check-stdout.sh",
 		"check:tests-assert": "bun scripts/check-tests-assert.ts",
+		"check:test-ceiling": "bun scripts/check-test-ceiling.ts",
 		"check:test-teardown": "bun scripts/check-test-teardown.ts",
 		"check:binary": "bash scripts/smoke-binary.sh",
 		"check:cli": "bash scripts/smoke-cli.sh",

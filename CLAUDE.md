@@ -319,6 +319,7 @@ bun run check:lint             # biome lint — rules that are off are off by na
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
+bun run check:test-ceiling     # nothing runs the suite as a bare `bun test`
 bun run check:test-teardown    # a test file that opens a scenario must also reset the database
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
@@ -1528,7 +1529,20 @@ bypasses `package.json`, so it runs at bun's default — and so did
 `bun run check`, whose sweep invoked `["bun", "test"]` while every other step
 went through `bun run`. The flag was added, CI went on failing at 5000ms, and
 the log showed a ceiling the repo believed it had raised. `check-all.ts` routes
-through the script now, so one place says what the test step is. It went up because CI found the edge:
+through the script now, so one place says what the test step is.
+
+**It then happened a second time, in the other caller.** With the sweep fixed
+the build got further and failed in `scripts/test-postgres.sh`, which also ran
+`bun test` directly. Fixing callers one at a time is what produced the second
+failure, so `check:test-ceiling` now refuses either spelling — the shell
+`bun test` and the `["bun", "test"]` argv array that caused the original. Its
+first version caught only the shell one, which would not have caught the bug it
+was written for; both are in its negative control.
+
+**`bunfig.toml` is not the way out.** Measured against bun 1.3.14, `[test]
+timeout = 20000` is ignored — a 6.5s `beforeAll` fails identically with and
+without it. If a later bun honours it, move the ceiling there and delete the
+check. It went up because CI found the edge:
 a `beforeAll` calling `openScenario()` timed out at 5807ms on a Cloud Build
 worker, and the cascade — `scenario` never assigned, `afterAll` throwing
 `undefined is not an object` — reported as two failures. Booting WASM in a hook
