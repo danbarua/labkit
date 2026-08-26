@@ -54,11 +54,12 @@ Claude Code, from the project directory you want the record kept in:
 claude mcp add labkit -e LABKIT_HOME="$PWD" -- bun /path/to/labkit/src/mcp/server.ts
 ```
 
-That is **local** scope, the default: the entry is stored against this project
-only, so a literal path in it stays correct.
+That is Claude Code's **local** scope, the default, and it is the one to use:
+the entry is stored against this project alone, so the literal path `$PWD`
+expands to is correct and stays correct.
 
-For a `.mcp.json` committed at the root of a project — Claude Code's **project**
-scope, and anything else that reads an `mcpServers` block:
+Anything else that reads an `mcpServers` block wants the same two fields, with
+`LABKIT_HOME` written out in full:
 
 ```json
 {
@@ -66,22 +67,28 @@ scope, and anything else that reads an `mcpServers` block:
     "labkit": {
       "command": "bun",
       "args": ["/path/to/labkit/src/mcp/server.ts"],
-      "env": { "LABKIT_HOME": "${PWD}" }
+      "env": { "LABKIT_HOME": "/absolute/path/to/your-project" }
     }
   }
 }
 ```
 
-`${PWD}` rather than a literal path, because this file is committed and a path
-that is right on your machine is wrong on everyone else's. Measured 2026-08-26:
-Claude Code expands `${VAR}` in an `mcpServers` env value, and launches the
-server with the project directory as its working directory.
+**A literal path, because a variable is only as portable as the client reading
+it.** Claude Code expands `${VAR}` here; a client that does not creates a
+directory *named* `${PWD}` and reports an empty record — no error, and it looks
+exactly like a correctly wired new project. Measured 2026-08-26, both halves.
 
-**Do not put LabKit in `user` scope.** One entry applies to every project you
-open, so every directory becomes a LabKit record — including the ones that have
-nothing to do with research. If you want one shared record across projects, say
-so deliberately: point `LABKIT_HOME` at a fixed directory and give each
-programme its own `LABKIT_TENANT`.
+**Two scopes to avoid, for different reasons.**
+
+A committed `.mcp.json` (Claude Code's **project** scope) cannot name the project
+root: `${PWD}` expands to wherever `claude` was launched, so a colleague who
+starts in `packages/foo` gets a record there and one who starts at the root gets
+a different one. `${CLAUDE_PROJECT_DIR}` does not expand at all. Measured, both.
+
+**User** scope applies one entry to every project you open, which makes every
+directory a LabKit record — including ones with nothing to do with research. If
+you do want a shared record, say so deliberately: a fixed `LABKIT_HOME` and a
+`LABKIT_TENANT` per programme, which is what that variable is for.
 
 The server is named by absolute path rather than launched with
 `bun run --cwd /path/to/labkit mcp`. That form worked, and it set the process's
