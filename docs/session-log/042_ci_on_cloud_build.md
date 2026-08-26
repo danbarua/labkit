@@ -63,11 +63,27 @@ gets a watcher.
 **`25aa42f` — do not build on prose.**
 
 - `infra/ci/triggers.tf` — an `ignored_files` denylist on `test-on-pr`.
-- `infra/ci/README.md` — what is on it, what is deliberately not, and why the
-  direction matters.
+- `infra/ci/README.md` — what is on it and why the direction matters.
 
-Working tree clean at `25aa42f`; pushed. **Not yet applied** — the trigger in
-the cloud still builds on everything until `terraform apply` runs.
+**`a78cef7` — ignore `docs/` wholesale, and drop the test that made that
+impossible.** The list in `25aa42f` named paths individually so that
+`docs/mcp-tools.md` would keep building, because a test asserted the checked-in
+copy matched its generator. Dan called the exception a smell — a path filter
+with one load-bearing entry breaks silently on a rename, and looks identical to
+a trigger with nothing to do.
+
+- `tests/mcp.test.ts` — the freshness assertion deleted, with its now-unused
+  `readFileSync`/`DOCS_FILE` imports. The test beside it, "the document is
+  generated, not stored", stays: it exercises `renderToolDocs()` over a subset,
+  which is code rather than a file's freshness.
+- `infra/ci/triggers.tf` — `docs/**`, no exceptions.
+- `src/mcp/docs.ts`, `CLAUDE.md` — both described a freshness mechanism that no
+  longer exists; they now say the checked-in copy is a snapshot nothing holds
+  true.
+- `infra/ci/README.md`.
+
+Working tree clean at `a78cef7`; pushed. **Not yet applied** — the live trigger
+still builds on everything until `terraform apply` runs.
 
 ## Verified
 
@@ -144,9 +160,16 @@ against it, having waited for TCP rather than assuming readiness.
 
 ## Open
 
-**`25aa42f` is committed but not applied.** `terraform plan` is 0 to add, 1 to
-change, 0 to destroy; until an apply runs, the live trigger has no
+**The trigger change is committed but not applied.** `terraform plan` is 0 to
+add, 1 to change, 0 to destroy; until an apply runs, the live trigger has no
 `ignored_files` and builds on prose.
+
+**`docs/mcp-tools.md` now drifts, by decision.** It is generated and checked in,
+and as of `a78cef7` nothing keeps it matching `src/mcp/tools.ts` — the next tool
+change makes it wrong and no test will say so. The live resource
+`labkit://docs/tools` renders on every read and is the copy to trust;
+`bun run docs:tools` refreshes the file when someone wants it current. Deleting
+the checked-in copy is the consistent follow-up and was offered, not taken.
 
 **The ignore list's semantics are stated but not verified.** The filter is
 believed to be evaluated against the files a *pull request* changes, so a PR
@@ -179,8 +202,8 @@ DB-layer loose ends.
 
 ## Next
 
-`terraform apply` in `infra/ci` to put the `ignored_files` denylist live — 0 to
-add, 1 to change, 0 to destroy.
+`terraform apply` in `infra/ci` to put the `docs/**` denylist live — 0 to add,
+1 to change, 0 to destroy.
 
 PR #30 awaits review; the trigger is green and running on every push to it.
 
