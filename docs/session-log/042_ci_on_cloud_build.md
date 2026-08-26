@@ -4,7 +4,9 @@
 arguments live in `cloudbuild.test.yaml`'s header, `docker/ci/Dockerfile` and
 `infra/ci/README.md`.
 
-Baseline `7fbc84f`, the squash-merge of PR #29. Open as **PR #30**.
+Baseline `7fbc84f`, the squash-merge of PR #29. Open as **PR #30**. Dan ran the
+first `terraform apply` mid-session; the two `infra` commits below are its
+fallout.
 
 ## Goal
 
@@ -37,7 +39,19 @@ gets a watcher.
 - `.gitignore` — tfvars, state and `.terraform/`; the lock file deliberately not.
 - `CLAUDE.md`.
 
-Working tree clean at `bb2601c`; pushed.
+**`85bcdb1` — order the service account after the IAM API settles.**
+
+- `infra/ci/service_accounts.tf` — a `time_sleep.apis_settle` between enabling
+  the APIs and creating the service account, which the account now depends on.
+- `infra/ci/project.tf` — declares `hashicorp/time`.
+- `infra/ci/README.md` — the failure, and the two ways its error message
+  misleads.
+
+**`128d97f` — make apply say which project it acted on.**
+
+- `infra/ci/outputs.tf` — a `target_project` output.
+
+Working tree clean at `128d97f`; pushed.
 
 ## Verified
 
@@ -61,15 +75,46 @@ writing it went wrong.
 - `.gitignore` behaviour asserted with `git check-ignore`: tfvars, state and
   `.terraform/` ignored, `.terraform.lock.hcl` tracked.
 
+**The first `terraform apply` ran, and got most of the way.** It created the
+project `labkit-build` (number 408778432826), linked billing and enabled all
+three APIs, then failed:
+
+```
+Error creating service account: googleapi: Error 403:
+Permission iam.serviceAccounts.create
+```
+
+Diagnosed from three read-only facts rather than from the message: everything
+created had landed in `labkit-build` and nothing in `agent-bus-build`;
+`danbarua@gmail.com` holds `roles/owner` there; and an ADC-authenticated IAM
+call against the project returned **200** minutes later. So it was a race —
+`google_service_account` declared no dependency on `google_project_service`, so
+Terraform created it in parallel with enabling `iam.googleapis.com`, and
+enabling a Google API returns before the enablement is usable.
+
+`terraform validate` clean and `terraform plan` against the real state is **4 to
+add, 0 to change, 0 to destroy** — the project and APIs already in state are
+untouched, so a re-apply is safe.
+
 **Nothing has run on Cloud Build.** The timeout is generous and says in the file
 that it is unmeasured.
 
 ## Open
 
-**One step terraform cannot do, and it fails the first apply if skipped**: the
-repository must be connected to Cloud Build in the console, in the same region
-as the trigger. `infra/ci/README.md` leads with it, along with the `import`
-block for adopting a `labkit-build` project that already exists.
+**The trigger has not been created yet**, and it is one of the four resources a
+re-apply will add. It is also the one that needs the step terraform cannot do:
+the repository must be connected to Cloud Build **in the console, in the same
+region as the trigger**, or it fails with a repository-mapping error.
+`infra/ci/README.md` leads with it.
+
+**The error message misleads in two directions, both now written down.** It was
+first read as an apply run under the wrong `gcloud config` — and the active
+gcloud project decides nothing here, since `providers.tf` pins the target to
+`var.project_id`. Three separate things are in play and only the first chooses
+where resources go: `var.project_id`, the ADC credential, and ADC's *quota*
+project (which was a third project again, `bonsai-504422`). And a 403 naming a
+permission the caller demonstrably holds reads as an IAM problem rather than a
+timing one.
 
 **A PR trigger cannot see upstream drift.** A new `oven/bun` or `apache/age`
 tag, or a dependency resolving differently, breaks nothing until someone
@@ -82,8 +127,10 @@ DB-layer loose ends.
 
 ## Next
 
-PR #30 awaits review, and `terraform apply` in `infra/ci` after the console
-connection — see `infra/ci/README.md`.
+Re-run `terraform apply` in `infra/ci` — 4 to add, nothing to change or
+destroy. Connect the repository to Cloud Build in the console first, in
+`us-central1`, or the trigger resource fails; `infra/ci/README.md` has it.
 
-Then the documents group in `docs/TASKS.md`, starting by reading
-`~/Code/agents/agent-bus/AGENTS.md` for the pinned-header shape.
+Then PR #30 awaits review, and after it the documents group in `docs/TASKS.md`,
+starting by reading `~/Code/agents/agent-bus/AGENTS.md` for the pinned-header
+shape.
