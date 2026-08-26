@@ -16,7 +16,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { connectDb, resolveTenantContext } from "../src/db";
+import { connectDb } from "../src/db/connect";
+import { resolveTenantContext } from "../src/db/tenant";
 
 const TEST_ROOT = join(import.meta.dir, "..", ".labkit-test-tmp");
 

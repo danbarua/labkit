@@ -12,7 +12,7 @@ import {
   type EvidenceProps,
   type LineOfEnquiryProps,
 } from "../src/db/domain";
-import type { LabKitDB } from "../src/db/client";
+import type { LabKitDB } from "../src/db/backend";
 import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
 import { setupTestDb, type TestDb } from "./helpers/db";
 

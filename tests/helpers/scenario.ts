@@ -11,7 +11,7 @@
 
 import { resolveTenantContext, type TenantContext } from "../../src/db/tenant";
 import { TenantGraph } from "../../src/db/graph";
-import type { LabKitDB } from "../../src/db/client";
+import type { LabKitDB } from "../../src/db/backend";
 import { setupTestDb, type TestDb } from "./db";
 
 export interface Scenario {

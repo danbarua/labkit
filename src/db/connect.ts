@@ -36,7 +36,7 @@ function derivePort(projectRoot: string): number {
  * because a caller that named one has already made the decision this is here
  * to guess at.
  */
-export function labkitHome(): string {
+function labkitHome(): string {
   return process.env.LABKIT_HOME ?? process.cwd();
 }
 

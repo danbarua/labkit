@@ -3,7 +3,7 @@ import { age } from "@electric-sql/pglite-age";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { Client } from "pg";
 import { runMigrations } from "../../src/db/migrate";
-import { bootstrapSession, type LabKitDB } from "../../src/db/client";
+import { bootstrapSession, type LabKitDB } from "../../src/db/backend";
 import { traced } from "../../src/db/trace";
 
 /**

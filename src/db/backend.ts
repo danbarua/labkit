@@ -11,9 +11,42 @@ import { dirname } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { Client } from "pg";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
-import { bootstrapSession, type LabKitDB } from "./client";
 import { age, pgliteAssets } from "./extensions";
 import { runMigrations } from "./migrate";
+
+/**
+ * The seam every other module talks to the database through: the minimum a
+ * connection has to offer for LabKit to use it. Structurally satisfied by
+ * `pg.Client`, by a raw `PGlite` instance, and by test doubles --
+ * intentionally narrower than any of them, so nothing below this seam can
+ * reach for backend-specific behaviour.
+ *
+ * It lives here, beside {@link LabKitDBConnection}, because a connection and
+ * the thing you can do with one are the same subject. It was its own file
+ * (`client.ts`) named for a thing it does not export -- no client, just an
+ * interface with two permanent implementations -- and the name misled every
+ * reader who went looking for the construction, which is `connect.ts`.
+ *
+ * It knows nothing about graphs, tenants or the domain model. That is what
+ * lets tests hand application code a plain `pg.Client`, and what keeps every
+ * importer of it outside this file a *type-only* importer: nothing under
+ * `src/db/` or `src/domain/` pulls PGlite in by depending on the seam.
+ */
+export interface LabKitDB {
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+}
+
+/**
+ * Per-session setup: `LOAD`/`search_path` are session-scoped in Postgres, so
+ * every connecting process must call this itself -- it can't be migrated
+ * away like the one-time bootstrap (`CREATE EXTENSION`) can. Graph/label
+ * provisioning is per-tenant runtime work now, not migrated at all -- see
+ * src/db/provisioning.ts's provisionTenantGraph().
+ */
+export async function bootstrapSession(db: LabKitDB): Promise<void> {
+  await db.query(`LOAD 'age';`);
+  await db.query(`SET search_path = ag_catalog, "$user", public;`);
+}
 
 export interface LabKitDBConnection {
   db: LabKitDB;

@@ -530,13 +530,26 @@ dependency direction is enforced by `npx depcruise src tests --output-type err`
 
 | module | job |
 | --- | --- |
-| `client.ts` | `LabKitDB` (the connection seam) + `bootstrapSession` |
+| `backend.ts` | `LabKitDB` (the connection seam) + `bootstrapSession`, and the two backends that satisfy it |
+| `connect.ts` | picks a backend and connects through it |
 | `agtype.ts` | agtype parsing, identifier validation, Cypher clause/quoting helpers |
 | `cypher.ts` | `CypherRunner` + column decoders — typed Cypher execution |
 | `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA`, `INDEXED_PROPS` |
 | `graph.ts` | `TenantGraph` — the domain-typed verbs |
 | `provisioning.ts` | per-tenant graph schema reconciliation |
 | `tenant.ts` | resolving a slug to a `TenantContext` |
+
+**There is no barrel and no `client.ts`.** `src/db/index.ts` exported 11 names
+of which 4 were ever imported through it, while 47 imports reached into
+submodules directly — a file to keep in sync with something nothing depended on.
+It is cheap to reintroduce later as an *enforced* boundary, which is the only
+version of it worth having. `client.ts` held the seam and was named for a thing
+it does not export: no client, just an interface with two permanent
+implementations, which sent readers looking for the construction in the wrong
+file. It is folded into `backend.ts`, beside `LabKitDBConnection` — a connection
+and the thing you can do with one are the same subject. Every importer of
+`LabKitDB` outside `backend.ts` is `import type`, so nothing pulls PGlite in by
+depending on the seam.
 
 `domain.ts` imports nothing from `src/db/`; it's pure types and data, read by
 both `graph.ts` (to type and validate writes) and `provisioning.ts` (to decide

@@ -9,7 +9,7 @@
 
 import { provisionTenantGraph } from "./provisioning";
 import { LABKIT_SCHEMA } from "./schema";
-import type { LabKitDB } from "./client";
+import type { LabKitDB } from "./backend";
 
 export interface TenantContext {
   tenantId: number;

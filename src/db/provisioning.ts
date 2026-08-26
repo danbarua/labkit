@@ -13,7 +13,7 @@
  */
 
 import { NODE_LABELS, EDGE_LABELS, INDEXED_PROPS, type NodeLabel, type EdgeLabel } from "./domain";
-import type { LabKitDB } from "./client";
+import type { LabKitDB } from "./backend";
 
 /**
  * Reconciles a tenant's AGE graph, unconditionally, every time it's called

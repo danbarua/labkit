@@ -19,7 +19,7 @@
  * that direction. Taking a `LabKitDB` is the allowed way round.
  */
 
-import type { LabKitDB } from "../db/client";
+import type { LabKitDB } from "../db/backend";
 import { LABKIT_SCHEMA } from "../db/schema";
 import type { AttributionContext, DomainEvent, EventFilter, EventSink, Operation } from "./events";
 

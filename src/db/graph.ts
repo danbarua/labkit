@@ -30,7 +30,7 @@ import {
   type NodePropsByLabel,
   type PublicNode,
 } from "./domain";
-import type { LabKitDB } from "./client";
+import type { LabKitDB } from "./backend";
 import type { TenantContext } from "./tenant";
 
 /**
