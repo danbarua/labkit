@@ -48,15 +48,17 @@ database — a real PostgreSQL over `LABKIT_DB_URL`, or two clients pointed at o
 
 ### Wiring it into a client
 
-Claude Code:
-
 Claude Code, from the project directory you want the record kept in:
 
 ```sh
 claude mcp add labkit -e LABKIT_HOME="$PWD" -- bun /path/to/labkit/src/mcp/server.ts
 ```
 
-Anything that reads an `mcpServers` block:
+That is **local** scope, the default: the entry is stored against this project
+only, so a literal path in it stays correct.
+
+For a `.mcp.json` committed at the root of a project — Claude Code's **project**
+scope, and anything else that reads an `mcpServers` block:
 
 ```json
 {
@@ -64,11 +66,22 @@ Anything that reads an `mcpServers` block:
     "labkit": {
       "command": "bun",
       "args": ["/path/to/labkit/src/mcp/server.ts"],
-      "env": { "LABKIT_HOME": "/path/to/your-project" }
+      "env": { "LABKIT_HOME": "${PWD}" }
     }
   }
 }
 ```
+
+`${PWD}` rather than a literal path, because this file is committed and a path
+that is right on your machine is wrong on everyone else's. Measured 2026-08-26:
+Claude Code expands `${VAR}` in an `mcpServers` env value, and launches the
+server with the project directory as its working directory.
+
+**Do not put LabKit in `user` scope.** One entry applies to every project you
+open, so every directory becomes a LabKit record — including the ones that have
+nothing to do with research. If you want one shared record across projects, say
+so deliberately: point `LABKIT_HOME` at a fixed directory and give each
+programme its own `LABKIT_TENANT`.
 
 The server is named by absolute path rather than launched with
 `bun run --cwd /path/to/labkit mcp`. That form worked, and it set the process's
