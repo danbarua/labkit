@@ -306,6 +306,7 @@ would hand a new worktree another session's pinned baseline).
 bun install                    # install dependencies
 bun test                       # run all tests (embedded PGlite)
 bun run test:pg                # the same suite against a real Postgres + AGE container (docker/postgres)
+bun run test:in-docker         # what Cloud Build runs, in the CI image, on a worker-sized machine
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 bunx depcruise src tests --output-type err   # layering rules (errors) + cycles
@@ -318,6 +319,7 @@ bun run check:lint             # biome lint — rules that are off are off by na
 bun run check:migrations       # lints drizzle/*.sql for destructive DDL
 bun run check:doc-comments     # finds doc comments detached from what they document
 bun run check:tests-assert     # finds tests that assert nothing, or comparing two literals
+bun run check:test-ceiling     # nothing runs the suite as a bare `bun test`
 bun run check:test-teardown    # a test file that opens a scenario must also reset the database
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
@@ -1409,6 +1411,21 @@ holding on to: the old rule's stated reason was fidelity to production, and
 production now opens PGlite directly, so sharing the instance is the *more*
 faithful arrangement.
 
+**`bun run test:in-docker` runs what CI runs, here.** Same image, same steps as
+`cloudbuild.test.yaml`, with `--cpus`/`--memory` defaulted to a Cloud Build
+worker's shape (2/8g) because the resource limit is the point — this machine has
+ten cores and the suite is timing sensitive. `LABKIT_CI_CPUS=1` squeezes harder.
+It tests a `git clone` with the working tree copied over it, so uncommitted
+changes are included *and* the container gets a real `.git`, which a bind mount
+of a git **worktree** cannot give it — the `.git` file there names a host path.
+
+**It did not reproduce the failure that prompted it**, which is worth knowing
+before trusting it. The hook timeout that reddened the first CI build was green
+here at 2 cpus and at 1, with Postgres running alongside as CI does. What it
+closes is the *environment* half of "works on my machine" — image, dependencies,
+git, the Postgres wiring. The *speed* half it only approximates: a shared-core
+`e2` throttled to a sustained baseline is not a full local core under quota.
+
 **`bun run test:pg` runs the same suite against a real Postgres**
 (`docker-compose.yml`'s `apache/age:release_PG18_1.7.0`) by setting
 `LABKIT_DB_URL` — the same variable production reads. It is `test:` and not
@@ -1503,6 +1520,40 @@ hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
 `a beforeEach hook timed out`, and every failure this repo has recorded says
 `timed out after 5000ms`, the body wording. So in the files that set up from
 `beforeEach`, setup cost is not the mechanism.
+
+**The ceiling is now 20000ms and chosen, not bun's 5000ms default** (`--timeout`
+on the `test` script, added 2026-08-26).
+
+**`bun test` does not read that; `bun run test` does.** A bare `bun test`
+bypasses `package.json`, so it runs at bun's default — and so did
+`bun run check`, whose sweep invoked `["bun", "test"]` while every other step
+went through `bun run`. The flag was added, CI went on failing at 5000ms, and
+the log showed a ceiling the repo believed it had raised. `check-all.ts` routes
+through the script now, so one place says what the test step is.
+
+**It then happened a second time, in the other caller.** With the sweep fixed
+the build got further and failed in `scripts/test-postgres.sh`, which also ran
+`bun test` directly. Fixing callers one at a time is what produced the second
+failure, so `check:test-ceiling` now refuses either spelling — the shell
+`bun test` and the `["bun", "test"]` argv array that caused the original. Its
+first version caught only the shell one, which would not have caught the bug it
+was written for; both are in its negative control.
+
+**`bunfig.toml` is not the way out.** Measured against bun 1.3.14, `[test]
+timeout = 20000` is ignored — a 6.5s `beforeAll` fails identically with and
+without it. If a later bun honours it, move the ceiling there and delete the
+check. It went up because CI found the edge:
+a `beforeAll` calling `openScenario()` timed out at 5807ms on a Cloud Build
+worker, and the cascade — `scenario` never assigned, `afterAll` throwing
+`undefined is not an object` — reported as two failures. Booting WASM in a hook
+is legitimate work, and 5000ms was a number nobody here picked.
+
+Two things this does not change. **`--timeout` covers hooks** — verified with a
+6.5s `beforeAll`, which fails at the default and passes at 20000 — so the
+margin-measuring method below still works, just from a higher start. And bun
+says *"a beforeEach/afterEach hook timed out"* even when the hook is a
+`beforeAll`, which is worth knowing before hunting for a `beforeEach` that does
+not exist.
 
 **It stopped happening, and the honest version is that nobody knows which
 change did it.** Re-measured 2026-08-25 by the method below — five full runs

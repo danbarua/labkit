@@ -87,7 +87,14 @@ echo
 # Not piped, deliberately. `$?` after a pipeline reports the *last* command's
 # status, and a pipe would also throw away every `(fail)` line — the two traps
 # CLAUDE.md records, both of which have caught someone here.
-LABKIT_DB_URL="$url" bun test
+#
+# **`bun run test`, not `bun test`.** A bare `bun test` bypasses `package.json`,
+# so it runs at bun's 5000ms default rather than the ceiling the `test` script
+# sets. This said `bun test` until 2026-08-26 and cost a CI cycle: the sweep was
+# fixed, the build got further, and failed here instead — the same defect in the
+# second of the two places that invoke the suite. `bunfig.toml`'s `[test]
+# timeout` is not an answer; measured against bun 1.3.14, it is ignored.
+LABKIT_DB_URL="$url" bun run test
 status=$?
 
 echo

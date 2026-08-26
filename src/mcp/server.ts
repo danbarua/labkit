@@ -194,6 +194,9 @@ let inFlight = 0;
 /**
  * Serves over stdio, opening and releasing the database around each tool call.
  *
+ * **Does not return.** The promise settles only by the process exiting; see the
+ * end of the function.
+ *
  * **Nothing is held between calls, and that is the point.** The embedded PGlite
  * file is single-writer: a process that keeps it open locks every other process
  * out of the project for as long as it lives, and the use case is several
@@ -287,6 +290,19 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   process.stdin.on("end", () => {
     void drainThenExit(server);
   });
+
+  // **Never settles, and that is the contract.** `main()` used to resolve as
+  // soon as the transport was connected, on the reasoning that the stdin
+  // subscription keeps the process alive — true when this file was the entry
+  // point, and false the moment it became one. `src/cli/cli.ts` ends with
+  // `process.exit(await main())`, so a resolving promise here meant the
+  // compiled binary's `labkit mcp` connected, returned, and exited **0 with no
+  // output** before answering a single request.
+  //
+  // Serving ends by `process.exit` inside `drainThenExit`, so there is nothing
+  // for this to resolve *with*. Saying so in the type is what stops the next
+  // caller assuming otherwise.
+  await new Promise<never>(() => {});
 }
 
 /** Waits for every request already in hand to be answered, then shuts down. */
