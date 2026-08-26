@@ -71,6 +71,27 @@ state_file="$state_dir/$session_id"
 
 cd "$root" 2>/dev/null || exit 0
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+
+# **Never fire on `main`.** Work happens on branches in worktrees; a session
+# sitting on `main` is reviewing, merging or reading, and HEAD moves there
+# because someone else's PR landed. The hook cannot tell that from work of its
+# own -- it fires on HEAD moving, which is the right signal for a session that
+# commits and a false one for a session that does not. A review session pulled
+# three times on 2026-08-26 and got three prompts to write up peer merges that
+# already had entries 044-047; the only correct answer each time was to
+# re-baseline and write nothing.
+#
+# The cost of being wrong here is worse than a missed entry: the prompt asks an
+# agent to commit, on `main`, describing work it did not do.
+#
+# `if` rather than `[ ... ] && exit 0`: under `set -e` a false test as the last
+# command of an `&&` list is a failing statement, so the one-liner would have
+# exited 1 on every branch that is *not* main -- the opposite of the intent, and
+# silent.
+if [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)" = "main" ]; then
+  exit 0
+fi
+
 head_sha="$(git rev-parse HEAD 2>/dev/null || true)"
 [ -n "$head_sha" ] || exit 0   # a repo with no commits has nothing to wrap
 
