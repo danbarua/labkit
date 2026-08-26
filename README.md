@@ -22,16 +22,24 @@ That is the whole setup. On first run it creates `.labkit/` **in the working
 directory**, holding an embedded PostgreSQL (PGlite, with Apache AGE for the
 graph), and runs its migrations. That directory is the database, so where you
 launch the server from decides which record you are working in — the `--cwd`
-in the client configurations below is what pins it. Several processes may share
-one directory: they elect a leader and the rest connect to it over a local
-socket.
+in the client configurations below is what pins it.
 
-Two environment variables, and both have working defaults:
+The file is single-writer, so a process takes an exclusive lock for the length
+of a unit of work and gives it back: several agents can share one project, and
+one waits briefly while another is mid-command.
+
+Three environment variables, and all have working defaults:
 
 | variable | default | what it does |
 | --- | --- | --- |
-| `LABKIT_TENANT` | `labkit` | which tenant's graph to open. Each tenant is a separate research programme with its own graph; the slug is created on first use. |
-| `LABKIT_DB_URL` | unset | connect to a real PostgreSQL instead of the embedded one. **Migrations are not run** on this path — that is an out-of-band deploy step by design. |
+| `LABKIT_HOME` | the working directory | which directory holds `.labkit/`. The CLI's `--db` says the same thing. |
+| `LABKIT_TENANT` | `labkit` | which tenant's graph to open, within one database. |
+| `LABKIT_DB_URL` | unset | connect to a real PostgreSQL instead of the embedded one. **Migrations are not run** on this path — an out-of-band deploy step by design. |
+
+**Most projects never touch `LABKIT_TENANT`.** A directory is already a
+database, so one project is one record and the default tenant is all of it.
+Tenants matter when several programmes share *one* database — which is the
+`LABKIT_DB_URL` case, not the `.labkit/` one.
 
 ### Wiring it into a client
 
@@ -56,9 +64,10 @@ Anything that reads an `mcpServers` block:
 ```
 
 The server reads and writes. Nothing is exposed that the domain layer does not
-already offer, and every tool is listed — with its arguments and its answer —
-in [`docs/mcp-tools.md`](docs/mcp-tools.md). The same document is served live at
-`labkit://docs/tools`, so a client can fetch it without leaving the session.
+already offer, and every tool is listed — with its arguments and its answer — at
+`labkit://docs/tools`, which a client can fetch without leaving the session. It
+is rendered from the tool declarations on each read and stored nowhere, so it
+cannot disagree with the server.
 
 ### Where to start, as an agent
 
@@ -77,23 +86,35 @@ they are two different claims.
 ## The CLI
 
 ```sh
-bun run dev            # the CLI
+bun run dev --help     # the CLI
 bun run build          # compiles it to bin/labkit
+bun run example        # a narrated lifecycle, for reading
 ```
 
-**Read-only by construction**: it builds a read surface and never a write one,
-so it cannot change the record. `bun run mcp` is the half that writes.
+It reads **and writes** — every verb the MCP server exposes has a command — and
+`--json` gives the same document an MCP client gets. `--db <dir>` picks the
+record; `--author` names who is acting, since a script driving LabKit is not the
+account it runs under.
 
 ## Developing
 
-`CLAUDE.md` is the guide — architecture, the gates to run before committing,
-and the AGE-specific traps. In short:
+`CLAUDE.md` is the guide — architecture, the traps, and why things are the way
+they are. Before committing:
 
 ```sh
-bun test                                    # 0 is clean; never pipe it, or $? reports the pipe
-bun run typecheck
-npx depcruise src tests --output-type err
+bun run check          # the whole sweep: tests, types, layering, every check:*
 ```
+
+It derives its own list, so this line does not go stale as checks are added.
+Never pipe `bun test` — `$?` reports the pipe, and the `(fail)` lines are what
+you needed.
+
+```sh
+bun run test:pg        # the same suite against a real Postgres + AGE container
+```
+
+Not in the sweep, because it needs Docker. Cloud Build runs it, and
+`bun run check`, on every pull request to `main`; see `infra/ci/`.
 
 The reasoning behind the domain model is in `docs/project-journal/`, oldest
 first; `docs/TASKS.md` is the work queue.
