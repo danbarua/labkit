@@ -10,7 +10,6 @@ import {
 import { dirname } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { Client } from "pg";
-import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { age, pgliteAssets } from "./extensions";
 import { runMigrations } from "./migrate";
 
@@ -50,7 +49,6 @@ export async function bootstrapSession(db: LabKitDB): Promise<void> {
 
 export interface LabKitDBConnection {
   db: LabKitDB;
-  role: "primary" | "secondary";
   close(): Promise<void>;
 }
 
@@ -68,44 +66,27 @@ async function openPglite(dataDir: string): Promise<PGlite> {
   // Assets handed in rather than located -- see `./extensions.ts`. Doing it
   // unconditionally keeps one code path: an interpreted run reads the same
   // files from `node_modules/`, a compiled one from inside the bundle.
-  return new PGlite({ dataDir, extensions: { age }, ...(await pgliteAssets()) });
-}
-
-async function tryClient(host: string, port: number): Promise<Client> {
-  const client = new Client({
-    host,
-    port,
-    database: "postgres",
-    user: "postgres",
-  });
-  await client.connect();
-  return client;
-}
-
-async function waitForClient(host: string, port: number, timeoutMs = 10_000): Promise<Client> {
-  const start = Date.now();
-  for (;;) {
-    try {
-      return await tryClient(host, port);
-    } catch (_err) {
-      if (Date.now() - start > timeoutMs) {
-        throw new Error(
-          `timed out waiting for ledger primary to start listening on ${host}:${port}`,
-        );
-      }
-      await Bun.sleep(25);
-    }
-  }
+  const db = new PGlite({ dataDir, extensions: { age }, ...(await pgliteAssets()) });
+  await db.waitReady;
+  return db;
 }
 
 /**
+ * The mutex, and the only thing standing between two processes and a corrupt
+ * database file.
+ *
  * PID lockfile, exactly Postgres's own `postmaster.pid` mechanism: atomic
- * exclusive-create (`wx`) is the mutex — no check-then-act race, unlike
- * `existsSync` followed by a separate open. If the lock file already
- * exists, read the PID inside and check whether that process is still
- * alive; if not, it's a stale lock from a crash and gets reclaimed.
+ * exclusive-create (`wx`) is the mutex -- no check-then-act race, unlike
+ * `existsSync` followed by a separate open. If the lock file already exists,
+ * read the PID inside and check whether that process is still alive; if not,
+ * it is a stale lock from a crash and gets reclaimed.
+ *
+ * **A process does not get to skip its own lock.** Two overlapping calls in one
+ * process read their own PID as alive and the second one waits, which is right:
+ * the lock guards a `dataDir`, and one process opening it twice corrupts the
+ * file exactly as two processes would.
  */
-function acquirePrimaryLock(lockPath: string): boolean {
+function tryAcquire(lockPath: string): boolean {
   try {
     const fd = openSync(lockPath, "wx");
     writeSync(fd, String(process.pid));
@@ -119,9 +100,9 @@ function acquirePrimaryLock(lockPath: string): boolean {
       return false;
     } catch (checkErr: any) {
       if (checkErr.code === "ESRCH") {
-        // Holder is dead — stale lock, reclaim it.
+        // Holder is dead -- stale lock, reclaim it.
         unlinkSync(lockPath);
-        return acquirePrimaryLock(lockPath);
+        return tryAcquire(lockPath);
       }
       // EPERM or anything else ambiguous: don't steal the lock.
       return false;
@@ -129,91 +110,100 @@ function acquirePrimaryLock(lockPath: string): boolean {
   }
 }
 
-function releasePrimaryLock(lockPath: string): void {
+function holderOf(lockPath: string): string {
   try {
-    unlinkSync(lockPath);
+    return readFileSync(lockPath, "utf8").trim();
   } catch {
-    // already gone — fine
+    return "unknown";
   }
 }
 
 /**
- * Postmaster/client election over an embedded, single-writer PGlite file,
- * "just like Postgres itself": the first process to win the PID-lockfile
- * race becomes primary — it owns the real PGlite instance and serves it
- * over pglite-socket (real Postgres wire protocol). Every other process
- * connects as a plain `pg` client instead, either immediately (primary
- * already listening) or after a short poll (primary still starting up).
+ * Waits for the lock rather than failing on it, because the holder is a
+ * hundred milliseconds away.
  *
- * Migration invariant: only the election winner ever reaches
- * `runMigrations()`, and it does so before starting the socket server —
- * losers only ever connect to an already-migrated primary and never call
- * it, so there is no concurrent-writer race on the migration ledger to
- * reason about under this strategy.
- *
- * Election is a PGlite-specific concern (PGlite is single-writer/
- * single-process) — `directPostgresBackend` below has no election at all,
- * because a real Postgres server is already the single source of truth
- * every process can connect to directly.
+ * Measured 2026-08-26 against a real `dataDir`: a **warm** open-migrate-resolve-
+ * close cycle is 80-96ms, of which the open is 70-85ms, the migration no-op 2ms
+ * and the close 2ms. A **cold** one -- an empty directory, initdb and the first
+ * migration -- is 1067ms. The default deadline has to clear the cold case with
+ * margin or the first two processes to start against a fresh project race each
+ * other into an error, so it is ten seconds and not one.
  */
-export function pgliteLeaderElectionBackend(opts: {
+async function acquireLock(lockPath: string, timeoutMs = 10_000): Promise<void> {
+  const start = Date.now();
+  for (;;) {
+    if (tryAcquire(lockPath)) return;
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(
+        `timed out after ${timeoutMs}ms waiting for the LabKit database lock at ${lockPath} ` +
+          `(held by pid ${holderOf(lockPath)})`,
+      );
+    }
+    await Bun.sleep(25);
+  }
+}
+
+function releaseLock(lockPath: string): void {
+  try {
+    unlinkSync(lockPath);
+  } catch {
+    // already gone -- fine
+  }
+}
+
+/**
+ * An embedded, single-writer PGlite file, held for exactly as long as the work
+ * takes: lock, open, work, close.
+ *
+ * **This replaced a leader election.** The first process to win the lockfile
+ * used to open PGlite, start a `PGLiteSocketServer`, and then connect *to
+ * itself* over loopback TCP so that everyone -- including the owner -- talked
+ * to it as a plain `pg.Client`. It was coherent, and it bought nothing the use
+ * case needs. Multiple agents against one project cannot each hold a connection
+ * under it either: the first one in owns the file and the rest connect through
+ * it only while it lives, so releasing between units of work was already
+ * forced rather than chosen. What the socket added on top of that was a second
+ * failure mode -- when the primary died, a secondary's next query raised an
+ * uncaught `'error'` event from `pg` and killed the process before any `catch`
+ * ran.
+ *
+ * The whole cycle is 80-96ms warm (measured 2026-08-26; see {@link acquireLock}
+ * for the breakdown), against which a CLI invocation used to pay a speculative
+ * TCP connect, possibly a lockfile race, possibly a 25ms poll, and then talk
+ * over loopback anyway.
+ *
+ * **Migrations run on every open**, which is a change and a cheap one: the
+ * no-op case is 2ms, and the alternative is a version gate of the kind PJ-005
+ * reverted. There is no concurrent-writer race to reason about because the lock
+ * is held across it.
+ */
+export function pgliteBackend(opts: {
   dataDir: string;
   lockPath: string;
-  port: number;
-  host: string;
+  /** How long to wait for the holder before giving up. See {@link acquireLock}. */
+  lockTimeoutMs?: number;
 }): DbBackend {
-  const { dataDir, lockPath, port, host } = opts;
+  const { dataDir, lockPath, lockTimeoutMs } = opts;
 
   return {
     async connect(): Promise<LabKitDBConnection> {
       const lockDir = dirname(lockPath);
       if (!existsSync(lockDir)) mkdirSync(lockDir, { recursive: true });
 
-      // Fast path: someone's already primary and listening.
+      await acquireLock(lockPath, lockTimeoutMs);
       try {
-        const client = await tryClient(host, port);
-        await bootstrapSession(client);
-        return { db: client, role: "secondary", close: () => client.end() };
-      } catch {
-        // fall through to the election
-      }
-
-      if (!acquirePrimaryLock(lockPath)) {
-        // Someone else holds the lock (mid-startup or already primary) —
-        // never open PGlite ourselves; wait for them to be reachable instead.
-        const client = await waitForClient(host, port);
-        await bootstrapSession(client);
-        return { db: client, role: "secondary", close: () => client.end() };
-      }
-
-      try {
-        const rawDb = await openPglite(dataDir);
-        await runMigrations(rawDb);
-        await bootstrapSession(rawDb);
-
-        // maxConnections defaults to 1 (no concurrency) in this library — we
-        // need at least 2 (the primary's own selfClient, plus every secondary).
-        const server = new PGLiteSocketServer({
-          db: rawDb,
-          port,
-          host,
-          maxConnections: 16,
-        });
-        await server.start();
-        const selfClient = await tryClient(host, port);
-        await bootstrapSession(selfClient);
+        const db = await openPglite(dataDir);
+        await runMigrations(db);
+        await bootstrapSession(db);
         return {
-          db: selfClient,
-          role: "primary",
+          db,
           close: async () => {
-            await selfClient.end();
-            await server.stop();
-            await rawDb.close();
-            releasePrimaryLock(lockPath);
+            await db.close();
+            releaseLock(lockPath);
           },
         };
       } catch (err) {
-        releasePrimaryLock(lockPath);
+        releaseLock(lockPath);
         throw err;
       }
     },
@@ -221,32 +211,27 @@ export function pgliteLeaderElectionBackend(opts: {
 }
 
 /**
- * Connects directly to a real (local or cloud) Postgres — no leader
- * election, since Postgres itself is already the single writer every
- * process can reach concurrently. `role` is kept for interface uniformity
- * with the PGlite strategy but is meaningless here: every process is
- * symmetric.
+ * Connects directly to a real (local or cloud) Postgres.
+ *
+ * No lock: Postgres is its own arbiter and is already the single writer every
+ * process can reach concurrently. This is the only route to a shared or
+ * per-user database, and the reason {@link LabKitDB} has two permanent
+ * implementations rather than collapsing into one.
  *
  * Migrations are deliberately NOT run by this backend (decided 2026-08-17,
- * see docs/project-journal/002_schema_dot_ts.md) — with no election, N
- * processes connecting concurrently would race `runMigrations()` with no
- * guard. For now that's out of scope: migrations against this backend are
- * an out-of-band `bun run db:migrate`-style deploy step, run once before any
- * LabKit process starts. A `pg_advisory_lock`-guarded in-process migration
- * would be the alternative if that stops being good enough.
+ * see docs/project-journal/002_schema_dot_ts.md): with N processes connecting
+ * concurrently and nothing serialising them, migrating here would be a race.
+ * Against this backend migrations are an out-of-band deploy step, run once
+ * before any LabKit process starts. A `pg_advisory_lock`-guarded in-process
+ * migration would be the alternative if that stops being good enough.
  */
 export function directPostgresBackend(opts: { connectionString: string }): DbBackend {
   return {
     async connect(): Promise<LabKitDBConnection> {
-      const client = await tryClientAt(opts.connectionString);
+      const client = new Client({ connectionString: opts.connectionString });
+      await client.connect();
       await bootstrapSession(client);
-      return { db: client, role: "primary", close: () => client.end() };
+      return { db: client, close: () => client.end() };
     },
   };
-}
-
-async function tryClientAt(connectionString: string): Promise<Client> {
-  const client = new Client({ connectionString });
-  await client.connect();
-  return client;
 }

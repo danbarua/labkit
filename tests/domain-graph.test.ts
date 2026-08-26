@@ -22,8 +22,8 @@ import { setupTestDb, type TestDb } from "./helpers/db";
  * docs/project-journal/004_tenancy_implementation_plan.md) against Apache
  * AGE, migrated and provisioned the same way a real connection would be
  * (runMigrations() + resolveTenantContext(), not hand-rolled setup) and
- * queried through the same `pg.Client`-over-`pglite-socket` path production
- * uses — never a raw `PGlite` instance directly (see tests/helpers/db.ts).
+ * queried through the same `LabKitDB` seam production uses (see
+ * tests/helpers/db.ts).
  * Each test corresponds to one of the journal's MVP acceptance-criteria
  * questions, or one of PJ-003 §15 / PJ-004's acceptance tests.
  */
@@ -42,11 +42,11 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // A fresh connection every test, not one shared for the whole file — see
-  // tests/helpers/db.ts's file-level comment on why that's load-bearing,
-  // not a style preference (a confirmed pglite-socket bug can permanently
-  // corrupt a connection that sees enough error/concurrency exposure, and
-  // several tests in this file deliberately provoke DB-level errors).
+  // One labelled client per test. Several tests in this file deliberately
+  // provoke DB-level errors, which used to be load-bearing: a pglite-socket
+  // defect could permanently corrupt a connection that saw enough of them, and
+  // a connection per test bounded that. The socket is gone and so is the
+  // defect — see tests/helpers/db.ts.
   db = await testDb.openClient();
   ctx = await resolveTenantContext(db, "labkit");
   graph = new TenantGraph(ctx, db);
@@ -568,17 +568,14 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     ).rejects.toThrow(/duplicate key value violates unique constraint/);
   });
 
-  // NOT a real Promise.all() race against two live connections — genuine
-  // concurrent queries against pglite-socket are not reliable enough for a
-  // deterministic suite to depend on (confirmed 2026-08-18: two SEPARATE
-  // pg.Client connections issuing overlapping queries where one errors,
-  // e.g. this exact 23505, corrupt the connection after a handful of
-  // iterations — reproducible with plain SQL, nothing AGE-specific about
-  // it; see the postgres-age skill's "Upstream filing"). That's a real bug
-  // in @electric-sql/pglite-socket, not something to work around by wanting
-  // harder — and it matters beyond this test, since pgliteLeaderElectionBackend's
-  // whole design is every secondary process hitting the primary's socket
-  // concurrently. What's actually testable deterministically: the DB
+  // NOT a real Promise.all() race against two live connections, and the reason
+  // has outlived the bug it started as. It was originally that concurrent
+  // queries against pglite-socket were not reliable enough to depend on
+  // (confirmed 2026-08-18; see the postgres-age skill's "Upstream filing").
+  // There is no socket now: the embedded database is single-writer and held
+  // under an exclusive lock, so two live connections to it is not a state this
+  // deployment can reach at all. What is actually testable deterministically:
+  // the DB
   // constraint itself (the "duplicate CREATE... blocked at the database"
   // test above, one connection, no race needed) and createEdge()'s own
   // handling of losing that race — proven here by making the CREATE step

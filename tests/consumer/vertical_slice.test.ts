@@ -60,9 +60,10 @@ afterAll(async () => {
  * Runs two worlds in sequence, each against a genuinely fresh graph, and hands
  * back what the read surface said about each.
  *
- * Sequential rather than side by side because one connection per test is this
- * repo's containment strategy for a live pglite-socket bug (tests/helpers/db.ts).
- * `end()` truncates, so world B cannot see world A.
+ * Sequential rather than side by side because the suite shares one database
+ * session (tests/helpers/db.ts) and `end()` truncates, so world B cannot see
+ * world A. Two worlds side by side would need two sessions, which is what
+ * production has and the harness does not.
  */
 async function inTwoWorlds<T>(
   worldA: (s: ResearchSession) => Promise<T>,

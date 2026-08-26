@@ -42,10 +42,11 @@ export interface Scenario {
    * method exists to catch — that risk lives in the `TenantGraph`/
    * `ResearchSession` instance, and this still builds a fresh one every call.
    *
-   * It deliberately does **not** open a new connection: `@electric-sql/pglite-socket`
-   * has a confirmed concurrency bug (see tests/helpers/db.ts and PJ-006), so
-   * one connection per test is the containment strategy. "Durable" here means
-   * *in the graph rather than in memory*, not *survives a reconnect*.
+   * It does **not** open a new connection, and cannot: the suite shares one
+   * database session (tests/helpers/db.ts). "Durable" here means *in the graph
+   * rather than in memory*, not *survives a reconnect* — which was true when
+   * this said the reason was containing a pglite-socket defect, and is true now
+   * for a plainer reason.
    */
   current(): Promise<TenantGraph>;
   end(): Promise<void>;

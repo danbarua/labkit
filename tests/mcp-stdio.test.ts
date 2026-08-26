@@ -5,7 +5,7 @@
  * through `InMemoryTransport`. That proves the tools answer; it does not prove
  * the thing anyone actually runs works. `bun run mcp` is the deployment
  * artefact, and until this file existed nothing had ever launched it: not the
- * database connection, not leader election, not migrations, not tenant
+ * database connection, not the file lock, not migrations, not tenant
  * resolution, not `StdioServerTransport`, and not the shutdown path.
  *
  * It also checks the property `bun run check:stdout` exists for, and the last

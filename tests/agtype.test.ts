@@ -203,11 +203,10 @@ describe("parseAgtype — against live pglite-age", () => {
     await testDb.close();
   });
 
-  // A fresh connection per test, not one shared for the whole describe
-  // block — see tests/helpers/db.ts's file-level comment: a confirmed
-  // pglite-socket bug can permanently corrupt a connection under
-  // concurrency/error exposure, so sharing one risks cascading failures
-  // unrelated to whatever this file is actually testing.
+  // One labelled client per test. This used to be a *fresh connection* per
+  // test, containing a pglite-socket defect that could permanently corrupt one;
+  // there is no socket any more, so it is now bookkeeping and a trace label
+  // rather than containment — see tests/helpers/db.ts's file-level comment.
   beforeEach(async () => {
     db = await testDb.openClient();
   });

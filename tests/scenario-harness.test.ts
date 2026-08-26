@@ -3,7 +3,8 @@
  *
  * The suite's intermittent `graph "labkit_t1" does not exist` and
  * `Connection terminated unexpectedly` bursts were a **teardown cascade**, not
- * the pglite-socket defect they were twice attributed to (`docs/TASKS.md`).
+ * the pglite-socket defect they were twice attributed to (`docs/TASKS.md`) —
+ * a defect since removed along with the socket itself.
  * bun's fixed 5000ms per-test timeout does not cancel the test body: an
  * overrunning test keeps executing while the next one starts, and its late
  * `scenario.end()` used to reset the database and close a connection that by

@@ -94,9 +94,11 @@ async function overTheWire() {
   const graph = await scenario.begin();
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const events = inMemoryEventLog();
-  await buildServer(
-    new ReadSurface(graph, { events }),
-    () => new WriteSurface(graph, { clock, events }),
+  await buildServer((work) =>
+    work({
+      read: new ReadSurface(graph, { events }),
+      write: new WriteSurface(graph, { clock, events }),
+    }),
   ).connect(serverSide);
   const client = new Client({ name: "subject-identity", version: "0" });
   await client.connect(clientSide);

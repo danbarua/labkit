@@ -57,19 +57,21 @@ const id = (v: unknown): string =>
 
 /**
  * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and
- * a **factory** for the write half so each tool call gets its own surface. The
- * sink must be constructed at this level rather than taken from a surface — a
- * per-call surface defaulting to its own log would fragment the stream and
- * leave the read half holding an empty one.
+ * handed to a **scope** the server enters per tool call. The sink must be
+ * constructed at this level rather than taken from a surface — a per-call
+ * surface defaulting to its own log would fragment the stream and leave the two
+ * halves of one call holding different ones.
  */
 async function connectServer(
   graph: TenantGraph,
   transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0],
 ) {
   const events = inMemoryEventLog();
-  return buildServer(
-    new ReadSurface(graph, { events }),
-    () => new WriteSurface(graph, { events }),
+  return buildServer((work) =>
+    work({
+      read: new ReadSurface(graph, { events }),
+      write: new WriteSurface(graph, { events }),
+    }),
   ).connect(transport);
 }
 

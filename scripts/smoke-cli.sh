@@ -19,9 +19,9 @@
 # at all. Nothing else runs the binary end to end.
 #
 # Hermetic. `--db` points at a fresh temporary directory, so this cannot touch a
-# working database and cannot contend with one: `derivePort` in
-# `src/db/connect.ts` hashes that path, so this run gets its own file *and* its
-# own port. The directory is removed on exit, success or failure.
+# working database and cannot contend with one: the database file and the lock
+# that guards it both live in there. The directory is removed on exit, success
+# or failure.
 #
 # **Exit 0 means it worked, and nothing else does.** `set -e` plus explicit
 # assertions on what came back — not on whether the commands ran. The

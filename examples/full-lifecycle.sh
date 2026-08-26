@@ -6,9 +6,9 @@
 # `scripts/smoke-cli.sh` (`bun run check:cli`), so this file can stay readable
 # and that one can check things nobody wants narrated.
 #
-# Hermetic: `--db` points at a fresh temporary directory, removed on exit, and
-# `derivePort` hashes that path so this gets its own port too. It cannot touch
-# or contend with a working database.
+# Hermetic: `--db` points at a fresh temporary directory, removed on exit. Its
+# database file and its lock both live in there, so this cannot touch or contend
+# with a working database.
 #
 # Usage: bun run example
 set -euo pipefail
