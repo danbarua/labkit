@@ -18,11 +18,15 @@ bun install
 bun run mcp        # speaks MCP over stdio
 ```
 
-That is the whole setup. On first run it creates `.labkit/` **in the working
-directory**, holding an embedded PostgreSQL (PGlite, with Apache AGE for the
-graph), and runs its migrations. That directory is the database, so where you
-launch the server from decides which record you are working in — the `--cwd`
-in the client configurations below is what pins it.
+That is the whole setup. On first run it creates `.labkit/` in the directory
+`LABKIT_HOME` names — defaulting to the working directory — holding an embedded
+PostgreSQL (PGlite, with Apache AGE for the graph), and runs its migrations.
+
+**That directory is the database, so naming it is the only configuration that
+matters.** Set `LABKIT_HOME` to your project in the wiring below. Do not rely on
+the working directory: a client decides that, and a launcher that points at the
+LabKit checkout puts every project's record in one place inside the source
+tree — silently, since `.labkit/` is gitignored.
 
 The file is single-writer, so a process takes an exclusive lock for the length
 of a unit of work and gives it back: several agents can share one project, and
@@ -36,17 +40,20 @@ Three environment variables, and all have working defaults:
 | `LABKIT_TENANT` | `labkit` | which tenant's graph to open, within one database. |
 | `LABKIT_DB_URL` | unset | connect to a real PostgreSQL instead of the embedded one. **Migrations are not run** on this path — an out-of-band deploy step by design. |
 
-**Most projects never touch `LABKIT_TENANT`.** A directory is already a
-database, so one project is one record and the default tenant is all of it.
-Tenants matter when several programmes share *one* database — which is the
-`LABKIT_DB_URL` case, not the `.labkit/` one.
+**Most projects never touch `LABKIT_TENANT`**, provided `LABKIT_HOME` differs
+between them. A directory is a database, so one project is one record and the
+default tenant is all of it. Tenants separate programmes that share *one*
+database — a real PostgreSQL over `LABKIT_DB_URL`, or two clients pointed at one
+`LABKIT_HOME`.
 
 ### Wiring it into a client
 
 Claude Code:
 
+Claude Code, from the project directory you want the record kept in:
+
 ```sh
-claude mcp add labkit -- bun run --cwd /path/to/labkit mcp
+claude mcp add labkit -e LABKIT_HOME="$PWD" -- bun /path/to/labkit/src/mcp/server.ts
 ```
 
 Anything that reads an `mcpServers` block:
@@ -56,12 +63,18 @@ Anything that reads an `mcpServers` block:
   "mcpServers": {
     "labkit": {
       "command": "bun",
-      "args": ["run", "--cwd", "/path/to/labkit", "mcp"],
-      "env": { "LABKIT_TENANT": "my-programme" }
+      "args": ["/path/to/labkit/src/mcp/server.ts"],
+      "env": { "LABKIT_HOME": "/path/to/your-project" }
     }
   }
 }
 ```
+
+The server is named by absolute path rather than launched with
+`bun run --cwd /path/to/labkit mcp`. That form worked, and it set the process's
+working directory to the **LabKit checkout** — so every client wired that way
+shared one `.labkit/` in the source tree. `--cwd` was only ever resolving the
+`mcp` script; naming the file resolves it without moving anything.
 
 The server reads and writes. Nothing is exposed that the domain layer does not
 already offer, and every tool is listed — with its arguments and its answer — at
