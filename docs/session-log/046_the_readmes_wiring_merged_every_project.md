@@ -15,6 +15,7 @@ Act on a cold-review finding from a peer session (`labkit-review`) against
 `main` at `e1433d9`: the README's own wiring examples contradicted its advice
 about `LABKIT_TENANT`. Then, on Dan's follow-up, say *which* MCP scope the
 `mcpServers` example belongs in — the wrong one reintroduces the same defect.
+Then, on a second review pass, stop implying a portable variable exists.
 
 ## Changed
 
@@ -32,7 +33,14 @@ about `LABKIT_TENANT`. Then, on Dan's follow-up, say *which* MCP scope the
   `${PWD}` or it is wrong on every other clone, and `user` should not be used
   at all.
 
-Working tree clean at `884c645`; pushed.
+**`3c5bf35` — a portable variable is only as portable as the client reading
+it.** The previous commit had reproduced the original defect one level down.
+
+- `README.md` — the generic `mcpServers` block takes a literal absolute path;
+  project scope joins user scope as something to avoid, with its reason;
+  `local` is stated as the one to use.
+
+Working tree clean at `3c5bf35`; pushed.
 
 ## Verified
 
@@ -73,11 +81,34 @@ The second means the default would in fact have been correct for project scope.
 is what put every record in the LabKit checkout to begin with — the mechanism
 was right there too, and the configuration pointed it somewhere nobody intended.
 
+**Three more measurements for `3c5bf35`, all 2026-08-26.** The peer reported the
+first and flagged the second as unmeasured; the third came from chasing it.
+
+- An unexpanded `${PWD}` reaching LabKit creates a directory **literally named
+  `${PWD}`** with a `.labkit/pglite` inside, and reports an empty record. No
+  error. Indistinguishable from a correctly wired new project — worse than the
+  defect this branch began with, which at least showed a stranger's question.
+- **`${PWD}` expands to the launch directory, not the project root.** A git
+  repo with `.mcp.json` at its root, `claude -p` run from `packages/foo`,
+  expanded to `.../packages/foo`. A committed config therefore yields one record
+  per launch directory.
+- **`${CLAUDE_PROJECT_DIR}` is not a substitute.** It does not expand in
+  `.mcp.json` — it arrives as the literal string — and the value Claude Code
+  puts in the server's environment under that name is *also* the launch
+  directory. So the file is located by walking up to the git root and "project
+  dir" is reported by a different rule.
+
 `bun run check` all 16 green.
 
 ## Open
 
-**No check was added, and that is a decision rather than an omission.** The
+**No check was added, and the argument for that got stronger.** A check
+asserting the README contains `${PWD}` would have passed against the wording
+carrying the second defect — and against the wording that caused the third. The
+reviewer made that point and it is better than the original reasoning, which was
+only that the documentation-gate genre had been retired.
+
+ The
 defect is a paragraph and a code block twenty lines apart describing different
 deployments. The only thing a check could assert is that the README contains a
 particular string — the documentation-gate genre this repo retired on
@@ -104,6 +135,20 @@ as `--cwd` did. Fixing the wiring did not fix the advice about where to put it.
 expansion works, so records would stay separate; every directory ever opened
 would still become a LabKit database. That is a second reason, independent of
 the first, and it is the one that decides it.
+
+**There is no variable that names the project root**, which is the finding this
+branch ends on. Project scope cannot express "one record for this repository"
+portably, so a committed `.mcp.json` is now listed as something to avoid rather
+than shown as an example. **Unresolved:** someone who wants a committed team
+config will reasonably ignore that warning, and the README offers them nothing
+better than a literal path each colleague edits. Raised with the reviewer; no
+answer yet.
+
+**A sentence-sized fix was proposed and was correctly sized to the finding that
+had been verified.** What made it larger was the corollary the reviewer
+explicitly declined to assert — it moved the recommendation from
+under-qualified to wrong. Worth remembering that the flagged-as-unmeasured part
+of a report is where the leverage was, twice now on this branch.
 
 ## Next
 
