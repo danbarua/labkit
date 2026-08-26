@@ -30,6 +30,19 @@ gains one gate; SKILL.md's Notes record it.
 merge race to `docs/TASKS.md`. Both had been pushed to branches whose pull
 requests were already merged; see Open.
 
+**`0259242`, `e721c8f`** — `.githooks/pre-push` and the fix that keys it on the
+remote ref; `scripts/install-hooks.sh` and `dev:install-hooks`. See Open.
+
+**`776ee82`** — Dan's "never fire on `main`" guard, ported verbatim from his
+uncommitted change in the main checkout. **Not verified here**: a synthetic
+two-repo harness never fired on its own control, so it demonstrated nothing and
+is not written up as though it did.
+
+**Both hooks are tracked and `core.hooksPath` is shared between worktrees**, so
+neither needs installing twice — the config in `.git/config` already reads
+`.githooks` for all three checkouts, and `.githooks` being relative means each
+resolves its own copy.
+
 **`dc07f40`** — four things Dan asked for after the review:
 
 - **`CLAUDE.md` gets an outline.** 1,606 lines and no header below `##`; the
