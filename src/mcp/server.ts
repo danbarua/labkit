@@ -18,8 +18,12 @@
  * other's verbs — but the server holds both.
  *
  * **It holds no database connection between tool calls**, and that is forced
- * rather than chosen: the embedded PGlite file is single-writer and a process
- * holding it locks every other agent out of the project. See {@link main}.
+ * rather than chosen: the embedded PGlite file is single-writer, so a process
+ * holding it locks every *other* process out of the project. Usually that other
+ * process is a person: `labkit known` in a terminal while an agent session is
+ * live is the ordinary workflow, not an edge case. Several agents at once is the
+ * rarer reason and was the only one written down until 2026-08-26. See
+ * {@link main}.
  *
  * **Import from subpaths only.** `@modelcontextprotocol/sdk`'s `exports` maps
  * `"."` to a `dist/esm/index.js` that is not on disk — verified under Bun, not

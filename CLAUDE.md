@@ -1064,7 +1064,12 @@ that the whole test suite was shaped around containing.
 
 **So nothing holds the database between units of work, and `src/mcp/server.ts`
 is where that matters.** An MCP server lives as long as its agent's session; if
-it held the file for that long, no other agent could work the project at all.
+it held the file for that long, nothing else could touch the project at all —
+and the thing that most often wants it is **a person at a terminal**, running
+`labkit known` or `labkit why` against the record an agent is currently writing.
+Several agents at once is the rarer case and was the only one this paragraph
+named until 2026-08-26.
+
 It opens and closes around each tool call — 80-96ms warm, measured 2026-08-26
 (open 70-85ms, migrate 2ms, tenant resolve 7-8ms, close 2ms) against a cold
 open of 1067ms. Two overlapping calls serialise on the lock. **A process does
@@ -1076,6 +1081,16 @@ What keeps that server's process alive between calls is **the stdin
 subscription, not a held connection** — measured under Bun 1.3.14, since the
 comment that used to credit the connection would now be describing something
 that no longer exists.
+
+**Independently confirmed, on a second codebase.** Dan's `exo-ledger` runs the
+design this replaced — a lockfile-elected daemon serving PGlite over the pg wire
+protocol — and measured the arm LabKit could not, on the same machine: a client
+connecting to a live daemon costs **1-7ms**, and the same unit of work costs
+76-88ms through the socket against 81-87ms in-process. So the wire hop is free
+at these shapes and the daemon buys a flat ~78ms per call and nothing else.
+Their in-process open was 72-83ms cold-to-warm against LabKit's 70-85ms, which
+is the same number twice from two codebases. Recorded because a measurement that
+agrees from somewhere else is worth more than a repeat of your own.
 
 ## Row-level security, and what it is actually worth
 

@@ -194,7 +194,9 @@ function releaseLock(lockPath: string): void {
  * case needs. Multiple agents against one project cannot each hold a connection
  * under it either: the first one in owns the file and the rest connect through
  * it only while it lives, so releasing between units of work was already
- * forced rather than chosen. What the socket added on top of that was a second
+ * forced rather than chosen. And the process that most often wants the file is
+ * not another agent at all — it is a person running `labkit` in a terminal
+ * while an agent session is open. What the socket added on top of that was a second
  * failure mode -- when the primary died, a secondary's next query raised an
  * uncaught `'error'` event from `pg` and killed the process before any `catch`
  * ran.
