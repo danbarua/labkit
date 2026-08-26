@@ -90,15 +90,32 @@ export type Tenant = typeof tenants.$inferSelect;
  * leaf of `src/db/`, which is why it holds the name — putting it beside the
  * `SET ROLE` made the layer cyclic.
  *
- * `createRole: false` — the role is created by `drizzle/0004_rls.sql`, once, in a form
- * that tolerates already existing. `CREATE ROLE` is cluster-scoped while
- * drizzle's migration ledger is per-database, so a second LabKit database in
- * one cluster would otherwise fail its first migration.
+ * **`.existing()` is what says "declared here, created elsewhere"**, and it is
+ * the whole reason the RLS migration is generated rather than hand-edited.
+ * `generatePgSnapshot` skips any role marked that way (`if (!role._existing)`),
+ * so the generated file names the role in its policy and never emits a
+ * `CREATE ROLE` for it. `drizzle/0002_natural_ids.sql` creates it instead,
+ * guarded, because a role is cluster-scoped while drizzle's ledger is
+ * per-database.
+ *
+ * Two wrong answers preceded this one, both worth keeping because both look
+ * right:
+ *
+ * - `pgRole(name, { createRole: false })` does **not** mean "do not create it".
+ *   `createRole` is the Postgres `CREATEROLE` *attribute* —
+ *   may-this-role-create-other-roles — beside `createDb` and `inherit`.
+ * - `entities.roles.exclude` in `drizzle.config.ts` does **not** apply here
+ *   either. Read in drizzle-kit 0.30.6's bundle: `prepareRoles`' `excludeRoles`
+ *   is consumed only by `fromDatabase`, the *introspection* path.
+ *   `generatePgSnapshot` takes no config at all, so exclusion cannot reach a
+ *   schema-file generate.
+ *
+ * The first misreading is what produced a hand-edited generated migration.
  */
 export const APP_ROLE = "labkit_app";
 
 /** The declaration `drizzle-kit` reads, over the name above. */
-export const labkitApp = p.pgRole(APP_ROLE, { createRole: false });
+export const labkitApp = p.pgRole(APP_ROLE).existing();
 
 /**
  * The durable event log — **the second LabKit-owned relational table**, and the

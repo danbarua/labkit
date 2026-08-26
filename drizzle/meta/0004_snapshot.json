@@ -1,5 +1,5 @@
 {
-  "id": "60506e35-958e-483f-adf5-de591ffa9ac8",
+  "id": "2575380d-2438-4e3a-a40c-4bce6c4d384e",
   "prevId": "9316e284-5508-4bd0-9baf-431f6ad7faf5",
   "version": "7",
   "dialect": "postgresql",
@@ -233,14 +233,7 @@
   "enums": {},
   "schemas": {},
   "sequences": {},
-  "roles": {
-    "labkit_app": {
-      "name": "labkit_app",
-      "createDb": false,
-      "createRole": false,
-      "inherit": true
-    }
-  },
+  "roles": {},
   "policies": {},
   "views": {},
   "_meta": {

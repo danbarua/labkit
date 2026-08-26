@@ -40,7 +40,7 @@ import m0000 from "../../drizzle/0000_overrated_texas_twister.sql" with { type: 
 import m0001 from "../../drizzle/0001_age_bootstrap.sql" with { type: "text" };
 import m0002 from "../../drizzle/0002_natural_ids.sql" with { type: "text" };
 import m0003 from "../../drizzle/0003_tense_hawkeye.sql" with { type: "text" };
-import m0004 from "../../drizzle/0004_rls.sql" with { type: "text" };
+import m0004 from "../../drizzle/0004_typical_bloodstrike.sql" with { type: "text" };
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -58,7 +58,7 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0001_age_bootstrap": m0001,
   "0002_natural_ids": m0002,
   "0003_tense_hawkeye": m0003,
-  "0004_rls": m0004,
+  "0004_typical_bloodstrike": m0004,
 };
 
 /**

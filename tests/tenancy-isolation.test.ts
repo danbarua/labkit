@@ -1,7 +1,8 @@
 /**
  * Row-level security, asserted rather than described.
  *
- * `drizzle/0004_rls.sql` puts a policy on `public.labkit_event` and
+ * The generated RLS migration puts a policy on `public.labkit_event`,
+ * `drizzle/0002_natural_ids.sql` creates the role and grants it, and
  * `src/db/scoped.ts` steps a session down to the role it applies to. Neither is
  * worth anything unless something demonstrates that a scoped session *cannot*
  * see another tenant's rows — a policy with no reader is the same shape as this
@@ -147,7 +148,7 @@ describe("a scoped session is confined to its tenant", () => {
   test("the session really is the unprivileged role", async () => {
     // Otherwise everything above would pass against a superuser session with
     // no policy in force at all — a superuser bypasses RLS unconditionally,
-    // which is the trap `drizzle/0004_rls.sql` exists past.
+    // which is the trap the whole step-down exists past.
     const who = await asTenant("rls-a", async (c) => {
       const r = await c.db.query<{ current_user: string; rolsuper: boolean }>(
         `select current_user, (select rolsuper from pg_roles where rolname = current_user) as rolsuper`,

@@ -29,7 +29,7 @@
  * happens and the second is not in the threat model. `LABKIT_DB_URL` pointing
  * at a shared Postgres is where that would stop being true, and the answer
  * there is a login role with `session_preload_libraries = 'age'`, which is
- * written down in `drizzle/0004_rls.sql` and not built.
+ * written down in `drizzle/0002_natural_ids.sql` and not built.
  *
  * ## Why the tenant is a session GUC
  *

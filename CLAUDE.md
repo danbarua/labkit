@@ -1069,7 +1069,7 @@ does not stop is a caller who means harm. Both halves of that matter — the wor
 "policy" invites a reader to assume the second. A deployment wanting a real
 login boundary needs `ALTER ROLE labkit_app SET session_preload_libraries =
 'age'` so the library arrives without a `LOAD`; that is written down in
-`drizzle/0004_rls.sql` and **not built or measured**.
+`drizzle/0002_natural_ids.sql` and **not built or measured**.
 
 Three things that are easy to get wrong here, all measured rather than assumed:
 
@@ -1086,6 +1086,35 @@ Three things that are easy to get wrong here, all measured rather than assumed:
   a future release will add to it. `ALTER DEFAULT PRIVILEGES` covers what comes
   later and a blanket `GRANT … ON ALL TABLES` covers what came before; each
   misses what the other catches.
+
+**Which migration holds what is decided by one rule: drizzle cannot migrate what
+it does not manage.** `drizzle/0002_natural_ids.sql` is *the* hand-written
+migration — natural-id sequences and functions, and since 2026-08-26 the
+`labkit_app` role and every `GRANT`, because drizzle models privileges not at
+all (measured: the string `GRANT ` does not appear anywhere in drizzle-kit's
+bundle). Everything drizzle *does* manage stays in files it generated and nobody
+edits. The filename says which is which: generated migrations carry drizzle-kit's
+random names, hand-written ones are named for what they do.
+
+**`pgRole(...).existing()` is what keeps the generated file generated.**
+`generatePgSnapshot` skips a role marked that way (`if (!role._existing)`), so
+the RLS migration names the role in its policy and never emits a `CREATE ROLE`
+that `0002` has already made, guarded. Two things that look like the right lever
+and are not: `pgRole(name, { createRole: false })` is the Postgres `CREATEROLE`
+*attribute*, and `entities.roles.exclude` is consumed only by drizzle-kit's
+*introspection* path — `generatePgSnapshot` takes no config at all. The first
+misreading is what produced a hand-edited generated migration in the first place.
+
+**`ALTER DEFAULT PRIVILEGES IN SCHEMA public` in `0002` is why a new
+tenant-aware table needs no privilege work.** `labkit_event` does not exist yet
+at `0002` and so cannot be granted explicitly from there; default privileges
+cover it and everything added after. Verified 2026-08-26 by creating a table and
+asking `has_table_privilege`/`has_sequence_privilege` — both true with no grant
+naming it. It holds only while one role runs every migration, which is true
+today. One caveat found by trying it: a table with a foreign key generates an
+`ALTER TABLE … ADD CONSTRAINT`, which `check:migrations` requires a
+`-- lock-strategy:` line for — the check working, but one comment prepended by
+hand.
 
 `tests/tenancy-isolation.test.ts` is the reader. It drives `connectDb()`, the
 real resolve and the real step-down, so a missing grant surfaces as a
