@@ -60,7 +60,14 @@ gets a watcher.
 - `cloudbuild.test.yaml`, `infra/ci/README.md` — per-step figures from build
   `9907cb31`, and what they say about a worker's speed.
 
-Working tree clean at `7db4248`; pushed.
+**`25aa42f` — do not build on prose.**
+
+- `infra/ci/triggers.tf` — an `ignored_files` denylist on `test-on-pr`.
+- `infra/ci/README.md` — what is on it, what is deliberately not, and why the
+  direction matters.
+
+Working tree clean at `25aa42f`; pushed. **Not yet applied** — the trigger in
+the cloud still builds on everything until `terraform apply` runs.
 
 ## Verified
 
@@ -137,9 +144,15 @@ against it, having waited for TCP rather than assuming readiness.
 
 ## Open
 
-**Every push to an open PR fires a build**, which is the intended behaviour and
-also means the wrap commits in this session each cost one. Two were still
-`WORKING` when this entry was last written.
+**`25aa42f` is committed but not applied.** `terraform plan` is 0 to add, 1 to
+change, 0 to destroy; until an apply runs, the live trigger has no
+`ignored_files` and builds on prose.
+
+**The ignore list's semantics are stated but not verified.** The filter is
+believed to be evaluated against the files a *pull request* changes, so a PR
+containing code and a wrap entry still builds — it should skip docs-only pull
+requests, not docs-only pushes onto a code PR. Nothing here has demonstrated
+that; a docs-only PR would.
 
 **One green run is not a flake rate.** The suite's history in this repo is of
 timing-sensitive failures under load (CLAUDE.md carries the measurements), and a
@@ -165,6 +178,9 @@ Principles header, a CLAUDE.md stale-prose sweep, `docs/persistence.md`) and the
 DB-layer loose ends.
 
 ## Next
+
+`terraform apply` in `infra/ci` to put the `ignored_files` denylist live — 0 to
+add, 1 to change, 0 to destroy.
 
 PR #30 awaits review; the trigger is green and running on every push to it.
 
