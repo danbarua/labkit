@@ -306,6 +306,7 @@ would hand a new worktree another session's pinned baseline).
 bun install                    # install dependencies
 bun test                       # run all tests (embedded PGlite)
 bun run test:pg                # the same suite against a real Postgres + AGE container (docker/postgres)
+bun run test:in-docker         # what Cloud Build runs, in the CI image, on a worker-sized machine
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 bunx depcruise src tests --output-type err   # layering rules (errors) + cycles
@@ -1409,6 +1410,21 @@ holding on to: the old rule's stated reason was fidelity to production, and
 production now opens PGlite directly, so sharing the instance is the *more*
 faithful arrangement.
 
+**`bun run test:in-docker` runs what CI runs, here.** Same image, same steps as
+`cloudbuild.test.yaml`, with `--cpus`/`--memory` defaulted to a Cloud Build
+worker's shape (2/8g) because the resource limit is the point — this machine has
+ten cores and the suite is timing sensitive. `LABKIT_CI_CPUS=1` squeezes harder.
+It tests a `git clone` with the working tree copied over it, so uncommitted
+changes are included *and* the container gets a real `.git`, which a bind mount
+of a git **worktree** cannot give it — the `.git` file there names a host path.
+
+**It did not reproduce the failure that prompted it**, which is worth knowing
+before trusting it. The hook timeout that reddened the first CI build was green
+here at 2 cpus and at 1, with Postgres running alongside as CI does. What it
+closes is the *environment* half of "works on my machine" — image, dependencies,
+git, the Postgres wiring. The *speed* half it only approximates: a shared-core
+`e2` throttled to a sustained baseline is not a full local core under quota.
+
 **`bun run test:pg` runs the same suite against a real Postgres**
 (`docker-compose.yml`'s `apache/age:release_PG18_1.7.0`) by setting
 `LABKIT_DB_URL` — the same variable production reads. It is `test:` and not
@@ -1503,6 +1519,20 @@ hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
 `a beforeEach hook timed out`, and every failure this repo has recorded says
 `timed out after 5000ms`, the body wording. So in the files that set up from
 `beforeEach`, setup cost is not the mechanism.
+
+**The ceiling is now 20000ms and chosen, not bun's 5000ms default** (`--timeout`
+on the `test` script, added 2026-08-26). It went up because CI found the edge:
+a `beforeAll` calling `openScenario()` timed out at 5807ms on a Cloud Build
+worker, and the cascade — `scenario` never assigned, `afterAll` throwing
+`undefined is not an object` — reported as two failures. Booting WASM in a hook
+is legitimate work, and 5000ms was a number nobody here picked.
+
+Two things this does not change. **`--timeout` covers hooks** — verified with a
+6.5s `beforeAll`, which fails at the default and passes at 20000 — so the
+margin-measuring method below still works, just from a higher start. And bun
+says *"a beforeEach/afterEach hook timed out"* even when the hook is a
+`beforeAll`, which is worth knowing before hunting for a `beforeEach` that does
+not exist.
 
 **It stopped happening, and the honest version is that nobody knows which
 change did it.** Re-measured 2026-08-25 by the method below — five full runs
