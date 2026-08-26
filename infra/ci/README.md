@@ -110,6 +110,27 @@ A Cloud Build worker is roughly **twice as slow as a developer's machine** on
 both suites — the same work is ~112s and ~55s locally. Worth knowing before
 adding anything to the gate: whatever it costs you, it costs CI double.
 
+## What does not build
+
+`test-on-pr` carries an `ignored_files` denylist: a pull request touching only
+dated records, `CLAUDE.md`, `.claude/`, or prose no test reads does not run a
+build. A build cannot fail on prose, and one that can only ever be green trains
+you to stop reading it.
+
+**`docs/mcp-tools.md` is deliberately not ignored** — it is generated and
+`tests/mcp.test.ts` asserts the checked-in file matches the generator, so a
+hand-edit to it *should* fail. That is why the list names paths rather than
+saying `docs/**`.
+
+A denylist rather than `included_files` on purpose: an allowlist gives no CI to
+whatever it forgets to name, and a trigger that does not fire looks exactly like
+one with nothing to do. This way anything new defaults to building.
+
+**One thing to know about the semantics, and it is not verified here:** the
+filter is evaluated against the files a pull request changes, so a PR that
+contains code *and* a wrap entry still builds. It skips docs-only pull requests,
+not docs-only pushes onto a code PR.
+
 ## Known gap
 
 A pull-request trigger catches **your** changes breaking the build. It cannot
