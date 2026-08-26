@@ -126,6 +126,20 @@ check above, so the work would never be wrapped at all.
 so their change is unmerged or local. Duplicating a guard that cannot be seen
 seemed worse than leaving it.
 
+**It has now happened three times, and the third one ate the work rather than
+the write-up.** PR #40 was merged at 23:04:38, squashed at `0cbfaeb`; everything
+pushed to that branch afterwards — the `CLAUDE.md` outline, the login-role
+measurement, the deletion of `docs/mcp-server/`, the queue restructure and this
+entry's rewrite — was on a merged branch and not in `main`. Recovered by
+cherry-picking onto `docs/outline-and-probe`, verified by diffing the trees.
+
+**What the third instance changes:** this is not a wrap-tooling annoyance. The
+same race takes code. And the operative mistake is mine and simpler than the
+race — **I kept pushing to a branch whose pull request was already merged.**
+Nothing warned me, because nothing looks wrong: the push succeeds, the branch
+exists, `git log` is fine. The only tell is comparing against `origin/main`,
+which is not a thing anyone does by habit.
+
 **The squash that ate 048 did it again, to this entry, forty-five seconds
 later.** The prediction above was written, pushed, and immediately confirmed:
 `ffe1fb2` was cut from `457bf9d` at 23:37:00; the commit carrying 048 and 049

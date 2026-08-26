@@ -111,9 +111,20 @@ worth keeping.
 ## Tooling, not product
 
 `/wrap` is scaffolding. It has been necessary and it is an annoyance; nothing
-here ships.
+here ships. The item below is here because it stopped being about `/wrap`.
 
-- **A wrap entry pushed while its pull request is merging is lost, silently.**
+- **Work pushed to a branch whose pull request is already merged is lost,
+  silently.** Three times in two days. Twice it took a session-log entry; the
+  third time it took a `CLAUDE.md` restructure, a measurement recorded in
+  `src/db/scoped.ts`, a file deletion and a queue rewrite. A squash merge takes
+  the branch as it stood when the merge commit was cut, and every later push to
+  that branch succeeds, leaves the branch looking healthy, and reaches nothing.
+  The only tell is diffing against `origin/main`.
+  Firing the wrap hook on a push narrowed one instance of this and closed none
+  of it, because the real mistake is continuing to work on a merged branch.
+  Candidate fixes, none built: refuse to push to a branch whose PR is merged;
+  a check that a merged branch holds no commits its merge lacks; or start a
+  fresh branch the moment a PR is opened.
   A squash merge takes the branch as it stood when the merge commit was cut, so
   a wrap pushed after that moment is not in `main` and nothing reports it. It
   has happened twice — entry 048 to PR #38, then 048 *and* 049 to PR #39,
