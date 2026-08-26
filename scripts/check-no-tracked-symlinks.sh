@@ -20,7 +20,20 @@
 
 set -euo pipefail
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# **Without git this check passed while checking nothing**, and it was found by
+# running the gate in a container that has no git (`oven/bun` does not ship
+# one). `git ls-files` failed, `|| true` on that pipeline swallowed it, `found`
+# came back empty and the script printed `OK: no tracked symlinks.` and exited
+# 0 — a green light meaning "the tool is missing", which is the failure mode
+# CLAUDE.md records for telling readers to ignore a signal.
+if ! command -v git >/dev/null 2>&1; then
+  echo "FAILED: git is not on PATH, so nothing here can be checked."
+  echo "This exits non-zero rather than reporting OK: a check that passes"
+  echo "because its tool is absent is worse than no check at all."
+  exit 1
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
 # Paths permitted to be tracked symlinks. Empty by design.
@@ -29,7 +42,9 @@ ALLOWLIST=()
 # Git records symlinks with mode 120000. Field 4 of `ls-files -s` is the path
 # (tab-separated from the stage number), so cut on the tab to keep paths with
 # spaces intact.
-found="$(git ls-files -s | awk '$1 == "120000"' | cut -f2- || true)"
+# No `|| true`: `git ls-files` succeeds with empty output when there is nothing
+# to list, so the only thing it ever suppressed was a real failure.
+found="$(git ls-files -s | awk '$1 == "120000"' | cut -f2-)"
 
 if [ -n "$found" ]; then
   filtered="$found"
