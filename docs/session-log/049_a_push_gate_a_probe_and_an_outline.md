@@ -191,10 +191,21 @@ available remedy. What would close it: a check that refuses a merge whose branch
 has commits the merge commit does not contain, or a wrap that writes to `main`
 rather than to the branch. Queued in `docs/TASKS.md`; neither is built.
 
+**`f042c0e`** (PR #42, after #41 merged) — the login role moves out of the DB
+loose ends and under a new `### Deferred until multi-tenancy is real` in
+`docs/TASKS.md`. It had been reading as *available and unbuilt*, which invites
+building it; the trigger is named instead — a second party able to reach the
+database. Nothing is exposed by leaving it, LabKit being one tenant per process
+on the operator's own machine.
+
 ## Next
 
-PR #41 awaits review — and it is where every change from this session now
-lives, `main` having only the first two.
+PRs #39, #40 and #41 are merged. **#42 is open** and is the only outstanding
+one.
+
+The queue's own recommendation, unchanged by any of this: the two agent-facing
+items — orientation, and dogfooding LabKit on its own open questions — are the
+same piece of work and the only thing on the list that is not housekeeping.
 
 Everything the review produced is now in `docs/TASKS.md` or done. What it left
 for next time:
