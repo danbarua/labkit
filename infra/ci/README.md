@@ -64,6 +64,21 @@ waits (`time_sleep.apis_settle`), so it should not recur; **re-running
 `terraform apply` is the fix if it does**, since the project and APIs are
 already in state and a second run finds them settled.
 
+### Smoke-testing the trigger
+
+There is no way to run it by hand:
+
+```
+ERROR: (gcloud.builds.triggers.run) INVALID_ARGUMENT:
+RunTrigger is not supported for GitHub PullRequest Triggers
+```
+
+A pull-request trigger fires on pull-request events only — opened, or a new
+commit pushed to the branch. So a trigger created *while a PR is already open*
+has nothing to react to and will sit with zero builds until the next push, which
+looks identical to a trigger that does not work. Push a commit to the branch to
+find out which.
+
 ## What runs, and what does not
 
 `cloudbuild.test.yaml` runs `bun run check` and `bun run test:pg`, in one
