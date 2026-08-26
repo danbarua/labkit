@@ -51,7 +51,11 @@ gets a watcher.
 
 - `infra/ci/outputs.tf` — a `target_project` output.
 
-Working tree clean at `128d97f`; pushed.
+**`f204359` — a PR trigger cannot be run by hand.**
+
+- `infra/ci/README.md` — how to smoke-test one, given that you cannot.
+
+Working tree clean at `f204359`; pushed.
 
 ## Verified
 
@@ -96,16 +100,33 @@ enabling a Google API returns before the enablement is usable.
 add, 0 to change, 0 to destroy** — the project and APIs already in state are
 untouched, so a re-apply is safe.
 
-**Nothing has run on Cloud Build.** The timeout is generous and says in the file
-that it is unmeasured.
+**The infrastructure is up.** The second apply — after connecting the repository
+in the console, which failed the first as the README predicted — completed:
+project, three APIs, the `time_sleep`, the service account, its log-writer role
+and the trigger. `terraform output` reports
+`target_project = "labkit-build"` and
+`ci_test_email = "labkit-build-ci-test@labkit-build.iam.gserviceaccount.com"`.
+
+**The trigger existed with zero builds, and that is not the same as working.**
+PR #30 was opened before it, so no pull-request event had ever reached it, and
+`gcloud builds triggers run` refuses:
+`RunTrigger is not supported for GitHub PullRequest Triggers`. Pushing `f204359`
+to the branch fired it. Build `9907cb31` started and was **still `WORKING`** when
+this entry was written.
+
+**So no Cloud Build run has completed.** The timeout in `cloudbuild.test.yaml`
+is generous and says in the file that it is unmeasured; that stays true until a
+build finishes.
 
 ## Open
 
-**The trigger has not been created yet**, and it is one of the four resources a
-re-apply will add. It is also the one that needs the step terraform cannot do:
-the repository must be connected to Cloud Build **in the console, in the same
-region as the trigger**, or it fails with a repository-mapping error.
-`infra/ci/README.md` leads with it.
+**No Cloud Build run has finished yet.** Everything about the build is verified
+locally — the gate in `oven/bun:1.3.14`, the sidecar on a real docker network —
+and nothing about it is verified on a Cloud Build worker. The two questions
+that only a real run answers: whether the Postgres sidecar behaves the same on
+`--network=cloudbuild` there as it does locally, and what the steps actually
+cost. **Replace the timeout's unmeasured note with real figures once one
+lands.**
 
 **The error message misleads in two directions, both now written down.** It was
 first read as an apply run under the wrong `gcloud config` — and the active
@@ -127,9 +148,17 @@ DB-layer loose ends.
 
 ## Next
 
-Re-run `terraform apply` in `infra/ci` — 4 to add, nothing to change or
-destroy. Connect the repository to Cloud Build in the console first, in
-`us-central1`, or the trigger resource fails; `infra/ci/README.md` has it.
+Read the first build:
+
+```sh
+gcloud builds list --project labkit-build --region us-central1 --limit 3
+gcloud builds log 9907cb31-be98-49e6-9117-9fe01cab43a6 \
+  --project labkit-build --region us-central1
+```
+
+If it is green, put its per-step timings into `cloudbuild.test.yaml`'s closing
+comment in place of the unmeasured note. If it is red, the step that failed
+says which of the local simulations did not transfer.
 
 Then PR #30 awaits review, and after it the documents group in `docs/TASKS.md`,
 starting by reading `~/Code/agents/agent-bus/AGENTS.md` for the pinned-header
