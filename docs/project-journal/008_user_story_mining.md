@@ -703,8 +703,8 @@ this document's original analysis are marked as such.
 | AF | Execution input order is not recorded | **S-10b**, **S-10d** | resolved |
 | AG | An artefact id does not say whether it is measured or computed | **S-11f** | refuted |
 | AH | `Claim.kind` carries two facts under one value | — | open, unowned |
-| AI | `Computation.kind` holds prose where `Artefact.kind` holds kinds | — | open, unowned |
-| AJ | `(proposition, enquiry)` is a hidden entity | — | open, unowned |
+| AI | `Computation.kind` holds prose where `Artefact.kind` holds kinds | **story 16**° | open |
+| AJ | `(proposition, enquiry)` is a hidden entity | **story 15**° | open |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -796,12 +796,66 @@ conflating two facts, and R can be resolved without touching it.
 `Artefact.kind` holds actual kinds. Exposed by the S-11f classification work and
 not settled by it.
 
+**Owner: story 16** (infrastructure change vs scientific rerun), added
+2026-08-26. Its distinctive content is that acceptance criteria differ by intent
+— byte-identity versus reproduction-of-conclusions — which is a distinction
+*between two kinds of computation*, and that is what `Computation.kind` would
+have to carry. The wrong answer to expect: under story 16 the method text is
+**unchanged by construction** — same science, new machinery — so any report
+classifying runs by matching method prose calls a genuine new execution a
+machinery revalidation, or the reverse, on exactly the case the story exists
+for. Confidently wrong rather than empty, which is PJ-011 §5's bar, and wrong
+*because* prose is doing a kind's job.
+
+**How to know this owner was wrong:** if story 16's distinction turns out to
+live entirely in *criteria* — gates and their conditions, which already exist —
+with `Computation.kind` never consulted. Then the row is unowned again rather
+than settled, and that is a verdict to record.
+
 **AJ — `(proposition, enquiry)` is a hidden entity.** Withdrawable as a unit and
 able to block a write, with no node, no id, no `Ref` and no report type. Whether
 that is a missing entity or a correct absence is the question.
 
-What would settle each is unwritten. That is the gap, and naming it is the point
-of the row.
+**The pair is already load-bearing in a signature**, which is the row's best
+existing evidence: `recordAnalysis()`'s withdrawal guard calls
+`withdrawalOf({ proposition, enquiry })`. Something the model does not name is
+the unit a write is checked against.
+
+**Owner: story 15** (candidate implementation vs a trusted reference), added
+2026-08-26. Coexistence is the operative word — candidate and reference assert
+the same proposition in different work, and AJ asks whether the withdrawable
+unit is the proposition or the pair. Same shape as S-5 one level along: S-5
+earned `ClaimRef` because two stages assert one sentence about different
+endpoints; AJ asks whether *withdrawal* needs what the *claim* got.
+
+**The obvious wrong answer is already guarded, and that narrows what the story
+must exercise.** A review proposed it as: withdraw against the candidate, and
+`recordAnalysis()` then refuses the reference's own analysis of the same
+proposition. It does not — the guard is scoped to the enquiry, S-5 having found
+that exact defect, and `src/domain/write.ts` says so at the call site. So the
+case that bites is coexistence **within one enquiry**, where the pair collapses
+to the proposition and the guard has nothing left to discriminate on. Whether
+story 15 puts candidate and reference in one enquiry or two is unknown and is
+the thing to watch when it is built.
+
+**How to know this owner was wrong:** if candidate and reference naturally
+become *different propositions* — different wording, different endpoints — in
+which case S-5's `ClaimRef` already covers it and AJ is closer to `refuted` than
+to open. The scoping above makes that outcome more likely than the review
+assumed, not less.
+
+**AH keeps no owner, deliberately.** None of §4's stories fits, and the tempting
+one is story 18 because it is about promotion — but 18 is already promoted, built
+as S-18, and row K is its verdict. AH is a reader-side question about a value
+with one reader; a real report asking for the distinction is what would earn it
+an owner. **Naming a bad owner is worse than naming none**: it converts "we are
+still looking" into "this is covered", which is the state row K sat in through
+three external reviews.
+
+The two refutation conditions above are written *before* either story is built,
+for that same reason. Row K's owner was built and returned no verdict, and the
+row then went unnoticed; an owner being built is not the same as an owner
+returning an answer, and only one of those is recorded by clearing a `°`.
 
 Only the second kind is a gap in the *method* — CLAUDE.md's deferral rule says
 a row that cannot name a scenario is unresolved and unowned rather than
