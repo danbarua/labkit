@@ -67,9 +67,15 @@ const fileFor = (name: string): string | undefined =>
 const steps: Step[] = [
   // The three CLAUDE.md names as the pre-commit bar, first, because they are
   // the ones that fail for real reasons rather than for tidiness. Their
-  // sentences are written here because they are not scripts in this repo and
-  // have no header to read.
-  { name: "test", argv: ["bun", "test"], says: "Every test in the suite." },
+  // sentences are written here because they have no script header to read.
+  //
+  // **`bun run test`, not `bun test`.** This said `["bun", "test"]` until
+  // 2026-08-26, which bypasses `package.json` entirely — so a `--timeout` added
+  // to the `test` script applied to `bun run test` and not to the sweep, and CI
+  // went on failing at bun's default ceiling with the flag apparently set. Two
+  // definitions of one step is exactly the shape this file exists to avoid;
+  // every other step below already goes through `bun run`.
+  { name: "test", argv: ["bun", "run", "test"], says: "Every test in the suite." },
   {
     name: "typecheck",
     argv: ["bun", "run", "typecheck"],
@@ -161,8 +167,27 @@ function digestOf(lines: string[]): string[] {
     /^\s*error\s/, // dependency-cruiser
     /^\s*×\s/, // biome, which prints no FAILED: of its own
   ];
-  const hits = lines.filter((l) => patterns.some((p) => p.test(l)));
-  if (hits.length > 0) return hits;
+  const hits: string[] = [];
+  lines.forEach((line, i) => {
+    if (!patterns.some((p) => p.test(line))) return;
+    hits.push(line);
+    // bun puts the reason on the *next* line — `^ a beforeEach/afterEach hook
+    // timed out for this test.` — and without it a digest reads
+    // `(fail) (unnamed) [5694ms]` and says nothing about why. That happened on
+    // the build this function was written for.
+    const next = lines[i + 1];
+    if (next?.trimStart().startsWith("^")) hits.push(next);
+  });
+  // bun prints each failure twice, inline and again under "N tests failed:".
+  // Repeating that here doubles the thing the digest exists to shorten.
+  const seen = new Set<string>();
+  const unique = hits.filter((l) => {
+    const key = l.trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (unique.length > 0) return unique;
   return lines.filter((l) => l.trim() !== "").slice(-8);
 }
 
