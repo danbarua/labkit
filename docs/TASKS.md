@@ -20,6 +20,15 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   is a concise explainer of how persistence works now — two backends, one seam,
   a lock, migrations, tenancy. Keep the dated probes that still bite; drop what
   the code has since answered.
+- **A wrap entry pushed while its pull request is merging is lost, silently.**
+  A squash merge takes the branch as it stood when the merge commit was cut, so
+  a wrap pushed after that moment is not in `main` and nothing reports it. It
+  has happened twice — entry 048 to PR #38, then 048 *and* 049 to PR #39,
+  forty-five seconds after the squash. Firing the hook on a push narrowed the
+  window and did not close it; it is a race, so "push before merging" is not a
+  remedy. Two candidate fixes, neither built: a check that refuses when a merged
+  branch holds commits the merge does not contain, or a wrap that writes to
+  `main` rather than to the branch.
 
 ## Loose ends from the DB layer work
 
