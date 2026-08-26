@@ -244,6 +244,14 @@ covers what comes next.
 
 ## Notes
 
+- **The hook fires on a push, not on a commit** (2026-08-26). A session that
+  commits as it goes was getting a wrap request per commit: on the day this
+  changed that meant seven entries for four units of work, and one entry
+  rewritten five times as its branch grew, each rewrite describing work that was
+  still moving. A push is when the range an entry describes stops changing.
+  Verified in four states — committed-and-unpushed is quiet, the push fires
+  once, the same HEAD again is quiet, and the entry's own commit is quiet both
+  before and after being pushed.
 - The Stop hook advances the recorded sha at the moment it fires, so a HEAD is
   never asked about twice even if this skill errors. Failing loudly is safe.
 - **The wrap's own commit no longer fires the hook.** It used to: committing
