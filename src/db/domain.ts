@@ -39,7 +39,7 @@ export type NodeLabel = (typeof NODE_LABELS)[number];
  * That checker exists under protest. CLAUDE.md is right that a fact in one
  * place needs no checker, and this is a fact in two: the type is for the reader
  * and this is for the machine. The honest upgrade is to **generate** this from
- * the types, the way `docs/mcp-tools.md` is generated from the tool
+ * the types, the way `labkit://docs/tools` is generated from the tool
  * declarations and its freshness asserted by a test that was running anyway. It
  * is written by hand first because a generator for a table nobody has read yet
  * is a step ahead of the evidence.

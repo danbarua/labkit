@@ -95,18 +95,23 @@ list in `src/mcp/tools.ts`, the scripts in `package.json`. This paragraph used
 to carry those numbers and was wrong about them repeatedly.
 
 
-`docs/mcp-tools.md` is **the domain's API as one reviewable file** — every MCP
-tool, what it takes and what it returns — generated from the tool declarations
-by `bun run docs:tools`. The same document is served live at
-`labkit://docs/tools`.
+**The domain's API as one reviewable page is `labkit://docs/tools`** — every MCP
+tool, what it takes and what it returns, rendered from the tool declarations on
+every read by `src/mcp/docs.ts`. It is stored nowhere, so it cannot disagree
+with the tools.
 
-**It is a snapshot and nothing holds it true.** An assertion in
-`tests/mcp.test.ts` did until 2026-08-26, so that the file's diff would show an
-API change. It went because the price was wrong: a test whose only failure mode
-was "someone regenerated late", and — once CI existed — a build that had to run
-on documentation in order to catch it. `bun run docs:tools` refreshes it; the
-live resource at `labkit://docs/tools` renders on every read and cannot be
-stale, which is the copy to trust.
+**A checked-in copy existed until 2026-08-26 and is worth knowing about, because
+the failure was a genre and not a file.** `docs/mcp-tools.md` was committed so
+its diff would show an API change, kept honest by an assertion in
+`tests/mcp.test.ts`, refreshed by a `docs:tools` script. The assertion's only
+failure mode was "someone regenerated late"; catching it cost a build that had
+to run on documentation, and a `docs/**` CI filter that needed a load-bearing
+exception — which breaks silently the first time someone renames a file.
+
+What settled it was what the arrangement *invited*: agents proposing a parity
+document for the CLI surface, tests asserting the two agree, and a gate over all
+of it. A generated file checked in beside the code it describes is an invitation
+to that. Generate into the running program, not into the tree.
 
 `docs/dependency-graph.mmd` is the module dependency graph, as text.
 `bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
@@ -193,7 +198,6 @@ bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 bunx depcruise src tests --output-type err   # layering rules (errors) + cycles
 bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
-bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool declarations
 bun run typecheck              # tsc --noEmit
 bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
 bun run check:all-checks       # every check script must introduce itself in one plain sentence
@@ -359,7 +363,7 @@ one batch of work and that is not a design position: a record nothing can write
 to has nothing in it. Read and write handlers are handed different surfaces, so
 neither can reach the other's verbs, and
 `tests/mcp.test.ts` asserts every public verb on either surface is exposed or
-listed in `NOT_EXPOSED` with a reason. **`docs/mcp-tools.md` is the tool list**;
+listed in `NOT_EXPOSED` with a reason. **`labkit://docs/tools` is the tool list**;
 this paragraph deliberately does not count them.
 
 `bun test`'s exit code means what it says: **0 is a clean run, non-zero is a
