@@ -47,6 +47,13 @@ Landing on **`feat/one-binary`** (PR #35):
 - `package.json` — `test:in-docker`, and `test` gains `--timeout 20000`.
 - `CLAUDE.md` — both, including what the new script does not do.
 
+**`b2495d7`, `bd09630` — the sweep ran `bun test`, so the timeout never
+applied.**
+
+- `scripts/check-all.ts` — the test step goes through `bun run test`; the
+  digest keeps bun's reason line and dedupes.
+- `CLAUDE.md` — `bun test` and `bun run check` are no longer equivalent.
+
 Abandoned on `fix/readme-tenant-wiring`, and worth knowing it happened: four
 commits correcting the README's wiring for a deployment the binary then
 replaced. The two conclusions that survive are in the README that ships here —
@@ -145,6 +152,35 @@ CLAUDE.md documents survives, from a higher start.
 slower report on a genuinely hung test for not failing on a slow machine. The
 alternative — per-hook timeouts — would touch forty-two files to say the same
 thing.
+
+**And it did not work, for a reason worth more than the fix.** The next build
+failed identically, at 5000ms, with the flag apparently set. `check-all.ts`
+invoked `["bun", "test"]`, and **a bare `bun test` bypasses `package.json`
+entirely** — so `--timeout 20000` applied to `bun run test`, which nothing
+invokes: not the sweep, not a developer typing `bun test`. Every other step in
+that file already went through `bun run`; the test step was the one exception
+and nobody had needed it to matter before. Two definitions of one step, which is
+the shape that file exists to prevent.
+
+Verified both ways with a deliberately slow `beforeAll`: green through the sweep
+with the script's flag, red without it.
+
+**The digest could not say why, either**, on the build that proved it was
+needed: it printed `(fail) (unnamed) [5694.17ms]` and stopped, because bun puts
+the reason on the *following* line. It carries that now, and dedupes — bun
+prints each failure twice, inline and again under "N tests failed:", which the
+digest was faithfully doubling.
+
+So the sequence was: red build → raise a ceiling → the flag silently does not
+reach the runner → identical red build → the digest built for exactly this
+cannot explain it. Both instruments were wrong in the same direction, and both
+were found by watching a check fail at the one job it exists for rather than by
+reading it.
+
+**Peak US business hours was the first hypothesis and was wrong.** 16:03 CDT on
+a Wednesday makes worker contention plausible, and the log said otherwise. Worth
+remembering as an instance of the pinned header's first rule: the cheap
+measurement was in hand and the guess came first anyway.
 
 ## Next
 
