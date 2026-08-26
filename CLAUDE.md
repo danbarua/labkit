@@ -1135,8 +1135,13 @@ PGlite lockfile that a real Postgres does not have. `tests/mcp-stdio.test.ts`
 strips `LABKIT_DB_URL` from the servers it spawns, because it gives each one a
 private directory and that variable wins over one.
 
-`reset()` **truncates every table outside four system schemas**, so point
-`LABKIT_DB_URL` at a throwaway database and nothing else.
+`reset()` **truncates every table outside four system schemas**, so it must only
+ever point at a throwaway database. The default is one called **`labkit_tests`**,
+created by the script if absent — not `postgres`, which every tool defaults to
+and where a truncate would eat whatever a developer had been poking at, and not
+`labkit`, which is the name a real deployment would pick and therefore the one a
+destructive run must not reach by default. An explicit `LABKIT_DB_URL` is
+honoured verbatim; a caller who named a database has made that decision.
 
 A test that needs to exercise "a query loses a race and hits a constraint
 violation" should do it deterministically — mock the DB layer to inject the
