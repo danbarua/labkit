@@ -7,40 +7,14 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ---
 
-## CI on Google Cloud Build
-
-The `agent-bus` repo already has this working; the LabKit side is adapting it
-to TypeScript/Bun. `terraform apply` in that repo's `infra/ci` is Dan's to run.
-
-- **Read `~/Code/agents/agent-bus/infra/ci`** — `triggers.tf`,
-  `service_accounts.tf`, `secrets.tf`, `apis.tf`, and its `README.md`.
-- **Read that repo's `cloudbuild.yaml`, `cloudbuild.test.yaml`,
-  `cloudbuild.e2e.yaml`, `cloudbuild.image.yaml`, `docker-compose.cloud.yml`
-  and `docker-entrypoint.sh`** — four build files split by what they run, which
-  is the shape to copy.
-- **Adapt for Bun.** No Python image, no `pip`. `oven/bun` plus
-  `docker/postgres/` for the Postgres arm.
-- **Decide what runs per PR rather than per commit**: `bun run check`,
-  `bun run test:pg` (needs the container), and anything slow enough that nobody
-  runs it locally. `test:pg` is the one with no watcher at all today — no CI, no
-  hook, and `bun run check` excludes it deliberately.
-- **`docker/postgres/` is the Postgres arm's image** and already exists. A
-  second image for the build itself is a separate question.
-
 ## Documents
 
-- **Read `~/Code/agents/agent-bus/AGENTS.md`** — its pinned DX Principles
-  header, and how it keeps itself from rotting (the Entropy-Safe Prose rule:
-  check the tense; a sentence about how the code *is* goes stale, one about what
-  *changed* does not).
-- **Draft a pinned DX Principles header for this repo's `CLAUDE.md`.** Same
-  shape: rules earned by something going wrong here, each with its tell.
-  LabKit has the material — a barrel nothing imported through, a check
-  satisfiable only by hand-editing generated SQL, four documents asserting a
-  wrong cause for one flake.
 - **Sweep `CLAUDE.md` for stale prose.** It is long and parts of it describe a
   system two refactors ago. Retire rather than revise where the code now says
-  it; the file's own rule is that state belongs in exactly one place.
+  it; the pinned header's sixth rule is what "stale" means, and its tense tell
+  makes the sweep a grep rather than a judgement call. The file has grown while
+  the system under it was rewritten twice this week — the connection model, the
+  testing patterns and the persistence layer are where to start.
 - **`docs/persistence-spikes.md` -> `docs/persistence.md`.** It is dated AGE
   findings from 2026-08-17/18 and reads as a lab notebook. What a reader needs
   is a concise explainer of how persistence works now — two backends, one seam,
@@ -63,11 +37,40 @@ Each is small and none is blocking.
   preloads AGE (ours does) plus a `bootstrapSession` that does not issue `LOAD`
   gives a security boundary where `SET ROLE` gives only a safety one. The read
   half is measured; the write half is not. See `src/db/scoped.ts`.
+- **`LABKIT_HOME` naming a path that does not exist is manufactured, not
+  refused.** `src/db/backend.ts`'s `mkdirSync(lockDir, { recursive: true })`
+  creates the whole path, so a typo yields a fresh empty record rather than an
+  error — and an empty record looks exactly like a new project. Loud today only
+  when the parent happens to be unwritable.
+- **`connectDb()` could discover an existing record above it.** Proposed by the
+  review session: `LABKIT_HOME` set → use it and require it to exist; unset →
+  walk up from cwd for an existing `.labkit/`, and create only at cwd. The walk
+  would never decide *where to create*, which is what keeps it from
+  reintroducing the implicitness three review rounds removed. It answers the
+  case that survives the one binary: a client launched from `packages/foo`
+  reports an empty record for a project full of work.
 - **Drizzle v1** is release-candidate and we wait for the release. When it
   lands: `.enableRLS()` becomes `pgTable.withRLS()`, and the surfaces most
   likely to break are `src/db/migrate.ts` (it casts through private
   `dialect`/`session` fields) and `src/db/orm.ts` (it depends on `pg-proxy`'s
   callback shape). `drizzle-kit` has a smaller upgrade available independently.
+
+## The suite's margin, and the checks around it
+
+- **The suite runs close to bun's ceiling on a CI worker, and the raised
+  ceiling is not headroom.** A `test:pg` run of 368 tests took 208s there, and
+  one *test body* — not a hook — failed at 5008ms before the ceiling moved to
+  20000ms. Locally the same suite is ~55s. Nothing here measures the margin on
+  the machine that actually runs it; `bun run test:in-docker` approximates the
+  environment and demonstrably not the speed.
+- **`bun run test:in-docker` does not reproduce timing failures.** Green at 2
+  cpus and at 1 against a build that was failing. Either find what does — a
+  throttled cgroup, an I/O limit — or write down that the tool is for
+  environment only, more plainly than its header already does.
+- **`bunfig.toml` would delete `check:test-ceiling`.** `[test] timeout` is
+  ignored by bun 1.3.14, measured. If a later bun honours it, move the ceiling
+  there and remove the check — the trap stops existing rather than being
+  guarded.
 
 ## Deliberately not being done
 
