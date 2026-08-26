@@ -54,6 +54,12 @@ applied.**
   digest keeps bun's reason line and dedupes.
 - `CLAUDE.md` — `bun test` and `bun run check` are no longer equivalent.
 
+**`9f5fda3` — the other caller ran `bun test` too.**
+
+- `scripts/test-postgres.sh` — through the script, so the ceiling applies.
+- `scripts/check-test-ceiling.ts` **new** — refuses either spelling.
+- `package.json`, `CLAUDE.md`. Seventeen checks now.
+
 Abandoned on `fix/readme-tenant-wiring`, and worth knowing it happened: four
 commits correcting the README's wiring for a deployment the binary then
 replaced. The two conclusions that survive are in the README that ships here —
@@ -181,6 +187,27 @@ reading it.
 a Wednesday makes worker contention plausible, and the log said otherwise. Worth
 remembering as an instance of the pinned header's first rule: the cheap
 measurement was in hand and the guess came first anyway.
+
+**Then it happened again, in the other caller.** With the sweep fixed, `check`
+passed and `test-pg` failed at 5000ms instead: `scripts/test-postgres.sh` also
+invoked `bun test` directly. One defect, two of the two places that run the
+suite, and fixing them one at a time is what produced the second failure.
+`check:test-ceiling` now refuses both spellings.
+
+**Its first version would not have caught the bug it was written for.** It
+matched the shell `bun test` and not the `["bun", "test"]` argv array that
+started this. Caught by running it against both reinstated, which is the only
+reason it is worth having.
+
+**`bunfig.toml` was tried first and does not work** — `[test] timeout` is
+ignored by bun 1.3.14, a 6.5s `beforeAll` failing identically with and without
+it. That would have removed the trap rather than guarding it, which is the
+better shape; the check's header says to delete it if a later bun honours the
+setting.
+
+**The suite still runs close to the line on a worker.** The `test-pg` failure
+was a *test body* at 5008ms, not a hook, in a run of 368 tests taking 208s.
+The raised ceiling was necessary and is not the same as headroom.
 
 ## Next
 
