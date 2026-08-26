@@ -105,7 +105,16 @@ that repo's `AGENTS.md`, a stale-prose sweep of CLAUDE.md, and
 `docs/persistence-spikes.md` becoming a `docs/persistence.md` explainer), and
 the DB-layer loose ends listed under **Open** below.
 
-Working tree clean at `d8095e7`; pushed.
+**`b7a9b07` — stop bun leaving a copy of itself in the repo root.** Dan noticed
+`.<hash>-00000000.bun-build` files in a directory listing. `bun build --compile`
+leaves one per **successful** run and never removes it.
+
+- `scripts/build-binary.sh` **new** — builds from a `mktemp -d` removed on exit.
+- `package.json` — `build` calls it instead of inlining `bun build`.
+- `scripts/smoke-binary.sh` — calls it too, so `check:binary` stops leaking.
+- `CLAUDE.md`.
+
+Working tree clean at `b7a9b07`; pushed.
 
 ## Verified
 
@@ -155,6 +164,25 @@ Working tree clean at `d8095e7`; pushed.
   365 pass, 4 skip, 0 fail.
 - **The new `check:migrations` exemption has a negative control**: an
   `ADD COLUMN` in the same file still fails.
+
+**Measured for the build leak:**
+
+- The leftover is a **byte-identical copy of the `bun` binary itself** — sha256
+  matches `bun` 1.3.14 exactly, and all thirty-two matched each other. Bun
+  stages its own runtime, appends the bundle to make the outfile, and drops the
+  staged copy. Not a crash artefact and not a cache: the name carries a
+  per-build hash, so they accumulate rather than being reused.
+- It happens on the **success** path — `bun run build` took the count 31 to 32.
+- **The staging path follows the CWD, not `--outfile`**, established by building
+  the same target from a temp directory and watching the repo root stay clean.
+  That is what makes a scratch working directory the fix.
+- No flag exists: `bun build --help` says nothing about temporary files, and
+  `--compile-executable-path` names an input rather than a staging location.
+- Thirty-two files had reached **1.9GB**, most of it from `check:binary` running
+  inside every `bun run check`. After the fix a full sweep leaves **zero**. The
+  compiled binary still migrates a fresh database and answers from it, so
+  building from a scratch CWD has not broken resolution. No other checkout or
+  worktree had any.
 
 **Three defects the tests found rather than review:**
 
@@ -208,6 +236,11 @@ and `src/db/orm.ts` (it depends on `pg-proxy`'s callback shape). Separately,
 
 **A LabKit application image** was considered and declined — different
 lifecycle, no consumer yet.
+
+**`.gitignore`d is not absent.** The build leak ran for as long as it did
+because the pattern was ignored, so no tool mentioned it and nothing measured
+the directory. Worth remembering the next time something is silenced rather than
+fixed.
 
 **Everything actionable is in `docs/TASKS.md`** as of `d8095e7`, and is not
 restated here — that file is the queue and this one is a handover. What it
