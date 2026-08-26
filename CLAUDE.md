@@ -1521,7 +1521,14 @@ hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
 `beforeEach`, setup cost is not the mechanism.
 
 **The ceiling is now 20000ms and chosen, not bun's 5000ms default** (`--timeout`
-on the `test` script, added 2026-08-26). It went up because CI found the edge:
+on the `test` script, added 2026-08-26).
+
+**`bun test` does not read that; `bun run test` does.** A bare `bun test`
+bypasses `package.json`, so it runs at bun's default — and so did
+`bun run check`, whose sweep invoked `["bun", "test"]` while every other step
+went through `bun run`. The flag was added, CI went on failing at 5000ms, and
+the log showed a ceiling the repo believed it had raised. `check-all.ts` routes
+through the script now, so one place says what the test step is. It went up because CI found the edge:
 a `beforeAll` calling `openScenario()` timed out at 5807ms on a Cloud Build
 worker, and the cascade — `scenario` never assigned, `afterAll` throwing
 `undefined is not an object` — reported as two failures. Booting WASM in a hook
