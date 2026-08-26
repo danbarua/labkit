@@ -40,6 +40,13 @@ Landing on **`feat/one-binary`** (PR #35):
   and a digest of each failed step prints under the summary table. See Verified.
 - `docs/session-log/` — 047 folded into this entry.
 
+**`4b83b21` — run what CI runs, here, and raise a ceiling nobody chose.**
+
+- `scripts/test-in-docker.sh` **new** — `cloudbuild.test.yaml`'s steps in the CI
+  image, `--cpus`/`--memory` defaulted to a worker's 2/8g.
+- `package.json` — `test:in-docker`, and `test` gains `--timeout 20000`.
+- `CLAUDE.md` — both, including what the new script does not do.
+
 Abandoned on `fix/readme-tenant-wiring`, and worth knowing it happened: four
 commits correcting the README's wiring for a deployment the binary then
 replaced. The two conclusions that survive are in the README that ships here —
@@ -110,13 +117,34 @@ explicitly-set `LABKIT_HOME` naming a path that does not exist is
 fresh empty record rather than an error. Loud today only when the parent is
 unwritable.
 
-**CI found the suite's timing flakiness on a slower worker.** Two tests failed
-in PR #35's first build with `a beforeEach/afterEach hook timed out`. CLAUDE.md
-records ~2.5x headroom against bun's 5000ms ceiling measured locally, and a
-Cloud Build worker is ~2x slower — so the margin is roughly gone there. The
-build was queued for a retry rather than investigated. **This is the first red
-CI build**, and it found a real property of the suite rather than a bug in the
-change.
+**The first red CI build, and it found a real property of the suite.** A
+`beforeAll` calling `openScenario()` timed out at 5807ms on a Cloud Build
+worker. It reported as *two* failures and is one: `scenario` was never assigned,
+so `afterAll` threw `undefined is not an object (evaluating 'scenario.close')`.
+Bun also says *"a beforeEach/afterEach hook timed out"* when the hook is a
+`beforeAll`, which sends a reader hunting for a `beforeEach` that does not
+exist.
+
+**Answered two ways, and only one of them worked.**
+
+`bun run test:in-docker` runs CI's steps in CI's image at a worker's resource
+shape. **It did not reproduce the failure** — green at 2 cpus and at 1, with
+Postgres alongside as CI does. It closes the *environment* half of "works on my
+machine"; the speed half it only approximates, because a shared-core `e2`
+throttled to a sustained baseline is not a full local core under quota. Recorded
+in CLAUDE.md so nobody trusts it further than it goes.
+
+So the ceiling moved instead: **20000ms, chosen**, where 5000ms was bun's
+default and nobody here picked it. Booting WASM inside a hook is legitimate work
+and a machine slow enough to exceed five seconds at it is not reporting a hang.
+Measured before relying on it: `--timeout` does cover hooks — a 6.5s `beforeAll`
+fails at the default and passes at 20000 — so the margin-measuring method
+CLAUDE.md documents survives, from a higher start.
+
+**That last one is a judgement, not a fix, and easy to reverse.** It trades a
+slower report on a genuinely hung test for not failing on a slow machine. The
+alternative — per-hook timeouts — would touch forty-two files to say the same
+thing.
 
 ## Next
 
