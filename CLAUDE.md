@@ -186,7 +186,8 @@ would hand a new worktree another session's pinned baseline).
 
 ```sh
 bun install                    # install dependencies
-bun test                       # run all tests
+bun test                       # run all tests (embedded PGlite)
+bun run test:pg                # the same suite against a real Postgres + AGE container
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
@@ -1115,6 +1116,27 @@ The justification inverted rather than weakened, which is the part worth
 holding on to: the old rule's stated reason was fidelity to production, and
 production now opens PGlite directly, so sharing the instance is the *more*
 faithful arrangement.
+
+**`bun run test:pg` runs the same suite against a real Postgres**
+(`docker-compose.yml`'s `apache/age:release_PG18_1.7.0`) by setting
+`LABKIT_DB_URL` — the same variable production reads. It is `test:` and not
+`check:` on purpose: `bun run check` derives its list from the `check:` prefix
+and must not need docker. **Nothing runs it for you.**
+
+It is not decoration. It is the only backend on which **two connections can be
+live at once**, so anything about isolation, a session-scoped role or tenant, or
+advisory locking under contention can only be *demonstrated* there. It is also a
+disagreeing measurement — a `pg.Client` and a raw PGlite do not decode
+identically, and a suite that only sees one of them cannot notice.
+
+First run, 2026-08-26: **360 pass, 4 skip, 0 fail, 56s**, against 364/0/52s on
+PGlite. The four skips are `tests/connection-lock.test.ts`, whose subject is the
+PGlite lockfile that a real Postgres does not have. `tests/mcp-stdio.test.ts`
+strips `LABKIT_DB_URL` from the servers it spawns, because it gives each one a
+private directory and that variable wins over one.
+
+`reset()` **truncates every table outside four system schemas**, so point
+`LABKIT_DB_URL` at a throwaway database and nothing else.
 
 A test that needs to exercise "a query loses a race and hits a constraint
 violation" should do it deterministically — mock the DB layer to inject the

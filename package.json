@@ -15,6 +15,7 @@
 		"docs:tools": "bun scripts/render-tool-docs.ts",
 		"build": "bun build --compile --outfile bin/labkit src/cli/cli.ts",
 		"test": "bun test",
+		"test:pg": "bash scripts/test-postgres.sh",
 		"typecheck": "tsc --noEmit",
 		"check": "bun scripts/check-all.ts",
 		"check:all-checks": "bun scripts/check-all-checks.ts",

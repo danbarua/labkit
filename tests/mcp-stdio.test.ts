@@ -46,6 +46,21 @@ const id = (v: unknown): string =>
 
 const SERVER = join(import.meta.dir, "..", "src", "mcp", "server.ts");
 
+/**
+ * This process's environment with `LABKIT_DB_URL` removed.
+ *
+ * Every test here gives the server its own temporary directory, and
+ * `LABKIT_DB_URL` **wins over that** (`src/db/connect.ts`) — so under
+ * `bun run test:pg` these children would silently write into the shared
+ * container while the test believed it had a private database. Stripping it
+ * keeps the subject of this file what it says: the real process, over a real
+ * pipe, against its own PGlite.
+ */
+function childEnv(): Record<string, string> {
+  const { LABKIT_DB_URL: _dropped, ...rest } = process.env as Record<string, string>;
+  return rest;
+}
+
 let workdir: string;
 let client: Client;
 
@@ -62,7 +77,7 @@ beforeAll(async () => {
     args: [SERVER],
     cwd: workdir,
     env: {
-      ...(process.env as Record<string, string>),
+      ...childEnv(),
       LABKIT_TENANT: "stdio-probe",
     },
   });
@@ -134,7 +149,7 @@ test(
       const child = Bun.spawn([process.execPath, SERVER], {
         cwd: dir,
         env: {
-          ...(process.env as Record<string, string>),
+          ...childEnv(),
           LABKIT_TENANT: "stdout-probe",
         },
         stdin: "pipe",

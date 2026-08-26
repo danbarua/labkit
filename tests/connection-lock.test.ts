@@ -22,6 +22,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pgliteBackend } from "../src/db/backend";
+import { usingPostgres } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
 
 let root: string;
@@ -44,7 +45,11 @@ afterAll(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-describe("the database lock", () => {
+// Skipped under `LABKIT_DB_URL`: the subject here is the PGlite lockfile, and
+// a real Postgres is its own arbiter and has none. Skipping is the honest
+// answer — running these against a container would prove the lock works while
+// testing a code path that deployment never takes.
+describe.skipIf(usingPostgres())("the database lock", () => {
   test("is taken for the duration of the work and handed back afterwards", async () => {
     const first = await backend().connect();
     // Held: the file exists and names this process.
