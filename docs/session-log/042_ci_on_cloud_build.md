@@ -55,7 +55,12 @@ gets a watcher.
 
 - `infra/ci/README.md` — how to smoke-test one, given that you cannot.
 
-Working tree clean at `f204359`; pushed.
+**`7db4248` — replace the unmeasured timeout note with the first green run.**
+
+- `cloudbuild.test.yaml`, `infra/ci/README.md` — per-step figures from build
+  `9907cb31`, and what they say about a worker's speed.
+
+Working tree clean at `7db4248`; pushed.
 
 ## Verified
 
@@ -111,22 +116,35 @@ and the trigger. `terraform output` reports
 PR #30 was opened before it, so no pull-request event had ever reached it, and
 `gcloud builds triggers run` refuses:
 `RunTrigger is not supported for GitHub PullRequest Triggers`. Pushing `f204359`
-to the branch fired it. Build `9907cb31` started and was **still `WORKING`** when
-this entry was written.
+to the branch fired it.
 
-**So no Cloud Build run has completed.** The timeout in `cloudbuild.test.yaml`
-is generous and says in the file that it is unmeasured; that stays true until a
-build finishes.
+**Build `9907cb31` — the first Cloud Build run LabKit has ever had — passed all
+four steps**, 394s total, 1s queued:
+
+| step | Cloud Build | locally |
+| --- | --- | --- |
+| `ci-image` | 20s | — |
+| `postgres` | 12s | — |
+| `check` | 208s | ~112s |
+| `test-pg` | 153s | ~55s |
+
+A worker is roughly **2x slower than the machine this was developed on**, on
+both suites. Whatever a check costs locally, it costs CI double.
+
+That also settles the one thing only a real run could: **the Postgres sidecar on
+`--network=cloudbuild` behaves as it did in local simulation** — `test-pg` green
+against it, having waited for TCP rather than assuming readiness.
 
 ## Open
 
-**No Cloud Build run has finished yet.** Everything about the build is verified
-locally — the gate in `oven/bun:1.3.14`, the sidecar on a real docker network —
-and nothing about it is verified on a Cloud Build worker. The two questions
-that only a real run answers: whether the Postgres sidecar behaves the same on
-`--network=cloudbuild` there as it does locally, and what the steps actually
-cost. **Replace the timeout's unmeasured note with real figures once one
-lands.**
+**Every push to an open PR fires a build**, which is the intended behaviour and
+also means the wrap commits in this session each cost one. Two were still
+`WORKING` when this entry was last written.
+
+**One green run is not a flake rate.** The suite's history in this repo is of
+timing-sensitive failures under load (CLAUDE.md carries the measurements), and a
+worker at half the speed is exactly the condition that used to surface them. The
+figures above are one sample.
 
 **The error message misleads in two directions, both now written down.** It was
 first read as an apply run under the wrong `gcloud config` — and the active
@@ -148,18 +166,11 @@ DB-layer loose ends.
 
 ## Next
 
-Read the first build:
+PR #30 awaits review; the trigger is green and running on every push to it.
 
 ```sh
-gcloud builds list --project labkit-build --region us-central1 --limit 3
-gcloud builds log 9907cb31-be98-49e6-9117-9fe01cab43a6 \
-  --project labkit-build --region us-central1
+gcloud builds list --project labkit-build --region us-central1 --limit 5
 ```
 
-If it is green, put its per-step timings into `cloudbuild.test.yaml`'s closing
-comment in place of the unmeasured note. If it is red, the step that failed
-says which of the local simulations did not transfer.
-
-Then PR #30 awaits review, and after it the documents group in `docs/TASKS.md`,
-starting by reading `~/Code/agents/agent-bus/AGENTS.md` for the pinned-header
-shape.
+Then the documents group in `docs/TASKS.md`, starting by reading
+`~/Code/agents/agent-bus/AGENTS.md` for the pinned-header shape.
