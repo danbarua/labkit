@@ -26,6 +26,13 @@ gains one gate; SKILL.md's Notes record it.
 merge race to `docs/TASKS.md`. Both had been pushed to branches whose pull
 requests were already merged; see Open.
 
+**`6797e54`** — moves the stale-document finding below into `docs/TASKS.md`. It
+had been written into the Next section of this entry and nowhere else, which is
+the wrong place: a session log is disposable and the queue is not. Dan caught
+it by asking whether any of it was in `TASKS.md`. Worth knowing for the next
+review that produces findings — **a review's output is queue material, and
+putting it in the handover only looks like recording it.**
+
 048 was first lost in **#38's** squash — pushed to `docs/ledger-owners` shortly
 before the merge, recovered from `5360287` — and then lost again with 049 in
 **#39's**.
@@ -89,13 +96,15 @@ rather than to the branch. Queued in `docs/TASKS.md`; neither is built.
 PR #40 awaits review.
 
 A status review at the end of this session found two plan documents worth
-acting on, neither yet touched:
+acting on. Both are now reflected in `docs/TASKS.md` — the second as an item,
+the first by having nothing left to add:
 
 - **The migration-and-image plan is fully implemented** — the role and grants
   are in the hand-written migration, `pgRole(...).existing()` keeps the
   generated one generated, `docker/postgres/` owns the image. Its only residue,
   the login-role probe, is already in `docs/TASKS.md`.
-- **`docs/mcp-server/001_...` is stale in its status table** — it records the
+- **`docs/mcp-server/001_...` is stale in its status table**, and is queued for
+  delete-or-date — it records the
   agent-facing write contract as not done against 34 shipped tools, 18 of them
   writes, and the suite-ceiling problem as unresolved after it was re-measured
   to zero failures. It is referenced by nothing and sits outside the three
