@@ -671,13 +671,13 @@ this document's original analysis are marked as such.
 | --- | --- | --- | --- |
 | A | A criterion evaluation has no inconclusive outcome | S-3, S-17 | refuted |
 | B | Supersession is decision-only | ~~S-11~~, S-12 | resolved |
-| C | A claim has no endpoint or scope | S-5, S-13° | resolved |
-| D | No question-to-question lineage | **S-1**, S-13° | resolved |
+| C | A claim has no endpoint or scope | S-5, S-13 | resolved |
+| D | No question-to-question lineage | **S-1**, S-13 | resolved |
 | E | No evidence-to-evidence lineage | **S-10** | resolved |
 | F | ~~No artefact-to-artefact lineage~~ — artefacts are not versioned entities | **S-9**, **S-9b**, **S-9c**, **S-9d**, **S-10c** | boundary |
-| G | "Locked" is not distinct from "decision record still active" | S-7, S-13° | resolved |
+| G | "Locked" is not distinct from "decision record still active" | S-7, S-13 | resolved |
 | H | Closure carries no polarity | S-4 | refuted |
-| I | Absence of evidence vs inconclusive evidence | S-1, S-2°, S-3, **S-4** | resolved |
+| I | Absence of evidence vs inconclusive evidence | S-1, S-2, S-3, **S-4** | resolved |
 | J | Deferred vs accepted-as-unresolved | **S-14** | resolved |
 | K | No provisional/scratch standing | S-8, **S-18** | resolved |
 | L | No execution input lineage | S-11 | resolved |
@@ -685,7 +685,7 @@ this document's original analysis are marked as such.
 | N | Claim identity is undefined | S-5, S-12 | resolved |
 | O | Withdrawal reason is under-determined | S-3, S-7, **S-11b** | resolved |
 | P | `Evidence` carries two senses | **S-9**, S-10, S-12 | resolved |
-| Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2°, S-13°, **S-4** | resolved |
+| Q | Question and LineOfEnquiry are collapsed by the service layer | S-1, S-2, S-13, **S-4** | resolved |
 | R | Standing is a birth property, not a transition | S-8, S-7, **S-18** | resolved |
 | S | No agent, person or role exists in the model | S-8, **S-8b** | refuted |
 | T | Edges cannot carry properties | S-7, ~~row O~~, **S-10b** | refuted |
@@ -702,6 +702,9 @@ this document's original analysis are marked as such.
 | AE | An analysis cannot read another analysis's output | **S-11c**, **S-11d** | resolved |
 | AF | Execution input order is not recorded | **S-10b**, **S-10d** | resolved |
 | AG | An artefact id does not say whether it is measured or computed | **S-11f** | refuted |
+| AH | `Claim.kind` carries two facts under one value | — | open, unowned |
+| AI | `Computation.kind` holds prose where `Artefact.kind` holds kinds | — | open, unowned |
+| AJ | `(proposition, enquiry)` is a hidden entity | — | open, unowned |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -748,7 +751,57 @@ vocabulary could not express it**. "At most one confirmed wrong answer ships
 green" has a precondition the ledger had no way to mark, so whether the rule was
 engaged could only be established by reading prose — which is row K's failure
 mode exactly, a condition recorded where nobody re-reads it. A fourth label that
-nothing counts would repeat that, so `bun run check:ledger` counts it.
+nothing counts would repeat that, so `bun run check:ledger` counted it.
+
+**That checker was deleted (2026-08-22) and this paragraph is now describing
+its own failure mode.** It went because it held two copies of one status to each
+other, and a fact in one place needs no checker — but the argument above for the
+fourth label rested on something counting it, and nothing does. The label is
+kept on the narrower ground that the deferral rule references the state and the
+vocabulary must be able to express it; whether it stays honest is now a reader's
+job, which is exactly what the paragraph warns about. Left standing rather than
+quietly reworded, because the tension is the useful part.
+
+### AH, AI, AJ — named elsewhere, tracked nowhere
+
+Added 2026-08-26. All three have been live since **session-log 030**; none is a
+new finding. They are here because the place they were written down was not a
+place anyone greps.
+
+Each was stated once and then *carried forward* from wrap entry to wrap entry —
+which feels like tracking and is closer to laundering, since every restatement
+sits in a document the next reader will not open. Entry 035 diagnosed exactly
+this about itself (*"a session log is disposable and nobody greps it for a
+rule"*) and moved the CLAUDE.md-shaped findings out. These are ledger-shaped and
+stayed put. `docs/TASKS.md`'s own header says where they belong: *"What the model
+knows lives in PJ-008 §3's index table."*
+
+**`open, unowned` is the honest status, not `deferred`.** No scenario names any
+of them, and CLAUDE.md's rule is that a row which cannot name one is unresolved
+and unowned rather than deferred, said in its own cell. This takes the ledger
+from "nothing open" to "three unowned", which is a truer description of the
+model than the tidy one it replaces. None is `demonstrated` — no wrong answer
+has been shown for any — so the one-wrong-answer-at-a-time rule stays
+un-engaged.
+
+**AH — `Claim.kind` carries two facts under one value.** *This was prespecified*
+and *this has been promoted*. The same word for good reasons — both mean "not
+scratch" — but a reader cannot tell them apart and `whatIsKnown` does not try.
+First stated in `docs/project-journal/033`, under a heading naming it a question
+for the model rather than for that change. **Distinct from row R**, which is
+about the *writer* hardcoding `confirmatory`; this is about the *value*
+conflating two facts, and R can be resolved without touching it.
+
+**AI — `Computation.kind` holds `input.method`**, free-text prose, where
+`Artefact.kind` holds actual kinds. Exposed by the S-11f classification work and
+not settled by it.
+
+**AJ — `(proposition, enquiry)` is a hidden entity.** Withdrawable as a unit and
+able to block a write, with no node, no id, no `Ref` and no report type. Whether
+that is a missing entity or a correct absence is the question.
+
+What would settle each is unwritten. That is the gap, and naming it is the point
+of the row.
 
 Only the second kind is a gap in the *method* — CLAUDE.md's deferral rule says
 a row that cannot name a scenario is unresolved and unowned rather than
@@ -757,8 +810,10 @@ ordinary backlog. Keeping the three apart is what stops "we haven't decided"
 collapsing into one undifferentiated pile.
 
 `°` is a fact about build state, not about the row: when a scenario is built,
-clear its `°` everywhere in this table **and update the Rows-today column above**
-in the same change — both are derived, and both go stale silently. An owner need not be
+clear its `°` everywhere in this table in the same change — it is derived, and
+goes stale silently. (This said "and update the Rows-today column above" until
+2026-08-26. That column had already been deleted for being wrong in four places,
+so the instruction pointed at nothing.) An owner need not be
 a corpus scenario — row K's *was* **story 18**, a §4 story held back, and row
 T's is **row O**. An owner from §4 is a live claim that the story would settle
 the row, and story 18 did: it was promoted and built as S-18. And an owner being built is not the same as it returning a verdict —
