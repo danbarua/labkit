@@ -10,11 +10,10 @@
  *
  * Each step needs the one before it. `bootstrapSession` runs `LOAD 'age'`,
  * which **requires a superuser** — measured 2026-08-26, a non-superuser gets
- * `access to library "age" is not allowed` (42501), and without the library the
- * `agtype` type does not resolve, so every Cypher query fails, reads included.
- * `resolveTenantContext` provisions the tenant's graph, which is DDL on
- * `ag_catalog` and also superuser work. Only once both have happened is there a
- * tenant to pin and nothing left that needs the privilege.
+ * `access to library "age" is not allowed` (42501). `resolveTenantContext`
+ * provisions the tenant's graph, which is DDL on `ag_catalog` and also
+ * superuser work. Only once both have happened is there a tenant to pin and
+ * nothing left that needs the privilege.
  *
  * ## What it is worth
  *
@@ -27,9 +26,18 @@
  * Given LabKit's deployment — a CLI process or an MCP server on a developer's
  * machine, one tenant per process — the first is the failure that actually
  * happens and the second is not in the threat model. `LABKIT_DB_URL` pointing
- * at a shared Postgres is where that would stop being true, and the answer
- * there is a login role with `session_preload_libraries = 'age'`, which is
- * written down in `drizzle/0002_natural_ids.sql` and not built.
+ * at a shared Postgres is where that would stop being true.
+ *
+ * **And there a real login boundary is closer than this file used to claim.**
+ * The refusal above is of *issuing* `LOAD`, not of needing it: a server that
+ * preloads AGE has the library in every backend already. `docker/postgres`'s
+ * base image runs `postgres -c shared_preload_libraries=age`, and measured on
+ * it, a plain LOGIN role that never issues `LOAD` resolves `agtype` and reads
+ * through Cypher. So the ingredients for a genuine boundary are a preloading
+ * server and a `bootstrapSession` that does not issue `LOAD` — not the
+ * `session_preload_libraries` per-role setting this comment used to name.
+ * PGlite still needs the step-down, having no preload and one superuser
+ * session. Noted; not built.
  *
  * ## Why the tenant is a session GUC
  *

@@ -24,15 +24,22 @@
 # system schemas** between tests, so it must only ever point at a throwaway
 # database.
 #
-# Which is why the default is a database called **`labkit_tests`**, created here
-# if it does not exist, and not `postgres` and not `labkit`. `postgres` is the
-# cluster's own maintenance database and every tool defaults to it, so a suite
-# that truncated *there* would eat whatever a developer had been poking at with
-# psql; `labkit` is the name a real deployment would pick, which is precisely
-# the name a destructive test run must not be able to reach by default. An
-# explicit `LABKIT_DB_URL` is still honoured verbatim — a caller who named a
-# database has made that decision — so the guard is a safe default rather than
-# a restriction.
+# Which is why the default is a database called **`labkit_tests`**, and not
+# `postgres` and not `labkit`. `postgres` is the cluster's own maintenance
+# database and every tool defaults to it, so a suite that truncated *there*
+# would eat whatever a developer had been poking at with psql; `labkit` is the
+# name a real deployment would pick, which is precisely the name a destructive
+# test run must not be able to reach by default. An explicit `LABKIT_DB_URL` is
+# still honoured verbatim — a caller who named a database has made that decision
+# — so the guard is a safe default rather than a restriction.
+#
+# **That database is created by the image, not by this script.** It used to be
+# a check-then-`CREATE DATABASE` in shell here, which existed only because we
+# did not own the image; `docker/postgres/initdb/` does it now, once, on an
+# empty data directory. What the image may and may not contain is argued in
+# `docker/postgres/Dockerfile`, and the short version is that it is a
+# convenience and never a requirement — LabKit must keep working against a
+# stock Postgres + AGE somebody else administers.
 #
 # Two files opt out, both deliberately: `tests/connection-lock.test.ts` skips
 # (its subject is the PGlite lockfile, which a real Postgres does not have) and
@@ -48,8 +55,12 @@ url="${LABKIT_DB_URL:-postgres://postgres:agens@127.0.0.1:5432/$test_db}"
 
 if [ -z "${LABKIT_DB_URL:-}" ]; then
   if ! docker compose ps --status running --quiet db 2>/dev/null | grep -q .; then
-    echo "test:pg: starting docker-compose.yml's db service"
-    docker compose up -d db
+    echo "test:pg: building and starting docker-compose.yml's db service"
+    # `--build` on every run, not only the first: compose reuses a previously
+    # built image without noticing the Dockerfile changed, and a stale image is
+    # the kind of failure that gets blamed on the code. Cached, so it costs
+    # nothing when nothing changed.
+    docker compose up -d --build db
   fi
 
   echo -n "test:pg: waiting for postgres"
@@ -65,17 +76,6 @@ if [ -z "${LABKIT_DB_URL:-}" ]; then
     echo
     echo "FAILED: postgres did not become ready. \`docker compose logs db\` has the reason."
     exit 1
-  fi
-
-  # `CREATE DATABASE` cannot run inside a transaction, so this is a check and
-  # then a statement rather than one idempotent DDL. Not a race worth guarding:
-  # two concurrent `test:pg` runs against one container would fight over the
-  # truncates long before they fought over this.
-  exists="$(docker compose exec -T db psql -U postgres -d postgres -tAc \
-    "select 1 from pg_database where datname = '$test_db'" 2>/dev/null || true)"
-  if [ "$exists" != "1" ]; then
-    echo "test:pg: creating database $test_db"
-    docker compose exec -T db psql -U postgres -d postgres -c "create database $test_db"
   fi
 else
   echo "test:pg: using the LABKIT_DB_URL already in the environment"

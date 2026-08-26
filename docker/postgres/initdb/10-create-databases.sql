@@ -1,0 +1,20 @@
+-- The database `bun run test:pg` points at.
+--
+-- Runs once, on an empty data directory, after the base image's own
+-- `00-create-extension-age.sql` — hence the `10-` prefix, since the entrypoint
+-- sorts these by filename.
+--
+-- **`labkit_tests` and not `labkit`.** The suite's `reset()` truncates every
+-- table outside four system schemas, so whatever this names is a database that
+-- gets emptied between tests. `labkit` is the name a real deployment would
+-- pick, which makes it precisely the name a destructive test run must not be
+-- handed by default; `postgres` is worse still, being where every tool connects
+-- when nothing says otherwise. A developer wanting a persistent `labkit` here
+-- can create one, and the suite will never touch it.
+--
+-- **No extension, no role, no schema.** `CREATE EXTENSION age` is migration
+-- 0001's and works against a Postgres this image did not build; the role and
+-- its grants are migration 0002's for the same reason. This file creates a
+-- database and stops, which is the whole of what makes the image a convenience
+-- rather than a dependency.
+CREATE DATABASE labkit_tests;

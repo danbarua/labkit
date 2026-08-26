@@ -187,7 +187,7 @@ would hand a new worktree another session's pinned baseline).
 ```sh
 bun install                    # install dependencies
 bun test                       # run all tests (embedded PGlite)
-bun run test:pg                # the same suite against a real Postgres + AGE container
+bun run test:pg                # the same suite against a real Postgres + AGE container (docker/postgres)
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
@@ -1051,8 +1051,8 @@ that no longer exists.
 
 A session connects as a **superuser**, and that is not laziness: `LOAD 'age'` is
 refused to a non-superuser — `access to library "age" is not allowed`, SQLSTATE
-42501, measured 2026-08-26 — and without the library the `agtype` type does not
-resolve, so **every Cypher query fails, reads included**. So the order is fixed:
+42501, measured 2026-08-26 — and PGlite has no other way to get the library in.
+So the order is fixed:
 
 ```
 connect → bootstrapSession → migrate → resolveTenantContext → scopeToTenant → domain
@@ -1066,10 +1066,18 @@ that writes another tenant's row is refused with 42501.
 **It is a safety boundary, not a security one.** The session can `RESET ROLE`
 back to superuser. What it stops is a *query that forgot its filter*; what it
 does not stop is a caller who means harm. Both halves of that matter — the word
-"policy" invites a reader to assume the second. A deployment wanting a real
-login boundary needs `ALTER ROLE labkit_app SET session_preload_libraries =
-'age'` so the library arrives without a `LOAD`; that is written down in
-`drizzle/0002_natural_ids.sql` and **not built or measured**.
+"policy" invites a reader to assume the second.
+
+**A real login boundary is closer than this said, and the correction is worth
+knowing.** The refusal is of *issuing* `LOAD`, not of needing it. `docker/postgres`'s
+base image runs `postgres -c shared_preload_libraries=age`, so AGE is in every
+backend at server start; measured on it, a plain LOGIN role that never issues
+`LOAD` resolves `agtype` and reads through Cypher fine. So the ingredients are a
+preloading server plus a `bootstrapSession` that does not issue `LOAD` — not the
+per-role `session_preload_libraries` this used to name. PGlite still needs the
+step-down, having no preload and one superuser session. **Noted, not built**;
+the write half of that probe was not re-verified after a grant gap in the probe
+itself.
 
 Three things that are easy to get wrong here, all measured rather than assumed:
 

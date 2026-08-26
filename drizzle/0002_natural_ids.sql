@@ -131,13 +131,29 @@ $$;
 -- a security one: the session can `RESET ROLE` back to superuser. Bugs do not
 -- issue `RESET ROLE`; that is the whole of the claim.
 --
--- **Why not a login role.** Measured 2026-08-26: `LOAD 'age'` is refused to a
--- non-superuser (`access to library "age" is not allowed`, 42501), and without
--- the library the `agtype` type does not resolve, so every Cypher query fails --
--- reads included. Stepping down after `bootstrapSession` keeps the library
--- loaded for the session. A deployment wanting a genuine login boundary would
--- need `ALTER ROLE labkit_app SET session_preload_libraries = 'age'`; noted,
--- not built, not measured.
+-- **Why not a login role — and this is narrower than it first looked.** `LOAD
+-- 'age'` is refused to a non-superuser (`access to library "age" is not
+-- allowed`, 42501), measured 2026-08-26. What that costs depends on whether the
+-- server loads AGE for itself:
+--
+--   * **PGlite** does not, so the library arrives only via `LOAD`, so a
+--     non-superuser session has no `agtype` and every Cypher query fails.
+--     Stepping down after `bootstrapSession` keeps it loaded for the session,
+--     which is why the arrangement works there at all.
+--   * **The `apache/age` image runs `postgres -c shared_preload_libraries=age`**,
+--     so AGE is in every backend at server start and `LOAD` is not *needed* —
+--     only refused to anyone who issues it. Measured on that image: a plain
+--     LOGIN role that never issues `LOAD` resolves `agtype` and reads through
+--     Cypher fine. (The probe's write failed on a sequence grant it had not
+--     made in the graph schema — a gap in the probe, not a limitation, and not
+--     re-verified.)
+--
+-- An earlier version of this comment said flatly that every Cypher query fails
+-- for a non-superuser, reads included. That is true of PGlite and **false of a
+-- preloading server**, and the difference is the whole of whether a genuine
+-- login boundary is available. A deployment wanting one needs the server to
+-- preload AGE (the image already does) and `bootstrapSession` not to issue
+-- `LOAD`. Noted; not built.
 --
 -- **`NOSUPERUSER`** is the point rather than a detail: a superuser bypasses RLS
 -- unconditionally, and `FORCE ROW LEVEL SECURITY` is not enough to stop it

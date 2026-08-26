@@ -1,6 +1,10 @@
 services:
   db:
-    image: apache/age:release_PG18_1.7.0
+    # Built rather than pulled -- see docker/postgres/Dockerfile for what the
+    # image adds (a database, and nothing else) and the rule that keeps it that
+    # way. The base image tag is pinned in the Dockerfile so one file names the
+    # version.
+    build: ./docker/postgres
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=agens
