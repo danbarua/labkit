@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Refuses a push to a branch whose pull request is already merged or closed.
+#
+# Three times in two days, work was pushed to a branch that GitHub had already
+# squashed and merged. Every one of those pushes *succeeded*: the branch still
+# exists, `git log` looks right, and the commits reach nothing. Twice it cost a
+# session-log entry. The third time it took a CLAUDE.md restructure, a
+# measurement, a file deletion and a queue rewrite — recovered only because
+# someone happened to say "labkit has no outstanding PRs".
+#
+# The only reliable tell is the pull request's state, which is not in the local
+# repository at all: a squash merge leaves no ancestry a `git merge-base` can
+# find. So this shells out to `gh`.
+#
+# **It refuses rather than warns when it cannot tell.** A hook that passes when
+# `gh` is missing is the `|| true` this repo has been bitten by before — the
+# absence of a tool reading as a clean result. Every refusal names the way out,
+# and `git push --no-verify` is always available.
+#
+# Installed by `bun run dev:install-hooks` (sets `core.hooksPath`). Hooks are
+# not cloned, so a fresh clone or worktree has to run it.
+set -euo pipefail
+
+remote_name="${1:-origin}"
+
+die() {
+  echo >&2
+  echo "pre-push: REFUSED — $1" >&2
+  shift
+  for line in "$@"; do echo >&2 "  $line"; done
+  echo >&2
+  echo "  To push anyway: git push --no-verify" >&2
+  echo >&2
+  exit 1
+}
+
+# Read the refs being pushed. Only branches are checked: a tag or a deletion
+# carries no pull request.
+branches=()
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+  if [ -z "${local_ref:-}" ]; then continue; fi
+  case "$local_ref" in
+    refs/heads/*) ;;
+    *) continue ;;
+  esac
+  # A *deletion* is the all-zeroes sha on the LOCAL side. All-zeroes on the
+  # remote side means "this branch is new there", which is an ordinary push and
+  # must still be checked. Getting these the wrong way round made the first
+  # version of this hook pass every test it had, including the one that has to
+  # fail — the branch it must refuse was skipped before `gh` was ever asked.
+  if [ "${local_sha:-}" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+  branches+=("${local_ref#refs/heads/}")
+done
+
+# Not `[ ... ] && exit 0`: under `set -e` a false test makes the whole `&&`
+# return 1 and kills the script, which looks like a refusal with no message.
+if [ ${#branches[@]} -eq 0 ]; then
+  exit 0
+fi
+
+default_branch="$(git symbolic-ref --quiet --short "refs/remotes/${remote_name}/HEAD" 2>/dev/null || true)"
+default_branch="${default_branch#${remote_name}/}"
+default_branch="${default_branch:-main}"
+
+for branch in "${branches[@]}"; do
+  if [ "$branch" = "$default_branch" ]; then continue; fi
+
+  if ! command -v gh > /dev/null 2>&1; then
+    die "cannot tell whether '${branch}' has already been merged." \
+        "\`gh\` is not installed, and a squash merge leaves no local trace to" \
+        "check instead — so this hook cannot do its job and will not pretend to." \
+        "" \
+        "  brew install gh && gh auth login"
+  fi
+
+  # `gh pr view` exits non-zero both when there is no PR (fine — a new branch)
+  # and when the call fails (not fine). The two are told apart by the message,
+  # because the exit code is 1 either way.
+  if ! out="$(gh pr view "$branch" --json state,number 2>&1)"; then
+    case "$out" in
+      *"no pull requests found"*|*"no open pull requests found"*) continue ;;
+      *) die "could not ask GitHub about '${branch}'." "$out" ;;
+    esac
+  fi
+
+  state="$(printf '%s' "$out" | grep -o '"state":"[A-Z]*"' | cut -d'"' -f4)"
+  number="$(printf '%s' "$out" | grep -o '"number":[0-9]*' | cut -d: -f2)"
+
+  case "$state" in
+    MERGED)
+      die "PR #${number} for '${branch}' is already merged." \
+          "A squash merge took the branch as it stood when the merge commit was" \
+          "cut. Anything pushed now reaches nothing, and nothing else will say so." \
+          "" \
+          "  git checkout -b <new-branch> ${remote_name}/${default_branch}" \
+          "  git cherry-pick ${remote_name}/${default_branch}..${branch}"
+      ;;
+    CLOSED)
+      die "PR #${number} for '${branch}' is closed." \
+          "Reopen it, or branch off ${default_branch} and open a new one."
+      ;;
+    OPEN|"") ;;
+    *) die "PR #${number} for '${branch}' is in an unexpected state: ${state}." ;;
+  esac
+done
+
+exit 0

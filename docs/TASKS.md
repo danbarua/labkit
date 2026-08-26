@@ -122,9 +122,10 @@ here ships. The item below is here because it stopped being about `/wrap`.
   The only tell is diffing against `origin/main`.
   Firing the wrap hook on a push narrowed one instance of this and closed none
   of it, because the real mistake is continuing to work on a merged branch.
-  Candidate fixes, none built: refuse to push to a branch whose PR is merged;
-  a check that a merged branch holds no commits its merge lacks; or start a
-  fresh branch the moment a PR is opened.
+  **`.githooks/pre-push` now refuses it** (`bun run dev:install-hooks`), which
+  closes the mechanical half. What is left is that hooks are not cloned, so
+  every fresh clone and worktree starts unprotected and silently — the one
+  remaining way to walk into this.
   A squash merge takes the branch as it stood when the merge commit was cut, so
   a wrap pushed after that moment is not in `main` and nothing reports it. It
   has happened twice — entry 048 to PR #38, then 048 *and* 049 to PR #39,

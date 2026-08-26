@@ -11,6 +11,7 @@
 	"scripts": {
 		"dev": "bun run src/cli/cli.ts",
 		"mcp": "bun run src/cli/cli.ts mcp",
+		"dev:install-hooks": "bash scripts/install-hooks.sh",
 		"dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
 		"build": "bash scripts/build-binary.sh",
 		"test": "bun test --timeout 20000",

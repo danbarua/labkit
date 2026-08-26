@@ -148,9 +148,36 @@ Two more things a worktree will not have, because they are untracked:
   across — they warn on mistakes already made in this repo. `.wrap-state/` must
   be **seeded** before the first Stop fire or the first wrap is silently
   swallowed; `.claude/skills/wrap/SKILL.md` §Forking has the command.
-- Nothing to configure for git hooks. `.githooks/` and the generated SVG were
-  both removed (`ce97456`); `bun run dev:dependency-cruiser` regenerates
-  `docs/dependency-graph.mmd` by hand, and graphviz is no longer needed.
+- **Git hooks, which have to be turned on: `bun run dev:install-hooks`.** Hooks
+  are not cloned and `core.hooksPath` is per-repository config, so a fresh
+  clone or worktree has none and says nothing about it.
+
+  There is one, `.githooks/pre-push`, and it refuses a push to a branch whose
+  pull request is already merged or closed. **That is not a reversal of
+  `ce97456`, which removed the previous `.githooks/`** — that hook *regenerated
+  a committed artefact inside someone else's commit*, and the objection was to
+  writing, not to hooks. This one writes nothing and only ever refuses.
+
+  It was earned three times in two days: work pushed to an already-squashed
+  branch, where every push succeeds, the branch looks healthy, and the commits
+  reach nothing. Twice it cost a session-log entry; the third time it took a
+  `CLAUDE.md` restructure, a measurement, a file deletion and a queue rewrite,
+  recovered only because Dan said *"labkit has no outstanding PRs"*. A squash
+  merge leaves no ancestry `git merge-base` can find, so the state has to come
+  from `gh` — and the hook **refuses rather than passes** when `gh` is missing,
+  because a hook that goes quiet when its tool is absent is the `|| true` this
+  repo has already been bitten by. `git push --no-verify` is the way out and
+  every refusal names it.
+
+  Its first version **passed every test including the one that had to fail**:
+  it treated all-zeroes on the *remote* side as a deletion, when that means "new
+  branch there", so the branch it exists to refuse was skipped before `gh` was
+  ever asked. Found by running it against a genuinely merged branch, not by
+  reading it.
+
+  The generated SVG went with `ce97456` too; `bun run dev:dependency-cruiser`
+  regenerates `docs/dependency-graph.mmd` by hand, and graphviz is no longer
+  needed.
 
 ## The one rule about documents
 

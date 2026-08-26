@@ -1,12 +1,14 @@
 # 049: a push gate, a probe, and an outline
 
-**Session wrap, 2026-08-26/27, on `fix/wrap-on-push` then
-`docs/wrap-entries-recovered`.** Renamed — it began as one gate and its test,
+**Session wrap, 2026-08-26/27, across three branches — `fix/wrap-on-push`,
+`docs/wrap-entries-recovered`, `docs/outline-and-probe`.** Three because each
+of the first two had its pull request merged out from under work still being
+pushed to it; see Open. Renamed — it began as one gate and its test,
 and the gate's first firing turned up work that outgrew the title.
 
-Merged as **PR #39** (`ffe1fb2`). The first entry written under the rule it
-describes, and — see Open — the first eaten by the window it predicted. Restored
-onto `main` afterwards, along with 048.
+**PR #39** (`ffe1fb2`) and **PR #40** (`f462fcd`) are merged; **PR #41** carries
+the rest. The first entry written under the rule it describes, and the first
+eaten by the window it predicted.
 
 ## Goal
 
@@ -140,6 +142,23 @@ Nothing warned me, because nothing looks wrong: the push succeeds, the branch
 exists, `git log` is fine. The only tell is comparing against `origin/main`,
 which is not a thing anyone does by habit.
 
+**A `pre-push` hook now refuses it**, which is Dan's answer to the third
+instance and a better one than the wrap gate: the wrap gate narrowed one
+symptom, and the hook refuses the act. `.githooks/pre-push` asks `gh` for the
+pull request's state — a squash merge leaves no ancestry `git merge-base` can
+find, so the local repository genuinely does not know — and refuses on `MERGED`
+or `CLOSED`, naming the recovery commands. It refuses rather than passes when
+`gh` is absent. Turned on by `bun run dev:install-hooks`, because hooks are not
+cloned.
+
+**Its first version passed every test it had, including the one that had to
+fail.** It read all-zeroes on the *remote* side as a deletion; that actually
+means "new branch there", so the merged branch it exists to refuse was skipped
+before `gh` was ever asked. Seven states are now checked and the negative
+control — a genuinely merged branch, and `gh` removed from `PATH` — is what
+found it. Second time in this session that a probe agreeing with me would have
+been believed.
+
 **The squash that ate 048 did it again, to this entry, forty-five seconds
 later.** The prediction above was written, pushed, and immediately confirmed:
 `ffe1fb2` was cut from `457bf9d` at 23:37:00; the commit carrying 048 and 049
@@ -156,7 +175,8 @@ rather than to the branch. Queued in `docs/TASKS.md`; neither is built.
 
 ## Next
 
-PR #40 awaits review.
+PR #41 awaits review — and it is where every change from this session now
+lives, `main` having only the first two.
 
 Everything the review produced is now in `docs/TASKS.md` or done. What it left
 for next time:
