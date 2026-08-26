@@ -95,23 +95,75 @@ const steps: Step[] = [
     }),
 ];
 
-const results: Array<{ name: string; ok: boolean; ms: number }> = [];
+const results: Array<{ name: string; ok: boolean; ms: number; lines: string[] }> = [];
+
+/**
+ * Copies a stream to the terminal as it arrives **and** keeps it.
+ *
+ * The rule this must not break: output goes straight through. A sweep that
+ * swallowed a failing test's diagnosis and reported "test: FAIL" would cost the
+ * thing you actually needed — the same loss CLAUDE.md records for
+ * `bun test | tail`. Buffering as well as writing is what lets the summary name
+ * the failure without taking the detail away; `stdout: "inherit"` could do the
+ * first half only.
+ */
+async function tee(
+  stream: ReadableStream<Uint8Array>,
+  out: NodeJS.WriteStream,
+  keep: string[],
+): Promise<void> {
+  const decoder = new TextDecoder();
+  for await (const chunk of stream) {
+    const text = decoder.decode(chunk, { stream: true });
+    out.write(text);
+    keep.push(text);
+  }
+}
 
 for (const step of steps) {
   console.log(`\n▸ ${step.name} — ${step.says}`);
   const started = performance.now();
-  // Output goes straight through. A sweep that swallowed a failing test's
-  // diagnosis and reported "test: FAIL" would cost the thing you actually
-  // needed — the same loss CLAUDE.md records for `bun test | tail`.
-  const proc = Bun.spawnSync(step.argv, {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  const proc = Bun.spawn(step.argv, { stdout: "pipe", stderr: "pipe" });
+  const kept: string[] = [];
+  await Promise.all([
+    tee(proc.stdout, process.stdout, kept),
+    tee(proc.stderr, process.stderr, kept),
+  ]);
+  const exitCode = await proc.exited;
   results.push({
     name: step.name,
-    ok: proc.exitCode === 0,
+    ok: exitCode === 0,
     ms: performance.now() - started,
+    lines: kept.join("").split("\n"),
   });
+}
+
+/**
+ * The lines worth repeating under the table, for a step that failed.
+ *
+ * **Written because a red build sent someone scrolling.** A CI log ends with
+ * `1 of 16 failed: test`, and the two test names that caused it are ~190
+ * seconds of output further up, above a `biome migrate` notice and a depcruise
+ * *warning* that both look like the failure and are not. The summary knew which
+ * step failed and did not say what in it.
+ *
+ * The patterns are this repo's own vocabulary rather than a general guess:
+ * `(fail)` is bun's, `FAILED:` is the one every `check:*` script prints by
+ * convention (`check:all-checks` holds them to it), and the other two are what
+ * `tsc` and dependency-cruiser emit. A step that matches none falls back to its
+ * last few lines, which is worse than a real match and better than nothing.
+ */
+function digestOf(lines: string[]): string[] {
+  const patterns = [
+    /^\(fail\)/, // bun test
+    /^\s*FAILED:/, // every check:* script
+    /error TS\d+/, // tsc
+    /^\s*error\s/, // dependency-cruiser
+    /^\s*×\s/, // biome, which prints no FAILED: of its own
+  ];
+  const hits = lines.filter((l) => patterns.some((p) => p.test(l)));
+  if (hits.length > 0) return hits;
+  return lines.filter((l) => l.trim() !== "").slice(-8);
 }
 
 const failed = results.filter((r) => !r.ok);
@@ -127,6 +179,15 @@ if (failed.length > 0) {
   console.log(
     `\n${failed.length} of ${results.length} failed: ${failed.map((f) => f.name).join(", ")}`,
   );
+  // Say what, not only which. Capped, because a cascade can produce hundreds
+  // and the point is to stop someone scrolling, not to reproduce the run.
+  const CAP = 20;
+  for (const f of failed) {
+    const digest = digestOf(f.lines);
+    console.log(`\n${f.name}:`);
+    for (const line of digest.slice(0, CAP)) console.log(`  ${line.trimEnd()}`);
+    if (digest.length > CAP) console.log(`  … and ${digest.length - CAP} more`);
+  }
   process.exit(1);
 }
 console.log(`\nall ${results.length} passed.`);
