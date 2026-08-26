@@ -20,6 +20,15 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   is a concise explainer of how persistence works now — two backends, one seam,
   a lock, migrations, tenancy. Keep the dated probes that still bite; drop what
   the code has since answered.
+- **Delete or date `docs/mcp-server/001_...`.** A captured conversation from
+  2026-08-22 whose status table is now wrong: it records the agent-facing write
+  contract as not done, against a tool list that is 18 writes, and the suite
+  ceiling as unresolved after it was re-measured to zero failures. Referenced by
+  nothing, and outside the three directories that are exempt as dated records.
+  Two ideas in it are tracked nowhere else and go with the file unless they are
+  moved here first: dogfooding LabKit on its own open questions, and an
+  orientation surface for an agent that does not yet know an identifier to ask
+  about — every read tool today needs one.
 - **A wrap entry pushed while its pull request is merging is lost, silently.**
   A squash merge takes the branch as it stood when the merge commit was cut, so
   a wrap pushed after that moment is not in `main` and nothing reports it. It
