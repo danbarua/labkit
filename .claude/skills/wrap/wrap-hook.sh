@@ -3,8 +3,9 @@
 # Hook driver for the `wrap` skill -- see SKILL.md in this directory.
 #
 #   wrap-hook.sh start   SessionStart: record the HEAD this session began at.
-#   wrap-hook.sh stop    Stop: ask Claude to write the session log entry,
-#                        but only if HEAD has moved since the last time we asked.
+#   wrap-hook.sh stop    Stop: ask Claude to write the session log entry, but
+#                        only once the work is PUSHED and HEAD has moved since
+#                        the last time we asked.
 #
 # Wired from .claude/settings.json, which is CHECKED IN -- it was gitignored
 # until 2026-08-20, so a clone got this skill without the hook that runs it.
@@ -18,6 +19,10 @@
 # recorded sha is advanced at the moment we fire (so a fire is never repeated
 # for the same HEAD, whatever the skill does or fails to do), and a session
 # that has committed nothing never fires at all.
+#
+# The wrap's own commit does not re-fire either, by two independent routes now:
+# it is unpushed when made, and once pushed the range since the entry's commit
+# touches nothing outside the session log. Either alone would be enough.
 
 set -euo pipefail
 
@@ -154,6 +159,28 @@ if [ -z "$baseline" ]; then
 fi
 
 [ "$asked" = "$head_sha" ] && exit 0   # already asked about this HEAD
+
+# **Fire on push, not on every commit.**
+#
+# The Stop hook fires at every turn boundary where HEAD moved, which in a
+# session that commits as it goes means a wrap request per commit. On
+# 2026-08-26 that produced seven entries for four units of work, and rewrote
+# one entry five times as its branch grew -- each rewrite a turn spent
+# describing work that was still moving.
+#
+# A push is the honest boundary: it is when the work stops being yours alone,
+# and when the range an entry describes stops changing under it.
+#
+# **`asked` deliberately does NOT advance here.** Advancing it would mark this
+# HEAD as handled, and the push that follows -- same HEAD -- would then be
+# skipped by the check above, so the work would never be wrapped at all.
+# Staying quiet without recording anything is what makes the eventual push
+# fire.
+#
+# No upstream means nothing to compare against: a branch never pushed stays
+# quiet, which is the same intent.
+upstream="$(git rev-parse --verify --quiet '@{upstream}' 2>/dev/null || true)"
+[ "$upstream" = "$head_sha" ] || exit 0
 
 entry="$(read_state entry)"
 
