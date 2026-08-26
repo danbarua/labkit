@@ -97,7 +97,15 @@ hand-written file.
 - `drizzle/0002_natural_ids.sql`, `src/db/scoped.ts`, `CLAUDE.md` — the
   login-role correction below.
 
-Working tree clean at `b02f4f8`; pushed.
+**`d8095e7` — queue the outstanding work.** `docs/TASKS.md` had no actionable
+items; it now carries three groups — CI on Google Cloud Build (adapting
+`agent-bus`'s `infra/ci` terraform and its four `cloudbuild.*.yaml` for
+TypeScript/Bun), a documents group (a pinned DX Principles header modelled on
+that repo's `AGENTS.md`, a stale-prose sweep of CLAUDE.md, and
+`docs/persistence-spikes.md` becoming a `docs/persistence.md` explainer), and
+the DB-layer loose ends listed under **Open** below.
+
+Working tree clean at `d8095e7`; pushed.
 
 ## Verified
 
@@ -201,25 +209,26 @@ and `src/db/orm.ts` (it depends on `pg-proxy`'s callback shape). Separately,
 **A LabKit application image** was considered and declined — different
 lifecycle, no consumer yet.
 
-**`provisionTenantGraph()` still opens its own transaction** with raw
-`BEGIN`/`COMMIT` rather than the transactor. It is admin DDL that runs before
-the application pipeline exists, so it has nothing to join — but it is the one
-place left that owns a boundary, and it should be said out loud rather than
-noticed later.
-
-**A new relational call site has to remember `unwrapped()`.** Drizzle offers no
-hook, so this is convention, and convention is what this repo distrusts. Nothing
-checks it.
+**Everything actionable is in `docs/TASKS.md`** as of `d8095e7`, and is not
+restated here — that file is the queue and this one is a handover. What it
+carries from this session: `provisionTenantGraph()`'s raw `BEGIN`/`COMMIT`,
+nothing checking that a relational call site uses `unwrapped()`, the unbuilt
+login-role boundary, and the Drizzle v1 wait.
 
 **Nothing runs `test:pg` for you** — no CI, no hook, and `bun run check` does
 not include it. It is the only backend that can settle anything about roles,
-tenancy or privileges, so run it before landing work that touches them.
+tenancy or privileges, so run it before landing work that touches them. Giving
+it a watcher is the point of the CI group in the queue.
 
 ## Next
 
-PR #29 carries seventeen commits and awaits review. Nothing on the layering
-plan is left; it was deleted when it landed.
+PR #29 awaits review. Nothing on the layering plan is left; it was deleted when
+it landed.
 
-`docs/TASKS.md` still has no actionable items. The domain modelling behind
-PJ-008 §3's open rows is the larger thing waiting, and is what Dan named as the
-important work before this run of infrastructure began.
+Then `docs/TASKS.md`, whose first group is CI — read `agent-bus`'s `infra/ci`
+and its `cloudbuild.*.yaml` set, and adapt them for Bun. Dan runs the
+`terraform apply`.
+
+The domain modelling behind PJ-008 §3's open rows is still the larger thing
+waiting, and is what Dan named as the important work before this run of
+infrastructure began.
