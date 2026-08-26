@@ -10,7 +10,7 @@ bun install
 
 **Nothing else in this file works until that runs, and the failure does not name
 its cause.** A worktree starts with no `node_modules`, so `bun run typecheck`
-and `npx depcruise src tests --output-type err` — two of the three gates — fail
+and `bunx depcruise src tests --output-type err` — two of the three gates — fail
 with `TS2688: Cannot find type definition file for 'bun'`, which reads like a
 TypeScript configuration problem and is not one. `bun run check:doc-comments`
 passes throughout, being a plain script with no dependencies, so a green check
@@ -95,17 +95,23 @@ list in `src/mcp/tools.ts`, the scripts in `package.json`. This paragraph used
 to carry those numbers and was wrong about them repeatedly.
 
 
-`docs/mcp-tools.md` is **the domain's API as one reviewable file** — every MCP
-tool, what it takes and what it returns — generated from the tool declarations
-by `bun run docs:tools`. The same document is served live at
-`labkit://docs/tools`.
+**The domain's API as one reviewable page is `labkit://docs/tools`** — every MCP
+tool, what it takes and what it returns, rendered from the tool declarations on
+every read by `src/mcp/docs.ts`. It is stored nowhere, so it cannot disagree
+with the tools.
 
-It is checked in because its **diff** is the useful part: a changed line means
-the API changed. Freshness is one assertion in `tests/mcp.test.ts` (the
-checked-in file equals what the generator produces), not a hook and not a
-`check:*` script — that test already renders the document, so the check rides a
-run that was happening anyway. The accepted cost is that a commit touching
-`src/mcp/tools.ts` also touches this file.
+**A checked-in copy existed until 2026-08-26 and is worth knowing about, because
+the failure was a genre and not a file.** `docs/mcp-tools.md` was committed so
+its diff would show an API change, kept honest by an assertion in
+`tests/mcp.test.ts`, refreshed by a `docs:tools` script. The assertion's only
+failure mode was "someone regenerated late"; catching it cost a build that had
+to run on documentation, and a `docs/**` CI filter that needed a load-bearing
+exception — which breaks silently the first time someone renames a file.
+
+What settled it was what the arrangement *invited*: agents proposing a parity
+document for the CLI surface, tests asserting the two agree, and a gate over all
+of it. A generated file checked in beside the code it describes is an invitation
+to that. Generate into the running program, not into the tree.
 
 `docs/dependency-graph.mmd` is the module dependency graph, as text.
 `bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
@@ -120,10 +126,10 @@ that being noise rather than to make it useful. The SVG went for its own reasons
 — 1,444 generated lines in which a moved edge is invisible, against 3KB of
 mermaid that renders on GitHub and diffs line by line. PJ-007 records a design
 change prompted by *reading* the SVG, which is the case for having had one; it is
-not a case for regenerating it forever. `npx depcruise-fmt -T dot` over the
+not a case for regenerating it forever. `bunx depcruise-fmt -T dot` over the
 cruise JSON recovers one if a person wants it.
 
-It is **not a gate** and never was: `npx depcruise src tests --output-type err`
+It is **not a gate** and never was: `bunx depcruise src tests --output-type err`
 is. Generation lives in `scripts/update-dependency-graph.sh` rather than a
 `package.json` one-liner because the one-liner was a pipeline, and `$?` after a
 pipeline reports the last command's status — a crashed `depcruise` used to yield
@@ -190,9 +196,8 @@ bun test                       # run all tests (embedded PGlite)
 bun run test:pg                # the same suite against a real Postgres + AGE container (docker/postgres)
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
-npx depcruise src tests --output-type err   # layering rules (errors) + cycles
+bunx depcruise src tests --output-type err   # layering rules (errors) + cycles
 bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
-bun run docs:tools             # regenerate docs/mcp-tools.md from the MCP tool declarations
 bun run typecheck              # tsc --noEmit
 bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
 bun run check:all-checks       # every check script must introduce itself in one plain sentence
@@ -358,7 +363,7 @@ one batch of work and that is not a design position: a record nothing can write
 to has nothing in it. Read and write handlers are handed different surfaces, so
 neither can reach the other's verbs, and
 `tests/mcp.test.ts` asserts every public verb on either surface is exposed or
-listed in `NOT_EXPOSED` with a reason. **`docs/mcp-tools.md` is the tool list**;
+listed in `NOT_EXPOSED` with a reason. **`labkit://docs/tools` is the tool list**;
 this paragraph deliberately does not count them.
 
 `bun test`'s exit code means what it says: **0 is a clean run, non-zero is a
@@ -416,7 +421,17 @@ single failing test — or to tell a real regression from a teardown cascade.
 Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
 about the pipe, not about that incident.
 
-**Nothing runs these for you** — there is no CI workflow and no git hook.
+**CI runs the gates on pull requests to `main`, and nothing else runs them for
+you** — there is no git hook, and a commit that is not in a PR is checked by
+whoever typed it. `cloudbuild.test.yaml` runs `bun run check` and
+`bun run test:pg` on Google Cloud Build; `infra/ci/` is the terraform, and its
+README carries the one step terraform cannot do (connecting the repo to Cloud
+Build, in the console, in the same region).
+
+**`test:pg` is why CI exists.** `bun run check` is a command anyone can type;
+`test:pg` needs a container, is excluded from the sweep deliberately, and had no
+watcher at all until the trigger existed.
+
 Before committing, run **`bun run check`**: it runs `bun test`, `typecheck`,
 `depcruise` and every `check:*` script, prints a table, and exits non-zero if
 any of them failed. About ninety seconds, most of it `bun test`.
@@ -541,7 +556,7 @@ forcing them into FK tables would just reimplement graph traversal as
 recursive CTEs.
 
 `src/db/` is layered, not a hub — each module has one job, and the
-dependency direction is enforced by `npx depcruise src tests --output-type err`
+dependency direction is enforced by `bunx depcruise src tests --output-type err`
 (violations only; `bun run dev:dependency-cruiser` redraws
 `docs/dependency-graph.mmd`):
 
@@ -755,7 +770,7 @@ scenario asserts it with an empty event log open beside it. See PJ-008 row Z for
 the level above that, which is not answerable and has not been made so.
 
 Two layering rules are enforced as `dependency-cruiser` **errors**, not
-conventions — `npx depcruise src tests --output-type err`:
+conventions — `bunx depcruise src tests --output-type err`:
 
 - `tests/scenarios/` may not import `src/db`. A scenario asserts a
   researcher's intent can be carried out through research verbs alone; if it

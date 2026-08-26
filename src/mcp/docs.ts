@@ -6,19 +6,19 @@
  * This renders the same declarations as documentation: what each tool answers,
  * what it takes, and what comes back, field by field.
  *
- * **Generated, in both places it appears.** The resource renders on each read,
- * so it cannot fall behind `TOOLS`. The checked-in copy at `DOCS_FILE` can, and
- * is held to the generator by an assertion in `tests/mcp.test.ts` rather than by
- * a hook or a `check:*` script — the test already renders this document, so
- * freshness is one more assertion in a run that was happening anyway.
+ * **Rendered on every read, and stored nowhere.** There is no second copy to go
+ * stale, so nothing has to hold two things equal.
  *
- * The copy is checked in for one reason: it is the only place this domain's API
- * is reviewable as a single file, and its **diff** is the useful part — a
- * changed line means the API changed. That is the opposite of the dependency
- * graph, whose byte-stability existed to suppress noise and which was taken out
- * of self-maintenance on 2026-08-21 for putting a generated artefact in every
- * commit. The cost here is the same and is accepted rather than denied: a commit
- * touching `tools.ts` will also touch `docs/mcp-tools.md`.
+ * There was one until 2026-08-26 — `docs/mcp-tools.md`, checked in so its diff
+ * would show an API change, kept honest by an assertion in `tests/mcp.test.ts`
+ * and refreshed by a `docs:tools` script. All three are gone. The assertion's
+ * only failure mode was "someone regenerated late"; catching that cost a build
+ * that had to run on documentation, and a generated file checked in beside the
+ * code it describes invites a whole genre of ceremony — parity docs for the
+ * other surface, tests asserting the two agree, a gate on all of it.
+ *
+ * The dependency graph went the same way on 2026-08-21, for the narrower
+ * version of the same reason.
  *
  * The types are rendered from **JSON Schema**, not from the Zod objects, for
  * the same reason `server.ts` ships the whole report rather than a chosen
@@ -32,14 +32,6 @@ import { historicalSurveySchema, knowledgeSurveySchema } from "./schemas";
 
 /** The URI this document is served at. */
 export const DOCS_URI = "labkit://docs/tools";
-
-/**
- * Where the same document is checked in.
- *
- * Named here so the generator, the freshness assertion and the resource all
- * agree on one path rather than three string literals.
- */
-export const DOCS_FILE = "docs/mcp-tools.md";
 
 type JsonSchema = {
   type?: string | string[];
@@ -192,9 +184,8 @@ export function renderToolDocs(
   const lines = [
     "# LabKit — the tools",
     "",
-    "Generated from the server's own tool declarations. Served live at",
-    "`labkit://docs/tools`, and checked in at `docs/mcp-tools.md` — the two are",
-    "held identical by a test, so neither can disagree with the tools.",
+    "Generated from the server's own tool declarations on every read, so it",
+    "cannot disagree with the tools. Served at `labkit://docs/tools`.",
     "",
     "LabKit records **why** a piece of research was done and what rests on it:",
     "questions, the lines of enquiry pursuing them, what was measured, what was",

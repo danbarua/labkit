@@ -24,7 +24,7 @@
  * goes uncalled. This comment used to say nine commands were "a later pass";
  * they landed, and the sentence outlived them.
  *
- * `docs/mcp-tools.md` is the tool list. This file deliberately does not count
+ * `labkit://docs/tools` is the tool list. This file deliberately does not count
  * them.
  */
 

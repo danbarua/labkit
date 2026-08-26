@@ -91,9 +91,19 @@ LABKIT_DB_URL="$url" bun test
 status=$?
 
 echo
-if [ "$status" -eq 0 ]; then
-  echo "OK: the suite passes against Postgres. The container is still up; \`docker compose down\` stops it."
+# The closing line depends on who owns the database. When `LABKIT_DB_URL` came
+# from the environment -- CI, or a developer pointing at their own Postgres --
+# there is no compose stack to stop, and saying otherwise sends the reader to a
+# command that does nothing.
+if [ -n "${LABKIT_DB_URL:-}" ]; then
+  after="Against the database LABKIT_DB_URL names; nothing here started or stopped it."
 else
-  echo "FAILED: see above. The container is still up so the failure can be inspected."
+  after="The container is still up; \`docker compose down\` stops it."
+fi
+
+if [ "$status" -eq 0 ]; then
+  echo "OK: the suite passes against Postgres. $after"
+else
+  echo "FAILED: see above. $after"
 fi
 exit "$status"

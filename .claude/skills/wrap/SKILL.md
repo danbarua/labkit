@@ -57,7 +57,7 @@ that says "not run".
 ```sh
 bun test
 bun run typecheck
-npx depcruise src tests --output-type err
+bunx depcruise src tests --output-type err
 ```
 
 One trap in this repo, which has caught someone already (see CLAUDE.md):

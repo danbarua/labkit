@@ -1,0 +1,104 @@
+# Every gate LabKit has, on every pull request to main.
+#
+# Publishes nothing, reads no secrets, pushes no image. The value is entirely in
+# whether the build succeeds — which is why the trigger runs it as an identity
+# that can write a log line and do nothing else (`infra/ci/service_accounts.tf`).
+#
+# **The point of this file is `test:pg`.** `bun run check` is a `git commit`
+# away from being run by anyone; `bun run test:pg` needs a Postgres container,
+# so it is excluded from the sweep on purpose and, until this existed, had **no
+# watcher at all** — no CI, no hook, nothing. It is also the only backend on
+# which two connections can be live at once, so anything about roles, tenancy or
+# privileges can only be settled here.
+#
+# **One trigger, not three.** The repo this pattern came from splits its builds
+# by cost — a manual tier that spends money on real model calls, an image build
+# gated on the files that shape it. Neither applies yet: both arms below are
+# secret-free and cheap, and the image build is not separable because `test:pg`
+# builds `docker/postgres` every run anyway. Split when something here starts
+# being skipped, not before.
+
+steps:
+  # The gate's image: bun plus git. See docker/ci/Dockerfile for why git.
+  # Never pushed; built here so both bun steps below share one copy.
+  - id: ci-image
+    name: gcr.io/cloud-builders/docker
+    args: [build, -t, labkit-ci, docker/ci]
+
+  # The database. `--network=cloudbuild` is what makes it reachable from later
+  # steps by name: every step joins that network, so `labkit-pg` resolves.
+  # Started early so initdb overlaps with the gate rather than blocking it.
+  - id: postgres
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        docker build -t labkit-pg docker/postgres
+        docker run -d --name labkit-pg --network=cloudbuild \
+          -e POSTGRES_USER=postgres \
+          -e POSTGRES_PASSWORD=agens \
+          -e POSTGRES_DB=postgres \
+          labkit-pg
+
+  # `bun test`, typecheck, depcruise and every `check:*`. Installs dependencies
+  # into /workspace, which the Postgres arm below then reuses -- steps share the
+  # workspace, not the container filesystem.
+  #
+  # `--frozen-lockfile` so a drifted lockfile fails here rather than being
+  # silently updated inside a build nobody keeps.
+  - id: check
+    name: labkit-ci
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        bun install --frozen-lockfile
+        bun run check
+
+  # The same suite again, against real Postgres.
+  #
+  # **The wait is not optional and its absence would be invisible locally.**
+  # With `LABKIT_DB_URL` already set, `scripts/test-postgres.sh` skips the
+  # container management *and the readiness loop* it does when it owns the
+  # container -- so without this, the first connection races initdb.
+  #
+  # Over **TCP from this network**, not `docker exec`: the postgres entrypoint
+  # runs a temporary server during initdb that answers on the unix socket while
+  # TCP is still closed, so a socket-side check can pass before the database is
+  # actually reachable from here.
+  - id: test-pg
+    name: labkit-ci
+    entrypoint: bash
+    env:
+      - LABKIT_DB_URL=postgres://postgres:agens@labkit-pg:5432/labkit_tests
+    args:
+      - -c
+      - |
+        set -e
+        for _ in $(seq 1 60); do
+          if bun -e 'const {Client}=require("pg");const c=new Client({connectionString:process.env.LABKIT_DB_URL});c.connect().then(()=>c.end()).then(()=>process.exit(0)).catch(()=>process.exit(1))' 2>/dev/null; then
+            echo "postgres is accepting connections"
+            break
+          fi
+          sleep 1
+        done
+        bun run test:pg
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+# **Measured on the first green run, 2026-08-26** (build `9907cb31`, 394s total,
+# 1s queued):
+#
+#   ci-image    20s
+#   postgres    12s
+#   check      208s   -- ~112s for the same work locally
+#   test-pg    153s   -- ~55s locally
+#
+# A worker is roughly **2x slower than a Mac Studio** on both suites, which is
+# the number worth carrying: the gate is the cost here, and it is `bun test`
+# inside it. 1800s leaves better than 4x headroom over the whole build.
+timeout: 1800s

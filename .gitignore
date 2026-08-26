@@ -36,3 +36,14 @@ package-lock.json
 # sessions, and swept on a timer — a tracked copy would conflict, go stale, and
 # hand a new worktree some other session's pinned baseline.
 .claude/.wrap-state/
+
+# Terraform. `*.tfvars` holds the billing account id; state holds everything
+# else about the project, including service-account emails and, in some
+# providers, secrets. `.terraform/` is a provider cache the size of a binary.
+infra/**/*.tfvars
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+
+# `.terraform.lock.hcl` is deliberately NOT ignored: it pins provider versions
+# and belongs in the repo for the same reason `bun.lock` does.

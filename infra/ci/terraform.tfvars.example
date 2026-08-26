@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in. Gitignored (`infra/**/*.tfvars`),
+# because it holds the billing account id.
+#
+# Terraform reads terraform.tfvars automatically: no exports, no -var flags, no
+# prompts. TF_VAR_* environment variables work too, but have to be exported in
+# every new shell -- which is how you end up hand-typing a billing account into
+# a prompt halfway through an apply.
+
+billing_account_id = "000000-000000-000000"
+project_id         = "labkit-build"

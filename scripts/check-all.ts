@@ -5,7 +5,7 @@
  * There was no shortcut: `bun run` does not glob, so `bun run check:*` was ten
  * invocations typed by hand or, more often, the three or four somebody
  * remembered. CLAUDE.md's own instruction — *"run `bun test`, `bun run
- * typecheck` and `npx depcruise`; add `check:migrations` if you touched
+ * typecheck` and `bunx depcruise`; add `check:migrations` if you touched
  * `drizzle/`, `check:tests-assert` if you touched tests, …"* — is a list of
  * conditionals held in a person's head, which is the shape that gets skipped.
  *
@@ -77,7 +77,7 @@ const steps: Step[] = [
   },
   {
     name: "depcruise",
-    argv: ["npx", "depcruise", "src", "tests", "--output-type", "err"],
+    argv: ["bunx", "depcruise", "src", "tests", "--output-type", "err"],
     says: "The layering rules hold, and nothing imports in a circle.",
   },
   ...Object.keys(scripts)

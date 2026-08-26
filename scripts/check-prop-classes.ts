@@ -16,10 +16,11 @@
  * builds an index nothing reads, which is invisible forever. Neither shows up
  * in a test, because both spellings return the same rows.
  *
- * The honest end state is to **generate** the table from the annotations — the
- * `docs/mcp-tools.md` pattern, where the generated file is checked in because
- * its diff is the useful part and freshness rides on a test already running.
- * When that happens this script deletes itself.
+ * The honest end state is to **generate** the table from the annotations, at
+ * which point this script deletes itself. Note what that does *not* mean: this
+ * repo tried checking a generated file in beside the code it describes, with a
+ * test holding the two equal, and retired it on 2026-08-26 — see
+ * `src/mcp/docs.ts`. Generate it into the running program, not into the tree.
  *
  * It reads the **written type node**, not the resolved type. All five aliases
  * resolve to `string`, so a checker asking the type checker what these are
