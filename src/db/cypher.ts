@@ -26,7 +26,7 @@ import {
   type AgtypePath,
   type AgtypeJSON,
 } from "./agtype";
-import type { LabKitDB } from "./client";
+import type { LabKitDB } from "./backend";
 
 // ---------------------------------------------------------------------------
 // Column decoders

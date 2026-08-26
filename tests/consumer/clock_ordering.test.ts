@@ -5,18 +5,12 @@
  * `025` and `026` (row Z's predictions and outcomes).
  *
  * **Split out of `vertical_slice.test.ts` on 2026-08-21, for containment.** The
- * suite is flaky and it concentrates here: five consecutive plain `bun test`
- * runs gave 0, 2, 2, 9 and 1 failures, and the nine was one file cascading
- * after a single death — the shape `tests/helpers/db.ts` documents, where a
- * connection hitting the pglite-socket defect desyncs permanently and stays
- * broken for the rest of its life. Every file gets its own PGlite and its own
- * socket server, so splitting the file halves the blast radius: a connection
- * that dies in here can no longer take the paired-world probes with it.
- *
- * **Containment, not a fix.** The root cause is not known — see
- * `docs/TASKS.md`, which records what is established and what is not, including
- * two failed experiments worth not repeating. If the flake follows this file
- * rather than staying with it, that is itself a result.
+ * suite was flaky and concentrated here: five consecutive plain `bun test` runs
+ * gave 0, 2, 2, 9 and 1 failures, and the nine was one file cascading after a
+ * single death. The containment argument no longer applies — the cascade was a
+ * teardown race, fixed on 2026-08-22 (`tests/scenario-harness.test.ts`), and
+ * the socket the rest of it was attributed to has since been deleted. The split
+ * stays for the reason in the next paragraph, which was always the better one.
  *
  * The seam is real rather than convenient. Everything here winds a clock;
  * everything left behind freezes one, deliberately, so that two worlds cannot

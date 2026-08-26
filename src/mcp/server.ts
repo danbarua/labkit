@@ -2,10 +2,10 @@
 /**
  * The MCP server — the door an agent works through.
  *
- * The CLI next door is for a person at a terminal, renders prose by default,
- * and is **read-only**: it builds only a `ReadSurface`, so it cannot write at
- * all. This server is for an agent, returns the **whole** structured report
- * every time, and reads *and writes*. Returning the report entire is deliberate
+ * The CLI next door is for a person at a terminal and renders prose by default.
+ * This server is for an agent and returns the **whole** structured report every
+ * time. Both read and write — the CLI's read-only era ended for the same reason
+ * this server's did. Returning the report entire is deliberate
  * rather than lazy: the CLI's hand-picked prose fields fell behind the report
  * types twice (see that file's header), and a transport that ships the report
  * entire cannot fall behind it at all.
@@ -16,6 +16,10 @@
  * halves stay separate at the handler boundary — a read tool is handed a
  * `ReadSurface` and a write tool a `WriteSurface`, so neither can reach the
  * other's verbs — but the server holds both.
+ *
+ * **It holds no database connection between tool calls**, and that is forced
+ * rather than chosen: the embedded PGlite file is single-writer and a process
+ * holding it locks every other agent out of the project. See {@link main}.
  *
  * **Import from subpaths only.** `@modelcontextprotocol/sdk`'s `exports` maps
  * `"."` to a `dist/esm/index.js` that is not on disk — verified under Bun, not
@@ -31,6 +35,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
+import { scopeToTenant } from "../db/scoped";
 import { TenantGraph } from "../db/graph";
 import { ReadSurface, WriteSurface } from "../domain";
 import { pgEventLog } from "../domain/event-store";
@@ -39,24 +44,39 @@ import { TOOLS, WRITE_TOOLS } from "./tools";
 import { DOCS_URI, renderToolDocs } from "./docs";
 
 /**
- * Registers every tool against the read surface and a **factory** for the write
- * one. Transport-free, so a test can drive it over `InMemoryTransport` without
- * a subprocess.
+ * Everything a tool call needs, for the duration of that call and no longer.
  *
- * Both are required. An optional write half would be the read-only mode
- * surviving as an API shape, and a caller that wants a read-only server has one
- * already: `src/cli.ts` builds a `ReadSurface` and nothing else.
+ * Expressed as a scope rather than as two values because acquiring the database
+ * is part of it: {@link main} opens a connection inside this function and closes
+ * it in a `finally`, so a handler cannot outlive the connection it read through
+ * and nothing else can be holding the file while an agent is idle. A test
+ * supplies surfaces over a scenario graph and ignores the scoping entirely.
+ */
+export type WithSurfaces = <T>(
+  work: (surfaces: { read: ReadSurface; write: WriteSurface }) => Promise<T>,
+) => Promise<T>;
+
+/**
+ * Registers every tool against a **scope** that yields both surfaces.
+ * Transport-free, so a test can drive it over `InMemoryTransport` without a
+ * subprocess.
  *
- * **A factory rather than an instance, so attribution can be per command.** A
- * surface holds no query state — no constructor and no field of its own beyond
- * `SessionCore`'s three, and the only mutable state in reach is
- * `inTransaction`'s depth counter on the shared `TenantGraph` — so building one
- * per tool call costs a `new` over three references and buys a fresh
- * `git_hash` and session id each time. The alternative was threading a context
- * argument through all eighteen write verbs.
+ * Both halves are required. An optional write half would be the read-only mode
+ * surviving as an API shape.
  *
- * The read side stays a single instance on purpose: reads never touch the clock
- * and never emit, so there is nothing per-call for them to carry.
+ * **Per call rather than per server, so attribution and the connection are
+ * both per command.** A surface holds no query state — no constructor and no
+ * field of its own beyond `SessionCore`'s three — so building one per tool call
+ * costs a `new` over three references and buys a fresh `git_hash` and session
+ * id each time. The alternative was threading a context argument through all
+ * eighteen write verbs. What made the scope a scope rather than a factory is
+ * the connection: it has to be released between calls, so something has to own
+ * a `finally`.
+ *
+ * The read half is built per call too, which it did not used to be. Reads never
+ * touch the clock and never emit, so there was nothing per-call for them to
+ * carry — but they do read through a connection, and that is now per call for
+ * both.
  *
  * Every tool declares an `outputSchema`. This reverses what this comment said
  * until 2026-08-22 — that a mirror of the report interfaces would exist only to
@@ -72,7 +92,7 @@ import { DOCS_URI, renderToolDocs } from "./docs";
  * would convert a good refusal into an empty success, which is the one
  * outcome the domain went to trouble to avoid.
  */
-export function buildServer(read: ReadSurface, makeWrite: () => WriteSurface): McpServer {
+export function buildServer(withSurfaces: WithSurfaces): McpServer {
   const server = new McpServer({ name: "labkit", version: "0.0.1" });
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
@@ -111,7 +131,7 @@ export function buildServer(read: ReadSurface, makeWrite: () => WriteSurface): M
         // the honest thing to say about a tool that changes the record.
         annotations: { readOnlyHint: true },
       },
-      respond((args) => definition.handler(read, args)),
+      respond((args) => withSurfaces(({ read }) => definition.handler(read, args))),
     );
   }
 
@@ -126,7 +146,7 @@ export function buildServer(read: ReadSurface, makeWrite: () => WriteSurface): M
       },
       // A surface per call, so each write records the attribution and commit
       // in force at the moment it ran rather than at server start.
-      respond((args) => definition.handler(makeWrite(), args)),
+      respond((args) => withSurfaces(({ write }) => definition.handler(write, args))),
     );
   }
 
@@ -168,56 +188,78 @@ function respond(run: (args: Record<string, unknown>) => Promise<unknown>) {
 let inFlight = 0;
 
 /**
- * Resolves one tenant, builds the read surface and a per-call write factory,
- * serves over stdio.
+ * Serves over stdio, opening and releasing the database around each tool call.
  *
- * The tenant is resolved once at the boundary and never again — below it every
- * function takes a resolved context, and there is no "current tenant" anyone
- * can change mid-session.
+ * **Nothing is held between calls, and that is the point.** The embedded PGlite
+ * file is single-writer: a process that keeps it open locks every other process
+ * out of the project for as long as it lives, and the use case is several
+ * agents working one project at once. An MCP server lives as long as its agent's
+ * session, so holding the file for that long is the one thing it must not do.
+ *
+ * The cost is a lock, an open, a migration no-op and a tenant resolution per
+ * call — **80-96ms warm**, measured 2026-08-26 (open 70-85ms, migrate 2ms,
+ * resolve 7-8ms, close 2ms). That is noise against the domain work inside one
+ * tool call, and two overlapping calls serialise on the lock rather than racing
+ * the file.
+ *
+ * The tenant is resolved inside each scope and never cached: below the boundary
+ * every function takes a resolved context, and there is no "current tenant"
+ * anyone can change mid-session. Resolution is also the self-healing
+ * reconciliation pass PJ-005 argued for, so paying it per call is a feature
+ * rather than a tax.
  */
 export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Promise<void> {
-  const connection = await connectDb();
-  // `tenantCtx`, not `ctx`. There are two contexts in scope below and they are
-  // unrelated: this one is which tenant's graph to talk to, and the
-  // `CommandContext` further down is who is talking and when.
-  const tenantCtx = await resolveTenantContext(connection.db, tenant);
+  const withSurfaces: WithSurfaces = async (work) => {
+    const connection = await connectDb();
+    try {
+      // `tenantCtx`, not `ctx`. There are two contexts in scope here and they
+      // are unrelated: this one is which tenant's graph to talk to, and the
+      // `CommandContext` below is who is talking and when.
+      const tenantCtx = await resolveTenantContext(connection.db, tenant);
 
-  // One graph, so `inTransaction`'s re-entrancy depth is shared between the
-  // halves. This is the composition `src/domain/session.ts` specifies for an
-  // adapter that needs both.
-  const graph = new TenantGraph(tenantCtx, connection.db);
+      // Superuser work is done: `LOAD 'age'` and the graph DDL both needed it.
+      // From here the session is `labkit_app` with its tenant pinned, so a tool
+      // that forgets to filter still cannot read another tenant's events. See
+      // src/db/scoped.ts for what that is and is not worth.
+      await scopeToTenant(connection.db, tenantCtx);
 
-  // The sink is constructed **here** rather than taken from a surface, and that
-  // is load-bearing now that the write half is built per call. It used to be
-  // whatever `new WriteSurface(graph)` defaulted to, handed on to the read half
-  // as `writes.events`; with a surface per call each one would default to its
-  // own fresh log, the read half would hold the first call's, and the stream
-  // would fragment silently. Owning it at this level makes the process-scoped
-  // sink a decision instead of a consequence of construction order.
-  //
-  // **Durable now.** It was `inMemoryEventLog()` on the grounds that a store
-  // was unearned: the graph is the record, `read.ts` never consulted the log,
-  // and the scenarios that mention it assert it is *empty* when a historical
-  // answer is read. What earned it is the consumer PJ-031 named — attribution
-  // rode on every event and nothing could read it, because the log died with
-  // the process.
-  //
-  // Same connection as the graph, which is the atomicity story: `emit` runs
-  // inside each verb's `inTransaction`, so an event and the writes it describes
-  // commit together. A second connection would silently end that.
-  const events = pgEventLog(connection.db, tenantCtx.tenantId);
+      // One graph for both halves, so `inTransaction`'s re-entrancy depth is
+      // shared. This is the composition `src/domain/session.ts` specifies for
+      // an adapter that needs both.
+      const graph = new TenantGraph(tenantCtx, connection.db, connection.tx);
 
-  // Providers are sampled per call, not once here, so a long-running server
-  // records the commit each piece of work was actually done against. Both are
-  // mocks today; `src/attribution.ts` is the single file that changes when they
-  // stop being.
-  const makeWrite = () =>
-    new WriteSurface(graph, {
-      ...commandContext(mockGitContext, mockSessionContext),
-      events,
-    });
+      // **Durable, and on the same connection as the graph** — that is the
+      // atomicity story: `emit` runs inside each verb's `inTransaction`, so an
+      // event and the writes it describes commit together. A second connection
+      // would silently end that.
+      //
+      // It was `inMemoryEventLog()` on the grounds that a store was unearned:
+      // the graph is the record, `read.ts` never consulted the log, and the
+      // scenarios that mention it assert it is *empty* when a historical answer
+      // is read. What earned it is the consumer PJ-031 named — attribution rode
+      // on every event and nothing could read it, because the log died with the
+      // process. It must be built here rather than left to a surface's default:
+      // a surface defaulting its own log would give the two halves of one call
+      // separate streams.
+      const events = pgEventLog(connection.db, tenantCtx.tenantId);
 
-  const server = buildServer(new ReadSurface(graph, { events }), makeWrite);
+      // Providers are sampled per call, so a long-running server records the
+      // commit each piece of work was actually done against. Both are mocks
+      // today; `src/attribution.ts` is the single file that changes when they
+      // stop being.
+      return await work({
+        read: new ReadSurface(graph, { events }),
+        write: new WriteSurface(graph, {
+          ...commandContext(mockGitContext, mockSessionContext),
+          events,
+        }),
+      });
+    } finally {
+      await connection.close();
+    }
+  };
+
+  const server = buildServer(withSurfaces);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -225,8 +267,13 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   // A client shuts an MCP stdio server down by closing its stdin, and nothing
   // else does. `StdioServerTransport` subscribes to stdin's `data` and `error`
   // only — never `end` — so its `onclose` fires when someone calls `close()`
-  // and at no other time, and the open database connection then keeps the
-  // event loop alive forever.
+  // and at no other time.
+  //
+  // **What keeps the process alive is the stdin subscription, not a held
+  // database connection**, which matters now that there is no held connection
+  // to fall back on. The comment here used to credit the connection; measured
+  // under Bun 1.3.14, a process whose only handle is a `data` listener on
+  // stdin stays up indefinitely and keeps answering.
   //
   // The first attempt at this hung `transport.onclose` off the transport and
   // was dead code. It was "verified" by a pipeline whose exit status came from
@@ -234,22 +281,18 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
   // straight into. Measured without the pipe, the process sat there for the
   // full 15 seconds.
   process.stdin.on("end", () => {
-    void drainThenExit(server, connection);
+    void drainThenExit(server);
   });
 }
 
 /** Waits for every request already in hand to be answered, then shuts down. */
-async function drainThenExit(
-  server: McpServer,
-  connection: { close(): Promise<void> },
-): Promise<void> {
+async function drainThenExit(server: McpServer): Promise<void> {
   // One tick before counting: a request that arrived in the same chunk as the
   // EOF may not have reached its handler yet, so a count of zero right now
   // proves nothing.
   await new Promise((resolve) => setTimeout(resolve, 0));
   while (inFlight > 0) await new Promise((resolve) => setTimeout(resolve, 5));
   await server.close().catch(() => {});
-  await connection.close().catch(() => {});
   process.exit(0);
 }
 

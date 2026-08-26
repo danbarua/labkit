@@ -52,7 +52,7 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
   expect(back.rows[0]!.n).toBe("1");
 
   // ...and the edge is actually usable, plus its uniqueness index is back.
-  const graph = new TenantGraph(ctx, db);
+  const graph = new TenantGraph(ctx, db, db.tx);
   const comp = await graph.createNode("Computation", {
     kind: "k",
     status: "done",
@@ -171,7 +171,7 @@ test("a property index is built, and a tenant missing one picks it up on re-reso
 
   // And the index actually serves the query it was built for. Two claims of the
   // same wording so the match is not trivially empty.
-  const graph = new TenantGraph(ctx, db);
+  const graph = new TenantGraph(ctx, db, db.tx);
   await graph.createNode("Claim", { name: "the coating slows corrosion" });
   await graph.createNode("Claim", { name: "the coating slows corrosion" });
   const found = await graph.query(

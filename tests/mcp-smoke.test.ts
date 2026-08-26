@@ -42,24 +42,26 @@ afterAll(async () => {
 const called = new Set<string>();
 
 /**
- * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and
- * a **factory** for the write half so each tool call gets its own surface. The
- * sink must be constructed at this level rather than taken from a surface — a
- * per-call surface defaulting to its own log would fragment the stream and
- * leave the read half holding an empty one.
+ * The composition `src/mcp/server.ts` uses: one graph and one sink owned here,
+ * handed to a **scope** the server enters per tool call. The sink must be
+ * constructed at this level rather than taken from a surface — a per-call
+ * surface defaulting to its own log would fragment the stream and leave the two
+ * halves of one call holding different ones. The server's own scope opens and
+ * closes a database connection as well; a test has a graph already.
  */
 async function connectServer(
   graph: TenantGraph,
   transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0],
 ): Promise<EventSink> {
   const events = inMemoryEventLog();
-  await buildServer(
-    new ReadSurface(graph, { events }),
-    () =>
-      new WriteSurface(graph, {
+  await buildServer((work) =>
+    work({
+      read: new ReadSurface(graph, { events }),
+      write: new WriteSurface(graph, {
         ...commandContext(mockGitContext, mockSessionContext),
         events,
       }),
+    }),
   ).connect(transport);
   return events;
 }

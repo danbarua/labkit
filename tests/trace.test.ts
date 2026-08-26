@@ -10,7 +10,7 @@
  */
 import { afterEach, expect, test } from "bun:test";
 import { traced, traceTotals, tracedInFlight } from "../src/db/trace";
-import type { LabKitDB } from "../src/db/client";
+import type { LabKitDB } from "../src/db/backend";
 
 const stub: LabKitDB = {
   async query() {

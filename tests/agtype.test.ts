@@ -8,9 +8,9 @@ import {
 } from "../src/db/agtype";
 import { TenantGraph } from "../src/db/graph";
 import { agtypeValue } from "../src/db/cypher";
-import type { LabKitDB } from "../src/db/client";
+import type { LabKitDB } from "../src/db/backend";
 import { resolveTenantContext } from "../src/db/tenant";
-import { setupTestDb, type TestDb } from "./helpers/db";
+import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 
 /**
  * Validates parseAgtype's assumptions and uncovers gaps, per the review
@@ -193,7 +193,7 @@ describe("parseAgtype — pure parsing", () => {
 
 describe("parseAgtype — against live pglite-age", () => {
   let testDb: TestDb;
-  let db: LabKitDB & { close(): Promise<void> };
+  let db: TestClient;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
@@ -203,11 +203,10 @@ describe("parseAgtype — against live pglite-age", () => {
     await testDb.close();
   });
 
-  // A fresh connection per test, not one shared for the whole describe
-  // block — see tests/helpers/db.ts's file-level comment: a confirmed
-  // pglite-socket bug can permanently corrupt a connection under
-  // concurrency/error exposure, so sharing one risks cascading failures
-  // unrelated to whatever this file is actually testing.
+  // One labelled client per test. This used to be a *fresh connection* per
+  // test, containing a pglite-socket defect that could permanently corrupt one;
+  // there is no socket any more, so it is now bookkeeping and a trace label
+  // rather than containment — see tests/helpers/db.ts's file-level comment.
   beforeEach(async () => {
     db = await testDb.openClient();
   });
@@ -219,7 +218,7 @@ describe("parseAgtype — against live pglite-age", () => {
 
   test("round-trips a real vertex, edge, and path exactly as parseAgtype expects", async () => {
     const ctx = await resolveTenantContext(db, "labkit");
-    const graph = new TenantGraph(ctx, db);
+    const graph = new TenantGraph(ctx, db, db.tx);
 
     const a = await graph.createNode("Question", {
       name: "q",
@@ -273,7 +272,7 @@ describe("parseAgtype — against live pglite-age", () => {
   // protects nothing an existing assertion does not is a change-detector.
   test("a SUPERSEDES edge's internal id, past Number.MAX_SAFE_INTEGER, round-trips exactly via bigint", async () => {
     const ctx = await resolveTenantContext(db, "labkit");
-    const graph = new TenantGraph(ctx, db);
+    const graph = new TenantGraph(ctx, db, db.tx);
 
     const d1 = await graph.createNode("Decision", {
       reason: "r1",

@@ -12,9 +12,10 @@ import {
   type EvidenceProps,
   type LineOfEnquiryProps,
 } from "../src/db/domain";
-import type { LabKitDB } from "../src/db/client";
+import type { LabKitDB } from "../src/db/backend";
 import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
-import { setupTestDb, type TestDb } from "./helpers/db";
+import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
+import { transactor } from "../src/db/transactor";
 
 /**
  * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
@@ -22,14 +23,14 @@ import { setupTestDb, type TestDb } from "./helpers/db";
  * docs/project-journal/004_tenancy_implementation_plan.md) against Apache
  * AGE, migrated and provisioned the same way a real connection would be
  * (runMigrations() + resolveTenantContext(), not hand-rolled setup) and
- * queried through the same `pg.Client`-over-`pglite-socket` path production
- * uses — never a raw `PGlite` instance directly (see tests/helpers/db.ts).
+ * queried through the same `LabKitDB` seam production uses (see
+ * tests/helpers/db.ts).
  * Each test corresponds to one of the journal's MVP acceptance-criteria
  * questions, or one of PJ-003 §15 / PJ-004's acceptance tests.
  */
 
 let testDb: TestDb;
-let db: LabKitDB & { close(): Promise<void> };
+let db: TestClient;
 let ctx: TenantContext;
 let graph: TenantGraph;
 
@@ -42,14 +43,14 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // A fresh connection every test, not one shared for the whole file — see
-  // tests/helpers/db.ts's file-level comment on why that's load-bearing,
-  // not a style preference (a confirmed pglite-socket bug can permanently
-  // corrupt a connection that sees enough error/concurrency exposure, and
-  // several tests in this file deliberately provoke DB-level errors).
+  // One labelled client per test. Several tests in this file deliberately
+  // provoke DB-level errors, which used to be load-bearing: a pglite-socket
+  // defect could permanently corrupt a connection that saw enough of them, and
+  // a connection per test bounded that. The socket is gone and so is the
+  // defect — see tests/helpers/db.ts.
   db = await testDb.openClient();
   ctx = await resolveTenantContext(db, "labkit");
-  graph = new TenantGraph(ctx, db);
+  graph = new TenantGraph(ctx, db, db.tx);
 });
 
 afterEach(async () => {
@@ -462,8 +463,8 @@ describe("tenant isolation", () => {
     const ctxA = await resolveTenantContext(db, "tenant-a");
     const ctxB = await resolveTenantContext(db, "tenant-b");
     expect(ctxA.graphName).not.toBe(ctxB.graphName);
-    const graphA = new TenantGraph(ctxA, db);
-    const graphB = new TenantGraph(ctxB, db);
+    const graphA = new TenantGraph(ctxA, db, db.tx);
+    const graphB = new TenantGraph(ctxB, db, db.tx);
 
     const claimA = await graphA.createNode("Claim", { name: "x" });
     const claimB = await graphB.createNode("Claim", { name: "x" });
@@ -479,8 +480,8 @@ describe("tenant isolation", () => {
   test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {
     const ctxA = await resolveTenantContext(db, "tenant-a");
     const ctxB = await resolveTenantContext(db, "tenant-b");
-    const graphA = new TenantGraph(ctxA, db);
-    const graphB = new TenantGraph(ctxB, db);
+    const graphA = new TenantGraph(ctxA, db, db.tx);
+    const graphB = new TenantGraph(ctxB, db, db.tx);
 
     const questionA = await graphA.createNode("Question", {
       name: "q-in-a",
@@ -568,17 +569,14 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     ).rejects.toThrow(/duplicate key value violates unique constraint/);
   });
 
-  // NOT a real Promise.all() race against two live connections — genuine
-  // concurrent queries against pglite-socket are not reliable enough for a
-  // deterministic suite to depend on (confirmed 2026-08-18: two SEPARATE
-  // pg.Client connections issuing overlapping queries where one errors,
-  // e.g. this exact 23505, corrupt the connection after a handful of
-  // iterations — reproducible with plain SQL, nothing AGE-specific about
-  // it; see the postgres-age skill's "Upstream filing"). That's a real bug
-  // in @electric-sql/pglite-socket, not something to work around by wanting
-  // harder — and it matters beyond this test, since pgliteLeaderElectionBackend's
-  // whole design is every secondary process hitting the primary's socket
-  // concurrently. What's actually testable deterministically: the DB
+  // NOT a real Promise.all() race against two live connections, and the reason
+  // has outlived the bug it started as. It was originally that concurrent
+  // queries against pglite-socket were not reliable enough to depend on
+  // (confirmed 2026-08-18; see the postgres-age skill's "Upstream filing").
+  // There is no socket now: the embedded database is single-writer and held
+  // under an exclusive lock, so two live connections to it is not a state this
+  // deployment can reach at all. What is actually testable deterministically:
+  // the DB
   // constraint itself (the "duplicate CREATE... blocked at the database"
   // test above, one connection, no race needed) and createEdge()'s own
   // handling of losing that race — proven here by making the CREATE step
@@ -609,7 +607,7 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
         return db.query(sql, params);
       },
     };
-    const flakyGraph = new TenantGraph(ctx, flakyDb);
+    const flakyGraph = new TenantGraph(ctx, flakyDb, transactor(flakyDb));
 
     await expect(
       flakyGraph.createEdge(question.natural_id, "MOTIVATES", loe.natural_id),
@@ -759,7 +757,7 @@ test("a failing COMMIT does not corrupt the transaction depth", async () => {
       return db.query(sql, params);
     },
   };
-  const brittle = new TenantGraph(ctx, brittleDb);
+  const brittle = new TenantGraph(ctx, brittleDb, transactor(brittleDb));
 
   await expect(brittle.inTransaction(async () => "done")).rejects.toThrow(/injected/);
 
@@ -792,7 +790,7 @@ test("a failing ROLLBACK does not replace the original error", async () => {
       return { rows: [] } as never;
     },
   } as LabKitDB;
-  const brittle = new TenantGraph(ctx, brittleDb);
+  const brittle = new TenantGraph(ctx, brittleDb, transactor(brittleDb));
 
   await expect(
     brittle.inTransaction(async () => {

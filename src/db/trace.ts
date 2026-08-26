@@ -31,7 +31,7 @@
  * findings, verdicts — and a trace file is a debugging artefact that gets pasted
  * into issues and chat. SQL text is truncated for the same reason.
  */
-import type { LabKitDB } from "./client";
+import type { LabKitDB } from "./backend";
 
 interface TraceOptions {
   /** Log completed queries at or above this duration. Default 1000ms. */

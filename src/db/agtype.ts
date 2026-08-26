@@ -66,7 +66,7 @@ export interface AgtypePath {
   elements: Array<AgtypeVertex | AgtypeEdge>;
 }
 
-export interface AgtypeScalar<T = AgtypeJSON> {
+interface AgtypeScalar<T = AgtypeJSON> {
   kind: "scalar";
   value: T;
 }
@@ -84,7 +84,7 @@ export type AgtypeValue<T = Record<string, AgtypeJSON>> =
 
 const IDENT_RE = /[A-Za-z0-9_]/;
 
-export class AgtypeParseError extends Error {}
+class AgtypeParseError extends Error {}
 
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
@@ -409,7 +409,7 @@ export function validateIdentifier(name: string, context: string): void {
 // strings into query text. Those are gone; this is what replaced them.
 // ---------------------------------------------------------------------------
 
-export interface CypherColumn {
+interface CypherColumn {
   name: string;
   /** Defaults to "agtype" — AGE's actual column type in a cypher() AS clause. */
   type?: string;

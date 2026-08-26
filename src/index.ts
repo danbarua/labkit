@@ -13,5 +13,7 @@
  * surface on purpose.
  */
 export { ReadSurface } from "./domain";
-export type { LabKitDB } from "./db";
-export { connectDb, resolveTenantContext, TenantGraph } from "./db";
+export type { LabKitDB } from "./db/backend";
+export { connectDb } from "./db/connect";
+export { resolveTenantContext } from "./db/tenant";
+export { TenantGraph } from "./db/graph";

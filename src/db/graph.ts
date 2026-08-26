@@ -30,7 +30,8 @@ import {
   type NodePropsByLabel,
   type PublicNode,
 } from "./domain";
-import type { LabKitDB } from "./client";
+import type { LabKitDB } from "./backend";
+import type { Transactor } from "./transactor";
 import type { TenantContext } from "./tenant";
 
 /**
@@ -44,8 +45,6 @@ import type { TenantContext } from "./tenant";
 export class TenantGraph {
   private readonly runner: CypherRunner;
   private readonly db: LabKitDB;
-  /** Depth counter, so a compound verb calling another one does not nest BEGIN. */
-  private depth = 0;
   /**
    * Natural ids minted since the last {@link drainMinted}.
    *
@@ -54,15 +53,23 @@ export class TenantGraph {
    * writes an event saying what it created; that list has to come from the
    * thing doing the creating.
    *
-   * Cleared at the end of every depth-0 transaction — see {@link inTransaction}
+   * Cleared when the outermost transaction settles — see {@link inTransaction}
    * — so a verb that throws before draining cannot leave its ids to be claimed
    * by the next one.
    */
   private minted: string[] = [];
 
+  /**
+   * `tx` is required and never defaulted. Two graphs over one connection must
+   * share one boundary — `tests/helpers/scenario.ts`'s `current()` and
+   * `tests/domain-graph.test.ts`'s two-tenant cases both build a second one —
+   * and a defaulted transactor would give them a depth counter each. See
+   * `./transactor.ts`.
+   */
   constructor(
     private readonly ctx: TenantContext,
     db: LabKitDB,
+    private readonly tx: Transactor,
   ) {
     this.db = db;
     // CypherRunner validates ctx.graphName once, in its own constructor —
@@ -88,49 +95,36 @@ export class TenantGraph {
    * with a worse landing: without its second write, the durable state is
    * exactly S-10's demonstrated wrong answer.
    *
-   * Re-entrant by depth count rather than by savepoint. A verb that composes
-   * another (`reverify` calls the analysis writer) must not issue a nested
-   * `BEGIN`, and partial rollback to a savepoint is not something any caller
-   * has needed — the whole point is that these actions are indivisible.
+   * **The boundary itself is not this class's any more** — see
+   * `./transactor.ts` for why it moved and what it would cost to move back.
+   * What stays here is the one consequence of settling that only a graph knows
+   * about: clearing {@link minted}. A verb that threw never reached its `emit`,
+   * so its ids are still in the list, and clearing them when the *outermost*
+   * transaction settles is what stops the next verb's event claiming to have
+   * created records that were rolled back. On the success path `emit` has
+   * already drained and it is a no-op.
    *
    * Note this is a *transaction* boundary, not a raw-string escape hatch: no
    * caller gains the ability to issue Cypher this class would not otherwise
    * run. See the file header.
    */
   async inTransaction<T>(work: () => Promise<T>): Promise<T> {
-    if (this.depth > 0) return work();
-    await this.db.query("BEGIN");
-    this.depth += 1;
-    try {
-      const result = await work();
-      await this.db.query("COMMIT");
-      return result;
-    } catch (err) {
-      // A failed ROLLBACK must not become the error the caller sees. The
-      // original is why we are here; the rollback failure is a consequence of
-      // it, and reporting the consequence loses the cause.
+    // Asked **before** entering, and this is the whole subtlety. Inside the
+    // transactor's `work` the depth is 1 for an outermost call *and* for one
+    // nested inside it — a nested call joins rather than incrementing — so
+    // testing it there makes an inner `inTransaction` clear the list before the
+    // outer verb's `emit` has drained it, and the outer event then reports
+    // creating nothing. Caught by `tests/event-store.test.ts`'s
+    // "an act is found by what it created", which is exactly the case: three
+    // verbs deep, one event.
+    const outermost = this.tx.depth === 0;
+    return this.tx.inTransaction(async () => {
       try {
-        await this.db.query("ROLLBACK");
-      } catch {
-        // deliberately swallowed -- see above
+        return await work();
+      } finally {
+        if (outermost) this.minted.length = 0;
       }
-      throw err;
-    } finally {
-      // In `finally`, so it happens exactly once on every path. It used to be
-      // decremented before COMMIT *and* again in the catch, so a throwing
-      // COMMIT left `depth` at -1 -- and since re-entrancy is keyed on
-      // `depth > 0`, the next compound verb would run at an apparent depth of
-      // 0 and a verb nested inside it would issue a second BEGIN instead of
-      // joining. The re-entrancy contract silently inverted, for the life of
-      // the TenantGraph. Never observed firing; found while investigating the
-      // suite flake and demonstrated in tests/domain-graph.test.ts.
-      this.depth -= 1;
-      // A verb that threw never reached its `emit`, so its minted ids are still
-      // here. Clearing them at depth 0 is what stops the next verb's event
-      // claiming to have created records that were rolled back. On the success
-      // path `emit` has already drained and this is a no-op.
-      if (this.depth === 0) this.minted.length = 0;
-    }
+    });
   }
 
   /**

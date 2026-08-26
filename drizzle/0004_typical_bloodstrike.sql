@@ -1,0 +1,2 @@
+ALTER TABLE "labkit_event" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE POLICY "labkit_event_tenant_isolation" ON "labkit_event" AS PERMISSIVE FOR ALL TO "labkit_app" USING (tenant_id = current_setting('labkit.tenant_id')::int) WITH CHECK (tenant_id = current_setting('labkit.tenant_id')::int);

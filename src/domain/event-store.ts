@@ -17,24 +17,23 @@
  * It lives under `src/domain/` rather than `src/db/` because `EventSink` does,
  * and because `src/db` may not import `src/domain` — dependency-cruiser enforces
  * that direction. Taking a `LabKitDB` is the allowed way round.
+ *
+ * **It used to build its `WHERE` clause by hand**, with an array of fragments
+ * and a `bind()` closure doing `$${params.push(value)}` — the only place in the
+ * codebase that assembled SQL rather than Cypher, on a table whose filters come
+ * from an MCP caller. The graph side has had a typed surface since
+ * `CypherRunner`; this is the relational half finally getting one. See
+ * `src/db/orm.ts`.
  */
 
-import type { LabKitDB } from "../db/client";
-import { LABKIT_SCHEMA } from "../db/schema";
+import { and, arrayContains, asc, eq, gt, or } from "drizzle-orm";
+import type { LabKitDB } from "../db/backend";
+import { ormOver, unwrapped } from "../db/orm";
+import { labkitEvents } from "../db/schema";
 import type { AttributionContext, DomainEvent, EventFilter, EventSink, Operation } from "./events";
 
-/** The row shape, as Postgres hands it back. */
-interface EventRow {
-  seq: string;
-  at: string;
-  operation: Operation;
-  subject: string;
-  created: string[];
-  attribution_label: string;
-  attribution_id: string;
-  git_hash: string;
-  detail: Record<string, unknown> | null;
-}
+/** The row shape, as drizzle hands it back — derived from the table, not restated. */
+type EventRow = typeof labkitEvents.$inferSelect;
 
 const toEvent = (r: EventRow): DomainEvent => {
   const attribution: AttributionContext = {
@@ -43,17 +42,22 @@ const toEvent = (r: EventRow): DomainEvent => {
     git_hash: r.git_hash,
   };
   return {
-    // `bigserial` arrives as a string from `pg`, which is correct of it -- a
-    // bigint does not fit a JS number in general. It does here, and will for
-    // longer than this system will exist, so it is narrowed once at the seam
-    // rather than pushed onto every caller.
-    seq: Number(r.seq),
+    // `seq` is a `bigserial`, which `pg` hands back as a **string** and a raw
+    // PGlite as a **number** (measured 2026-08-26). This used to be
+    // `Number(r.seq)`, narrowing at the seam so no caller had to know. It is
+    // gone because the column is declared `mode: "number"` and drizzle applies
+    // that mapper on both backends -- which is one of the things moving to the
+    // ORM buys, rather than an incidental tidy-up.
+    seq: r.seq,
     at: r.at,
     attribution,
-    operation: r.operation,
+    // `text` in the schema, an `Operation` in the domain. The narrowing is
+    // here because this is where a stored string re-enters the type system;
+    // nothing else in the round trip can check it.
+    operation: r.operation as Operation,
     subject: r.subject,
     created: r.created,
-    ...(r.detail === null ? {} : { detail: r.detail }),
+    ...(r.detail === null ? {} : { detail: r.detail as Record<string, unknown> }),
   };
 };
 
@@ -64,56 +68,65 @@ const toEvent = (r: EventRow): DomainEvent => {
  * atomicity story: `WriteSurface.emit` runs inside the verb's `inTransaction`,
  * so the INSERT below joins the transaction already holding that verb's writes.
  * An event and the writes it describes commit together or neither does. Hand it
- * a second connection and that silently stops being true.
+ * a second connection and that silently stops being true. The ORM is built over
+ * that same seam and inherits the property for free (`src/db/orm.ts`).
  */
 export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
-  const select = async (filter: EventFilter): Promise<readonly DomainEvent[]> => {
-    // Built positionally rather than interpolated: `operation` and `by` come
-    // from an MCP caller, and this is the one place in the codebase that
-    // assembles SQL rather than Cypher.
-    const where = [`tenant_id = $1`];
-    const params: unknown[] = [tenantId];
-    const bind = (value: unknown): string => `$${params.push(value)}`;
-    if (filter.since !== undefined) where.push(`seq > ${bind(filter.since)}`);
-    if (filter.by !== undefined) where.push(`attribution_id = ${bind(filter.by)}`);
-    if (filter.operation !== undefined) where.push(`operation = ${bind(filter.operation)}`);
-    // Subject *or* minted. "What happened to this record" has to include the
-    // act that brought it into existence, and for most verbs that act names
-    // something else as its subject.
-    if (filter.touching !== undefined) {
-      const t = bind(filter.touching);
-      where.push(`(subject = ${t} OR created @> ARRAY[${t}]::text[])`);
-    }
-    const limit = filter.limit === undefined ? "" : ` LIMIT ${bind(filter.limit)}`;
-    const rows = await db.query<EventRow>(
-      `SELECT seq, at, operation, subject, created, attribution_label, attribution_id, git_hash, detail
-       FROM ${LABKIT_SCHEMA}.labkit_event
-       WHERE ${where.join(" AND ")}
-       ORDER BY seq${limit}`,
-      params,
-    );
-    return rows.rows.map(toEvent);
-  };
+  const orm = ormOver(db);
+
+  const select = (filter: EventFilter): Promise<readonly DomainEvent[]> =>
+    unwrapped(async () => {
+      const conditions = [eq(labkitEvents.tenant_id, tenantId)];
+      if (filter.since !== undefined) conditions.push(gt(labkitEvents.seq, filter.since));
+      if (filter.by !== undefined) conditions.push(eq(labkitEvents.attribution_id, filter.by));
+      if (filter.operation !== undefined)
+        conditions.push(eq(labkitEvents.operation, filter.operation));
+      // Subject *or* minted. "What happened to this record" has to include the
+      // act that brought it into existence, and for most verbs that act names
+      // something else as its subject. `arrayContains` is the `@>` this needs, so
+      // the GIN index on `created` is still the one doing the work.
+      if (filter.touching !== undefined) {
+        const touching = filter.touching;
+        const clause = or(
+          eq(labkitEvents.subject, touching),
+          arrayContains(labkitEvents.created, [touching]),
+        );
+        if (clause) conditions.push(clause);
+      }
+
+      // `$dynamic()` because the limit is optional and a drizzle builder is
+      // otherwise single-use: without it the two branches would each need their
+      // own copy of the query.
+      const query = orm
+        .select()
+        .from(labkitEvents)
+        .where(and(...conditions))
+        .orderBy(asc(labkitEvents.seq))
+        .$dynamic();
+      const rows = await (filter.limit === undefined ? query : query.limit(filter.limit));
+      return rows.map(toEvent);
+    });
 
   return {
-    async record(event) {
-      await db.query(
-        `INSERT INTO ${LABKIT_SCHEMA}.labkit_event
-           (tenant_id, at, operation, subject, created, attribution_label, attribution_id, git_hash, detail)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          tenantId,
-          event.at,
-          event.operation,
-          event.subject,
-          event.created ?? [],
-          event.attribution.attribution_label,
-          event.attribution.attribution_id,
-          event.attribution.git_hash,
-          event.detail === undefined ? null : JSON.stringify(event.detail),
-        ],
-      );
-    },
+    record: (event) =>
+      unwrapped(async () => {
+        await orm.insert(labkitEvents).values({
+          tenant_id: tenantId,
+          at: event.at,
+          operation: event.operation,
+          subject: event.subject,
+          // Copied: `DomainEvent.created` is `readonly string[]` and drizzle's
+          // insert type is not.
+          created: [...(event.created ?? [])],
+          attribution_label: event.attribution.attribution_label,
+          attribution_id: event.attribution.attribution_id,
+          git_hash: event.attribution.git_hash,
+          // `jsonb` takes the value, not a string: the driver serialises it.
+          // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
+          // payload is the classic way that goes wrong.
+          detail: event.detail ?? null,
+        });
+      }),
     all: () => select({}),
     select,
   };

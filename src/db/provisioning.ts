@@ -13,7 +13,9 @@
  */
 
 import { NODE_LABELS, EDGE_LABELS, INDEXED_PROPS, type NodeLabel, type EdgeLabel } from "./domain";
-import type { LabKitDB } from "./client";
+import type { LabKitDB } from "./backend";
+import { validateGraphName } from "./agtype";
+import { APP_ROLE } from "./schema";
 
 /**
  * Reconciles a tenant's AGE graph, unconditionally, every time it's called
@@ -155,6 +157,47 @@ class TenantGraphProvisioner {
     for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label, indexes);
     for (const label of NODE_LABELS) await this.ensurePropertyIndexes(label, indexes);
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
+    await this.ensureGrants();
+  }
+
+  /**
+   * Lets the application role reach this tenant's graph.
+   *
+   * **This has to live here rather than in a migration**, and it is the clearest
+   * case for reconciliation in the whole file: a tenant's schema does not exist
+   * when the migrations run, and neither do the label tables a *future* release
+   * will add to it. A migration can only grant on what already exists.
+   *
+   * `ALTER DEFAULT PRIVILEGES` covers the tables created after this statement
+   * *by this role*, which is what makes a label added next year reachable
+   * without anyone remembering to grant it. The blanket `GRANT … ON ALL TABLES`
+   * beside it covers the ones created before — including everything AGE's
+   * `create_vlabel` just made, since default privileges do not apply
+   * retroactively. Both, because each misses what the other catches.
+   *
+   * Unconditional, like everything else here. Re-granting is a catalog write
+   * that costs a round trip and cannot drift; checking first would cost a round
+   * trip too and could.
+   */
+  private async ensureGrants(): Promise<void> {
+    // Validated before interpolation even though `graph_name` is a generated
+    // column the server derives from a trusted id (PJ-003 §5) — an identifier
+    // cannot be a bind parameter, so the check is the only thing standing where
+    // a parameter would be. The rest of this file interpolates the same value
+    // unvalidated; this is the one that grants privileges.
+    validateGraphName(this.graphName);
+    const g = `"${this.graphName}"`;
+    await this.db.query(`GRANT USAGE ON SCHEMA ${g} TO ${APP_ROLE}`);
+    await this.db.query(
+      `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${g} TO ${APP_ROLE}`,
+    );
+    await this.db.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${g} TO ${APP_ROLE}`);
+    await this.db.query(
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA ${g} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${APP_ROLE}`,
+    );
+    await this.db.query(
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA ${g} GRANT USAGE, SELECT ON SEQUENCES TO ${APP_ROLE}`,
+    );
   }
 
   private async ensureGraph(): Promise<void> {

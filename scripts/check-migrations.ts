@@ -7,6 +7,9 @@
  * knows whether it takes an exclusive lock and the person deploying it does
  * not. Both are grep, not a parser: practical, not perfect.
  *
+ * One family of `ALTER TABLE` is exempt, and the reason is about this repo
+ * rather than about locks: see {@link CATALOG_ONLY_ALTERS}.
+ *
  * There is no persistent database yet, so today this guards a convention rather
  * than production data. That is the cheap moment to start — the migration that
  * would have needed it is the one written after the first deploy, by someone
@@ -32,6 +35,28 @@ const MIGRATIONS_DIR = path.join(process.cwd(), "drizzle");
 const FORBIDDEN_BY_DEFAULT = [/drop\s+table/i, /drop\s+column/i];
 
 const REQUIRE_COMMENT_FOR = [{ pattern: /alter\s+table/i, tag: "-- lock-strategy:" }];
+
+/**
+ * `ALTER TABLE` forms that change a catalog flag and nothing else, exempted
+ * from needing a lock strategy.
+ *
+ * **The exemption exists because the alternative is hand-editing a generated
+ * file.** `drizzle-kit generate` emits
+ * `ALTER TABLE "x" ENABLE ROW LEVEL SECURITY;` for any table declared with
+ * `.enableRLS()`, and a generator cannot write a lock-strategy comment. Demand
+ * one and the only way to be green is to edit the generated SQL by hand — which
+ * is the practice `drizzle/0002_natural_ids.sql`'s header exists to end. A
+ * check that can only be satisfied by the thing it should discourage is the
+ * wrong check.
+ *
+ * It is also true on the merits: enabling RLS is a catalog write, no table
+ * scan and no data touched. It still takes ACCESS EXCLUSIVE briefly, so it can
+ * queue behind a long transaction — worth a `lock_timeout` against a busy
+ * database, not worth a per-migration annotation nobody can add.
+ *
+ * Narrow on purpose. Every other `ALTER TABLE` still answers for itself.
+ */
+const CATALOG_ONLY_ALTERS = [/alter\s+table\s+\S+\s+(enable|disable)\s+row\s+level\s+security/gi];
 
 function readMigrations() {
   const files = fs
@@ -62,9 +87,11 @@ for (const m of migrations) {
     }
   }
 
-  // 2) Require operational notes for risky ops
+  // 2) Require operational notes for risky ops, ignoring the catalog-only
+  //    forms a generator emits -- see CATALOG_ONLY_ALTERS.
+  const risky = CATALOG_ONLY_ALTERS.reduce((sql, rx) => sql.replace(rx, ""), m.sql);
   for (const rule of REQUIRE_COMMENT_FOR) {
-    if (rule.pattern.test(m.sql) && !m.sql.includes(rule.tag)) {
+    if (rule.pattern.test(risky) && !m.sql.includes(rule.tag)) {
       fail(
         `FAILED: ${m.name} contains "${rule.pattern}" but is missing "${rule.tag}". ` +
           `Example: "-- lock-strategy: online/low-traffic/backfill/batched"`,

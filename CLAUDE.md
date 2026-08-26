@@ -186,7 +186,8 @@ would hand a new worktree another session's pinned baseline).
 
 ```sh
 bun install                    # install dependencies
-bun test                       # run all tests
+bun test                       # run all tests (embedded PGlite)
+bun run test:pg                # the same suite against a real Postgres + AGE container (docker/postgres)
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 npx depcruise src tests --output-type err   # layering rules (errors) + cycles
@@ -205,23 +206,70 @@ bun run check:stdout          # nothing under src/ writes to stdout except the C
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
-bun run probe:pglite-concurrency  # asks whether a known pglite-socket bug is still there — see "Testing patterns"
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
 bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted
+bun run check:binary          # builds bin/labkit and drives it against a fresh database
 bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 ```
 
 Formatting and linting are both biome — `bun run format` writes,
-`check:format` and `check:lint` are in the sweep. `bun run build` compiles `src/cli/cli.ts` to a binary — **and that binary cannot migrate a fresh database**: `runMigrations()`
-resolves `drizzle/` from `import.meta.url`, which inside a compiled bundle is
-`/$bunfs/root/…`, so it dies with `Can't find meta/_journal.json file`.
-Measured 2026-08-25 against both the old and new entry points, so it predates
-the CLI split and is not caused by it. `bun run dev` and `bun test` are
-unaffected; nothing has ever run the binary against an empty database.
-`docs/TASKS.md` carries it.
+`check:format` and `check:lint` are in the sweep.
+
+`bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
+directory** (`scripts/build-binary.sh`), and that is not tidiness:
+`bun build --compile` leaves a **byte-identical copy of the `bun` binary
+itself** — 61MB, `.<hash>-00000000.bun-build` — in the current working
+directory on every *successful* run, and never removes it. Verified by sha256
+against bun 1.3.14. The hash differs per build so they accumulate, and they are
+`.gitignore`d so nothing complains; thirty-two of them had reached **1.9GB** in
+the repo root before anyone read a directory listing. The staging path follows
+the **CWD, not `--outfile`** — measured — so building from a `mktemp -d` that is
+removed on exit leaves the leak nowhere to go. There is no flag for it.
+
+That is also why `build` is a script rather than the `package.json` one-liner it
+was, the same reason `dev:dependency-cruiser` is one.
+
+**`bun run check:binary` proves the binary works** — it builds and drives the binary
+against a database that does not exist yet, which is the case that was broken.
+
+It was broken from the day the build script existed, in **three places, each
+hidden behind the last**: drizzle's migration folder, the two PGlite extension
+tarballs, and PGlite's own `pglite.data`. One root cause —
+**`import.meta.url` does not name a directory on disk once the code is inside a
+`bun build --compile` bundle**; it is `/$bunfs/root/…`, and nothing put a file
+there. Every one was invisible to `bun test` and `bun run dev`, which read those
+files off the real filesystem and work.
+
+The fix is to hand the assets over rather than let them be located
+(`src/db/migrations.ts`, `src/db/extensions.ts`) — Bun embeds a file imported
+`with { type: "file" }`, and `node:fs` can read it back out of `$bunfs`.
+
+**One asset could not stay embedded, and the reason is worth knowing before
+trying again**: PGlite reads an extension bundle with `createReadStream` piped
+through `zlib`, and `$bunfs` does not implement streaming. `existsSync` returns
+true and `open` then fails `ENOENT` — a confusing pair. Those two tarballs are
+written once to a temp file; everything else is read in place.
+
+**Known upstream and unfixed**, so this is not a local oddity and there is no
+version to wait for: [pglite#414](https://github.com/electric-sql/pglite/issues/414)
+and [bun#15032](https://github.com/oven-sh/bun/issues/15032) are the same
+`ENOENT … /$bunfs/root/pglite.data`, open since Bun 1.1.33. The asset handover
+is PGlite's own documented answer for restricted environments
+([bundler support](https://pglite.dev/docs/bundler-support)); the extension
+tarballs are not covered there and are the part with no prior art.
+
+**Drizzle's documented advice does not fix this**, and that was measured rather
+than assumed. Its docs say to copy `drizzle/` alongside the build output — which
+is right for a `dist` deployment run by Node, and insufficient here: a binary
+built that way finds the folder and then dies on `pglite.data`, because two of
+the three bugs are PGlite's, not drizzle's.
+
+The general lesson, which cost three rounds of build-and-run: **each fix moved
+the failure one step later rather than removing it**, and the only way to find
+the next was to run the binary again. Nothing had ever run it.
 
 `src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
 surface, reads *and* writes (`bun run dev`). It is a composition root and
@@ -299,10 +347,11 @@ Two more things the tests caught rather than review:
   picocolors' own `isColorSupported` is reused rather than reimplemented.
 
 **`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
-the project root by another route. `derivePort` hashes that path, so a temporary
-directory gets its own file *and* its own port, which is what makes
-`examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic.
-`LABKIT_DB_URL` still wins over both.
+the project root by another route. A temporary directory gets its own database
+file *and* its own lock, sharing nothing with a working database, which is what
+makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
+to get its own TCP port too, from a `derivePort` that hashed the path; there is
+no port any more. `LABKIT_DB_URL` still wins over both.
 
 **`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
 one batch of work and that is not a design position: a record nothing can write
@@ -379,8 +428,9 @@ is a rule held in a person's head and therefore the kind that gets skipped.
 later is picked up without anyone editing anything.
 
 **`check:` means green is fine and red is yours to fix.** Anything that does
-not mean that needs a different prefix — see `probe:pglite-concurrency`, whose
-exit 0 means an upstream bug *still reproduces*.
+not mean that needs a different prefix. There is currently no such script —
+`probe:pglite-concurrency` was the one, and it went with the socket whose bug it
+asked about — so the rule is standing guidance rather than a live example.
 
 **An exclusion list is a tell.** That probe sat under `check:` and the first
 version of `check-all.ts` excluded it by name, with a paragraph explaining why.
@@ -389,11 +439,10 @@ Renaming it out of the namespace deleted the exclusion rather than documenting
 it. When a derived list needs a hand-written exception, check whether the thing
 being excepted is misnamed before writing the exception down.
 
-**The sweep does not run everything, and each absence has a reason.**
-`bun run example` is for reading rather than checking;
-`probe:pglite-concurrency` has an inverted exit code and takes minutes. Two is
-a considered set; a third omission needs its own reason rather than joining a
-habit.
+**The sweep does not run everything, and the one absence has a reason.**
+`bun run example` is for reading rather than checking. It was two until the
+concurrency probe was deleted; a second omission needs its own reason rather
+than joining a habit.
 
 **A check announces `OK:` or `FAILED:` and does not repeat its own name** —
 `bun run check` already said which one is running. `FAILED:` means the check ran
@@ -439,8 +488,9 @@ immediately. That was the discriminator, and it is a good one: **if a lint
 rule's fix contradicts the typechecker, the rule is wrong for the project, not
 the code.**
 
-`noExplicitAny` is off for two sites in `src/db/backend.ts`, casting through
-`any` to reach `pglite-socket`'s untyped internals.
+`noExplicitAny` is off for two sites in `src/db/backend.ts`, both `catch (err:
+any)` around the lockfile so `err.code` can be read. A caught value is `unknown`
+and `Error` has no `code`, so the alternative is a cast at every use.
 
 Two things learnt adopting it, both the hard way:
 
@@ -497,13 +547,29 @@ dependency direction is enforced by `npx depcruise src tests --output-type err`
 
 | module | job |
 | --- | --- |
-| `client.ts` | `LabKitDB` (the connection seam) + `bootstrapSession` |
+| `backend.ts` | `LabKitDB` (the connection seam) + `bootstrapSession`, and the two backends that satisfy it |
+| `connect.ts` | picks a backend and connects through it |
+| `transactor.ts` | the transaction boundary, one per connection |
+| `orm.ts` | drizzle, mounted **on** the seam via `pg-proxy` |
+| `scoped.ts` | steps a session down to `labkit_app` with its tenant pinned |
 | `agtype.ts` | agtype parsing, identifier validation, Cypher clause/quoting helpers |
 | `cypher.ts` | `CypherRunner` + column decoders — typed Cypher execution |
 | `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA`, `INDEXED_PROPS` |
 | `graph.ts` | `TenantGraph` — the domain-typed verbs |
 | `provisioning.ts` | per-tenant graph schema reconciliation |
 | `tenant.ts` | resolving a slug to a `TenantContext` |
+
+**There is no barrel and no `client.ts`.** `src/db/index.ts` exported 11 names
+of which 4 were ever imported through it, while 47 imports reached into
+submodules directly — a file to keep in sync with something nothing depended on.
+It is cheap to reintroduce later as an *enforced* boundary, which is the only
+version of it worth having. `client.ts` held the seam and was named for a thing
+it does not export: no client, just an interface with two permanent
+implementations, which sent readers looking for the construction in the wrong
+file. It is folded into `backend.ts`, beside `LabKitDBConnection` — a connection
+and the thing you can do with one are the same subject. Every importer of
+`LabKitDB` outside `backend.ts` is `import type`, so nothing pulls PGlite in by
+depending on the seam.
 
 `domain.ts` imports nothing from `src/db/`; it's pure types and data, read by
 both `graph.ts` (to type and validate writes) and `provisioning.ts` (to decide
@@ -554,9 +620,58 @@ does. It is re-entrant by depth, so a composed verb does not nest `BEGIN`. Note
 this is a transaction boundary, not an escape hatch: no caller gains the ability
 to issue Cypher this class would not otherwise run.
 
+**The boundary itself belongs to the connection, not to the graph**
+(`src/db/transactor.ts`). `TenantGraph` owned it because it was the only citizen
+of `src/db/` when `inTransaction` was written — not a decision, the only
+available place. The event store writes down the same connection and drizzle
+mounts on the same seam, and two objects issuing `BEGIN` down one connection are
+in one transaction whether they know it or not; a second depth counter is how
+they stop knowing. `LabKitDBConnection.tx` hands out the one, `TenantGraph`
+takes it as a **required** constructor argument, and `graph.inTransaction`
+delegates while keeping the one consequence only a graph knows about — clearing
+its minted-id list when the outermost transaction settles.
+
+Two traps, both found by the suite rather than by review:
+
+- **Ask "am I the outermost?" before entering, not inside.** Within the
+  transactor's closure the depth reads 1 for an outermost call *and* for one
+  nested in it, so testing it there makes an inner call clear the minted ids
+  before the outer verb's `emit` drains them — and the outer event then reports
+  creating nothing.
+- **Never default the transactor.** A `TenantGraph` that made its own would look
+  identical and be wrong the moment a second graph appeared over the same
+  connection, which is not hypothetical: `scenario.current()` builds exactly
+  that. Same failure shape as a per-call surface defaulting its own event sink.
+
 There is deliberately no raw-string escape hatch on `TenantGraph`. If a query
 needs a shape the decoders don't cover, add a decoder to `src/db/cypher.ts`
 rather than reintroducing one.
+
+**The relational half has a typed surface too, now.** `ormOver(db)`
+(`src/db/orm.ts`) mounts drizzle through `drizzle-orm/pg-proxy`, which takes a
+*callback* rather than a client — `LabKitDB.query` with one more argument — so
+the ORM sits **on** the seam beside `CypherRunner` instead of beside the
+connection. It inherits tracing, whatever the session was scoped to, and the
+open transaction, all for free; `drizzle(client)` would have inherited none of
+them and nothing would have said so. There is no socket involved.
+
+It replaced the only two places that assembled SQL by hand — `tenant.ts` and
+`src/domain/event-store.ts`, four call sites, one of them building a `WHERE`
+clause with `$${params.push(value)}` from MCP-supplied filters.
+
+**`rowMode: "array"` is not optional and its absence is silent.** The proxy
+driver decodes rows positionally; hand it objects and `select().from(t)` returns
+**`[{}, {}]`** — right row count, no error — or dies inside an array column's
+decoder with `undefined is not an object (evaluating 'value.map')`. That is why
+the option is on the seam (`QueryOptions`) rather than left to each call site,
+and why `directPostgresBackend` wraps its `pg.Client` instead of handing it
+over: `pg.Client.query`'s third positional argument is a *callback*, so the
+option has to travel in the config-object form. Forgetting to forward it in
+`tests/helpers/db.ts` is how the failure above was met, twice.
+
+One thing it buys beyond tidiness: **`bigserial` and `count(*)` come back as a
+string from `pg` and a number from a raw PGlite**, and drizzle's column mappers
+normalise that away. `event-store.ts` used to carry a `Number(r.seq)` for it.
 
 `TenantContext` (`{ tenantId, graphName }`) comes from
 `resolveTenantContext(db, slug)` (`src/db/tenant.ts`) — the CLI/MCP/bootstrap
@@ -908,14 +1023,127 @@ property that already has data) — see PJ-005's "Judgment calls."
 `connectDb(projectRoot)` (`src/db/connect.ts`) picks a `DbBackend`
 (`src/db/backend.ts`):
 
-- **PGlite + leader election** (default): PGlite is single-writer, so
-  multiple local processes race a PID lockfile; the winner opens the real
-  PGlite file and serves it over `pglite-socket`'s Postgres wire protocol,
-  everyone else (and the primary itself) talks to it as a plain `pg.Client`.
-  Only the primary calls `runMigrations()`, exactly once, before serving.
-- **Direct Postgres** (`LABKIT_DB_URL` env var set): no election, connects
-  straight to a real Postgres. Migrations are *not* run by this backend —
-  that's an out-of-band deploy step by design (see PJ-004).
+- **PGlite under an exclusive lock** (default): PGlite is single-writer and
+  file-backed, so a process takes a PID lockfile, opens the file, does its
+  work and gives both back. `runMigrations()` runs on every open — the no-op
+  case is 2ms and the lock is held across it, so there is no concurrent-writer
+  race. A process that finds the lock held **waits** rather than failing; the
+  holder is 80-96ms away.
+- **Direct Postgres** (`LABKIT_DB_URL` env var set): no lock, connects
+  straight to a real Postgres, which is its own arbiter. Migrations are *not*
+  run by this backend — that's an out-of-band deploy step by design (PJ-004).
+
+**This replaced a leader election, and the reason is worth knowing before
+anyone proposes bringing one back.** The winner of the lockfile race used to
+open PGlite, start a `PGLiteSocketServer`, and connect *to itself* over
+loopback TCP so every process — including the owner — talked to it as a
+`pg.Client`. It was coherent and it bought nothing the use case needs: several
+agents on one project cannot each hold a connection under it either, because
+the first process in owns the file and the rest reach it only while that
+process lives. Releasing between units of work was already forced. What the
+socket added on top was a second failure mode — when the primary died, a
+secondary's next query raised an **uncaught** `'error'` event from `pg` and
+killed the process before any `catch` ran — and one upstream concurrency bug
+([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046))
+that the whole test suite was shaped around containing.
+
+**So nothing holds the database between units of work, and `src/mcp/server.ts`
+is where that matters.** An MCP server lives as long as its agent's session; if
+it held the file for that long, no other agent could work the project at all.
+It opens and closes around each tool call — 80-96ms warm, measured 2026-08-26
+(open 70-85ms, migrate 2ms, tenant resolve 7-8ms, close 2ms) against a cold
+open of 1067ms. Two overlapping calls serialise on the lock. **A process does
+not skip its own lock**: two calls in one process read their own PID as alive
+and the second waits, which is right, because the lock guards a `dataDir` and
+one process opening it twice corrupts the file exactly as two would.
+
+What keeps that server's process alive between calls is **the stdin
+subscription, not a held connection** — measured under Bun 1.3.14, since the
+comment that used to credit the connection would now be describing something
+that no longer exists.
+
+## Row-level security, and what it is actually worth
+
+A session connects as a **superuser**, and that is not laziness: `LOAD 'age'` is
+refused to a non-superuser — `access to library "age" is not allowed`, SQLSTATE
+42501, measured 2026-08-26 — and PGlite has no other way to get the library in.
+So the order is fixed:
+
+```
+connect → bootstrapSession → migrate → resolveTenantContext → scopeToTenant → domain
+```
+
+`scopeToTenant` (`src/db/scoped.ts`) pins `labkit.tenant_id` with `set_config`
+and then `SET ROLE labkit_app`. From that point a query on `public.labkit_event`
+that forgets its tenant filter still returns only that tenant's rows, and one
+that writes another tenant's row is refused with 42501.
+
+**It is a safety boundary, not a security one.** The session can `RESET ROLE`
+back to superuser. What it stops is a *query that forgot its filter*; what it
+does not stop is a caller who means harm. Both halves of that matter — the word
+"policy" invites a reader to assume the second.
+
+**A real login boundary is closer than this said, and the correction is worth
+knowing.** The refusal is of *issuing* `LOAD`, not of needing it. `docker/postgres`'s
+base image runs `postgres -c shared_preload_libraries=age`, so AGE is in every
+backend at server start; measured on it, a plain LOGIN role that never issues
+`LOAD` resolves `agtype` and reads through Cypher fine. So the ingredients are a
+preloading server plus a `bootstrapSession` that does not issue `LOAD` — not the
+per-role `session_preload_libraries` this used to name. PGlite still needs the
+step-down, having no preload and one superuser session. **Noted, not built**;
+the write half of that probe was not re-verified after a grant gap in the probe
+itself.
+
+Three things that are easy to get wrong here, all measured rather than assumed:
+
+- **A superuser bypasses RLS unconditionally**, and `FORCE ROW LEVEL SECURITY`
+  is not enough to stop it. A non-superuser role is required, which is the whole
+  reason the step down exists.
+- **`current_setting('labkit.tenant_id')` has no `missing_ok`, deliberately.** A
+  scoped session that never had its tenant set raises 42704 on the first read.
+  The soft form returns NULL and the policy then matches nothing, so the log
+  reports that nothing has ever happened against a full table — the confidently
+  wrong answer this repo goes furthest to avoid.
+- **Grants live in `provisionTenantGraph()`, not in a migration.** A tenant's
+  schema does not exist when the migrations run, and neither do the label tables
+  a future release will add to it. `ALTER DEFAULT PRIVILEGES` covers what comes
+  later and a blanket `GRANT … ON ALL TABLES` covers what came before; each
+  misses what the other catches.
+
+**Which migration holds what is decided by one rule: drizzle cannot migrate what
+it does not manage.** `drizzle/0002_natural_ids.sql` is *the* hand-written
+migration — natural-id sequences and functions, and since 2026-08-26 the
+`labkit_app` role and every `GRANT`, because drizzle models privileges not at
+all (measured: the string `GRANT ` does not appear anywhere in drizzle-kit's
+bundle). Everything drizzle *does* manage stays in files it generated and nobody
+edits. The filename says which is which: generated migrations carry drizzle-kit's
+random names, hand-written ones are named for what they do.
+
+**`pgRole(...).existing()` is what keeps the generated file generated.**
+`generatePgSnapshot` skips a role marked that way (`if (!role._existing)`), so
+the RLS migration names the role in its policy and never emits a `CREATE ROLE`
+that `0002` has already made, guarded. Two things that look like the right lever
+and are not: `pgRole(name, { createRole: false })` is the Postgres `CREATEROLE`
+*attribute*, and `entities.roles.exclude` is consumed only by drizzle-kit's
+*introspection* path — `generatePgSnapshot` takes no config at all. The first
+misreading is what produced a hand-edited generated migration in the first place.
+
+**`ALTER DEFAULT PRIVILEGES IN SCHEMA public` in `0002` is why a new
+tenant-aware table needs no privilege work.** `labkit_event` does not exist yet
+at `0002` and so cannot be granted explicitly from there; default privileges
+cover it and everything added after. Verified 2026-08-26 by creating a table and
+asking `has_table_privilege`/`has_sequence_privilege` — both true with no grant
+naming it. It holds only while one role runs every migration, which is true
+today. One caveat found by trying it: a table with a foreign key generates an
+`ALTER TABLE … ADD CONSTRAINT`, which `check:migrations` requires a
+`-- lock-strategy:` line for — the check working, but one comment prepended by
+hand.
+
+`tests/tenancy-isolation.test.ts` is the reader. It drives `connectDb()`, the
+real resolve and the real step-down, so a missing grant surfaces as a
+permissions error rather than being supplied by the test — and it asserts
+`current_user` is not a superuser, without which every other assertion in it
+would pass against a session with no policy in force.
 
 `bootstrapSession(db)` (LOAD/search_path) must be called by every new
 session regardless of backend — it's session-scoped Postgres state and
@@ -1019,31 +1247,57 @@ additive provisioning of a *new* edge label against an already-provisioned
 tenant, through `resolveTenantContext()` — the production path — never
 provisioning internals.
 
-`tests/helpers/db.ts`'s `setupTestDb()` spins up one `PGlite` instance,
-runs migrations, and starts a `PGLiteSocketServer` once per file, in
-`beforeAll`. Application-code test files (`tests/domain-graph.test.ts`,
-`tests/agtype.test.ts`) never import `@electric-sql/pglite`/`pglite-age`/
-`pglite-pgvector` themselves — they only ever see a `LabKitDB`-shaped
-`pg.Client`, the same production talks through.
+`tests/helpers/db.ts`'s `setupTestDb()` boots **one `PGlite` instance for the
+whole suite**, on first use, and hands application code a `LabKitDB` over it.
+Application-code test files (`tests/domain-graph.test.ts`, `tests/agtype.test.ts`)
+never import `@electric-sql/pglite`/`pglite-age` themselves — they only see the
+seam, the same one production talks through.
 
-**Each test opens its own fresh connection** (`testDb.openClient()` in
-`beforeEach`, closed in `afterEach`) — never share one connection across a
-whole file. `@electric-sql/pglite-socket` has a confirmed, open upstream
-concurrency bug
-([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046) —
-see the postgres-age skill's "Upstream filing" and PJ-006): two connections
-racing, where one errors, can permanently corrupt the connection(s)
-involved. Corruption stays contained to the connection that hit it, so a
-fresh connection per test contains the blast radius even though the
-underlying bug isn't fixed. `scripts/probe-pglite-concurrency.sh`
-(`bun run probe:pglite-concurrency`) asks whether it is still there — see the
-script's header for its (inverted) exit-code meaning.
+**`openClient()` is a labelled view onto that one session, not a connection,
+and its `close()` is a no-op.** It used to open a fresh `pg.Client` per test to
+contain a confirmed upstream `pglite-socket` concurrency bug
+([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046),
+PJ-006), where two connections racing could permanently desync one of them. The
+bug **is** the socket, and there is no socket. The bookkeeping stayed so the harness reads as it did. Two consequences:
+session state (`search_path`, `SET ROLE`, any GUC) is shared between tests, and
+nothing here can prove state survives a *reconnect* — which it never could.
+
+The justification inverted rather than weakened, which is the part worth
+holding on to: the old rule's stated reason was fidelity to production, and
+production now opens PGlite directly, so sharing the instance is the *more*
+faithful arrangement.
+
+**`bun run test:pg` runs the same suite against a real Postgres**
+(`docker-compose.yml`'s `apache/age:release_PG18_1.7.0`) by setting
+`LABKIT_DB_URL` — the same variable production reads. It is `test:` and not
+`check:` on purpose: `bun run check` derives its list from the `check:` prefix
+and must not need docker. **Nothing runs it for you.**
+
+It is not decoration. It is the only backend on which **two connections can be
+live at once**, so anything about isolation, a session-scoped role or tenant, or
+advisory locking under contention can only be *demonstrated* there. It is also a
+disagreeing measurement — a `pg.Client` and a raw PGlite do not decode
+identically, and a suite that only sees one of them cannot notice.
+
+First run, 2026-08-26: **360 pass, 4 skip, 0 fail, 56s**, against 364/0/52s on
+PGlite. The four skips are `tests/connection-lock.test.ts`, whose subject is the
+PGlite lockfile that a real Postgres does not have. `tests/mcp-stdio.test.ts`
+strips `LABKIT_DB_URL` from the servers it spawns, because it gives each one a
+private directory and that variable wins over one.
+
+`reset()` **truncates every table outside four system schemas**, so it must only
+ever point at a throwaway database. The default is one called **`labkit_tests`**,
+created by the script if absent — not `postgres`, which every tool defaults to
+and where a truncate would eat whatever a developer had been poking at, and not
+`labkit`, which is the name a real deployment would pick and therefore the one a
+destructive run must not reach by default. An explicit `LABKIT_DB_URL` is
+honoured verbatim; a caller who named a database has made that decision.
 
 A test that needs to exercise "a query loses a race and hits a constraint
 violation" should do it deterministically — mock the DB layer to inject the
 error at the right point (see `domain-graph.test.ts`'s `createEdge treats a
 23505 from the CREATE step as success` test) — not via `Promise.all()`
-against two live connections, which this backend can't reliably support.
+against two live connections, which this deployment cannot reach at all.
 
 `afterEach` drops every AGE graph and truncates every remaining table
 outside `pg_catalog`/`information_schema`/`ag_catalog`/`drizzle` with
@@ -1055,12 +1309,15 @@ entity-type (PJ-004 decision #3), not per-tenant or per-test. Don't assert
 a specific natural-id value across more than one test in the same file for
 this reason — assert on the prefix/shape instead.
 
-`tests/leader-election.test.ts` races three concurrent `connectDb()` calls
-against a shared `.labkit-test-tmp` directory to prove the PGlite backend's
-election/socket-sharing actually works. It's a live, unresolved instance of
-the pglite-socket bug above (see PJ-006) — flaky, and not fixable the way
-the other tests were, since it deliberately needs genuine concurrent
-connections to prove what it proves.
+`tests/connection-lock.test.ts` covers the lockfile: it is taken and handed
+back, a live holder is waited for and then let through, a *stale* one (a dead
+PID) is reclaimed, and a refusal names the lock path and the holder. It
+replaced `tests/leader-election.test.ts`, which raced three concurrent
+`connectDb()` calls to prove the election worked and was **the suite's
+flakiest file** — flaky precisely because it proved a concurrency property by
+running a real race. Each claim is now reached deterministically. Its tests
+open real `dataDir`s and so carry explicit 30s timeouts; bun's 5000ms default
+is not generous enough for a test whose subject is a database starting up.
 
 **The suite's *other* flakiness is not that bug, and attributing it there cost
 two investigations.** Intermittent `graph "labkit_t1" does not exist` and

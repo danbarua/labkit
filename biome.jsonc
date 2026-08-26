@@ -25,10 +25,12 @@
         "noNonNullAssertion": "off"
       },
       "suspicious": {
-        // **Off for two sites, both in `src/db/backend.ts`**, casting through
-        // `any` to reach `pglite-socket`'s untyped internals. That is the seam
-        // where a third party's missing types stop being ours; `unknown` plus a
-        // cast at every use is the same hole with more ceremony.
+        // **Off for two sites, both in `src/db/backend.ts`**: `catch (err: any)`
+        // around the lockfile, so `err.code` can be read. A caught value is
+        // `unknown` and `Error` carries no `code`, so `unknown` plus a cast at
+        // every use is the same hole with more ceremony. It was previously off
+        // for two casts through `pglite-socket`'s untyped internals, which went
+        // with the socket.
         "noExplicitAny": "off"
       }
     }

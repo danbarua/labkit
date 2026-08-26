@@ -1,66 +1,113 @@
 import { PGlite } from "@electric-sql/pglite";
 import { age } from "@electric-sql/pglite-age";
-import { vector } from "@electric-sql/pglite-pgvector";
-import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { Client } from "pg";
-import { runMigrations } from "../../src/db/migrate";
-import { bootstrapSession, type LabKitDB } from "../../src/db/client";
+import { runMigrations, runMigrationsOnPostgres } from "../../src/db/migrate";
+import { bootstrapSession, type LabKitDB, type QueryOptions } from "../../src/db/backend";
 import { traced } from "../../src/db/trace";
+import { type Transactor, transactor } from "../../src/db/transactor";
 
 /**
- * Application-code tests should exercise `LabKitDB` the same way production
- * does — through a real `pg.Client` over `pglite-socket` — never a raw
- * `PGlite` instance directly. `src/db/backend.ts`'s primary role never hands
- * out its raw `PGlite` object either; it opens its own `selfClient` and
- * returns that. This file is the one place PGlite-specific setup/teardown
- * is allowed to live, so application-code test files never import
- * `@electric-sql/pglite`/`pglite-age`/`pglite-pgvector` themselves.
+ * The database the suite runs against, and there are two of them.
  *
- * `openClient()` opens a FRESH connection every call — `beforeEach` should
- * call it per test, not share one connection across a whole file. This is
- * load-bearing, not a style preference: `@electric-sql/pglite-socket` has
- * confirmed, open upstream bugs (electric-sql/pglite#1046) in how its
- * `QueryQueueManager` serializes concurrent connections — "Defect A"
- * interleaves two connections' extended-protocol message batches (Parse/
- * Bind/Describe/Execute/Sync) into the single shared PGlite session,
- * clobbering the unnamed prepared statement between them, with no
- * transaction required to trigger it. We reproduced this independently
- * (2026-08-18, see the postgres-age skill's "Upstream filing") before
- * finding the issue already open: a `pg.Client` connection that hits enough
- * of this eventually desyncs permanently ("unexpected parseComplete
- * message from backend", or silently wrong rows) and stays broken for the
- * rest of its life — but confirmed empirically that the corruption stays
- * contained to the connection that hit it; a brand new connection against
- * the same underlying PGlite instance is immediately clean. One shared
- * connection for an entire test file means one bad interaction anywhere in
- * that file can cascade into failing every test after it, at an
- * unpredictable point — which is exactly the flakiness this design avoids.
+ * **Default: one embedded PGlite instance for the whole suite**, handed to
+ * application code through the `LabKitDB` seam — the same shape production
+ * talks through.
  *
- * **This header has been read as explaining the suite's intermittent failures.
- * It does not, and that misattribution cost two investigations.** The
+ * **`LABKIT_DB_URL` set: a real Postgres**, one connection per `openClient()`.
+ * `bun run test:pg` points that at `docker-compose.yml`'s
+ * `apache/age:release_PG18_1.7.0`. It is the same environment variable
+ * production reads (`src/db/connect.ts`), so a suite run and a `labkit` command
+ * are pointed at a container by the same means.
+ *
+ * That second backend is not decoration. It is the **only** one on which two
+ * connections can be live at once — PGlite is single-writer and the whole suite
+ * shares one session — so anything about isolation, session-scoped role or
+ * tenant, or advisory locking under contention can only be *demonstrated*
+ * there. It is also a disagreeing measurement: a `pg.Client` and a raw PGlite
+ * do not decode identically (`count(*)` is a string on one and a number on the
+ * other, measured 2026-08-26), and a suite that only ever sees one of them
+ * cannot notice.
+ *
+ * Nothing runs it for you. There is no CI, and `bun run check` uses the default.
+ *
+ * ## What changed, and why the old rule inverted
+ *
+ * This file used to wrap PGlite in a `PGLiteSocketServer` and hand every test a
+ * fresh `pg.Client`. The stated reason was fidelity: production talked to
+ * PGlite over a socket, so tests should too. Production does not any more —
+ * `src/db/backend.ts` takes an exclusive lock and opens the file directly — so
+ * sharing the instance is now the *more* faithful arrangement, not a shortcut.
+ *
+ * The fresh-connection-per-test rule went with it. It existed to contain a
+ * confirmed upstream concurrency bug in `@electric-sql/pglite-socket`
+ * ([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046)),
+ * where two connections racing could permanently desync one of them. **The bug
+ * is the socket.** With no socket there is nothing to contain, and on the PGlite
+ * path `openClient()` is a labelled view onto the one session rather than a real
+ * connection. On the Postgres path it is a real connection again, for the
+ * plainer reason that there is a server to connect to.
+ *
+ * Two consequences worth knowing before writing a test against the default:
+ *
+ * - **`close()` on an opened client is a no-op under PGlite**, kept so the
+ *   harness's open/close bookkeeping (`tests/helpers/scenario.ts`) reads the
+ *   same either way. Nothing there can prove state survives a *reconnect*; it
+ *   never could, and `Scenario.current()` says so in its own doc comment.
+ * - **Session state is shared under PGlite**, because there is one session.
+ *   `search_path`, `SET ROLE` and any other session-scoped GUC set by one test
+ *   is visible to the next. A test whose subject *is* session scoping has to
+ *   say so, and run against `LABKIT_DB_URL`.
+ *
+ * A separate, older note that is still true: **this file's header has been read
+ * as explaining the suite's intermittent failures, and it does not.** The
  * `graph "labkit_t1" does not exist` and `Connection terminated` bursts were a
- * teardown race, not Defect A: bun's 5000ms per-test timeout does not cancel
- * the test body, so an overrunning test keeps executing while the next one
- * starts, and its late `scenario.end()` reset the database and closed the next
- * test's connection. **That cascade was fixed on 2026-08-22** — see
- * `tests/helpers/scenario.ts` and `tests/scenario-harness.test.ts`. Tests can
- * still cross the ceiling and fail; what they can no longer do is take the
- * next test with them. Instrumentation across a failing run tracked 59,086
- * queries with **zero** unfinished and found no desync signature at all.
- *
- * The last sentence here used to blame `provisionTenantGraph()`. It was wrong —
- * see CLAUDE.md, which carries the 2026-08-24 profile.
+ * teardown race — bun's 5000ms per-test timeout does not cancel the test body,
+ * so an overrunning test kept executing while the next one started, and its
+ * late `scenario.end()` reset the database underneath it. That cascade was
+ * fixed on 2026-08-22; see `tests/scenario-harness.test.ts`. Instrumentation
+ * across a failing run tracked 59,086 queries with **zero** unfinished and
+ * found no desync signature at all. Misattributing it cost two investigations.
  */
 export interface TestDb {
-  /** Opens a fresh, independently-bootstrapped connection — call in `beforeEach`, not once for the whole file. See the file-level comment. */
-  openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }>;
-  /** Drops every AGE graph and truncates every LabKit-owned table — call in `afterEach`, before closing that test's client. */
+  /**
+   * Under PGlite, a labelled view onto the shared session whose `close()` is a
+   * no-op. Under `LABKIT_DB_URL`, a real connection that `close()` really
+   * closes. Either way, call it in `beforeEach` and close it in `afterEach`.
+   */
+  openClient(label?: string): Promise<TestClient>;
+  /** Truncates every LabKit-owned table and empties every tenant graph — call in `afterEach`. */
   reset(): Promise<void>;
   close(): Promise<void>;
 }
 
 /**
- * The one PGlite instance the whole suite shares, booted on first use.
+ * What a test is handed: the seam, its transaction boundary, and a way to give
+ * it back.
+ *
+ * `tx` is here rather than made on demand because a `TenantGraph` requires one
+ * and **two graphs over one connection must share it** — `scenario.current()`
+ * and the two-tenant cases in `tests/domain-graph.test.ts` both build a second
+ * graph. See `src/db/transactor.ts`.
+ */
+export interface TestClient extends LabKitDB {
+  tx: Transactor;
+  close(): Promise<void>;
+}
+
+/** True when the suite has been pointed at a real Postgres. See the file header. */
+export const usingPostgres = (): boolean => Boolean(process.env.LABKIT_DB_URL);
+
+/**
+ * Everything a `TestDb` needs from whichever backend is in play: how to get a
+ * connection, and how to give one back.
+ */
+interface Booted {
+  open(): Promise<{ db: LabKitDB; close(): Promise<void> }>;
+}
+
+/**
+ * The one PGlite instance the whole suite shares, or the one migrated
+ * container, booted on first use.
  *
  * **Booting is the single largest cost in the suite and it was paid 44 times.**
  * Measured 2026-08-24: `setupTestDb()` takes ~900ms on a quiet machine and
@@ -70,72 +117,96 @@ export interface TestDb {
  * — which is why the query-count and off-budget work only moved 5-7%: both
  * optimised the minority.
  *
- * Bun runs every test file in one process, so one instance serves all of them.
- * Isolation is unchanged and still comes from `reset()`, which truncates
- * between tests, and from `openClient()`, which hands each test its own
- * connection — the containment for the pglite-socket defect described above.
+ * Bun runs every test file in one process, so one boot serves all of them.
+ * Isolation comes from `reset()`, which truncates between tests.
  *
  * Graphs survive between files because `reset()` truncates rather than drops,
  * deliberately (see `reset()`), so the second file onward finds provisioning's
  * six-query steady path instead of its 83-query cold one.
  */
-let shared:
-  | Promise<{
-      rawDb: PGlite;
-      server: PGLiteSocketServer;
-      host: string;
-      port: number;
-    }>
-  | undefined;
+let shared: Promise<Booted> | undefined;
 
-async function boot() {
-  const rawDb = new PGlite({ extensions: { age, vector } });
-
-  // Migration ordering mirrors backend.ts's primary role exactly: migrate
-  // the raw PGlite instance, then start serving it — runMigrations() is
-  // typed to PGlite specifically (drizzle-orm/pglite/migrator needs the
-  // concrete instance), so this is the one step that can't go through a
-  // client below.
+async function bootPglite(): Promise<Booted> {
+  const rawDb = new PGlite({ extensions: { age } });
   await runMigrations(rawDb);
   await bootstrapSession(rawDb);
+  return {
+    async open() {
+      return {
+        // `opts` forwarded, not dropped. PGlite's third argument is already an
+        // options object, so this is a rename — but dropping it is silent:
+        // drizzle asks for `rowMode: "array"` and, given objects instead,
+        // returns `[{}]` per row or dies inside an array column's decoder. It
+        // did the latter here first, which is the luckier of the two.
+        db: { query: (sql, params, opts) => rawDb.query(sql, params as unknown[], opts) },
+        close: async () => {},
+      };
+    },
+  };
+}
 
-  const server = new PGLiteSocketServer({
-    db: rawDb,
-    port: 0,
-    host: "127.0.0.1",
-    maxConnections: 16,
-  });
-  await server.start();
-  const [host, portStr] = server.getServerConn().split(":");
-  return { rawDb, server, host: host!, port: Number(portStr) };
+async function bootPostgres(connectionString: string): Promise<Booted> {
+  // Migrations are the out-of-band deploy step this backend expects (PJ-004),
+  // and a test run is a legitimate instance of one: nothing else is going to
+  // have migrated the container. Idempotent, so re-running the suite is free.
+  const migrator = new Client({ connectionString });
+  await migrator.connect();
+  try {
+    await runMigrationsOnPostgres(migrator);
+  } finally {
+    await migrator.end();
+  }
+  return {
+    async open() {
+      const c = new Client({ connectionString });
+      await c.connect();
+      // Wrapped rather than handed over: `pg.Client.query(sql, params, cb)`
+      // takes a *callback* third, so `QueryOptions` has to travel in the
+      // config-object form. Same wrap as `directPostgresBackend`.
+      const db: LabKitDB = {
+        query: async <T = Record<string, unknown>>(
+          sql: string,
+          params?: unknown[],
+          opts?: QueryOptions,
+        ) => {
+          const r = await c.query({ text: sql, values: params, ...(opts ?? {}) });
+          return { rows: r.rows as T[] };
+        },
+      };
+      return { db, close: () => c.end() };
+    },
+  };
+}
+
+async function boot(): Promise<Booted> {
+  const url = process.env.LABKIT_DB_URL;
+  return url ? bootPostgres(url) : bootPglite();
 }
 
 export async function setupTestDb(): Promise<TestDb> {
   shared ??= boot();
-  const { host, port } = await shared;
+  const booted = await shared;
 
   let opened = 0;
-  async function openClient(label?: string): Promise<LabKitDB & { close(): Promise<void> }> {
-    const c = new Client({
-      host,
-      port,
-      database: "postgres",
-      user: "postgres",
-    });
-    await c.connect();
-    await bootstrapSession(c);
+  async function openClient(label?: string): Promise<TestClient> {
+    const { db: raw, close } = await booted.open();
+    await bootstrapSession(raw);
     // Traced only when LABKIT_TRACE is set; otherwise `traced()` hands back the
-    // same object and this costs nothing. Labelled per connection because
-    // telling two connections apart is most of what a trace is for -- the
-    // teardown race described above is invisible without it.
-    const db = traced({ query: c.query.bind(c) }, label ?? `conn-${++opened}`);
-    return { query: db.query, close: () => c.end() };
+    // same object and this costs nothing. Labelled per logical client because
+    // telling two of them apart is most of what a trace is for — the teardown
+    // race described above is invisible without it.
+    const db = traced(
+      { query: (sql, params, opts) => raw.query(sql, params, opts) },
+      label ?? `conn-${++opened}`,
+    );
+    // One transactor per opened client, over the *traced* object, so a BEGIN
+    // shows up in a trace like every other query.
+    return { query: db.query, tx: transactor(db), close };
   }
 
-  // Dedicated to reset()/teardown, deliberately separate from whatever
-  // connection each test opens for itself via openClient() — reset() runs
-  // every test, so it's the one connection worth keeping simple and
-  // unlikely to ever see an errored query itself.
+  // Dedicated to reset()/teardown and kept open for the whole file. Under
+  // Postgres it is a genuinely separate session from every test's, which is
+  // what lets the truncate below run while a test's own connection is idle.
   const admin = await openClient("admin");
 
   return {
@@ -162,6 +233,10 @@ export async function setupTestDb(): Promise<TestDb> {
      * The truncate below already covered these tables — a graph's schema is not
      * one of the four exclusions — so the drop was doing nothing the truncate
      * did not, at seventy-seven times the price.
+     *
+     * **This is destructive to whatever `LABKIT_DB_URL` names.** It truncates
+     * every table outside four system schemas, so point it at a throwaway
+     * container and nothing else.
      */
     async reset() {
       const tables = await admin.query<{
@@ -175,24 +250,25 @@ export async function setupTestDb(): Promise<TestDb> {
       `);
       const tableNames = tables.rows.map((r) => `"${r.table_schema}"."${r.table_name}"`);
       if (tableNames.length > 0) {
-        // No params — relies on pg's simple query protocol to run multiple
-        // semicolon-separated statements in one call, unlike PGlite's
-        // prepared-statement protocol (see CLAUDE.md's migrations note).
-        await admin.query(`
-          set session_replication_role = replica;
-          truncate ${tableNames.join(", ")} restart identity cascade;
-          set session_replication_role = DEFAULT;
-        `);
+        // Three calls, not one semicolon-separated string. That form works over
+        // `pg`'s simple query protocol and **throws** against a raw PGlite
+        // instance — `cannot insert multiple commands into a prepared
+        // statement` — which is the same restriction the custom migrations work
+        // around with `--> statement-breakpoint` (see CLAUDE.md). Three calls
+        // work on both, so there is one code path rather than a branch.
+        await admin.query(`set session_replication_role = replica;`);
+        await admin.query(`truncate ${tableNames.join(", ")} restart identity cascade;`);
+        await admin.query(`set session_replication_role = DEFAULT;`);
       }
     },
     /**
-     * Closes this file's admin connection and **leaves the shared instance
-     * running** for the files after it.
+     * Closes this file's admin connection and **leaves the shared boot in
+     * place** for the files after it.
      *
      * Tearing it down here would defeat the point: bun runs files in sequence,
-     * so the first `afterAll` would kill the instance and the next file would
-     * boot another. The process exits when the run ends and takes the socket
-     * server and the WASM instance with it.
+     * so the first `afterAll` would kill it and the next file would boot again.
+     * The process exits when the run ends and takes the WASM instance, or the
+     * last connections, with it.
      */
     async close() {
       await admin.close();
