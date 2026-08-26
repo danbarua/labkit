@@ -34,7 +34,11 @@ Landing on **`feat/one-binary`** (PR #35):
 - `README.md` — the wiring section rewritten against the binary: four lines, no
   paths, no environment.
 
-**`check-all.ts` names what failed**, not only which step — see Verified.
+**`e077a58` — the sweep says what failed, not only which step.**
+
+- `scripts/check-all.ts` — the step runner tees rather than inheriting stdio,
+  and a digest of each failed step prints under the summary table. See Verified.
+- `docs/session-log/` — 047 folded into this entry.
 
 Abandoned on `fix/readme-tenant-wiring`, and worth knowing it happened: four
 commits correcting the README's wiring for a deployment the binary then
