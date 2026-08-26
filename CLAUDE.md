@@ -148,9 +148,39 @@ Two more things a worktree will not have, because they are untracked:
   across — they warn on mistakes already made in this repo. `.wrap-state/` must
   be **seeded** before the first Stop fire or the first wrap is silently
   swallowed; `.claude/skills/wrap/SKILL.md` §Forking has the command.
-- Nothing to configure for git hooks. `.githooks/` and the generated SVG were
-  both removed (`ce97456`); `bun run dev:dependency-cruiser` regenerates
-  `docs/dependency-graph.mmd` by hand, and graphviz is no longer needed.
+- **Git hooks, which have to be turned on: `bun run dev:install-hooks`.** Hooks
+  are not cloned and `core.hooksPath` is per-repository config, so a fresh
+  clone or worktree has none and says nothing about it.
+
+  There is one, `.githooks/pre-push`, and it refuses a push to a branch whose
+  pull request is already merged or closed. **That is not a reversal of
+  `ce97456`, which removed the previous `.githooks/`** — that hook *regenerated
+  a committed artefact inside someone else's commit*, and the objection was to
+  writing, not to hooks. This one writes nothing and only ever refuses.
+
+  It was earned three times in two days: work pushed to an already-squashed
+  branch, where every push succeeds, the branch looks healthy, and the commits
+  reach nothing. Twice it cost a session-log entry; the third time it took a
+  `CLAUDE.md` restructure, a measurement, a file deletion and a queue rewrite,
+  recovered only because Dan said *"labkit has no outstanding PRs"*. A squash
+  merge leaves no ancestry `git merge-base` can find, so the state has to come
+  from `gh` — and the hook **refuses rather than passes** when `gh` is missing,
+  because a hook that goes quiet when its tool is absent is the `|| true` this
+  repo has already been bitten by. `git push --no-verify` is the way out and
+  every refusal names it.
+
+  **Two bugs, both found by running it and neither by reading it**, and both had
+  the same shape — every test passed, including the one that had to fail. It
+  treated all-zeroes on the *remote* side as a deletion, when that means "new
+  branch there", so the merged branch was skipped before `gh` was ever asked.
+  And it read the branch name off the **local** ref, so
+  `git push origin HEAD:refs/heads/foo` — which writes `foo` on the remote under
+  the pull request's name — skipped the check entirely. It keys on the remote
+  ref, which is the name GitHub has. Ten states are checked.
+
+  The generated SVG went with `ce97456` too; `bun run dev:dependency-cruiser`
+  regenerates `docs/dependency-graph.mmd` by hand, and graphviz is no longer
+  needed.
 
 ## The one rule about documents
 
@@ -201,6 +231,8 @@ They are dated records: read them for reasoning, never for current state.
     named and in front of them. What worked was checking the *other side* of
     the operation in front of you, and a disagreeing measurement.
 
+### Where the live counts are
+
 **The live counts of anything countable are in the code, not here** —
 `NODE_LABELS.length` and `EDGE_LABELS.length` in `src/db/domain.ts`, the tool
 list in `src/mcp/tools.ts`, the scripts in `package.json`. This paragraph used
@@ -225,6 +257,8 @@ document for the CLI surface, tests asserting the two agree, and a gate over all
 of it. A generated file checked in beside the code it describes is an invitation
 to that. Generate into the running program, not into the tree.
 
+### The dependency graph
+
 `docs/dependency-graph.mmd` is the module dependency graph, as text.
 `bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
 
@@ -247,6 +281,8 @@ is. Generation lives in `scripts/update-dependency-graph.sh` rather than a
 pipeline reports the last command's status — a crashed `depcruise` used to yield
 an empty SVG and a success code.
 
+### Talking to the user
+
 **Do not use this repo's shorthand when reporting to the user.** `§5`, `bar 4`,
 `D2`, "the rungs", the ledger status words and the row letters are compression
 that pays between documents and costs on sight. Say *"we showed it gives a wrong
@@ -254,6 +290,8 @@ answer"*, not *"it clears §5"*. A glossary makes documents readable and does
 nothing for a sentence in a reply — the user hit unexplained shorthand three
 times in one session, twice after it was noticed and once in the same message
 that announced the glossary.
+
+### What the other documents are for
 
 `docs/persistence-spikes.md` holds dated AGE findings from 2026-08-17/18 —
 what `pglite-age` does and does not support, established by direct probe. Read
@@ -272,6 +310,8 @@ depending on the document.
 statuses, verdicts or counts; PJ-008 §3's index is authoritative on what the
 model knows, and standing facts and gates are in this file.
 
+### Working alongside another session
+
 **Never suggest `git reset --hard` to another session.** You cannot see its
 working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
 commit; it had **five uncommitted files** at that moment, including a fix and a
@@ -283,6 +323,8 @@ cannot see through. The advice was right in shape and wrong in verb.
 More generally: a parallel session's **worktree state is invisible to you** in a
 way its branch state is not. `git log` tells you where it is; nothing tells you
 what it is holding.
+
+### The dated records
 
 `docs/consumer-contract/` holds the **predictions-and-verdict pairs** — an
 odd-numbered file states what a probe will show and what would refute it, the
@@ -337,6 +379,8 @@ bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
 Formatting and linting are both biome — `bun run format` writes,
 `check:format` and `check:lint` are in the sweep.
 
+### The binary, and the 1.9GB it leaked
+
 `bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
 directory** (`scripts/build-binary.sh`), and that is not tidiness:
 `bun build --compile` leaves a **byte-identical copy of the `bun` binary
@@ -389,6 +433,8 @@ the three bugs are PGlite's, not drizzle's.
 The general lesson, which cost three rounds of build-and-run: **each fix moved
 the failure one step later rather than removing it**, and the only way to find
 the next was to run the binary again. Nothing had ever run it.
+
+### The CLI
 
 `src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
 surface, reads *and* writes (`bun run dev`). It is a composition root and
@@ -465,12 +511,16 @@ Two more things the tests caught rather than review:
   Either would have broken `$(labkit …)`. `--no-ansi` only ever subtracts, and
   picocolors' own `isColorSupported` is reused rather than reimplemented.
 
+### Where the database lives
+
 **`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
 the project root by another route. A temporary directory gets its own database
 file *and* its own lock, sharing nothing with a working database, which is what
 makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
 to get its own TCP port too, from a `derivePort` that hashed the path; there is
 no port any more. `LABKIT_DB_URL` still wins over both.
+
+### The MCP server
 
 **`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
 one batch of work and that is not a design position: a record nothing can write
@@ -479,6 +529,8 @@ neither can reach the other's verbs, and
 `tests/mcp.test.ts` asserts every public verb on either surface is exposed or
 listed in `NOT_EXPOSED` with a reason. **`labkit://docs/tools` is the tool list**;
 this paragraph deliberately does not count them.
+
+### Exit codes, and the script that told everyone to ignore its own
 
 `bun test`'s exit code means what it says: **0 is a clean run, non-zero is a
 failure.** It returned 99 on a passing suite until PGlite 0.5.7 (2026-08-24)
@@ -513,6 +565,8 @@ The general lesson, which cost more than the script did: **a rule that tells
 readers to ignore a signal removes the only watcher that signal had.** If a
 signal is unreliable, fix it or delete it — do not annotate it.
 
+### Shell traps in this userland
+
 **`\s` is not a character class in BSD `sed` or `grep`, and this userland is
 BSD.** It does not error — it matches a literal `s`, so a substitution silently
 does nothing. Cost a wrong measurement on 2026-08-25: a comparison meant to
@@ -535,6 +589,8 @@ single failing test — or to tell a real regression from a teardown cascade.
 Redirect to a file and read the file: `bun test > run.log 2>&1`. This is a fact
 about the pipe, not about that incident.
 
+### CI
+
 **CI runs the gates on pull requests to `main`, and nothing else runs them for
 you** — there is no git hook, and a commit that is not in a PR is checked by
 whoever typed it. `cloudbuild.test.yaml` runs `bun run check` and
@@ -545,6 +601,8 @@ Build, in the console, in the same region).
 **`test:pg` is why CI exists.** `bun run check` is a command anyone can type;
 `test:pg` needs a container, is excluded from the sweep deliberately, and had no
 watcher at all until the trigger existed.
+
+### The check sweep
 
 Before committing, run **`bun run check`**: it runs `bun test`, `typecheck`,
 `depcruise` and every `check:*` script, prints a table, and exits non-zero if
@@ -600,6 +658,8 @@ were wrong for one of the two languages.
 
 Do not pipe `bun test` — that trap is above, and is still live. `bun run check`
 passes each step's output straight through for the same reason.
+
+### Formatting and linting
 
 **Formatting and linting are biome** (`biome.jsonc`). `bun run format` writes;
 `check:format` and `check:lint` are both in the sweep.
@@ -669,6 +729,8 @@ traversal and dependency propagation are the actual point of this domain —
 forcing them into FK tables would just reimplement graph traversal as
 recursive CTEs.
 
+### The modules, and the direction they depend
+
 `src/db/` is layered, not a hub — each module has one job, and the
 dependency direction is enforced by `bunx depcruise src tests --output-type err`
 (violations only; `bun run dev:dependency-cruiser` redraws
@@ -716,6 +778,8 @@ natural-id `prefix` and its optional `validate` — the four parallel per-label
 tables it replaced are not coming back. It also carried `viewColumns` until the
 per-tenant CQRS views were removed; see "No relational read side" below.
 
+### TenantGraph is the only way in
+
 All graph access goes through `TenantGraph` (`src/db/graph.ts`), constructed
 per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
 
@@ -736,6 +800,8 @@ per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
   idempotent: calling it twice with the same three values is a no-op, not a
   duplicate edge (enforced by a real `UNIQUE (start_id, end_id)` Postgres
   index per edge label — see "AGE-specific gotchas" below).
+
+### Transactions belong to the connection
 
 A compound domain verb must run inside `graph.inTransaction(fn)` — everything
 it writes commits together or none of it does. Earned by external review of
@@ -775,6 +841,8 @@ Two traps, both found by the suite rather than by review:
 There is deliberately no raw-string escape hatch on `TenantGraph`. If a query
 needs a shape the decoders don't cover, add a decoder to `src/db/cypher.ts`
 rather than reintroducing one.
+
+### The relational half
 
 **The relational half has a typed surface too, now.** `ormOver(db)`
 (`src/db/orm.ts`) mounts drizzle through `drizzle-orm/pg-proxy`, which takes a
@@ -838,6 +906,8 @@ A verb that composes others records **one** event, not one per step
 stream is a record of research actions; a researcher who opened an enquiry did
 one thing, and a log that decomposes it describes the implementation instead.
 
+### The execution-context seam
+
 `src/domain/events.ts` is the **execution-context seam**: every state-changing
 verb flows through one choke point that stamps it from an injected
 `CommandContext` — a `Clock` and an `AttributionContext`. Time was the first
@@ -883,6 +953,8 @@ sharpening freezes the findings it was taken in light of onto the decision. The
 scenario asserts it with an empty event log open beside it. See PJ-008 row Z for
 the level above that, which is not answerable and has not been made so.
 
+### The two layering rules
+
 Two layering rules are enforced as `dependency-cruiser` **errors**, not
 conventions — `bunx depcruise src tests --output-type err`:
 
@@ -926,6 +998,8 @@ did not:
    ship API for an undecided model either: a speculative verb written to
    probe row V was removed rather than left in place.
 
+#### Earning an edge after implementing it
+
 A relationship can still be **earned after being implemented prematurely** —
 but the evidential sequence has to be reconstructed explicitly, by deleting the
 edge and demonstrating the wrong answer that returns. S-7 wired `IMPLEMENTS`
@@ -950,6 +1024,8 @@ prespecified check nobody ran must still count against the finding it
 qualifies, so `QUALIFIES` is written when the analysis is recorded and not when
 the check is evaluated — the same edge minted at the later moment cannot
 express the case the scenario exists for (S-3b, PJ-016).
+
+#### Handles, and which record an answer is about
 
 **Identity is never wording** — and its other half, **which record is this
 answer about?** The second is PJ-030: a reference denoting one record while the
@@ -992,6 +1068,8 @@ where a reader needs the text (`{claim, asserts}`, `{criterion, requires}`,
 `{work, objective}`, `{evidence, states}`); the handle is never a bare string
 and the wording never stands in for it.
 
+#### What a verb returns
+
 **A verb that mints something returns what it minted.** `recordAnalysis`,
 `replaceAnalysis` and `reverify` all return their claims. This is the
 `does the act record what it produced, or only what it acted on?` heuristic, and
@@ -1023,6 +1101,8 @@ S-3's four gate states and per-criterion itemisation are computed, not
 stored, so there is no `Gate.status` field to maintain and no value anyone
 can set to "passed". Stored shape is where change gets expensive; queries are
 free to be wrong and re-run.
+
+#### Why unwalked labels and edges stay
 
 **Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
 Every label is provisioned into every tenant up front, so declared-but-never-
@@ -1162,6 +1242,8 @@ property that already has data) — see PJ-005's "Judgment calls."
   straight to a real Postgres, which is its own arbiter. Migrations are *not*
   run by this backend — that's an out-of-band deploy step by design (PJ-004).
 
+### What replaced the leader election
+
 **This replaced a leader election, and the reason is worth knowing before
 anyone proposes bringing one back.** The winner of the lockfile race used to
 open PGlite, start a `PGLiteSocketServer`, and connect *to itself* over
@@ -1175,6 +1257,8 @@ secondary's next query raised an **uncaught** `'error'` event from `pg` and
 killed the process before any `catch` ran — and one upstream concurrency bug
 ([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046))
 that the whole test suite was shaped around containing.
+
+### Nothing holds the database between units of work
 
 **So nothing holds the database between units of work, and `src/mcp/server.ts`
 is where that matters.** An MCP server lives as long as its agent's session; if
@@ -1222,6 +1306,8 @@ and then `SET ROLE labkit_app`. From that point a query on `public.labkit_event`
 that forgets its tenant filter still returns only that tenant's rows, and one
 that writes another tenant's row is refused with 42501.
 
+### What the step-down is worth
+
 **It is a safety boundary, not a security one.** The session can `RESET ROLE`
 back to superuser. What it stops is a *query that forgot its filter*; what it
 does not stop is a caller who means harm. Both halves of that matter — the word
@@ -1238,6 +1324,8 @@ step-down, having no preload and one superuser session. **Noted, not built**;
 the write half of that probe was not re-verified after a grant gap in the probe
 itself.
 
+### Three things measured rather than assumed
+
 Three things that are easy to get wrong here, all measured rather than assumed:
 
 - **A superuser bypasses RLS unconditionally**, and `FORCE ROW LEVEL SECURITY`
@@ -1253,6 +1341,8 @@ Three things that are easy to get wrong here, all measured rather than assumed:
   a future release will add to it. `ALTER DEFAULT PRIVILEGES` covers what comes
   later and a blanket `GRANT … ON ALL TABLES` covers what came before; each
   misses what the other catches.
+
+### Which migration holds what
 
 **Which migration holds what is decided by one rule: drizzle cannot migrate what
 it does not manage.** `drizzle/0002_natural_ids.sql` is *the* hand-written
@@ -1391,6 +1481,8 @@ additive provisioning of a *new* edge label against an already-provisioned
 tenant, through `resolveTenantContext()` — the production path — never
 provisioning internals.
 
+### One PGlite for the whole suite
+
 `tests/helpers/db.ts`'s `setupTestDb()` boots **one `PGlite` instance for the
 whole suite**, on first use, and hands application code a `LabKitDB` over it.
 Application-code test files (`tests/domain-graph.test.ts`, `tests/agtype.test.ts`)
@@ -1411,6 +1503,8 @@ holding on to: the old rule's stated reason was fidelity to production, and
 production now opens PGlite directly, so sharing the instance is the *more*
 faithful arrangement.
 
+### Running the suite the way CI does
+
 **`bun run test:in-docker` runs what CI runs, here.** Same image, same steps as
 `cloudbuild.test.yaml`, with `--cpus`/`--memory` defaulted to a Cloud Build
 worker's shape (2/8g) because the resource limit is the point — this machine has
@@ -1425,6 +1519,8 @@ here at 2 cpus and at 1, with Postgres running alongside as CI does. What it
 closes is the *environment* half of "works on my machine" — image, dependencies,
 git, the Postgres wiring. The *speed* half it only approximates: a shared-core
 `e2` throttled to a sustained baseline is not a full local core under quota.
+
+### Against a real Postgres
 
 **`bun run test:pg` runs the same suite against a real Postgres**
 (`docker-compose.yml`'s `apache/age:release_PG18_1.7.0`) by setting
@@ -1443,6 +1539,8 @@ PGlite. The four skips are `tests/connection-lock.test.ts`, whose subject is the
 PGlite lockfile that a real Postgres does not have. `tests/mcp-stdio.test.ts`
 strips `LABKIT_DB_URL` from the servers it spawns, because it gives each one a
 private directory and that variable wins over one.
+
+### Resetting between tests
 
 `reset()` **truncates every table outside four system schemas**, so it must only
 ever point at a throwaway database. The default is one called **`labkit_tests`**,
@@ -1468,6 +1566,8 @@ entity-type (PJ-004 decision #3), not per-tenant or per-test. Don't assert
 a specific natural-id value across more than one test in the same file for
 this reason — assert on the prefix/shape instead.
 
+### The lockfile tests
+
 `tests/connection-lock.test.ts` covers the lockfile: it is taken and handed
 back, a live holder is waited for and then let through, a *stale* one (a dead
 PID) is reclaimed, and a refusal names the lock path and the holder. It
@@ -1478,6 +1578,8 @@ running a real race. Each claim is now reached deterministically. Its tests
 open real `dataDir`s and so carry explicit 30s timeouts; bun's 5000ms default
 is not generous enough for a test whose subject is a database starting up.
 
+### The flakiness, and what it turned out not to be
+
 **The suite's *other* flakiness is not that bug, and attributing it there cost
 two investigations.** Intermittent `graph "labkit_t1" does not exist` and
 `Connection terminated unexpectedly` bursts look like the socket defect and are
@@ -1486,6 +1588,8 @@ timeout **does not cancel the test body**, and the abandoned test's late
 `scenario.end()` then resets the database and closes the *next* test's
 connection. Nothing hangs — 59,086 queries were tracked across a failing run
 with zero unfinished.
+
+#### What the cost actually is
 
 **What pushes a test over is its own query count, not provisioning.** This
 paragraph said the cost was `provisionTenantGraph()` reconciling on every
@@ -1521,6 +1625,8 @@ hooks. Bun's hook and body clocks are separate — a slow `beforeEach` reports
 `timed out after 5000ms`, the body wording. So in the files that set up from
 `beforeEach`, setup cost is not the mechanism.
 
+#### The ceiling, and the two callers that ignored it
+
 **The ceiling is now 20000ms and chosen, not bun's 5000ms default** (`--timeout`
 on the `test` script, added 2026-08-26).
 
@@ -1554,6 +1660,8 @@ margin-measuring method below still works, just from a higher start. And bun
 says *"a beforeEach/afterEach hook timed out"* even when the hook is a
 `beforeAll`, which is worth knowing before hunting for a `beforeEach` that does
 not exist.
+
+#### It stopped, and nobody knows which change did it
 
 **It stopped happening, and the honest version is that nobody knows which
 change did it.** Re-measured 2026-08-25 by the method below — five full runs
@@ -1589,6 +1697,8 @@ down a cause for this.**
 instruments the `LabKitDB` seam and therefore cannot observe anything before a
 connection exists. WASM boot was 44-110s of a ~200s suite and invisible to it,
 so three rounds of hypotheses were all downstream of the largest cost.
+
+#### How to measure it again
 
 **The method, kept because the next re-measurement needs it.** Saturate
 `sysctl -n hw.ncpu` cores with busy loops, run `bun test` redirected to a file,

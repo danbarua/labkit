@@ -28,16 +28,25 @@
  * happens and the second is not in the threat model. `LABKIT_DB_URL` pointing
  * at a shared Postgres is where that would stop being true.
  *
- * **And there a real login boundary is closer than this file used to claim.**
+ * **And there a real login boundary works. Measured 2026-08-27, both halves.**
  * The refusal above is of *issuing* `LOAD`, not of needing it: a server that
  * preloads AGE has the library in every backend already. `docker/postgres`'s
- * base image runs `postgres -c shared_preload_libraries=age`, and measured on
- * it, a plain LOGIN role that never issues `LOAD` resolves `agtype` and reads
- * through Cypher. So the ingredients for a genuine boundary are a preloading
- * server and a `bootstrapSession` that does not issue `LOAD` — not the
- * `session_preload_libraries` per-role setting this comment used to name.
- * PGlite still needs the step-down, having no preload and one superuser
- * session. Noted; not built.
+ * base image runs `postgres -c shared_preload_libraries=age`, and against it a
+ * plain LOGIN role that never issues `LOAD` resolves `agtype`, reads through
+ * Cypher, and **writes** — `createNode` minted a natural id and `createEdge`
+ * connected two nodes, through this same `TenantGraph`. The write half had
+ * been unverified when this comment first claimed the read half.
+ *
+ * What makes it a *security* boundary rather than the safety one above: that
+ * session is refused `SET ROLE postgres` with 42501. There is no `RESET ROLE`
+ * back to superuser, because it never was one.
+ *
+ * So the ingredients are a preloading server and a `bootstrapSession` that
+ * does not issue `LOAD` — not the `session_preload_libraries` per-role setting
+ * this comment used to name. **Not built, and the reason is that it is
+ * per-backend**: PGlite has no preload and exactly one superuser session, so it
+ * keeps the step-down. Deciding what the seam looks like when one backend can
+ * offer a boundary the other cannot is the work, not the SQL.
  *
  * ## Why the tenant is a session GUC
  *
