@@ -1,3 +1,128 @@
+<!-- ┌──────────────────────────────────────────────────────────────────────┐ -->
+<!-- │ DO NOT MODIFY UNLESS EXPLICITLY REQUESTED                            │ -->
+<!-- │ This section is pinned. Cruft below it may be pruned; this may not.  │ -->
+<!-- └──────────────────────────────────────────────────────────────────────┘ -->
+
+# DX Principles
+
+Read this before you add anything.
+
+Every rule below was earned by someone in this repository doing the opposite,
+and each names the incident so you can weigh it rather than take it on trust.
+They are about *how* to work here, not about the domain — the domain starts at
+"What this is".
+
+## Measure it, or don't write it
+
+If a claim can be tested in under two minutes, test it before you write it down.
+Cite the date beside anything you measured.
+
+**The tell:** you are about to write a sentence containing a number, a version,
+or a mechanism — "X requires Y", "this costs N ms", "the API does Z".
+
+Four in one week. `entities.roles.exclude` was taken from the docs as the way to
+stop drizzle-kit emitting a `CREATE ROLE`; reading the installed bundle showed it
+is consumed only by the introspection path and cannot reach a schema-file
+generate. `pgTable.withRLS()` was reported as the current API; it does not exist
+in the version pinned here. "`LOAD 'age'` fails for a non-superuser, so every
+Cypher query fails" was written into three files and is false on a server that
+preloads AGE. And a per-round-trip figure was carried forward for days after the
+work it averaged had been deleted.
+
+## A check that cannot fail is not a check
+
+Before trusting a check, make it red on purpose. A test with no failing input
+and a script that cannot report a failure are the same thing wearing different
+clothes.
+
+**The tell:** you are adding an assertion, and you have not seen it fail.
+
+`check:no-tracked-symlinks` printed `OK: no tracked symlinks.` and exited 0 on a
+machine with no `git` — the command failed, a `|| true` swallowed it, and the
+absence of a tool read as a clean result. It was found by running the gate in a
+container, not by review, and it would have been green in CI while checking
+nothing. Earlier, `tests/leader-election.test.ts` ran a three-way race, printed
+the results and asserted **nothing at all**, while being cited in this file as
+proof that election worked.
+
+## A silenced signal is not an absent one
+
+Ignoring something does not make it stop happening; it makes it stop being
+counted. If a signal is unreliable, fix it or delete it — do not annotate it.
+
+**The tell:** you are writing a `.gitignore` line, a `|| true`, a skip, or a
+sentence telling readers to disregard an output.
+
+`*.bun-build` was gitignored, so nobody saw `bun build --compile` leave a
+61MB copy of the bun binary behind on every successful run. Thirty-two of them
+reached **1.9GB** in the repo root before anyone read a directory listing. And
+`examples/full-lifecycle.ts` once exited 99 on success, so this file told
+everyone to ignore its exit code and read the output instead — the script then
+died at a missing relation and stayed dead for **221 commits**, because
+declaring the signal meaningless left the real failure with no watcher either.
+
+## Generate into the running program, not into the tree
+
+A generated file committed beside the code it describes reads as something worth
+guarding, and the guards arrive.
+
+**The tell:** you are about to `git add` a file a script produced.
+
+`docs/mcp-tools.md` was checked in so its diff would show an API change. It
+acquired a test asserting it matched its generator, then a CI filter needing a
+load-bearing exception so that one file kept building, and then — reported from
+other repos — agents proposing a parity document for the CLI surface, tests
+asserting the two agree, and a gate over all of it. None of that was ever about
+whether the tool list was correct, which `labkit://docs/tools` cannot get wrong.
+Deleting it removed 1,055 lines. A 134KB dependency-graph SVG went the same way
+on 2026-08-21.
+
+## Delete the reason, not the exception
+
+When a derived list needs a hand-written exception, the exception is usually
+telling you something else is wrong. Fix that instead.
+
+**The tell:** you are adding an allowlist entry, an exclusion, or a paragraph
+explaining why one thing is special.
+
+`check-all.ts` excluded one script by name, with a paragraph explaining why its
+exit code was inverted. The paragraph was the signal: the script was fine and
+its **name** was wrong. Renaming it out of the `check:` namespace deleted the
+exclusion rather than documenting it. The same shape recurred with the CI
+path filter, which needed one exception so a generated document kept building —
+and the exception was a smell worth more than the test that caused it.
+
+## State belongs in one place, and prose is not it
+
+If a sentence would be wrong next week because something changed, it does not go
+in a document. Statuses, counts, "the newest entry is N" — that is state, and it
+belongs in the thing itself: the code, the index table, `git log`.
+
+**The tell:** check the tense. A sentence about how the code *is* goes stale; one
+about what *changed* does not. That makes it a grep rather than a judgement call.
+
+Every documentation defect this repo has found was state written into a
+sentence. None was a bad argument; the arguments have all held. It deleted a
+checker rather than adding one — `check:ledger` existed only to police a copy
+that should not have existed. Prose goes wrong in a second way no test can
+catch: a comment can be **true and still name the wrong reason**. Releasing the
+database between MCP tool calls was justified here as "otherwise no other agent
+could work the project", which is true, and not why it matters — a person at a
+terminal wants the file far more often than a second agent does. An outside
+reader found that, not a test.
+
+**Dated records are exempt and must stay exempt** — `docs/project-journal/`,
+`docs/session-log/`, `docs/consumer-contract/`. They say their date and are
+measurements of it, so they cannot go stale. Do not "correct" them.
+
+## When these conflict with a task
+
+They do not override an instruction. They override your instinct to add
+something while carrying one out. If a rule here genuinely blocks the work, say
+so in a sentence and ask — do not quietly build the thing.
+
+<!-- END PINNED SECTION -->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -29,22 +154,9 @@ Two more things a worktree will not have, because they are untracked:
 
 ## The one rule about documents
 
-**If a sentence would be wrong next week because something changed, it doesn't
-go in a document.**
-
-Statuses, counts, ranges, "no row is currently open", "X files", "the newest
-entry is N" — that is state, and state belongs in exactly one place, which is
-the thing itself: the code, the index table, `git log`. Every documentation
-defect this repo has found was state written into a sentence. None was a bad
-argument; the arguments have all held.
-
-So: other documents may write `row F` and nothing else about it. If a reader
-wants its status they grep one table. This deleted a checker rather than adding
-one — `check:ledger` existed only to police a copy that should not have existed.
-
-**Dated records are exempt and must stay exempt** — `docs/project-journal/`,
-`docs/session-log/`, `docs/consumer-contract/`. They say their date and are
-measurements of it, so they cannot go stale. Do not "correct" them.
+See **State belongs in one place** in the pinned header. One consequence worth
+spelling out here: other documents may write `row F` and nothing else about it.
+If a reader wants its status they grep one table.
 
 ## What this is
 
