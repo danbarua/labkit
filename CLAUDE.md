@@ -536,6 +536,7 @@ dependency direction is enforced by `npx depcruise src tests --output-type err`
 | `connect.ts` | picks a backend and connects through it |
 | `transactor.ts` | the transaction boundary, one per connection |
 | `orm.ts` | drizzle, mounted **on** the seam via `pg-proxy` |
+| `scoped.ts` | steps a session down to `labkit_app` with its tenant pinned |
 | `agtype.ts` | agtype parsing, identifier validation, Cypher clause/quoting helpers |
 | `cypher.ts` | `CypherRunner` + column decoders — typed Cypher execution |
 | `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA`, `INDEXED_PROPS` |
@@ -1045,6 +1046,52 @@ What keeps that server's process alive between calls is **the stdin
 subscription, not a held connection** — measured under Bun 1.3.14, since the
 comment that used to credit the connection would now be describing something
 that no longer exists.
+
+## Row-level security, and what it is actually worth
+
+A session connects as a **superuser**, and that is not laziness: `LOAD 'age'` is
+refused to a non-superuser — `access to library "age" is not allowed`, SQLSTATE
+42501, measured 2026-08-26 — and without the library the `agtype` type does not
+resolve, so **every Cypher query fails, reads included**. So the order is fixed:
+
+```
+connect → bootstrapSession → migrate → resolveTenantContext → scopeToTenant → domain
+```
+
+`scopeToTenant` (`src/db/scoped.ts`) pins `labkit.tenant_id` with `set_config`
+and then `SET ROLE labkit_app`. From that point a query on `public.labkit_event`
+that forgets its tenant filter still returns only that tenant's rows, and one
+that writes another tenant's row is refused with 42501.
+
+**It is a safety boundary, not a security one.** The session can `RESET ROLE`
+back to superuser. What it stops is a *query that forgot its filter*; what it
+does not stop is a caller who means harm. Both halves of that matter — the word
+"policy" invites a reader to assume the second. A deployment wanting a real
+login boundary needs `ALTER ROLE labkit_app SET session_preload_libraries =
+'age'` so the library arrives without a `LOAD`; that is written down in
+`drizzle/0004_rls.sql` and **not built or measured**.
+
+Three things that are easy to get wrong here, all measured rather than assumed:
+
+- **A superuser bypasses RLS unconditionally**, and `FORCE ROW LEVEL SECURITY`
+  is not enough to stop it. A non-superuser role is required, which is the whole
+  reason the step down exists.
+- **`current_setting('labkit.tenant_id')` has no `missing_ok`, deliberately.** A
+  scoped session that never had its tenant set raises 42704 on the first read.
+  The soft form returns NULL and the policy then matches nothing, so the log
+  reports that nothing has ever happened against a full table — the confidently
+  wrong answer this repo goes furthest to avoid.
+- **Grants live in `provisionTenantGraph()`, not in a migration.** A tenant's
+  schema does not exist when the migrations run, and neither do the label tables
+  a future release will add to it. `ALTER DEFAULT PRIVILEGES` covers what comes
+  later and a blanket `GRANT … ON ALL TABLES` covers what came before; each
+  misses what the other catches.
+
+`tests/tenancy-isolation.test.ts` is the reader. It drives `connectDb()`, the
+real resolve and the real step-down, so a missing grant surfaces as a
+permissions error rather than being supplied by the test — and it asserts
+`current_user` is not a superuser, without which every other assertion in it
+would pass against a session with no policy in force.
 
 `bootstrapSession(db)` (LOAD/search_path) must be called by every new
 session regardless of backend — it's session-scoped Postgres state and

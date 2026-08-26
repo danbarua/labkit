@@ -35,6 +35,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
+import { scopeToTenant } from "../db/scoped";
 import { TenantGraph } from "../db/graph";
 import { ReadSurface, WriteSurface } from "../domain";
 import { pgEventLog } from "../domain/event-store";
@@ -215,6 +216,12 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
       // are unrelated: this one is which tenant's graph to talk to, and the
       // `CommandContext` below is who is talking and when.
       const tenantCtx = await resolveTenantContext(connection.db, tenant);
+
+      // Superuser work is done: `LOAD 'age'` and the graph DDL both needed it.
+      // From here the session is `labkit_app` with its tenant pinned, so a tool
+      // that forgets to filter still cannot read another tenant's events. See
+      // src/db/scoped.ts for what that is and is not worth.
+      await scopeToTenant(connection.db, tenantCtx);
 
       // One graph for both halves, so `inTransaction`'s re-entrancy depth is
       // shared. This is the composition `src/domain/session.ts` specifies for

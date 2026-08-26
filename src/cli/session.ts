@@ -15,6 +15,7 @@
 
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
+import { scopeToTenant } from "../db/scoped";
 import { TenantGraph } from "../db/graph";
 import { ReadSurface, WriteSurface } from "../domain";
 import { pgEventLog } from "../domain/event-store";
@@ -87,6 +88,12 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
     const connection = await connectDb(opts.db);
     try {
       const ctx = await resolveTenantContext(connection.db, opts.tenant ?? "labkit");
+      // Everything above this line needs the superuser it connected as -- `LOAD
+      // 'age'` and the graph DDL both. Everything below runs as `labkit_app`
+      // with its tenant pinned, so a read that forgets to filter still cannot
+      // see another tenant's events. See src/db/scoped.ts for what that is and
+      // is not worth.
+      await scopeToTenant(connection.db, ctx);
       const events = pgEventLog(connection.db, ctx.tenantId);
       const graph = new TenantGraph(ctx, connection.db, connection.tx);
       const answered = await work({

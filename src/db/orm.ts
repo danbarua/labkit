@@ -72,3 +72,43 @@ export function ormOver(db: LabKitDB) {
     return { rows: rows as unknown[] };
   });
 }
+
+/**
+ * Runs ORM work and rethrows the **driver's** error rather than drizzle's
+ * wrapper, because the wrapper prints the parameters.
+ *
+ * A `DrizzleQueryError`'s message is `Failed query: <sql>\nparams: <values>` —
+ * measured, and the values are the ones that were bound. LabKit binds
+ * propositions, findings, verdicts and event payloads, and an error message
+ * goes further than a log: `src/mcp/server.ts` deliberately does not catch, so
+ * the SDK ships the message to the agent as `isError: true`. `src/db/trace.ts`
+ * already refuses to log parameters for exactly this reason, and moving to an
+ * ORM must not quietly undo that.
+ *
+ * The `cause` carries the real error unchanged — SQLSTATE included, verified —
+ * so nothing that switches on a code loses anything. The hand-written SQL this
+ * replaced threw the driver error directly; this restores that.
+ *
+ * Applied per operation rather than per statement, because an operation is the
+ * unit a caller already has a function for. A new relational call site has to
+ * remember it, which is the honest cost of drizzle not offering a hook.
+ */
+export async function unwrapped<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (err) {
+    // Recognised by its own properties, not by `err.name` — which is the
+    // inherited `"Error"`, because `DrizzleQueryError` sets a class name and
+    // not the field. Checked, after the first version of this silently caught
+    // nothing and the test that found the leak went on failing.
+    if (
+      err instanceof Error &&
+      err.cause instanceof Error &&
+      Object.hasOwn(err, "query") &&
+      Object.hasOwn(err, "params")
+    ) {
+      throw err.cause;
+    }
+    throw err;
+  }
+}

@@ -28,7 +28,7 @@
 
 import { and, arrayContains, asc, eq, gt, or } from "drizzle-orm";
 import type { LabKitDB } from "../db/backend";
-import { ormOver } from "../db/orm";
+import { ormOver, unwrapped } from "../db/orm";
 import { labkitEvents } from "../db/schema";
 import type { AttributionContext, DomainEvent, EventFilter, EventSink, Operation } from "./events";
 
@@ -74,57 +74,59 @@ const toEvent = (r: EventRow): DomainEvent => {
 export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
   const orm = ormOver(db);
 
-  const select = async (filter: EventFilter): Promise<readonly DomainEvent[]> => {
-    const conditions = [eq(labkitEvents.tenant_id, tenantId)];
-    if (filter.since !== undefined) conditions.push(gt(labkitEvents.seq, filter.since));
-    if (filter.by !== undefined) conditions.push(eq(labkitEvents.attribution_id, filter.by));
-    if (filter.operation !== undefined)
-      conditions.push(eq(labkitEvents.operation, filter.operation));
-    // Subject *or* minted. "What happened to this record" has to include the
-    // act that brought it into existence, and for most verbs that act names
-    // something else as its subject. `arrayContains` is the `@>` this needs, so
-    // the GIN index on `created` is still the one doing the work.
-    if (filter.touching !== undefined) {
-      const touching = filter.touching;
-      const clause = or(
-        eq(labkitEvents.subject, touching),
-        arrayContains(labkitEvents.created, [touching]),
-      );
-      if (clause) conditions.push(clause);
-    }
+  const select = (filter: EventFilter): Promise<readonly DomainEvent[]> =>
+    unwrapped(async () => {
+      const conditions = [eq(labkitEvents.tenant_id, tenantId)];
+      if (filter.since !== undefined) conditions.push(gt(labkitEvents.seq, filter.since));
+      if (filter.by !== undefined) conditions.push(eq(labkitEvents.attribution_id, filter.by));
+      if (filter.operation !== undefined)
+        conditions.push(eq(labkitEvents.operation, filter.operation));
+      // Subject *or* minted. "What happened to this record" has to include the
+      // act that brought it into existence, and for most verbs that act names
+      // something else as its subject. `arrayContains` is the `@>` this needs, so
+      // the GIN index on `created` is still the one doing the work.
+      if (filter.touching !== undefined) {
+        const touching = filter.touching;
+        const clause = or(
+          eq(labkitEvents.subject, touching),
+          arrayContains(labkitEvents.created, [touching]),
+        );
+        if (clause) conditions.push(clause);
+      }
 
-    // `$dynamic()` because the limit is optional and a drizzle builder is
-    // otherwise single-use: without it the two branches would each need their
-    // own copy of the query.
-    const query = orm
-      .select()
-      .from(labkitEvents)
-      .where(and(...conditions))
-      .orderBy(asc(labkitEvents.seq))
-      .$dynamic();
-    const rows = await (filter.limit === undefined ? query : query.limit(filter.limit));
-    return rows.map(toEvent);
-  };
+      // `$dynamic()` because the limit is optional and a drizzle builder is
+      // otherwise single-use: without it the two branches would each need their
+      // own copy of the query.
+      const query = orm
+        .select()
+        .from(labkitEvents)
+        .where(and(...conditions))
+        .orderBy(asc(labkitEvents.seq))
+        .$dynamic();
+      const rows = await (filter.limit === undefined ? query : query.limit(filter.limit));
+      return rows.map(toEvent);
+    });
 
   return {
-    async record(event) {
-      await orm.insert(labkitEvents).values({
-        tenant_id: tenantId,
-        at: event.at,
-        operation: event.operation,
-        subject: event.subject,
-        // Copied: `DomainEvent.created` is `readonly string[]` and drizzle's
-        // insert type is not.
-        created: [...(event.created ?? [])],
-        attribution_label: event.attribution.attribution_label,
-        attribution_id: event.attribution.attribution_id,
-        git_hash: event.attribution.git_hash,
-        // `jsonb` takes the value, not a string: the driver serialises it.
-        // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
-        // payload is the classic way that goes wrong.
-        detail: event.detail ?? null,
-      });
-    },
+    record: (event) =>
+      unwrapped(async () => {
+        await orm.insert(labkitEvents).values({
+          tenant_id: tenantId,
+          at: event.at,
+          operation: event.operation,
+          subject: event.subject,
+          // Copied: `DomainEvent.created` is `readonly string[]` and drizzle's
+          // insert type is not.
+          created: [...(event.created ?? [])],
+          attribution_label: event.attribution.attribution_label,
+          attribution_id: event.attribution.attribution_id,
+          git_hash: event.attribution.git_hash,
+          // `jsonb` takes the value, not a string: the driver serialises it.
+          // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
+          // payload is the classic way that goes wrong.
+          detail: event.detail ?? null,
+        });
+      }),
     all: () => select({}),
     select,
   };

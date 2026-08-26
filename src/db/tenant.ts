@@ -8,7 +8,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { ormOver } from "./orm";
+import { ormOver, unwrapped } from "./orm";
 import { provisionTenantGraph } from "./provisioning";
 import { tenants } from "./schema";
 import type { LabKitDB } from "./backend";
@@ -37,14 +37,16 @@ export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promi
   const orm = ormOver(db);
   const columns = { id: tenants.id, graph_name: tenants.graph_name };
 
-  const inserted = await orm
-    .insert(tenants)
-    .values({ slug, display_name: slug })
-    .onConflictDoNothing({ target: tenants.slug })
-    .returning(columns);
-
-  const row =
-    inserted[0] ?? (await orm.select(columns).from(tenants).where(eq(tenants.slug, slug)))[0];
+  const row = await unwrapped(async () => {
+    const inserted = await orm
+      .insert(tenants)
+      .values({ slug, display_name: slug })
+      .onConflictDoNothing({ target: tenants.slug })
+      .returning(columns);
+    return (
+      inserted[0] ?? (await orm.select(columns).from(tenants).where(eq(tenants.slug, slug)))[0]
+    );
+  });
   if (!row) throw new Error(`tenant "${slug}" not found after insert-or-fetch race`);
 
   await provisionTenantGraph(db, row.id, row.graph_name);
