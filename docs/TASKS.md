@@ -33,17 +33,6 @@ Each is small and none is blocking.
   offers no hook, so it is convention, and forgetting it leaks bound parameters
   into an error message that reaches an MCP client. Either a `check:` script or
   a reason it does not need one.
-- **A real login-role boundary works and is unbuilt.** Probed end to end
-  2026-08-27 against `docker/postgres`, which preloads AGE: a plain LOGIN role
-  that never issues `LOAD` resolves `agtype`, reads through Cypher, and
-  **writes** — `createNode` minted a natural id and `createEdge` connected two
-  nodes. It is refused `LOAD` (42501, and never needs it) and refused
-  `SET ROLE postgres` (42501), which is the difference that matters: the
-  step-down we ship today is a safety boundary precisely because a session can
-  `RESET ROLE` back to superuser, and a login role cannot. Both halves are now
-  measured; what is unbuilt is the seam. It is per-backend — PGlite has no
-  preload and one superuser session, so it keeps the step-down — which is the
-  design question to answer before writing any of it. See `src/db/scoped.ts`.
 - **`LABKIT_HOME` naming a path that does not exist is manufactured, not
   refused.** `src/db/backend.ts`'s `mkdirSync(lockDir, { recursive: true })`
   creates the whole path, so a typo yields a fresh empty record rather than an
@@ -143,3 +132,22 @@ Here so nobody re-discovers them as gaps.
   and no source obligation requires it. `Decision.decided_at` is record time.
 - **An instant on `EvidenceUnit`.** Would let `whatWasKnown()` split `open` into
   worked-on and untouched. Nothing has needed it.
+
+### Deferred until multi-tenancy is real
+
+Built or measured, and parked. The trigger for all of it is the same: a second
+party can reach the database — `LABKIT_DB_URL` pointing at a shared Postgres
+holding more than one tenant, or anyone but the operator issuing queries.
+
+- **A login role is a real security boundary, and works.** Measured 2026-08-27
+  against `docker/postgres`, which preloads AGE: a plain LOGIN role that never
+  issues `LOAD` reads *and writes* through Cypher, and is refused
+  `SET ROLE postgres` (42501). That refusal is the point — the `SET ROLE`
+  step-down we ship today can `RESET ROLE` back to superuser, so it stops a
+  query that forgot its tenant filter and not a caller who means harm.
+  Nothing is exposed by leaving it: LabKit runs one tenant per process on the
+  operator's own machine, where the superuser session is inside the process
+  that would be the attacker. It is also per-backend — PGlite has no preload
+  and one superuser session, so it keeps the step-down — and designing a seam
+  where one backend offers a stronger boundary than the other is the work. See
+  `src/db/scoped.ts`.
