@@ -17,6 +17,33 @@ resource "google_service_account" "ci_test" {
   account_id   = "${var.project_id}-ci-test"
   display_name = "LabKit PR test runner"
   description  = "Runs the gate on pull requests. Deliberately cannot do anything else."
+
+  # **Without this the first apply fails**, and it did:
+  #
+  #   Error creating service account: googleapi: Error 403:
+  #   Permission iam.serviceAccounts.create
+  #
+  # on an account that holds roles/owner on the project. Nothing here referenced
+  # `google_project_service.ci`, so Terraform had no reason to order the two and
+  # created the service account in parallel with enabling `iam.googleapis.com`.
+  # The trigger in triggers.tf already declared the dependency; this did not,
+  # which is the sort of asymmetry that only shows up on a genuinely empty
+  # project.
+  depends_on = [time_sleep.apis_settle]
+}
+
+# **`depends_on` on the API is necessary and not sufficient**, which is why this
+# exists rather than a direct dependency on `google_project_service.ci`.
+# Enabling a Google API returns before the enablement is usable: the call
+# succeeds, and an IAM write moments later still 403s. Terraform has no way to
+# wait for eventual consistency, so the wait is explicit.
+#
+# Thirty seconds is a guess sized to the one failure observed, not a measured
+# figure. It costs half a minute on a first apply and nothing on any later one,
+# since the resource is only created once.
+resource "time_sleep" "apis_settle" {
+  depends_on      = [google_project_service.ci]
+  create_duration = "30s"
 }
 
 # The one role, and it is not optional. A build service account with no roles at

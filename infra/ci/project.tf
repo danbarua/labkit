@@ -5,6 +5,12 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.45"
     }
+    # For the one `time_sleep` that absorbs API-enablement propagation --
+    # see infra/ci/service_accounts.tf.
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.13"
+    }
   }
 }
 

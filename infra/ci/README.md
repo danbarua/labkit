@@ -40,6 +40,30 @@ terraform plan     # read it
 terraform apply
 ```
 
+**The active `gcloud config` project does not decide where anything goes.**
+`providers.tf` pins the project to `var.project_id`, so an apply run with some
+other project selected still creates everything in `labkit-build`. Confirmed the
+hard way on 2026-08-26, when an apply under the wrong config was assumed to have
+put resources in the wrong project and had not.
+
+What *is* taken from your environment is the credential: Application Default
+Credentials, and its **quota project**, which is a third thing again and set by
+`gcloud auth application-default set-quota-project`.
+
+### If a first apply 403s on the service account
+
+```
+Error creating service account: googleapi: Error 403:
+Permission iam.serviceAccounts.create
+```
+
+on an account holding `roles/owner`. This was a race — the apply enabled
+`iam.googleapis.com` and created the service account in parallel, and enabling a
+Google API returns before the enablement is usable. `service_accounts.tf` now
+waits (`time_sleep.apis_settle`), so it should not recur; **re-running
+`terraform apply` is the fix if it does**, since the project and APIs are
+already in state and a second run finds them settled.
+
 ## What runs, and what does not
 
 `cloudbuild.test.yaml` runs `bun run check` and `bun run test:pg`, in one
