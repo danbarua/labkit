@@ -1,7 +1,8 @@
-# 049: the wrap fires on a push
+# 049: a push gate, a probe, and an outline
 
-**Session wrap, 2026-08-26, on `fix/wrap-on-push`.** Short — one gate and its
-test.
+**Session wrap, 2026-08-26/27, on `fix/wrap-on-push` then
+`docs/wrap-entries-recovered`.** Renamed — it began as one gate and its test,
+and the gate's first firing turned up work that outgrew the title.
 
 Merged as **PR #39** (`ffe1fb2`). The first entry written under the rule it
 describes, and — see Open — the first eaten by the window it predicted. Restored
@@ -10,7 +11,8 @@ onto `main` afterwards, along with 048.
 ## Goal
 
 Dan, on watching a wrap commit threaten to become PR #39: make the hook fire on
-a push rather than on every commit.
+a push rather than on every commit. Then, once it fired and lost two entries to
+a squash: a status review, and the four items it produced.
 
 ## Changed
 
@@ -25,6 +27,24 @@ gains one gate; SKILL.md's Notes record it.
 **`82342ed`** (PR #40) — restores 048 *and* this entry onto `main`, and adds the
 merge race to `docs/TASKS.md`. Both had been pushed to branches whose pull
 requests were already merged; see Open.
+
+**`dc07f40`** — four things Dan asked for after the review:
+
+- **`CLAUDE.md` gets an outline.** 1,606 lines and no header below `##`; the
+  longest run of prose with nothing to skim by was **175 lines**, now 76.
+  Thirty-eight headers, no text moved and nothing deleted — deliberately, so
+  there is something to read the file against before deciding what to cull.
+  `## Commands` was the worst of it: 364 lines covering the command table, the
+  binary's leak, the CLI, the MCP server, shell traps, CI, the check sweep and
+  biome, under one word.
+- **The login-role boundary is measured, not deferred** — see Verified.
+  `src/db/scoped.ts` carries the result with its date.
+- **`docs/mcp-server/` deleted**, 184 lines. Its status table recorded the
+  agent-facing write contract as not done against 18 shipped write tools, and
+  the suite ceiling as unresolved after it was re-measured to zero. The two
+  ideas worth keeping went into `docs/TASKS.md` first.
+- **The wrap race moves to a `## Tooling, not product` section.** Dan: `/wrap`
+  is an annoyance that has been necessary, and is not something we ship.
 
 **`6797e54`** — moves the stale-document finding below into `docs/TASKS.md`. It
 had been written into the Next section of this entry and nowhere else, which is
@@ -52,9 +72,38 @@ Four states, run rather than reasoned about:
 `bun run check` — all 17 pass, twice: at `457bf9d` and again at `82342ed`
 (55.8s for the suite).
 
+**The login-role probe, 2026-08-27, and the answer is yes.** Against
+`docker/postgres`, which runs `postgres -c shared_preload_libraries=age`, a
+plain LOGIN role that never issues `LOAD`:
+
+| | result |
+| --- | --- |
+| `agtype` resolves | works |
+| Cypher read | works |
+| **Cypher write — `createNode`** | works, minted a natural id |
+| **Cypher write — `createEdge`** | works, connected two nodes |
+| `LOAD 'age'` | refused, 42501 — and never needed |
+| `SET ROLE postgres` | **refused, 42501** |
+
+The write half had never been run; the read half had. That last row is the
+whole difference from the step-down we ship, whose session can `RESET ROLE`
+back to superuser — a safety boundary rather than a security one. What is
+unbuilt is the seam, and it is per-backend: PGlite has no preload and exactly
+one superuser session, so it keeps the step-down.
+
+The probe was written, run, and deleted, along with its database and role.
+
 **The orphaning was found by comparison, not by any check.** `git merge-base
 --is-ancestor` against `origin/main` is what showed both entries missing; the
 merge reported success and nothing else disagreed with it.
+
+**A silenced stderr cost a commit its contents.** `git add … docs/mcp-server`
+was run with `2>/dev/null` after the directory had already been removed, so the
+pathspec error was invisible and `git add` aborted having staged nothing. The
+commit carried the deletion alone while its message described four changes.
+Caught by reading `git show --stat` rather than trusting the exit code, and
+amended. The repo's own header has this as a rule; it was broken by the person
+applying it.
 
 **The first probe proved nothing, twice over**, and both failures are worth
 knowing before writing another. An empty `--allow-empty` commit tripped the
@@ -95,23 +144,15 @@ rather than to the branch. Queued in `docs/TASKS.md`; neither is built.
 
 PR #40 awaits review.
 
-A status review at the end of this session found two plan documents worth
-acting on. Both are now reflected in `docs/TASKS.md` — the second as an item,
-the first by having nothing left to add:
+Everything the review produced is now in `docs/TASKS.md` or done. What it left
+for next time:
 
-- **The migration-and-image plan is fully implemented** — the role and grants
-  are in the hand-written migration, `pgRole(...).existing()` keeps the
-  generated one generated, `docker/postgres/` owns the image. Its only residue,
-  the login-role probe, is already in `docs/TASKS.md`.
-- **`docs/mcp-server/001_...` is stale in its status table**, and is queued for
-  delete-or-date — it records the
-  agent-facing write contract as not done against 34 shipped tools, 18 of them
-  writes, and the suite-ceiling problem as unresolved after it was re-measured
-  to zero failures. It is referenced by nothing and sits outside the three
-  exempt dated-record directories. Two live ideas in it are tracked nowhere
-  and would be lost with the file: dogfooding LabKit on its own open questions,
-  and an orientation surface for an agent that does not yet know an identifier
-  to ask about. Dan's call.
+- **`## Commands` in `CLAUDE.md` is not about commands** — most of it is
+  architecture and hard-won traps. It probably wants splitting rather than
+  trimming, and the outline is what made that visible.
+- **The document blocks in `## What this is` are split in two** by the section
+  on working alongside another session. Left alone: moving prose is culling,
+  and the outline came first on purpose.
 
 Then `docs/TASKS.md`'s documents group: the CLAUDE.md stale-prose sweep, and
 `docs/persistence-spikes.md` becoming `docs/persistence.md`.
