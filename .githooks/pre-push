@@ -37,9 +37,13 @@ die() {
 # Read the refs being pushed. Only branches are checked: a tag or a deletion
 # carries no pull request.
 branches=()
-while read -r local_ref local_sha _remote_ref _remote_sha; do
-  if [ -z "${local_ref:-}" ]; then continue; fi
-  case "$local_ref" in
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  if [ -z "${remote_ref:-}" ]; then continue; fi
+  # Keyed on the REMOTE ref, not the local one. `git push origin
+  # HEAD:refs/heads/foo` sends a local ref of `HEAD` — or of a bare sha — while
+  # writing `foo` on the remote, which is the name the pull request has. Reading
+  # the local side let that form skip the check completely.
+  case "$remote_ref" in
     refs/heads/*) ;;
     *) continue ;;
   esac
@@ -51,7 +55,7 @@ while read -r local_ref local_sha _remote_ref _remote_sha; do
   if [ "${local_sha:-}" = "0000000000000000000000000000000000000000" ]; then
     continue
   fi
-  branches+=("${local_ref#refs/heads/}")
+  branches+=("${remote_ref#refs/heads/}")
 done
 
 # Not `[ ... ] && exit 0`: under `set -e` a false test makes the whole `&&`

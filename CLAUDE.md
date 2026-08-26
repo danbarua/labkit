@@ -169,11 +169,14 @@ Two more things a worktree will not have, because they are untracked:
   repo has already been bitten by. `git push --no-verify` is the way out and
   every refusal names it.
 
-  Its first version **passed every test including the one that had to fail**:
-  it treated all-zeroes on the *remote* side as a deletion, when that means "new
-  branch there", so the branch it exists to refuse was skipped before `gh` was
-  ever asked. Found by running it against a genuinely merged branch, not by
-  reading it.
+  **Two bugs, both found by running it and neither by reading it**, and both had
+  the same shape — every test passed, including the one that had to fail. It
+  treated all-zeroes on the *remote* side as a deletion, when that means "new
+  branch there", so the merged branch was skipped before `gh` was ever asked.
+  And it read the branch name off the **local** ref, so
+  `git push origin HEAD:refs/heads/foo` — which writes `foo` on the remote under
+  the pull request's name — skipped the check entirely. It keys on the remote
+  ref, which is the name GitHub has. Ten states are checked.
 
   The generated SVG went with `ce97456` too; `bun run dev:dependency-cruiser`
   regenerates `docs/dependency-graph.mmd` by hand, and graphviz is no longer

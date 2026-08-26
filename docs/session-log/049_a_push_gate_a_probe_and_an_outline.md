@@ -151,13 +151,18 @@ or `CLOSED`, naming the recovery commands. It refuses rather than passes when
 `gh` is absent. Turned on by `bun run dev:install-hooks`, because hooks are not
 cloned.
 
-**Its first version passed every test it had, including the one that had to
-fail.** It read all-zeroes on the *remote* side as a deletion; that actually
-means "new branch there", so the merged branch it exists to refuse was skipped
-before `gh` was ever asked. Seven states are now checked and the negative
-control — a genuinely merged branch, and `gh` removed from `PATH` — is what
-found it. Second time in this session that a probe agreeing with me would have
-been believed.
+**Two bugs in it, both found by running it and neither by reading it, and both
+with the same tell — every test passed, including the one that had to fail.**
+It read all-zeroes on the *remote* side as a deletion, which actually means "new
+branch there", so the merged branch it exists to refuse was skipped before `gh`
+was ever asked. And it took the branch name from the **local** ref, so
+`git push origin HEAD:refs/heads/foo` — writing `foo` on the remote under the
+pull request's name — skipped the check completely; that one surfaced only
+because a `--dry-run` said `Everything up-to-date` and I went looking for a
+push that would actually reach the hook. Ten states are checked now.
+
+Third time in this session that a probe agreeing with me would have been
+believed.
 
 **The squash that ate 048 did it again, to this entry, forty-five seconds
 later.** The prediction above was written, pushed, and immediately confirmed:
