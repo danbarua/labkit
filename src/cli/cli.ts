@@ -24,6 +24,7 @@
  */
 
 import { buildProgram } from "./program";
+import { logFailedRequest } from "../request-log";
 import { runner } from "./session";
 
 /**
@@ -51,6 +52,11 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
     // Commander has already printed help or the argument error; it only needs
     // its exit code carrying out.
     if (typeof error.exitCode === "number") return error.exitCode;
+    // The request as the user gave it, on stderr, beside the error. `argv` and
+    // not the parsed options: a parse failure never produces options, and that
+    // is the case this is most useful for — "unexpected input" is exactly what
+    // you cannot reconstruct from a stack trace. See `src/request-log.ts`.
+    logFailedRequest({ surface: "cli", argv }, error);
     console.error(`labkit: ${error.message}`);
     return 1;
   }
