@@ -24,6 +24,19 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Loose ends from the DB layer work
 
+- **Walk the present-tense guard comments once.** A comment saying *guards
+  against X* / *prevents* / *ensures* is an assertion about the code and can be
+  wrong in silence; one saying *X was possible until <date>, and this stopped
+  it* names an event and cannot. 28 comments under `src/` and `scripts/` match
+  the first shape (counted 2026-08-27 — `labkit-review` said 30 and the
+  difference is not worth chasing). Most are presumably true. The question for
+  each is not *is this true* but **what would fail if it were false**, and the
+  discriminator is `labkit-review`'s: **delete the guard and run the same input
+  again — if it still fails, the guard is not what stopped it.** That is
+  PJ-009's bar 1 for earning an edge, pointed one level down. Found because
+  `check:orm-unwrapped`'s own comment claimed a protection the typechecker was
+  actually providing, and the naive test confirmed the comment.
+
 - **Drizzle v1** is release-candidate and we wait for the release. When it
   lands: `.enableRLS()` becomes `pgTable.withRLS()`, and the surfaces most
   likely to break are `src/db/migrate.ts` (it casts through private

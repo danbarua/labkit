@@ -328,7 +328,7 @@ Three things that are easy to get wrong here, all measured rather than assumed:
   later and a blanket `GRANT … ON ALL TABLES` covers what came before; each
   misses what the other catches.
 
-### Which migration holds what
+### Why the role and the grants are hand-written
 
 **Which migration holds what is decided by one rule: drizzle cannot migrate what
 it does not manage.** `drizzle/0002_natural_ids.sql` is *the* hand-written
