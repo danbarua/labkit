@@ -1,6 +1,8 @@
 # 050: a design for `labkit digest`, and the two defects it found instead
 
-**Session wrap, 2026-08-27, on `feat/digest-design`.** Not a decision record —
+**Session wrap, 2026-08-27, on `feat/digest-design` then
+`feat/digest-design-2`.** PR #44 merged; the revision after Dan's and Grok's
+review is the second branch. Not a decision record —
 the design doc is `docs/digest-design.md` and it is awaiting Dan's review.
 
 **The range is wider than this entry.** The wrap baseline still points at the
@@ -18,6 +20,9 @@ Discuss with `labkit-review`, draft a design doc for review in the morning.
 **`2cf6d6c`** — the first draft. **`ce2fad5`** — a rewrite, because
 `labkit-review` refuted its central argument. **`3c3f599`** — a recommendation
 in place of a fork, once the deciding test had been run.
+
+**`7abebe4`** (after #44 merged) — Grok's review, which refuted the *shape* of
+the recommended fix.
 
 Nothing else. No verbs, no schema, nothing shipped.
 
@@ -62,6 +67,32 @@ not hold. That turned two defensible positions into one recommendation.
 **Not run:** the `report.ts` reachability table for `GateRef`/`WorkRef`, which
 was read. Nor whether each proposed digest section is one Cypher traversal.
 
+**Grok's correction, and it would have shipped a bug.** The recommended walk
+was loosely stated as *question → cited claim → criterion → state*. The join is
+`held_to`, and the gate is not it. Built to separate them — a gate governing
+`CRIT_2` and blocked, a claim held to `CRIT_1` only:
+
+```
+$ labkit why CLM_1 --json
+  standard: [ CRIT_1 ]   unmet: [ CRIT_1 ]      ← CRIT_2 never appears
+```
+
+A survey consulting "any blocked gate on the enquiry" would demote a question
+whose answering work was never held to the failing criterion. **In the original
+§2 transcript the two coincide**, so that implementation would have passed the
+test written for it.
+
+**Standing is per claim, by citation** — nobody predicted this. `evaluate
+CRIT_1 --outcome pass` without `--citing` leaves `why` reporting `never-run`;
+adding `--citing CLM_1` flips it to `passed`.
+
+**And a simpler demonstration than the one the document opened with**, needing
+no gate, no evaluation and no re-evaluation: `analyse --held-to` a criterion
+that is never evaluated, promote, close. `why` says `never-run` and `unmet`;
+`known` says `Established`. S-3b verbatim — a prespecified check nobody ran must
+count against the finding it qualifies — with the survey as the one reader that
+ignores it. It also fixes the condition's shape: `never-run` is not `passed`.
+
 ## Open
 
 **The document's first central argument was wrong**, and the correction is the
@@ -96,6 +127,13 @@ answer ships green at a time; and `whySupported` already carrying
 `standard[].state = "failed"` is a confirming argument rather than a stray
 observation — the read side has the fact one hop from the survey, so a
 `promote()` fix would add a write-time lookup for something already in hand.
+
+**Two rounds of review each refuted something, and each refutation was
+verified here rather than accepted.** `labkit-review` took the central argument
+(§4); Grok took the shape of the fix that replaced it. The pattern worth
+carrying: both times the refuted version *had a passing demonstration behind
+it*, and in Grok's case the demonstration passed only because two objects
+coincided in the one record that was built.
 
 **Which bucket is left open on purpose.** `provisional` means "resting on work
 nobody promoted", and a promoted claim behind a blocked gate *is* promoted, so

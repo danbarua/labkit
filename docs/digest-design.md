@@ -1,13 +1,15 @@
 # `labkit digest` and the list-shaped queries — a design, for review
 
-**Draft, 2026-08-27, for Dan to review.** Nothing is built. Every claim about
+**2026-08-27. Reviewed and revised; the build order in §8 is settled.** Nothing
+is built. Every claim about
 what LabKit does today was run against a real record on that date; the
 transcripts below can be re-run in about a minute each.
 
-Input from Grok (a proposed verb set) and from `labkit-review`, who **refuted
-this document's first central argument** and supplied the two that replaced it.
-Both replacements were re-verified here rather than taken on report — §2 and §3
-are this session's transcripts, not their claims.
+Input from Grok and `labkit-review`. Two of this document's claims were refuted
+by review and replaced: `labkit-review` refuted its original central argument
+(§4), and Grok refuted the *shape* of the fix it then recommended — the join is
+`held_to`, not the gate (§2). Every replacement was re-verified here against a
+running record rather than taken on report.
 
 ---
 
@@ -80,6 +82,72 @@ review:
 > That wrong answer earns a fix, and the fix is not digest. If you spend it on
 > digest, digest becomes a workaround for a live defect — and the defect stays,
 > because something now papers over it.
+
+### What the survey must consult, pinned — it is *not* the gate
+
+**Grok's correction, and it would have caused a bug.** The recommended walk was
+loosely stated as "question → cited claim → criterion → state". Run against a
+record built to separate the two candidates:
+
+```
+GATE_1 governs CRIT_2 (throughput), protects TASK_1, and is blocked.
+CLM_1  is held to CRIT_1 (loss) only.
+
+$ labkit why CLM_1 --json
+  standard: [ CRIT_1 ]      unmet: [ CRIT_1 ]      ← CRIT_2 does not appear
+```
+
+**The join is `held_to`, not the gate.** A survey that consulted "any blocked
+gate on this enquiry" would demote a question whose answering work was never
+held to the failing criterion. In the original §2 transcript the two coincide —
+`GATE_1` protects `TASK_1`, promotion is of `CLM_1`, and they are different
+objects that happened to line up — which is exactly how this would have been
+implemented wrongly and passed its own test.
+
+**Standing is per claim, decided by citation.** A second thing the same probe
+turned up, unpredicted: an evaluation counts toward a claim's `standard` only
+when it **cites** that claim. `evaluate CRIT_1 --outcome pass` with no
+`--citing` leaves `why` reporting `state: "never-run"` and `unmet: [CRIT_1]`;
+adding `--citing CLM_1` flips it to `passed` and empties `unmet`. So the walk is
+question → answering claim → criteria it is **held to** → the state *for that
+claim*.
+
+**Current standing, never `everFailed`:**
+
+| Consult | Effect |
+| --- | --- |
+| current state of held-to criteria (`failed`/`passed`/`never-run`) | a fail stops `established`; a later pass restores it |
+| `gate.everFailed` | one historical fail permanently poisons the question |
+
+`everFailed` stays where it is, on `gateStatus`, so that a later pass does not
+read as "never failed". It is not the survey's business.
+
+### The simplest demonstration is not the one this document opened with
+
+The §2 transcript needs a gate, a task, an evaluation and a promotion. **This
+needs none of them**, and is a stronger showing of the same defect:
+
+```
+pose → pursue → observe → analyse --held-to CRIT_1 → promote → close
+                                    (CRIT_1 is never evaluated at all)
+
+$ labkit why CLM_1 --json
+  standard: [ { criterion: CRIT_1, state: "never-run" } ]   unmet: [ CRIT_1 ]
+$ labkit known
+Established
+  - does the sampler converge?
+```
+
+A prespecified check that **nobody ever ran**, and the survey calls the question
+established. No gate anywhere. That is S-3b's argument verbatim — *a
+prespecified check nobody ran must still count against the finding it
+qualifies*, which is why `QUALIFIES` is written when the analysis is recorded
+rather than when the check is evaluated — and the survey is the one reader that
+ignores it.
+
+It also settles the shape of the fix: `never-run` is not `passed`, so the
+condition cannot be "no failing check". It is "every held-to criterion has a
+passing verdict citing this claim".
 
 ### The fix: the survey, not `promote()`
 
@@ -347,19 +415,21 @@ any stored `queue_state`.
 
 ---
 
-## 8. Proposed order of work
+## 8. Build order
 
-1. **Fix §2** — `whatIsKnown()` consults check state. A ledger row and a
-   scenario; the scenario picks the bucket.
-2. **Then §3's enumeration**, and **its scenario written after §2 lands, not in
-   parallel.** The dependency runs one way and is easy to miss: fixing §2
-   requires walking question → cited claim → criterion → state *inside the read
-   surface*, so whatever produces a `GateRef` may already exist as a by-product.
-   §3's scenario can then ask the sharper question — given that the traversal
-   exists internally, what does a *researcher* still need? That may be one verb
-   rather than three. Do §3 first and the risk is designing three enumeration
-   verbs, then finding §2's fix produced the traversal underneath them.
-3. **`digest` as the composition**, argued as a convenience.
+**§2 is the next build, full stop** — CLAUDE.md's *at most one confirmed wrong
+answer ships green at a time*, and no PJ-008 row is currently `demonstrated`
+(AH, AI and AJ are `open`, which is a different state).
+
+1. **Scenario:** a promoted, closed answer whose claim is held to a currently
+   failed — or never-run — criterion. `known` must not say `established`. **The
+   scenario picks the bucket.** Handles on `known`'s prose view can ride along.
+2. **Scenario:** a researcher holds `CRIT_n` from `why` and asks what it blocks.
+   One reverse-`GOVERNS` read, its exact shape taken from the conversation.
+   **Written after §2 lands, not in parallel** — §2's fix walks question →
+   answering claim → held-to criteria inside the read surface, so part of §3 may
+   exist as a by-product, and the scenario can then ask the sharper question.
+3. **Only then `digest`**, as `{ blocked: …, untouched: …, open: known.unresolved, … }`.
 
 ### This wants a scenario, not more design
 
@@ -367,28 +437,49 @@ any stored `queue_state`.
 PJ-008 §2's corpus is for — a researcher's intent that cannot be carried out
 through research verbs alone. **Writing it as a conversation will settle whether
 the answer is one enumeration verb or three**, which no amount of design will.
-The open question in §9.3 should be answered that way rather than argued.
+The remaining open question in §9 — which bucket — should be answered that way
+rather than argued.
 
 ---
 
-## 9. Open questions for Dan
+## 9. What is settled, and the one thing that is not
 
-1. **§2 — the fix is recommended, the bucket is not.** Fixing the survey rather
-   than `promote()` is settled on evidence (§2). *Which* bucket a promoted claim
-   behind a blocked gate belongs in is a question for the scenario, and row Y
-   warns against inventing a sixth for nobody. Do you want it decided before the
-   scenario is written?
-2. **Is `digest`-as-convenience acceptable?** The attempt to earn it as a gap
-   failed (§4). If a convenience needs a stronger case here, say so and it can
-   wait behind §2 and §3, both of which stand on their own.
-3. **One enumeration verb or three?** `gate_list`, `work_list`, and something
-   answering "what does this criterion block?" — or one verb. §8 argues the
-   scenario decides this.
-4. **Should `known`'s prose view print handles?** It prints wording only —
-   `- does the new sampler converge?`, no `Q_1` — while `--json` carries them.
-   One-line fix, unrelated to the rest, and it makes the default view drillable.
+Reviewed by Dan, `labkit-review` and Grok. Four of the original questions are
+answered; the fifth is deliberately left to a scenario.
 
----
+1. **The fix goes in the survey, and `promote()` stays gate-blind.** Settled by
+   the T1/T2 transcript: a write-time refusal cannot hold a read-time property.
+2. **What the survey consults is pinned** (§2): the *current* standing of the
+   criteria the answering claim is **held to**, per claim, by citation. Not the
+   gate, not `everFailed`.
+3. **`digest` is a convenience, and ships behind §2 and §3 — never instead of
+   them.** If it shipped while `known` still says `established` over a failed
+   held-to check, `digest`'s own **Blocked** and **Established** sections would
+   disagree with each other. That alone is sufficient reason to wait.
+4. **`known`'s prose view should print handles.** Cheap, unrelated, and Grok's
+   reason is the right one: *a default view that cannot be followed is why
+   people stay in chat.*
+
+**Still open, on purpose: which bucket.** `provisional` means "resting on work
+nobody promoted", and a promoted claim behind a failed check *is* promoted, so
+widening it is a decision about what the word means. Row Y warns against
+minting a sixth for nobody. Grok's prior — do not widen `provisional`; the
+least-wrong existing home is `unresolved` while the question stays closed as
+answered, which is ugly, *and that is the point*: the scenario has to feel the
+words. A label here has to be earned by a researcher trying to act — *can I
+build on this?* — and failing.
+
+**The prior on §3 is two reads, not three**, and also for the scenario:
+
+- **The reverse of `GOVERNS`** — one read taking a `CriterionRef`, returning the
+  gates it governs and the work they protect. Named for the question it answers,
+  not for a list fashion.
+- **Planned work with nothing recorded against it** — the standup case. It may
+  fall out of the reverse walk, or it may not.
+
+Do not design `gate_list` + `work_list` + a reverse walk as a set of three up
+front. After §2's traversal exists, ask what a *researcher* still lacks as a
+handle.
 
 ## 10. What was verified, and what was not
 
