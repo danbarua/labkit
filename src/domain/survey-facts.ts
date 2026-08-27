@@ -356,3 +356,28 @@ export function standingAsOf(at: string): Leaf<{ resolved: boolean; promoted: bo
     },
   };
 }
+
+/**
+ * The anchor for "the checks this claim answers to", **for one bearing**.
+ *
+ * Called once per bearing and the results merged, which is the idiom
+ * `findingsBearing` already uses in this codebase — and it is here rather than
+ * inline because writing it inline is what keeps going wrong. AGE has no edge
+ * alternation, so a hand-written anchor names one edge, and naming only
+ * `SUPPORTS` is **silent**: a promoted negative result reports *held to no
+ * prespecified standard* while the record holds the check.
+ *
+ * That has now happened three times — twice in shipped readers, and once in the
+ * spike written to demonstrate it. The third was in an anchor written *after*
+ * the fact existed, which is why the anchor is a function now and not a
+ * template a caller fills in.
+ *
+ * Evidence recorded in an invalidated artefact is excluded: a superseded
+ * analysis's checks are not this claim's standard any more.
+ */
+export function checksAnchor(bearing: "SUPPORTS" | "CHALLENGES"): string {
+  return `MATCH (cl:Claim {natural_id: $claim})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
+       WHERE out.invalidated IS NULL OR out.invalidated = false
+       MATCH (crit:Criterion)-[:QUALIFIES]->(u)`;
+}

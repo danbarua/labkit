@@ -34,6 +34,7 @@ import type {
   ConflictSide,
   ConflictVerdict,
   AnalysisRef,
+  CheckStatus,
   EnquiryStatus,
   CriterionRef,
   BlockedWork,
@@ -65,6 +66,7 @@ import {
   answeringClaim,
   checkStatus,
   checkStatusForGate,
+  checksAnchor,
   checksMet,
   standingAsOf,
 } from "./survey-facts";
@@ -1403,18 +1405,21 @@ export class ReadSurface extends SessionCore {
     // claim answer to" is one definition. Selected by handle: two analyses in
     // one enquiry concluding the same sentence are two claims, and matching by
     // wording made this verb and `whatIsKnown` contradict each other.
-    const { cypher: standardCypher, decoders: standardDecoders } = compose(
-      `MATCH (cl:Claim {natural_id: $claim})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL OR out.invalidated = false
-       MATCH (crit:Criterion)-[:QUALIFIES]->(u)`,
-      checkStatus,
-      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
-    );
-    const standardRows = (await this.graph.query(standardCypher, standardDecoders, {
-      claim,
-    })) as unknown as Row[];
-    const standard = [...per(checkStatus, standardRows).values()];
+    // Both bearings, merged — the idiom `findingsBearing` uses, and the reason
+    // it is a loop rather than two hand-written anchors is that the one-sided
+    // version is silent: a promoted negative result reported "held to no
+    // prespecified standard" while the record held the check.
+    const byCriterion = new Map<CriterionRef, CheckStatus>();
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const { cypher, decoders } = compose(checksAnchor(bearing), checkStatus, {
+        crit: vertexProps<{ natural_id: string; proposition: string }>(),
+      });
+      const rows = (await this.graph.query(cypher, decoders, { claim })) as unknown as Row[];
+      for (const [criterion, check] of per(checkStatus, rows)) {
+        byCriterion.set(ref("criterion", criterion), check);
+      }
+    }
+    const standard = [...byCriterion.values()];
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
     // and the two must agree, since in S-3 they are the same checks.
