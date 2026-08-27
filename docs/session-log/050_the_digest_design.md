@@ -16,7 +16,8 @@ Discuss with `labkit-review`, draft a design doc for review in the morning.
 ## Changed
 
 **`2cf6d6c`** — the first draft. **`ce2fad5`** — a rewrite, because
-`labkit-review` refuted its central argument.
+`labkit-review` refuted its central argument. **`3c3f599`** — a recommendation
+in place of a fork, once the deciding test had been run.
 
 Nothing else. No verbs, no schema, nothing shipped.
 
@@ -45,6 +46,18 @@ not occur in its body.
 All five read commands taking a handle then refuse it: `affects`, `criteria`,
 `gate`, `design`, `contract`. `affects CRIT_1` gives `no artefact named
 "CRIT_1"`.
+
+**The test that chose the fix.** `labkit-review` argued a write-time refusal
+cannot hold a read-time property. Run rather than accepted:
+
+| | gate | `known` | |
+| --- | --- | --- | --- |
+| T1 promote while satisfied | `satisfied` | Established | correct — a refusing `promote` allows it |
+| T2 re-evaluate the criterion `fail` | `blocked` | **Established** | wrong, and the refusal caught nothing |
+
+So refusing at promote-time catches only the case where the gate was already
+blocked at that instant, and creates the appearance of an invariant that does
+not hold. That turned two defensible positions into one recommendation.
 
 **Not run:** the `report.ts` reachability table for `GateRef`/`WorkRef`, which
 was read. Nor whether each proposed digest section is one Cypher traversal.
@@ -77,11 +90,25 @@ researcher's intent that cannot be carried out through research verbs alone gets
 settled, and writing the second as a conversation is what will decide whether
 the answer is one enumeration verb or three.
 
-**Unanswered, asked of `labkit-review` and not yet returned:** whether one of
-the two §2 fixes is clearly right on existing evidence; whether §2's scenario
-must precede §3's; and whether `whySupported` already carrying
-`standard[].state = "failed"` argues for fixing the bucketing rather than
-`promote()`.
+**All three questions to `labkit-review` came back and are folded in.** The
+fix is the survey; §2 precedes §3, by the rule that at most one confirmed wrong
+answer ships green at a time; and `whySupported` already carrying
+`standard[].state = "failed"` is a confirming argument rather than a stray
+observation — the read side has the fact one hop from the survey, so a
+`promote()` fix would add a write-time lookup for something already in hand.
+
+**Which bucket is left open on purpose.** `provisional` means "resting on work
+nobody promoted", and a promoted claim behind a blocked gate *is* promoted, so
+widening it is a decision about what the word means; row Y is the standing
+warning against inventing a sixth for nobody. The scenario picks it.
+
+**A correction sent back the other way.** `labkit-review` reported the ledger as
+having no open rows. It has three — AH, AI and AJ, added yesterday and therefore
+postdating the audit they were recalling. Their conclusion survived, because the
+rule turns on `demonstrated` and none of the three is, but the doc now names the
+row letters rather than asserting "nothing is open", so a reader who greps the
+ledger does not meet a contradiction. Second time today that a peer's conclusion
+was right and its stated evidence was not; both were worth checking.
 
 ## Next
 
