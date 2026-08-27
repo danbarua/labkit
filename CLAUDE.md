@@ -305,14 +305,30 @@ Six labels, one per section that file had grown:
 | `tooling` | scaffolding; necessary, and nothing there ships |
 | `not-doing` | decided against, and **closed as not planned** — searchable so nobody rediscovers it as a gap, without sitting in the open list |
 | `deferred` | understood and parked; the body says what would unpark it |
+| `open question` | a decision for the repo owner, not a defect to repair |
+| `domain model` | a claim about what the model must represent |
 
 A `deferred` issue names the issue that would unpark it rather than carrying its
 own copy of the condition — today that is the multi-tenancy issue, which exists
 for no other purpose.
 
-**PJ-008 §3's index is still authoritative on what the model knows**, and
-standing facts and gates are still in this file. An issue is a piece of work, not
-a verdict about the domain.
+**An `open question` issue follows one shape**, borrowed from `agent-bus`: what
+it blocks and who owns it, what is **settled**, what is **undecided and what
+that decides**, a table of candidates, and two or three things worth weighing.
+It exists so a decision can be described precisely without being taken — which
+is a different job from a task, and mixing the two is how a decision gets made
+by whoever happened to implement first.
+
+**`domain model` + `open question` means defined and tracked, not ready to
+work on.** Those are PJ-008 §3's open rows — AH, AI and AJ — which had been
+carried forward from one session log to the next, *"which feels like tracking
+and is closer to laundering, since every restatement sits in a document the next
+reader will not open"*.
+
+**PJ-008 §3's index is still authoritative on what the model knows.** The issue
+tracks the work; the ledger row holds the evidence, the owner and the refutation
+condition. An issue is a piece of work, not a verdict about the domain, and the
+two must not both carry a status.
 
 ### The dated records
 
