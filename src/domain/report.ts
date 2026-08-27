@@ -777,6 +777,35 @@ export interface ReplacementClaim {
 export interface UnmetCheck {
   criterion: CriterionRef;
   requires: string;
+  /**
+   * What this unmet check is holding up, if anything.
+   *
+   * **The report answers "what does this block?" so that nothing has to ask
+   * it.** A researcher reaching a criterion does so through here — `claims` to
+   * a claim, `why` to an unmet check — and the obvious next question had no
+   * verb: `GOVERNS` is written from criterion to gate, walked only from the
+   * gate, and the gate's `consequence` exists for no other purpose than to
+   * answer this. The record knew and could not say.
+   *
+   * Embedded rather than given its own verb, which was Dan's question and is
+   * the better answer for the drill-down case: a reader looking at a claim
+   * wants the consequence *here*, not a handle to go and look up. It does not
+   * serve the standup case — "show me everything blocked" still needs an
+   * enumeration, because there is no claim to start from.
+   *
+   * Empty is an answer: a criterion can qualify a finding and gate no work at
+   * all, which is why `--gate` is optional on `labkit evaluate`.
+   */
+  blocks: BlockedWork[];
+}
+
+/** A gate an unmet check is holding, and the work that gate protects. */
+export interface BlockedWork {
+  gate: GateRef;
+  /** What not passing means, in the words of whoever declared the gate. */
+  consequence: string;
+  /** The work this gate protects. Empty where it guards nothing yet. */
+  gating: GatedWork[];
 }
 
 /**

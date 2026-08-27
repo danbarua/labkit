@@ -38,6 +38,7 @@ import type {
   EnquiryStatus,
   EvaluationRecord,
   CriterionRef,
+  BlockedWork,
   DecisionRef,
   EvidenceRef,
   GateRef,
@@ -1024,9 +1025,17 @@ export class ReadSurface extends SessionCore {
     const checks = this.checksFrom(rows);
     // Flattened in the same order the checks were assembled in.
     const evaluations = checks.flatMap((c) => c.evaluations);
-    const unmet = checks
-      .filter((c) => c.state !== "passed")
-      .map((c) => ({ criterion: c.criterion, requires: c.proposition }));
+    const unmetChecks = checks.filter((c) => c.state !== "passed");
+    // The same computation as `whySupported`'s, and not redundant here even
+    // though the caller is holding this gate: a criterion may govern several,
+    // so an unmet check on GATE_1 can be holding GATE_7 as well, and that is
+    // the blast radius a reader of a blocked gate most wants.
+    const blocking = await this.blockedBy(unmetChecks.map((c) => c.criterion));
+    const unmet = unmetChecks.map((c) => ({
+      criterion: c.criterion,
+      requires: c.proposition,
+      blocks: blocking.get(c.criterion) ?? [],
+    }));
 
     // Order matters. Absence is checked before satisfaction so a gate nobody
     // evaluated can never fall through to "satisfied" (S-17); failure is
@@ -1071,6 +1080,56 @@ export class ReadSurface extends SessionCore {
       })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
+  }
+
+  /**
+   * What each of these criteria is holding up.
+   *
+   * Walks `GOVERNS` **from the criterion**, which nothing did before — it was
+   * written by `stateCriterion`/`declareGate` and read only from the gate's
+   * end, so a caller holding a criterion had no way back. See
+   * {@link UnmetCheck.blocks}.
+   *
+   * `OPTIONAL MATCH` on the protected work, because a gate that guards nothing
+   * yet is a real state and must not drop the gate from the answer.
+   */
+  private async blockedBy(
+    criteria: readonly CriterionRef[],
+  ): Promise<Map<CriterionRef, BlockedWork[]>> {
+    const out = new Map<CriterionRef, BlockedWork[]>();
+    if (criteria.length === 0) return out;
+    const rows = await this.graph.query(
+      `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate)
+       WHERE c.natural_id IN $ids
+       OPTIONAL MATCH (g)-[:GATES]->(w)
+       RETURN c, g, w`,
+      {
+        c: vertexProps<Identified>(),
+        g: vertexProps<{ consequence?: string } & Identified>(),
+        w: optional(vertexProps<{ objective?: string } & Identified>()),
+      },
+      { ids: [...criteria] },
+    );
+    for (const row of rows) {
+      // `ref()` rather than the raw id: the key is a handle, and
+      // `check:no-stringly-typed` is right that a `Map<string, …>` here says
+      // nothing about what the string is. It refuses a mismatched prefix too.
+      const criterion = ref("criterion", row.c.natural_id);
+      const list = out.get(criterion) ?? [];
+      const existing = list.find((b) => b.gate === row.g.natural_id);
+      const work = row.w
+        ? [{ work: ref("work", row.w.natural_id), objective: row.w.objective ?? "" }]
+        : [];
+      if (existing) existing.gating.push(...work);
+      else
+        list.push({
+          gate: ref("gate", row.g.natural_id),
+          consequence: row.g.consequence ?? "",
+          gating: work,
+        });
+      out.set(criterion, list);
+    }
+    return out;
   }
 
   /**
@@ -1577,9 +1636,16 @@ export class ReadSurface extends SessionCore {
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
     // and the two must agree, since in S-3 they are the same checks.
-    const unmet = standard
-      .filter((c) => c.state !== "passed")
-      .map((c) => ({ criterion: c.criterion, requires: c.proposition }));
+    const unmetChecks = standard.filter((c) => c.state !== "passed");
+    // One query for every unmet check rather than one per check: the number of
+    // prespecified conditions on a claim is small, but a round trip each is the
+    // shape that turns a report into a profiler finding.
+    const blocking = await this.blockedBy(unmetChecks.map((c) => c.criterion));
+    const unmet = unmetChecks.map((c) => ({
+      criterion: c.criterion,
+      requires: c.proposition,
+      blocks: blocking.get(c.criterion) ?? [],
+    }));
 
     // A withdrawn interpretation is not supported, however much evidence once
     // carried it. `support` stays populated deliberately: the findings are

@@ -164,12 +164,32 @@ const bearingFinding = z.strictObject({
   analysis: ref("analysis"),
 });
 
+const gatedWork = z.strictObject({ work: ref("work"), objective: z.string() });
+const blockedWork = z.strictObject({
+  gate: ref("gate"),
+  consequence: z.string(),
+  gating: z.array(gatedWork),
+});
+
 const unmetCheck = z.strictObject({
   criterion: ref("criterion"),
   requires: z.string(),
+  blocks: z.array(blockedWork),
 });
-const condition = unmetCheck;
-const gatedWork = z.strictObject({ work: ref("work"), objective: z.string() });
+
+/**
+ * `Condition` and `UnmetCheck` are **separate interfaces that shared a shape**,
+ * and this was `const condition = unmetCheck` until `UnmetCheck` gained
+ * `blocks`. The alias was never a claim that they are the same thing — a
+ * condition is what an amendment replaced, and carries no consequences —
+ * so they diverge here rather than one being widened to fit the other.
+ *
+ * The `Exact<>` assertions below are what caught it; nothing else would have.
+ */
+const condition = z.strictObject({
+  criterion: ref("criterion"),
+  requires: z.string(),
+});
 
 const checkStatus = z.strictObject({
   criterion: ref("criterion"),

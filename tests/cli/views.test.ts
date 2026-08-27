@@ -156,7 +156,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
   expect(withdrawn).toContain("moves by ~3 steps");
 });
 
-test("identically worded questions are distinguishable in the survey", () => {
+test("every question in the survey carries its handle", () => {
   const survey: KnowledgeSurvey = {
     established: [{ question: ref("question", "Q_1"), asks: "does it converge?" }],
     provisional: [],
@@ -165,10 +165,13 @@ test("identically worded questions are distinguishable in the survey", () => {
     untested: [{ question: ref("question", "Q_3"), asks: "does depth matter?" }],
   };
   const out = renderKnown(survey, PLAIN);
-  expect(out).toContain("does it converge?  [Q_1]");
-  expect(out).toContain("does it converge?  [Q_2]");
-  // The unambiguous one is not cluttered with an id.
-  expect(out).toMatch(/- does depth matter\?$/);
+  // Two questions may share wording, so the handle is what tells them apart.
+  expect(out).toContain("does it converge?  (Q_1)");
+  expect(out).toContain("does it converge?  (Q_2)");
+  // And the unambiguous one carries its handle too, because a handle is not a
+  // disambiguator — it is what the next command takes. A row without one can
+  // be read and not acted on.
+  expect(out).toContain("does depth matter?  (Q_3)");
 });
 
 test("a gate that failed and was re-checked does not read as though it never failed", () => {
@@ -471,7 +474,9 @@ const gateFixture: GateStatus = {
       evaluations: [],
     },
   ],
-  unmet: [{ criterion: ref("criterion", "CRIT_1"), requires: "the effect holds at n>=20" }],
+  unmet: [
+    { criterion: ref("criterion", "CRIT_1"), requires: "the effect holds at n>=20", blocks: [] },
+  ],
   evaluations: [],
   gating: [],
   everFailed: true,
