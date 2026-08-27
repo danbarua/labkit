@@ -245,15 +245,56 @@ lab evaluate "$criterion" --gate "$gate" --value 'n=24 at every depth' --outcome
 
 lab gate "$gate"
 
+chapter "The rest of the programme" \
+  "One question in one state says nothing about the partition. A real" \
+  "programme has several at once, at different stages -- so here are four" \
+  "more, each stopped at a different point."
+
+say "Posed and nothing else. Nobody has pursued it:"
+
+lab pose 'does depth interact with the schedule?'
+
+say "Pursued and measured, with nothing concluded yet:"
+
+lab open 'is the effect stable across seeds?'
+seeds=$(handle LOE "$LAST")
+lab observe "$seeds" --name 'seed-sweep-raw' --finding 'convergence step counts over 20 seeds'
+
+say "Concluded and closed -- but nobody promoted the finding, so the answer" \
+    "rests on scratch:"
+
+lab open 'does it hold on the held-out split?'
+holdout=$(handle LOE "$LAST")
+lab observe "$holdout" --name 'holdout-raw' --finding 'convergence on the held-out split'
+holdout_obs=$(handle ART "$LAST")
+lab analyse "$holdout" \
+  --method 'paired comparison on the held-out split' \
+  --from "$holdout_obs" \
+  --concludes '{"proposition": "the effect holds on the held-out split", "finding": "converges ~2 steps earlier"}'
+holdout_claim=$(handle CLM "$(printf '%s' "$LAST" | tail -1)")
+lab close "$holdout" --answered-by "$holdout_claim"
+
+say "And one left open on purpose, with the condition that would reopen it." \
+    "That is not the same as nobody having got round to it:"
+
+lab open 'why does depth 12 behave differently?'
+anomaly=$(handle LOE "$LAST")
+lab accept "$anomaly" \
+  --because 'the confirmatory set is spent and this needs a fresh design' \
+  --until 'a data source other than the spent set' \
+  --in-light-of "$claim"
+
 chapter "Reading the record back" \
   "Everything below is derived from durable state, not replayed from a log."
 
-say "Now the same question, with the check run and passed. Nothing else about" \
-    "the record changed -- one evaluation moved it:"
+say "Five questions, five states. The buckets are the distinction that matters," \
+    "and a reader scanning for what still needs doing must not find the" \
+    "deliberately-parked one among them:"
 
 lab known
 
-say "Every command takes --json, and it is the same document an MCP client gets:"
+say "Every command takes --json, and it is the same document an MCP client" \
+    "gets. Same five buckets, and now with something in each of them:"
 
 lab --json known
 
