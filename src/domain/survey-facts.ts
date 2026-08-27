@@ -44,75 +44,75 @@ export const byCriterion: (row: Row) => string | null = (row) => id(row, "crit")
 export const byEvaluation: (row: Row) => string | null = (row) => id(row, "ev");
 
 /**
- * The claim a closing decision rests on, **whichever way its evidence bears**.
+ * The claim a closing decision rests on, **for one bearing**.
  *
- * The one place the `SUPPORTS`/`CHALLENGES` pair is spelled, and the reason
- * this file exists. AGE has no edge alternation — `[:SUPPORTS|CHALLENGES]` is a
- * syntax error — so reaching a claim needs two clauses and a coalesce, and
- * writing only the first is a silent hole rather than an error: the row is
- * simply absent and the reader concludes nothing is wrong.
+ * AGE has no edge alternation — `[:SUPPORTS|CHALLENGES]` is a syntax error — so
+ * a claim is reached one edge at a time. The two ways used to be two clauses in
+ * one query binding two column names, and that is exactly how the last defect
+ * survived: `checksOf` collected both names and the **grain** read one, so a
+ * criterion arriving down the challenged path was dropped. Two places knew
+ * there were two paths and only one was updated.
  *
- * A promoted **negative** result is a first-class case (S-18b), so the second
- * clause is not an edge case. It was missing from one reader and present in
- * another, and the two agreed while both were blind — quieter than a
- * contradiction and harder to find.
+ * So the bearing is a parameter and the caller runs both, merging the results.
+ * Downstream there is one `answering` and one `crit`, and nothing after this
+ * function can be written to know about only half of it. `WITH coalesce(…)` was
+ * measured and does work on AGE, but it collapses the query — every later
+ * clause would have to be projected forward by hand, which a composable
+ * system cannot ask of its callers.
+ *
+ * A promoted **negative** result is a first-class case (S-18b): this is not an
+ * edge condition, it is half the domain.
  */
-export const answeringClaim: Leaf<ClaimNode | null> = {
-  name: "answeringClaim",
-  grain: byQuestion,
-  clause: `OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(q)
+export function answeringClaimBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<ClaimNode | null> {
+  return {
+    name: "answeringClaim",
+    grain: byQuestion,
+    clause: `OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(q)
            OPTIONAL MATCH (closing)-[:BASED_ON]->(cited:Evidence)
-           OPTIONAL MATCH (cited)-[:SUPPORTS]->(supported:Claim)
-           OPTIONAL MATCH (cited)-[:CHALLENGES]->(challenged:Claim)`,
-  yields: {
-    cited: optional(vertexProps<Node>()),
-    supported: optional(vertexProps<ClaimNode>()),
-    challenged: optional(vertexProps<ClaimNode>()),
-  },
-  empty: () => null,
-  fold: (found, row) =>
-    found ?? (row.supported as ClaimNode | null) ?? (row.challenged as ClaimNode | null),
-};
+           OPTIONAL MATCH (cited)-[:${bearing}]->(answering:Claim)`,
+    yields: {
+      cited: optional(vertexProps<Node>()),
+      answering: optional(vertexProps<ClaimNode>()),
+    },
+    empty: () => null,
+    fold: (found, row) => found ?? (row.answering as ClaimNode | null),
+  };
+}
 
 /**
- * The evidence units a claim's checks hang off — **selected by handle**.
+ * The prespecified checks a claim answers to — **selected by handle**.
  *
- * The second place two readers disagreed. `whySupported` selected claims by
- * proposition wording narrowed to an enquiry; the survey selected by handle.
- * `recordAnalysis` mints a `Claim` per conclusion unconditionally, so two
- * analyses in one enquiry concluding the same sentence are two nodes sharing a
- * name — and the two verbs then gave contradictory answers about one claim's
- * standing. Demonstrated on 2026-08-27.
+ * The second place two readers disagreed, before this. `whySupported` selected
+ * claims by proposition wording narrowed to an enquiry; the survey selected by
+ * handle. `recordAnalysis` mints a `Claim` per conclusion unconditionally, so
+ * two analyses in one enquiry concluding the same sentence are two nodes
+ * sharing a name — and the two verbs gave contradictory answers about one
+ * claim's standing.
  *
  * Handle wins, which is S-5's argument: a claim has its own identity and
- * wording is not it. The same pair problem as above appears here too, because
- * an `EvidenceUnit` reaches its claim by whichever edge its evidence bears.
+ * wording is not it. **Findings are the opposite and deliberately so** — see
+ * `findingsBearing` in `read.ts`, where selecting by handle was tried and
+ * refuted by 13 scenarios.
  */
-export const checksOf: Leaf<Set<string>> = {
-  name: "checksOf",
-  grain: byClaim,
-  // Declares the claim fact so its clause is emitted first: these patterns read
-  // `supported` and `challenged`, which nothing else binds.
-  needs: [answeringClaim],
-  clause: `OPTIONAL MATCH (supported)<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(su:EvidenceUnit)
-           OPTIONAL MATCH (challenged)<-[:CHALLENGES]-(:Evidence)<-[:PRODUCES]-(cu:EvidenceUnit)
-           OPTIONAL MATCH (crit:Criterion)-[:QUALIFIES]->(su)
-           OPTIONAL MATCH (crit2:Criterion)-[:QUALIFIES]->(cu)`,
-  yields: {
-    su: optional(vertexProps<Node>()),
-    cu: optional(vertexProps<Node>()),
-    crit: optional(vertexProps<Node>()),
-    crit2: optional(vertexProps<Node>()),
-  },
-  empty: () => new Set<string>(),
-  fold: (criteria, row) => {
-    for (const key of ["crit", "crit2"]) {
-      const found = id(row, key);
+export function checksOfBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<Set<string>> {
+  return {
+    name: "checksOf",
+    grain: byClaim,
+    needs: [answeringClaimBearing(bearing)],
+    clause: `OPTIONAL MATCH (answering)<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+           OPTIONAL MATCH (crit:Criterion)-[:QUALIFIES]->(u)`,
+    yields: {
+      u: optional(vertexProps<Node>()),
+      crit: optional(vertexProps<Node>()),
+    },
+    empty: () => new Set<string>(),
+    fold: (criteria, row) => {
+      const found = id(row, "crit");
       if (found !== null) criteria.add(found);
-    }
-    return criteria;
-  },
-};
+      return criteria;
+    },
+  };
+}
 
 /**
  * One evaluation, folded: its verdict, and how much of its basis still stands.
@@ -250,16 +250,21 @@ export const checkStatus = checkStatusOver(anyVerdict);
 export const checkStatusForGate = checkStatusOver(verdictForGate);
 
 /** Every prespecified check on the answering claim passed. Vacuously true when there are none. */
-export const checksMet: Derived<boolean> = {
-  name: "checksMet",
-  grain: byClaim,
-  needs: [checksOf, checkState],
-  from: (needs) => {
-    const required = needs.checksOf as Set<string>;
-    const states = needs.checkState as Map<string, CheckState>;
-    return [...required].every((criterion) => states.get(criterion) === "passed");
-  },
-};
+export function checksMetBearing(bearing: "SUPPORTS" | "CHALLENGES"): Derived<boolean> {
+  return {
+    name: "checksMet",
+    grain: byClaim,
+    needs: [checksOfBearing(bearing), checkState],
+    from: (needs) => {
+      const required = needs.checksOf as Set<string>;
+      const states = needs.checkState as Map<string, CheckState>;
+      return [...required].every((criterion) => states.get(criterion) === "passed");
+    },
+  };
+}
+
+/** The two ways a claim is reached. Callers run both and merge; see {@link answeringClaimBearing}. */
+export const BEARINGS = ["SUPPORTS", "CHALLENGES"] as const;
 
 /**
  * A check, itemised — the shape a reader is shown, not just its state.

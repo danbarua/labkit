@@ -164,4 +164,56 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
     const survey = await later.whatIsKnown();
     expect(survey.established.some((q: { asks: string }) => q.asks === QUESTION)).toBe(true);
   });
+
+  /**
+   * The mirror image, and the case that was passing for the wrong reason.
+   *
+   * A promoted **negative** result whose prespecified check ran and passed must
+   * reach `established` exactly as a positive one does. It did not: `checksOf`
+   * collected criteria from both bearings while the *grain* read one column, so
+   * a criterion reached down the challenged path was silently dropped — and a
+   * dropped criterion reads as "no checks", which is vacuously met.
+   *
+   * **The never-run test above passed for the wrong reason** while that was
+   * true: dropping the row and finding the check unmet give the same bucket.
+   * That is PJ-029's shape — a right conclusion with the reasoning under it
+   * wrong, and no test catching it because the tests pass either way. This is
+   * the case that could have been positive and was not.
+   */
+  test("a promoted negative result whose check passed is established", async () => {
+    const check = await session.stateCriterion(CHECK);
+    const enquiry = await session.openEnquiry(QUESTION);
+    const observations = await session.recordObservations({
+      enquiry,
+      name: "8k-step run logs",
+      finding: "loss plateaus at 4.1 by step 6k",
+    });
+    const { claims } = await session.recordAnalysis({
+      enquiry,
+      method: "8k-step ablation",
+      from: [observations],
+      concludes: [
+        {
+          proposition: PROPOSITION,
+          finding: "no effect at any depth",
+          bearing: "challenges",
+        },
+      ],
+      heldTo: [check],
+    });
+    const claim = claims[0]!.claim;
+    await session.evaluateCriterion({
+      criterion: check,
+      outcome: "pass",
+      value: "loss 3.6 vs 3.8 baseline",
+      citing: claim,
+    });
+    await session.promote({ claim, because: "the answer is no, and we checked" });
+    await session.closeEnquiry({ enquiry, answeredBy: claim });
+
+    const later = await afterwards();
+    const survey = await later.whatIsKnown();
+    expect(survey.established.some((q) => q.asks === QUESTION)).toBe(true);
+    expect(survey.provisional.some((q) => q.asks === QUESTION)).toBe(false);
+  });
 });

@@ -162,6 +162,12 @@ export function per<T>(f: Fact<T>, rows: readonly Row[]): Map<string, T> {
     const needs: Record<string, unknown> = {};
     for (const dep of f.needs) {
       const sub = per(dep, group);
+      // Reference equality on a function, which holds only because every grain
+      // is a shared exported constant. A fact written `grain: (r) => …` inline
+      // would be semantically identical, compare unequal, and silently fan a
+      // same-grain dependency out into a Map where the consumer expects one
+      // value. The type system cannot carry this; the convention is that grains
+      // are named and shared, never written at the use site.
       needs[dep.name] = dep.grain === f.grain ? [...sub.values()][0] : sub;
     }
     out.set(key, f.from(needs) as T);

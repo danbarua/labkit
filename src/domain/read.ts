@@ -63,11 +63,12 @@ import type {
 import { ref, isRefOfKind } from "./report";
 import { compose, per, type Row } from "./facts";
 import {
-  answeringClaim,
+  BEARINGS,
+  answeringClaimBearing,
   checkStatus,
   checkStatusForGate,
   checksAnchor,
-  checksMet,
+  checksMetBearing,
   standingAsOf,
 } from "./survey-facts";
 import { SessionCore } from "./core";
@@ -267,25 +268,42 @@ export class ReadSurface extends SessionCore {
     // because only `SUPPORTS` was matched, and a disagreement with
     // `whySupported` about which claims a check belongs to. See
     // `./survey-facts.ts`.
+    // One bearing per query, merged — because AGE has no edge alternation and
+    // the two-columns-in-one-query version is how the last defect survived: the
+    // fact collected both names and the grain read one, so a criterion reached
+    // down the challenged path was silently dropped. Downstream of this loop
+    // there is one `answering` and one `crit`.
     const anchor = `MATCH (q:Question)
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
        OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)`;
-    const { cypher, decoders } = compose(anchor, checksMet, {
-      q: vertexProps<{ natural_id: string; name: string }>(),
-      accepting: optional(vertexProps<{ natural_id: string }>()),
-      work: optional(vertexProps<{ natural_id: string }>()),
-    });
-    // `answering` is the fact's own grain and is not matched by any clause:
-    // it is the claim `answeringClaim` resolves to, projected onto each row so
-    // the claim-grained facts have a subject to group by.
-    const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
 
-    const answering = per(answeringClaim, rows);
-    const withSubject = rows.map((row) => ({
-      ...row,
-      answering: answering.get((row.q as { natural_id: string }).natural_id) ?? null,
-    }));
-    const met = per(checksMet, withSubject);
+    const answering = new Map<string, { natural_id: string; kind?: string }>();
+    const met = new Map<string, boolean>();
+    const seen = new Map<string, { asks: string; accepted: boolean; worked: boolean }>();
+
+    for (const bearing of BEARINGS) {
+      const claimFact = answeringClaimBearing(bearing);
+      const metFact = checksMetBearing(bearing);
+      const { cypher, decoders } = compose(anchor, metFact, {
+        q: vertexProps<{ natural_id: string; name: string }>(),
+        accepting: optional(vertexProps<{ natural_id: string }>()),
+        work: optional(vertexProps<{ natural_id: string }>()),
+      });
+      const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
+
+      for (const [question, claim] of per(claimFact, rows)) {
+        if (claim !== null) answering.set(question, claim);
+      }
+      for (const [claim, ok] of per(metFact, rows)) met.set(claim, ok);
+
+      for (const row of rows) {
+        const q = row.q as { natural_id: string; name: string };
+        const entry = seen.get(q.natural_id) ?? { asks: q.name, accepted: false, worked: false };
+        entry.accepted ||= row.accepting !== null;
+        entry.worked ||= row.work !== null;
+        seen.set(q.natural_id, entry);
+      }
+    }
 
     const survey: KnowledgeSurvey = {
       established: [],
@@ -294,15 +312,6 @@ export class ReadSurface extends SessionCore {
       untested: [],
       accepted: [],
     };
-    const seen = new Map<string, { asks: string; accepted: boolean; worked: boolean }>();
-    for (const row of rows) {
-      const q = row.q as { natural_id: string; name: string };
-      const entry = seen.get(q.natural_id) ?? { asks: q.name, accepted: false, worked: false };
-      entry.accepted ||= row.accepting !== null;
-      entry.worked ||= row.work !== null;
-      seen.set(q.natural_id, entry);
-    }
-
     for (const [question, entry] of seen) {
       const standing: QuestionStanding = { question: ref("question", question), asks: entry.asks };
       const claim = answering.get(question);
