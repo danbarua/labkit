@@ -706,6 +706,7 @@ this document's original analysis are marked as such.
 | AI | `Computation.kind` holds prose where `Artefact.kind` holds kinds | **story 16**° | open |
 | AJ | `(proposition, enquiry)` is a hidden entity | **story 15**° | open |
 | AK | The survey's strongest word ignored the standard its answer was held to | **S-19** | resolved |
+| AL | Findings aggregate over a proposition; a prespecified check belongs to one analysis | **S-10**, **S-19** | resolved |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -2748,6 +2749,23 @@ never-run but not failed.
 
 Demonstrated in `examples/full-lifecycle.sh`, which promotes and closes before
 running the check for exactly this reason.
+
+**A fourth case was added after review, and the first three were passing partly
+by luck.** A promoted *negative* result — `bearing: "challenges"` — whose check
+**ran and passed** could not reach `established` either, which is the mirror
+image of the defect above. The cause was one level down: the fact collected
+criteria reached by both bearings while the **grain** read one column, so a
+criterion arriving down the challenged path was silently dropped.
+
+A dropped criterion reads as *no checks*, which is vacuously met — so the
+never-run case landed in the right bucket for the wrong reason, and no test
+could tell. That is PJ-029's shape exactly, and the case worth adding is the one
+that **could have been positive and was not**: `challenges + passed`.
+
+Found by `labkit-review` from reading four lines — the grain definitions — and
+confirmed with one probe afterwards. The prediction was available *because the
+fact had a name*; while it lived in whichever loop the reader happened to be
+inside, it was not.
 
 ---
 

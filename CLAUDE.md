@@ -972,6 +972,58 @@ A verb that composes others records **one** event, not one per step
 stream is a record of research actions; a researcher who opened an enquiry did
 one thing, and a log that decomposes it describes the implementation instead.
 
+### The read side is a graph of facts
+
+**`src/domain/facts.ts` is the machinery; `src/domain/survey-facts.ts` is the
+vocabulary.** A *fact* is a named node carrying three things a hand-written
+query leaves unnamed: a **Cypher clause**, a **fold** over the rows it returns,
+and the **grain** — the subject it is computed per. `compose()` walks the facts
+a report needs and emits one query; `per()` folds it once per subject.
+
+**Write-side queries stay hand-rolled Cypher, deliberately.** They are the
+reference documentation for *why* the graph is shaped as it is, and that is a
+different job from answering a question about it.
+
+**What earned this**, and it is one defect with six occurrences rather than an
+argument about elegance. AGE has no edge alternation, so `[:SUPPORTS|CHALLENGES]`
+is a syntax error and reaching a claim takes two clauses. Naming only one is
+**silent** — the row is absent, and a reader concludes the record holds nothing.
+It appeared in the survey, in three parts of `whySupported`, in the historical
+survey, and in the spike written to demonstrate the problem. **Four were written
+by the author of the fix for the previous one**, two of them afterwards. This is
+PJ-028's rule arriving from a new direction with a bigger sample: *be more
+careful* is not an available remedy.
+
+A fact spells such a pair once, so every reader is right or wrong together.
+
+**Three rules the machinery needs, each learned by breaking it:**
+
+- **`empty` is a factory, not a value.** A shared mutable accumulator leaks one
+  subject's rows into the next subject's answer — invisible with one subject,
+  wrong with two.
+- **A leaf declares the clauses it reads.** Without that, `compose()` silently
+  omitted a clause whose variable another clause referenced: no error, a column
+  never returned, and a fact folding to `null` for every subject.
+- **Grains are shared named constants, never written at the use site.** `per()`
+  compares them by reference, so an inline `grain: (r) => …` would be
+  semantically identical, compare unequal, and fan a same-grain dependency into
+  a `Map` where the consumer expects one value. The type system cannot carry
+  this.
+
+**`WITH coalesce(…)` works on AGE and is still the wrong tool** — measured,
+along with `UNION`. `WITH` collapses the query, so every clause appended after
+it must be projected forward by hand. That is a limit of *composition*, not of
+the engine, which makes it a different kind of trap from the ones under
+"AGE-specific gotchas" — and someone will reach for it precisely because it
+parses.
+
+**Where the line falls.** A fact earns its place when **more than one reader has
+to reach the same answer about the same subject**. That is what predicts the
+defect — it is *written once and forgotten the second time*, which requires a
+second time — and a single-reader query cannot have it whatever it computes.
+Queries with one reader stay raw until a second appears, which is the same rule
+this file applies to earning a relationship.
+
 ### The execution-context seam
 
 `src/domain/events.ts` is the **execution-context seam**: every state-changing
