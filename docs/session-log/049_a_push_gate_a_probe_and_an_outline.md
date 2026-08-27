@@ -198,10 +198,56 @@ building it; the trigger is named instead — a second party able to reach the
 database. Nothing is exposed by leaving it, LabKit being one tenant per process
 on the operator's own machine.
 
+**`99cbd66`, `29c6109`** — the crud, cleared in one batch on Dan's instruction
+to stop opening a PR per change.
+
+- **Four DB loose ends gone.** `provisionTenantGraph()` joins the transactor —
+  and the hazard was real rather than tidiness: a `resolveTenantContext()`
+  called inside an open transaction would have had its `COMMIT` end the
+  caller's transaction early and silently. Threading cost almost nothing
+  because every call site already had a transactor. `check:orm-unwrapped` is a
+  new AST check tracking the value `ormOver()` returns. `LABKIT_HOME` naming a
+  missing path is refused rather than built. An existing `.labkit/` above cwd
+  is found when it is unset. `tests/project-root.test.ts` covers the last two,
+  and three of its eight go red when the behaviour is removed.
+- **`docs/persistence.md` is a move, not a new explainer**, which is
+  `labkit-review`'s call and the right one: CLAUDE.md already held ~350 lines
+  on the subject, so composing beside it would have put one subsystem in two
+  places. Four sections lifted verbatim, `persistence-spikes.md` folded in as
+  dated findings and deleted, a pointer left with the three rules that are
+  quiet to break. AGE gotchas stayed — needed before writing a query, not
+  looked up after. **CLAUDE.md 1,716 → 1,365.**
+- **The one live defect in `labkit-review`'s 88/100 audit is fixed**: `labkit
+  mcp` and `src/cli/commands/serve.ts` appeared nowhere, so two lines still
+  sent a reader to `src/mcp/server.ts` for an entry point that has been a
+  subcommand since PR #35.
+
+**`labkit-review` found why the guard harness never fired**, and it was the push
+gate, not the branch check: the fake upstream was an `update-ref` with no bare
+remote and no actual push, so `@{upstream}` never matched HEAD and the run was
+silenced before the guard was reached. Their own table — quiet on `main`, quiet
+with no upstream, fires when genuinely pushed — is the verification; it is in on
+their measurement, not re-run here.
+
+**Two self-inflicted losses, both from blunt git.** `git add … <deleted path>`
+with stderr silenced aborted the whole stage, so a commit shipped one file while
+its message described four. And `git checkout -- src/db/connect.ts`, reached for
+to undo a one-line test mutation, discarded the entire edit instead; it was
+redone from scratch. Neither cost anything permanent. Both were the same
+mistake: using a command that resets to HEAD when what was wanted was to undo
+the last thing typed.
+
 ## Next
 
-PRs #39, #40 and #41 are merged. **#42 is open** and is the only outstanding
-one.
+PRs #39, #40 and #41 are merged. **#42 is open** and everything since batches
+into it.
+
+**The queue's remaining crud is one item and a wait**: the `CLAUDE.md` sweep,
+now with `labkit-review`'s specific move written into it — leave the command
+block, lift `### The CLI`, the binary, the MCP paragraphs and formatting out to
+a surfaces section — and Drizzle v1, still unreleased.
+
+Then the two agent-facing items, which Dan has held until the crud is clear.
 
 The queue's own recommendation, unchanged by any of this: the two agent-facing
 items — orientation, and dogfooding LabKit on its own open questions — are the
