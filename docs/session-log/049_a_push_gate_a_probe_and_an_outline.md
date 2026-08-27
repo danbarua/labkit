@@ -260,15 +260,47 @@ claims under `src/` and `scripts/` — counted here, against the 30 reported.
 `CLAUDE.md`'s pinned header as a seventh rule. A peer's suggestion is not
 authority to edit `CLAUDE.md`, so it went to Dan as a question instead.
 
+**`a912d0a`, `e06579e`** — the `CLAUDE.md` sweep, moves and culls in separate
+commits.
+
+`## Commands` was 364 lines and mostly not about commands, so the binary, the
+CLI, the database location and the MCP server lift into a new `## Surfaces`;
+what stays is what is actually about running things. The document inventory in
+`## What this is` is reunited — an unrelated block split it, so a reader
+scanning for which document holds what found half a list and stopped. AGE
+gotchas moved up beside `## Persistence`; they were deliberately kept out of the
+moved document, but sat after the whole domain layer, which made the pointer
+saying "they stay below" true and useless.
+
+**The moves were verified as moves**: sorted non-blank lines differed by exactly
+the seven added.
+
+Three currency defects, and **no check catches any of them**:
+
+- **My own commit an hour earlier broke command parity.**
+  `check:orm-unwrapped` was in `package.json` and named nowhere in the file.
+- **`### Where the database lives` described pre-`99cbd66` behaviour** — the
+  CLI's `--db` help text was updated when `resolveProjectRoot` changed and this
+  paragraph was not.
+- Every relative reference re-checked after the moves; all three still resolve.
+
+The done-gate was asserted rather than eyeballed: script parity clean both
+directions, 73 paths and 37 symbols current, every apparent miss deliberate
+past tense.
+
+**1,716 → 1,387 lines; 2 headers below `##` → 44; longest unskimmable run 175 →
+57.** One cull only — the hooks paragraph written this morning, whose story is
+already in the queue. The flakiness measurements and AGE findings were left
+alone deliberately: length there is the point, and `labkit-review` scored that
+material 15/15 while the deduction was all conciseness.
+
 ## Next
 
 PRs #39, #40 and #41 are merged. **#42 is open** and everything since batches
 into it.
 
-**The queue's remaining crud is one item and a wait**: the `CLAUDE.md` sweep,
-now with `labkit-review`'s specific move written into it — leave the command
-block, lift `### The CLI`, the binary, the MCP paragraphs and formatting out to
-a surfaces section — and Drizzle v1, still unreleased.
+**The queue's remaining crud is a wait and a sweep**: Drizzle v1, still
+unreleased, and the one-pass walk of the 28 present-tense guard comments.
 
 Then the two agent-facing items, which Dan has held until the crud is clear.
 

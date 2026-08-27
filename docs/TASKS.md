@@ -9,21 +9,6 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Documents
 
-- **Sweep `CLAUDE.md` for stale prose.** It is long and parts of it describe a
-  system two refactors ago. Retire rather than revise where the code now says
-  it; the pinned header's sixth rule is what "stale" means, and its tense tell
-  makes the sweep a grep rather than a judgement call. The file has grown while
-  the system under it was rewritten twice this week. Persistence has since
-  moved out to `docs/persistence.md`; what is left and least swept is
-  `## Commands`, which is 364 lines and mostly not about commands — it holds
-  the binary's leak, the CLI, the MCP server, shell traps, CI and biome. The
-  move `labkit-review` suggested: leave the command block, lift the rest into
-  a surfaces section or the architecture half. The document inventory in
-  `## What this is` is also split in two by an unrelated block, so a reader
-  scanning for which document holds what finds half a list and stops.
-
-## Loose ends from the DB layer work
-
 - **Walk the present-tense guard comments once.** A comment saying *guards
   against X* / *prevents* / *ensures* is an assertion about the code and can be
   wrong in silence; one saying *X was possible until <date>, and this stopped
