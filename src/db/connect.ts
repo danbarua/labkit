@@ -1,6 +1,7 @@
 import { traced } from "./trace";
-import { dirname, join } from "node:path";
-import { existsSync } from "node:fs";
+import { dirname, join, sep } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { directPostgresBackend, pgliteBackend, type LabKitDBConnection } from "./backend";
 
 export type { LabKitDBConnection };
@@ -57,7 +58,133 @@ export function resolveProjectRoot(
     }
     return named;
   }
-  return discoverProjectRoot(cwd);
+  return gitProjectRoot(cwd) ?? dotGitProjectRoot(cwd) ?? discoverProjectRoot(cwd);
+}
+
+/**
+ * The repository's own directory, which is **not** the working tree's.
+ *
+ * `git rev-parse --git-common-dir` names the one `.git` a repository has,
+ * whichever worktree you ask from — its parent is the project root. That is the
+ * whole fix: a worktree is a **sibling** of the main checkout, not a
+ * descendant, so no amount of walking up from
+ * `…/labkit.worktrees/feat-mcp-server` ever passes through `…/labkit`. The walk
+ * finds nothing, and the first command run in a fresh worktree therefore
+ * *creates* a database instead of finding the project's.
+ *
+ * That is not hypothetical. Measured 2026-08-27, three `.labkit/` directories
+ * existed on this machine for one project — 41M, 60M and 41M, last written on
+ * three different days — and nobody decided that. Every session in this project
+ * runs in a worktree, so it is the normal case rather than an edge one.
+ *
+ * **A branch is not a project.** The record — questions, claims, gates, what is
+ * unresolved — belongs to the programme. A record per worktree means
+ * `labkit known` silently answers about whichever branch you happen to be
+ * standing in. It is the README wiring defect arriving from the opposite
+ * direction: there, every project shared one record; here, one project
+ * fragments into several.
+ *
+ * `--show-toplevel` names the *worktree* and would reintroduce the bug. This is
+ * the same distinction `.claude/skills/wrap/wrap-hook.sh` drew when it stopped
+ * resolving from `$CLAUDE_PROJECT_DIR`, one level further out.
+ *
+ * Returns `undefined` outside a repository — `git rev-parse` fails, and
+ * LabKit does not require git — so {@link discoverProjectRoot} stays as the
+ * fallback rather than being replaced. In an ordinary checkout the two agree,
+ * so there is no special case beside a normal one.
+ *
+ * It also **subsumes the `packages/foo` case** at no extra cost: it is correct
+ * from any depth, with no walk at all.
+ */
+function gitProjectRoot(cwd: string): string | undefined {
+  if (!existsSync(cwd)) return undefined;
+  // `--path-format=absolute` because the bare form returns a *relative* path
+  // when you are already at the top of a normal checkout — it prints `.git`,
+  // whose dirname is `.`, which would resolve every project to the process's
+  // working directory. Requires git 2.31+; older git fails the flag and this
+  // returns undefined, which is the correct behaviour rather than a wrong root.
+  const r = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd,
+    encoding: "utf8",
+    // Never let git's own stderr reach a caller's terminal: "not a git
+    // repository" is an ordinary outcome here, not a failure to report.
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (r.status !== 0 || typeof r.stdout !== "string") return undefined;
+  const gitDir = r.stdout.trim();
+  if (gitDir === "") return undefined;
+  const root = dirname(gitDir);
+  // A bare repository has no working tree and therefore no project root to
+  // speak of; its `--git-common-dir` is the repository itself, whose parent is
+  // wherever it happens to be filed. Refuse rather than guess.
+  //
+  // This also rejects `git init --separate-git-dir`, where `.git` is a file
+  // pointing outside the tree — considered and declined for the same reason,
+  // not missed. Both fall through to the steps below, which is the safe
+  // direction.
+  return existsSync(join(root, ".git")) ? root : undefined;
+}
+
+/**
+ * The same answer as {@link gitProjectRoot}, read off the filesystem, for when
+ * there is no git to ask.
+ *
+ * **The walk below cannot solve the bug it is the fallback for.** With git
+ * absent — a compiled binary on a host without it, which is exactly what
+ * `bun run build` ships — a worktree that is a *sibling* of its checkout walks
+ * up, never passes through the repository, and creates a database. That is the
+ * original defect, untouched, in the one environment where the subprocess is
+ * unavailable. Found in review by Dan from `exo-ledger`, which hit the same
+ * question from the other side.
+ *
+ * A linked worktree's `.git` is a **file**, not a directory:
+ *
+ * ```
+ * gitdir: /Users/dan/Code/science/labkit/.git/worktrees/feat-mcp-server
+ * ```
+ *
+ * Strip `/worktrees/<name>` and take the parent of `.git`, and that is the
+ * project root — byte-identical to what `--git-common-dir` returns, verified
+ * against this repository and against exo's differently-shaped one. In an
+ * ordinary checkout `.git` is a directory and the answer is simply the
+ * directory holding it.
+ *
+ * **`--separate-git-dir` is deliberately not handled**, and falls through to
+ * the walk. Its `.git` file names a directory with no `worktrees/` component
+ * and no reliable path back to a working tree, so deriving a root from it would
+ * be guessing. Considered and declined, rather than missed.
+ *
+ * This walks for `.git` rather than assuming `from` is the top, so it is
+ * correct from any depth — the same property the subprocess has.
+ *
+ * **Exported for its own tests, and that is a concession worth naming.** Under
+ * bun 1.3.14 `spawnSync` finds `git` with `PATH` empty, unset, or pointing at
+ * an empty directory — measured, all three — so there is no way to reach this
+ * from {@link resolveProjectRoot} in-process by making the subprocess fail. The
+ * composition is one `??`; the logic is here, and here is where it is tested.
+ */
+export function dotGitProjectRoot(from: string): string | undefined {
+  let dir = from;
+  for (;;) {
+    const dotGit = join(dir, ".git");
+    if (existsSync(dotGit)) {
+      if (statSync(dotGit).isDirectory()) return dir;
+      const named = readFileSync(dotGit, "utf8").trim();
+      const prefix = "gitdir:";
+      if (named.startsWith(prefix)) {
+        const gitDir = named.slice(prefix.length).trim();
+        // `…/.git/worktrees/<name>` -> `…/.git` -> `…`. Anything else is a
+        // layout this cannot read a working tree out of; see above.
+        const marker = `${sep}.git${sep}worktrees${sep}`;
+        const at = gitDir.lastIndexOf(marker);
+        if (at !== -1) return gitDir.slice(0, at);
+      }
+      return undefined;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
 }
 
 /**
@@ -96,6 +223,7 @@ export async function connectDb(projectRoot = resolveProjectRoot()): Promise<Lab
   }
 
   const labkitDir = join(projectRoot, ".labkit");
+  announceNewRecord(labkitDir);
   const connection = await pgliteBackend({
     dataDir: join(labkitDir, "pglite"),
     lockPath: join(labkitDir, "pglite.lock"),
@@ -113,4 +241,33 @@ export async function connectDb(projectRoot = resolveProjectRoot()): Promise<Lab
 function withTrace(connection: LabKitDBConnection, label: string): LabKitDBConnection {
   const db = traced(connection.db, label);
   return db === connection.db ? connection : { ...connection, db };
+}
+
+/**
+ * Says so, once, when a command is about to bring a new record into existence.
+ *
+ * **Creating a database is silent, and that is how three of them accumulated.**
+ * Any stray `bun run dev` in a directory without one produces an empty 42MB
+ * database and then answers every question with "nothing" — which is
+ * indistinguishable from a project nobody has worked on yet. All three
+ * `.labkit/` directories found on 2026-08-27 were made that way; not one came
+ * from a script, because every script pins `--db` into a temporary directory
+ * and `bun run check` and `bun run example` were both measured leaving none.
+ *
+ * So the remaining way to make one by accident is a person or an agent typing a
+ * command in the wrong place, and the remedy is not a guard — creating a record
+ * is what the first command in a new project is *supposed* to do. It is to stop
+ * doing it quietly.
+ *
+ * **stderr, never stdout.** The whole of a write command's stdout is an id the
+ * next command consumes, and `$(labkit criterion 'x')` must not capture this.
+ * Same reason a handle-only answer is never coloured.
+ *
+ * Not a warning and not prefixed as one: on the first run of a real project
+ * this is the correct and expected thing to happen, and crying wolf there would
+ * teach a reader to ignore the line in the case that matters.
+ */
+function announceNewRecord(labkitDir: string): void {
+  if (existsSync(labkitDir)) return;
+  process.stderr.write(`labkit: creating a new record at ${labkitDir}\n`);
 }

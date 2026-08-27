@@ -710,8 +710,67 @@ makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
 to get its own TCP port too, from a `derivePort` that hashed the path; there is
 no port any more. `LABKIT_DB_URL` still wins over both.
 
-**With neither set, an existing `.labkit/` at or above the working directory is
-found** (`resolveProjectRoot`, `src/db/connect.ts`). A client launched from
+**With neither set, git is asked first: `rev-parse --git-common-dir` names the
+one `.git` a repository has, and its parent is the project root**
+(`resolveProjectRoot`, `src/db/connect.ts`). **A worktree is a sibling of the
+main checkout, not a descendant**, so walking up from one never passes through
+it — and three `.labkit/` directories had accumulated for this one project
+before anyone looked, on 2026-08-27. All three were empty; a fresh database is
+42M, so their sizes said nothing. That is the fix's real lesson: the
+fragmentation was invisible *because* nothing had been recorded yet, and the
+first time it would have mattered is the first time it did.
+
+`--show-toplevel` names the worktree and would reintroduce the bug. Outside a
+repository `git rev-parse` fails and the walk below is the fallback, so there is
+no special case beside a normal one.
+
+**A command that is about to create a record says so, on stderr.** Creating one
+is silent otherwise, and that is how three of them accumulated: a stray
+`bun run dev` in the wrong directory makes an empty 42MB database and then
+answers every question with *"nothing"*, which reads exactly like a project
+nobody has worked on. **Not one came from a script** — every script pins `--db`
+into a temporary directory, and `bun run check` and `bun run example` were both
+measured on 2026-08-27 leaving nothing behind. So the remaining way to make one
+by accident is a person or an agent typing a command in the wrong place, and the
+remedy is not a guard: creating a record is what the first command in a new
+project is supposed to do. It is to stop doing it quietly.
+
+stderr and never stdout, for the same reason a handle-only answer is never
+coloured — the whole of a write command's stdout is an id the next command
+consumes. `scripts/smoke-cli.sh` asserts both halves: it fires on the first
+command and not the second, and `check:stdout` already refuses a stdout write
+from anywhere under `src/` outside the CLI.
+
+**With no git to ask, the same answer is read off the filesystem.** A linked
+worktree's `.git` is a *file* — `gitdir: …/labkit/.git/worktrees/feat-mcp-server`
+— so stripping `/worktrees/<name>` gives the project root with no subprocess,
+byte-identical to what `--git-common-dir` returns. It matters because
+**the walk cannot solve the bug it is the fallback for**: with git absent, a
+sibling worktree walks up, misses the repository, and creates a database exactly
+as before — and a compiled binary on a host without git is precisely what
+`bun run build` ships. Found in review, from `exo-ledger`, which hit the same
+question from the other side.
+
+`git init --separate-git-dir` is declined rather than guessed at: its `.git`
+file names a directory with no `worktrees/` component and no reliable path back
+to a working tree.
+
+**`dotGitProjectRoot` is exported for its own tests, and that is a concession
+with a measured reason.** Under bun 1.3.14 `spawnSync` finds `git` with `PATH`
+set to the empty string, unset, *or* pointing at an empty directory — all three
+checked — so the subprocess cannot be made to fail in-process and the fallback
+cannot be reached that way. The first version of those tests tried, and its own
+control caught it: four tests were passing through the subprocess while claiming
+to test the filesystem.
+
+**"A worktree is a sibling of the main checkout" is true of this repository's
+layout, not of worktrees generally** — `exo-ledger` nests them under
+`.claude/worktrees/`, where a walk *would* find the root. The fix is correct for
+both, which means it rests on `--git-common-dir` being the right question rather
+than on the sibling premise.
+
+**The walk remains, and still answers the nested case** — though git subsumes it
+at no cost, being correct from any depth without walking. A client launched from
 `packages/foo` used to report an empty record for a project full of work, which
 matters more since one binary: an MCP client's working directory is chosen by
 the editor, not the user. The walk **only ever finds, never decides where to

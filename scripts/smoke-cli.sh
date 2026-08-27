@@ -45,6 +45,28 @@ trap 'rm -rf "$db"' EXIT
 # person who was asleep.
 lab() { bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@"; }
 
+# The record-creation announcement: once, on stderr, and never on stdout.
+#
+# `--db` points at a `mktemp -d` that exists but holds no `.labkit/`, so the
+# first command here is genuinely a first command in a new project. That makes
+# this the one place the announcement can be exercised without leaving a
+# database behind — which is the whole subject.
+#
+# The stdout half matters more than it looks: the whole of a write command's
+# stdout is an id the next command consumes, so a line printed to the wrong
+# stream turns `$(labkit criterion 'x')` into a captured error message.
+first_err="$(bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
+case "$first_err" in
+  *"creating a new record"*) printf '  ok  %s\n' "the first command says it is creating a record" ;;
+  *) printf '\nFAILED: the first command did not announce a new record\n  stderr was: %s\n' "$first_err" >&2; exit 1 ;;
+esac
+
+second_err="$(bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
+case "$second_err" in
+  *"creating a new record"*) printf '\nFAILED: it announced a new record twice\n' >&2; exit 1 ;;
+  *) printf '  ok  %s\n' "the second says nothing" ;;
+esac
+
 # Asserts on the *content* of an answer, not on the exit code of the command
 # that produced it. A command that runs and answers wrongly is the failure this
 # script exists to catch.
