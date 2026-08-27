@@ -9,53 +9,19 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Documents
 
-- **Sweep `CLAUDE.md` for stale prose.** It is long and parts of it describe a
-  system two refactors ago. Retire rather than revise where the code now says
-  it; the pinned header's sixth rule is what "stale" means, and its tense tell
-  makes the sweep a grep rather than a judgement call. The file has grown while
-  the system under it was rewritten twice this week — the connection model, the
-  testing patterns and the persistence layer are where to start.
-- **`docs/persistence-spikes.md` -> `docs/persistence.md`.** It is dated AGE
-  findings from 2026-08-17/18 and reads as a lab notebook. What a reader needs
-  is a concise explainer of how persistence works now — two backends, one seam,
-  a lock, migrations, tenancy. Keep the dated probes that still bite; drop what
-  the code has since answered.
+- **Walk the present-tense guard comments once.** A comment saying *guards
+  against X* / *prevents* / *ensures* is an assertion about the code and can be
+  wrong in silence; one saying *X was possible until <date>, and this stopped
+  it* names an event and cannot. 28 comments under `src/` and `scripts/` match
+  the first shape (counted 2026-08-27 — `labkit-review` said 30 and the
+  difference is not worth chasing). Most are presumably true. The question for
+  each is not *is this true* but **what would fail if it were false**, and the
+  discriminator is `labkit-review`'s: **delete the guard and run the same input
+  again — if it still fails, the guard is not what stopped it.** That is
+  PJ-009's bar 1 for earning an edge, pointed one level down. Found because
+  `check:orm-unwrapped`'s own comment claimed a protection the typechecker was
+  actually providing, and the naive test confirmed the comment.
 
-## Loose ends from the DB layer work
-
-Each is small and none is blocking.
-
-- **`provisionTenantGraph()` still opens its own transaction** with raw
-  `BEGIN`/`COMMIT` rather than `src/db/transactor.ts`. It is admin DDL that runs
-  before the application pipeline exists, so it has nothing to join — but it is
-  the one boundary left outside the transactor.
-- **Nothing checks that a relational call site uses `unwrapped()`.** Drizzle
-  offers no hook, so it is convention, and forgetting it leaks bound parameters
-  into an error message that reaches an MCP client. Either a `check:` script or
-  a reason it does not need one.
-- **A real login-role boundary works and is unbuilt.** Probed end to end
-  2026-08-27 against `docker/postgres`, which preloads AGE: a plain LOGIN role
-  that never issues `LOAD` resolves `agtype`, reads through Cypher, and
-  **writes** — `createNode` minted a natural id and `createEdge` connected two
-  nodes. It is refused `LOAD` (42501, and never needs it) and refused
-  `SET ROLE postgres` (42501), which is the difference that matters: the
-  step-down we ship today is a safety boundary precisely because a session can
-  `RESET ROLE` back to superuser, and a login role cannot. Both halves are now
-  measured; what is unbuilt is the seam. It is per-backend — PGlite has no
-  preload and one superuser session, so it keeps the step-down — which is the
-  design question to answer before writing any of it. See `src/db/scoped.ts`.
-- **`LABKIT_HOME` naming a path that does not exist is manufactured, not
-  refused.** `src/db/backend.ts`'s `mkdirSync(lockDir, { recursive: true })`
-  creates the whole path, so a typo yields a fresh empty record rather than an
-  error — and an empty record looks exactly like a new project. Loud today only
-  when the parent happens to be unwritable.
-- **`connectDb()` could discover an existing record above it.** Proposed by the
-  review session: `LABKIT_HOME` set → use it and require it to exist; unset →
-  walk up from cwd for an existing `.labkit/`, and create only at cwd. The walk
-  would never decide *where to create*, which is what keeps it from
-  reintroducing the implicitness three review rounds removed. It answers the
-  case that survives the one binary: a client launched from `packages/foo`
-  reports an empty record for a project full of work.
 - **Drizzle v1** is release-candidate and we wait for the release. When it
   lands: `.enableRLS()` becomes `pgTable.withRLS()`, and the surfaces most
   likely to break are `src/db/migrate.ts` (it casts through private
@@ -143,3 +109,22 @@ Here so nobody re-discovers them as gaps.
   and no source obligation requires it. `Decision.decided_at` is record time.
 - **An instant on `EvidenceUnit`.** Would let `whatWasKnown()` split `open` into
   worked-on and untouched. Nothing has needed it.
+
+### Deferred until multi-tenancy is real
+
+Built or measured, and parked. The trigger for all of it is the same: a second
+party can reach the database — `LABKIT_DB_URL` pointing at a shared Postgres
+holding more than one tenant, or anyone but the operator issuing queries.
+
+- **A login role is a real security boundary, and works.** Measured 2026-08-27
+  against `docker/postgres`, which preloads AGE: a plain LOGIN role that never
+  issues `LOAD` reads *and writes* through Cypher, and is refused
+  `SET ROLE postgres` (42501). That refusal is the point — the `SET ROLE`
+  step-down we ship today can `RESET ROLE` back to superuser, so it stops a
+  query that forgot its tenant filter and not a caller who means harm.
+  Nothing is exposed by leaving it: LabKit runs one tenant per process on the
+  operator's own machine, where the superuser session is inside the process
+  that would be the attacker. It is also per-backend — PGlite has no preload
+  and one superuser session, so it keeps the step-down — and designing a seam
+  where one backend offers a stronger boundary than the other is the work. See
+  `src/db/scoped.ts`.

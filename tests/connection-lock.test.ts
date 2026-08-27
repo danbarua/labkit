@@ -54,7 +54,7 @@ describe.skipIf(usingPostgres())("the database lock", () => {
     const first = await backend().connect();
     // Held: the file exists and names this process.
     expect(readFileSync(lockPath(), "utf8").trim()).toBe(String(process.pid));
-    const a = await resolveTenantContext(first.db, "lock-a");
+    const a = await resolveTenantContext(first.db, first.tx, "lock-a");
     await first.close();
 
     // Released: a second cycle gets in without waiting, and finds the first
@@ -62,7 +62,7 @@ describe.skipIf(usingPostgres())("the database lock", () => {
     // test spent a three-way race to establish.
     const second = await backend().connect();
     const all = await second.db.query<{ slug: string }>(`select slug from tenants order by slug`);
-    const b = await resolveTenantContext(second.db, "lock-b");
+    const b = await resolveTenantContext(second.db, second.tx, "lock-b");
     await second.close();
 
     expect(all.rows.map((r) => r.slug)).toEqual(["lock-a"]);

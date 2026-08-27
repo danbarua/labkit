@@ -191,10 +191,122 @@ available remedy. What would close it: a check that refuses a merge whose branch
 has commits the merge commit does not contain, or a wrap that writes to `main`
 rather than to the branch. Queued in `docs/TASKS.md`; neither is built.
 
+**`f042c0e`** (PR #42, after #41 merged) — the login role moves out of the DB
+loose ends and under a new `### Deferred until multi-tenancy is real` in
+`docs/TASKS.md`. It had been reading as *available and unbuilt*, which invites
+building it; the trigger is named instead — a second party able to reach the
+database. Nothing is exposed by leaving it, LabKit being one tenant per process
+on the operator's own machine.
+
+**`99cbd66`, `29c6109`** — the crud, cleared in one batch on Dan's instruction
+to stop opening a PR per change.
+
+- **Four DB loose ends gone.** `provisionTenantGraph()` joins the transactor —
+  and the hazard was real rather than tidiness: a `resolveTenantContext()`
+  called inside an open transaction would have had its `COMMIT` end the
+  caller's transaction early and silently. Threading cost almost nothing
+  because every call site already had a transactor. `check:orm-unwrapped` is a
+  new AST check tracking the value `ormOver()` returns. `LABKIT_HOME` naming a
+  missing path is refused rather than built. An existing `.labkit/` above cwd
+  is found when it is unset. `tests/project-root.test.ts` covers the last two,
+  and three of its eight go red when the behaviour is removed.
+- **`docs/persistence.md` is a move, not a new explainer**, which is
+  `labkit-review`'s call and the right one: CLAUDE.md already held ~350 lines
+  on the subject, so composing beside it would have put one subsystem in two
+  places. Four sections lifted verbatim, `persistence-spikes.md` folded in as
+  dated findings and deleted, a pointer left with the three rules that are
+  quiet to break. AGE gotchas stayed — needed before writing a query, not
+  looked up after. **CLAUDE.md 1,716 → 1,365.**
+- **The one live defect in `labkit-review`'s 88/100 audit is fixed**: `labkit
+  mcp` and `src/cli/commands/serve.ts` appeared nowhere, so two lines still
+  sent a reader to `src/mcp/server.ts` for an entry point that has been a
+  subcommand since PR #35.
+
+**`labkit-review` found why the guard harness never fired**, and it was the push
+gate, not the branch check: the fake upstream was an `update-ref` with no bare
+remote and no actual push, so `@{upstream}` never matched HEAD and the run was
+silenced before the guard was reached. Their own table — quiet on `main`, quiet
+with no upstream, fires when genuinely pushed — is the verification; it is in on
+their measurement, not re-run here.
+
+**Two self-inflicted losses, both from blunt git.** `git add … <deleted path>`
+with stderr silenced aborted the whole stage, so a commit shipped one file while
+its message described four. And `git checkout -- src/db/connect.ts`, reached for
+to undo a one-line test mutation, discarded the entire edit instead; it was
+redone from scratch. Neither cost anything permanent. Both were the same
+mistake: using a command that resets to HEAD when what was wanted was to undo
+the last thing typed.
+
+**`e7edb43`** — `labkit-review` answered the placement question with a third
+option better than either offered: the grants section is in the right place and
+its *title* was wrong, promising a general answer about migrations and
+delivering a specific argument about roles. Retitled, nothing reordered. They
+name it as the third instance today of a generic title over a specific
+argument, all three visible only because the outline gave headings neighbours
+to be read beside.
+
+**The sharper half is about guard comments, and it corrects how I tested one.**
+A guard's claim is about *attribution*, not outcome: "this guards against X" is
+not "X fails", it is "X fails **because of this**", so testing the first can
+never falsify the second — the naive test on `check:orm-unwrapped`'s comment
+would have confirmed it. The discriminator is **delete the guard and run the
+same input again; if it still fails, the guard is not what stopped it**, which
+is PJ-009's bar for earning an edge pointed one level down. The repo already
+refuses a relationship that arrives by argument; guard comments have been
+arriving that way. Queued as a one-pass sweep of the 28 present-tense guard
+claims under `src/` and `scripts/` — counted here, against the 30 reported.
+
+**Not done, deliberately:** they suggested writing that unification into
+`CLAUDE.md`'s pinned header as a seventh rule. A peer's suggestion is not
+authority to edit `CLAUDE.md`, so it went to Dan as a question instead.
+
+**`a912d0a`, `e06579e`** — the `CLAUDE.md` sweep, moves and culls in separate
+commits.
+
+`## Commands` was 364 lines and mostly not about commands, so the binary, the
+CLI, the database location and the MCP server lift into a new `## Surfaces`;
+what stays is what is actually about running things. The document inventory in
+`## What this is` is reunited — an unrelated block split it, so a reader
+scanning for which document holds what found half a list and stopped. AGE
+gotchas moved up beside `## Persistence`; they were deliberately kept out of the
+moved document, but sat after the whole domain layer, which made the pointer
+saying "they stay below" true and useless.
+
+**The moves were verified as moves**: sorted non-blank lines differed by exactly
+the seven added.
+
+Three currency defects, and **no check catches any of them**:
+
+- **My own commit an hour earlier broke command parity.**
+  `check:orm-unwrapped` was in `package.json` and named nowhere in the file.
+- **`### Where the database lives` described pre-`99cbd66` behaviour** — the
+  CLI's `--db` help text was updated when `resolveProjectRoot` changed and this
+  paragraph was not.
+- Every relative reference re-checked after the moves; all three still resolve.
+
+The done-gate was asserted rather than eyeballed: script parity clean both
+directions, 73 paths and 37 symbols current, every apparent miss deliberate
+past tense.
+
+**1,716 → 1,387 lines; 2 headers below `##` → 44; longest unskimmable run 175 →
+57.** One cull only — the hooks paragraph written this morning, whose story is
+already in the queue. The flakiness measurements and AGE findings were left
+alone deliberately: length there is the point, and `labkit-review` scored that
+material 15/15 while the deduction was all conciseness.
+
 ## Next
 
-PR #41 awaits review — and it is where every change from this session now
-lives, `main` having only the first two.
+PRs #39, #40 and #41 are merged. **#42 is open** and everything since batches
+into it.
+
+**The queue's remaining crud is a wait and a sweep**: Drizzle v1, still
+unreleased, and the one-pass walk of the 28 present-tense guard comments.
+
+Then the two agent-facing items, which Dan has held until the crud is clear.
+
+The queue's own recommendation, unchanged by any of this: the two agent-facing
+items — orientation, and dogfooding LabKit on its own open questions — are the
+same piece of work and the only thing on the list that is not housekeeping.
 
 Everything the review produced is now in `docs/TASKS.md` or done. What it left
 for next time:

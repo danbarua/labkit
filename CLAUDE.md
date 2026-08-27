@@ -149,38 +149,22 @@ Two more things a worktree will not have, because they are untracked:
   be **seeded** before the first Stop fire or the first wrap is silently
   swallowed; `.claude/skills/wrap/SKILL.md` §Forking has the command.
 - **Git hooks, which have to be turned on: `bun run dev:install-hooks`.** Hooks
-  are not cloned and `core.hooksPath` is per-repository config, so a fresh
-  clone or worktree has none and says nothing about it.
+  are not cloned and `core.hooksPath` is per-repository config, so a fresh clone
+  or worktree has none and says nothing about it.
 
-  There is one, `.githooks/pre-push`, and it refuses a push to a branch whose
-  pull request is already merged or closed. **That is not a reversal of
-  `ce97456`, which removed the previous `.githooks/`** — that hook *regenerated
-  a committed artefact inside someone else's commit*, and the objection was to
-  writing, not to hooks. This one writes nothing and only ever refuses.
+  There is one, `.githooks/pre-push`: it refuses a push to a branch whose pull
+  request GitHub has already merged or closed. Such a push **succeeds and
+  reaches nothing** — a squash merge takes the branch as it stood when the merge
+  commit was cut, and `git merge-base` cannot see that, so the state comes from
+  `gh`. It happened three times in two days, the third time taking a
+  `CLAUDE.md` restructure and a measurement with it. The hook **refuses rather
+  than passes when `gh` is missing**, because a hook that goes quiet when its
+  tool is absent is the `|| true` this repo has been bitten by; every refusal
+  names `git push --no-verify` and the two commands that recover the work.
 
-  It was earned three times in two days: work pushed to an already-squashed
-  branch, where every push succeeds, the branch looks healthy, and the commits
-  reach nothing. Twice it cost a session-log entry; the third time it took a
-  `CLAUDE.md` restructure, a measurement, a file deletion and a queue rewrite,
-  recovered only because Dan said *"labkit has no outstanding PRs"*. A squash
-  merge leaves no ancestry `git merge-base` can find, so the state has to come
-  from `gh` — and the hook **refuses rather than passes** when `gh` is missing,
-  because a hook that goes quiet when its tool is absent is the `|| true` this
-  repo has already been bitten by. `git push --no-verify` is the way out and
-  every refusal names it.
-
-  **Two bugs, both found by running it and neither by reading it**, and both had
-  the same shape — every test passed, including the one that had to fail. It
-  treated all-zeroes on the *remote* side as a deletion, when that means "new
-  branch there", so the merged branch was skipped before `gh` was ever asked.
-  And it read the branch name off the **local** ref, so
-  `git push origin HEAD:refs/heads/foo` — which writes `foo` on the remote under
-  the pull request's name — skipped the check entirely. It keys on the remote
-  ref, which is the name GitHub has. Ten states are checked.
-
-  The generated SVG went with `ce97456` too; `bun run dev:dependency-cruiser`
-  regenerates `docs/dependency-graph.mmd` by hand, and graphviz is no longer
-  needed.
+  Not a reversal of `ce97456`, which removed the previous `.githooks/`: that
+  hook regenerated a committed artefact inside someone else's commit, and the
+  objection was to writing. This one writes nothing.
 
 ## The one rule about documents
 
@@ -293,11 +277,11 @@ that announced the glossary.
 
 ### What the other documents are for
 
-`docs/persistence-spikes.md` holds dated AGE findings from 2026-08-17/18 —
-what `pglite-age` does and does not support, established by direct probe. Read
-it before changing tenancy, natural ids or provisioning. It lived at the top of
+`docs/persistence.md` is how persistence works, and holds the dated AGE probe
+findings that used to be `docs/persistence-spikes.md` — read those before
+changing tenancy, natural ids or provisioning. They lived at the top of
 `examples/full-lifecycle.md` until 2026-08-25, above an example nobody scrolled
-far enough to reach.
+far enough to reach, and in their own file until 2026-08-27.
 
 `docs/GLOSSARY.md` is a pointer table for the shorthand this repo uses across
 documents — `D2`, `§5`, `bar 4`, the rungs, the ledger status words. It defines
@@ -309,20 +293,6 @@ depending on the document.
 `docs/TASKS.md` is the **work queue** — actionable items only. It carries no
 statuses, verdicts or counts; PJ-008 §3's index is authoritative on what the
 model knows, and standing facts and gates are in this file.
-
-### Working alongside another session
-
-**Never suggest `git reset --hard` to another session.** You cannot see its
-working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
-commit; it had **five uncommitted files** at that moment, including a fix and a
-predictions document, and the command would have destroyed all of them silently.
-It rebased instead and said so. `rebase` reaches the same place and refuses when
-the tree is dirty, which is the property that matters across a boundary you
-cannot see through. The advice was right in shape and wrong in verb.
-
-More generally: a parallel session's **worktree state is invisible to you** in a
-way its branch state is not. `git log` tells you where it is; nothing tells you
-what it is holding.
 
 ### The dated records
 
@@ -341,6 +311,20 @@ independently; see its README. The Stop/SessionStart wiring lives in
 out of the repo is `.claude/settings.local.json` (machine-local) and
 `.claude/.wrap-state/` (one file per session, derived from git; a tracked copy
 would hand a new worktree another session's pinned baseline).
+
+### Working alongside another session
+
+**Never suggest `git reset --hard` to another session.** You cannot see its
+working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
+commit; it had **five uncommitted files** at that moment, including a fix and a
+predictions document, and the command would have destroyed all of them silently.
+It rebased instead and said so. `rebase` reaches the same place and refuses when
+the tree is dirty, which is the property that matters across a boundary you
+cannot see through. The advice was right in shape and wrong in verb.
+
+More generally: a parallel session's **worktree state is invisible to you** in a
+way its branch state is not. `git log` tells you where it is; nothing tells you
+what it is holding.
 
 ## Commands
 
@@ -367,168 +351,18 @@ bun run check:stdout          # nothing under src/ writes to stdout except the C
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
+bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
 bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted
 bun run check:binary          # builds bin/labkit and drives it against a fresh database
 bun run dev                    # the CLI (src/cli/cli.ts)
-bun run mcp                    # the MCP server over stdio (src/mcp/server.ts)
+bun run mcp                    # the MCP server over stdio -- `labkit mcp`, src/cli/commands/serve.ts
 ```
 
 Formatting and linting are both biome — `bun run format` writes,
 `check:format` and `check:lint` are in the sweep.
-
-### The binary, and the 1.9GB it leaked
-
-`bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
-directory** (`scripts/build-binary.sh`), and that is not tidiness:
-`bun build --compile` leaves a **byte-identical copy of the `bun` binary
-itself** — 61MB, `.<hash>-00000000.bun-build` — in the current working
-directory on every *successful* run, and never removes it. Verified by sha256
-against bun 1.3.14. The hash differs per build so they accumulate, and they are
-`.gitignore`d so nothing complains; thirty-two of them had reached **1.9GB** in
-the repo root before anyone read a directory listing. The staging path follows
-the **CWD, not `--outfile`** — measured — so building from a `mktemp -d` that is
-removed on exit leaves the leak nowhere to go. There is no flag for it.
-
-That is also why `build` is a script rather than the `package.json` one-liner it
-was, the same reason `dev:dependency-cruiser` is one.
-
-**`bun run check:binary` proves the binary works** — it builds and drives the binary
-against a database that does not exist yet, which is the case that was broken.
-
-It was broken from the day the build script existed, in **three places, each
-hidden behind the last**: drizzle's migration folder, the two PGlite extension
-tarballs, and PGlite's own `pglite.data`. One root cause —
-**`import.meta.url` does not name a directory on disk once the code is inside a
-`bun build --compile` bundle**; it is `/$bunfs/root/…`, and nothing put a file
-there. Every one was invisible to `bun test` and `bun run dev`, which read those
-files off the real filesystem and work.
-
-The fix is to hand the assets over rather than let them be located
-(`src/db/migrations.ts`, `src/db/extensions.ts`) — Bun embeds a file imported
-`with { type: "file" }`, and `node:fs` can read it back out of `$bunfs`.
-
-**One asset could not stay embedded, and the reason is worth knowing before
-trying again**: PGlite reads an extension bundle with `createReadStream` piped
-through `zlib`, and `$bunfs` does not implement streaming. `existsSync` returns
-true and `open` then fails `ENOENT` — a confusing pair. Those two tarballs are
-written once to a temp file; everything else is read in place.
-
-**Known upstream and unfixed**, so this is not a local oddity and there is no
-version to wait for: [pglite#414](https://github.com/electric-sql/pglite/issues/414)
-and [bun#15032](https://github.com/oven-sh/bun/issues/15032) are the same
-`ENOENT … /$bunfs/root/pglite.data`, open since Bun 1.1.33. The asset handover
-is PGlite's own documented answer for restricted environments
-([bundler support](https://pglite.dev/docs/bundler-support)); the extension
-tarballs are not covered there and are the part with no prior art.
-
-**Drizzle's documented advice does not fix this**, and that was measured rather
-than assumed. Its docs say to copy `drizzle/` alongside the build output — which
-is right for a `dist` deployment run by Node, and insufficient here: a binary
-built that way finds the folder and then dies on `pglite.data`, because two of
-the three bugs are PGlite's, not drizzle's.
-
-The general lesson, which cost three rounds of build-and-run: **each fix moved
-the failure one step later rather than removing it**, and the only way to find
-the next was to run the binary again. Nothing had ever run it.
-
-### The CLI
-
-`src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
-surface, reads *and* writes (`bun run dev`). It is a composition root and
-nothing else: `program.ts` assembles the commands, `commands/` declares them,
-`args.ts` turns text into domain values on zod, `views/` turns reports into
-pages, and `session.ts` is the wrap that hands a command its surfaces. It
-replaced a 1435-line `src/cli.ts` whose `switch` was five hundred of them; the
-port was verified by running `examples/full-lifecycle.sh` against both and
-diffing the transcripts, which were byte-identical.
-
-**It was read-only by construction and is not any more**, and that is the same
-correction the MCP server got. Read-only was never a shipping goal; what it
-produced was a record with **no way to put anything into it** except by wiring
-up an agent and an MCP server. The one script that did write —
-`examples/full-lifecycle.ts` — did it by calling `TenantGraph.createNode`
-underneath the domain layer, which is the bypass the read-only tests existed to
-prevent, in the only writer there was. The two structural tests were deleted
-with the commit that added write commands, not worked around, and
-`tests/helpers/read-only.ts` went with them.
-
-**Every public verb on either surface has a command**, derived in
-`tests/cli/coverage.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
-`tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
-`NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
-this paragraph deliberately does not count them. What survives from the
-read-only era, as a narrower test: **the CLI reaches the graph only through the
-domain verbs**, calling nothing on the `TenantGraph` it constructs.
-
-**Its event log is passed in, not defaulted, on both halves.** `SessionCore`
-falls back to `inMemoryEventLog()`, which in a process that exits after one
-command is an array nothing ever wrote to. On the read side `labkit happened`
-then reports that nothing has ever happened against a full database; on the
-write side a verb commits its graph changes durably while the event describing
-them dies at exit — durable state with no record of the act that caused it. Both
-are confidently wrong rather than empty. `main()` builds one `pgEventLog()` over
-the connection the graph already has and hands it to both.
-
-**The CLI is where attribution stopped being a mock.** `src/attribution.ts`
-predicted that a real `GitContextProvider` would be the first subprocess under
-`src/`; `gitContext` is it, and `personContext` names the user. The MCP server
-keeps the stubs, because *which agent* and *which session* are facts the
-protocol does not carry. `--author` overrides the username, because a script
-driving LabKit is not the account it runs under.
-
-**Colour is a `Palette` a view is handed, never a module-level global**
-(`src/cli/palette.ts`). Members are named for the record's distinctions —
-`settled`, `contested`, `untested`, `provisional`, `handle`, `heading`, `quiet`
-— so a view says `p.contested(state)` and the colour choice lives in one file.
-`PLAIN` is the identity function, so a plain run and a coloured one differ by
-escape sequences and never by which branch rendered the page.
-
-It is a parameter because of what a global would cost: `bun test`'s stdout is
-not a terminal, so every fixture in `tests/cli/views.test.ts` would silently
-check the uncoloured path and nothing would check the other. They now render
-both and assert `stripped(coloured) === plain`.
-
-**A handle-only answer is never coloured, even in a terminal.** The whole of a
-write command's stdout is an id the next command consumes. Colouring it made
-`$(labkit criterion 'x')` capture an id wrapped in escape sequences under
-`FORCE_COLOR=1` — measured, not predicted — turning a documented contract into
-something conditional on an environment variable. A report gets colour because a
-person reads it; a handle does not, because a shell does.
-
-Two more things the tests caught rather than review:
-
-- **Pad before colouring, and pick the colour from the unpadded value.** An
-  escape sequence has length, so padding a coloured string pads bytes nobody can
-  see. The first version padded first and then matched on the padded string, so
-  `"failed             "` matched no case and every gate state came out the same
-  colour.
-- picocolors was chosen **by measurement**: under Bun 1.3.14, `node:util`'s
-  `styleText` writes escapes into a pipe and ignores `NO_COLOR` entirely, and
-  `ansis` writes escapes into a pipe with no environment variables set at all.
-  Either would have broken `$(labkit …)`. `--no-ansi` only ever subtracts, and
-  picocolors' own `isColorSupported` is reused rather than reimplemented.
-
-### Where the database lives
-
-**`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
-the project root by another route. A temporary directory gets its own database
-file *and* its own lock, sharing nothing with a working database, which is what
-makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
-to get its own TCP port too, from a `derivePort` that hashed the path; there is
-no port any more. `LABKIT_DB_URL` still wins over both.
-
-### The MCP server
-
-**`src/mcp/server.ts` reads *and writes*** (`bun run mcp`). It was read-only for
-one batch of work and that is not a design position: a record nothing can write
-to has nothing in it. Read and write handlers are handed different surfaces, so
-neither can reach the other's verbs, and
-`tests/mcp.test.ts` asserts every public verb on either surface is exposed or
-listed in `NOT_EXPOSED` with a reason. **`labkit://docs/tools` is the tool list**;
-this paragraph deliberately does not count them.
 
 ### Exit codes, and the script that told everyone to ignore its own
 
@@ -717,163 +551,269 @@ The other text-reading checks were surveyed and left alone deliberately.
 *use the compiler everywhere* — it is **a pattern spanning a token boundary
 needs a parser**.
 
-## Architecture: two persistence halves, deliberately not one
+## Surfaces
 
-The domain has ~14 entities (Question, LineOfEnquiry, EvidenceUnit,
-Evidence, Claim, Decision, Criterion, CriterionEvaluation, Gate, Review,
-Artefact, Computation, Task). Only **`Tenant`** (`src/db/schema.ts`) is a
-relational Drizzle table — it's the persistence/isolation boundary, not a
-scientific entity (see PJ-003 for why `Tenant`, not `Project`). Every other
-entity is a node in **one Apache AGE graph per tenant**, because provenance
-traversal and dependency propagation are the actual point of this domain —
-forcing them into FK tables would just reimplement graph traversal as
-recursive CTEs.
+What LabKit *is*, from the outside: one binary, two adapters over one domain.
+These lived under `## Commands` until 2026-08-27, which put the `$bunfs` asset
+handover and the CLI's composition root under a heading promising a list of
+things to type. A section whose subsections are named for a binary leak is not
+a commands section.
 
-### The modules, and the direction they depend
+### The binary, and the 1.9GB it leaked
 
-`src/db/` is layered, not a hub — each module has one job, and the
-dependency direction is enforced by `bunx depcruise src tests --output-type err`
-(violations only; `bun run dev:dependency-cruiser` redraws
-`docs/dependency-graph.mmd`):
+`bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
+directory** (`scripts/build-binary.sh`), and that is not tidiness:
+`bun build --compile` leaves a **byte-identical copy of the `bun` binary
+itself** — 61MB, `.<hash>-00000000.bun-build` — in the current working
+directory on every *successful* run, and never removes it. Verified by sha256
+against bun 1.3.14. The hash differs per build so they accumulate, and they are
+`.gitignore`d so nothing complains; thirty-two of them had reached **1.9GB** in
+the repo root before anyone read a directory listing. The staging path follows
+the **CWD, not `--outfile`** — measured — so building from a `mktemp -d` that is
+removed on exit leaves the leak nowhere to go. There is no flag for it.
 
-| module | job |
-| --- | --- |
-| `backend.ts` | `LabKitDB` (the connection seam) + `bootstrapSession`, and the two backends that satisfy it |
-| `connect.ts` | picks a backend and connects through it |
-| `transactor.ts` | the transaction boundary, one per connection |
-| `orm.ts` | drizzle, mounted **on** the seam via `pg-proxy` |
-| `scoped.ts` | steps a session down to `labkit_app` with its tenant pinned |
-| `agtype.ts` | agtype parsing, identifier validation, Cypher clause/quoting helpers |
-| `cypher.ts` | `CypherRunner` + column decoders — typed Cypher execution |
-| `domain.ts` | what LabKit's entities *are*: labels, `*Props`, `NODE_TYPES`, `EDGE_SCHEMA`, `INDEXED_PROPS` |
-| `graph.ts` | `TenantGraph` — the domain-typed verbs |
-| `provisioning.ts` | per-tenant graph schema reconciliation |
-| `tenant.ts` | resolving a slug to a `TenantContext` |
+That is also why `build` is a script rather than the `package.json` one-liner it
+was, the same reason `dev:dependency-cruiser` is one.
 
-**There is no barrel and no `client.ts`.** `src/db/index.ts` exported 11 names
-of which 4 were ever imported through it, while 47 imports reached into
-submodules directly — a file to keep in sync with something nothing depended on.
-It is cheap to reintroduce later as an *enforced* boundary, which is the only
-version of it worth having. `client.ts` held the seam and was named for a thing
-it does not export: no client, just an interface with two permanent
-implementations, which sent readers looking for the construction in the wrong
-file. It is folded into `backend.ts`, beside `LabKitDBConnection` — a connection
-and the thing you can do with one are the same subject. Every importer of
-`LabKitDB` outside `backend.ts` is `import type`, so nothing pulls PGlite in by
-depending on the seam.
+**`bun run check:binary` proves the binary works** — it builds and drives the binary
+against a database that does not exist yet, which is the case that was broken.
 
-`domain.ts` imports nothing from `src/db/`; it's pure types and data, read by
-both `graph.ts` (to type and validate writes) and `provisioning.ts` (to decide
-what to create). Its **string taxonomy** — `IndexedString`,
-`Timestamp`, `IdentityString`, `ReadOnlyString<T>`, `Prose` — says what LabKit
-*does* with each stored string, so a reader learns it from the declaration
-instead of auditing every Cypher query. All five are plain aliases and constrain
-nothing; the one with a machine consequence is `INDEXED_PROPS`, which
-`provisionTenantGraph()` loops to build a non-unique functional index per
-matched property, and which `check:prop-classes` holds to the annotations. Two
-copies of one fact, kept because they fail silently in opposite directions — a
-missing entry is a sequential scan nobody sees, a spurious one an index nobody
-reads. Generating the table from the types is the honest end state. `NODE_TYPES` is one entry per node label carrying its
-natural-id `prefix` and its optional `validate` — the four parallel per-label
-tables it replaced are not coming back. It also carried `viewColumns` until the
-per-tenant CQRS views were removed; see "No relational read side" below.
+It was broken from the day the build script existed, in **three places, each
+hidden behind the last**: drizzle's migration folder, the two PGlite extension
+tarballs, and PGlite's own `pglite.data`. One root cause —
+**`import.meta.url` does not name a directory on disk once the code is inside a
+`bun build --compile` bundle**; it is `/$bunfs/root/…`, and nothing put a file
+there. Every one was invisible to `bun test` and `bun run dev`, which read those
+files off the real filesystem and work.
 
-### TenantGraph is the only way in
+The fix is to hand the assets over rather than let them be located
+(`src/db/migrations.ts`, `src/db/extensions.ts`) — Bun embeds a file imported
+`with { type: "file" }`, and `node:fs` can read it back out of `$bunfs`.
 
-All graph access goes through `TenantGraph` (`src/db/graph.ts`), constructed
-per-tenant as `new TenantGraph(ctx, db)`. Never touch AGE directly:
+**One asset could not stay embedded, and the reason is worth knowing before
+trying again**: PGlite reads an extension bundle with `createReadStream` piped
+through `zlib`, and `$bunfs` does not implement streaming. `existsSync` returns
+true and `open` then fails `ENOENT` — a confusing pair. Those two tarballs are
+written once to a temp file; everything else is read in place.
 
-- `query(cypher, columns, params)` — the read surface. `columns` is
-  `{ returnedName: decoder }` (`vertexProps`, `edgeProps`, `vertex`, `edge`,
-  `path`, `scalar`, `agtypeValue`, `optional` — all from `src/db/cypher.ts`).
-  That one declaration produces both the SQL `AS` clause AGE requires and the
-  row type, so callers never hand-write `"(n agtype)"` or call `parseAgtype`
-  themselves. Params are bound as agtype, never interpolated.
-- `createNode(label, props)` — `label` selects the property shape via
-  `NodePropsByLabel`, so passing another label's props is a compile error.
-  Stamps a short natural ID (`COMP_123`, prefix from `NODE_TYPES[label].prefix`)
-  in the same round trip; strips AGE's internal graphid before returning. That
-  graphid must never reach a caller outside this file.
-- `createEdge(fromId, edge, toId)` — resolves both endpoints' labels from
-  their natural-id prefix, validates the `(fromLabel, edge, toLabel)`
-  combination against the authoritative `EDGE_SCHEMA` table, and is
-  idempotent: calling it twice with the same three values is a no-op, not a
-  duplicate edge (enforced by a real `UNIQUE (start_id, end_id)` Postgres
-  index per edge label — see "AGE-specific gotchas" below).
+**Known upstream and unfixed**, so this is not a local oddity and there is no
+version to wait for: [pglite#414](https://github.com/electric-sql/pglite/issues/414)
+and [bun#15032](https://github.com/oven-sh/bun/issues/15032) are the same
+`ENOENT … /$bunfs/root/pglite.data`, open since Bun 1.1.33. The asset handover
+is PGlite's own documented answer for restricted environments
+([bundler support](https://pglite.dev/docs/bundler-support)); the extension
+tarballs are not covered there and are the part with no prior art.
 
-### Transactions belong to the connection
+**Drizzle's documented advice does not fix this**, and that was measured rather
+than assumed. Its docs say to copy `drizzle/` alongside the build output — which
+is right for a `dist` deployment run by Node, and insufficient here: a binary
+built that way finds the folder and then dies on `pglite.data`, because two of
+the three bugs are PGlite's, not drizzle's.
 
-A compound domain verb must run inside `graph.inTransaction(fn)` — everything
-it writes commits together or none of it does. Earned by external review of
-S-3c (PJ-020), by negative test in each case: `replaceAnalysis()` invalidates the superseded
-output *before* recording the replacement, and since S-3c invalidating an output
-withdraws the criterion evaluations that cited it, so a failure between the
-halves left an earlier failure no longer deciding its check and no corrected
-check in existence. `reverify()`, `replaceAnalysis()` and `recordAnalysis()` use
-it, and so do `reinterpret()` and `amendDesign()` — every compound verb now
-does. It is re-entrant by depth, so a composed verb does not nest `BEGIN`. Note
-this is a transaction boundary, not an escape hatch: no caller gains the ability
-to issue Cypher this class would not otherwise run.
+The general lesson, which cost three rounds of build-and-run: **each fix moved
+the failure one step later rather than removing it**, and the only way to find
+the next was to run the binary again. Nothing had ever run it.
 
-**The boundary itself belongs to the connection, not to the graph**
-(`src/db/transactor.ts`). `TenantGraph` owned it because it was the only citizen
-of `src/db/` when `inTransaction` was written — not a decision, the only
-available place. The event store writes down the same connection and drizzle
-mounts on the same seam, and two objects issuing `BEGIN` down one connection are
-in one transaction whether they know it or not; a second depth counter is how
-they stop knowing. `LabKitDBConnection.tx` hands out the one, `TenantGraph`
-takes it as a **required** constructor argument, and `graph.inTransaction`
-delegates while keeping the one consequence only a graph knows about — clearing
-its minted-id list when the outermost transaction settles.
+### The CLI
 
-Two traps, both found by the suite rather than by review:
+`src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
+surface, reads *and* writes (`bun run dev`). It is a composition root and
+nothing else: `program.ts` assembles the commands, `commands/` declares them,
+`args.ts` turns text into domain values on zod, `views/` turns reports into
+pages, `session.ts` is the wrap that hands a command its surfaces, and
+`commands/serve.ts` registers `labkit mcp`. That last one is **not** registered
+through `runner()` and does not go through `session.ts`, which is the reason it
+has its own file: `runner()` opens a database, resolves a tenant, does one unit
+of work, prints a report and closes — the shape of a command that answers and
+exits. The server acquires and releases per *tool call*, for as long as an
+agent's session lasts, and prints nothing a person reads. It
+replaced a 1435-line `src/cli.ts` whose `switch` was five hundred of them; the
+port was verified by running `examples/full-lifecycle.sh` against both and
+diffing the transcripts, which were byte-identical.
 
-- **Ask "am I the outermost?" before entering, not inside.** Within the
-  transactor's closure the depth reads 1 for an outermost call *and* for one
-  nested in it, so testing it there makes an inner call clear the minted ids
-  before the outer verb's `emit` drains them — and the outer event then reports
-  creating nothing.
-- **Never default the transactor.** A `TenantGraph` that made its own would look
-  identical and be wrong the moment a second graph appeared over the same
-  connection, which is not hypothetical: `scenario.current()` builds exactly
-  that. Same failure shape as a per-call surface defaulting its own event sink.
+#### It is not read-only, and never shipped that way
 
-There is deliberately no raw-string escape hatch on `TenantGraph`. If a query
-needs a shape the decoders don't cover, add a decoder to `src/db/cypher.ts`
-rather than reintroducing one.
+**It was read-only by construction and is not any more**, and that is the same
+correction the MCP server got. Read-only was never a shipping goal; what it
+produced was a record with **no way to put anything into it** except by wiring
+up an agent and an MCP server. The one script that did write —
+`examples/full-lifecycle.ts` — did it by calling `TenantGraph.createNode`
+underneath the domain layer, which is the bypass the read-only tests existed to
+prevent, in the only writer there was. The two structural tests were deleted
+with the commit that added write commands, not worked around, and
+`tests/helpers/read-only.ts` went with them.
 
-### The relational half
+**Every public verb on either surface has a command**, derived in
+`tests/cli/coverage.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
+`tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
+`NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
+this paragraph deliberately does not count them. What survives from the
+read-only era, as a narrower test: **the CLI reaches the graph only through the
+domain verbs**, calling nothing on the `TenantGraph` it constructs.
 
-**The relational half has a typed surface too, now.** `ormOver(db)`
-(`src/db/orm.ts`) mounts drizzle through `drizzle-orm/pg-proxy`, which takes a
-*callback* rather than a client — `LabKitDB.query` with one more argument — so
-the ORM sits **on** the seam beside `CypherRunner` instead of beside the
-connection. It inherits tracing, whatever the session was scoped to, and the
-open transaction, all for free; `drizzle(client)` would have inherited none of
-them and nothing would have said so. There is no socket involved.
+**Its event log is passed in, not defaulted, on both halves.** `SessionCore`
+falls back to `inMemoryEventLog()`, which in a process that exits after one
+command is an array nothing ever wrote to. On the read side `labkit happened`
+then reports that nothing has ever happened against a full database; on the
+write side a verb commits its graph changes durably while the event describing
+them dies at exit — durable state with no record of the act that caused it. Both
+are confidently wrong rather than empty. `main()` builds one `pgEventLog()` over
+the connection the graph already has and hands it to both.
 
-It replaced the only two places that assembled SQL by hand — `tenant.ts` and
-`src/domain/event-store.ts`, four call sites, one of them building a `WHERE`
-clause with `$${params.push(value)}` from MCP-supplied filters.
+**The CLI is where attribution stopped being a mock.** `src/attribution.ts`
+predicted that a real `GitContextProvider` would be the first subprocess under
+`src/`; `gitContext` is it, and `personContext` names the user. The MCP server
+keeps the stubs, because *which agent* and *which session* are facts the
+protocol does not carry. `--author` overrides the username, because a script
+driving LabKit is not the account it runs under.
 
-**`rowMode: "array"` is not optional and its absence is silent.** The proxy
-driver decodes rows positionally; hand it objects and `select().from(t)` returns
-**`[{}, {}]`** — right row count, no error — or dies inside an array column's
-decoder with `undefined is not an object (evaluating 'value.map')`. That is why
-the option is on the seam (`QueryOptions`) rather than left to each call site,
-and why `directPostgresBackend` wraps its `pg.Client` instead of handing it
-over: `pg.Client.query`'s third positional argument is a *callback*, so the
-option has to travel in the config-object form. Forgetting to forward it in
-`tests/helpers/db.ts` is how the failure above was met, twice.
+#### Colour is a parameter, not a global
 
-One thing it buys beyond tidiness: **`bigserial` and `count(*)` come back as a
-string from `pg` and a number from a raw PGlite**, and drizzle's column mappers
-normalise that away. `event-store.ts` used to carry a `Number(r.seq)` for it.
+**Colour is a `Palette` a view is handed, never a module-level global**
+(`src/cli/palette.ts`). Members are named for the record's distinctions —
+`settled`, `contested`, `untested`, `provisional`, `handle`, `heading`, `quiet`
+— so a view says `p.contested(state)` and the colour choice lives in one file.
+`PLAIN` is the identity function, so a plain run and a coloured one differ by
+escape sequences and never by which branch rendered the page.
 
-`TenantContext` (`{ tenantId, graphName }`) comes from
-`resolveTenantContext(db, slug)` (`src/db/tenant.ts`) — the CLI/MCP/bootstrap
-boundary resolves a tenant once; below that boundary, every function takes a
-resolved context, there is no "tenant omitted" mode.
+It is a parameter because of what a global would cost: `bun test`'s stdout is
+not a terminal, so every fixture in `tests/cli/views.test.ts` would silently
+check the uncoloured path and nothing would check the other. They now render
+both and assert `stripped(coloured) === plain`.
+
+**A handle-only answer is never coloured, even in a terminal.** The whole of a
+write command's stdout is an id the next command consumes. Colouring it made
+`$(labkit criterion 'x')` capture an id wrapped in escape sequences under
+`FORCE_COLOR=1` — measured, not predicted — turning a documented contract into
+something conditional on an environment variable. A report gets colour because a
+person reads it; a handle does not, because a shell does.
+
+Two more things the tests caught rather than review:
+
+- **Pad before colouring, and pick the colour from the unpadded value.** An
+  escape sequence has length, so padding a coloured string pads bytes nobody can
+  see. The first version padded first and then matched on the padded string, so
+  `"failed             "` matched no case and every gate state came out the same
+  colour.
+- picocolors was chosen **by measurement**: under Bun 1.3.14, `node:util`'s
+  `styleText` writes escapes into a pipe and ignores `NO_COLOR` entirely, and
+  `ansis` writes escapes into a pipe with no environment variables set at all.
+  Either would have broken `$(labkit …)`. `--no-ansi` only ever subtracts, and
+  picocolors' own `isColorSupported` is reused rather than reimplemented.
+
+### Where the database lives
+
+**`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
+the project root by another route. A temporary directory gets its own database
+file *and* its own lock, sharing nothing with a working database, which is what
+makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
+to get its own TCP port too, from a `derivePort` that hashed the path; there is
+no port any more. `LABKIT_DB_URL` still wins over both.
+
+**With neither set, an existing `.labkit/` at or above the working directory is
+found** (`resolveProjectRoot`, `src/db/connect.ts`). A client launched from
+`packages/foo` used to report an empty record for a project full of work, which
+matters more since one binary: an MCP client's working directory is chosen by
+the editor, not the user. The walk **only ever finds, never decides where to
+create** — with nothing above, the answer is the working directory exactly as
+before, which is what keeps it from reintroducing the implicitness three review
+rounds removed.
+
+**`LABKIT_HOME` naming a directory that does not exist is refused.** It used to
+be created, because the lock directory was made with `{ recursive: true }` — so
+a typo built the whole path and yielded a fresh empty database, which reads
+exactly like a project nobody has worked on. Naming a directory is a claim that
+it is there. `tests/project-root.test.ts` holds both rules.
+
+### The MCP server
+
+**`src/mcp/server.ts` reads *and writes***, and is started by `labkit mcp`
+(`bun run mcp`) — one binary since PR #35, so the entry point is
+`src/cli/commands/serve.ts` and the server is a subcommand rather than a second
+executable. Two 77MB binaries shipping together came to ~154MB for two copies of
+one runtime. It was read-only for
+one batch of work and that is not a design position: a record nothing can write
+to has nothing in it. Read and write handlers are handed different surfaces, so
+neither can reach the other's verbs, and
+`tests/mcp.test.ts` asserts every public verb on either surface is exposed or
+listed in `NOT_EXPOSED` with a reason. **`labkit://docs/tools` is the tool list**;
+this paragraph deliberately does not count them.
+
+## Persistence
+
+**`docs/persistence.md` is the whole of it** — the two halves and why they are
+two, the `src/db/` module table, `TenantGraph`, the connection and backend
+layering, row-level security, tenant provisioning, migrations, and the dated
+AGE probe findings. About a fifth of this file moved there on 2026-08-27,
+unchanged.
+
+Three rules from it that are worth having before you open it, because breaking
+them is easy and the failure is quiet:
+
+- **All graph access goes through `TenantGraph`** (`src/db/graph.ts`). There is
+  deliberately no raw-string escape hatch; if a query needs a shape the
+  decoders do not cover, add a decoder to `src/db/cypher.ts`.
+- **A session is assembled in one order and it is not negotiable:**
+  `connect → bootstrapSession → migrate → resolveTenantContext → scopeToTenant
+  → domain`.
+- **Every compound domain verb runs inside a transaction**, so an event commits
+  with the writes it describes.
+
+The AGE gotchas stay below, because those are needed before writing a query
+rather than looked up afterwards.
+
+## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
+
+`pglite-age` is a genuine compile of Apache AGE's own C source (pinned at
+branch `PG18`, tag `v1.7.0-rc0`), not a reduced WASM-only subset — see the
+skill doc's "Overview" for how that's established and PJ-006 for why it
+mattered. Working gotchas:
+
+- **`MERGE` for relationships is broken** — creates an edge with
+  `start_id`/`end_id` both `0`, never actually connecting the two nodes
+  (WASM/pglite-age-specific, not stock AGE — see the skill doc).
+  `createEdge()` uses explicit `MATCH`-then-`CREATE` instead, backed by a
+  real `UNIQUE (start_id, end_id)` index as the actual concurrency
+  guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
+  which `createEdge()` catches and treats as success).
+- No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
+- **A `RETURN` name that is a SQL reserved word breaks the AS clause** —
+  `RETURN d, from` becomes `AS (d agtype, from agtype)` and fails in the SQL
+  parser (`42601`, `scanner_yyerror`, not `cypher_yyerror`). Alias it:
+  `RETURN d, from AS origin`.
+- **A camelCase `RETURN` name silently decodes as `null`** — worse than the
+  reserved-word case above, because nothing fails. The AS clause is unquoted
+  SQL, so Postgres folds `basisOut` to `basisout` while AGE keys the row by
+  the name the Cypher `RETURN` used; the column arrives present and `NULL` for
+  every row, and a decoder reads that as "nothing matched". Cost a wrong
+  diagnosis once, blamed on `OPTIONAL MATCH` (S-3c). `buildAsClause()` now
+  **refuses** such a name, so this is a compile-time-ish error rather than a
+  debugging session; alias in the query (`RETURN basisOut AS basisout`) or
+  name the variable lower-case. Labels and property keys are unaffected —
+  they are quoted, and `CriterionEvaluation`/`natural_id` are fine.
+- **`OPTIONAL MATCH` is not the fragile thing it looks like.** Multi-hop
+  patterns bind, and so do patterns extending a variable that an earlier
+  `OPTIONAL MATCH` bound — both verified directly against this backend when
+  the case-folding bug above was mistaken for an AGE limitation. Don't
+  restructure a query around a limit that isn't there.
+- **No `NOT (pattern)` predicate in `WHERE`** — `WHERE NOT (e)-[:R]->(:X)` is a
+  syntax error (`cypher_yyerror`), not merely unsupported. Fetch the candidate
+  and filter in TypeScript, as `whySupported()`'s `restingOn` does. Watch the
+  precedence trap next door too: `WHERE a IS NULL OR a = false AND NOT ...`
+  binds the `AND` tighter than the `OR`, so parenthesise before assuming a
+  filter means what it reads like.
+- **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
+  `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
+  form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a
+  single-type `[:TYPE*1..5]` for variable length.
+- Every AGE label (vertex or edge) is a real Postgres table
+  (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
+  it directly — this is how natural-id uniqueness and edge uniqueness both
+  work, with no `cypher()` call involved.
+- **Always schema-qualify explicitly** — `ag_catalog.` for AGE catalog
+  functions, `src/db/schema.ts`'s `LABKIT_SCHEMA` constant for LabKit's own
+  `tenants` table and natural-id functions. Don't rely on `search_path`
+  ordering to resolve an unqualified name.
 
 ## The domain service layer (`src/domain/`)
 
@@ -1186,275 +1126,6 @@ Two rules, so this is checkable rather than remembered:
    cannot name one is not deferred, it is unresolved and unowned, and it should
    say so in its own cell. "Record both and pick neither" is a decision about
    *models*; it is not a decision to stop looking for the discriminator.
-
-## Tenant provisioning is reconciliation, run every time
-
-There's no `ALTER GRAPH` DDL the way there's `ALTER TABLE` — evolving a
-tenant's AGE graph structure (new label, new edge, new index) is
-the application's job. `resolveTenantContext()` calls
-`provisionTenantGraph()`, which — inside one transaction guarded by a
-transaction-scoped `pg_advisory_xact_lock(tenantId)` — unconditionally
-ensures the graph, every `NODE_LABELS`/`EDGE_LABELS` entry, every natural-id
-index and every edge-uniqueness index exist.
-This runs on *every* `resolveTenantContext()` call, deliberately, not gated
-behind a version check — an earlier version added a `schema_version` gate as
-a performance optimization and it was reverted (PJ-005) because it silently
-stopped tenant resolution from self-healing drift. Don't reintroduce that
-kind of gate without a measured cost driving it.
-
-**No relational read side.** Every tenant used to get one SQL view per node
-label, reconciled on each `resolveTenantContext()`. Nothing ever read them, and
-nothing could: `TenantGraph` has no raw-SQL escape hatch, so every domain and
-scenario read goes through `cypher()`. They were removed after eight scenarios
-without a reader — 13 `CREATE OR REPLACE VIEW` statements per tenant per
-resolution, plus a standing non-additive migration problem (a view's columns
-can't be removed or reordered in place) held open for no consumer. This is not
-a reversal of the no-cull policy: that policy protects unused *labels and
-edges*, because a declared-but-unwalked edge is a claim about the domain. A view
-claims nothing. The MCP/CLI read layer was the case for bringing them back and
-it has since been built without them — every read goes through `cypher()` and
-none wanted a relational projection. `git show 51b70d6:src/db/provisioning.ts`
-has the implementation if one is ever earned;
-`provisionTenantGraph()` and `dropTenantGraph()` (`src/db/provisioning.ts`)
-are the only exports there. The class that does the work,
-`TenantGraphProvisioner`, is **module-private** on purpose — it takes no lock
-and opens no transaction itself, so `provisionTenantGraph()` is the only
-entry point. Tests exercise reconciliation through `resolveTenantContext()`,
-the same path production uses, never by calling internals directly.
-
-"Ensures ... exists" means additive structure only: indexes are checked by
-name (`IF NOT EXISTS`), labels by existence. There is deliberately no story
-yet for a non-additive schema change (renaming a label, reshaping a
-property that already has data) — see PJ-005's "Judgment calls."
-
-## Connection/backend layering
-
-`connectDb(projectRoot)` (`src/db/connect.ts`) picks a `DbBackend`
-(`src/db/backend.ts`):
-
-- **PGlite under an exclusive lock** (default): PGlite is single-writer and
-  file-backed, so a process takes a PID lockfile, opens the file, does its
-  work and gives both back. `runMigrations()` runs on every open — the no-op
-  case is 2ms and the lock is held across it, so there is no concurrent-writer
-  race. A process that finds the lock held **waits** rather than failing; the
-  holder is 80-96ms away.
-- **Direct Postgres** (`LABKIT_DB_URL` env var set): no lock, connects
-  straight to a real Postgres, which is its own arbiter. Migrations are *not*
-  run by this backend — that's an out-of-band deploy step by design (PJ-004).
-
-### What replaced the leader election
-
-**This replaced a leader election, and the reason is worth knowing before
-anyone proposes bringing one back.** The winner of the lockfile race used to
-open PGlite, start a `PGLiteSocketServer`, and connect *to itself* over
-loopback TCP so every process — including the owner — talked to it as a
-`pg.Client`. It was coherent and it bought nothing the use case needs: several
-agents on one project cannot each hold a connection under it either, because
-the first process in owns the file and the rest reach it only while that
-process lives. Releasing between units of work was already forced. What the
-socket added on top was a second failure mode — when the primary died, a
-secondary's next query raised an **uncaught** `'error'` event from `pg` and
-killed the process before any `catch` ran — and one upstream concurrency bug
-([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046))
-that the whole test suite was shaped around containing.
-
-### Nothing holds the database between units of work
-
-**So nothing holds the database between units of work, and `src/mcp/server.ts`
-is where that matters.** An MCP server lives as long as its agent's session; if
-it held the file for that long, nothing else could touch the project at all —
-and the thing that most often wants it is **a person at a terminal**, running
-`labkit known` or `labkit why` against the record an agent is currently writing.
-Several agents at once is the rarer case and was the only one this paragraph
-named until 2026-08-26.
-
-It opens and closes around each tool call — 80-96ms warm, measured 2026-08-26
-(open 70-85ms, migrate 2ms, tenant resolve 7-8ms, close 2ms) against a cold
-open of 1067ms. Two overlapping calls serialise on the lock. **A process does
-not skip its own lock**: two calls in one process read their own PID as alive
-and the second waits, which is right, because the lock guards a `dataDir` and
-one process opening it twice corrupts the file exactly as two would.
-
-What keeps that server's process alive between calls is **the stdin
-subscription, not a held connection** — measured under Bun 1.3.14, since the
-comment that used to credit the connection would now be describing something
-that no longer exists.
-
-**Independently confirmed, on a second codebase.** Dan's `exo-ledger` runs the
-design this replaced — a lockfile-elected daemon serving PGlite over the pg wire
-protocol — and measured the arm LabKit could not, on the same machine: a client
-connecting to a live daemon costs **1-7ms**, and the same unit of work costs
-76-88ms through the socket against 81-87ms in-process. So the wire hop is free
-at these shapes and the daemon buys a flat ~78ms per call and nothing else.
-Their in-process open was 72-83ms cold-to-warm against LabKit's 70-85ms, which
-is the same number twice from two codebases. Recorded because a measurement that
-agrees from somewhere else is worth more than a repeat of your own.
-
-## Row-level security, and what it is actually worth
-
-A session connects as a **superuser**, and that is not laziness: `LOAD 'age'` is
-refused to a non-superuser — `access to library "age" is not allowed`, SQLSTATE
-42501, measured 2026-08-26 — and PGlite has no other way to get the library in.
-So the order is fixed:
-
-```
-connect → bootstrapSession → migrate → resolveTenantContext → scopeToTenant → domain
-```
-
-`scopeToTenant` (`src/db/scoped.ts`) pins `labkit.tenant_id` with `set_config`
-and then `SET ROLE labkit_app`. From that point a query on `public.labkit_event`
-that forgets its tenant filter still returns only that tenant's rows, and one
-that writes another tenant's row is refused with 42501.
-
-### What the step-down is worth
-
-**It is a safety boundary, not a security one.** The session can `RESET ROLE`
-back to superuser. What it stops is a *query that forgot its filter*; what it
-does not stop is a caller who means harm. Both halves of that matter — the word
-"policy" invites a reader to assume the second.
-
-**A real login boundary is closer than this said, and the correction is worth
-knowing.** The refusal is of *issuing* `LOAD`, not of needing it. `docker/postgres`'s
-base image runs `postgres -c shared_preload_libraries=age`, so AGE is in every
-backend at server start; measured on it, a plain LOGIN role that never issues
-`LOAD` resolves `agtype` and reads through Cypher fine. So the ingredients are a
-preloading server plus a `bootstrapSession` that does not issue `LOAD` — not the
-per-role `session_preload_libraries` this used to name. PGlite still needs the
-step-down, having no preload and one superuser session. **Noted, not built**;
-the write half of that probe was not re-verified after a grant gap in the probe
-itself.
-
-### Three things measured rather than assumed
-
-Three things that are easy to get wrong here, all measured rather than assumed:
-
-- **A superuser bypasses RLS unconditionally**, and `FORCE ROW LEVEL SECURITY`
-  is not enough to stop it. A non-superuser role is required, which is the whole
-  reason the step down exists.
-- **`current_setting('labkit.tenant_id')` has no `missing_ok`, deliberately.** A
-  scoped session that never had its tenant set raises 42704 on the first read.
-  The soft form returns NULL and the policy then matches nothing, so the log
-  reports that nothing has ever happened against a full table — the confidently
-  wrong answer this repo goes furthest to avoid.
-- **Grants live in `provisionTenantGraph()`, not in a migration.** A tenant's
-  schema does not exist when the migrations run, and neither do the label tables
-  a future release will add to it. `ALTER DEFAULT PRIVILEGES` covers what comes
-  later and a blanket `GRANT … ON ALL TABLES` covers what came before; each
-  misses what the other catches.
-
-### Which migration holds what
-
-**Which migration holds what is decided by one rule: drizzle cannot migrate what
-it does not manage.** `drizzle/0002_natural_ids.sql` is *the* hand-written
-migration — natural-id sequences and functions, and since 2026-08-26 the
-`labkit_app` role and every `GRANT`, because drizzle models privileges not at
-all (measured: the string `GRANT ` does not appear anywhere in drizzle-kit's
-bundle). Everything drizzle *does* manage stays in files it generated and nobody
-edits. The filename says which is which: generated migrations carry drizzle-kit's
-random names, hand-written ones are named for what they do.
-
-**`pgRole(...).existing()` is what keeps the generated file generated.**
-`generatePgSnapshot` skips a role marked that way (`if (!role._existing)`), so
-the RLS migration names the role in its policy and never emits a `CREATE ROLE`
-that `0002` has already made, guarded. Two things that look like the right lever
-and are not: `pgRole(name, { createRole: false })` is the Postgres `CREATEROLE`
-*attribute*, and `entities.roles.exclude` is consumed only by drizzle-kit's
-*introspection* path — `generatePgSnapshot` takes no config at all. The first
-misreading is what produced a hand-edited generated migration in the first place.
-
-**`ALTER DEFAULT PRIVILEGES IN SCHEMA public` in `0002` is why a new
-tenant-aware table needs no privilege work.** `labkit_event` does not exist yet
-at `0002` and so cannot be granted explicitly from there; default privileges
-cover it and everything added after. Verified 2026-08-26 by creating a table and
-asking `has_table_privilege`/`has_sequence_privilege` — both true with no grant
-naming it. It holds only while one role runs every migration, which is true
-today. One caveat found by trying it: a table with a foreign key generates an
-`ALTER TABLE … ADD CONSTRAINT`, which `check:migrations` requires a
-`-- lock-strategy:` line for — the check working, but one comment prepended by
-hand.
-
-`tests/tenancy-isolation.test.ts` is the reader. It drives `connectDb()`, the
-real resolve and the real step-down, so a missing grant surfaces as a
-permissions error rather than being supplied by the test — and it asserts
-`current_user` is not a superuser, without which every other assertion in it
-would pass against a session with no policy in force.
-
-`bootstrapSession(db)` (LOAD/search_path) must be called by every new
-session regardless of backend — it's session-scoped Postgres state and
-can't be migrated away, unlike the one-time `CREATE EXTENSION` bootstrap in
-`drizzle/0001_age_bootstrap.sql`.
-
-## Migrations
-
-`drizzle/` mixes `drizzle-kit generate`-produced files (currently just
-`0000`, the `tenants` table) with hand-written `--custom` ones (`0001`
-extension bootstrap, `0002` global natural-id sequences/functions) in one
-journal, applied together via `runMigrations()`
-(`drizzle-orm/pglite/migrator`). Custom migration files use
-`--> statement-breakpoint` between statements — required because PGlite's
-prepared-statement protocol can't execute a file containing multiple
-semicolon-separated statements in one call; `drizzle-kit generate --custom`
-does not add these automatically, you must.
-
-There is no persistent database yet (still pre-first-deploy). Until that
-changes, migrations get edited/regenerated *in place* rather than stacked —
-see the "License to rewrite history" note in
-`docs/project-journal/004_tenancy_implementation_plan.md`. Once a real
-database exists, that stops being true and this note should be updated.
-
-
-## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
-
-`pglite-age` is a genuine compile of Apache AGE's own C source (pinned at
-branch `PG18`, tag `v1.7.0-rc0`), not a reduced WASM-only subset — see the
-skill doc's "Overview" for how that's established and PJ-006 for why it
-mattered. Working gotchas:
-
-- **`MERGE` for relationships is broken** — creates an edge with
-  `start_id`/`end_id` both `0`, never actually connecting the two nodes
-  (WASM/pglite-age-specific, not stock AGE — see the skill doc).
-  `createEdge()` uses explicit `MATCH`-then-`CREATE` instead, backed by a
-  real `UNIQUE (start_id, end_id)` index as the actual concurrency
-  guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
-  which `createEdge()` catches and treats as success).
-- No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
-- **A `RETURN` name that is a SQL reserved word breaks the AS clause** —
-  `RETURN d, from` becomes `AS (d agtype, from agtype)` and fails in the SQL
-  parser (`42601`, `scanner_yyerror`, not `cypher_yyerror`). Alias it:
-  `RETURN d, from AS origin`.
-- **A camelCase `RETURN` name silently decodes as `null`** — worse than the
-  reserved-word case above, because nothing fails. The AS clause is unquoted
-  SQL, so Postgres folds `basisOut` to `basisout` while AGE keys the row by
-  the name the Cypher `RETURN` used; the column arrives present and `NULL` for
-  every row, and a decoder reads that as "nothing matched". Cost a wrong
-  diagnosis once, blamed on `OPTIONAL MATCH` (S-3c). `buildAsClause()` now
-  **refuses** such a name, so this is a compile-time-ish error rather than a
-  debugging session; alias in the query (`RETURN basisOut AS basisout`) or
-  name the variable lower-case. Labels and property keys are unaffected —
-  they are quoted, and `CriterionEvaluation`/`natural_id` are fine.
-- **`OPTIONAL MATCH` is not the fragile thing it looks like.** Multi-hop
-  patterns bind, and so do patterns extending a variable that an earlier
-  `OPTIONAL MATCH` bound — both verified directly against this backend when
-  the case-folding bug above was mistaken for an AGE limitation. Don't
-  restructure a query around a limit that isn't there.
-- **No `NOT (pattern)` predicate in `WHERE`** — `WHERE NOT (e)-[:R]->(:X)` is a
-  syntax error (`cypher_yyerror`), not merely unsupported. Fetch the candidate
-  and filter in TypeScript, as `whySupported()`'s `restingOn` does. Watch the
-  precedence trap next door too: `WHERE a IS NULL OR a = false AND NOT ...`
-  binds the `AND` tighter than the `OR`, so parenthesise before assuming a
-  filter means what it reads like.
-- **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
-  `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
-  form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a
-  single-type `[:TYPE*1..5]` for variable length.
-- Every AGE label (vertex or edge) is a real Postgres table
-  (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
-  it directly — this is how natural-id uniqueness and edge uniqueness both
-  work, with no `cypher()` call involved.
-- **Always schema-qualify explicitly** — `ag_catalog.` for AGE catalog
-  functions, `src/db/schema.ts`'s `LABKIT_SCHEMA` constant for LabKit's own
-  `tenants` table and natural-id functions. Don't rely on `search_path`
-  ordering to resolve an unqualified name.
 
 ## Testing patterns
 

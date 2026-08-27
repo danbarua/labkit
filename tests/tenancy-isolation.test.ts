@@ -84,7 +84,7 @@ async function asTenant<T>(
 ): Promise<T> {
   const connection = await connectDb(home);
   try {
-    const ctx = await resolveTenantContext(connection.db, slug);
+    const ctx = await resolveTenantContext(connection.db, connection.tx, slug);
     await scopeToTenant(connection.db, ctx);
     return await work(connection, ctx);
   } finally {

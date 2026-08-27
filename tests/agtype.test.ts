@@ -217,7 +217,7 @@ describe("parseAgtype — against live pglite-age", () => {
   });
 
   test("round-trips a real vertex, edge, and path exactly as parseAgtype expects", async () => {
-    const ctx = await resolveTenantContext(db, "labkit");
+    const ctx = await resolveTenantContext(db, db.tx, "labkit");
     const graph = new TenantGraph(ctx, db, db.tx);
 
     const a = await graph.createNode("Question", {
@@ -271,7 +271,7 @@ describe("parseAgtype — against live pglite-age", () => {
   // `expect(EDGE_LABELS.length).toBe(n)` would merely break. An assertion that
   // protects nothing an existing assertion does not is a change-detector.
   test("a SUPERSEDES edge's internal id, past Number.MAX_SAFE_INTEGER, round-trips exactly via bigint", async () => {
-    const ctx = await resolveTenantContext(db, "labkit");
+    const ctx = await resolveTenantContext(db, db.tx, "labkit");
     const graph = new TenantGraph(ctx, db, db.tx);
 
     const d1 = await graph.createNode("Decision", {
