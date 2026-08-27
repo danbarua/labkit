@@ -26,6 +26,20 @@ or ranges — see CLAUDE.md, "The one rule about documents".
 | **D1 / D2 / D3** | **Designer 1/2/3** — the three cold-context designers of the consumer-contract exercise. 1 = `claude-opus-5`, 2 = `gpt-5.6-sol`, 3 = `grok-4.6`. **Beware:** `D1`/`D2` also appear in PJ-001 and PJ-003 as *Decision* nodes in ASCII diagrams. Different thing entirely | `docs/consumer-contract/020_synthesis_blinded.md` |
 | **H1** | The consumer-contract exercise's main hypothesis, and the count of candidate distinctions surviving it | `docs/consumer-contract/021`, rescored in `023` |
 
+## Domain vocabulary that reads like plain English and is not
+
+Words a reader will assume they already understand. Each is defined in exactly
+one place and used everywhere.
+
+| Term | Means | Defined in |
+| --- | --- | --- |
+| **the five buckets** | `established` / `provisional` / `accepted` / `unresolved` / `untested` — how `whatIsKnown` partitions questions | `KnowledgeSurvey`, `src/domain/report.ts` |
+| **provisional** | **Answered, and not something to build on yet.** Two reasons, deliberately one bucket: the finding nobody promoted (S-18), *and* the promoted finding whose prespecified check failed or was never run (S-19). Its name described only the first until 2026-08-27 | `KnowledgeSurvey.provisional` |
+| **`Status` vs `state`** | `Status` is only ever a **report type** — `GateStatus`, `CheckStatus`, `EnquiryStatus`, the whole answer about one thing. `state` is only ever a **field** holding a computed enum. There is no `status:` field anywhere, and using both words for one idea is the confusion this entry exists to stop | `src/domain/report.ts` |
+| **the string taxonomy** | `IndexedString` / `Timestamp` / `IdentityString` / `ReadOnlyString<T>` / `Prose` — what LabKit *does* with a stored string, so a reader learns it from the declaration instead of auditing every query. All are plain aliases and constrain nothing; `check:no-stringly-typed` is what makes them load-bearing | `src/db/domain.ts` |
+| **`ReadOnlyString<T>`** | *Stored, handed back to callers, **never decided on***. It exists to say **nothing reads this field**, so an annotation that is wrong is worse than none — `Claim.kind` carried it falsely while three sites branched on it (2026-08-27) | `src/db/domain.ts` |
+| **held to** | A conclusion answering to a condition agreed **before** the run. Written when the analysis is recorded, not when the check is evaluated, so a check nobody ran still counts against the finding (S-3b) | `EDGE_SCHEMA.QUALIFIES`, `src/db/domain.ts` |
+
 ## The bars a change has to clear
 
 Four separate tests, easy to conflate and conflated once already (`024` records
