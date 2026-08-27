@@ -13,10 +13,15 @@ The first product work after the housekeeping: build the scenario for issue
 
 ## Changed
 
-**`b8092f2`** — `tests/scenarios/s19_promoted_over_an_unmet_check.test.ts` new;
+**`8563447`** — `tests/scenarios/s19_promoted_over_an_unmet_check.test.ts` new;
 `whatIsKnown` consults held-to check standing via a new `checksMetFor`;
 `KnowledgeSurvey.provisional` re-documented and its CLI heading renamed;
 `Claim.kind` loses a false `ReadOnlyString`.
+
+**`6d7d50a`** — S-19 gets prose in PJ-008 §3, ledger row **AK**, and a
+demonstration in `examples/full-lifecycle.sh`.
+
+Open as **PR #69**.
 
 ## Verified
 
@@ -35,6 +40,21 @@ middle test goes red again and the rest stay green.
 handle. Second time today that check has caught the same slip — the first was
 `blockedBy` in the previous piece of work — which is the argument for it being
 a script rather than a habit.
+
+**A scenario that exists only as a test file is findable by nobody**, which
+Dan said and was right about: *"Is anyone going to go looking in PJ-008 for
+S-19?"* The prose follows the convention S-3b set for a scenario authored after
+the mining exercise, and says it came from the digest design and issue #62
+rather than §1 — which is why no story number sits above it.
+
+**The example demonstrates it for the cost of a reorder, not an addition.** It
+already had every ingredient — criterion, gate, `analyse --held-to`, evaluate,
+promote, close — but ran the check *before* promoting, so it only ever showed
+the happy path. It now promotes, closes, shows `known` reporting provisional,
+shows `why` explaining, then evaluates and shows the same question established.
+One evaluation moves it and nothing else about the record changes. The text it
+replaced asserted that promotion is what separates provisional from
+established, which is now half true and was the reading that hid this defect.
 
 ## Open
 
@@ -75,9 +95,23 @@ made the conflation invisible.
 **Unmerged and easy to lose:** `docs/wrap-margin-close` carries 054's closing
 update and is not in `main`.
 
+**The prediction #66 was waiting on did not hold, and that is a result.** It
+was sequenced behind #62 on the theory that fixing the survey might produce the
+enumeration as a by-product. It did not: `checksMetFor` is **keyed by claim and
+answers one boolean**, taking claims the caller already holds. It never
+enumerates anything and cannot be asked *which gates are blocked*, because
+there is no claim to start from. The traversal exists and is the wrong shape,
+which is a cleaner answer than "reuse it" and is written onto #66 so nobody
+reconstructs it from merged PRs.
+
+It also settles one of #66's options: **extending `known` with more buckets is
+now clearly wrong** rather than suspected. `provisional` absorbed a second
+reason precisely because a reader acts identically on both; adding *gates* to a
+survey of *questions* is the scope error that sank the first attempt at a
+standup view.
+
 ## Next
 
-A PR for this branch, then issue #66 — one enumeration verb or two — which the
-design sequenced behind #62 precisely because this fix walks question →
-answering claim → held-to criteria inside the read surface, and part of the
-enumeration may exist as a by-product of `checksMetFor`.
+PR #69 awaits review. Then #66, which nothing blocks — and the recommendation
+there is unchanged: a worked example settles it faster than more design, since
+both prior rounds on this feature were corrected by running something.
