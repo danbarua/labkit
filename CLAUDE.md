@@ -724,6 +724,37 @@ first time it would have mattered is the first time it did.
 repository `git rev-parse` fails and the walk below is the fallback, so there is
 no special case beside a normal one.
 
+**A failed command writes the request that failed, on stderr**
+(`src/request-log.ts`), at the composition root of each surface — `main()`'s
+catch in `src/cli/cli.ts`, and `respond()` in `src/mcp/server.ts`. A stack trace
+says where a command broke and nothing about what it was given, which for LabKit
+is most of the diagnosis. The CLI logs **`argv`** rather than the parsed
+options, because a parse failure never produces options and that is the case it
+is most useful for; MCP logs the tool name and the arguments as the client sent
+them, before any schema takes them apart.
+
+**It does not catch. It logs and rethrows**, so an agent is still told over MCP
+exactly as before.
+
+**The stream is the whole of what makes this safe, and it does not reverse the
+existing rule.** `unwrapped()` and `src/db/trace.ts` refuse to log bound
+parameters because an error *message* travels verbatim to the calling agent as
+`isError: true`. Nothing here widens that: a message still goes to the agent,
+and the request goes to the operator's own stderr.
+
+**Truncation had to be a length, because the type it wants is not there at
+runtime.** `Prose` is exactly the class to cut — *a string LabKit reads and
+writes and never applies logic to* — and `src/db/domain.ts` declares it
+`export type Prose = string`, a plain alias, erased before any of this runs.
+Length is what survives, and among *domain* values it agrees with the taxonomy:
+handles are a five-character prefix and a number, a `Timestamp` is 24
+characters, and prose is the only stored class that can be long. **It is not
+only prose that gets cut, and the first run proved it** — a `--db` argument is a
+filesystem path and went over immediately. So it is a bound on output that
+coincides with the prose line for everything the record holds, which is weaker
+than the claim it was first written with and is the true one. A cut value keeps
+its original length, so nothing is elided silently.
+
 **A command that is about to create a record says so, on stderr.** Creating one
 is silent otherwise, and that is how three of them accumulated: a stray
 `bun run dev` in the wrong directory makes an empty 42MB database and then

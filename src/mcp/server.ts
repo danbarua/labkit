@@ -36,6 +36,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logFailedRequest } from "../request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
@@ -135,7 +136,9 @@ export function buildServer(withSurfaces: WithSurfaces): McpServer {
         // the honest thing to say about a tool that changes the record.
         annotations: { readOnlyHint: true },
       },
-      respond((args) => withSurfaces(({ read }) => definition.handler(read, args))),
+      respond(definition.name, (args) =>
+        withSurfaces(({ read }) => definition.handler(read, args)),
+      ),
     );
   }
 
@@ -150,7 +153,9 @@ export function buildServer(withSurfaces: WithSurfaces): McpServer {
       },
       // A surface per call, so each write records the attribution and commit
       // in force at the moment it ran rather than at server start.
-      respond((args) => withSurfaces(({ write }) => definition.handler(write, args))),
+      respond(definition.name, (args) =>
+        withSurfaces(({ write }) => definition.handler(write, args)),
+      ),
     );
   }
 
@@ -162,9 +167,15 @@ export function buildServer(withSurfaces: WithSurfaces): McpServer {
  * JSON text for a client that reads `content`, and as `structuredContent` for
  * one that reads the schema.
  *
- * Errors are deliberately not caught here; see the note on `buildServer`.
+ * **Errors are still not caught here**, which is the note on `buildServer` and
+ * has not changed: the SDK turns a throw into `isError: true` and the agent is
+ * told. What is added is a line on *stderr* naming the arguments that failed —
+ * `rethrow`, not `catch`. A stack trace says where a tool broke and nothing
+ * about what it was given, and `args` is the request as the client sent it,
+ * before any schema has taken it apart. See `src/request-log.ts` for why the
+ * stream is the whole of what makes this safe.
  */
-function respond(run: (args: Record<string, unknown>) => Promise<unknown>) {
+function respond(tool: string, run: (args: Record<string, unknown>) => Promise<unknown>) {
   return async (args: Record<string, unknown>) => {
     inFlight++;
     try {
@@ -173,6 +184,9 @@ function respond(run: (args: Record<string, unknown>) => Promise<unknown>) {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         structuredContent: result as Record<string, unknown>,
       };
+    } catch (error) {
+      logFailedRequest({ surface: "mcp", tool, args }, error);
+      throw error;
     } finally {
       inFlight--;
     }
