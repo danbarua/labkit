@@ -62,6 +62,8 @@ import type {
   SupportExplanation,
 } from "./report";
 import { ref, isRefOfKind } from "./report";
+import { compose, per, type Row } from "./facts";
+import { answeringClaim, checksMet, readOutcomes } from "./survey-facts";
 import { SessionCore } from "./core";
 import type { DomainEvent, EventFilter } from "./events";
 
@@ -290,63 +292,33 @@ export class ReadSurface extends SessionCore {
    * each question, not from what it says.
    */
   async whatIsKnown(): Promise<KnowledgeSurvey> {
-    const rows = await this.graph.query(
-      `MATCH (q:Question)
-       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
-       OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
-       OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
-       OPTIONAL MATCH (cited)-[:CHALLENGES]->(against:Claim)
+    // Composed from named facts rather than written out, so that "the claim
+    // this answer rests on" and "did its prespecified checks pass" are the same
+    // definitions every other reader uses. Two defects came from those being
+    // written twice: a promoted *negative* result whose checks were unreachable
+    // because only `SUPPORTS` was matched, and a disagreement with
+    // `whySupported` about which claims a check belongs to. See
+    // `./survey-facts.ts`.
+    const anchor = `MATCH (q:Question)
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
-       OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)
-       RETURN q, cited, work, accepting, settled, against`,
-      {
-        q: vertexProps<{ natural_id: string; name: string }>(),
-        cited: optional(vertexProps<{ natural_id: string }>()),
-        work: optional(vertexProps<{ natural_id: string }>()),
-        accepting: optional(vertexProps<{ natural_id: string }>()),
-        settled: optional(vertexProps<{ natural_id: string; kind?: string }>()),
-        // The claim the closing evidence bears AGAINST. A question answered
-        // *no* is settled this way and matched nothing above, so a promoted
-        // negative result counted as scratch (S-18b).
-        against: optional(vertexProps<{ natural_id: string; kind?: string }>()),
-      },
-    );
+       OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)`;
+    const { cypher, decoders } = compose(anchor, checksMet, {
+      q: vertexProps<{ natural_id: string; name: string }>(),
+      accepting: optional(vertexProps<{ natural_id: string }>()),
+      work: optional(vertexProps<{ natural_id: string }>()),
+    });
+    // `answering` is the fact's own grain and is not matched by any clause:
+    // it is the claim `answeringClaim` resolves to, projected onto each row so
+    // the claim-grained facts have a subject to group by.
+    const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
+    readOutcomes(rows);
 
-    const byQuestion = new Map<
-      string,
-      {
-        asks: string;
-        cited: boolean;
-        worked: boolean;
-        accepted: boolean;
-        promoted: boolean;
-        /** The claims the closing decision rests on. Usually one. */
-        closedBy: Set<ClaimRef>;
-      }
-    >();
-    for (const row of rows) {
-      const entry = byQuestion.get(row.q.natural_id) ?? {
-        asks: row.q.name,
-        cited: false,
-        worked: false,
-        accepted: false,
-        promoted: false,
-        closedBy: new Set<ClaimRef>(),
-      };
-      entry.cited ||= row.cited !== null;
-      entry.worked ||= row.work !== null;
-      entry.accepted ||= row.accepting !== null;
-      entry.promoted ||= (row.settled ?? row.against)?.kind === "confirmatory";
-      // The claim the closing decision rests on, whichever way it bears. Its
-      // prespecified checks are consulted below.
-      const closing = row.settled ?? row.against;
-      if (closing !== null) entry.closedBy.add(ref("claim", closing.natural_id));
-      byQuestion.set(row.q.natural_id, entry);
-    }
-
-    const verified = await this.checksMetFor(
-      [...byQuestion.values()].flatMap((e) => [...e.closedBy]),
-    );
+    const answering = per(answeringClaim, rows);
+    const withSubject = rows.map((row) => ({
+      ...row,
+      answering: answering.get((row.q as { natural_id: string }).natural_id) ?? null,
+    }));
+    const met = per(checksMet, withSubject);
 
     const survey: KnowledgeSurvey = {
       established: [],
@@ -355,34 +327,32 @@ export class ReadSurface extends SessionCore {
       untested: [],
       accepted: [],
     };
-    for (const [question, entry] of byQuestion) {
-      const standing: QuestionStanding = {
-        question: ref("question", question),
-        asks: entry.asks,
-      };
+    const seen = new Map<string, { asks: string; accepted: boolean; worked: boolean }>();
+    for (const row of rows) {
+      const q = row.q as { natural_id: string; name: string };
+      const entry = seen.get(q.natural_id) ?? { asks: q.name, accepted: false, worked: false };
+      entry.accepted ||= row.accepting !== null;
+      entry.worked ||= row.work !== null;
+      seen.set(q.natural_id, entry);
+    }
+
+    for (const [question, entry] of seen) {
+      const standing: QuestionStanding = { question: ref("question", question), asks: entry.asks };
+      const claim = answering.get(question);
       // Settled beats accepted: a question answered after being accepted is
       // answered. Accepted beats worked, because a reader scanning for what
       // still needs doing must not find a deliberately-parked question there.
-      // Settled on a promoted finding is established; settled on scratch is
-      // provisional. Both are answered -- what differs is what the answer rests
-      // on, and a reader asking "what do we know" must not get the second
-      // silently mixed into the first (S-18).
-      // `established` is the strongest word this survey has, and it means the
-      // answer rests on promoted work **that met the standard it was held
-      // to**. Promotion alone is not enough: a claim held to a prespecified
-      // check nobody ran, or one that failed, is exactly the case S-3b exists
-      // for — a check nobody performed counts against the finding it
-      // qualifies, which is why `QUALIFIES` is written when the analysis is
-      // recorded rather than when the check is evaluated. This survey was the
-      // one reader that ignored it, and said `established` about a claim
-      // `whySupported` was simultaneously calling unmet (issue #62, S-19).
       //
-      // A claim held to **nothing** is vacuously met, which keeps S-18's case
-      // intact: promoted scratch with no prespecified standard is still
-      // established.
-      const met = [...entry.closedBy].every((c) => verified.get(c) !== false);
-      if (entry.cited && entry.promoted && met) survey.established.push(standing);
-      else if (entry.cited) survey.provisional.push(standing);
+      // `established` is the strongest word this survey has and means the
+      // answer rests on promoted work **that met the standard it was held to**.
+      // Promotion alone is not enough — a claim held to a check that failed, or
+      // that nobody ran, is S-3b's case: a prespecified check nobody performed
+      // counts against the finding it qualifies (issue #62, S-19). A claim held
+      // to nothing is vacuously met, which keeps S-18's promoted scratch in
+      // `established`.
+      if (claim && claim.kind === "confirmatory" && met.get(claim.natural_id) !== false)
+        survey.established.push(standing);
+      else if (claim) survey.provisional.push(standing);
       else if (entry.accepted) survey.accepted.push(standing);
       else if (entry.worked) survey.unresolved.push(standing);
       else survey.untested.push(standing);
