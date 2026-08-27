@@ -503,7 +503,27 @@ export interface ClaimProps {
    * two claims can assert the same sentence (S-5).
    */
   name: IndexedString;
-  kind?: ReadOnlyString<"exploratory" | "confirmatory">;
+  /**
+   * Whether the finding was prespecified, and whether anyone has promoted it —
+   * **two facts under one value**, which is issue #63.
+   *
+   * `ReadOnlyString` until 2026-08-27, and that was **false**. The taxonomy
+   * defines that class as *stored, handed back to callers, never decided on*;
+   * the annotation exists to say nothing reads it. Three sites decide on it,
+   * and the first is `whatIsKnown`'s bucketing, where it selects the survey's
+   * strongest word. Found by reading the declaration beside its readers rather
+   * than by any check — the shape issue #50 is a sweep for.
+   *
+   * It is a plain union now, which claims nothing beyond the values. That is
+   * weaker than the taxonomy would like and it is what is true: a taxonomy
+   * member asserting something false about the field it annotates is worse
+   * than one absent, because the annotation is what a reader trusts instead of
+   * grepping.
+   *
+   * Optional because it is unset until promotion, and absence is read as
+   * exploratory rather than defaulted at the write.
+   */
+  kind?: "exploratory" | "confirmatory";
 }
 
 /**

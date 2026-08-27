@@ -304,11 +304,11 @@ export class ReadSurface extends SessionCore {
         cited: optional(vertexProps<{ natural_id: string }>()),
         work: optional(vertexProps<{ natural_id: string }>()),
         accepting: optional(vertexProps<{ natural_id: string }>()),
-        settled: optional(vertexProps<{ kind?: string }>()),
+        settled: optional(vertexProps<{ natural_id: string; kind?: string }>()),
         // The claim the closing evidence bears AGAINST. A question answered
         // *no* is settled this way and matched nothing above, so a promoted
         // negative result counted as scratch (S-18b).
-        against: optional(vertexProps<{ kind?: string }>()),
+        against: optional(vertexProps<{ natural_id: string; kind?: string }>()),
       },
     );
 
@@ -320,6 +320,8 @@ export class ReadSurface extends SessionCore {
         worked: boolean;
         accepted: boolean;
         promoted: boolean;
+        /** The claims the closing decision rests on. Usually one. */
+        closedBy: Set<ClaimRef>;
       }
     >();
     for (const row of rows) {
@@ -329,13 +331,22 @@ export class ReadSurface extends SessionCore {
         worked: false,
         accepted: false,
         promoted: false,
+        closedBy: new Set<ClaimRef>(),
       };
       entry.cited ||= row.cited !== null;
       entry.worked ||= row.work !== null;
       entry.accepted ||= row.accepting !== null;
       entry.promoted ||= (row.settled ?? row.against)?.kind === "confirmatory";
+      // The claim the closing decision rests on, whichever way it bears. Its
+      // prespecified checks are consulted below.
+      const closing = row.settled ?? row.against;
+      if (closing !== null) entry.closedBy.add(ref("claim", closing.natural_id));
       byQuestion.set(row.q.natural_id, entry);
     }
+
+    const verified = await this.checksMetFor(
+      [...byQuestion.values()].flatMap((e) => [...e.closedBy]),
+    );
 
     const survey: KnowledgeSurvey = {
       established: [],
@@ -356,7 +367,21 @@ export class ReadSurface extends SessionCore {
       // provisional. Both are answered -- what differs is what the answer rests
       // on, and a reader asking "what do we know" must not get the second
       // silently mixed into the first (S-18).
-      if (entry.cited && entry.promoted) survey.established.push(standing);
+      // `established` is the strongest word this survey has, and it means the
+      // answer rests on promoted work **that met the standard it was held
+      // to**. Promotion alone is not enough: a claim held to a prespecified
+      // check nobody ran, or one that failed, is exactly the case S-3b exists
+      // for — a check nobody performed counts against the finding it
+      // qualifies, which is why `QUALIFIES` is written when the analysis is
+      // recorded rather than when the check is evaluated. This survey was the
+      // one reader that ignored it, and said `established` about a claim
+      // `whySupported` was simultaneously calling unmet (issue #62, S-19).
+      //
+      // A claim held to **nothing** is vacuously met, which keeps S-18's case
+      // intact: promoted scratch with no prespecified standard is still
+      // established.
+      const met = [...entry.closedBy].every((c) => verified.get(c) !== false);
+      if (entry.cited && entry.promoted && met) survey.established.push(standing);
       else if (entry.cited) survey.provisional.push(standing);
       else if (entry.accepted) survey.accepted.push(standing);
       else if (entry.worked) survey.unresolved.push(standing);
@@ -1130,6 +1155,80 @@ export class ReadSurface extends SessionCore {
       out.set(criterion, list);
     }
     return out;
+  }
+
+  /**
+   * Whether each of these claims met every check it was **held to**.
+   *
+   * `false` means at least one prespecified check is not `passed` — failed, or
+   * never run, which S-3b holds to be the same verdict for the finding it
+   * qualifies. A claim with no qualifying criteria is absent from the map
+   * rather than `false`: it was held to nothing, so there is nothing it failed
+   * to meet, and callers read a missing entry as met.
+   *
+   * **One query for every claim, not one each.** `whatIsKnown` is the most
+   * called read in the system and a round trip per answered question would be
+   * a profiler finding by the twentieth.
+   *
+   * **The state rule is `checksFrom`'s, deliberately not re-derived here.** A
+   * failure sticks among verdicts that still stand, a verdict whose whole basis
+   * was withdrawn is retracted rather than failing, and never-run is a
+   * first-class value — three rules earned by S-3, S-3c and S-17. A second
+   * implementation of them would be a second thing to keep in step, and
+   * `whySupported` and this survey disagreeing about one claim is the defect
+   * this method exists to fix.
+   */
+  private async checksMetFor(claims: readonly ClaimRef[]): Promise<Map<ClaimRef, boolean>> {
+    const met = new Map<ClaimRef, boolean>();
+    const ids = [...new Set(claims)];
+    if (ids.length === 0) return met;
+    const rows = await this.graph.query(
+      `MATCH (cl:Claim)<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       WHERE cl.natural_id IN $ids
+       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
+       WHERE out.invalidated IS NULL OR out.invalidated = false
+       MATCH (crit:Criterion)-[:QUALIFIES]->(u)
+       OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
+       OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
+       OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)
+       RETURN cl, crit AS c, ev, basis, basisout`,
+      {
+        cl: vertexProps<Identified>(),
+        c: vertexProps<{ natural_id: string; proposition: string }>(),
+        ev: optional(
+          vertexProps<{
+            natural_id: string;
+            value: string;
+            outcome: "pass" | "fail";
+            evaluated_at: string;
+          }>(),
+        ),
+        basis: optional(vertexProps<{ statement: string } & Identified>()),
+        basisout: optional(vertexProps<{ invalidated?: boolean } & Identified>()),
+      },
+      { ids },
+    );
+
+    // Partition before grouping: `checksFrom` groups by criterion alone, so
+    // rows from two claims sharing a criterion would merge into one check and
+    // one claim's verdict would decide the other's.
+    const byClaim = new Map<ClaimRef, typeof rows>();
+    for (const row of rows) {
+      // `ref()` rather than the raw id, and it refuses a mismatched prefix.
+      // `check:no-stringly-typed` is right that `Map<string, …>` here says
+      // nothing about what the string is.
+      const claim = ref("claim", row.cl.natural_id);
+      const list = byClaim.get(claim) ?? [];
+      list.push(row);
+      byClaim.set(claim, list);
+    }
+    for (const [claim, claimRows] of byClaim) {
+      met.set(
+        claim,
+        this.checksFrom(claimRows).every((check) => check.state === "passed"),
+      );
+    }
+    return met;
   }
 
   /**

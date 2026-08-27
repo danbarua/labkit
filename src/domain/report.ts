@@ -1059,13 +1059,32 @@ export interface KnowledgeSurvey {
   /** On the books, never pursued. Not a failure and not an inconclusive result. */
   untested: QuestionStanding[];
   /**
-   * Answered, but on a finding nobody has promoted (S-18).
+   * Answered, but not on something to build on — **for either of two
+   * reasons**, and the bucket deliberately holds both.
    *
-   * Its own bucket, and the distinction the story exists for: a
-   * result is being relied on and the question is settled *as far as anyone has
-   * taken it*, but what settles it is scratch. Kept out of `established` so
-   * that reading the survey for "what do we actually know" cannot silently
-   * include a lunchtime notebook sweep.
+   * The first is S-18's: the finding nobody promoted. A result is relied on and
+   * the question is settled *as far as anyone has taken it*, but what settles
+   * it is scratch. Kept out of `established` so that reading the survey for
+   * "what do we actually know" cannot silently include a lunchtime notebook
+   * sweep.
+   *
+   * The second is S-19's, and it is the opposite shape: the finding somebody
+   * **did** promote, held to a prespecified check that failed or was never
+   * run. Promotion says a person vouched for it; the check says nobody
+   * confirmed it, and S-3b holds a check nobody performed to count against the
+   * finding it qualifies.
+   *
+   * **One bucket rather than a sixth**, which is the answer S-19 arrived at by
+   * landing here rather than by being designed. The two reasons differ and the
+   * consequence does not: *this is answered, and it is not something to build
+   * on*. A reader acts identically on both. Row Y is the standing warning
+   * against a bucket built for nobody, and splitting these would be one —
+   * `whySupported` already distinguishes them for anyone who needs to know
+   * which it is.
+   *
+   * The heading this renders under said "resting on work nobody promoted"
+   * until 2026-08-27, which was true of the first reason and false of the
+   * second the moment it existed.
    */
   provisional: QuestionStanding[];
   /**
