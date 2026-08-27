@@ -5,17 +5,34 @@
 # answer to a red CI build and was not useful: `bun run check` and
 # `bun run test:pg` both passed here while the build failed on a hook timeout.
 #
-# **The resource limits are the point, not the container.** A Cloud Build
-# default worker is an `e2-standard-2` — 2 vCPU, 8GB — and this machine has ten
-# cores. Running the same image unconstrained reproduces the environment and not
-# the failure, which is the half that matters: LabKit's suite is timing
-# sensitive (CLAUDE.md carries the measurements, including that it fails at a
-# 3000ms ceiling and passes at 5000ms), so cores are the variable that decides
-# whether a hook beats bun's clock. `--cpus` and `--memory` default to the
-# worker's shape and can be overridden:
+# **The resource limits are the point, not the container**, and the default of
+# 2 buys the *environment* half rather than the *timing* half. A Cloud Build
+# default worker is an `e2-standard-2` — 2 dedicated vCPUs, 8GB.
+#
+# **`--cpus` caps quota, not speed, and that is why `LABKIT_CI_CPUS=2` never
+# reproduced a CI timing failure.** Two cores of an M1 Max are several times the
+# throughput of two e2 vCPUs, so the "worker-shaped" default is a machine much
+# faster than the worker. Measured 2026-08-27 on a 10-core M1 Max, running the
+# real suite at the *old* 5000ms ceiling:
+#
+#     --cpus=2     398 tests, 78s, 0 failures
+#     --cpus=1     398 tests, 85s, 0 failures
+#     --cpus=0.5   388 tests, 195s, FAILS — `a beforeEach/afterEach hook timed
+#                  out`, 8178ms, in tests/subject-identity.test.ts, with ten
+#                  tests never reaching the runner
+#
+# That is the CI failure exactly: the same wording (bun says beforeEach even for
+# a `beforeAll`) and the same cascade. Note also that 2 -> 1 costs only 7s: the
+# suite is not CPU-bound, so core *count* was never the variable.
+#
+# **The calibrating number is machine-specific.** 0.5 approximates a worker on
+# *this* laptop; on a slower machine it would be too harsh and on a faster one
+# too kind. There is no portable value, which is why the default stays at the
+# worker's real shape and the timing arm is opt-in:
 #
 #     LABKIT_CI_CPUS=4 bun run test:in-docker      # less strict
 #     LABKIT_CI_CPUS=1 bun run test:in-docker      # more
+#     LABKIT_CI_CPUS=0.5 bun run test:in-docker    # reproduces CI timing, on an M1 Max
 #
 # **It tests a copy, not this directory.** A `git clone` gives the container a
 # real `.git` — several checks shell out to git, and one of them refuses rather
@@ -48,6 +65,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "test:in-docker: ${cpus} cpus, ${memory} memory — a Cloud Build worker is 2/8g"
+echo "test:in-docker: --cpus caps quota, not speed; see the header for the timing arm"
 
 # A real clone, then the working tree over it. See the header.
 git clone -q "file://$root" "$work/repo"
