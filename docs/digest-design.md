@@ -81,25 +81,63 @@ review:
 > digest, digest becomes a workaround for a live defect — and the defect stays,
 > because something now papers over it.
 
-The fix is one of two things, and choosing between them is a real design
-question this document does not settle:
+### The fix: the survey, not `promote()`
 
-- **`whatIsKnown()` consults gate state** when bucketing — an answer resting on
-  a claim whose prespecified check failed is not `established`. Possibly a sixth
-  bucket, possibly `provisional`.
-- **or `promote()` refuses** over a blocked gate, in the S-5 decline-rather-
-  than-guess shape.
+**Recommended: `whatIsKnown()` consults the check state when bucketing. Do not
+make `promote()` refuse over a blocked gate.** This is not a preference between
+two defensible positions — a write-time refusal *cannot hold the property*, and
+that was demonstrated rather than argued.
 
-They are not equivalent. The first keeps promotion a free act and makes the
-survey honest; the second makes the record refuse to enter the state at all.
-**This is the ledger's business**, and it should be argued as a row with a
-scenario, not decided in a design doc about a read verb.
+`Gate.state` is computed, never stored (S-3), re-evaluation is modelled
+(`GateStatus.evaluations`, `everFailed`), and `reverify()` exists. So run the
+sequence a refusing `promote()` would permit:
 
-**Sequencing consequence:** shipping `digest` on a survey that contradicts
-`gateStatus` means the two halves of `digest` disagree with each other — the
-`Blocked` section and anything sourced from `known` would say opposite things
-about the same claim. So this is fixed **first**, or `digest` is built without
-any section that reads `known`.
+```
+T1  evaluate CRIT_1 --outcome pass    → GATE_1 satisfied
+    promote CLM_1                       (a refusing promote allows this — correctly)
+    close --answered-by CLM_1
+    labkit known                      → Established        ✓ right
+T2  evaluate CRIT_1 --outcome fail    → GATE_1 blocked
+    labkit known                      → Established        ✗ wrong
+```
+
+Run 2026-08-27; both lines are transcript. **The wrong answer returns and the
+refusal bought nothing.** It catches only the case where the gate was already
+blocked at the instant of promotion — a subset — and does something worse than
+missing the rest: it creates the appearance of an invariant that does not hold,
+so the next reader of `whatIsKnown()` has *more* reason to trust a bucket that
+is still wrong.
+
+Two further reasons, both pointing the same way:
+
+- **The read side already has the fact in hand.** `whySupported` computes
+  `standard[].state = "failed"` for the claim's own report — one hop from the
+  survey. A fix in `promote()` would add a new *write-time* consultation for
+  something the read side is already carrying.
+- **It is the repo's stated preference**: structure in the query over structure
+  in the stored model. Stored shape is where change gets expensive; queries are
+  free to be wrong and re-run.
+
+**Which bucket is deliberately left open.** `provisional` means "resting on work
+nobody promoted", and a promoted claim behind a blocked gate *is* promoted — so
+the existing definition does not fit, and widening it is a real decision about
+what the word means. A new bucket is the alternative, and row Y is the standing
+warning against one: *a fifth bucket built for nobody is the ceremony S-14
+declined a field over.* **The scenario picks it, not this document.**
+
+**And the cost is not free**, which the recommendation should not hide: the
+survey buckets *questions*, so consulting check state means walking question →
+cited claim → criterion → state. A query change, not a field read.
+
+**Sequencing consequence, and it is a rule rather than a preference.**
+CLAUDE.md: *at most one confirmed wrong answer ships green at a time, and
+clearing it is the next thing built.* §2 is now a demonstrated wrong answer, and
+no row in PJ-008 §3 is currently `demonstrated` — the three unfinished rows
+(AH, AI, AJ) are `open` and `open, unowned`, which is a different state. So §2
+becomes the one, and the rule says clearing it is next.
+
+Independently: shipping `digest` on a survey that contradicts `gateStatus` means
+two of `digest`'s own sections would disagree with a third about the same claim.
 
 ---
 
@@ -183,8 +221,11 @@ the programme knows, got a right answer, and drew an inference the verb never
 offered. **A missing feature manufacturing an empty result**, which is what the
 bar exists to catch.
 
-Recorded rather than deleted because the two arguments look almost identical and
-differ on the thing that matters: in §2 the verb makes a **positive assertion**
+**Kept rather than deleted, and the reason is the point**: the two arguments look
+almost identical, and a future reader will re-derive the distinction badly if the
+failed version is not sitting beside the working one. It is also PJ-008's own
+convention — a prediction that fails is a result about the model, and rows are
+not deleted when that happens. They differ on the thing that matters: in §2 the verb makes a **positive assertion**
 that another verb contradicts. Here it merely fails to mention something.
 
 ---
@@ -308,10 +349,16 @@ any stored `queue_state`.
 
 ## 8. Proposed order of work
 
-1. **Settle §2** — `whatIsKnown()` versus `promote()`. A ledger row and a
-   scenario, not a design-doc decision. Everything else waits on it, because
-   `digest` built on the current survey has two sections contradicting a third.
-2. **Build §3's enumeration**, earned on its own and independent of §2.
+1. **Fix §2** — `whatIsKnown()` consults check state. A ledger row and a
+   scenario; the scenario picks the bucket.
+2. **Then §3's enumeration**, and **its scenario written after §2 lands, not in
+   parallel.** The dependency runs one way and is easy to miss: fixing §2
+   requires walking question → cited claim → criterion → state *inside the read
+   surface*, so whatever produces a `GateRef` may already exist as a by-product.
+   §3's scenario can then ask the sharper question — given that the traversal
+   exists internally, what does a *researcher* still need? That may be one verb
+   rather than three. Do §3 first and the risk is designing three enumeration
+   verbs, then finding §2's fix produced the traversal underneath them.
 3. **`digest` as the composition**, argued as a convenience.
 
 ### This wants a scenario, not more design
@@ -326,9 +373,11 @@ The open question in §9.3 should be answered that way rather than argued.
 
 ## 9. Open questions for Dan
 
-1. **§2 — which fix?** `whatIsKnown()` consulting gate state, or `promote()`
-   refusing over a blocked gate. They are genuinely different positions about
-   whether promotion is a free act.
+1. **§2 — the fix is recommended, the bucket is not.** Fixing the survey rather
+   than `promote()` is settled on evidence (§2). *Which* bucket a promoted claim
+   behind a blocked gate belongs in is a question for the scenario, and row Y
+   warns against inventing a sixth for nobody. Do you want it decided before the
+   scenario is written?
 2. **Is `digest`-as-convenience acceptable?** The attempt to earn it as a gap
    failed (§4). If a convenience needs a stronger case here, say so and it can
    wait behind §2 and §3, both of which stand on their own.
