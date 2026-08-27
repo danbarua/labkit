@@ -32,6 +32,8 @@ rather than a paragraph.
 `whySupported`, and a refutation worth more than the fixes.
 **`73714bf`** — the bearing becomes a parameter, closing the mirror-image
 defect `labkit-review` found by reading.
+**`94b364a`** — the bearing sweep checked mechanically and closed; one
+confusable helper renamed.
 
 ## Verified
 
@@ -144,11 +146,33 @@ the code without running it… because the code tells you how it is."* That
 prediction was unavailable while the fact lived in whichever loop you were
 inside; it became available because this change gave it a name.
 
-**Not done: 39 raw queries across 13 verbs**, and the shape of that work is now
-the open question rather than its size. Most produce no classification and no
-shared selection — `pursuitsOf` is `MATCH → RETURN ids`. Whether every query
-goes behind `compose` for uniformity, or only those carrying a classification
-with the rest explicitly invalidated, is Dan's call and was put to him.
+**The defect class is closed on the read side, checked mechanically rather
+than by eye.** Every query reaching a claim through a bearing edge names both
+or takes the bearing as a parameter. Two remain one-sided and both are
+deliberate with the reason already written where they are: `enquiryStatus`
+fetches only the challenging side because polarity is *no* when something
+challenges and *yes* otherwise, and `reproductionOf` asks *whether* evidence
+challenges, which is single-bearing by construction.
+
+**`labkit-review` proposed a third answer to Dan's open question, better than
+either option he offered: compose facts with more than one reader.** Not "every
+query" and not "carries a classification". The defect is *written once and
+forgotten the second time*, which requires a second time — a single-reader query
+cannot have it, whatever it computes. Carrying a classification is a proxy; what
+predicts the bug is **a rule that must agree with another reader**, and all six
+occurrences were that.
+
+Measured rather than accepted: 33 queries remain, 13 edges have more than one
+reading verb, and only about six traversals reach *the same answer about the
+same subject*. Edge-sharing badly overstates it — six verbs walk `PRODUCES` for
+six different purposes. `DEFERS` has three readers and they agree, which is the
+shape that drifts rather than one that has.
+
+**They also withdrew half of their #69 finding**, publicly on the PR rather than
+by editing it, on the grounds that the reasoning is worth more than the
+conclusion. Their proposal would have collapsed the very distinction S-10 needs,
+and what settled it was running it rather than accepting a plausible argument
+from someone who had just been right about something adjacent.
 
 **The write side stays raw Cypher**, on Dan's reasoning that it is the reference
 documentation for *why* the graph is shaped as it is.
@@ -159,6 +183,12 @@ documentation for *why* the graph is shaped as it is.
 read side is ported or explicitly invalidated. Four verbs are ported and the
 rest are surveyed.
 
-Waiting on one decision — every query behind `compose`, or only the ones
-carrying a classification. That decides whether the remainder is an hour or
-several.
+One decision outstanding: accept the more-than-one-reader line, in which case
+"ported or invalidated" is complete and the PR is ready — or put the remaining
+33 behind `compose` anyway. Both `labkit-review` and I would argue against the
+second: 33 more grains, each of which must be reference-correct, on machinery
+whose one known footgun scales with the number of facts.
+
+**And one sentence still wants a durable home**: *findings corroborate, checks
+belong to*. It lives in a doc comment. Absent somewhere better, the next person
+re-unifies them with an argument that sounds as good as the one refuted here.
