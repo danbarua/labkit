@@ -24,6 +24,8 @@ demonstration in `examples/full-lifecycle.sh`.
 **`56f4b0d`** — `docs/GLOSSARY.md` gains a section for the words this change
 made non-obvious.
 
+**`a4c0e3d`** — the example carries five questions, one per bucket.
+
 Open as **PR #69**.
 
 ## Verified
@@ -137,6 +139,28 @@ enum already, computed with no settable field; **`work_list(state)` has none.**
 There is no `Task.state` and no computed equivalent, so the work half needs its
 states named before it can be filtered, and they must be computed for the
 reason `gateStatus` earned: a stored one is the first place a queue could rot.
+
+**The example was demonstrating a partition with one row in it.** Dan, on the
+`--json known` output: *"you've shown me an empty JSON output... it tells me
+nothing about what those four fields mean."* The prose view had the same fault
+more quietly — one question in one bucket says as much about a five-way
+partition as one row says about a table, and only the JSON made it obvious.
+
+The programme now holds five questions at once, each stopped at a different
+point, which is also what a real one looks like: posed and never pursued;
+pursued and measured with nothing concluded; concluded and closed with nobody
+promoting it; left open on purpose with its reopening condition; and the
+original, checked and promoted. Four commands of narrative for a survey that
+finally shows what it is for.
+
+**The `accepted` entry is the one that most needed a neighbour.** Its whole
+argument is that a reader scanning for what still needs doing must not find a
+deliberately-parked question among the unresolved ones — and with four buckets
+empty that argument had nothing to stand on.
+
+`--in-light-of` turned out to be **required** on `accept`, which is S-14's
+design rather than an obstacle: an acceptance is taken in light of a finding.
+The example cites the established claim, so the transcript now shows that too.
 
 ## Next
 
