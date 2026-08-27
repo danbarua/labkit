@@ -21,6 +21,9 @@ The first product work after the housekeeping: build the scenario for issue
 **`6d7d50a`** — S-19 gets prose in PJ-008 §3, ledger row **AK**, and a
 demonstration in `examples/full-lifecycle.sh`.
 
+**`56f4b0d`** — `docs/GLOSSARY.md` gains a section for the words this change
+made non-obvious.
+
 Open as **PR #69**.
 
 ## Verified
@@ -110,8 +113,37 @@ reason precisely because a reader acts identically on both; adding *gates* to a
 survey of *questions* is the scope error that sank the first attempt at a
 standup view.
 
+**The glossary gaps were not the obvious candidates.** Dan asked whether #69
+added jargon. S-19 and row AK were already covered by the existing `S-N` and
+`row X` entries, so it added no new *shorthand* at all. What it added was
+**words that read like plain English and are not**, which needed a new section
+because the file previously glossed only notation:
+
+- **`provisional`** now means two opposite things and its name describes
+  neither on its own. The likeliest of the three to be misread, precisely
+  because it looks like ordinary English.
+- **`Status` vs `state`** — Dan hit this directly on #66, and the codebase is
+  consistent where my proposal was not: `Status` is only ever a report **type**
+  name and `state` only ever a **field** holding a computed enum. There is no
+  `status:` field anywhere in `src/`. I had written `gate_list(state)` beside
+  `work_list(status)` for the same kind of thing.
+- **`ReadOnlyString`** — the reason #69's correction mattered *is* the
+  definition: it exists to say nothing reads the field. A reader who does not
+  know that reads it as decoration.
+
+**#66 is settled by Dan: two verbs, `digest` a facade over them.** One thing
+that surfaces and is flagged rather than assumed — `gate_list(state)` has its
+enum already, computed with no settable field; **`work_list(state)` has none.**
+There is no `Task.state` and no computed equivalent, so the work half needs its
+states named before it can be filtered, and they must be computed for the
+reason `gateStatus` earned: a stored one is the first place a queue could rot.
+
 ## Next
 
-PR #69 awaits review. Then #66, which nothing blocks — and the recommendation
-there is unchanged: a worked example settles it faster than more design, since
-both prior rounds on this feature were corrected by running something.
+PR #69 awaits review.
+
+Then #66, now decided in shape: `gate_list(state)`, `work_list(state)`, and
+`digest` as their composition. The open sub-question is what `work_list`'s
+states *are* — `planned` / `observed` / `analysed` / `closed` are candidates
+from the corpus and none is argued yet. Put to Dan as: settle it inside the
+build, or make it its own open question.
