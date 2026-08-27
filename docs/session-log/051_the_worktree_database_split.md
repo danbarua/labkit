@@ -20,6 +20,14 @@ deployment, is the labkit db resolvable from a git worktree?"* It was not.
 **`2f94464`** — a command that is about to create a record says so, on stderr,
 once. `scripts/smoke-cli.sh` asserts both halves.
 
+**`018efac`** — the gap Dan found reviewing from `exo-ledger`: the fallback
+could not solve the bug it was the fallback for. With git absent, a sibling
+worktree walks up, misses the repository and creates a database exactly as
+before — and a compiled binary on a host without git is what `bun run build`
+ships. A linked worktree's `.git` is a *file* naming
+`…/.git/worktrees/<name>`, so the same answer is available with no subprocess.
+Order is now `LABKIT_HOME` → git → read `.git` → walk → cwd.
+
 ## Verified
 
 **The defect, measured before fixing.** Three `.labkit/` directories existed for
@@ -51,6 +59,14 @@ finding is that nothing in the repository does.
 **Negative control on the new assertion:** remove the `announceNewRecord` call
 and `check:cli` fails naming it.
 
+**The fallback's first tests were passing through the subprocess, and their own
+control caught it.** They hid `git` by emptying `PATH`, with one test asserting
+`git` really was hidden. That test failed — under bun 1.3.14 `spawnSync` finds
+`git` with `PATH` set to the empty string, unset, *or* pointing at an empty
+directory, all three measured. So the four tests beside it had been exercising
+the subprocess while naming the filesystem. Rewritten as direct tests of
+`dotGitProjectRoot`, with the reason for the export written into it.
+
 ## Open
 
 **Dan asked whether anyone had actually been using LabKit without saying so.
@@ -74,6 +90,13 @@ returns a *relative* path at the top of a normal checkout — it prints `.git`,
 whose dirname is `.` — which would resolve every project to the process's
 working directory. That failure would pass every test written from a worktree.
 
+**Dan reviewed the PR from `exo-ledger` and corrected an overstated premise.**
+*"A worktree is a sibling of the main checkout"* is true of this repository's
+layout and not of worktrees generally — exo nests them under
+`.claude/worktrees/`, where a walk *would* find the root. The fix is correct for
+both, which puts it on the stronger footing of `--git-common-dir` being the
+right question rather than on the sibling premise.
+
 **All three were deleted by Dan.** His reading, and it is better than the one
 in this entry's first draft: *the existence of those databases is the error, not
 the migrations.* Pre-first-deploy in-place migration edits are the documented
@@ -87,6 +110,22 @@ the lockfile removed, which is why the originals kept their timestamps — but t
 general point stands and is worth carrying: **inspecting a LabKit database
 mutates it**, because `runMigrations()` runs on every open.
 
+**The source of the three databases was found, and it was not what this entry
+first said.** `examples/full-lifecycle.ts`, deleted in `8f57fef`, opened with
+`connectDb(process.cwd())` — no temporary directory. `bun run example` wrote a
+`.labkit/` into whichever tree it was run from, which is three trees and three
+databases. It was replaced on 2026-08-25 by `examples/full-lifecycle.sh`, which
+pins `--db` into a `mktemp -d`, so the measurement taken today came back clean
+and **"clean now" was mistaken for "never was"**. Dan's question — *"who runs
+`bun run dev`? I never have"* — is what forced the check; the assertion of
+hand-typed commands had been made twice, in a commit message and in this entry,
+without looking.
+
+Two other candidates were eliminated on the way: `mcpServers` is empty in the
+user's config, so no MCP client ever launched it, and
+`tests/mcp-stdio.test.ts` says in a comment that *a test must not write into the
+repo* and uses `mkdtemp` — someone had already hit this.
+
 **The remedy was not a guard, and working that out is the useful part.** The
 residue came from hand-typed commands, not from tooling, so there was nothing to
 fix in the scripts. Creating a record is what the first command in a new project
@@ -98,8 +137,16 @@ to ignore the line in the case that matters.
 
 ## Next
 
-PR #45 awaits review — it now carries both the split and the silence that hid
-it.
+PR #45 carries the split, the silence that hid it, and the no-git fallback.
+
+**Awaiting a decision before more goes in**: Dan asked for the request DTO to be
+logged with the error when a command fails. It conflicts on its face with the
+argument behind `unwrapped()` and `src/db/trace.ts`, both of which refuse to log
+bound parameters because an error *message* reaches the calling agent verbatim
+over MCP. The distinction that resolves it is the **stream** — message to the
+agent, DTO to the operator's stderr — but where the wrapper sits, and whether
+research prose is logged whole, are his calls and were put to him rather than
+assumed.
 
 Then the digest work: `feat/digest-design-2` carries the revised design, and
 §8's build order says the §2 scenario is next — a promoted, closed answer whose
