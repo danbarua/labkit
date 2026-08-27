@@ -24,6 +24,13 @@ five-bucket example — then two of this session's:
 (the facts); `whatIsKnown` composed from them.
 **`26bbfe6`** — `whySupported` selects by handle, and `checksMetFor` is deleted.
 
+**`13c9551`** — `gateStatus` and the standard read one check fact; `checksFrom`
+deleted, and the gate-scoped/criterion-scoped distinction becomes an argument
+rather than a paragraph.
+**`5faa307`** — the historical survey shares the selection.
+**`c85ea7c`**, **`1dcc42d`** — three more one-sided traversals in
+`whySupported`, and a refutation worth more than the fixes.
+
 ## Verified
 
 `bun run check` — all 18, at both commits. 175 scenarios green throughout.
@@ -74,12 +81,47 @@ proving handle-selection *right*, and it is what there is.
 result, so a heterogeneous list needs *some* `T`, which TypeScript cannot spell.
 Confined to one alias with the reason on it.
 
-**Not done:** the remaining ~21 classifications and the write side.
-`gateStatus` is the obvious next and already shares `checkState`.
+**Six instances of one defect, four of them found here rather than in review.**
+Sweeping for the pattern — a hand-written anchor naming one bearing — turned up
+the survey's checks, `whySupported`'s standard, its promotion (a promoted claim
+reading `exploratory`), its `restingOn` (empty), the spike, and the historical
+survey. All the same cause: AGE has no edge alternation, so naming one edge is
+**silent**. The third instance was in an anchor written *after* the fact existed,
+in the commit that fixed the second — which is why `checksAnchor` is a function
+now and not a template a caller fills in.
+
+**The promotion query needed no traversal at all.** A promotion is an edge on
+the claim; reaching it through evidence was the footgun, and deleting the walk
+removed it rather than handling it.
+
+**The most valuable result is a refutation.** Everything in `whySupported` now
+selects by handle, so unifying findings and `restingOn` the same way looked
+obviously right. Both are wrong: findings by handle turns **13 scenarios red**,
+S-10's *"the re-run reads as independent confirmation"* among them, and
+`restingOn` by handle empties it for a two-stage pipeline in
+`tests/subject-identity.test.ts`.
+
+So the two selections differ **on purpose**, which neither `labkit-review` nor I
+had stated: a re-run concluding the same sentence **corroborates**, so findings
+aggregate over the proposition — but a prespecified check **belongs to** the
+analysis held to it. Same nodes, two questions, two answers. Both exceptions are
+documented where the query is, with what refuted them.
+
+**Not done: 39 raw queries across 13 verbs**, and the shape of that work is now
+the open question rather than its size. Most produce no classification and no
+shared selection — `pursuitsOf` is `MATCH → RETURN ids`. Whether every query
+goes behind `compose` for uniformity, or only those carrying a classification
+with the rest explicitly invalidated, is Dan's call and was put to him.
+
+**The write side stays raw Cypher**, on Dan's reasoning that it is the reference
+documentation for *why* the graph is shaped as it is.
 
 ## Next
 
-PR #72 awaits review. It supersedes #69, which Dan set to draft.
+**PR #72 is not ready for review**, by Dan's own bar: it ships when the whole
+read side is ported or explicitly invalidated. Four verbs are ported and the
+rest are surveyed.
 
-Then `gateStatus` onto the same facts, which is the test of whether the second
-report costs less than the first — the claim the machinery is making.
+Waiting on one decision — every query behind `compose`, or only the ones
+carrying a classification. That decides whether the remainder is an hour or
+several.
