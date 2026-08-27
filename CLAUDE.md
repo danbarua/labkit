@@ -149,38 +149,22 @@ Two more things a worktree will not have, because they are untracked:
   be **seeded** before the first Stop fire or the first wrap is silently
   swallowed; `.claude/skills/wrap/SKILL.md` §Forking has the command.
 - **Git hooks, which have to be turned on: `bun run dev:install-hooks`.** Hooks
-  are not cloned and `core.hooksPath` is per-repository config, so a fresh
-  clone or worktree has none and says nothing about it.
+  are not cloned and `core.hooksPath` is per-repository config, so a fresh clone
+  or worktree has none and says nothing about it.
 
-  There is one, `.githooks/pre-push`, and it refuses a push to a branch whose
-  pull request is already merged or closed. **That is not a reversal of
-  `ce97456`, which removed the previous `.githooks/`** — that hook *regenerated
-  a committed artefact inside someone else's commit*, and the objection was to
-  writing, not to hooks. This one writes nothing and only ever refuses.
+  There is one, `.githooks/pre-push`: it refuses a push to a branch whose pull
+  request GitHub has already merged or closed. Such a push **succeeds and
+  reaches nothing** — a squash merge takes the branch as it stood when the merge
+  commit was cut, and `git merge-base` cannot see that, so the state comes from
+  `gh`. It happened three times in two days, the third time taking a
+  `CLAUDE.md` restructure and a measurement with it. The hook **refuses rather
+  than passes when `gh` is missing**, because a hook that goes quiet when its
+  tool is absent is the `|| true` this repo has been bitten by; every refusal
+  names `git push --no-verify` and the two commands that recover the work.
 
-  It was earned three times in two days: work pushed to an already-squashed
-  branch, where every push succeeds, the branch looks healthy, and the commits
-  reach nothing. Twice it cost a session-log entry; the third time it took a
-  `CLAUDE.md` restructure, a measurement, a file deletion and a queue rewrite,
-  recovered only because Dan said *"labkit has no outstanding PRs"*. A squash
-  merge leaves no ancestry `git merge-base` can find, so the state has to come
-  from `gh` — and the hook **refuses rather than passes** when `gh` is missing,
-  because a hook that goes quiet when its tool is absent is the `|| true` this
-  repo has already been bitten by. `git push --no-verify` is the way out and
-  every refusal names it.
-
-  **Two bugs, both found by running it and neither by reading it**, and both had
-  the same shape — every test passed, including the one that had to fail. It
-  treated all-zeroes on the *remote* side as a deletion, when that means "new
-  branch there", so the merged branch was skipped before `gh` was ever asked.
-  And it read the branch name off the **local** ref, so
-  `git push origin HEAD:refs/heads/foo` — which writes `foo` on the remote under
-  the pull request's name — skipped the check entirely. It keys on the remote
-  ref, which is the name GitHub has. Ten states are checked.
-
-  The generated SVG went with `ce97456` too; `bun run dev:dependency-cruiser`
-  regenerates `docs/dependency-graph.mmd` by hand, and graphviz is no longer
-  needed.
+  Not a reversal of `ce97456`, which removed the previous `.githooks/`: that
+  hook regenerated a committed artefact inside someone else's commit, and the
+  objection was to writing. This one writes nothing.
 
 ## The one rule about documents
 
@@ -367,6 +351,7 @@ bun run check:stdout          # nothing under src/ writes to stdout except the C
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
+bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
@@ -646,6 +631,8 @@ replaced a 1435-line `src/cli.ts` whose `switch` was five hundred of them; the
 port was verified by running `examples/full-lifecycle.sh` against both and
 diffing the transcripts, which were byte-identical.
 
+#### It is not read-only, and never shipped that way
+
 **It was read-only by construction and is not any more**, and that is the same
 correction the MCP server got. Read-only was never a shipping goal; what it
 produced was a record with **no way to put anything into it** except by wiring
@@ -679,6 +666,8 @@ predicted that a real `GitContextProvider` would be the first subprocess under
 keeps the stubs, because *which agent* and *which session* are facts the
 protocol does not carry. `--author` overrides the username, because a script
 driving LabKit is not the account it runs under.
+
+#### Colour is a parameter, not a global
 
 **Colour is a `Palette` a view is handed, never a module-level global**
 (`src/cli/palette.ts`). Members are named for the record's distinctions —
@@ -721,6 +710,21 @@ makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
 to get its own TCP port too, from a `derivePort` that hashed the path; there is
 no port any more. `LABKIT_DB_URL` still wins over both.
 
+**With neither set, an existing `.labkit/` at or above the working directory is
+found** (`resolveProjectRoot`, `src/db/connect.ts`). A client launched from
+`packages/foo` used to report an empty record for a project full of work, which
+matters more since one binary: an MCP client's working directory is chosen by
+the editor, not the user. The walk **only ever finds, never decides where to
+create** — with nothing above, the answer is the working directory exactly as
+before, which is what keeps it from reintroducing the implicitness three review
+rounds removed.
+
+**`LABKIT_HOME` naming a directory that does not exist is refused.** It used to
+be created, because the lock directory was made with `{ recursive: true }` — so
+a typo built the whole path and yielded a fresh empty database, which reads
+exactly like a project nobody has worked on. Naming a directory is a claim that
+it is there. `tests/project-root.test.ts` holds both rules.
+
 ### The MCP server
 
 **`src/mcp/server.ts` reads *and writes***, and is started by `labkit mcp`
@@ -757,6 +761,59 @@ them is easy and the failure is quiet:
 
 The AGE gotchas stay below, because those are needed before writing a query
 rather than looked up afterwards.
+
+## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
+
+`pglite-age` is a genuine compile of Apache AGE's own C source (pinned at
+branch `PG18`, tag `v1.7.0-rc0`), not a reduced WASM-only subset — see the
+skill doc's "Overview" for how that's established and PJ-006 for why it
+mattered. Working gotchas:
+
+- **`MERGE` for relationships is broken** — creates an edge with
+  `start_id`/`end_id` both `0`, never actually connecting the two nodes
+  (WASM/pglite-age-specific, not stock AGE — see the skill doc).
+  `createEdge()` uses explicit `MATCH`-then-`CREATE` instead, backed by a
+  real `UNIQUE (start_id, end_id)` index as the actual concurrency
+  guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
+  which `createEdge()` catches and treats as success).
+- No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
+- **A `RETURN` name that is a SQL reserved word breaks the AS clause** —
+  `RETURN d, from` becomes `AS (d agtype, from agtype)` and fails in the SQL
+  parser (`42601`, `scanner_yyerror`, not `cypher_yyerror`). Alias it:
+  `RETURN d, from AS origin`.
+- **A camelCase `RETURN` name silently decodes as `null`** — worse than the
+  reserved-word case above, because nothing fails. The AS clause is unquoted
+  SQL, so Postgres folds `basisOut` to `basisout` while AGE keys the row by
+  the name the Cypher `RETURN` used; the column arrives present and `NULL` for
+  every row, and a decoder reads that as "nothing matched". Cost a wrong
+  diagnosis once, blamed on `OPTIONAL MATCH` (S-3c). `buildAsClause()` now
+  **refuses** such a name, so this is a compile-time-ish error rather than a
+  debugging session; alias in the query (`RETURN basisOut AS basisout`) or
+  name the variable lower-case. Labels and property keys are unaffected —
+  they are quoted, and `CriterionEvaluation`/`natural_id` are fine.
+- **`OPTIONAL MATCH` is not the fragile thing it looks like.** Multi-hop
+  patterns bind, and so do patterns extending a variable that an earlier
+  `OPTIONAL MATCH` bound — both verified directly against this backend when
+  the case-folding bug above was mistaken for an AGE limitation. Don't
+  restructure a query around a limit that isn't there.
+- **No `NOT (pattern)` predicate in `WHERE`** — `WHERE NOT (e)-[:R]->(:X)` is a
+  syntax error (`cypher_yyerror`), not merely unsupported. Fetch the candidate
+  and filter in TypeScript, as `whySupported()`'s `restingOn` does. Watch the
+  precedence trap next door too: `WHERE a IS NULL OR a = false AND NOT ...`
+  binds the `AND` tighter than the `OR`, so parenthesise before assuming a
+  filter means what it reads like.
+- **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
+  `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
+  form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a
+  single-type `[:TYPE*1..5]` for variable length.
+- Every AGE label (vertex or edge) is a real Postgres table
+  (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
+  it directly — this is how natural-id uniqueness and edge uniqueness both
+  work, with no `cypher()` call involved.
+- **Always schema-qualify explicitly** — `ag_catalog.` for AGE catalog
+  functions, `src/db/schema.ts`'s `LABKIT_SCHEMA` constant for LabKit's own
+  `tenants` table and natural-id functions. Don't rely on `search_path`
+  ordering to resolve an unqualified name.
 
 ## The domain service layer (`src/domain/`)
 
@@ -1069,59 +1126,6 @@ Two rules, so this is checkable rather than remembered:
    cannot name one is not deferred, it is unresolved and unowned, and it should
    say so in its own cell. "Record both and pick neither" is a decision about
    *models*; it is not a decision to stop looking for the discriminator.
-
-## AGE-specific gotchas (see `.claude/skills/postgres-age/SKILL.md` for the full reference)
-
-`pglite-age` is a genuine compile of Apache AGE's own C source (pinned at
-branch `PG18`, tag `v1.7.0-rc0`), not a reduced WASM-only subset — see the
-skill doc's "Overview" for how that's established and PJ-006 for why it
-mattered. Working gotchas:
-
-- **`MERGE` for relationships is broken** — creates an edge with
-  `start_id`/`end_id` both `0`, never actually connecting the two nodes
-  (WASM/pglite-age-specific, not stock AGE — see the skill doc).
-  `createEdge()` uses explicit `MATCH`-then-`CREATE` instead, backed by a
-  real `UNIQUE (start_id, end_id)` index as the actual concurrency
-  guarantee (a losing concurrent `CREATE` hits Postgres error `23505`,
-  which `createEdge()` catches and treats as success).
-- No whole-map `CREATE (n:Label $props)` — expand to `{k: $k, ...}` per key.
-- **A `RETURN` name that is a SQL reserved word breaks the AS clause** —
-  `RETURN d, from` becomes `AS (d agtype, from agtype)` and fails in the SQL
-  parser (`42601`, `scanner_yyerror`, not `cypher_yyerror`). Alias it:
-  `RETURN d, from AS origin`.
-- **A camelCase `RETURN` name silently decodes as `null`** — worse than the
-  reserved-word case above, because nothing fails. The AS clause is unquoted
-  SQL, so Postgres folds `basisOut` to `basisout` while AGE keys the row by
-  the name the Cypher `RETURN` used; the column arrives present and `NULL` for
-  every row, and a decoder reads that as "nothing matched". Cost a wrong
-  diagnosis once, blamed on `OPTIONAL MATCH` (S-3c). `buildAsClause()` now
-  **refuses** such a name, so this is a compile-time-ish error rather than a
-  debugging session; alias in the query (`RETURN basisOut AS basisout`) or
-  name the variable lower-case. Labels and property keys are unaffected —
-  they are quoted, and `CriterionEvaluation`/`natural_id` are fine.
-- **`OPTIONAL MATCH` is not the fragile thing it looks like.** Multi-hop
-  patterns bind, and so do patterns extending a variable that an earlier
-  `OPTIONAL MATCH` bound — both verified directly against this backend when
-  the case-folding bug above was mistaken for an AGE limitation. Don't
-  restructure a query around a limit that isn't there.
-- **No `NOT (pattern)` predicate in `WHERE`** — `WHERE NOT (e)-[:R]->(:X)` is a
-  syntax error (`cypher_yyerror`), not merely unsupported. Fetch the candidate
-  and filter in TypeScript, as `whySupported()`'s `restingOn` does. Watch the
-  precedence trap next door too: `WHERE a IS NULL OR a = false AND NOT ...`
-  binds the `AND` tighter than the `OR`, so parenthesise before assuming a
-  filter means what it reads like.
-- **No edge-type alternation at all** — `[:A|B]` is a syntax error (Postgres
-  `42601`, `cypher_yyerror`), not just the variable-length `[:A|B*1..3]`
-  form. Chain explicit `MATCH`/`OPTIONAL MATCH` per type, or use a
-  single-type `[:TYPE*1..5]` for variable length.
-- Every AGE label (vertex or edge) is a real Postgres table
-  (`ag_catalog.ag_label`), so plain SQL indexes/constraints/reads can target
-  it directly — this is how natural-id uniqueness and edge uniqueness both
-  work, with no `cypher()` call involved.
-- **Always schema-qualify explicitly** — `ag_catalog.` for AGE catalog
-  functions, `src/db/schema.ts`'s `LABKIT_SCHEMA` constant for LabKit's own
-  `tenants` table and natural-id functions. Don't rely on `search_path`
-  ordering to resolve an unqualified name.
 
 ## Testing patterns
 
