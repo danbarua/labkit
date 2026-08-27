@@ -1,5 +1,6 @@
 import { traced } from "./trace";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 import { directPostgresBackend, pgliteBackend, type LabKitDBConnection } from "./backend";
 
 export type { LabKitDBConnection };
@@ -20,9 +21,60 @@ export type { LabKitDBConnection };
  * An explicit argument still wins: `connectDb(dir)` means that directory,
  * because a caller that named one has already made the decision this is here
  * to guess at.
+ *
+ * ## Two rules, and they point in opposite directions on purpose
+ *
+ * **`LABKIT_HOME` must exist.** It used to be enough that it *could* — the lock
+ * directory was created with `{ recursive: true }`, so a typo built the whole
+ * path and yielded a fresh empty database. An empty record and a mistyped one
+ * are indistinguishable to a reader, and "this project has no history" is a
+ * confident wrong answer rather than an error. Naming a directory is a claim
+ * that it is there; it is not a request to create one.
+ *
+ * **With `LABKIT_HOME` unset, an existing record above the working directory is
+ * found.** A client launched from `packages/foo` of a project whose `.labkit/`
+ * sits at the root would otherwise report an empty record for a project full of
+ * work — the case that survives shipping one binary, because an MCP client's
+ * working directory is chosen by the editor and not by the user.
+ *
+ * The walk **only ever finds, never decides where to create**. With no
+ * `.labkit/` anywhere above, the answer is the working directory, exactly as
+ * before. That asymmetry is what keeps this from reintroducing the implicitness
+ * three review rounds removed: discovering something already there is not the
+ * same as guessing where a new one belongs.
  */
-function labkitHome(): string {
-  return process.env.LABKIT_HOME ?? process.cwd();
+export function resolveProjectRoot(
+  cwd: string = process.cwd(),
+  named: string | undefined = process.env.LABKIT_HOME,
+): string {
+  if (named !== undefined) {
+    if (!existsSync(named)) {
+      throw new Error(
+        `LABKIT_HOME names a directory that does not exist: ${named}\n` +
+          `  It must be the project root — the directory that holds .labkit/ — and it is ` +
+          `not created for you, because a typo would look exactly like a new project.`,
+      );
+    }
+    return named;
+  }
+  return discoverProjectRoot(cwd);
+}
+
+/**
+ * Walks up from `from` for a directory already containing `.labkit/`.
+ *
+ * Returns `from` unchanged when there is none, which is the create-here case.
+ * `dirname` of the filesystem root is the root itself, and that is what ends
+ * the loop — no depth limit is needed and none is guessed at.
+ */
+function discoverProjectRoot(from: string): string {
+  let dir = from;
+  for (;;) {
+    if (existsSync(join(dir, ".labkit"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return from;
+    dir = parent;
+  }
 }
 
 /**
@@ -32,12 +84,12 @@ function labkitHome(): string {
  * `<projectRoot>/.labkit/pglite`, held under an exclusive lock for the
  * duration of the work, since PGlite is single-writer/single-process.
  *
- * `projectRoot` defaults to {@link labkitHome}, so `LABKIT_HOME` is read here
+ * `projectRoot` defaults to {@link resolveProjectRoot}, so `LABKIT_HOME` is read here
  * and not by every caller. **`LABKIT_DB_URL` still wins over both** — a caller
  * pointed at a real Postgres is not asking for a file, and silently building
  * one beside it would be worse than ignoring the flag.
  */
-export async function connectDb(projectRoot = labkitHome()): Promise<LabKitDBConnection> {
+export async function connectDb(projectRoot = resolveProjectRoot()): Promise<LabKitDBConnection> {
   const url = process.env.LABKIT_DB_URL;
   if (url) {
     return withTrace(await directPostgresBackend({ connectionString: url }).connect(), "postgres");

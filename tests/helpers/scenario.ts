@@ -92,7 +92,7 @@ export async function openScenario(): Promise<Scenario> {
       // load-bearing rather than tidiness.
       const db = await testDb.openClient(`test-${open.length + 1}`);
       open.push(db);
-      ctx = await resolveTenantContext(db, "labkit");
+      ctx = await resolveTenantContext(db, db.tx, "labkit");
       return new TenantGraph(ctx, db, db.tx);
     },
     async current() {

@@ -12,6 +12,7 @@ import { ormOver, unwrapped } from "./orm";
 import { provisionTenantGraph } from "./provisioning";
 import { tenants } from "./schema";
 import type { LabKitDB } from "./backend";
+import type { Transactor } from "./transactor";
 
 export interface TenantContext {
   tenantId: number;
@@ -33,7 +34,11 @@ export interface TenantContext {
  * desync the two (PJ-003 §5). Drizzle knows that from the column declaration
  * and leaves it out of the insert while still reading it back.
  */
-export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promise<TenantContext> {
+export async function resolveTenantContext(
+  db: LabKitDB,
+  tx: Transactor,
+  slug = "labkit",
+): Promise<TenantContext> {
   const orm = ormOver(db);
   const columns = { id: tenants.id, graph_name: tenants.graph_name };
 
@@ -49,6 +54,6 @@ export async function resolveTenantContext(db: LabKitDB, slug = "labkit"): Promi
   });
   if (!row) throw new Error(`tenant "${slug}" not found after insert-or-fetch race`);
 
-  await provisionTenantGraph(db, row.id, row.graph_name);
+  await provisionTenantGraph(db, tx, row.id, row.graph_name);
   return { tenantId: row.id, graphName: row.graph_name };
 }

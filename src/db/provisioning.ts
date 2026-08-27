@@ -14,6 +14,7 @@
 
 import { NODE_LABELS, EDGE_LABELS, INDEXED_PROPS, type NodeLabel, type EdgeLabel } from "./domain";
 import type { LabKitDB } from "./backend";
+import type { Transactor } from "./transactor";
 import { validateGraphName } from "./agtype";
 import { APP_ROLE } from "./schema";
 
@@ -46,18 +47,14 @@ import { APP_ROLE } from "./schema";
  */
 export async function provisionTenantGraph(
   db: LabKitDB,
+  tx: Transactor,
   tenantId: number,
   graphName: string,
 ): Promise<void> {
-  await db.query("BEGIN");
-  try {
+  await tx.inTransaction(async () => {
     await db.query("SELECT pg_advisory_xact_lock($1)", [tenantId]);
     await new TenantGraphProvisioner(db, graphName).reconcile();
-    await db.query("COMMIT");
-  } catch (err) {
-    await db.query("ROLLBACK");
-    throw err;
-  }
+  });
 }
 
 /**

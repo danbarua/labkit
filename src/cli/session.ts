@@ -87,7 +87,7 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
     const opts = globals();
     const connection = await connectDb(opts.db);
     try {
-      const ctx = await resolveTenantContext(connection.db, opts.tenant ?? "labkit");
+      const ctx = await resolveTenantContext(connection.db, connection.tx, opts.tenant ?? "labkit");
       // Everything above this line needs the superuser it connected as -- `LOAD
       // 'age'` and the graph DDL both. Everything below runs as `labkit_app`
       // with its tenant pinned, so a read that forgets to filter still cannot

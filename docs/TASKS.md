@@ -23,28 +23,6 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
 
 ## Loose ends from the DB layer work
 
-Each is small and none is blocking.
-
-- **`provisionTenantGraph()` still opens its own transaction** with raw
-  `BEGIN`/`COMMIT` rather than `src/db/transactor.ts`. It is admin DDL that runs
-  before the application pipeline exists, so it has nothing to join — but it is
-  the one boundary left outside the transactor.
-- **Nothing checks that a relational call site uses `unwrapped()`.** Drizzle
-  offers no hook, so it is convention, and forgetting it leaks bound parameters
-  into an error message that reaches an MCP client. Either a `check:` script or
-  a reason it does not need one.
-- **`LABKIT_HOME` naming a path that does not exist is manufactured, not
-  refused.** `src/db/backend.ts`'s `mkdirSync(lockDir, { recursive: true })`
-  creates the whole path, so a typo yields a fresh empty record rather than an
-  error — and an empty record looks exactly like a new project. Loud today only
-  when the parent happens to be unwritable.
-- **`connectDb()` could discover an existing record above it.** Proposed by the
-  review session: `LABKIT_HOME` set → use it and require it to exist; unset →
-  walk up from cwd for an existing `.labkit/`, and create only at cwd. The walk
-  would never decide *where to create*, which is what keeps it from
-  reintroducing the implicitness three review rounds removed. It answers the
-  case that survives the one binary: a client launched from `packages/foo`
-  reports an empty record for a project full of work.
 - **Drizzle v1** is release-candidate and we wait for the release. When it
   lands: `.enableRLS()` becomes `pgTable.withRLS()`, and the surfaces most
   likely to break are `src/db/migrate.ts` (it casts through private

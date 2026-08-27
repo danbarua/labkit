@@ -29,7 +29,7 @@ afterAll(async () => {
 
 test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re-resolve", async () => {
   const db = await testDb.openClient();
-  const ctx = await resolveTenantContext(db, "labkit");
+  const ctx = await resolveTenantContext(db, db.tx, "labkit");
 
   // Simulate a graph provisioned by an older build: remove a label this
   // commit adds, leaving everything else intact.
@@ -42,7 +42,7 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
   expect(gone.rows[0]!.n).toBe("0");
 
   // The production path: resolving the tenant again reconciles it.
-  await resolveTenantContext(db, "labkit");
+  await resolveTenantContext(db, db.tx, "labkit");
 
   const back = await db.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM ag_catalog.ag_label WHERE name = 'CONSUMES'
@@ -94,7 +94,7 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
  */
 test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", async () => {
   const db = await testDb.openClient();
-  const ctx = await resolveTenantContext(db, "drop-me");
+  const ctx = await resolveTenantContext(db, db.tx, "drop-me");
 
   const present = async () =>
     (
@@ -110,7 +110,7 @@ test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", 
 
   // And reconciliation puts it back, labels and all -- the same self-healing
   // path the rest of this file exercises.
-  await resolveTenantContext(db, "drop-me");
+  await resolveTenantContext(db, db.tx, "drop-me");
   expect(await present()).toBe("1");
   const labels = await db.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM ag_catalog.ag_label
@@ -137,7 +137,7 @@ test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", 
  */
 test("a property index is built, and a tenant missing one picks it up on re-resolve", async () => {
   const db = await testDb.openClient();
-  const ctx = await resolveTenantContext(db, "labkit");
+  const ctx = await resolveTenantContext(db, db.tx, "labkit");
 
   const indexNames = async (): Promise<string[]> => {
     const rows = await db.query<{ indexname: string }>(
@@ -166,7 +166,7 @@ test("a property index is built, and a tenant missing one picks it up on re-reso
   await db.query(`DROP INDEX "${ctx.graphName}".claim_name_idx`);
   expect(await indexNames()).not.toContain("claim_name_idx");
 
-  await resolveTenantContext(db, "labkit");
+  await resolveTenantContext(db, db.tx, "labkit");
   expect(await indexNames()).toContain("claim_name_idx");
 
   // And the index actually serves the query it was built for. Two claims of the

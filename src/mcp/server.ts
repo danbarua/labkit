@@ -222,7 +222,7 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
       // `tenantCtx`, not `ctx`. There are two contexts in scope here and they
       // are unrelated: this one is which tenant's graph to talk to, and the
       // `CommandContext` below is who is talking and when.
-      const tenantCtx = await resolveTenantContext(connection.db, tenant);
+      const tenantCtx = await resolveTenantContext(connection.db, connection.tx, tenant);
 
       // Superuser work is done: `LOAD 'age'` and the graph DDL both needed it.
       // From here the session is `labkit_app` with its tenant pinned, so a tool

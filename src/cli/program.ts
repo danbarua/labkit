@@ -30,7 +30,10 @@ export function globalOptions(program: Command): Command {
   return (
     program
       .option("--tenant <slug>", "which tenant to read or write", "labkit")
-      .option("--db <dir>", "the directory holding .labkit/ (default: $LABKIT_HOME, else cwd)")
+      .option(
+        "--db <dir>",
+        "the directory holding .labkit/ (default: $LABKIT_HOME, else the nearest .labkit/ at or above cwd)",
+      )
       .option("--author <name>", "who to attribute writes to (default: your username)")
       .option("--json", "emit the report as JSON instead of prose")
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only

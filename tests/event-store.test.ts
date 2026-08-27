@@ -40,7 +40,7 @@ afterEach(async () => {
 const clock: Clock = { now: () => "2026-08-25T09:00:00.000Z" };
 
 const surfaceFor = async (slug: string) => {
-  const ctx = await resolveTenantContext(db, slug);
+  const ctx = await resolveTenantContext(db, db.tx, slug);
   const graph = new TenantGraph(ctx, db, db.tx);
   return {
     graph,
@@ -65,7 +65,7 @@ describe("the event log outlives the process that wrote it", () => {
 
     const other = await testDb.openClient();
     try {
-      const ctx = await resolveTenantContext(other, "labkit");
+      const ctx = await resolveTenantContext(other, other.tx, "labkit");
       const seen = await pgEventLog(other, ctx.tenantId).all();
       expect(seen.map((e) => e.operation)).toEqual(["pose"]);
       expect(seen[0]!.subject).toBe(question);

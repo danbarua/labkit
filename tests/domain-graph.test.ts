@@ -49,7 +49,7 @@ beforeEach(async () => {
   // a connection per test bounded that. The socket is gone and so is the
   // defect — see tests/helpers/db.ts.
   db = await testDb.openClient();
-  ctx = await resolveTenantContext(db, "labkit");
+  ctx = await resolveTenantContext(db, db.tx, "labkit");
   graph = new TenantGraph(ctx, db, db.tx);
 });
 
@@ -440,7 +440,7 @@ describe("all node labels", () => {
 
 describe("tenant resolution", () => {
   test("resolving the same slug twice returns the same tenant", async () => {
-    const again = await resolveTenantContext(db, "labkit");
+    const again = await resolveTenantContext(db, db.tx, "labkit");
     expect(again.tenantId).toBe(ctx.tenantId);
     expect(again.graphName).toBe(ctx.graphName);
   });
@@ -460,8 +460,8 @@ describe("tenant resolution", () => {
 
 describe("tenant isolation", () => {
   test("two tenants can hold nodes with identical properties without any query crossing between them", async () => {
-    const ctxA = await resolveTenantContext(db, "tenant-a");
-    const ctxB = await resolveTenantContext(db, "tenant-b");
+    const ctxA = await resolveTenantContext(db, db.tx, "tenant-a");
+    const ctxB = await resolveTenantContext(db, db.tx, "tenant-b");
     expect(ctxA.graphName).not.toBe(ctxB.graphName);
     const graphA = new TenantGraph(ctxA, db, db.tx);
     const graphB = new TenantGraph(ctxB, db, db.tx);
@@ -478,8 +478,8 @@ describe("tenant isolation", () => {
   });
 
   test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {
-    const ctxA = await resolveTenantContext(db, "tenant-a");
-    const ctxB = await resolveTenantContext(db, "tenant-b");
+    const ctxA = await resolveTenantContext(db, db.tx, "tenant-a");
+    const ctxB = await resolveTenantContext(db, db.tx, "tenant-b");
     const graphA = new TenantGraph(ctxA, db, db.tx);
     const graphB = new TenantGraph(ctxB, db, db.tx);
 
@@ -511,7 +511,7 @@ describe("provisioning reconciliation", () => {
     );
     expect(before.rows).toHaveLength(0);
 
-    await resolveTenantContext(db, "labkit");
+    await resolveTenantContext(db, db.tx, "labkit");
 
     const after = await db.query(
       `SELECT 1 FROM pg_indexes WHERE schemaname = $1 AND indexname = 'claim_natural_id_idx'`,
@@ -536,7 +536,7 @@ describe("provisioning reconciliation", () => {
     );
     expect(before.rows).toHaveLength(0);
 
-    await resolveTenantContext(db, "labkit");
+    await resolveTenantContext(db, db.tx, "labkit");
 
     const task = await graph.createNode("Task", {
       objective: "o",
