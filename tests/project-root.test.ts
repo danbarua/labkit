@@ -10,7 +10,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveProjectRoot } from "../src/db/connect";
@@ -69,5 +70,91 @@ describe("with LABKIT_HOME unset", () => {
 
   test("the walk terminates at the filesystem root", () => {
     expect(resolveProjectRoot("/", undefined)).toBe("/");
+  });
+});
+
+/**
+ * A worktree is a **sibling** of the main checkout, not a descendant, so
+ * walking up from one never passes through it. Every session in this project
+ * runs in a worktree, and three `.labkit/` databases had accumulated for one
+ * project before anyone looked — 41M, 60M and 41M, written on three different
+ * days.
+ *
+ * These build real repositories and real worktrees rather than faking the
+ * layout, because the bug *is* the layout: a test that only ever runs in a
+ * normal checkout cannot fail either way, which is the shape that let this
+ * ship.
+ */
+describe("a worktree resolves to the repository, not to itself", () => {
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+
+  /**
+   * A repository with one commit, and a worktree beside it.
+   *
+   * `realpathSync` because git reports resolved paths and macOS files temp
+   * directories under `/var`, which is a symlink to `/private/var`. Without it
+   * every assertion here fails on the prefix while naming the same directory —
+   * a test artefact, not a defect, but one that would otherwise read as one.
+   */
+  function repoWithWorktree(): { root: string; worktree: string } {
+    const base = realpathSync(scratch());
+    const root = join(base, "project");
+    mkdirSync(root);
+    git(root, "init", "-q", "-b", "main");
+    git(
+      root,
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "user.name=t",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "base",
+    );
+    const worktree = join(base, "project.worktrees", "feature");
+    git(root, "worktree", "add", "-q", "-b", "feature", worktree);
+    return { root, worktree };
+  }
+
+  test("from the worktree itself", () => {
+    const { root, worktree } = repoWithWorktree();
+    expect(resolveProjectRoot(worktree, undefined)).toBe(root);
+  });
+
+  test("from a subdirectory of the worktree", () => {
+    const { root, worktree } = repoWithWorktree();
+    const nested = join(worktree, "packages", "foo");
+    mkdirSync(nested, { recursive: true });
+    expect(resolveProjectRoot(nested, undefined)).toBe(root);
+  });
+
+  test("the main checkout resolves to itself, so there is no special case", () => {
+    const { root } = repoWithWorktree();
+    expect(resolveProjectRoot(root, undefined)).toBe(root);
+  });
+
+  test("an existing .labkit in the worktree does not win", () => {
+    const { root, worktree } = repoWithWorktree();
+    // This is the state the machine was already in: a record per worktree.
+    // The repository is still the answer.
+    mkdirSync(join(worktree, ".labkit"));
+    expect(resolveProjectRoot(worktree, undefined)).toBe(root);
+  });
+
+  test("LABKIT_HOME still wins, so per-branch stays available", () => {
+    const { worktree } = repoWithWorktree();
+    expect(resolveProjectRoot(worktree, worktree)).toBe(worktree);
+  });
+
+  test("outside a repository it falls back to the walk", () => {
+    const base = realpathSync(scratch());
+    mkdirSync(join(base, ".labkit"));
+    const nested = join(base, "a", "b");
+    mkdirSync(nested, { recursive: true });
+    // No git anywhere above: the walk is what answers.
+    expect(resolveProjectRoot(nested, undefined)).toBe(base);
   });
 });

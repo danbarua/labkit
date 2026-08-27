@@ -710,8 +710,22 @@ makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
 to get its own TCP port too, from a `derivePort` that hashed the path; there is
 no port any more. `LABKIT_DB_URL` still wins over both.
 
-**With neither set, an existing `.labkit/` at or above the working directory is
-found** (`resolveProjectRoot`, `src/db/connect.ts`). A client launched from
+**With neither set, git is asked first: `rev-parse --git-common-dir` names the
+one `.git` a repository has, and its parent is the project root**
+(`resolveProjectRoot`, `src/db/connect.ts`). **A worktree is a sibling of the
+main checkout, not a descendant**, so walking up from one never passes through
+it — and three `.labkit/` directories had accumulated for this one project
+before anyone looked, on 2026-08-27. All three were empty; a fresh database is
+42M, so their sizes said nothing. That is the fix's real lesson: the
+fragmentation was invisible *because* nothing had been recorded yet, and the
+first time it would have mattered is the first time it did.
+
+`--show-toplevel` names the worktree and would reintroduce the bug. Outside a
+repository `git rev-parse` fails and the walk below is the fallback, so there is
+no special case beside a normal one.
+
+**The walk remains, and still answers the nested case** — though git subsumes it
+at no cost, being correct from any depth without walking. A client launched from
 `packages/foo` used to report an empty record for a project full of work, which
 matters more since one binary: an MCP client's working directory is chosen by
 the editor, not the user. The walk **only ever finds, never decides where to
