@@ -30,6 +30,8 @@ rather than a paragraph.
 **`5faa307`** — the historical survey shares the selection.
 **`c85ea7c`**, **`1dcc42d`** — three more one-sided traversals in
 `whySupported`, and a refutation worth more than the fixes.
+**`73714bf`** — the bearing becomes a parameter, closing the mirror-image
+defect `labkit-review` found by reading.
 
 ## Verified
 
@@ -106,6 +108,41 @@ had stated: a re-run concluding the same sentence **corroborates**, so findings
 aggregate over the proposition — but a prespecified check **belongs to** the
 analysis held to it. Same nodes, two questions, two answers. Both exceptions are
 documented where the query is, with what refuted them.
+
+**`labkit-review` found the mirror image of the defect being fixed, and found
+it by reading.** A promoted negative result whose prespecified check *ran and
+passed* could never reach `established`. `checksOf` collected criteria from both
+bearings into `crit` and `crit2`; the **grain** read `crit`. Two places knew
+there were two paths and one was updated.
+
+Their four-cell probe reproduced here cell for cell before anything was
+touched, including that `challenges + never-run` was passing **accidentally** —
+a dropped row and an unmet check land in the same bucket, so the new scenario
+had a right conclusion sitting on wrong reasoning. That is PJ-029's shape, and
+the case that could have been positive and was not is `challenges + passed`. It
+is now a test, with a negative control: restricted to `SUPPORTS`, it goes red.
+
+**The one-liner was declined.** `crit ?? crit2` fixes the instance and leaves
+the class — two places would still know. The bearing is a parameter now, one
+query per bearing merged by the caller, so downstream there is one `answering`
+and one `crit` and the second name does not exist to be forgotten.
+
+**`WITH coalesce(…)` was measured before choosing, and it works on AGE** —
+`UNION` too. It was rejected anyway: `WITH` collapses the query, so every later
+clause would have to be projected forward by hand. The constraint is
+composition's, not AGE's, and it is written down so nobody reaches for it
+expecting a shortcut.
+
+**That is six occurrences of one defect, four of them mine, two written after
+the fix for the previous one.** The strongest evidence for the approach and the
+least flattering way to make the case.
+
+**And the reviewer's method is the result worth keeping.** They predicted the
+bug from four lines — the grain definitions — and only then ran a probe. Dan's
+observation on it: *"you were able to construct solid predictions from reading
+the code without running it… because the code tells you how it is."* That
+prediction was unavailable while the fact lived in whichever loop you were
+inside; it became available because this change gave it a name.
 
 **Not done: 39 raw queries across 13 verbs**, and the shape of that work is now
 the open question rather than its size. Most produce no classification and no
