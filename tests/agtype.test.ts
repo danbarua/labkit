@@ -8,7 +8,6 @@ import {
 } from "../src/db/agtype";
 import { TenantGraph } from "../src/db/graph";
 import { agtypeValue } from "../src/db/cypher";
-import type { LabKitDB } from "../src/db/backend";
 import { resolveTenantContext } from "../src/db/tenant";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 

@@ -13,8 +13,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { resolveProjectRoot } from "../src/db/connect";
+import { dirname, join } from "node:path";
+import { dotGitProjectRoot, resolveProjectRoot } from "../src/db/connect";
 
 const scratch = () => mkdtempSync(join(tmpdir(), "labkit-root-"));
 
@@ -156,5 +156,85 @@ describe("a worktree resolves to the repository, not to itself", () => {
     mkdirSync(nested, { recursive: true });
     // No git anywhere above: the walk is what answers.
     expect(resolveProjectRoot(nested, undefined)).toBe(base);
+  });
+});
+
+/**
+ * The filesystem answer, tested directly — it is the case the walk cannot solve
+ * and the environment `bun run build` ships into: a compiled binary on a host
+ * without git. Found in review; the fallback could not fix the bug it was the
+ * fallback for, because a sibling worktree walks up and misses the repository
+ * exactly as before.
+ *
+ * **Tested directly rather than through `resolveProjectRoot`, and the reason is
+ * measured.** Under bun 1.3.14 `spawnSync` finds `git` with `PATH` set to the
+ * empty string, unset, or pointing at an empty directory — all three checked —
+ * so the subprocess cannot be made to fail in-process and the fallback cannot
+ * be reached that way. The first version of this block tried, and its own
+ * control caught it: four tests were passing through the subprocess and
+ * asserting nothing about the code they named. The composition is a single
+ * `??`; the logic is what these cover.
+ */
+describe("dotGitProjectRoot — the answer with no git to ask", () => {
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+
+  function repoWithWorktree(): { root: string; worktree: string } {
+    const base = realpathSync(scratch());
+    const root = join(base, "project");
+    mkdirSync(root);
+    git(root, "init", "-q", "-b", "main");
+    git(
+      root,
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "user.name=t",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "base",
+    );
+    const worktree = join(base, "project.worktrees", "feature");
+    git(root, "worktree", "add", "-q", "-b", "feature", worktree);
+    return { root, worktree };
+  }
+
+  test("a sibling worktree names its repository", () => {
+    const { root, worktree } = repoWithWorktree();
+    expect(dotGitProjectRoot(worktree)).toBe(root);
+  });
+
+  test("and so does a subdirectory of one", () => {
+    const { root, worktree } = repoWithWorktree();
+    const nested = join(worktree, "packages", "foo");
+    mkdirSync(nested, { recursive: true });
+    expect(dotGitProjectRoot(nested)).toBe(root);
+  });
+
+  test("it agrees with git, which is the whole claim", () => {
+    const { worktree } = repoWithWorktree();
+    const viaGit = git(worktree, "rev-parse", "--path-format=absolute", "--git-common-dir").trim();
+    expect(dotGitProjectRoot(worktree)).toBe(dirname(realpathSync(viaGit)));
+  });
+
+  test("a normal checkout, where .git is a directory", () => {
+    const { root } = repoWithWorktree();
+    expect(dotGitProjectRoot(root)).toBe(root);
+  });
+
+  test("`--separate-git-dir` is declined rather than guessed at", () => {
+    const base = realpathSync(scratch());
+    const tree = join(base, "tree");
+    mkdirSync(tree);
+    git(base, "init", "-q", "--separate-git-dir", join(base, "elsewhere.git"), tree);
+    // Names a directory with no `worktrees/` component and no reliable path
+    // back to a working tree. Refused, so the caller falls through to the walk.
+    expect(dotGitProjectRoot(tree)).toBeUndefined();
+  });
+
+  test("outside a repository there is nothing to read", () => {
+    expect(dotGitProjectRoot(realpathSync(scratch()))).toBeUndefined();
   });
 });

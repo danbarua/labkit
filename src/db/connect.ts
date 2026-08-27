@@ -1,6 +1,6 @@
 import { traced } from "./trace";
-import { dirname, join } from "node:path";
-import { existsSync } from "node:fs";
+import { dirname, join, sep } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { directPostgresBackend, pgliteBackend, type LabKitDBConnection } from "./backend";
 
@@ -58,7 +58,7 @@ export function resolveProjectRoot(
     }
     return named;
   }
-  return gitProjectRoot(cwd) ?? discoverProjectRoot(cwd);
+  return gitProjectRoot(cwd) ?? dotGitProjectRoot(cwd) ?? discoverProjectRoot(cwd);
 }
 
 /**
@@ -117,7 +117,74 @@ function gitProjectRoot(cwd: string): string | undefined {
   // A bare repository has no working tree and therefore no project root to
   // speak of; its `--git-common-dir` is the repository itself, whose parent is
   // wherever it happens to be filed. Refuse rather than guess.
+  //
+  // This also rejects `git init --separate-git-dir`, where `.git` is a file
+  // pointing outside the tree — considered and declined for the same reason,
+  // not missed. Both fall through to the steps below, which is the safe
+  // direction.
   return existsSync(join(root, ".git")) ? root : undefined;
+}
+
+/**
+ * The same answer as {@link gitProjectRoot}, read off the filesystem, for when
+ * there is no git to ask.
+ *
+ * **The walk below cannot solve the bug it is the fallback for.** With git
+ * absent — a compiled binary on a host without it, which is exactly what
+ * `bun run build` ships — a worktree that is a *sibling* of its checkout walks
+ * up, never passes through the repository, and creates a database. That is the
+ * original defect, untouched, in the one environment where the subprocess is
+ * unavailable. Found in review by Dan from `exo-ledger`, which hit the same
+ * question from the other side.
+ *
+ * A linked worktree's `.git` is a **file**, not a directory:
+ *
+ * ```
+ * gitdir: /Users/dan/Code/science/labkit/.git/worktrees/feat-mcp-server
+ * ```
+ *
+ * Strip `/worktrees/<name>` and take the parent of `.git`, and that is the
+ * project root — byte-identical to what `--git-common-dir` returns, verified
+ * against this repository and against exo's differently-shaped one. In an
+ * ordinary checkout `.git` is a directory and the answer is simply the
+ * directory holding it.
+ *
+ * **`--separate-git-dir` is deliberately not handled**, and falls through to
+ * the walk. Its `.git` file names a directory with no `worktrees/` component
+ * and no reliable path back to a working tree, so deriving a root from it would
+ * be guessing. Considered and declined, rather than missed.
+ *
+ * This walks for `.git` rather than assuming `from` is the top, so it is
+ * correct from any depth — the same property the subprocess has.
+ *
+ * **Exported for its own tests, and that is a concession worth naming.** Under
+ * bun 1.3.14 `spawnSync` finds `git` with `PATH` empty, unset, or pointing at
+ * an empty directory — measured, all three — so there is no way to reach this
+ * from {@link resolveProjectRoot} in-process by making the subprocess fail. The
+ * composition is one `??`; the logic is here, and here is where it is tested.
+ */
+export function dotGitProjectRoot(from: string): string | undefined {
+  let dir = from;
+  for (;;) {
+    const dotGit = join(dir, ".git");
+    if (existsSync(dotGit)) {
+      if (statSync(dotGit).isDirectory()) return dir;
+      const named = readFileSync(dotGit, "utf8").trim();
+      const prefix = "gitdir:";
+      if (named.startsWith(prefix)) {
+        const gitDir = named.slice(prefix.length).trim();
+        // `…/.git/worktrees/<name>` -> `…/.git` -> `…`. Anything else is a
+        // layout this cannot read a working tree out of; see above.
+        const marker = `${sep}.git${sep}worktrees${sep}`;
+        const at = gitDir.lastIndexOf(marker);
+        if (at !== -1) return gitDir.slice(0, at);
+      }
+      return undefined;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
 }
 
 /**

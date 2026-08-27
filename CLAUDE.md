@@ -741,6 +741,34 @@ consumes. `scripts/smoke-cli.sh` asserts both halves: it fires on the first
 command and not the second, and `check:stdout` already refuses a stdout write
 from anywhere under `src/` outside the CLI.
 
+**With no git to ask, the same answer is read off the filesystem.** A linked
+worktree's `.git` is a *file* — `gitdir: …/labkit/.git/worktrees/feat-mcp-server`
+— so stripping `/worktrees/<name>` gives the project root with no subprocess,
+byte-identical to what `--git-common-dir` returns. It matters because
+**the walk cannot solve the bug it is the fallback for**: with git absent, a
+sibling worktree walks up, misses the repository, and creates a database exactly
+as before — and a compiled binary on a host without git is precisely what
+`bun run build` ships. Found in review, from `exo-ledger`, which hit the same
+question from the other side.
+
+`git init --separate-git-dir` is declined rather than guessed at: its `.git`
+file names a directory with no `worktrees/` component and no reliable path back
+to a working tree.
+
+**`dotGitProjectRoot` is exported for its own tests, and that is a concession
+with a measured reason.** Under bun 1.3.14 `spawnSync` finds `git` with `PATH`
+set to the empty string, unset, *or* pointing at an empty directory — all three
+checked — so the subprocess cannot be made to fail in-process and the fallback
+cannot be reached that way. The first version of those tests tried, and its own
+control caught it: four tests were passing through the subprocess while claiming
+to test the filesystem.
+
+**"A worktree is a sibling of the main checkout" is true of this repository's
+layout, not of worktrees generally** — `exo-ledger` nests them under
+`.claude/worktrees/`, where a walk *would* find the root. The fix is correct for
+both, which means it rests on `--git-common-dir` being the right question rather
+than on the sibling premise.
+
 **The walk remains, and still answers the nested case** — though git subsumes it
 at no cost, being correct from any depth without walking. A client launched from
 `packages/foo` used to report an empty record for a project full of work, which

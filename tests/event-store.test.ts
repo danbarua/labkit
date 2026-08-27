@@ -17,7 +17,6 @@ import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, UNATTRIBUTED, type Clock } from "../src/domain";
 import { pgEventLog } from "../src/domain/event-store";
-import type { LabKitDB } from "../src/db/backend";
 
 let testDb: TestDb;
 let db: TestClient;

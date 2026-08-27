@@ -44,7 +44,6 @@ import type { TenantContext } from "./tenant";
  */
 export class TenantGraph {
   private readonly runner: CypherRunner;
-  private readonly db: LabKitDB;
   /**
    * Natural ids minted since the last {@link drainMinted}.
    *
@@ -71,7 +70,6 @@ export class TenantGraph {
     db: LabKitDB,
     private readonly tx: Transactor,
   ) {
-    this.db = db;
     // CypherRunner validates ctx.graphName once, in its own constructor —
     // graphName is immutable for this instance's lifetime, and always
     // server-derived (tenants.graph_name is a generated column, PJ-003 §5),
