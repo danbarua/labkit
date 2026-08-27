@@ -33,7 +33,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { claimOf } from "../helpers/claims";
 
 let scenario: Scenario;
 let session: ResearchSession;

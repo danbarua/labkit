@@ -95,7 +95,6 @@ export type Fact<T = unknown> = Leaf<T> | Derived<T>;
  * is confined to this alias, so every use of it is one declaration a reader can
  * check rather than a habit spread across the file.
  */
-// biome-ignore lint/suspicious/noExplicitAny: an existential type, see above
 export type SomeFact = Fact<any>;
 
 function isLeaf<T>(f: Fact<T>): f is Leaf<T> {
