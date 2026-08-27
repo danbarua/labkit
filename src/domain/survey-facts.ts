@@ -308,3 +308,51 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus> {
     },
   };
 }
+
+/**
+ * Whether the answer stood as promoted **at a moment**, and whether it had been
+ * resolved by then.
+ *
+ * A historical survey cannot read `Claim.kind`, which carries no time: it has
+ * to ask whether a promoting decision had been taken yet. That is a third
+ * definition of "promoted" living beside the other two, and the reason it is
+ * here rather than inline is that the first two drifted — the survey learned to
+ * consult prespecified checks and the historical one did not, four lines apart
+ * in shape.
+ *
+ * Both bearings again, and for the same reason as {@link answeringClaim}: a
+ * promoted *negative* result is settled by evidence that `CHALLENGES`, and
+ * matching only `SUPPORTS` reads it as scratch (S-18b).
+ */
+export function standingAsOf(at: string): Leaf<{ resolved: boolean; promoted: boolean }> {
+  return {
+    name: "standingAsOf",
+    grain: byQuestion,
+    clause: `OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
+           OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
+           OPTIONAL MATCH (cited)-[:SUPPORTS]->(supported:Claim)
+           OPTIONAL MATCH (cited)-[:CHALLENGES]->(challenged:Claim)
+           OPTIONAL MATCH (promoting:Decision)-[:PROMOTES]->(supported)
+           OPTIONAL MATCH (denying:Decision)-[:PROMOTES]->(challenged)`,
+    yields: {
+      resolving: optional(vertexProps<{ decided_at: string }>()),
+      cited: optional(vertexProps<Node>()),
+      supported: optional(vertexProps<ClaimNode>()),
+      challenged: optional(vertexProps<ClaimNode>()),
+      promoting: optional(vertexProps<{ decided_at: string }>()),
+      denying: optional(vertexProps<{ decided_at: string }>()),
+    },
+    empty: () => ({ resolved: false, promoted: false }),
+    fold: (standing, row) => {
+      const resolving = row.resolving as { decided_at: string } | null;
+      // A decision taken after the moment asked about has not happened yet.
+      const resolvedByThen = resolving !== null && resolving.decided_at <= at;
+      const vouched = (row.promoting ?? row.denying) as { decided_at: string } | null;
+      return {
+        resolved: standing.resolved || (resolvedByThen && row.cited !== null),
+        promoted:
+          standing.promoted || (resolvedByThen && vouched !== null && vouched.decided_at <= at),
+      };
+    },
+  };
+}

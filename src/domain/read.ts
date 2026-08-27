@@ -61,7 +61,13 @@ import type {
 } from "./report";
 import { ref, isRefOfKind } from "./report";
 import { compose, per, type Row } from "./facts";
-import { answeringClaim, checkStatus, checkStatusForGate, checksMet } from "./survey-facts";
+import {
+  answeringClaim,
+  checkStatus,
+  checkStatusForGate,
+  checksMet,
+  standingAsOf,
+} from "./survey-facts";
 import { SessionCore } from "./core";
 import type { DomainEvent, EventFilter } from "./events";
 
@@ -194,70 +200,34 @@ export class ReadSurface extends SessionCore {
     if (Number.isNaN(parsed)) throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
     const asOf = new Date(parsed).toISOString();
 
-    const rows = await this.graph.query(
+    // Composed from a time-scoped standing fact. `whatIsKnown` and this verb
+    // both decide "was this answer promoted", and the two drifted once already
+    // — the current survey learned to consult prespecified checks and this one
+    // did not, four lines apart in shape. Sharing the clause and the fold is
+    // what stops that recurring; the *time* is the argument.
+    const standing = standingAsOf(asOf);
+    const { cypher, decoders } = compose(
       `MATCH (q:Question)
        WHERE q.posed_at <= $at
-       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
-       OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
-       OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
-       OPTIONAL MATCH (cited)-[:CHALLENGES]->(against:Claim)
-       OPTIONAL MATCH (promoting:Decision)-[:PROMOTES]->(settled)
-       OPTIONAL MATCH (denying:Decision)-[:PROMOTES]->(against)
-       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
-       RETURN q, resolving, cited, settled, against, promoting, denying, accepting`,
+       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)`,
+      standing,
       {
         q: vertexProps<{ natural_id: string; name: string }>(),
-        resolving: optional(vertexProps<{ decided_at: string }>()),
-        cited: optional(vertexProps<{ natural_id: string }>()),
-        settled: optional(vertexProps<{ natural_id: string }>()),
-        // The claim the closing evidence bears AGAINST, and its promotion.
-        // A question answered *no* is settled that way and matched nothing
-        // above, so a promoted negative result read as scratch (S-18b). Two
-        // OPTIONAL MATCHes because AGE has no edge alternation, and the names
-        // are lower-case because a camelCase RETURN name decodes as null.
-        against: optional(vertexProps<{ natural_id: string }>()),
-        promoting: optional(vertexProps<{ decided_at: string }>()),
-        denying: optional(vertexProps<{ decided_at: string }>()),
         accepting: optional(vertexProps<{ decided_at: string }>()),
       },
-      { at: asOf },
     );
+    const rows = (await this.graph.query(cypher, decoders, { at: asOf })) as unknown as Row[];
+    const standings = per(standing, rows);
 
-    // The decision cutoffs stay in TypeScript while the question cutoff is in
-    // the query, and the split is not arbitrary. `posed_at` decides whether a
-    // row belongs in the answer at all, so filtering it in Cypher means the
-    // rows that arrive are already the right set. The decision stamps only
-    // decide which *bucket* a row lands in, and there are three of them across
-    // five OPTIONAL MATCHes — pushing those down would mean an OPTIONAL MATCH
-    // per predicate for no change in the result.
-    const by = new Map<
-      QuestionRef,
-      { asks: Prose; resolved: boolean; promoted: boolean; accepted: boolean }
-    >();
+    const asked = new Map<string, { asks: string; accepted: boolean }>();
     for (const row of rows) {
-      const entry = by.get(ref("question", row.q.natural_id)) ?? {
-        asks: row.q.name,
-        resolved: false,
-        promoted: false,
-        accepted: false,
-      };
-      const resolvedByThen = row.resolving !== null && row.resolving.decided_at <= asOf;
-      entry.resolved ||= resolvedByThen && row.cited !== null;
-      // A promotion only counts toward *this* question if the resolution it
-      // qualifies had also happened -- otherwise a claim promoted early would
-      // establish a question resolved later.
-      // Either promotion, and still read from the PROMOTES decision rather than
-      // the claim's current `kind` -- `kind` is right for now and wrong for any
-      // past instant, which is what this whole method is about.
-      const vouched = row.promoting ?? row.denying;
-      entry.promoted ||= resolvedByThen && vouched !== null && vouched.decided_at <= asOf;
-      entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= asOf;
-      by.set(ref("question", row.q.natural_id), entry);
+      const q = row.q as { natural_id: string; name: string };
+      const entry = asked.get(q.natural_id) ?? { asks: q.name, accepted: false };
+      const accepting = row.accepting as { decided_at: string } | null;
+      entry.accepted ||= accepting !== null && accepting.decided_at <= asOf;
+      asked.set(q.natural_id, entry);
     }
 
-    // The canonical instant, not the caller's text: it is what every comparison
-    // above actually used, and echoing back a form that was not compared would
-    // describe an answer nobody computed.
     const survey: HistoricalSurvey = {
       at: asOf,
       established: [],
@@ -265,15 +235,13 @@ export class ReadSurface extends SessionCore {
       accepted: [],
       open: [],
     };
-    for (const [question, e] of by) {
-      const standing: QuestionStanding = {
-        question: ref("question", question),
-        asks: e.asks,
-      };
-      if (e.resolved && e.promoted) survey.established.push(standing);
-      else if (e.resolved) survey.provisional.push(standing);
-      else if (e.accepted) survey.accepted.push(standing);
-      else survey.open.push(standing);
+    for (const [question, e] of asked) {
+      const entry: QuestionStanding = { question: ref("question", question), asks: e.asks };
+      const was = standings.get(question) ?? { resolved: false, promoted: false };
+      if (was.resolved && was.promoted) survey.established.push(entry);
+      else if (was.resolved) survey.provisional.push(entry);
+      else if (e.accepted) survey.accepted.push(entry);
+      else survey.open.push(entry);
     }
     return survey;
   }
