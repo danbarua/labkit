@@ -56,11 +56,33 @@ grain fans out. In the shipped code that relationship is carried by *which loop
 you are inside*, which is invisible and is how `checksMetFor` came to group by
 criterion alone.
 
-**5. AGE did not get in the way.** Composed 15-line queries ran first time.
+**5. The state I predicted would break the decomposition did not.**
+`no-standing-verdict` is the fourth check state and the only rule that reaches
+back *down* a level: a verdict is retracted when every finding it cited has
+been invalidated, which lives two grains below the check. Reached by evaluating
+a criterion against a robustness finding, then reviewing that analysis and
+replacing it — which invalidates the artefact the verdict rested on:
+
+```
+before:  the effect holds at n>=20 — passed
+after :  the effect holds at n>=20 — no-standing-verdict
+```
+
+Shipped and spike agree. And the spike is right for the right reason, checked
+rather than assumed: the row carries `outcome: "pass"`, `basis: EV_3`,
+`invalidated: true`, so the evaluation-grain fold sees one cited basis and zero
+standing, marks it withdrawn, and the check has verdicts of which none stands.
+
+**Grain absorbed it with no new machinery.** The fold at the evaluation grain
+consumes the basis rows beneath it naturally, because "reaching down a level"
+is what a fold at that grain already does. Predicted as the most likely place
+to find a wall; there isn't one.
+
+**6. AGE did not get in the way.** Composed 15-line queries ran first time.
 `OPTIONAL MATCH` through a null-bound variable correctly yields null rather than
 a cartesian product — predicted otherwise, and wrong.
 
-**6. The machinery has its own hazards.** `empty: new Set()` is one shared
+**7. The machinery has its own hazards.** `empty: new Set()` is one shared
 mutable instance, so one question's criteria leaked into the next question's
 fold. Invisible with one subject, wrong with two. The identity element must be a
 factory, and in a real version that should be unforgeable rather than a
@@ -85,16 +107,16 @@ each of the remaining classifications.
 | **challenging claim, check never run** | **`established`** | `provisional` |
 | supporting claim, check passed | `established` | `established` |
 | criterion failed then passed | `failed` | `failed` |
+| verdict whose cited finding was invalidated | `no-standing-verdict` | `no-standing-verdict` |
 
 The second row is a defect in shipped code, found by this spike and not yet
 filed.
 
+**All four check states are now covered**, which was the open question when
+this spike was committed.
+
 ## Not attempted
 
-- **`no-standing-verdict`** — the fourth check state, reached only by a review
-  that invalidates the artefact a verdict cited. It is the state most likely to
-  break the decomposition, because withdrawal is the only rule that reaches back
-  *down* a level.
 - **The write side.** All of this is read-only.
 - **Anything about performance.** One composed query replaces two, which is
   suggestive and unmeasured.
