@@ -49,10 +49,17 @@ At 0.5 it is the CI failure exactly — `a beforeEach/afterEach hook timed out`,
 8178ms, in `tests/subject-identity.test.ts`, with ten tests never reaching the
 runner.
 
-**Margin, which is #52's question:** at `--cpus=0.5` with today's 20000ms
-ceiling, **0 failures, 398 tests, 180s**. At 0.25 and the old ceiling, three
-failures including a hook at **28513ms**. The 0.25 arm at today's ceiling was
-still running when this was written.
+**Margin, which is #52's question — complete:**
+
+| `--cpus` | @ 5000ms (old) | @ 20000ms (today) | wall |
+| --- | --- | --- | --- |
+| 2 | 0 failures | — | 78s |
+| 1 | 0 failures | — | 85s |
+| **0.5** | **2 failures** | **0 failures** | 180s |
+| **0.25** | 3 failures | **2 failures** — hook at 25499ms | 729s |
+
+So the margin is roughly **2× in throughput**: it holds at 0.5 and breaks at
+0.25.
 
 ## Open
 
@@ -72,7 +79,15 @@ version to Dan mid-session before checking it.
 **#52's premise is wrong in the useful direction.** It says the raised ceiling
 *is not headroom*. At the constraint that reproduces CI's original failure, the
 suite runs clean at 180s — the raise did real work rather than papering over.
-Headroom runs out between 0.5 and 0.25 CPU.
+And the number it asked for from "the machine that actually runs it" turned out
+not to need Cloud Build at all: the reproduction gives it locally for one
+`docker run`. Recommended for closing on the evidence rather than worked.
+
+**One number seen and deliberately set aside.** Wall time goes 180s → 729s for
+half the CPU — 4× cost for a 2× cut, so something thrashes at very low quota
+rather than merely running slower. Well outside any real worker's shape and not
+chased. Written down because an unexplained figure nobody admits to having seen
+looks like a bug six months later.
 
 **The default stays at 2 on purpose.** 0.5 is this laptop's calibration; there
 is no portable number, and changing the default would silently redefine what
@@ -88,10 +103,31 @@ flakiness. Doing #53 first made #52 nearly free, where running all three in
 parallel would have burned Cloud Build minutes answering a question #53
 dissolved.
 
+**Found while orienting for the next piece, and not yet acted on:
+`Claim.kind` is falsely annotated.** It is declared
+`ReadOnlyString<"exploratory" | "confirmatory">`, and the taxonomy defines that
+class as *stored, handed back to callers, **never decided on*** — the whole
+point of the annotation is to say nothing reads it. Three places decide on it,
+`src/domain/read.ts` lines 336, 559 and 1669, the first being `whatIsKnown`'s
+bucketing.
+
+It is false about **the exact field #63 is a question about**, and false in the
+direction that hides the problem: the field the taxonomy says nobody reads is
+the one the survey's strongest word branches on. It is also a live instance of
+#50 — a comment asserting a property the code does not have — found by reading
+the declaration next to its readers rather than by any check.
+
 ## Next
 
-PR #67 awaits review. When the 0.25 arm at the 20000ms ceiling lands, #52 gets
-its comment and can probably be closed on the evidence rather than worked.
+**The scenario for #62**, which is build-ready: the design settled *where* the
+fix goes and left *which bucket* to the scenario deliberately, because the words
+are only tested by a researcher trying to act. Simplest form: `analyse
+--held-to` a criterion that is never evaluated, promote, close — three verbs, no
+gate, and `why` says unmet while `known` says `Established`.
 
-Then the digest work: #62 is the open question that blocks it, and #66 is the
-one after.
+**#63 may then fall out rather than needing its own round.** Once the survey
+stops reading `kind` as a proxy for *verified*, the two facts crammed into that
+value come apart on their own — and the false annotation above is the evidence
+that they were crammed.
+
+Then #66, #55, and the digest as an assembled view.
