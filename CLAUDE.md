@@ -290,9 +290,29 @@ second copy is a second thing to go stale. Read it if a token in a journal entry
 means nothing to you; `D1`/`D2` in particular mean two unrelated things
 depending on the document.
 
-`docs/TASKS.md` is the **work queue** — actionable items only. It carries no
-statuses, verdicts or counts; PJ-008 §3's index is authoritative on what the
-model knows, and standing facts and gates are in this file.
+**Work is tracked in GitHub issues, not in a document.** `gh issue list` is the
+queue. It replaced `docs/TASKS.md` on 2026-08-27, which is the sixth principle
+applied to itself: a queue is state, a markdown file is prose, and keeping the
+two in step was a job nobody had.
+
+Six labels, one per section that file had grown:
+
+| label | what it holds |
+| --- | --- |
+| `documents` | prose that has to stay true — this file, the journal, comments |
+| `suite-margin` | the suite's headroom, and the checks around it |
+| `agent-surface` | what an agent or researcher can reach through the tools |
+| `tooling` | scaffolding; necessary, and nothing there ships |
+| `not-doing` | decided against, and **closed as not planned** — searchable so nobody rediscovers it as a gap, without sitting in the open list |
+| `deferred` | understood and parked; the body says what would unpark it |
+
+A `deferred` issue names the issue that would unpark it rather than carrying its
+own copy of the condition — today that is the multi-tenancy issue, which exists
+for no other purpose.
+
+**PJ-008 §3's index is still authoritative on what the model knows**, and
+standing facts and gates are still in this file. An issue is a piece of work, not
+a verdict about the domain.
 
 ### The dated records
 
