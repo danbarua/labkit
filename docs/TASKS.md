@@ -13,13 +13,14 @@ Neither is restated here — see CLAUDE.md, "The one rule about documents".
   system two refactors ago. Retire rather than revise where the code now says
   it; the pinned header's sixth rule is what "stale" means, and its tense tell
   makes the sweep a grep rather than a judgement call. The file has grown while
-  the system under it was rewritten twice this week — the connection model, the
-  testing patterns and the persistence layer are where to start.
-- **`docs/persistence-spikes.md` -> `docs/persistence.md`.** It is dated AGE
-  findings from 2026-08-17/18 and reads as a lab notebook. What a reader needs
-  is a concise explainer of how persistence works now — two backends, one seam,
-  a lock, migrations, tenancy. Keep the dated probes that still bite; drop what
-  the code has since answered.
+  the system under it was rewritten twice this week. Persistence has since
+  moved out to `docs/persistence.md`; what is left and least swept is
+  `## Commands`, which is 364 lines and mostly not about commands — it holds
+  the binary's leak, the CLI, the MCP server, shell traps, CI and biome. The
+  move `labkit-review` suggested: leave the command block, lift the rest into
+  a surfaces section or the architecture half. The document inventory in
+  `## What this is` is also split in two by an unrelated block, so a reader
+  scanning for which document holds what finds half a list and stops.
 
 ## Loose ends from the DB layer work
 
