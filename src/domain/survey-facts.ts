@@ -9,7 +9,9 @@
  */
 
 import { optional, vertexProps } from "../db/cypher";
-import type { Derived, Leaf, Row, SomeFact } from "./facts";
+import { ref } from "./report";
+import type { CheckStatus, EvidenceRef } from "./report";
+import type { Derived, Leaf, Row } from "./facts";
 
 /** Shapes the folds below assert. A row is decoded, not typed, at the seam. */
 interface Node {
@@ -21,6 +23,13 @@ interface ClaimNode extends Node {
 interface EvaluationNode extends Node {
   outcome: "pass" | "fail";
   evaluated_at: string;
+  value: string;
+}
+interface CriterionNode extends Node {
+  proposition: string;
+}
+interface BasisNode extends Node {
+  statement: string;
 }
 interface ArtefactNode extends Node {
   invalidated?: boolean;
@@ -106,76 +115,139 @@ export const checksOf: Leaf<Set<string>> = {
 };
 
 /**
- * How much of an evaluation's basis still stands.
+ * One evaluation, folded: its verdict, and how much of its basis still stands.
  *
- * A verdict is **retracted** when everything it cited has been invalidated —
- * which is not the same as failing, and the difference is `no-standing-verdict`
- * (S-3c). A verdict citing nothing cannot be retracted at all, which is what
- * stops S-8's asserted-versus-measured distinction becoming a loophole.
+ * **Parameterised by which evaluations count**, because two scopes are
+ * deliberately different and the difference is load-bearing (S-17 with S-3):
+ *
+ * - **gate-scoped** — has this condition been checked *for this gate*?
+ * - **criterion-scoped** — has this check ever been shown able to fail?
+ *
+ * One criterion can govern several gates and be evaluated separately against
+ * each — the same hash check run against staging and against release.
+ * Collapsing the two made a gate nobody had evaluated report as blocked
+ * because its criterion had failed somewhere else. That distinction used to
+ * live in a paragraph above one of the two queries; here it is an argument, so
+ * a caller has to choose rather than inherit whichever query they copied.
+ *
+ * A verdict is **retracted** when everything it cited has been invalidated,
+ * which is not failing — that difference is `no-standing-verdict` (S-3c). A
+ * verdict citing nothing cannot be retracted at all, which stops S-8's
+ * asserted-versus-measured distinction becoming a loophole.
  */
-export const basisStanding: Leaf<{ cited: number; standing: number }> = {
-  name: "basisStanding",
-  grain: byEvaluation,
-  clause: `OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
+export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verdict> {
+  return {
+    name,
+    grain: byEvaluation,
+    clause: `${evaluationClause}
            OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
            OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)`,
-  yields: {
-    ev: optional(vertexProps<EvaluationNode>()),
-    basis: optional(vertexProps<Node>()),
-    basisout: optional(vertexProps<ArtefactNode>()),
-  },
-  empty: () => ({ cited: 0, standing: 0 }),
-  fold: (counts, row) =>
-    row.basis === null
-      ? counts
-      : {
-          cited: counts.cited + 1,
-          standing: counts.standing + ((row.basisout as ArtefactNode | null)?.invalidated ? 0 : 1),
-        },
-};
+    yields: {
+      ev: optional(vertexProps<EvaluationNode>()),
+      basis: optional(vertexProps<Node>()),
+      basisout: optional(vertexProps<ArtefactNode>()),
+    },
+    empty: () => ({ cited: 0, standing: 0, outcome: null, at: "", value: "", basis: [] }),
+    fold: (verdict, row) => {
+      const evaluation = row.ev as EvaluationNode | null;
+      const seen: Verdict = evaluation
+        ? {
+            ...verdict,
+            outcome: evaluation.outcome,
+            at: evaluation.evaluated_at,
+            value: evaluation.value,
+          }
+        : verdict;
+      const basis = row.basis as BasisNode | null;
+      if (basis === null) return seen;
+      // By handle, not by sentence: one evaluation citing several findings
+      // arrives as several rows, and two findings can state the same thing.
+      const known = seen.basis.some((b) => b.evidence === basis.natural_id);
+      return {
+        ...seen,
+        basis: known
+          ? seen.basis
+          : [
+              ...seen.basis,
+              { evidence: ref("evidence", basis.natural_id), states: basis.statement },
+            ],
+        cited: seen.cited + 1,
+        standing: seen.standing + ((row.basisout as ArtefactNode | null)?.invalidated ? 0 : 1),
+      };
+    },
+  };
+}
+
+/** A verdict and how much of its basis stands. `outcome` is null when none exists. */
+export interface Verdict {
+  cited: number;
+  standing: number;
+  outcome: "pass" | "fail" | null;
+  at: string;
+  value: string;
+  /** The findings it was reached against, deduplicated by handle. */
+  basis: { evidence: EvidenceRef; states: string }[];
+}
+
+/** The four states a prespecified condition can be in. */
+export type CheckState = "passed" | "failed" | "never-run" | "no-standing-verdict";
+
+/** Retracted: it cited findings, and every one has since been invalidated. */
+const retracted = (v: Verdict): boolean => v.cited > 0 && v.standing === 0;
 
 /**
- * A criterion's state, and the precedence three scenarios earned.
+ * A criterion's state, over whichever verdicts the caller chose.
  *
  * A failure **sticks** among verdicts that still stand, so re-running until
- * green is not evidence (S-3). A wholly-withdrawn verdict is a retraction
- * rather than a failure (S-3c). And `never-run` is a first-class value, not the
- * absence of one, because a check nobody performed must be distinguishable from
- * one that failed (S-17).
+ * green is not evidence (S-3). A wholly-retracted verdict is a retraction and
+ * not a failure (S-3c). And `never-run` is a first-class value rather than the
+ * absence of one, because a check nobody performed must be distinguishable
+ * from one that failed (S-17).
  */
-export const checkState: Derived<"passed" | "failed" | "never-run" | "no-standing-verdict"> = {
-  name: "checkState",
+export function checkStateOver(verdicts: Leaf<Verdict>): Derived<CheckState> {
+  return {
+    name: "checkState",
+    grain: byCriterion,
+    needs: [verdicts],
+    from: (needs) => {
+      const all = [...(needs[verdicts.name] as Map<string, Verdict>).values()];
+      const standing = all.filter((v) => !retracted(v));
+      if (standing.length === 0) return all.length > 0 ? "no-standing-verdict" : "never-run";
+      return standing.some((v) => v.outcome === "fail") ? "failed" : "passed";
+    },
+  };
+}
+
+/** The criterion node itself, so a check can report what it requires. */
+export const criterionProps: Leaf<CriterionNode> = {
+  name: "criterionProps",
   grain: byCriterion,
-  needs: [basisStanding],
-  from: (needs) => {
-    const perEvaluation = needs.basisStanding as Map<string, { cited: number; standing: number }>;
-    const standing = [...perEvaluation].filter(([, b]) => !(b.cited > 0 && b.standing === 0));
-    if (standing.length === 0) return perEvaluation.size > 0 ? "no-standing-verdict" : "never-run";
-    return standing.some(([evaluation]) => outcomes.get(evaluation) === "fail")
-      ? "failed"
-      : "passed";
-  },
+  clause: "",
+  yields: {},
+  empty: () => ({ natural_id: "", proposition: "" }),
+  fold: (found, row) => (row.crit as CriterionNode | null) ?? found,
 };
 
-/**
- * Outcomes, by evaluation handle.
- *
- * A concession, and a small one: `checkState` needs each verdict's `outcome`,
- * which lives on the evaluation node rather than on anything its own grain
- * folds. Filled by {@link readOutcomes} before evaluation. A fuller machinery
- * would let a fact carry a scalar off its own grain's node; this does not, and
- * naming the gap is better than hiding it in a wider fold.
- */
-const outcomes = new Map<string, "pass" | "fail">();
+/** Every evaluation of a criterion, whichever gate it was reached for. */
+export const anyVerdict = verdictsWhere(
+  "anyVerdict",
+  `OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)`,
+);
 
-/** Records each evaluation's verdict so {@link checkState} can read it. */
-export function readOutcomes(rows: readonly Row[]): void {
-  outcomes.clear();
-  for (const row of rows) {
-    const evaluation = row.ev as EvaluationNode | null;
-    if (evaluation) outcomes.set(evaluation.natural_id, evaluation.outcome);
-  }
-}
+/** Only the evaluations reached **for this gate** (S-17 with S-3; see above). */
+export const verdictForGate = verdictsWhere(
+  "verdictForGate",
+  `OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)`,
+);
+
+/** How a check bears on a finding: every verdict counts. */
+export const checkState = checkStateOver(anyVerdict);
+
+/** A finding's prespecified conditions, itemised. */
+export const checkStatus = checkStatusOver(anyVerdict);
+
+/** A gate's conditions, itemised, scoped to verdicts reached for that gate. */
+export const checkStatusForGate = checkStatusOver(verdictForGate);
 
 /** Every prespecified check on the answering claim passed. Vacuously true when there are none. */
 export const checksMet: Derived<boolean> = {
@@ -184,15 +256,55 @@ export const checksMet: Derived<boolean> = {
   needs: [checksOf, checkState],
   from: (needs) => {
     const required = needs.checksOf as Set<string>;
-    const states = needs.checkState as Map<string, string>;
+    const states = needs.checkState as Map<string, CheckState>;
     return [...required].every((criterion) => states.get(criterion) === "passed");
   },
 };
 
-export const facts: Record<string, SomeFact> = {
-  answeringClaim,
-  checksOf,
-  basisStanding,
-  checkState,
-  checksMet,
-};
+/**
+ * A check, itemised — the shape a reader is shown, not just its state.
+ *
+ * Replaces `checksFrom`, and with it the last place the four-state rule was
+ * written out. Three reports need this — a gate's conditions, the standard a
+ * finding was held to, and the survey's own bucketing — and each used to fold
+ * it separately from a query it also wrote separately.
+ *
+ * Evaluations are ordered by time then identity because **Cypher imposes no
+ * ordering**, and without it *which* verdict is reported as "the" value of a
+ * check is not a stable contract between runs.
+ */
+export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus> {
+  const state = checkStateOver(verdicts);
+  return {
+    name: "checkStatus",
+    grain: byCriterion,
+    needs: [verdicts, state, criterionProps],
+    from: (needs) => {
+      const found = needs[verdicts.name] as Map<string, Verdict>;
+      const criterion = needs.criterionProps as CriterionNode;
+      const ordered = [...found]
+        .map(([evaluation, v]) => ({ evaluation, ...v }))
+        .sort((a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation));
+      const records = ordered.map((v) => ({
+        evaluation: ref("evaluation", v.evaluation),
+        criterion: ref("criterion", criterion.natural_id),
+        value: v.value ?? "",
+        outcome: (v.outcome ?? "pass") as "pass" | "fail",
+        at: v.at,
+        basis: v.basis,
+        ...(retracted(v) ? { withdrawn: true as const } : {}),
+      }));
+      const standing = ordered.filter((v) => !retracted(v));
+      const decisive = standing.find((v) => v.outcome === "fail") ?? standing[0];
+      return {
+        criterion: ref("criterion", criterion.natural_id),
+        proposition: criterion.proposition,
+        state: needs[state.name] as CheckState,
+        evaluations: records,
+        ...(decisive
+          ? { decidedBy: records.find((r) => r.evaluation === decisive.evaluation) }
+          : {}),
+      } as CheckStatus;
+    },
+  };
+}

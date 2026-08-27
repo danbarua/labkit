@@ -34,9 +34,7 @@ import type {
   ConflictSide,
   ConflictVerdict,
   AnalysisRef,
-  CheckStatus,
   EnquiryStatus,
-  EvaluationRecord,
   CriterionRef,
   BlockedWork,
   DecisionRef,
@@ -63,7 +61,7 @@ import type {
 } from "./report";
 import { ref, isRefOfKind } from "./report";
 import { compose, per, type Row } from "./facts";
-import { answeringClaim, checksMet, readOutcomes } from "./survey-facts";
+import { answeringClaim, checkStatus, checkStatusForGate, checksMet } from "./survey-facts";
 import { SessionCore } from "./core";
 import type { DomainEvent, EventFilter } from "./events";
 
@@ -311,7 +309,6 @@ export class ReadSurface extends SessionCore {
     // it is the claim `answeringClaim` resolves to, projected onto each row so
     // the claim-grained facts have a subject to group by.
     const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
-    readOutcomes(rows);
 
     const answering = per(answeringClaim, rows);
     const withSubject = rows.map((row) => ({
@@ -995,29 +992,18 @@ export class ReadSurface extends SessionCore {
     // OPTIONAL MATCH is load-bearing twice over: a criterion nobody evaluated
     // must still appear as a check, and `g` is bound from the first MATCH so
     // only evaluations triggering this gate count.
-    const rows = await this.graph.query(
-      `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})
-       OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)
-       OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
-       OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)
-       RETURN c, ev, basis, basisout`,
-      {
-        c: vertexProps<{ natural_id: string; proposition: string }>(),
-        ev: optional(
-          vertexProps<{
-            natural_id: string;
-            value: string;
-            outcome: "pass" | "fail";
-            evaluated_at: string;
-          }>(),
-        ),
-        basis: optional(vertexProps<{ statement: string } & Identified>()),
-        basisout: optional(vertexProps<{ invalidated?: boolean }>()),
-      },
-      { id: gate },
+    // Composed from the gate-scoped verdict fact. The scope is the argument
+    // rather than a paragraph: `verdictForGate` counts only evaluations
+    // reached FOR this gate, where `anyVerdict` counts every evaluation of the
+    // criterion. Collapsing the two made a gate nobody had evaluated report as
+    // blocked because its criterion had failed somewhere else.
+    const { cypher, decoders } = compose(
+      `MATCH (crit:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})`,
+      checkStatusForGate,
+      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
     );
-
-    const checks = this.checksFrom(rows);
+    const rows = (await this.graph.query(cypher, decoders, { id: gate })) as unknown as Row[];
+    const checks = [...per(checkStatusForGate, rows).values()];
     // Flattened in the same order the checks were assembled in.
     const evaluations = checks.flatMap((c) => c.evaluations);
     const unmetChecks = checks.filter((c) => c.state !== "passed");
@@ -1126,160 +1112,6 @@ export class ReadSurface extends SessionCore {
     }
     return out;
   }
-
-  /**
-   * Groups (criterion, evaluation, basis) rows into itemised checks.
-   *
-   * Shared by the two jobs a criterion does, which S-3 fused and S-3b took
-   * apart: gating work (`gateStatus`) and qualifying a finding
-   * (`whySupported`). The traversals that reach the criteria differ; how a
-   * check is reported must not, or the same condition would read one way
-   * through a gate and another through the finding it qualifies.
-   */
-  private checksFrom(
-    rows: Array<{
-      c: { natural_id: string; proposition: string };
-      ev: {
-        natural_id: string;
-        value: string;
-        outcome: "pass" | "fail";
-        evaluated_at: string;
-      } | null;
-      basis: ({ statement: string } & Identified) | null;
-      /**
-       * The artefact the cited finding was recorded in, carrying whether that
-       * analysis has since been replaced.
-       *
-       * Lower-case deliberately, and enforced: `basisOut` here returns present
-       * and NULL for every row, silently, because the AS clause AGE requires
-       * is unquoted SQL and Postgres folds it. See `buildAsClause`.
-       */
-      basisout: { invalidated?: boolean } | null;
-    }>,
-  ): CheckStatus[] {
-    // Keyed by natural id, not by proposition text. Two criteria worded
-    // identically are two criteria; whether they SHOULD be one is an identity
-    // question, and a read-side query must not settle it by string equality.
-    // `standing` counts the cited findings that have NOT been withdrawn. It
-    // is kept alongside `basis` rather than derived from it because `basis`
-    // is display text, and two withdrawn findings can share a sentence.
-    // `id` used to live here separately and be discarded by `strip`. It is
-    // `EvaluationRecord.evaluation` now, so there is one field rather than two
-    // and nothing to drop on the way out.
-    type TimedEvaluation = EvaluationRecord & {
-      cited: number;
-      standing: number;
-    };
-    const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
-    for (const row of rows) {
-      const id = row.c.natural_id;
-      const entry = byCriterion.get(id) ?? {
-        proposition: row.c.proposition,
-        evaluations: [],
-      };
-      if (row.ev) {
-        // One row per (evaluation, basis) pair, so an evaluation citing several
-        // findings arrives more than once. Accumulate rather than push.
-        const seen = entry.evaluations.find((e) => e.evaluation === row.ev!.natural_id);
-        const record = seen ?? {
-          evaluation: ref("evaluation", row.ev.natural_id),
-          criterion: ref("criterion", id),
-          value: row.ev.value,
-          outcome: row.ev.outcome,
-          at: row.ev.evaluated_at,
-          basis: [] as CitedFinding[],
-          cited: 0,
-          standing: 0,
-        };
-        if (row.basis) {
-          // By id, not by statement: two findings can say the same sentence.
-          if (!record.basis.some((b) => b.evidence === row.basis!.natural_id))
-            record.basis.push({
-              evidence: ref("evidence", row.basis.natural_id),
-              states: row.basis.statement,
-            });
-          record.cited += 1;
-          if (!row.basisout?.invalidated) record.standing += 1;
-        }
-        if (!seen) entry.evaluations.push(record);
-      }
-      byCriterion.set(id, entry);
-    }
-
-    /**
-     * A verdict is withdrawn when everything it was reached against has
-     * been. A verdict that cited nothing cannot be withdrawn at all — there
-     * is nothing to retract — which is what keeps S-8's asserted-versus-
-     * measured distinction (row W) from becoming a loophole.
-     */
-    const isWithdrawn = (e: TimedEvaluation): boolean => e.cited > 0 && e.standing === 0;
-
-    const strip = (e: TimedEvaluation): EvaluationRecord => ({
-      evaluation: e.evaluation,
-      criterion: e.criterion,
-      value: e.value,
-      outcome: e.outcome,
-      at: e.at,
-      basis: [...e.basis].sort((x, y) => x.evidence.localeCompare(y.evidence)),
-      // Present only when true, so a record that stands is byte-identical to
-      // what it was before this field existed.
-      ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
-    });
-
-    const checks: CheckStatus[] = [];
-    for (const [id, entry] of byCriterion) {
-      // Cypher imposes no ordering, so sort explicitly: by time, then by
-      // identity. Without this, which evaluation gets reported as "the" value
-      // of a check is not a stable contract between runs.
-      const ordered = entry.evaluations.sort(
-        (a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation),
-      );
-
-      // A failure sticks -- among verdicts that still stand. One failing
-      // evaluation is decisive even if a later run passed, so re-running
-      // until green is not evidence (S-3, and the case that earned this).
-      //
-      // S-3c narrowed it, and only here: a verdict whose entire basis has
-      // been reviewed and withdrawn is not a failure that stands, it is a
-      // failure that was retracted. Before this the two were the same state,
-      // so a check found to be defective, corrected and re-run went on
-      // disqualifying the finding and blocking the work for ever -- the same
-      // answer as re-rolling the dice, which is the one thing S-3 set out to
-      // prevent. Ledger row X.
-      //
-      // What did NOT change: the withdrawn verdict stays in `evaluations`,
-      // marked. Erasing it would leave no record of why the finding was ever
-      // in doubt, and re-running a check that nobody faulted still cannot
-      // clear it, because nothing withdraws it.
-      const standing = ordered.filter((e) => !isWithdrawn(e));
-      const decisive = standing.find((e) => e.outcome === "fail") ?? standing[0];
-      // Three ways to have no decisive verdict, and only one of them is
-      // "nobody ran this". A check every one of whose verdicts has been
-      // withdrawn *ran*, and saying `never-run` contradicted the evaluations
-      // listed beside it -- external review of S-3c.
-      const state: CheckStatus["state"] =
-        decisive !== undefined
-          ? decisive.outcome === "fail"
-            ? "failed"
-            : "passed"
-          : ordered.length > 0
-            ? "no-standing-verdict"
-            : "never-run";
-      checks.push({
-        criterion: ref("criterion", id),
-        proposition: entry.proposition,
-        state,
-        evaluations: ordered.map(strip),
-        ...(decisive ? { decidedBy: strip(decisive) } : {}),
-      });
-    }
-
-    return checks;
-  }
-
-  // -------------------------------------------------------------------------
-  // Revision
-  // -------------------------------------------------------------------------
 
   /**
    * An interpretation and every narrowing behind it, oldest first.
@@ -1599,31 +1431,22 @@ export class ReadSurface extends SessionCore {
     // is not qualified the way `supported` now is. Nothing in the corpus holds
     // a challenging analysis to a prespecified standard; the scenario that
     // would settle it is a null result whose robustness checks disagree.
-    const standardRows = await this.graph.query(
+    // The same fact the survey and a gate read, so "which checks does this
+    // claim answer to" is one definition. Selected by handle: two analyses in
+    // one enquiry concluding the same sentence are two claims, and matching by
+    // wording made this verb and `whatIsKnown` contradict each other.
+    const { cypher: standardCypher, decoders: standardDecoders } = compose(
       `MATCH (cl:Claim {natural_id: $claim})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        MATCH (e)-[:RECORDED_IN]->(out:Artefact)
        WHERE out.invalidated IS NULL OR out.invalidated = false
-       MATCH (crit:Criterion)-[:QUALIFIES]->(u)
-       OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
-       OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
-       OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)
-       RETURN crit AS c, ev, basis, basisout`,
-      {
-        c: vertexProps<{ natural_id: string; proposition: string }>(),
-        ev: optional(
-          vertexProps<{
-            natural_id: string;
-            value: string;
-            outcome: "pass" | "fail";
-            evaluated_at: string;
-          }>(),
-        ),
-        basis: optional(vertexProps<{ statement: string } & Identified>()),
-        basisout: optional(vertexProps<{ invalidated?: boolean }>()),
-      },
-      { claim },
+       MATCH (crit:Criterion)-[:QUALIFIES]->(u)`,
+      checkStatus,
+      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
     );
-    const standard = this.checksFrom(standardRows);
+    const standardRows = (await this.graph.query(standardCypher, standardDecoders, {
+      claim,
+    })) as unknown as Row[];
+    const standard = [...per(checkStatus, standardRows).values()];
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
     // and the two must agree, since in S-3 they are the same checks.
