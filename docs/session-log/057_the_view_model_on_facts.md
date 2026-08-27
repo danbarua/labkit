@@ -34,6 +34,9 @@ rather than a paragraph.
 defect `labkit-review` found by reading.
 **`94b364a`** — the bearing sweep checked mechanically and closed; one
 confusable helper renamed.
+**`b0c45f0`** — the prose catches up: CLAUDE.md gains a section on the fact
+graph, S-19 gains its fourth case, and ledger row **AL** gains a glossary
+entry.
 
 ## Verified
 
@@ -183,12 +186,43 @@ documentation for *why* the graph is shaped as it is.
 read side is ported or explicitly invalidated. Four verbs are ported and the
 rest are surveyed.
 
-One decision outstanding: accept the more-than-one-reader line, in which case
-"ported or invalidated" is complete and the PR is ready — or put the remaining
-33 behind `compose` anyway. Both `labkit-review` and I would argue against the
-second: 33 more grains, each of which must be reference-correct, on machinery
-whose one known footgun scales with the number of facts.
+**PR #72 is ready.** Dan accepted the more-than-one-reader line — his words
+for it were better than mine: *"can't find a way to shrink one line of code into
+less than one line."* `pursuitsOf` is `MATCH → RETURN ids`, and facts pay where
+a rule is duplicated, not where it is not.
 
-**And one sentence still wants a durable home**: *findings corroborate, checks
-belong to*. It lives in a doc comment. Absent somewhere better, the next person
-re-unifies them with an argument that sounds as good as the one refuted here.
+Verified at the end: up to date with `main`, `bun run check` 18/18, 176
+scenarios, 17 commits, `read.ts` 162 lines lighter net while gaining
+correctness.
+
+**One idea of Dan's deferred with a reason rather than declined**: a
+`queryBuilder.add("raw clause")` escape hatch, so every read goes through one
+machinery and raw clauses visibly flag themselves. Today the raw form already
+announces itself — a different function, a template literal, hand-written
+decoders. It earns its place when the machinery grows something *every* read
+should get: tracing, a row-count guard, a tenant assertion. That reason does not
+exist yet.
+
+**The sentence that wanted a durable home has one.** *Findings aggregate over a
+proposition; a prespecified check belongs to the one analysis held to it* is
+ledger row **AL** and a glossary entry, not a doc comment on one query.
+
+**The prose was imported from #69 and adapted rather than copied**, which is the
+part that took judgement. Three things changed on the way:
+
+- **CLAUDE.md gained a section it did not have.** `src/domain/facts.ts` is a new
+  architectural module and the architecture document did not mention it — the
+  gap was invisible because nothing checks for it.
+- **S-19's prose gained a fourth case and an admission.** The first three tests
+  were passing partly by luck: a dropped criterion reads as *no checks*, which
+  is vacuously met, so the never-run case landed in the right bucket for the
+  wrong reason. PJ-029's shape inside the scenario written to demonstrate the
+  fix.
+- **`WITH coalesce(…)` is recorded as a limit of composition, not of AGE.** It
+  parses, which is exactly why someone will reach for it; every clause appended
+  after it would have to be projected forward by hand.
+
+**Left alone deliberately:** the session logs and PJ-008's S-3c predictions
+still name `checksFrom`, which no longer exists. They are dated records and say
+what was true when written; correcting them is what the exemption exists to
+prevent.
