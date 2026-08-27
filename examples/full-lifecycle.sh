@@ -214,27 +214,42 @@ lab analyse "$enquiry" \
 analysis=$(handle COMP "$(printf '%s' "$LAST" | head -1)")
 claim=$(handle CLM "$(printf '%s' "$LAST" | tail -1)")
 
-chapter "Checking, promoting, closing" \
-  "Record the prespecified check's outcome. A gate's state is computed from the" \
-  "checks under it -- there is no field anyone can set to 'satisfied'."
+chapter "Promoting and closing, before the check has run" \
+  "Promotion is a separate act from concluding, and it is not the same as" \
+  "verification. Doing it in this order shows the difference."
+
+say "Until a finding is promoted it is scratch, and an answer resting on it is" \
+    "provisional. So promote it, and close the question on it:"
+
+lab promote "$claim" --because 'we are relying on this to ship'
+
+lab close "$enquiry" --answered-by "$claim"
+
+say "The question is answered on promoted work -- and the condition agreed" \
+    "before the run has still not been checked. LabKit will not call that" \
+    "established:"
+
+lab known
+
+say "Promotion says a person vouched for it. The prespecified check says" \
+    "nobody has confirmed it. A check nobody ran counts against the finding it" \
+    "qualifies, exactly as a failing one would."
+
+lab why "$claim"
+
+chapter "Running the check" \
+  "A gate's state is computed from the checks under it -- there is no field" \
+  "anyone can set to 'satisfied'."
 
 lab evaluate "$criterion" --gate "$gate" --value 'n=24 at every depth' --outcome pass
 
 lab gate "$gate"
 
-say "Promotion is a separate act from concluding. Until a finding is promoted" \
-    "it is scratch, and an answer resting on it is provisional rather than" \
-    "established. LabKit keeps those two apart on purpose."
-
-lab promote "$claim" --because 'the prespecified check passed at every depth'
-
-lab close "$enquiry" --answered-by "$claim"
-
 chapter "Reading the record back" \
   "Everything below is derived from durable state, not replayed from a log."
 
-say "What does the programme know? Answers are partitioned by how well each one" \
-    "is held up, and those buckets are the distinction that matters:"
+say "Now the same question, with the check run and passed. Nothing else about" \
+    "the record changed -- one evaluation moved it:"
 
 lab known
 
