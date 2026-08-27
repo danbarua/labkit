@@ -705,6 +705,7 @@ this document's original analysis are marked as such.
 | AH | `Claim.kind` carries two facts under one value | — | open, unowned |
 | AI | `Computation.kind` holds prose where `Artefact.kind` holds kinds | **story 16**° | open |
 | AJ | `(proposition, enquiry)` is a hidden entity | **story 15**° | open |
+| AK | The survey's strongest word ignored the standard its answer was held to | **S-19** | resolved |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -2694,6 +2695,61 @@ confirmatory. S-17 already established that declaring a gate does not satisfy
 it, so a claim behind an unevaluated confirmatory gate would read exploratory
 and the S-7 amendment check would miss a scientific change. Row R's note says
 this outright. Promotion must be an act with a reason, not a gate state.
+
+### S-19 — Somebody vouched for it. Nobody checked it.
+
+Authored 2026-08-27, and **not from §1** — it came from the digest design
+(`docs/digest-design.md`) and issue #62, which is why no story number sits
+above it. Recorded here rather than only as a test file, because a scenario
+findable only by opening `tests/scenarios/` is findable by nobody.
+
+> **Researcher:** Before we run this, the held-out loss has to beat the
+> baseline. Agreed?
+> **Agent:** Recorded, and the analysis will be held to it.
+> *(the run happens; the result looks good; nobody evaluates the check)*
+> **Researcher:** That settles it. I'm relying on this — promote it and close
+> the question.
+> **Agent:** Done.
+> **Researcher:** *(next morning)* What do we know?
+
+**Afterward — LabKit must answer:**
+
+- *What do we know?* → **not** "established". The strongest word in the survey
+  means the answer rests on promoted work **that met the standard it was held
+  to**, and nobody has run that check.
+- *Why does this conclusion stand?* → it does not, and `whySupported` already
+  said so: the check is `never-run` and therefore `unmet`, on a claim whose
+  standing is `confirmatory`. Both facts are true at once.
+- *Which bucket, then?* → whichever the case **lands in**, which is the whole
+  point of building it rather than designing it.
+
+**Expressibility.** Everything needed is already on the record: `QUALIFIES` is
+written when the analysis is recorded, precisely so a check nobody ran counts
+against the finding it qualifies (S-3b). The survey was the one reader that
+never consulted it, so `whatIsKnown` and `whySupported` gave contradictory
+answers about one claim — and the **reassuring** one was what a person reads
+first.
+
+**Never-run rather than failed, deliberately.** The failing case needs a gate,
+an evaluation and a second act; this needs none of them. Six ordinary verbs and
+the contradiction is there, which makes it the cheapest possible demonstration
+and the hardest to dismiss as contrived.
+
+**The verdict, and it was landed in rather than chosen.** The case falls to
+`provisional`, whose heading said *"resting on work nobody promoted"* — false
+for it the instant it existed, since this claim **was** promoted. So
+`provisional` now holds two opposite reasons and is named for what they share:
+*answered, and not something to build on yet*. **One bucket rather than a
+sixth.** A reader acts identically on both, `whySupported` distinguishes them
+for anyone who needs to know which, and row Y is the standing warning against a
+bucket built for nobody. The candidate words both failed on inspection:
+`contested` is taken by evidence bearing *against*, and `unverified` fits
+never-run but not failed.
+
+Demonstrated in `examples/full-lifecycle.sh`, which promotes and closes before
+running the check for exactly this reason.
+
+---
 
 ## §4 — Held back as stories, not scenarios
 
