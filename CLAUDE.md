@@ -724,6 +724,23 @@ first time it would have mattered is the first time it did.
 repository `git rev-parse` fails and the walk below is the fallback, so there is
 no special case beside a normal one.
 
+**A command that is about to create a record says so, on stderr.** Creating one
+is silent otherwise, and that is how three of them accumulated: a stray
+`bun run dev` in the wrong directory makes an empty 42MB database and then
+answers every question with *"nothing"*, which reads exactly like a project
+nobody has worked on. **Not one came from a script** — every script pins `--db`
+into a temporary directory, and `bun run check` and `bun run example` were both
+measured on 2026-08-27 leaving nothing behind. So the remaining way to make one
+by accident is a person or an agent typing a command in the wrong place, and the
+remedy is not a guard: creating a record is what the first command in a new
+project is supposed to do. It is to stop doing it quietly.
+
+stderr and never stdout, for the same reason a handle-only answer is never
+coloured — the whole of a write command's stdout is an id the next command
+consumes. `scripts/smoke-cli.sh` asserts both halves: it fires on the first
+command and not the second, and `check:stdout` already refuses a stdout write
+from anywhere under `src/` outside the CLI.
+
 **The walk remains, and still answers the nested case** — though git subsumes it
 at no cost, being correct from any depth without walking. A client launched from
 `packages/foo` used to report an empty record for a project full of work, which

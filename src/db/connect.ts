@@ -156,6 +156,7 @@ export async function connectDb(projectRoot = resolveProjectRoot()): Promise<Lab
   }
 
   const labkitDir = join(projectRoot, ".labkit");
+  announceNewRecord(labkitDir);
   const connection = await pgliteBackend({
     dataDir: join(labkitDir, "pglite"),
     lockPath: join(labkitDir, "pglite.lock"),
@@ -173,4 +174,33 @@ export async function connectDb(projectRoot = resolveProjectRoot()): Promise<Lab
 function withTrace(connection: LabKitDBConnection, label: string): LabKitDBConnection {
   const db = traced(connection.db, label);
   return db === connection.db ? connection : { ...connection, db };
+}
+
+/**
+ * Says so, once, when a command is about to bring a new record into existence.
+ *
+ * **Creating a database is silent, and that is how three of them accumulated.**
+ * Any stray `bun run dev` in a directory without one produces an empty 42MB
+ * database and then answers every question with "nothing" — which is
+ * indistinguishable from a project nobody has worked on yet. All three
+ * `.labkit/` directories found on 2026-08-27 were made that way; not one came
+ * from a script, because every script pins `--db` into a temporary directory
+ * and `bun run check` and `bun run example` were both measured leaving none.
+ *
+ * So the remaining way to make one by accident is a person or an agent typing a
+ * command in the wrong place, and the remedy is not a guard — creating a record
+ * is what the first command in a new project is *supposed* to do. It is to stop
+ * doing it quietly.
+ *
+ * **stderr, never stdout.** The whole of a write command's stdout is an id the
+ * next command consumes, and `$(labkit criterion 'x')` must not capture this.
+ * Same reason a handle-only answer is never coloured.
+ *
+ * Not a warning and not prefixed as one: on the first run of a real project
+ * this is the correct and expected thing to happen, and crying wolf there would
+ * teach a reader to ignore the line in the case that matters.
+ */
+function announceNewRecord(labkitDir: string): void {
+  if (existsSync(labkitDir)) return;
+  process.stderr.write(`labkit: creating a new record at ${labkitDir}\n`);
 }
