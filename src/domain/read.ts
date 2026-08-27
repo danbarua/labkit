@@ -1390,7 +1390,7 @@ export class ReadSurface extends SessionCore {
     const resting = (
       await Promise.all(
         (["SUPPORTS", "CHALLENGES"] as const).map((bearing) =>
-          this.restingArtefacts(scope, bearing),
+          this.artefactsConsumedBy(scope, bearing),
         ),
       )
     ).flat();
@@ -1727,6 +1727,10 @@ export class ReadSurface extends SessionCore {
   /**
    * The artefacts a claim's still-current analyses consumed, for one bearing.
    *
+   * The inverse of {@link restingOnArtefact}, which walks artefact → claims.
+   * Named apart deliberately: `restingArtefacts` beside `restingOnArtefact` was
+   * two names one letter apart for opposite traversals.
+   *
    * One hop from the computation, not a detour through the enquiry. Only
    * currently-standing findings count: a superseded analysis's inputs are not
    * what the claim rests on now — and the `invalidated` filter is on the
@@ -1743,7 +1747,7 @@ export class ReadSurface extends SessionCore {
    * `tests/subject-identity.test.ts`. What a claim rests on aggregates over the
    * proposition; what it was *held to* belongs to one analysis.
    */
-  private async restingArtefacts(
+  private async artefactsConsumedBy(
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
     bearing: "SUPPORTS" | "CHALLENGES",
   ): Promise<{ a: ArtefactProps & Identified; e: Identified }[]> {
