@@ -237,6 +237,29 @@ redone from scratch. Neither cost anything permanent. Both were the same
 mistake: using a command that resets to HEAD when what was wanted was to undo
 the last thing typed.
 
+**`e7edb43`** — `labkit-review` answered the placement question with a third
+option better than either offered: the grants section is in the right place and
+its *title* was wrong, promising a general answer about migrations and
+delivering a specific argument about roles. Retitled, nothing reordered. They
+name it as the third instance today of a generic title over a specific
+argument, all three visible only because the outline gave headings neighbours
+to be read beside.
+
+**The sharper half is about guard comments, and it corrects how I tested one.**
+A guard's claim is about *attribution*, not outcome: "this guards against X" is
+not "X fails", it is "X fails **because of this**", so testing the first can
+never falsify the second — the naive test on `check:orm-unwrapped`'s comment
+would have confirmed it. The discriminator is **delete the guard and run the
+same input again; if it still fails, the guard is not what stopped it**, which
+is PJ-009's bar for earning an edge pointed one level down. The repo already
+refuses a relationship that arrives by argument; guard comments have been
+arriving that way. Queued as a one-pass sweep of the 28 present-tense guard
+claims under `src/` and `scripts/` — counted here, against the 30 reported.
+
+**Not done, deliberately:** they suggested writing that unification into
+`CLAUDE.md`'s pinned header as a seventh rule. A peer's suggestion is not
+authority to edit `CLAUDE.md`, so it went to Dan as a question instead.
+
 ## Next
 
 PRs #39, #40 and #41 are merged. **#42 is open** and everything since batches
