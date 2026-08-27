@@ -526,12 +526,26 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * Findings bearing on a proposition one way or the other.
+   * Findings bearing on a proposition **within an enquiry**, one way or the
+   * other — deliberately not by claim handle, which was tried and refuted.
    *
-   * `bearing` is interpolated because pglite-age rejects edge-type
-   * alternation outright — `[:SUPPORTS|CHALLENGES]` is a syntax error, not
-   * merely unsupported for variable-length patterns. The value comes from a
-   * closed set of literals here, never from a caller.
+   * `bearing` is interpolated because pglite-age rejects edge-type alternation
+   * outright — `[:SUPPORTS|CHALLENGES]` is a syntax error, not merely
+   * unsupported for variable-length patterns. The value comes from a closed set
+   * of literals here, never from a caller.
+   *
+   * Everything else in `whySupported` now selects by handle, because two
+   * analyses in one enquiry concluding the same sentence are two claims and a
+   * check held by one is not the other's standard. **Findings are the
+   * exception, and the corpus is what says so**: selecting them by handle
+   * turned 13 scenarios red, S-10's *"the re-run reads as independent
+   * confirmation"* among them.
+   *
+   * That is the distinction, and it is a domain fact rather than an oversight.
+   * A re-run producing the same conclusion **corroborates** — the findings
+   * aggregate over the proposition. A prespecified check **belongs to** the
+   * analysis that was held to it. Same two nodes, two different questions, and
+   * the answer differs.
    */
   private async findingsBearing(
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
@@ -1361,28 +1375,16 @@ export class ReadSurface extends SessionCore {
     // computation, not a detour through the enquiry. Only currently-standing
     // findings count: a superseded analysis's inputs are not what the claim
     // rests on now.
-    const resting = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       ${this.withinScope(scope)}
-       MATCH (u)-[:USES]->(comp:Computation)
-       MATCH (comp)-[:CONSUMES]->(a:Artefact)
-       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL OR out.invalidated = false
-       RETURN a, e`,
-      {
-        // `natural_id` because `restingOn` deduplicates by identity, not by
-        // name -- see where it is built below, and S-9d. `invalidated` rides
-        // along on the same row: the filter above is on the evidence's OWN
-        // output, never on what the computation read, so a retracted input was
-        // reported with nothing marking it (S-11e).
-        a: vertexProps<ArtefactProps & { natural_id: string }>(),
-        e: vertexProps<{ natural_id: string }>(),
-      },
-      {
-        name: proposition,
-        ...this.scopeParams(scope),
-      },
-    );
+    // Both bearings and by handle, for the reasons on `checksAnchor` — a claim
+    // its evidence bears *against* rests on inputs exactly as one it supports
+    // does, and the one-sided walk reported `restingOn: []` for it.
+    const resting = (
+      await Promise.all(
+        (["SUPPORTS", "CHALLENGES"] as const).map((bearing) =>
+          this.restingArtefacts(scope, bearing),
+        ),
+      )
+    ).flat();
 
     // The standard the finding was held to, if it was held to one. S-3b: the
     // criteria a researcher agreed before the run are what "does this stand?"
@@ -1442,16 +1444,24 @@ export class ReadSurface extends SessionCore {
 
     // Standing, and why it was conferred. Read from the claim rather than the
     // conclusion so a promotion taken later is visible here at all.
+    // By handle, and with no traversal at all. This used to reach the claim
+    // through `<-[:SUPPORTS]-`, which meant a **promoted negative result read
+    // as exploratory** — the promotion is on the claim, and the walk that found
+    // it could not reach a claim its evidence bears against. Selecting by name
+    // within an enquiry also let it return a *different* claim's promotion,
+    // since two analyses in one enquiry can conclude the same sentence.
+    //
+    // The traversal was never load-bearing: a promotion is an edge on the claim.
+    // Removing it deletes the footgun rather than handling it.
     const promotion = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       ${this.withinScope(scope)}
+      `MATCH (c:Claim {natural_id: $claim})
        OPTIONAL MATCH (d:Decision)-[:PROMOTES]->(c)
        RETURN c, d`,
       {
         c: vertexProps<{ kind?: string }>(),
         d: optional(vertexProps<{ reason: string }>()),
       },
-      { name: proposition, ...this.scopeParams(scope) },
+      { claim },
     );
     const confirmed = promotion.some((r) => r.c.kind === "confirmatory");
     const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
@@ -1703,6 +1713,47 @@ export class ReadSurface extends SessionCore {
       ],
       complete: false,
     };
+  }
+
+  /**
+   * The artefacts a claim's still-current analyses consumed, for one bearing.
+   *
+   * One hop from the computation, not a detour through the enquiry. Only
+   * currently-standing findings count: a superseded analysis's inputs are not
+   * what the claim rests on now — and the `invalidated` filter is on the
+   * evidence's **own** output, never on what the computation read, because a
+   * retracted input must still be reported and marked (S-11e).
+   *
+   * Called once per bearing: the single-bearing version reported an empty list
+   * for a claim its evidence bears *against* (S-18b's shape), the same silent
+   * hole `checksAnchor` exists to close.
+   *
+   * **Selected by proposition within the enquiry, not by handle** — the same
+   * exception `findingsBearing` documents, and refuted the same way: selecting
+   * by handle emptied `restingOn` for a two-stage pipeline in
+   * `tests/subject-identity.test.ts`. What a claim rests on aggregates over the
+   * proposition; what it was *held to* belongs to one analysis.
+   */
+  private async restingArtefacts(
+    scope: { proposition: IndexedString; enquiry?: EnquiryRef },
+    bearing: "SUPPORTS" | "CHALLENGES",
+  ): Promise<{ a: ArtefactProps & Identified; e: Identified }[]> {
+    return this.graph.query(
+      `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       ${this.withinScope(scope)}
+       MATCH (u)-[:USES]->(comp:Computation)
+       MATCH (comp)-[:CONSUMES]->(a:Artefact)
+       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
+       WHERE out.invalidated IS NULL OR out.invalidated = false
+       RETURN a, e`,
+      {
+        // `natural_id` because `restingOn` deduplicates by identity, not by
+        // name — see S-9d.
+        a: vertexProps<ArtefactProps & { natural_id: string }>(),
+        e: vertexProps<{ natural_id: string }>(),
+      },
+      { name: scope.proposition, ...this.scopeParams(scope) },
+    );
   }
 
   /** The claims and enquiries resting on one artefact, by the two direct routes. */
