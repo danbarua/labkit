@@ -310,20 +310,6 @@ depending on the document.
 statuses, verdicts or counts; PJ-008 §3's index is authoritative on what the
 model knows, and standing facts and gates are in this file.
 
-### Working alongside another session
-
-**Never suggest `git reset --hard` to another session.** You cannot see its
-working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
-commit; it had **five uncommitted files** at that moment, including a fix and a
-predictions document, and the command would have destroyed all of them silently.
-It rebased instead and said so. `rebase` reaches the same place and refuses when
-the tree is dirty, which is the property that matters across a boundary you
-cannot see through. The advice was right in shape and wrong in verb.
-
-More generally: a parallel session's **worktree state is invisible to you** in a
-way its branch state is not. `git log` tells you where it is; nothing tells you
-what it is holding.
-
 ### The dated records
 
 `docs/consumer-contract/` holds the **predictions-and-verdict pairs** — an
@@ -341,6 +327,20 @@ independently; see its README. The Stop/SessionStart wiring lives in
 out of the repo is `.claude/settings.local.json` (machine-local) and
 `.claude/.wrap-state/` (one file per session, derived from git; a tracked copy
 would hand a new worktree another session's pinned baseline).
+
+### Working alongside another session
+
+**Never suggest `git reset --hard` to another session.** You cannot see its
+working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
+commit; it had **five uncommitted files** at that moment, including a fix and a
+predictions document, and the command would have destroyed all of them silently.
+It rebased instead and said so. `rebase` reaches the same place and refuses when
+the tree is dirty, which is the property that matters across a boundary you
+cannot see through. The advice was right in shape and wrong in verb.
+
+More generally: a parallel session's **worktree state is invisible to you** in a
+way its branch state is not. `git log` tells you where it is; nothing tells you
+what it is holding.
 
 ## Commands
 
@@ -378,167 +378,6 @@ bun run mcp                    # the MCP server over stdio -- `labkit mcp`, src/
 
 Formatting and linting are both biome — `bun run format` writes,
 `check:format` and `check:lint` are in the sweep.
-
-### The binary, and the 1.9GB it leaked
-
-`bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
-directory** (`scripts/build-binary.sh`), and that is not tidiness:
-`bun build --compile` leaves a **byte-identical copy of the `bun` binary
-itself** — 61MB, `.<hash>-00000000.bun-build` — in the current working
-directory on every *successful* run, and never removes it. Verified by sha256
-against bun 1.3.14. The hash differs per build so they accumulate, and they are
-`.gitignore`d so nothing complains; thirty-two of them had reached **1.9GB** in
-the repo root before anyone read a directory listing. The staging path follows
-the **CWD, not `--outfile`** — measured — so building from a `mktemp -d` that is
-removed on exit leaves the leak nowhere to go. There is no flag for it.
-
-That is also why `build` is a script rather than the `package.json` one-liner it
-was, the same reason `dev:dependency-cruiser` is one.
-
-**`bun run check:binary` proves the binary works** — it builds and drives the binary
-against a database that does not exist yet, which is the case that was broken.
-
-It was broken from the day the build script existed, in **three places, each
-hidden behind the last**: drizzle's migration folder, the two PGlite extension
-tarballs, and PGlite's own `pglite.data`. One root cause —
-**`import.meta.url` does not name a directory on disk once the code is inside a
-`bun build --compile` bundle**; it is `/$bunfs/root/…`, and nothing put a file
-there. Every one was invisible to `bun test` and `bun run dev`, which read those
-files off the real filesystem and work.
-
-The fix is to hand the assets over rather than let them be located
-(`src/db/migrations.ts`, `src/db/extensions.ts`) — Bun embeds a file imported
-`with { type: "file" }`, and `node:fs` can read it back out of `$bunfs`.
-
-**One asset could not stay embedded, and the reason is worth knowing before
-trying again**: PGlite reads an extension bundle with `createReadStream` piped
-through `zlib`, and `$bunfs` does not implement streaming. `existsSync` returns
-true and `open` then fails `ENOENT` — a confusing pair. Those two tarballs are
-written once to a temp file; everything else is read in place.
-
-**Known upstream and unfixed**, so this is not a local oddity and there is no
-version to wait for: [pglite#414](https://github.com/electric-sql/pglite/issues/414)
-and [bun#15032](https://github.com/oven-sh/bun/issues/15032) are the same
-`ENOENT … /$bunfs/root/pglite.data`, open since Bun 1.1.33. The asset handover
-is PGlite's own documented answer for restricted environments
-([bundler support](https://pglite.dev/docs/bundler-support)); the extension
-tarballs are not covered there and are the part with no prior art.
-
-**Drizzle's documented advice does not fix this**, and that was measured rather
-than assumed. Its docs say to copy `drizzle/` alongside the build output — which
-is right for a `dist` deployment run by Node, and insufficient here: a binary
-built that way finds the folder and then dies on `pglite.data`, because two of
-the three bugs are PGlite's, not drizzle's.
-
-The general lesson, which cost three rounds of build-and-run: **each fix moved
-the failure one step later rather than removing it**, and the only way to find
-the next was to run the binary again. Nothing had ever run it.
-
-### The CLI
-
-`src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
-surface, reads *and* writes (`bun run dev`). It is a composition root and
-nothing else: `program.ts` assembles the commands, `commands/` declares them,
-`args.ts` turns text into domain values on zod, `views/` turns reports into
-pages, `session.ts` is the wrap that hands a command its surfaces, and
-`commands/serve.ts` registers `labkit mcp`. That last one is **not** registered
-through `runner()` and does not go through `session.ts`, which is the reason it
-has its own file: `runner()` opens a database, resolves a tenant, does one unit
-of work, prints a report and closes — the shape of a command that answers and
-exits. The server acquires and releases per *tool call*, for as long as an
-agent's session lasts, and prints nothing a person reads. It
-replaced a 1435-line `src/cli.ts` whose `switch` was five hundred of them; the
-port was verified by running `examples/full-lifecycle.sh` against both and
-diffing the transcripts, which were byte-identical.
-
-**It was read-only by construction and is not any more**, and that is the same
-correction the MCP server got. Read-only was never a shipping goal; what it
-produced was a record with **no way to put anything into it** except by wiring
-up an agent and an MCP server. The one script that did write —
-`examples/full-lifecycle.ts` — did it by calling `TenantGraph.createNode`
-underneath the domain layer, which is the bypass the read-only tests existed to
-prevent, in the only writer there was. The two structural tests were deleted
-with the commit that added write commands, not worked around, and
-`tests/helpers/read-only.ts` went with them.
-
-**Every public verb on either surface has a command**, derived in
-`tests/cli/coverage.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
-`tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
-`NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
-this paragraph deliberately does not count them. What survives from the
-read-only era, as a narrower test: **the CLI reaches the graph only through the
-domain verbs**, calling nothing on the `TenantGraph` it constructs.
-
-**Its event log is passed in, not defaulted, on both halves.** `SessionCore`
-falls back to `inMemoryEventLog()`, which in a process that exits after one
-command is an array nothing ever wrote to. On the read side `labkit happened`
-then reports that nothing has ever happened against a full database; on the
-write side a verb commits its graph changes durably while the event describing
-them dies at exit — durable state with no record of the act that caused it. Both
-are confidently wrong rather than empty. `main()` builds one `pgEventLog()` over
-the connection the graph already has and hands it to both.
-
-**The CLI is where attribution stopped being a mock.** `src/attribution.ts`
-predicted that a real `GitContextProvider` would be the first subprocess under
-`src/`; `gitContext` is it, and `personContext` names the user. The MCP server
-keeps the stubs, because *which agent* and *which session* are facts the
-protocol does not carry. `--author` overrides the username, because a script
-driving LabKit is not the account it runs under.
-
-**Colour is a `Palette` a view is handed, never a module-level global**
-(`src/cli/palette.ts`). Members are named for the record's distinctions —
-`settled`, `contested`, `untested`, `provisional`, `handle`, `heading`, `quiet`
-— so a view says `p.contested(state)` and the colour choice lives in one file.
-`PLAIN` is the identity function, so a plain run and a coloured one differ by
-escape sequences and never by which branch rendered the page.
-
-It is a parameter because of what a global would cost: `bun test`'s stdout is
-not a terminal, so every fixture in `tests/cli/views.test.ts` would silently
-check the uncoloured path and nothing would check the other. They now render
-both and assert `stripped(coloured) === plain`.
-
-**A handle-only answer is never coloured, even in a terminal.** The whole of a
-write command's stdout is an id the next command consumes. Colouring it made
-`$(labkit criterion 'x')` capture an id wrapped in escape sequences under
-`FORCE_COLOR=1` — measured, not predicted — turning a documented contract into
-something conditional on an environment variable. A report gets colour because a
-person reads it; a handle does not, because a shell does.
-
-Two more things the tests caught rather than review:
-
-- **Pad before colouring, and pick the colour from the unpadded value.** An
-  escape sequence has length, so padding a coloured string pads bytes nobody can
-  see. The first version padded first and then matched on the padded string, so
-  `"failed             "` matched no case and every gate state came out the same
-  colour.
-- picocolors was chosen **by measurement**: under Bun 1.3.14, `node:util`'s
-  `styleText` writes escapes into a pipe and ignores `NO_COLOR` entirely, and
-  `ansis` writes escapes into a pipe with no environment variables set at all.
-  Either would have broken `$(labkit …)`. `--no-ansi` only ever subtracts, and
-  picocolors' own `isColorSupported` is reused rather than reimplemented.
-
-### Where the database lives
-
-**`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
-the project root by another route. A temporary directory gets its own database
-file *and* its own lock, sharing nothing with a working database, which is what
-makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
-to get its own TCP port too, from a `derivePort` that hashed the path; there is
-no port any more. `LABKIT_DB_URL` still wins over both.
-
-### The MCP server
-
-**`src/mcp/server.ts` reads *and writes***, and is started by `labkit mcp`
-(`bun run mcp`) — one binary since PR #35, so the entry point is
-`src/cli/commands/serve.ts` and the server is a subcommand rather than a second
-executable. Two 77MB binaries shipping together came to ~154MB for two copies of
-one runtime. It was read-only for
-one batch of work and that is not a design position: a record nothing can write
-to has nothing in it. Read and write handlers are handed different surfaces, so
-neither can reach the other's verbs, and
-`tests/mcp.test.ts` asserts every public verb on either surface is exposed or
-listed in `NOT_EXPOSED` with a reason. **`labkit://docs/tools` is the tool list**;
-this paragraph deliberately does not count them.
 
 ### Exit codes, and the script that told everyone to ignore its own
 
@@ -726,6 +565,175 @@ The other text-reading checks were surveyed and left alone deliberately.
 (`expect(`, `openScenario(`) that a line break cannot separate. The rule is not
 *use the compiler everywhere* — it is **a pattern spanning a token boundary
 needs a parser**.
+
+## Surfaces
+
+What LabKit *is*, from the outside: one binary, two adapters over one domain.
+These lived under `## Commands` until 2026-08-27, which put the `$bunfs` asset
+handover and the CLI's composition root under a heading promising a list of
+things to type. A section whose subsections are named for a binary leak is not
+a commands section.
+
+### The binary, and the 1.9GB it leaked
+
+`bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
+directory** (`scripts/build-binary.sh`), and that is not tidiness:
+`bun build --compile` leaves a **byte-identical copy of the `bun` binary
+itself** — 61MB, `.<hash>-00000000.bun-build` — in the current working
+directory on every *successful* run, and never removes it. Verified by sha256
+against bun 1.3.14. The hash differs per build so they accumulate, and they are
+`.gitignore`d so nothing complains; thirty-two of them had reached **1.9GB** in
+the repo root before anyone read a directory listing. The staging path follows
+the **CWD, not `--outfile`** — measured — so building from a `mktemp -d` that is
+removed on exit leaves the leak nowhere to go. There is no flag for it.
+
+That is also why `build` is a script rather than the `package.json` one-liner it
+was, the same reason `dev:dependency-cruiser` is one.
+
+**`bun run check:binary` proves the binary works** — it builds and drives the binary
+against a database that does not exist yet, which is the case that was broken.
+
+It was broken from the day the build script existed, in **three places, each
+hidden behind the last**: drizzle's migration folder, the two PGlite extension
+tarballs, and PGlite's own `pglite.data`. One root cause —
+**`import.meta.url` does not name a directory on disk once the code is inside a
+`bun build --compile` bundle**; it is `/$bunfs/root/…`, and nothing put a file
+there. Every one was invisible to `bun test` and `bun run dev`, which read those
+files off the real filesystem and work.
+
+The fix is to hand the assets over rather than let them be located
+(`src/db/migrations.ts`, `src/db/extensions.ts`) — Bun embeds a file imported
+`with { type: "file" }`, and `node:fs` can read it back out of `$bunfs`.
+
+**One asset could not stay embedded, and the reason is worth knowing before
+trying again**: PGlite reads an extension bundle with `createReadStream` piped
+through `zlib`, and `$bunfs` does not implement streaming. `existsSync` returns
+true and `open` then fails `ENOENT` — a confusing pair. Those two tarballs are
+written once to a temp file; everything else is read in place.
+
+**Known upstream and unfixed**, so this is not a local oddity and there is no
+version to wait for: [pglite#414](https://github.com/electric-sql/pglite/issues/414)
+and [bun#15032](https://github.com/oven-sh/bun/issues/15032) are the same
+`ENOENT … /$bunfs/root/pglite.data`, open since Bun 1.1.33. The asset handover
+is PGlite's own documented answer for restricted environments
+([bundler support](https://pglite.dev/docs/bundler-support)); the extension
+tarballs are not covered there and are the part with no prior art.
+
+**Drizzle's documented advice does not fix this**, and that was measured rather
+than assumed. Its docs say to copy `drizzle/` alongside the build output — which
+is right for a `dist` deployment run by Node, and insufficient here: a binary
+built that way finds the folder and then dies on `pglite.data`, because two of
+the three bugs are PGlite's, not drizzle's.
+
+The general lesson, which cost three rounds of build-and-run: **each fix moved
+the failure one step later rather than removing it**, and the only way to find
+the next was to run the binary again. Nothing had ever run it.
+
+### The CLI
+
+`src/index.ts` is still a stub; **`src/cli/cli.ts` is not** — it is the full
+surface, reads *and* writes (`bun run dev`). It is a composition root and
+nothing else: `program.ts` assembles the commands, `commands/` declares them,
+`args.ts` turns text into domain values on zod, `views/` turns reports into
+pages, `session.ts` is the wrap that hands a command its surfaces, and
+`commands/serve.ts` registers `labkit mcp`. That last one is **not** registered
+through `runner()` and does not go through `session.ts`, which is the reason it
+has its own file: `runner()` opens a database, resolves a tenant, does one unit
+of work, prints a report and closes — the shape of a command that answers and
+exits. The server acquires and releases per *tool call*, for as long as an
+agent's session lasts, and prints nothing a person reads. It
+replaced a 1435-line `src/cli.ts` whose `switch` was five hundred of them; the
+port was verified by running `examples/full-lifecycle.sh` against both and
+diffing the transcripts, which were byte-identical.
+
+**It was read-only by construction and is not any more**, and that is the same
+correction the MCP server got. Read-only was never a shipping goal; what it
+produced was a record with **no way to put anything into it** except by wiring
+up an agent and an MCP server. The one script that did write —
+`examples/full-lifecycle.ts` — did it by calling `TenantGraph.createNode`
+underneath the domain layer, which is the bypass the read-only tests existed to
+prevent, in the only writer there was. The two structural tests were deleted
+with the commit that added write commands, not worked around, and
+`tests/helpers/read-only.ts` went with them.
+
+**Every public verb on either surface has a command**, derived in
+`tests/cli/coverage.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
+`tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
+`NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
+this paragraph deliberately does not count them. What survives from the
+read-only era, as a narrower test: **the CLI reaches the graph only through the
+domain verbs**, calling nothing on the `TenantGraph` it constructs.
+
+**Its event log is passed in, not defaulted, on both halves.** `SessionCore`
+falls back to `inMemoryEventLog()`, which in a process that exits after one
+command is an array nothing ever wrote to. On the read side `labkit happened`
+then reports that nothing has ever happened against a full database; on the
+write side a verb commits its graph changes durably while the event describing
+them dies at exit — durable state with no record of the act that caused it. Both
+are confidently wrong rather than empty. `main()` builds one `pgEventLog()` over
+the connection the graph already has and hands it to both.
+
+**The CLI is where attribution stopped being a mock.** `src/attribution.ts`
+predicted that a real `GitContextProvider` would be the first subprocess under
+`src/`; `gitContext` is it, and `personContext` names the user. The MCP server
+keeps the stubs, because *which agent* and *which session* are facts the
+protocol does not carry. `--author` overrides the username, because a script
+driving LabKit is not the account it runs under.
+
+**Colour is a `Palette` a view is handed, never a module-level global**
+(`src/cli/palette.ts`). Members are named for the record's distinctions —
+`settled`, `contested`, `untested`, `provisional`, `handle`, `heading`, `quiet`
+— so a view says `p.contested(state)` and the colour choice lives in one file.
+`PLAIN` is the identity function, so a plain run and a coloured one differ by
+escape sequences and never by which branch rendered the page.
+
+It is a parameter because of what a global would cost: `bun test`'s stdout is
+not a terminal, so every fixture in `tests/cli/views.test.ts` would silently
+check the uncoloured path and nothing would check the other. They now render
+both and assert `stripped(coloured) === plain`.
+
+**A handle-only answer is never coloured, even in a terminal.** The whole of a
+write command's stdout is an id the next command consumes. Colouring it made
+`$(labkit criterion 'x')` capture an id wrapped in escape sequences under
+`FORCE_COLOR=1` — measured, not predicted — turning a documented contract into
+something conditional on an environment variable. A report gets colour because a
+person reads it; a handle does not, because a shell does.
+
+Two more things the tests caught rather than review:
+
+- **Pad before colouring, and pick the colour from the unpadded value.** An
+  escape sequence has length, so padding a coloured string pads bytes nobody can
+  see. The first version padded first and then matched on the padded string, so
+  `"failed             "` matched no case and every gate state came out the same
+  colour.
+- picocolors was chosen **by measurement**: under Bun 1.3.14, `node:util`'s
+  `styleText` writes escapes into a pipe and ignores `NO_COLOR` entirely, and
+  `ansis` writes escapes into a pipe with no environment variables set at all.
+  Either would have broken `$(labkit …)`. `--no-ansi` only ever subtracts, and
+  picocolors' own `isColorSupported` is reused rather than reimplemented.
+
+### Where the database lives
+
+**`--db <dir>` and `LABKIT_HOME`** name the directory holding `.labkit/` —
+the project root by another route. A temporary directory gets its own database
+file *and* its own lock, sharing nothing with a working database, which is what
+makes `examples/full-lifecycle.sh` and `scripts/smoke-cli.sh` hermetic. It used
+to get its own TCP port too, from a `derivePort` that hashed the path; there is
+no port any more. `LABKIT_DB_URL` still wins over both.
+
+### The MCP server
+
+**`src/mcp/server.ts` reads *and writes***, and is started by `labkit mcp`
+(`bun run mcp`) — one binary since PR #35, so the entry point is
+`src/cli/commands/serve.ts` and the server is a subcommand rather than a second
+executable. Two 77MB binaries shipping together came to ~154MB for two copies of
+one runtime. It was read-only for
+one batch of work and that is not a design position: a record nothing can write
+to has nothing in it. Read and write handlers are handed different surfaces, so
+neither can reach the other's verbs, and
+`tests/mcp.test.ts` asserts every public verb on either surface is exposed or
+listed in `NOT_EXPOSED` with a reason. **`labkit://docs/tools` is the tool list**;
+this paragraph deliberately does not count them.
 
 ## Persistence
 
