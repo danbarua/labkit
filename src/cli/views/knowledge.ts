@@ -19,11 +19,10 @@ import type {
   SupportExplanation,
 } from "../../domain";
 import type { Palette } from "../palette";
-import { allOf, bullets, questionLines } from "./format";
+import { bullets, questionLines } from "./format";
 
 export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
-  const all = allOf(survey as unknown as { [k: string]: unknown });
-  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, all, p), "nothing");
+  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, p), "nothing");
   return [
     // The five headings carry the distinction the buckets exist for, so they
     // are coloured by what the bucket means rather than uniformly.
@@ -45,8 +44,7 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
 }
 
 export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
-  const all = allOf(survey as unknown as { [k: string]: unknown });
-  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, all, p), "nothing");
+  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, p), "nothing");
   return [
     p.heading(`As of ${survey.at}:`),
     "",
@@ -125,7 +123,24 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       : "\nHeld to no prespecified standard.",
     why.unmet.length
       ? `\nNot currently met\n${bullets(
-          why.unmet.map((u) => `${u.requires}  (${u.criterion})`),
+          why.unmet.map((u) =>
+            [
+              `${u.requires}  ${p.handle(`(${u.criterion})`)}`,
+              // What the unmet check is holding up, indented beneath it rather
+              // than bulleted beside it: these are consequences of the line
+              // above, not siblings of it. The consequence is in the words of
+              // whoever declared the gate, which is the sentence a reader
+              // needs and previously had no way to reach.
+              ...u.blocks.map((b) =>
+                [
+                  `      blocks ${p.handle(b.gate)} — ${p.contested(b.consequence)}`,
+                  ...b.gating.map(
+                    (g) => `        holding up ${g.objective}  ${p.handle(`(${g.work})`)}`,
+                  ),
+                ].join("\n"),
+              ),
+            ].join("\n"),
+          ),
           "",
         )}`
       : "",

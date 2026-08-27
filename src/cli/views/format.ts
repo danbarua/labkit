@@ -15,31 +15,28 @@ export function bullets(items: string[], empty: string): string {
 }
 
 /**
- * Questions, with their id shown **only when wording alone cannot tell two
- * apart**.
+ * Questions, each with its handle.
  *
- * LabKit deliberately allows two distinct questions to carry identical words
- * (S-1), so a survey printed as bare sentences can show two bullets a reader
- * cannot distinguish. Showing every id all the time would put a `Q_41` on
- * every line of the common case, where nothing is ambiguous; showing it on
- * collision puts it exactly where it carries information.
+ * **This printed the handle only on a wording collision until 2026-08-27, and
+ * the argument for that was about the wrong thing.** It reasoned from
+ * *ambiguity*: LabKit deliberately allows two distinct questions to carry
+ * identical words, so a survey of bare sentences can show two bullets a reader
+ * cannot tell apart, and an id on every line would be noise in the common case
+ * where nothing is ambiguous.
+ *
+ * That is true and it is not what a handle is for. A handle is what the **next
+ * command takes** — `labkit why`, `labkit pursuits`, `labkit enquiry` all
+ * require one, and `labkit known` was the only way to reach a question at all.
+ * A row a reader cannot act on is not less noisy for being shorter; it is
+ * useless, and the fix was to re-run the command as `--json` to recover what
+ * the prose view had dropped.
+ *
+ * Every other view in `src/cli/views/` prints handles unconditionally. This one
+ * was the outlier, and the collision case is still served — two identical
+ * sentences now differ by the handle beside each.
  */
-export function questionLines(
-  questions: QuestionStanding[],
-  all: QuestionStanding[],
-  p: Palette,
-): string[] {
-  const counts = new Map<string, number>();
-  for (const q of all) counts.set(q.asks, (counts.get(q.asks) ?? 0) + 1);
-  return questions.map((q) =>
-    (counts.get(q.asks) ?? 0) > 1 ? `${q.asks}  ${p.handle(`[${q.question}]`)}` : q.asks,
-  );
-}
-
-export function allOf(survey: { [k: string]: unknown }): QuestionStanding[] {
-  return Object.values(survey)
-    .filter((v): v is QuestionStanding[] => Array.isArray(v))
-    .flat();
+export function questionLines(questions: QuestionStanding[], p: Palette): string[] {
+  return questions.map((q) => `${q.asks}  ${p.handle(`(${q.question})`)}`);
 }
 
 export function partLine(a: IdentifiedArtefact, p: Palette): string {
