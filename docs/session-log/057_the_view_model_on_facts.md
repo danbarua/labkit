@@ -37,6 +37,8 @@ confusable helper renamed.
 **`b0c45f0`** — the prose catches up: CLAUDE.md gains a section on the fact
 graph, S-19 gains its fourth case, and ledger row **AL** gains a glossary
 entry.
+**`dd34e40`** — the last fact holding two names for one subject takes the
+bearing too.
 
 ## Verified
 
@@ -185,6 +187,55 @@ documentation for *why* the graph is shaped as it is.
 **PR #72 is not ready for review**, by Dan's own bar: it ships when the whole
 read side is ported or explicitly invalidated. Four verbs are ported and the
 rest are surveyed.
+
+**Three parties reproduced the same four-cell table from the same code** — Dan,
+`labkit-review` and this session, independently. That is the property the change
+was arguing for, demonstrated on the change itself.
+
+**The residual Dan spotted was safe for a bad reason.** `standingAsOf` still
+held `supported`/`challenged` in one clause, with a fold reading both. Correct,
+and *the exact shape that failed*: `checksOf` held two names and its **grain**
+read one. This one survived because its consumer was the fold in the same
+object rather than a separate function — safe by **proximity, not by
+construction**, and the next fact written beside it would inherit a pattern one
+refactor from wrong. Parameterised, so no code in the file holds two names for
+one subject.
+
+**A second, independent argument for the line arrived from `exo-ledger` via
+`labkit-review`, and was measured here rather than accepted.** Mine was
+correctness — spell it once and readers cannot disagree. Theirs is testability:
+spell it once and **one mutation exercises every reader**.
+
+| mutation | readers that go red |
+| --- | --- |
+| `checkState` loses the retraction rule | 4, spanning findings-qualifying *and* work-gating |
+| only the `SUPPORTS` bearing is ever walked | 3, across S-18b and S-19 |
+
+The second row is the one that matters: **the defect class that took six
+separate discoveries is now reachable by mutating two lines.** Spelled
+per-query, there was no single place to point a mutation at.
+
+It sharpens the line rather than widening it — mutation coverage only
+multiplies where a fact has more than one reader, so a single-reader query costs
+one mutation either way, and the recommendation is unchanged with two
+justifications instead of one.
+
+**`labkit-review` mutated S-19's new case expecting to find it vacuous, and
+reported that it was not.** `checksMet` is `every(... === "passed")`, and `every`
+over an empty set is true — so a dropped challenges arm might have passed
+silently. It does not: `checksMet` is itself per-bearing and merged, so a branch
+that loses its checks fails to contribute rather than passing. Reproduced here.
+Worth recording because they expected the opposite and published the negative
+result, and because what saved it was the design rather than the test.
+
+**A sharper severity test than the one in use here**, also from `exo-ledger`:
+
+> A query that returns **too little** makes someone look again. A query that
+> re-asks a **settled question** makes someone act.
+
+Better than empty-versus-wrong for deciding where to spend attention. Ours was
+the second kind: `established` is not a smaller answer than `provisional`, it is
+a prompt to build on something. Not yet written anywhere durable.
 
 **PR #72 is ready.** Dan accepted the more-than-one-reader line — his words
 for it were better than mine: *"can't find a way to shrink one line of code into
