@@ -1,0 +1,20 @@
+# What must not reach an image build context.
+#
+# `node_modules/` is the one that matters: the app image runs
+# `bun install --frozen-lockfile` for the target platform, and copying a host
+# tree over it would ship this machine's binaries — PGlite's WASM among them —
+# into a container that may not share the architecture.
+node_modules/
+
+# A local record. It is gitignored, it can be gigabytes, and an image that
+# shipped one would hand every container a copy of somebody's project.
+.labkit/
+
+# Build output and the leak `scripts/build-binary.sh` exists to contain: a
+# `bun build --compile` leaves a byte-identical copy of the bun binary behind
+# on every successful run, and thirty-two of them once reached 1.9GB here.
+bin/
+*.bun-build
+
+.git/
+docs/

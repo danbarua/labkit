@@ -11,3 +11,40 @@ services:
       - POSTGRES_DB=postgres
     ports:
       - 5432:5432
+    # `depends_on: condition: service_healthy` needs this, and the web service
+    # needs that: the entrypoint migrates before it serves, and migrating a
+    # Postgres that is still starting fails rather than waiting.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -q"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The MCP tools over HTTP, for the spike. **Behind a profile**, so
+  # `docker compose up -d db` and `bun run test:pg` cannot start it by accident
+  # — `scripts/test-postgres.sh` names `db` explicitly at every call site, and
+  # this keeps that true even for someone typing a bare `up`.
+  #
+  #   docker compose --profile spike up -d --build
+  #   curl -s localhost:8899/healthz
+  #
+  # Its own database, and a third name on purpose: `reset()` truncates
+  # `labkit_tests`, so a concurrent test run would eat the spike's data, and
+  # `labkit` is the name a real deployment would pick.
+  web:
+    profiles: ["spike"]
+    # Context is the repo root, not the Dockerfile's directory — the app image
+    # copies `src/`, `drizzle/` and the lockfile, and none of those live under
+    # `docker/webapp/`. `db` above is the other case and stays as it is: its
+    # context genuinely is its own directory, because `initdb/` is all it needs.
+    build:
+      context: .
+      dockerfile: docker/webapp/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - LABKIT_DB_URL=postgres://postgres:agens@db:5432/labkit_spike
+      - LABKIT_TENANT=labkit
+    ports:
+      - 8899:8899
