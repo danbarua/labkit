@@ -71,6 +71,9 @@ S-11  The analysis was wrong                5 steps  16 nodes  23 edges
 sixteen fragments, reaching all eighteen write verbs; thirteen compositions,
 one per distinct scenario shape.
 
+**`044f1f2`** — `check:compositions`, `fragments/run.ts`, and
+`.claude/skills/compose-scenario`. The sweep is **20** now.
+
 Working tree clean. All of the above open as PR **#110**.
 
 **The range is far wider than this session.** Everything in it except the shas
@@ -198,11 +201,29 @@ lost: *the trace is what happened; the state is a question you have to ask.*
 Anyone wanting state back needs reads in the trace, which is a different thing
 from what was built here.
 
-**Step 3 of the plan is now built; step 4 is not**
-(`~/.claude/plans/async-napping-quiche.md`): the agent-authoring prompt that
-falls out of the decomposition. An agent writing a new scenario picks fragments
-and never names a node or edge label, which is PJ-008 §2's lint rule holding by
-construction — `fragments/compositions.ts`'s header carries that argument.
+**A check earned by what typecheck cannot see.** `check:compositions` runs
+every arc and asserts each edge lands on a node it made. Nothing else exercises
+the compositions — the acceptance scenarios deliberately do not share fixtures —
+so a domain change would break one silently and the mockup would stop being
+reproducible. Made red on purpose: pointing S-10 at a proposition nobody
+concluded fails 1 of 13 and names both the composition and the refusal.
+
+`fragments/run.ts` exists so the builder and the check cannot fork their setup.
+Two copies of *connect, resolve, step down, build a surface* would drift, with
+the check passing against a composition the builder can no longer run.
+
+**All four steps of the plan are built**
+(`~/.claude/plans/async-napping-quiche.md`). The authoring prompt is
+`.claude/skills/compose-scenario`, and its §4 is the point of the whole shape:
+PJ-008 §2 says a scenario's lines must never name a node or edge label, and a
+composition **cannot**, because it does not write a graph. The rule holds by
+construction rather than by review — which is why the skill also forbids
+"this creates a Claim node" comments, true until they are not and checked by
+nothing.
+
+The skill does not list the fragments; it says to grep for them. A copy of a
+derivable list is a second thing to go stale, which is the same reason CLAUDE.md
+keeps no count of labels or tools.
 
 **And the composability question was answered "no" for the suite**, which is the
 part most likely to be re-litigated. `openScenario().begin()` hands back an
@@ -213,13 +234,19 @@ fixtures.
 
 ## Next
 
-The authoring prompt. A composition is already the shape an agent would write,
-so the prompt is mostly: *pick moves from `fragments/`, name nothing else, and
-run `bun scripts/build-traces.ts` — the graph is not yours to write.*
+Nothing queued — the plan is finished and #110 is ten commits waiting on
+review. If it merges and something else is wanted here:
 
 ```sh
-bun scripts/build-traces.ts --out /tmp/traces   # thirteen traces
+/compose-scenario                 # write a new arc
+bun run check:compositions        # every arc still runs
+bun scripts/build-traces.ts --out /tmp/traces
 ```
+
+The one thing knowingly given up is node **state** in the picture — see the
+`## Open` note. Getting it back means putting *reads* in the trace, which is a
+different design from the one built here and should be argued before it is
+built.
 
 `~/.claude/plans/async-napping-quiche.md` should be read against `fragments/`
 rather than followed from here — the plan predates the decomposition and its
