@@ -305,7 +305,13 @@ prevent.
 
 ---
 
-## Afterward, 2026-08-28: the design document caught up
+## Afterward, 2026-08-28
+
+The session continued past the entry above. The baseline range is **wider than
+this session** — it contains commits belonging to entries 048 through 058, which
+this entry does not restate; the shas below are this session's own.
+
+### The design document caught up
 
 **`8585656`** — `docs/digest-design.md` said *"Nothing is built"*, which was true
 when written and false by the next morning: §2 shipped in PR #72 and half of §3
@@ -337,3 +343,90 @@ part worth having:
 Re-checked against `main` rather than remembered: two call sites consult
 held-to checks, **zero** read verbs take a `CriterionRef`, `UnmetCheck.blocks`
 exists, `known` prints handles.
+
+
+### #70 and #50: the guard comments were never a population
+
+No commits — the deliverable is a measurement posted to both issues.
+
+#50 counts *28 comments matching the present-tense guard shape*; `labkit-review`
+said 30 and a recount said 29, which is what earned #70. The five verbs #50
+itself names give **12** today, and no filter setting reaches 28-30: dropping the
+comment filter entirely and going case-insensitive so identifiers count gives 25
+today and 26 at `9527ad8`, the commit where the 28 was written.
+
+So the three counts were not drift. **There was never a defined population**,
+only three regexes nobody wrote down. The exact grep is now in #50, so the next
+count is a command.
+
+Of the 12, **none** claims a live mechanism: four are explicit negatives, three
+are the `ensure*` function-name prefix, four name a purpose, one is already past
+tense. The one demonstrated instance — `check-orm-unwrapped`'s comment — was
+fixed when found.
+
+**Why the check #70 favours cannot work.** The comments that do claim mechanisms
+use `refuses` / `protects` (44 comments), which is this repo's *domain*
+vocabulary — `ref()` refuses a mismatch, `claimsAsserting` refuses to pick, a
+gate protects work. A tense check cannot separate the vocabulary from the claim,
+so it would need an exclusion list, which the pinned header treats as evidence
+the check is wrong. Recommended `not-doing`; the close is the owner's.
+
+Two sampled by #50's own discriminator rather than by reading. Deleting
+`"0003_tense_hawkeye": m0003,` from `EMBEDDED` (mutation confirmed with
+`git diff --stat`, not assumed) gave exit 1 and three failures each naming the
+tag. `ref()`'s claim has `tests/subject-identity.test.ts:633`. Both true, both
+already backed by a test named after the guard.
+
+### #66 answered by reachability, and a claim of mine corrected
+
+No commits; the answer is on the issue.
+
+**I had reported that no read verb produces a `GateRef`. That is false**, and
+`labkit-review` caught it by driving the CLI cold rather than reading types:
+`whySupported(claim)` returns `SupportExplanation.unmet`, and each `UnmetCheck`
+carries the criterion, `blocks: BlockedWork[]` with its `gate`, and `gating`
+with the work. My error was checking which top-level report interfaces name a
+`GateRef` and stopping — `BlockedWork` was in my own list and I never asked what
+contains it.
+
+The reachability that replaces it, counted from the verb signatures: of **13**
+handle kinds, question / claim / observations / enquiry are reachable cold;
+criterion, gate and work are reachable **only through a claim**; and five —
+evaluation, review, evidence, unit, decision — are consumed by no verb at all.
+
+That answers Dan's *"for every verb, `Noun(plural)`?"* with **no**: eleven of
+thirteen already have an entry point or hang off one, and five have nowhere to
+pass a handle back to. A uniform surface ships ~11 verbs with no caller, which
+is the written-and-never-read shape the repo refuses for edges.
+
+**And it sharpens the case for the two verbs rather than weakening it.** The
+gate route runs through a claim, so it works only once something has been
+analysed — and a standup is mostly about work that has not. `labkit-review`
+demonstrated it: a gate and task with no analysis behind them are invisible to
+every cold entry point except `happened`, the event log, which CLAUDE.md forbids
+for "what is true now". `workList` is separately owed because `planWork` mints a
+`WorkRef` with no gate.
+
+**One of their notes did not reproduce.** `bun run dev` in `$( )` was reported
+broken by bun's `$ bun run …` banner. Measured on bun 1.3.14: the banner is on
+**stderr**, substitution captures the report only. No `--silent`, no CLAUDE.md
+line owed.
+
+### `4727bac` — the references to a deleted work queue
+
+Eight, not the three first spotted. `README.md` told a reader present-tense that
+the work queue is a file the repository does not contain.
+
+**`src/domain/report.ts` was worse than a broken link.** It called the `ART_`
+prefix's inability to distinguish a raw input from an analysis output *"an open
+item"* — which stopped being true on 2026-08-24, when PJ-008's **row AG**
+measured it and recorded reference-model debt rather than a gap. A comment
+asserting a question that has since been answered is a wrong answer with nothing
+watching it.
+
+The other six cited the queue for content the sentence already carried — a count
+of documents, a quoted prediction, a named trap. Dropping the citation lost
+nothing, which is the test for whether the pointer was load-bearing.
+`CLAUDE.md`'s mention stays: past tense, and it records the replacement.
+
+`bun run check` — **19/19**. PR **#74**.
