@@ -41,7 +41,8 @@
 		"check:cli": "bash scripts/smoke-cli.sh",
 		"example": "bash examples/full-lifecycle.sh",
 		"db:generate": "drizzle-kit generate",
-		"db:generate:custom": "drizzle-kit generate --custom"
+		"db:generate:custom": "drizzle-kit generate --custom",
+		"board:status": "bash scripts/apply-board-status.sh"
 	},
 	"private": true,
 	"devDependencies": {
