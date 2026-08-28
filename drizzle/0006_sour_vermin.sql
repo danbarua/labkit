@@ -1,0 +1,16 @@
+-- lock-strategy: online
+--
+-- A nullable `ADD COLUMN` with no default. Postgres 11+ takes only an
+-- ACCESS EXCLUSIVE lock long enough to update the catalogue -- no table
+-- rewrite, no backfill, no scan -- so this is safe on a live table.
+--
+-- **No backfill, and that is the point of the nullability.** Every existing
+-- row was written by an act whose edges nobody collected. `[]` would assert
+-- those acts connected nothing, which is false for almost every verb --
+-- `recordAnalysis` alone writes eight. `null` says *recorded before LabKit
+-- collected them*, which is the only true thing available.
+--
+-- Hand-edited above the generated line, the same shape as 0005. See
+-- `docs/persistence.md` on why a generated file may carry a hand-written
+-- header and nothing else.
+ALTER TABLE "labkit_event" ADD COLUMN "edges" jsonb;

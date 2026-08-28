@@ -15,6 +15,9 @@ export type {
   DomainEvent,
   EventFilter,
   EventSink,
+  // Re-exported from `src/db/domain` through `./events`, so a consumer of the
+  // domain barrel can name an edge without importing the persistence layer.
+  MintedEdge,
   Operation,
 } from "./events";
 export type {

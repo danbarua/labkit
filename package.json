@@ -26,6 +26,7 @@
 		"check:format": "biome format .",
 		"check:lint": "biome lint .",
 		"format": "biome format --write .",
+		"check:compositions": "bun scripts/check-compositions.ts",
 		"check:doc-comments": "bun scripts/check-doc-comments.ts",
 		"check:migrations": "bun scripts/check-migrations.ts",
 		"check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",

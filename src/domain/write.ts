@@ -1449,6 +1449,8 @@ export class WriteSurface extends SessionCore {
       // question `subject` cannot answer, since most verbs are *about*
       // something other than what they created.
       created: this.graph.drainMinted(),
+      // The other half of the same collection. See `DomainEvent.edges`.
+      edges: this.graph.drainMintedEdges(),
       detail,
     });
   }

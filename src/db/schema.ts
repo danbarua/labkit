@@ -183,6 +183,28 @@ export const labkitEvents = p
        * `CONSUMES.positions`).
        */
       created: p.text().array().notNull().default([]),
+      /**
+       * Every edge the act created — `{from, label, to}` triples.
+       *
+       * **`jsonb` where {@link created} is `text[]`, and the shapes differ
+       * because the values do.** A handle is one string; an edge is three, and
+       * the alternative is encoding it as `"Q_1|ADDRESSES|LOE_1"`, which puts
+       * a parser in the read path and a delimiter in a namespace that has no
+       * rule against one.
+       *
+       * **Nullable, like `attribution_how` and for the same reason.** A row
+       * written before 2026-08-28 has edges nobody recorded, and `[]` would
+       * assert the act connected nothing — false for almost every verb.
+       * `null` means *recorded before LabKit collected them*; the migration
+       * itself produces that value, which is what keeps it from being a state
+       * nobody can explain.
+       *
+       * Not indexed. `created` has a GIN index because "which act created this
+       * record" is a question the log is asked; nothing yet asks "which act
+       * created this edge", and an index with no reader is the shape this repo
+       * removes.
+       */
+      edges: p.jsonb(),
       attribution_label: p.text().notNull(),
       attribution_id: p.text().notNull(),
       /**
