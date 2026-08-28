@@ -302,3 +302,38 @@ part that took judgement. Three things changed on the way:
 still name `checksFrom`, which no longer exists. They are dated records and say
 what was true when written; correcting them is what the exemption exists to
 prevent.
+
+---
+
+## Afterward, 2026-08-28: the design document caught up
+
+**`8585656`** — `docs/digest-design.md` said *"Nothing is built"*, which was true
+when written and false by the next morning: §2 shipped in PR #72 and half of §3
+in #61. The document was asserting the opposite of the record.
+
+Not a dated record — it sits outside the three exempt directories — so it is
+live prose that has to stay true. Status now lives in one header table and
+points at **#55** and **#66**, rather than in sentences that go stale again.
+
+**The transcripts are kept exactly as they were**, several of them showing
+behaviour since fixed. Editing them would delete the evidence and leave the
+conclusion, and the evidence *is* the argument.
+
+Three outcomes recorded against the arguments that produced them, which is the
+part worth having:
+
+- **§9's open question was answered the way it asked to be** — by the scenario
+  landing somewhere rather than by argument. Both candidate words failed on
+  inspection: `contested` is taken by evidence bearing *against*, `unverified`
+  fits never-run but not failed.
+- **§8 step 2's prediction was wrong, and usefully so.** §3's enumeration did
+  not fall out of §2's fix: `checksMet` is keyed by claim and answers one
+  boolean, so it cannot be asked *which gates are blocked* — there is no claim
+  to start from. The traversal exists and is the **wrong shape**, which narrows
+  #66 more than a silent success would have.
+- **§2 had a mirror image the document never predicted**: a promoted negative
+  result, unreachable in six places.
+
+Re-checked against `main` rather than remembered: two call sites consult
+held-to checks, **zero** read verbs take a `CriterionRef`, `UnmetCheck.blocks`
+exists, `known` prints handles.
