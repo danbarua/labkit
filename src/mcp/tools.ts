@@ -1,5 +1,6 @@
 /**
- * The tools, as data — reads in `TOOLS`, writes in `WRITE_TOOLS`.
+ * The tools, as data — reads in `TOOLS`, writes in `WRITE_TOOLS`, and the one
+ * that is neither in `SESSION_TOOLS`.
  *
  * Separated from transport deliberately. A tool here is a name, a description,
  * an input shape and a handler taking `(read, args)` — nothing that needs a
@@ -30,6 +31,7 @@
 
 import { z } from "zod";
 import type { ReadSurface, WriteSurface } from "../domain";
+import type { SessionRegistry } from "../attribution";
 import { ref } from "../domain/report";
 import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
@@ -61,6 +63,7 @@ import {
   interpretationHistorySchema,
   reproductionReportSchema,
   supportExplanationSchema,
+  registeredSessionSchema,
 } from "./schemas";
 
 /**
@@ -915,3 +918,79 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       }),
   }),
 ] as ReadonlyArray<WriteToolDefinition<z.ZodRawShape>>;
+
+/**
+ * One session tool. A third kind, and the third kind exists because the other
+ * two are defined by the surface their handler is handed — and this handler is
+ * handed neither.
+ *
+ * It touches no graph and no verb: it records who is calling, in process
+ * memory, for the life of one stdio connection. That makes it the first tool
+ * here that is plumbing rather than a research action, which is the same shape
+ * the CLI already tolerates in `doctor` and `completions`.
+ *
+ * **Not a member of {@link WRITE_TOOLS}, and not inline in `server.ts`.** In
+ * `WRITE_TOOLS` it would be gated by the gate it exists to open. Inline in
+ * `server.ts` it would be invisible to every enumeration in
+ * `tests/mcp.test.ts` — *every tool is documented*, *every tool's real output
+ * parses against its schema*, *every tool but `known` declares one* all iterate
+ * these arrays, so a tool declared elsewhere escapes the lot. A check that
+ * cannot see a thing cannot fail on it.
+ */
+export interface SessionToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  readonly inputSchema: Shape;
+  readonly outputSchema: z.ZodType;
+  handler(registry: SessionRegistry, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
+}
+
+/** The same pinning trick as {@link tool}, for the session half. */
+function sessionTool<Shape extends z.ZodRawShape>(
+  def: SessionToolDefinition<Shape>,
+): SessionToolDefinition<Shape> {
+  return def;
+}
+
+export const SESSION_TOOLS: readonly SessionToolDefinition<z.ZodRawShape>[] = [
+  sessionTool({
+    name: "register_session",
+    title: "Say who you are",
+    description:
+      "Record which agent is on the other end of this connection, so every write that " +
+      "follows is stamped with it. Call this once, before writing anything: the write " +
+      "tools refuse until you have, because an entry nobody signed is worse than no " +
+      "entry — it looks attributed and is not. LabKit does not check the id and cannot: " +
+      "it records what you tell it. Pass the session id your harness gives you (from " +
+      "`agent-bus whoami`, where there is one) so the same session is nameable in every " +
+      "tool that logs about it. Registering again replaces the previous answer.",
+    inputSchema: {
+      id: z
+        .string()
+        .min(1)
+        .describe(
+          "stable id, for comparing two events — a cross-harness session id where you have one",
+        ),
+      label: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("human-readable name a person scans in a report (default: the id)"),
+    },
+    outputSchema: registeredSessionSchema,
+    // Returns what it recorded, which is the rule for a verb that mints
+    // something: a caller who cannot read back what LabKit understood cannot
+    // tell a typo from a success. `replaced` is the previous registration, so
+    // registering twice is visible rather than silent.
+    handler: async (registry, { id, label }) => {
+      const replaced = registry.registered();
+      registry.register(label ?? id, id);
+      const now = registry.registered();
+      return {
+        registered: { id: now?.id ?? id, label: now?.label ?? label ?? id },
+        replaced: replaced ?? undefined,
+      };
+    },
+  }),
+] as ReadonlyArray<SessionToolDefinition<z.ZodRawShape>>;

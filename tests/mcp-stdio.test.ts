@@ -101,8 +101,36 @@ test(
 );
 
 test(
+  "the launched server refuses a write until it is told who is calling",
+  async () => {
+    // **This is the gate's only test against a real process.** Everything else
+    // drives `buildServer` in-process over `InMemoryTransport`; here the server
+    // was spawned, and the registry it consults is the one `main()` built.
+    //
+    // It runs before the write test below because a registration lasts for the
+    // life of the connection, and this file shares one client across tests —
+    // so this is the only point at which the server is genuinely unregistered.
+    const refused = await client.callTool({
+      name: "pose",
+      arguments: { question: "who is asking?" },
+    });
+    expect(refused.isError).toBe(true);
+    expect(JSON.stringify(refused.content)).toContain("register_session");
+  },
+  COLD_START,
+);
+
+test(
   "it writes, and then reads back what it wrote",
   async () => {
+    // Signing on, exactly as an agent would: `agent-bus whoami` gives the id,
+    // this hands it to LabKit. Nothing verifies it and nothing is meant to.
+    const registered = await client.callTool({
+      name: "register_session",
+      arguments: { id: "stdio-test-0", label: "mcp-stdio test" },
+    });
+    expect(registered.isError ?? false).toBe(false);
+
     const opened = await client.callTool({
       name: "open_enquiry",
       arguments: { question: "does the launched server write?" },

@@ -20,9 +20,18 @@
  *
  * **The real pair arrived with the CLI's write commands**, which is the first
  * caller with a genuine answer to either question: a person at a terminal has a
- * name, and the tree they are standing in has a HEAD. The MCP server keeps the
- * mocks, because the answers it needs — *which agent*, *which session* — are
- * facts the protocol does not carry and this file cannot invent.
+ * name, and the tree they are standing in has a HEAD.
+ *
+ * **The MCP server used to keep both mocks for the same reason — the protocol
+ * carries neither fact — and as of 2026-08-28 it keeps only one.** The protocol
+ * still cannot say which agent is calling, and this file still cannot invent
+ * it; what changed is that the *agent* can now say, through the
+ * `register_session` tool, and {@link SessionRegistry} below is where the
+ * answer is held. `git_hash` is untouched and stays forty zeros: a commit is
+ * not something a caller can be asked for, because the answer would be
+ * unfalsifiable in a way a session id is not — an agent naming itself is
+ * checkable against a bus that knows its sessions, an agent naming a commit is
+ * checkable against nothing.
  *
  * See PJ-031 for why attribution is recorded at all.
  */
@@ -133,6 +142,75 @@ export function personContext(override?: string): SessionContextProvider {
       }
     })();
   return { label: () => who, id: () => who };
+}
+
+/**
+ * Who is on the other end of one stdio connection, once they have said.
+ *
+ * **A register, not a check.** Any agent can register any string, and that is
+ * the design rather than a gap in it: LabKit is a shared book, anyone may pick
+ * up a pen, and who holds the keys to the stationery cupboard is somebody
+ * else's job. What the record owes in return is honesty about *which* pen —
+ * a registered id is something a caller **claimed**, never something LabKit
+ * observed, and no amount of gating changes that. The gate over the write
+ * tools (`src/mcp/server.ts`) stops an agent *forgetting* to sign, not lying
+ * about the signature.
+ *
+ * **One per connection, held by `main()` and passed in**, exactly as the event
+ * log is. Not module state: `inFlight` gets away with that because it serves a
+ * single caller and a test-built server has no shutdown, whereas two servers in
+ * one process — which the suite builds — would share one registration and each
+ * would see the other's agent.
+ *
+ * Stdio only, and that is a fact about the transport rather than a decision.
+ * The process *is* the session there, one client at a time, so a closure is the
+ * whole mechanism. Over HTTP it would have nowhere to live: measured
+ * 2026-08-28 against `@modelcontextprotocol/sdk@1.30.0`, the default transport
+ * is stateless, mints no `Mcp-Session-Id`, and throws rather than serving a
+ * second request through one transport. An HTTP LabKit must supply a
+ * `sessionIdGenerator` so a registration has a key to hang on.
+ */
+export interface SessionRegistry {
+  /** Records the caller's identity, replacing any previous one. */
+  register(label: string, id: string): void;
+  /**
+   * What was registered, or `null` if nobody has said yet.
+   *
+   * `null` rather than falling back to {@link mockSessionContext}, so a caller
+   * can tell *nobody registered* from *somebody registered something*. Those
+   * are different facts and the gate exists to keep them apart — the same
+   * reason {@link UNATTRIBUTED} is a named constant rather than three empty
+   * strings.
+   */
+  registered(): { label: string; id: string } | null;
+}
+
+/** A fresh registry, holding nobody. */
+export function sessionRegistry(): SessionRegistry {
+  let who: { label: string; id: string } | null = null;
+  return {
+    register: (label, id) => {
+      who = { label, id };
+    },
+    registered: () => who,
+  };
+}
+
+/**
+ * The registry as a {@link SessionContextProvider}, for `commandContext`.
+ *
+ * Falls back to {@link mockSessionContext} when nobody has registered — which
+ * the write gate is what stops reaching an event. Without the gate this is the
+ * pre-2026-08-28 behaviour: every MCP write stamped `mock-session-0`, the same
+ * value for every agent on every machine, occupying the identity column of a
+ * record whose whole purpose is provenance. A uniform fake is worse than an
+ * empty field, because an empty field reads as unknown and this reads as known.
+ */
+export function registeredSession(registry: SessionRegistry): SessionContextProvider {
+  return {
+    label: () => registry.registered()?.label ?? mockSessionContext.label(),
+    id: () => registry.registered()?.id ?? mockSessionContext.id(),
+  };
 }
 
 /**

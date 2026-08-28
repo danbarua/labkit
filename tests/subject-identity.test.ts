@@ -51,6 +51,7 @@ import {
   type Clock,
 } from "../src/domain";
 import { buildServer } from "../src/mcp/server";
+import { sessionRegistry } from "../src/attribution";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
 import { ref } from "../src/domain/report";
@@ -94,11 +95,15 @@ async function overTheWire() {
   const graph = await scenario.begin();
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const events = inMemoryEventLog();
-  await buildServer((work) =>
-    work({
-      read: new ReadSurface(graph, { events }),
-      write: new WriteSurface(graph, { clock, events }),
-    }),
+  const session = sessionRegistry();
+  session.register("subject-identity", "subject-identity-0");
+  await buildServer(
+    (work) =>
+      work({
+        read: new ReadSurface(graph, { events }),
+        write: new WriteSurface(graph, { clock, events }),
+      }),
+    session,
   ).connect(serverSide);
   const client = new Client({ name: "subject-identity", version: "0" });
   await client.connect(clientSide);
