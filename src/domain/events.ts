@@ -221,10 +221,15 @@ export interface DomainEvent {
    * Position in this tenant's stream — **assigned by the store, so absent until
    * one has it.**
    *
-   * Optional for that reason and no other: an event on its way to a sink has no
-   * position yet, and `inMemoryEventLog()` never gives it one because a process
-   * -lifetime array has nothing to number. Anything read back out of
-   * `pgEventLog()` has it.
+   * Optional because an event *on its way to* a sink has no position yet —
+   * `EventSink.record` takes one without a `seq` and the store assigns it.
+   * Anything read back out of either sink has one.
+   *
+   * `inMemoryEventLog()` did not assign one until 2026-08-28, on the reasoning
+   * that a process-lifetime array has nothing to number. That was wrong twice:
+   * an array index is a number, and the filter below reads `(e.seq ?? 0)`, so
+   * `select({since})` returned nothing for every value while `pgEventLog`
+   * answered correctly.
    *
    * It is the stream's order, not `at`. A frozen clock — which most of the
    * suite runs — stamps every event in a scenario with one instant, and this
@@ -339,7 +344,22 @@ export interface EventSink {
  */
 export function inMemoryEventLog(): EventSink {
   const events: DomainEvent[] = [];
+  // **Numbered here, and it took a defect to earn the counter.** This sink
+  // used to leave `seq` undefined on the reasoning that a process-lifetime
+  // array has nothing to number. An array index is a number, and the omission
+  // was not free: `matches` below reads `(e.seq ?? 0) > f.since`, so every
+  // event scored 0 and `select({since})` returned **nothing, for every value
+  // of `since`**, while `pgEventLog` answered the same filter correctly. Two
+  // sinks behind one interface, disagreeing — measured 2026-08-28.
+  //
+  // Per-sink and gapless, where Postgres's is a `bigserial` shared across
+  // tenants and therefore gappy within one. Neither property matters to the
+  // only thing `seq` is used for: it is a cursor, and monotonic is the whole
+  // requirement.
+  let n = 0;
   const matches = (e: DomainEvent, f: EventFilter): boolean =>
+    // `?? 0` survives for a hand-built fixture that never went through
+    // `record` — every event this sink stores has a `seq`.
     (f.since === undefined || (e.seq ?? 0) > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
@@ -347,7 +367,10 @@ export function inMemoryEventLog(): EventSink {
       e.subject === f.touching ||
       (e.created ?? []).includes(f.touching));
   return {
-    record: async (event) => void events.push(event),
+    // Copied rather than mutated: `WriteSurface.emit` builds the object and
+    // still holds it, and a sink that writes back into its caller's argument is
+    // a surprise nobody asked for.
+    record: async (event) => void events.push({ ...event, seq: ++n }),
     all: async () => events,
     // Filtered in TypeScript, which is the whole difference between the two
     // sinks: this one holds every event it has ever seen, so `select` is a

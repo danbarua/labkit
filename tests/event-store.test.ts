@@ -15,7 +15,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
-import { WriteSurface, UNATTRIBUTED, type Clock } from "../src/domain";
+import { WriteSurface, UNATTRIBUTED, inMemoryEventLog, type Clock } from "../src/domain";
 import { pgEventLog } from "../src/domain/event-store";
 
 let testDb: TestDb;
@@ -190,6 +190,43 @@ describe("an event commits with the writes it describes, or not at all", () => {
     await write.pose("the one that succeeds");
     const events = await log.select({ operation: "pose" });
     expect(events.at(-1)!.edges).toEqual([]);
+  });
+});
+
+describe("the two sinks answer one filter the same way", () => {
+  /**
+   * **`since` returned nothing from the in-memory sink, for every value.**
+   *
+   * `matches` reads `(e.seq ?? 0) > f.since`, and nothing assigned a `seq`, so
+   * every event scored 0 and every cursor filtered everything out —
+   * while `pgEventLog` answered the same call correctly. Two implementations
+   * of one interface disagreeing, and the only `since` test in the suite used
+   * the other one, which is why it stood.
+   *
+   * No database: the point is the sink, and reaching for one would hide which
+   * half is under test.
+   */
+  test("in-memory: since is a cursor, not a filter that empties the log", async () => {
+    const log = inMemoryEventLog();
+    const ev = (subject: string) => ({
+      at: "2026-08-28T00:00:00.000Z",
+      attribution: UNATTRIBUTED,
+      operation: "pose" as const,
+      subject,
+      created: [],
+      edges: [],
+    });
+    await log.record(ev("Q_1"));
+    await log.record(ev("Q_2"));
+    await log.record(ev("Q_3"));
+
+    const all = await log.all();
+    expect(all.map((e) => e.seq)).toEqual([1, 2, 3]);
+
+    // The assertion that was false: every one of these returned 0.
+    expect(await log.select({ since: 0 })).toHaveLength(3);
+    expect(await log.select({ since: 1 })).toHaveLength(2);
+    expect(await log.select({ since: 3 })).toHaveLength(0);
   });
 });
 
