@@ -33,7 +33,14 @@ import {
 } from "../src/domain";
 import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
-import { TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
+import {
+  commandContext,
+  mockGitContext,
+  registeredSession,
+  sessionRegistry,
+  type SessionRegistry,
+} from "../src/attribution";
+import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schemas";
 import { DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
@@ -64,14 +71,33 @@ const id = (v: unknown): string =>
 async function connectServer(
   graph: TenantGraph,
   transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0],
+  session: SessionRegistry = registeredSessionRegistry(),
 ) {
   const events = inMemoryEventLog();
-  return buildServer((work) =>
-    work({
-      read: new ReadSurface(graph, { events }),
-      write: new WriteSurface(graph, { events }),
-    }),
+  return buildServer(
+    (work) =>
+      work({
+        read: new ReadSurface(graph, { events }),
+        write: new WriteSurface(graph, { events }),
+      }),
+    session,
   ).connect(transport);
+}
+
+/**
+ * A registry that has already been registered, which is what every test but the
+ * gate's own wants.
+ *
+ * **Defaulted rather than left to each caller**, so adding a write test does not
+ * mean remembering the handshake — and *not* defaulted inside `buildServer`,
+ * where an unregistered-means-ungated server would be the safety property
+ * shipping switched off. The one test that wants the gate armed passes a fresh
+ * registry explicitly, which is the only way to reach the refusal from here.
+ */
+function registeredSessionRegistry(): SessionRegistry {
+  const session = sessionRegistry();
+  session.register("test-agent", "test-agent-0");
+  return session;
 }
 
 let scenario: Scenario;
@@ -136,7 +162,7 @@ describe("structure", () => {
 
       const { tools } = await client.listTools();
       expect(tools.map((t) => t.name).sort()).toEqual(
-        [...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
+        [...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort(),
       );
 
       // Derived from which list a tool is in, not from a list of names here.
@@ -595,7 +621,7 @@ describe("the tool documentation resource", () => {
       const { contents } = await client.readResource({ uri: DOCS_URI });
       const doc = markdown(contents).text;
 
-      for (const tool of [...TOOLS, ...WRITE_TOOLS]) {
+      for (const tool of [...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS]) {
         expect(doc).toContain(`## ${tool.name}`);
         expect(doc).toContain(tool.description);
         // Input field names, derived from the tool's own declaration.
@@ -794,6 +820,146 @@ describe("behaviour — the same answers, over the wire", () => {
         arguments: { enquiry: "LOE_does_not_exist" },
       });
       expect(result.isError).toBe(true);
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+});
+
+/**
+ * **Who signed this?**
+ *
+ * The server used to stamp every write `mock-session-0` — one value for every
+ * agent, every session and every machine, in the identity column of a record
+ * whose whole purpose is provenance. That is worse than an empty field: empty
+ * reads as unknown, a uniform placeholder reads as known.
+ *
+ * These build the server the way `main()` does — `commandContext` over
+ * `registeredSession` — because the composition is the thing under test. The
+ * helper at the top of this file deliberately does not, so the rest of the file
+ * stays about tools rather than about attribution.
+ */
+describe("the write gate, and what a registered write is signed with", () => {
+  /** `main()`'s composition, with the registry left for the caller to control. */
+  async function serverWithRegistry(graph: TenantGraph, session: SessionRegistry) {
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const events = inMemoryEventLog();
+    await buildServer(
+      (work) =>
+        work({
+          read: new ReadSurface(graph, { events }),
+          write: new WriteSurface(graph, {
+            ...commandContext(mockGitContext, registeredSession(session)),
+            events,
+          }),
+        }),
+      session,
+    ).connect(serverSide);
+    const client = new Client({ name: "gate", version: "0" });
+    await client.connect(clientSide);
+    return { client, events };
+  }
+
+  test("a write before register_session is refused, and the refusal names the remedy", async () => {
+    const graph = await scenario.begin();
+    try {
+      // A fresh registry: nobody has said who they are. This is the only way to
+      // reach the refusal, which is why the default elsewhere is registered.
+      const { client, events } = await serverWithRegistry(graph, sessionRegistry());
+
+      const result = await client.callTool({
+        name: "pose",
+        arguments: { question: "does anyone know who wrote this?" },
+      });
+
+      expect(result.isError).toBe(true);
+      // The message has to carry the remedy: refusing rather than hiding the
+      // tool is only worth anything if the caller learns what to do.
+      expect(JSON.stringify(result.content)).toContain("register_session");
+
+      // And nothing was written. A refusal that still records is not a refusal.
+      expect(await events.all()).toHaveLength(0);
+
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("a read before register_session is not gated", async () => {
+    const graph = await scenario.begin();
+    try {
+      const { client } = await serverWithRegistry(graph, sessionRegistry());
+      // Reads create no record, so they have nothing to sign. Gating them would
+      // be a refusal with nothing real to refuse.
+      const result = await client.callTool({ name: "known", arguments: {} });
+      expect(result.isError ?? false).toBe(false);
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("after registering, the write is signed with what the agent said", async () => {
+    const graph = await scenario.begin();
+    try {
+      const { client, events } = await serverWithRegistry(graph, sessionRegistry());
+
+      const registered = await client.callTool({
+        name: "register_session",
+        arguments: { id: "claude:9f3a", label: "labkit-mcp-dev" },
+      });
+      // Returns what it recorded -- a caller who cannot read back what LabKit
+      // understood cannot tell a typo from a success.
+      expect(registered.structuredContent).toEqual({
+        registered: { id: "claude:9f3a", label: "labkit-mcp-dev" },
+      });
+
+      const posed = await client.callTool({
+        name: "pose",
+        arguments: { question: "does registering change what the event says?" },
+      });
+      expect(posed.isError ?? false).toBe(false);
+
+      // **Asserted from the stream, not from the reply.** The tool's answer is
+      // a handle; attribution rides on the event and nowhere else, so this is
+      // the only place the claim is observable.
+      const written = await events.all();
+      expect(written).toHaveLength(1);
+      expect(written[0]!.attribution.attribution_id).toBe("claude:9f3a");
+      expect(written[0]!.attribution.attribution_label).toBe("labkit-mcp-dev");
+
+      // The invariant the feature exists for: the placeholder never lands.
+      expect(written.map((e) => e.attribution.attribution_id)).not.toContain("mock-session-0");
+
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("registering again replaces, and says what it replaced", async () => {
+    const graph = await scenario.begin();
+    try {
+      const { client } = await serverWithRegistry(graph, sessionRegistry());
+      await client.callTool({
+        name: "register_session",
+        arguments: { id: "first-0", label: "first" },
+      });
+      const again = await client.callTool({
+        name: "register_session",
+        arguments: { id: "second-0" },
+      });
+
+      // Anyone may pick up a pen, including a second time. What the record owes
+      // is that the change is visible rather than silent -- and `label`
+      // defaulting to the id keeps a reader from seeing the previous name
+      // against the new id.
+      expect(again.structuredContent).toEqual({
+        registered: { id: "second-0", label: "second-0" },
+        replaced: { id: "first-0", label: "first" },
+      });
       await client.close();
     } finally {
       await scenario.end();

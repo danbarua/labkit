@@ -709,10 +709,24 @@ the connection the graph already has and hands it to both.
 
 **The CLI is where attribution stopped being a mock.** `src/attribution.ts`
 predicted that a real `GitContextProvider` would be the first subprocess under
-`src/`; `gitContext` is it, and `personContext` names the user. The MCP server
-keeps the stubs, because *which agent* and *which session* are facts the
-protocol does not carry. `--author` overrides the username, because a script
-driving LabKit is not the account it runs under.
+`src/`; `gitContext` is it, and `personContext` names the user. `--author`
+overrides the username, because a script driving LabKit is not the account it
+runs under.
+
+**The MCP server kept both stubs until 2026-08-28 and now keeps one.** The
+protocol still carries neither fact — what changed is that the *agent* can say,
+through `register_session`, and the **write tools refuse until it has**. That
+gate is not authentication and must not be described as one: any agent can
+register any string, so it stops an agent *forgetting* to sign and never stops
+it lying. What it refuses is real, which is the bar — before it, every MCP write
+was stamped `mock-session-0`, one value for every agent on every machine, in the
+identity column of a record whose whole purpose is provenance. A uniform
+placeholder is worse than an empty field, because empty reads as unknown.
+
+`git_hash` stays forty zeros, and the asymmetry is the interesting part: a
+session id is worth taking on the caller's word because it is checkable in
+principle against a bus that knows its sessions, and a commit is not checkable
+against anything. Asking for one would buy a value nothing could contradict.
 
 #### Colour is a parameter, not a global
 

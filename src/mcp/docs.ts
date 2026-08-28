@@ -27,7 +27,14 @@
  */
 
 import { z } from "zod";
-import { TOOLS, WRITE_TOOLS, type ToolDefinition, type WriteToolDefinition } from "./tools";
+import {
+  SESSION_TOOLS,
+  TOOLS,
+  WRITE_TOOLS,
+  type SessionToolDefinition,
+  type ToolDefinition,
+  type WriteToolDefinition,
+} from "./tools";
 import { historicalSurveySchema, knowledgeSurveySchema } from "./schemas";
 
 /** The URI this document is served at. */
@@ -134,7 +141,7 @@ function renderFields(s: JsonSchema, depth = 0): string[] {
 }
 
 /** Either kind. The renderer only reads the declaration, never the handler. */
-type AnyTool = ToolDefinition | WriteToolDefinition;
+type AnyTool = ToolDefinition | WriteToolDefinition | SessionToolDefinition;
 
 function renderInput(tool: AnyTool): string[] {
   const shape = z.object(tool.inputSchema);
@@ -174,9 +181,16 @@ function renderOutput(tool: AnyTool): string[] {
 export function renderToolDocs(
   reads: readonly ToolDefinition[] = TOOLS,
   writes: readonly WriteToolDefinition[] = WRITE_TOOLS,
+  sessions: readonly SessionToolDefinition[] = SESSION_TOOLS,
 ): string {
-  const all: AnyTool[] = [...reads, ...writes];
+  // Sessions first in the body, because the answer to "which do I call first"
+  // should not be found by scrolling. They are listed under their own heading
+  // rather than folded into the writes: a reader deciding what a tool costs
+  // wants "changes the record" to mean the graph, and this one changes only who
+  // the next write is signed by.
+  const all: AnyTool[] = [...sessions, ...reads, ...writes];
   const writeNames = new Set(writes.map((t) => t.name));
+  const sessionNames = new Set(sessions.map((t) => t.name));
   const anchor = (t: AnyTool) => `#${t.name.replace(/_/g, "-")}`;
   const index = (list: readonly AnyTool[]) =>
     list.map((t) => `- [\`${t.name}\`](${anchor(t)}) — ${t.title}`);
@@ -191,6 +205,14 @@ export function renderToolDocs(
     "questions, the lines of enquiry pursuing them, what was measured, what was",
     "concluded, and what any of it is holding up. Work through it rather than",
     "through notes, and the record can answer questions notes cannot.",
+    "",
+    "## Before you write",
+    "",
+    "The write tools refuse until you have said who you are. LabKit records what",
+    "you tell it and verifies nothing — the point is that an entry nobody signed",
+    "looks attributed and is not.",
+    "",
+    ...index(sessions),
     "",
     "## Recording work",
     "",
@@ -212,7 +234,13 @@ export function renderToolDocs(
       "",
       `## ${tool.name}`,
       "",
-      `*${tool.title}* — ${writeNames.has(tool.name) ? "**changes the record**" : "read-only"}`,
+      `*${tool.title}* — ${
+        sessionNames.has(tool.name)
+          ? "**changes nothing in the record, and is what lets you change it**"
+          : writeNames.has(tool.name)
+            ? "**changes the record**"
+            : "read-only"
+      }`,
       "",
       tool.description,
       "",

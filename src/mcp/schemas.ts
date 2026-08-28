@@ -598,3 +598,31 @@ export type _ReplacementReport = Assert<
 export type _ReinterpretationReport = Assert<
   Exact<z.infer<typeof reinterpretationReportSchema>, ReinterpretationReport>
 >;
+
+/**
+ * What `register_session` recorded.
+ *
+ * **Not held to a report interface by `Exact<>`, and that is not an exemption
+ * being claimed quietly.** Every other schema here mirrors a type in
+ * `src/domain/report.ts`, and the gate exists because a hand-written mirror of
+ * something goes stale against it. This one mirrors nothing: a registration is
+ * not a report, it never reaches the graph, and `src/domain/` does not know the
+ * concept — the seam it belongs to is `src/attribution.ts`, which is
+ * deliberately outside all three layers. There is no original for a check to
+ * hold it to.
+ *
+ * `replaced` is optional and present only when a second registration displaced
+ * a first, so registering twice is visible in the answer rather than silent.
+ */
+export const registeredSessionSchema = z.strictObject({
+  registered: z.strictObject({
+    id: z.string(),
+    label: z.string(),
+  }),
+  replaced: z
+    .strictObject({
+      id: z.string(),
+      label: z.string(),
+    })
+    .optional(),
+});

@@ -44,8 +44,14 @@ import { scopeToTenant } from "../db/scoped";
 import { TenantGraph } from "../db/graph";
 import { ReadSurface, WriteSurface } from "../domain";
 import { pgEventLog } from "../domain/event-store";
-import { commandContext, mockGitContext, mockSessionContext } from "../attribution";
-import { TOOLS, WRITE_TOOLS } from "./tools";
+import {
+  commandContext,
+  mockGitContext,
+  registeredSession,
+  sessionRegistry,
+  type SessionRegistry,
+} from "../attribution";
+import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "./tools";
 import { DOCS_URI, renderToolDocs } from "./docs";
 
 /**
@@ -68,6 +74,16 @@ export type WithSurfaces = <T>(
  *
  * Both halves are required. An optional write half would be the read-only mode
  * surviving as an API shape.
+ *
+ * **`session` is required for the same reason, and it is the newer half of that
+ * argument.** It could default to a fresh {@link sessionRegistry}, and then a
+ * caller who forgot it would get a server whose write gate is armed but whose
+ * registration nothing can reach — or, worse, an optional-and-absent form
+ * meaning *no gate*, which is a safety property shipping switched off by
+ * default. Requiring it means every construction site, tests included, goes
+ * through the path that ships. `main()` owns the one real registry, exactly as
+ * it owns the one real event log and for the same reason: a component that
+ * defaults its own gives two halves of one call two different answers.
  *
  * **Per call rather than per server, so attribution and the connection are
  * both per command.** A surface holds no query state — no constructor and no
@@ -97,7 +113,7 @@ export type WithSurfaces = <T>(
  * would convert a good refusal into an empty success, which is the one
  * outcome the domain went to trouble to avoid.
  */
-export function buildServer(withSurfaces: WithSurfaces): McpServer {
+export function buildServer(withSurfaces: WithSurfaces, session: SessionRegistry): McpServer {
   const server = new McpServer({ name: "labkit", version: "0.0.1" });
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
@@ -142,6 +158,24 @@ export function buildServer(withSurfaces: WithSurfaces): McpServer {
     );
   }
 
+  // Registered before the writes, and reachable when they are not: this is the
+  // one tool whose whole job is to open the gate below.
+  for (const definition of SESSION_TOOLS) {
+    server.registerTool(
+      definition.name,
+      {
+        title: definition.title,
+        description: definition.description,
+        inputSchema: definition.inputSchema,
+        outputSchema: definition.outputSchema,
+        // No `readOnlyHint`, matching the writes. It changes nothing in the
+        // record and is not a read either; an absent hint is the honest thing
+        // to say about a tool that is neither.
+      },
+      respond(definition.name, (args) => definition.handler(session, args)),
+    );
+  }
+
   for (const definition of WRITE_TOOLS) {
     server.registerTool(
       definition.name,
@@ -153,13 +187,48 @@ export function buildServer(withSurfaces: WithSurfaces): McpServer {
       },
       // A surface per call, so each write records the attribution and commit
       // in force at the moment it ran rather than at server start.
-      respond(definition.name, (args) =>
-        withSurfaces(({ write }) => definition.handler(write, args)),
-      ),
+      //
+      // **Inside `respond`, so a blocked write reaches the operator's stderr.**
+      // The refusal could sit outside it and log nothing, which would be
+      // quieter; but the failure this gate creates is *"my agent cannot
+      // write"*, and the person diagnosing that wants to see which tool was
+      // called with what. `logFailedRequest` is already the answer to exactly
+      // that question for every other failure here.
+      respond(definition.name, (args) => {
+        requireRegistered(session, definition.name);
+        return withSurfaces(({ write }) => definition.handler(write, args));
+      }),
     );
   }
 
   return server;
+}
+
+/**
+ * Refuses a write from a caller who has not said who they are.
+ *
+ * **Not a permission check, and this is where someone would later assume
+ * otherwise.** Any agent can register any string — LabKit does not verify it
+ * and could not. This stops an agent *forgetting* to sign, never lying about
+ * the signature. A gate on anonymity, not on authority.
+ *
+ * What it refuses is real, which is this repo's bar for a refusal. Without it
+ * the write lands stamped `mock-session-0` (`src/attribution.ts`) — the same
+ * value for every agent on every machine, in the identity column of a record
+ * whose entire purpose is provenance. A uniform placeholder is worse than an
+ * empty field: empty reads as unknown, this reads as known.
+ *
+ * The message names the remedy, which is why this refuses rather than hiding
+ * the tool. A tool absent from `tools/list` is indistinguishable from a server
+ * that never had it, and teaches the caller nothing.
+ */
+function requireRegistered(session: SessionRegistry, tool: string): void {
+  if (session.registered()) return;
+  throw new Error(
+    `${tool} needs to know who is calling: call register_session first. ` +
+      "LabKit records what you tell it and checks nothing — the id is yours to " +
+      "state, and an unsigned entry is worse than none because it looks attributed.",
+  );
 }
 
 /**
@@ -230,6 +299,13 @@ let inFlight = 0;
  * rather than a tax.
  */
 export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Promise<void> {
+  // One registry for the life of the process, which over stdio is the life of
+  // one client's connection. Built here rather than defaulted inside
+  // `buildServer` for the same reason `pgEventLog` is: the tool that writes to
+  // it and the surface that reads from it must be looking at one object, and a
+  // component that defaults its own would hand them two.
+  const session = sessionRegistry();
+
   const withSurfaces: WithSurfaces = async (work) => {
     const connection = await connectDb();
     try {
@@ -265,13 +341,22 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
       const events = pgEventLog(connection.db, tenantCtx.tenantId);
 
       // Providers are sampled per call, so a long-running server records the
-      // commit each piece of work was actually done against. Both are mocks
-      // today; `src/attribution.ts` is the single file that changes when they
-      // stop being.
+      // commit each piece of work was actually done against — and, now, the
+      // agent that was registered at that moment rather than at server start.
+      //
+      // **One is still a mock and one is not.** `git_hash` stays forty zeros:
+      // the protocol carries no commit, and asking the caller for one would buy
+      // a value nothing could ever contradict. A session id is different — it
+      // is checkable in principle against a bus that knows its sessions, which
+      // is why it is worth taking on the caller's word and `git_hash` is not.
+      //
+      // `registeredSession` falls back to the mock when nobody has registered;
+      // `requireRegistered` is what stops that fallback ever reaching an event,
+      // and `tests/mcp.test.ts` asserts the pair.
       return await work({
         read: new ReadSurface(graph, { events }),
         write: new WriteSurface(graph, {
-          ...commandContext(mockGitContext, mockSessionContext),
+          ...commandContext(mockGitContext, registeredSession(session)),
           events,
         }),
       });
@@ -280,7 +365,7 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
     }
   };
 
-  const server = buildServer(withSurfaces);
+  const server = buildServer(withSurfaces, session);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
