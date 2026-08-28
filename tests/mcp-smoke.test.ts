@@ -191,6 +191,22 @@ describe("every tool answers when an agent actually calls it", () => {
       const status = await call(c, "gate_status", { gate: id(gate) });
       expect(status.state).toBe("satisfied");
 
+      // The two enumeration tools, driven the way an agent without a handle
+      // would: no arguments, then filtered.  must agree with the
+      //  above about this very gate -- they compute the state
+      // through the same function and a disagreement here is the defect the
+      // shared helper exists to prevent.
+      const gates = await call(c, "gate_list", {});
+      const listedGate = (gates.gates as Array<{ gate: string; state: string }>).find(
+        (g) => g.gate === id(gate),
+      );
+      expect(listedGate?.state).toBe("satisfied");
+
+      const workRows = await call(c, "work_list", { state: "carried-out" });
+      // The task above was implemented by the analysis, and its gate is
+      // satisfied, so nothing is blocking it.
+      expect((workRows.work as Array<{ work: string }>).map((w) => w.work)).toContain(id(work));
+
       await call(c, "promote", {
         claim,
         because: "re-timed on a quiet machine",

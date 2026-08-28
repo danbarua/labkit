@@ -38,6 +38,9 @@ import type {
   EnquiryStatus,
   CriterionRef,
   BlockedWork,
+  ListedGate,
+  ListedWork,
+  WorkState,
   DecisionRef,
   EvidenceRef,
   GateRef,
@@ -70,6 +73,7 @@ import {
   checksAnchor,
   checksMetBearing,
   standingAsOf,
+  type CheckState,
 } from "./survey-facts";
 import { SessionCore } from "./core";
 import type { DomainEvent, EventFilter } from "./events";
@@ -1023,16 +1027,7 @@ export class ReadSurface extends SessionCore {
       blocks: blocking.get(c.criterion) ?? [],
     }));
 
-    // Order matters. Absence is checked before satisfaction so a gate nobody
-    // evaluated can never fall through to "satisfied" (S-17); failure is
-    // checked before incompleteness because a failure is decisive (S-3).
-    const state: GateStatus["state"] = checks.every((c) => c.state === "never-run")
-      ? "never-evaluated"
-      : checks.some((c) => c.state === "failed")
-        ? "blocked"
-        : checks.some((c) => c.state === "never-run")
-          ? "incomplete"
-          : "satisfied";
+    const state = gateStateFrom(checks);
 
     // Criterion-scoped, deliberately unfiltered by gate: "has this check ever
     // been shown able to fail" is a question about the check itself.
@@ -1862,4 +1857,203 @@ export class ReadSurface extends SessionCore {
     }
     return ref("observations", rows[0]!.a.natural_id);
   }
+
+  /**
+   * Every gate, with the state a reader is filtering on.
+   *
+   * **The verb that lets an agent start.** Every other gate verb takes a
+   * `GateRef`, and until this existed the only way to obtain one was to already
+   * hold a claim and ask `whySupported` — so an agent opening a cold record
+   * could not answer *"what is blocked?"* at all, and the only thing that could
+   * was `whatHappened`, which is the event log and the one place this repo
+   * forbids answering a "what is true now" question from (#55, #66).
+   *
+   * **One query, then folded per gate.** `compose()` takes the anchor, so the
+   * gate-scoped check fact `gateStatus` uses composes just as well over every
+   * gate as over one. What does not carry is the **grain**: `checkStatusForGate`
+   * is grained `byCriterion`, and a criterion may govern several gates — the
+   * same hash check against staging and against release — so folding the whole
+   * result by criterion would merge two gates' verdicts into one answer. That
+   * is precisely the collapse S-17 and S-3 exist to prevent, arriving from a new
+   * direction.
+   *
+   * So the rows are bucketed by gate first and `per()` is applied within each
+   * bucket. The alternative — a composite grain — would have to change
+   * `checkStatusForGate` itself, and grains are compared by reference, so it
+   * would silently re-scope `gateStatus` too.
+   *
+   * The state comes from {@link gateStateFrom}, the same function `gateStatus`
+   * calls. Not a matter of tidiness: a reader who lists blocked gates and then
+   * opens one must not find it satisfied, and two copies of a four-branch
+   * precedence chain is the defect shape this repo has now hit six times.
+   */
+  async gateList(state?: GateStatus["state"]): Promise<ListedGate[]> {
+    const { cypher, decoders } = compose(
+      `MATCH (crit:Criterion)-[:GOVERNS]->(g:Gate)`,
+      checkStatusForGate,
+      {
+        crit: vertexProps<{ natural_id: string; proposition: string }>(),
+        g: vertexProps<{ natural_id: string; consequence: string }>(),
+      },
+    );
+    const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
+
+    // Bucketed on the gate the row was reached through, never on the criterion.
+    const byGate = new Map<string, { consequence: string; rows: Row[] }>();
+    for (const row of rows) {
+      const gate = row.g as { natural_id: string; consequence: string } | undefined;
+      if (!gate?.natural_id) continue;
+      const bucket = byGate.get(gate.natural_id) ?? {
+        consequence: gate.consequence,
+        rows: [],
+      };
+      bucket.rows.push(row);
+      byGate.set(gate.natural_id, bucket);
+    }
+
+    const listed = [...byGate.entries()].map(([id, { consequence, rows: forGate }]) => ({
+      gate: ref("gate", id),
+      consequence,
+      state: gateStateFrom([...per(checkStatusForGate, forGate).values()]),
+    }));
+
+    // Filtering here rather than in Cypher, because the state is computed and
+    // there is nothing in the graph to filter on -- which is the same reason
+    // there is no `Gate.status` column to maintain.
+    return state ? listed.filter((g) => g.state === state) : listed;
+  }
+
+  /**
+   * Every planned piece of work, with the state a reader is filtering on.
+   *
+   * The other half of what an agent needs to orient, and **not redundant with
+   * {@link gateList}**: a gate reaches only the work it protects, and
+   * `planWork` requires no gate. Work that is planned and ungated — the
+   * commonest thing in a standup — is reachable from nowhere else.
+   *
+   * **Three states, derived rather than chosen.** `Gate -[:GATES]-> Task` and
+   * `Task -[:IMPLEMENTS]-> EvidenceUnit` are everything the record holds about
+   * a task, so they are everything a state can be computed from. `observed` and
+   * `closed` were candidates and neither survived — see {@link WorkState},
+   * which carries the argument and the two that died.
+   *
+   * Nothing is stored. `Task.is_open` existed until 2026-08-28 and was written
+   * by `planWork` and read by nobody, exactly as `DecisionProps.is_open` had
+   * been; it was deleted rather than consumed, because a stored flag is the
+   * first place a work queue rots.
+   *
+   * **`OPTIONAL MATCH` twice, and both are load-bearing.** A task with no gate
+   * and no analysis is the *most* interesting row here — it is the ready work —
+   * so a plain `MATCH` on either edge would silently drop precisely what a
+   * standup is asking for.
+   */
+  async workList(state?: WorkState): Promise<ListedWork[]> {
+    const rows = await this.graph.query(
+      `MATCH (t:Task)
+       OPTIONAL MATCH (g:Gate)-[:GATES]->(t)
+       OPTIONAL MATCH (t)-[:IMPLEMENTS]->(u:EvidenceUnit)
+       RETURN t, g, u`,
+      {
+        t: vertexProps<{ natural_id: string; objective: string }>(),
+        // Both wrapped, because both MATCHes are OPTIONAL and the row that
+        // matters most -- ungated, unimplemented, ready to start -- is exactly
+        // the one where both are NULL.
+        g: optional(vertexProps<{ natural_id: string }>()),
+        u: optional(vertexProps<{ natural_id: string }>()),
+      },
+      {},
+    );
+
+    // One row per (task, gate, unit) combination, so a task with two gates
+    // arrives twice. Collected before anything is decided.
+    const tasks = new Map<
+      string,
+      { objective: string; gates: Set<string>; implemented: boolean }
+    >();
+    for (const row of rows) {
+      const id = row.t.natural_id;
+      const entry = tasks.get(id) ?? {
+        objective: row.t.objective ?? "",
+        gates: new Set<string>(),
+        implemented: false,
+      };
+      if (row.g?.natural_id) entry.gates.add(row.g.natural_id);
+      if (row.u?.natural_id) entry.implemented = true;
+      tasks.set(id, entry);
+    }
+
+    // A gate's state is the gate's own answer, asked once for all of them
+    // rather than per task: several tasks commonly share one gate.
+    const gateStates = new Map((await this.gateList()).map((g) => [g.gate as string, g.state]));
+
+    const listed = [...tasks.entries()].map(([id, t]) => ({
+      work: ref("work", id),
+      objective: t.objective,
+      state: workStateFrom(t, gateStates),
+    }));
+
+    return state ? listed.filter((w) => w.state === state) : listed;
+  }
+}
+
+/**
+ * A gate's state, from the checks governing it.
+ *
+ * **Extracted because a second reader arrived.** It was inline in
+ * `gateStatus` until `gateList` needed the same answer for every gate at once,
+ * and that is the condition this repository already applies to a fact: a
+ * computation earns a name when more than one reader has to reach the same
+ * answer about the same subject. Two copies of a four-branch precedence chain
+ * is the six-occurrence defect shape — written once, forgotten the second time,
+ * and silently disagreeing thereafter.
+ *
+ * Order matters and neither branch is cosmetic. Absence is checked before
+ * satisfaction so a gate nobody evaluated can never fall through to
+ * `satisfied` (S-17); failure is checked before incompleteness because a
+ * failure is decisive (S-3).
+ *
+ * **A gate with no criteria at all reports `never-evaluated`.** `every` over an
+ * empty list is `true`, which is the right answer for the wrong-looking reason:
+ * a gate governing nothing has certainly not been shown to hold, and
+ * `declareGate` refuses to mint one anyway (S-3b), so this is a defence rather
+ * than a case.
+ */
+function gateStateFrom(checks: readonly { state: CheckState }[]): GateStatus["state"] {
+  return checks.every((c) => c.state === "never-run")
+    ? "never-evaluated"
+    : checks.some((c) => c.state === "failed")
+      ? "blocked"
+      : checks.some((c) => c.state === "never-run")
+        ? "incomplete"
+        : "satisfied";
+}
+
+/**
+ * A task's state, from the edges that reach it.
+ *
+ * **`blocked` first, and that is the one real decision in this enum.** A task
+ * can be both carried out and protected by a gate that has not been satisfied,
+ * and the two readings are both defensible: *the work happened*, or *its result
+ * cannot be built on*. This picks the second, on the same rule
+ * `GateStatus.state` already applies to `blocked` over `incomplete` — a reader
+ * scanning for what needs attention must see the blockage, because a state that
+ * hides it is a state nobody can act on.
+ *
+ * The other reading is real and is why the overlap has a test of its own rather
+ * than being left to fall out of the branch order below.
+ *
+ * **A gate that is merely unevaluated does not block.** Only `blocked` counts —
+ * `never-evaluated` and `incomplete` mean nobody has finished checking, which is
+ * a fact about the gate rather than an obstruction to the work. Treating them as
+ * blocking would report every freshly gated task as blocked on the day it was
+ * planned, which is exactly the "queue that can never be emptied and is
+ * therefore never read" PJ-001 warns against.
+ */
+function workStateFrom(
+  task: { gates: Set<string>; implemented: boolean },
+  gateStates: ReadonlyMap<string, GateStatus["state"]>,
+): WorkState {
+  const held = [...task.gates].some((g) => gateStates.get(g) === "blocked");
+  if (held) return "blocked";
+  return task.implemented ? "carried-out" : "planned";
 }

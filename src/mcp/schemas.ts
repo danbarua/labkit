@@ -37,6 +37,8 @@
 
 import { z } from "zod";
 import type {
+  ListedGate,
+  ListedWork,
   RecordedAnalysis,
   QuestionClosure,
   ConflictSide,
@@ -626,3 +628,30 @@ export const registeredSessionSchema = z.strictObject({
     })
     .optional(),
 });
+
+/** One gate in a list of them. */
+const listedGate = z.strictObject({
+  gate: ref("gate"),
+  consequence: z.string(),
+  state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
+});
+
+/** `gate_list` — an array, wrapped because `structuredContent` must be an object. */
+export const gateListSchema = z.strictObject({
+  gates: z.array(listedGate),
+});
+
+/** One task in a list of them. */
+const listedWork = z.strictObject({
+  work: ref("work"),
+  objective: z.string(),
+  state: z.enum(["planned", "blocked", "carried-out"]),
+});
+
+/** `work_list` — the same wrapping, for the same reason. */
+export const workListSchema = z.strictObject({
+  work: z.array(listedWork),
+});
+
+export type _ListedGate = Assert<Exact<z.infer<typeof listedGate>, ListedGate>>;
+export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;

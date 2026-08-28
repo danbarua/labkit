@@ -1277,3 +1277,63 @@ export interface TaskContract {
   mayRead: string[];
   enforced: false;
 }
+
+/**
+ * One gate in a list of them, with the state a reader is filtering on.
+ *
+ * **Deliberately not a `GateStatus`.** That report answers *"tell me everything
+ * about this gate"* and costs several queries per gate to assemble — the
+ * itemised checks, the blast radius of each unmet one, whether the criterion
+ * ever failed anywhere. A list wants the handle, the sentence and the state,
+ * and a caller who wants the rest has the handle to ask with.
+ *
+ * `state` is the same value `gateStatus` reports, computed by the same function
+ * (`gateStateFrom`) over the same fact. They cannot disagree, which is the
+ * property that matters: a reader who lists blocked gates and then opens one
+ * must not find it satisfied.
+ */
+export interface ListedGate {
+  gate: GateRef;
+  consequence: string;
+  state: GateStatus["state"];
+}
+
+/**
+ * What a task's state can be, computed from the graph and never stored.
+ *
+ * **Derived from the two edge families that reach a Task**, not chosen from a
+ * list of plausible words: `Gate -[:GATES]-> Task` and
+ * `Task -[:IMPLEMENTS]-> EvidenceUnit` are everything the record holds about
+ * one, so they are everything a state can be computed from.
+ *
+ * Two candidates died on inspection while this was being written, and both are
+ * worth naming because they read as obvious:
+ *
+ * - **`observed`** is not computable. `recordObservations` takes an *enquiry*;
+ *   no edge connects observations to a Task at all.
+ * - **`closed`** has no verb behind it. Nothing closes work. `Task.is_open`
+ *   existed and was deleted the same day — written by `planWork`, read by
+ *   nobody, the same flag `DecisionProps` lost on 2026-08-24.
+ *
+ * **`blocked` takes precedence over `carried-out`**, which is the one real
+ * decision here and is the rule `GateStatus.state` already applies to
+ * `blocked` over `incomplete`: a reader scanning for what needs attention must
+ * see the blockage. The alternative reading — that work already carried out is
+ * not *blocked* whatever its gate says — is genuine, and is why the overlap has
+ * a test of its own rather than being left to fall out of the branch order.
+ */
+export type WorkState = "planned" | "blocked" | "carried-out";
+
+/**
+ * One task in a list of them.
+ *
+ * `{work, objective}` is the pair `GatedWork` already established, so a reader
+ * moving between the two reports meets one convention. `state` is what this
+ * adds, and it is why the two types are not one: a `GatedWork` says what a gate
+ * is holding up, and says nothing about whether that work has happened.
+ */
+export interface ListedWork {
+  work: WorkRef;
+  objective: string;
+  state: WorkState;
+}
