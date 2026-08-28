@@ -34,11 +34,22 @@ Find out what stops that, and clear it.
 - `src/cli/views/events.ts` — a `connecting` block under each event.
 - `tests/event-store.test.ts` — three tests.
 
-Working tree clean. Open as PR **#110**.
+**`f4db3a0`** — the in-memory sink numbers its events.
 
-**The range is far wider than this session** — fifteen commits, of which one is
-mine. #92, #93, #96–#109 belong to entries 063, 064 and 066–069 and are not
-restated here.
+`select({ since })` returned **nothing for every value** while `pgEventLog`
+answered the same filter correctly: `matches` reads `(e.seq ?? 0) > f.since`
+and nothing assigned a `seq`, so every event scored 0. Two sinks behind one
+interface, disagreeing. Dan asked why an atomic incrementer was not trivial;
+it is, and the comment saying "a process-lifetime array has nothing to number"
+is the reason the defect stood.
+
+Working tree clean. Both commits open as PR **#110**.
+
+**The range is far wider than this session.** Everything in it except the shas
+above belongs to entries 063, 064 and 066–069 — #92, #93, #96 through #109 —
+and none of it is restated here. (This paragraph carried a commit count until
+it was corrected; SKILL.md forbids one for the obvious reason, and it was
+already wrong.)
 
 ## Verified
 
@@ -51,6 +62,7 @@ restated here.
 | --- | --- |
 | remove the edge push | `recordAnalysis reports every edge, not only its nodes` |
 | remove the residue clear | `after a failure, the next event claims only its own edges` |
+| remove the seq counter | `in-memory: since is a cursor, not a filter that empties the log` |
 
 Driven end to end through the CLI, which is where the `connecting` output above
 was read from rather than predicted.
@@ -77,6 +89,32 @@ edges is *incomplete*, and PJ-011 §5 is explicit that an empty result is not a
 wrong one. What earns it is a consumer, as attribution earned the durable log in
 PJ-032. Anyone revisiting this should not find a stronger claim than was made.
 
+**One of two implementations was never asked the question**, which is the
+general form of the `seq` defect and worth more than the fix. The suite's only
+`since` test uses `pgEventLog`; the in-memory path had none, so a filter that
+returned nothing for every input survived in the sink *every scenario uses*.
+Where an interface has two implementations, a test that exercises one proves
+nothing about the other.
+
+**`fragments/` — Dan's decomposition, and it is better than this entry's.**
+Sketched mid-session as a small library of composable research moves:
+
+    ask-and-pursue  prespecify  gated-work  observe-and-analyse
+    negative-result  failed-check  rerun-check  promote
+    close-on-evidence  replace-analysis  reinterpret-claim
+    multi-pursuit  accept-unresolved  reverify
+
+Fourteen, covering the eighteen write verbs. The plan asked whether *scenarios*
+compose and answered no; the composable unit is a **move**. S-19 is
+`ask-and-pursue → prespecify → gated-work → observe-and-analyse → failed-check
+→ rerun-check → promote → close-on-evidence`, and the mockup hand-wrote that
+sequence eight times.
+
+**The boundary that still holds:** fragments compose in the *trace*, not in the
+test suite. `s9b_rebuild_or_fresh_work.test.ts:86` duplicates S-9's opening
+deliberately so the difference is visible; a shared fragment there would couple
+independent probes.
+
 **Steps 2–4 of the plan are not built**
 (`~/.claude/plans/async-napping-quiche.md`): a trace exporter over
 `ResearchSession.events`, the mockup consuming traces instead of hand-written
@@ -91,6 +129,10 @@ fixtures.
 
 ## Next
 
+Sketch the fragment API against `~/.claude/plans/async-napping-quiche.md`
+before building — the plan predates the `fragments/` idea and its step 2 is the
+weaker version of it.
+
 ```sh
 git checkout -b feat/scenario-trace origin/main   # after #110 merges
 ```
@@ -98,4 +140,5 @@ git checkout -b feat/scenario-trace origin/main   # after #110 merges
 A dump of `[{operation, subject, created, edges, detail}]` from
 `ResearchSession.events` after a scenario run. It reads the in-memory sink, so
 it adds nothing to `src/` and does not breach the harness's no-`src/db` rule.
-Caveat: in-memory events have `seq` undefined, so order is array order.
+The `seq` caveat this line carried is gone — `f4db3a0` above is what removed
+it, so a trace can order by `seq` on either sink.
