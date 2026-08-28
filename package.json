@@ -16,8 +16,8 @@
 		"dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
 		"build": "bash scripts/build-binary.sh",
 		"test": "bun test --timeout 20000",
-		"spike:web": "docker compose --profile spike up -d --build && docker compose logs -f web",
-		"spike:web:down": "docker compose --profile spike down",
+		"spike:web": "bash scripts/compose.sh --profile spike up -d --build && bash scripts/compose.sh logs -f web",
+		"spike:web:down": "bash scripts/compose.sh --profile spike down",
 		"test:pg": "bash scripts/test-postgres.sh",
 		"test:in-docker": "bash scripts/test-in-docker.sh",
 		"typecheck": "tsc --noEmit",
@@ -42,7 +42,8 @@
 		"example": "bash examples/full-lifecycle.sh",
 		"db:generate": "drizzle-kit generate",
 		"db:generate:custom": "drizzle-kit generate --custom",
-		"board:status": "bash scripts/apply-board-status.sh"
+		"board:status": "bash scripts/apply-board-status.sh",
+		"ports": "bash scripts/worktree-ports.sh"
 	},
 	"private": true,
 	"devDependencies": {

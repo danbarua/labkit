@@ -10,7 +10,7 @@ services:
       - POSTGRES_PASSWORD=agens
       - POSTGRES_DB=postgres
     ports:
-      - 5432:5432
+      - ${LABKIT_PORT_DB:-5432}:5432
     # `depends_on: condition: service_healthy` needs this, and the web service
     # needs that: the entrypoint migrates before it serves, and migrating a
     # Postgres that is still starting fails rather than waiting.
@@ -69,7 +69,7 @@ services:
       - LABKIT_DB_URL=postgres://postgres:agens@db:5432/labkit_spike
       - LABKIT_TENANT=labkit
     ports:
-      - 8899:8899
+      - ${LABKIT_PORT_WEB:-8899}:8899
 
   # PgBouncer in **transaction** pooling mode, for one experiment.
   #
@@ -102,7 +102,7 @@ services:
       - AUTH_TYPE=scram-sha-256
       - ADMIN_USERS=postgres
     ports:
-      - 6432:5432
+      - ${LABKIT_PORT_POOLER:-6432}:5432
 
   # Two servers, two tenants, one pooler. Two are needed because a tenant is
   # per process (measured: PR #91's finding 2), so "client A saw tenant B's
@@ -122,7 +122,7 @@ services:
       - LABKIT_DB_URL=postgres://postgres:agens@${LABKIT_PG_HOST:-pgbouncer}:5432/labkit_spike
       - LABKIT_TENANT=alpha
     ports:
-      - 8901:8899
+      - ${LABKIT_PORT_ALPHA:-8901}:8899
 
   web-beta:
     profiles: ["pooler"]
@@ -138,4 +138,4 @@ services:
       - LABKIT_DB_URL=postgres://postgres:agens@${LABKIT_PG_HOST:-pgbouncer}:5432/labkit_spike
       - LABKIT_TENANT=beta
     ports:
-      - 8902:8899
+      - ${LABKIT_PORT_BETA:-8902}:8899

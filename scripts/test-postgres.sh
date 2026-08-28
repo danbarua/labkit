@@ -16,7 +16,9 @@
 # 2026-08-26), and a suite that only ever sees one of them cannot notice.
 #
 # The container is started if it is not already up and **left running** on exit,
-# because the next run then costs nothing. `docker compose down` stops it.
+# because the next run then costs nothing. `bun run spike:web:down`, or
+# `bash scripts/compose.sh down`, stops it -- plain `docker compose down` works
+# too on the main checkout, where the ports are the defaults.
 #
 # `tests/helpers/db.ts` applies the migrations itself here — against this
 # backend that is the out-of-band deploy step PJ-004 describes, and a test run
@@ -51,30 +53,35 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
 test_db="labkit_tests"
-url="${LABKIT_DB_URL:-postgres://postgres:agens@127.0.0.1:5432/$test_db}"
+
+# This worktree's published port, not a literal 5432 -- two worktrees running
+# `test:pg` at once would otherwise be one truncating the other's database.
+# `LABKIT_DB_URL` still wins: a caller who named a database has decided.
+eval "$("$root/scripts/worktree-ports.sh" --export)"
+url="${LABKIT_DB_URL:-postgres://postgres:agens@127.0.0.1:${LABKIT_PORT_DB}/$test_db}"
 
 if [ -z "${LABKIT_DB_URL:-}" ]; then
-  if ! docker compose ps --status running --quiet db 2>/dev/null | grep -q .; then
+  if ! bash "$root/scripts/compose.sh" ps --status running --quiet db 2>/dev/null | grep -q .; then
     echo "test:pg: building and starting docker-compose.yml's db service"
     # `--build` on every run, not only the first: compose reuses a previously
     # built image without noticing the Dockerfile changed, and a stale image is
     # the kind of failure that gets blamed on the code. Cached, so it costs
     # nothing when nothing changed.
-    docker compose up -d --build db
+    bash "$root/scripts/compose.sh" up -d --build db
   fi
 
   echo -n "test:pg: waiting for postgres"
   for _ in $(seq 1 60); do
-    if docker compose exec -T db pg_isready -U postgres -q 2>/dev/null; then
+    if bash "$root/scripts/compose.sh" exec -T db pg_isready -U postgres -q 2>/dev/null; then
       echo " — ready"
       break
     fi
     echo -n "."
     sleep 1
   done
-  if ! docker compose exec -T db pg_isready -U postgres -q 2>/dev/null; then
+  if ! bash "$root/scripts/compose.sh" exec -T db pg_isready -U postgres -q 2>/dev/null; then
     echo
-    echo "FAILED: postgres did not become ready. \`docker compose logs db\` has the reason."
+    echo "FAILED: postgres did not become ready. \`bash scripts/compose.sh logs db\` has the reason."
     exit 1
   fi
 else
@@ -105,7 +112,7 @@ echo
 if [ -n "${LABKIT_DB_URL:-}" ]; then
   after="Against the database LABKIT_DB_URL names; nothing here started or stopped it."
 else
-  after="The container is still up; \`docker compose down\` stops it."
+  after="The container is still up; \`bash scripts/compose.sh down\` stops it."
 fi
 
 if [ "$status" -eq 0 ]; then

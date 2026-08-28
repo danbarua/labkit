@@ -53,6 +53,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { type SessionRegistry, sessionRegistry } from "../src/attribution";
 import { buildServer, surfacesOver } from "../src/mcp/server";
+import { worktreeName } from "../src/worktree";
 
 const args = process.argv.slice(2);
 const flag = (name: string): boolean => args.includes(name);
@@ -123,7 +124,16 @@ Bun.serve({
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/healthz") {
-      return Response.json({ ok: true, sessions: sessions.size, shared: SHARED });
+      // `worktree` so a stray curl on a port you did not expect is
+      // self-diagnosing. This endpoint answering green from *another*
+      // checkout's server is what issue #95 is.
+      return Response.json({
+        ok: true,
+        sessions: sessions.size,
+        shared: SHARED,
+        port: PORT,
+        ...(worktreeName() ? { worktree: worktreeName() } : {}),
+      });
     }
     if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
 

@@ -12,10 +12,14 @@
  */
 
 import { Command } from "commander";
+import pkg from "../../package.json" with { type: "json" };
+import { worktreeName } from "../worktree";
 import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
 import { registerServe } from "./commands/serve";
 import type { Run } from "./session";
+
+const VERSION = pkg.version;
 
 /**
  * The options every command shares.
@@ -53,6 +57,13 @@ export function globalOptions(program: Command): Command {
 export function buildProgram(run: Run): Command {
   const program = new Command("labkit")
     .description("a research record, from the command line")
+    // The worktree is a diagnostic, not a version: two checkouts of one
+    // repository run two stacks, and an answer that does not say which one
+    // produced it is what made a green `/healthz` describe someone else's
+    // server. Omitted when there is no git to ask -- a compiled binary on a
+    // host without it has no checkout to name, and inventing one would be
+    // exactly the meaningless-but-actionable value this is here to remove.
+    .version(worktreeName() ? `${VERSION} (${worktreeName()})` : VERSION)
     .showHelpAfterError();
   globalOptions(program);
   registerReads(program, run);
