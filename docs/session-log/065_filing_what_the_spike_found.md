@@ -42,6 +42,15 @@ forward in `## Open` is the laundering it names by name:
   one-tenant-per-process limit both fail loudly, while a shared registry fails
   **silently and intermittently**.
 
+**And one document fixed rather than filed** (#106). Dan went looking for the
+HTTP server in a `spikes/` directory; there is none, and reading CLAUDE.md
+would not have helped either, because `bun run spike:web` was in
+`package.json` and in no document. Deriving the rest rather than eyeballing it
+found two more the same afternoon — `ports` and `board:status`, from #99 and
+#102. The four-line derivation is now in CLAUDE.md, and deliberately **not** a
+`check:` script: `bun run check` must not need a judgement about which scripts
+a person would type, and `postinstall` is exactly that judgement.
+
 **A rename that was done twice, and the redundant half was mine.**
 `063_two_verbs_that_let_an_agent_start.md` needed to become `064`, and both
 sessions fixed it. `labkit-dev-mcp`'s landed as **#97**; my commit was dropped
