@@ -15,6 +15,8 @@
 		"dev:dependency-cruiser": "bash scripts/update-dependency-graph.sh",
 		"build": "bash scripts/build-binary.sh",
 		"test": "bun test --timeout 20000",
+		"spike:web": "docker compose --profile spike up -d --build && docker compose logs -f web",
+		"spike:web:down": "docker compose --profile spike down",
 		"test:pg": "bash scripts/test-postgres.sh",
 		"test:in-docker": "bash scripts/test-in-docker.sh",
 		"typecheck": "tsc --noEmit",

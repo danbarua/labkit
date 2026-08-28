@@ -304,41 +304,26 @@ function respond(tool: string, run: (args: Record<string, unknown>) => Promise<u
 let inFlight = 0;
 
 /**
- * Serves over stdio, opening and releasing the database around each tool call.
+ * The composition every surface is built through: connect, resolve the tenant,
+ * step down, hand a tool both halves, close.
  *
- * **Does not return.** The promise settles only by the process exiting; see the
- * end of the function.
+ * **Extracted from {@link main} on 2026-08-28 so a second transport cannot fork
+ * it.** Wiring an HTTP server meant either calling this or writing it again,
+ * and writing it again is the copy this repository deletes on sight — six
+ * paragraphs of argument about transaction scope, tenant pinning and which mock
+ * is still a mock, in two places, going stale independently. `main()` is the
+ * stdio call site now rather than the only one.
  *
- * **Nothing is held between calls, and that is the point.** The embedded PGlite
- * file is single-writer: a process that keeps it open locks every other process
- * out of the project for as long as it lives, and the use case is several
- * agents working one project at once. An MCP server lives as long as its agent's
- * session, so holding the file for that long is the one thing it must not do.
- *
- * The cost is a lock, an open, a migration no-op and a tenant resolution per
- * call — **80-96ms warm**, measured 2026-08-26 (open 70-85ms, migrate 2ms,
- * resolve 7-8ms, close 2ms). That is noise against the domain work inside one
- * tool call, and two overlapping calls serialise on the lock rather than racing
- * the file.
- *
- * The tenant is resolved inside each scope and never cached: below the boundary
- * every function takes a resolved context, and there is no "current tenant"
- * anyone can change mid-session. Resolution is also the self-healing
- * reconciliation pass PJ-005 argued for, so paying it per call is a feature
- * rather than a tax.
+ * **`session` is a parameter, and that is the whole of what a second transport
+ * changes.** Over stdio one registry per process is one registry per client,
+ * because the client owns the process. Over HTTP one process serves many, so
+ * the registry belongs to whatever that transport calls a session — and taking
+ * it as an argument is what lets a caller decide that without touching this
+ * function. One registry shared across connections would stamp every agent's
+ * writes with whichever registered first, which reads as true and is not.
  */
-export async function main(
-  tenant = process.env.LABKIT_TENANT ?? "labkit",
-  { readOnly = false }: { readOnly?: boolean } = {},
-): Promise<void> {
-  // One registry for the life of the process, which over stdio is the life of
-  // one client's connection. Built here rather than defaulted inside
-  // `buildServer` for the same reason `pgEventLog` is: the tool that writes to
-  // it and the surface that reads from it must be looking at one object, and a
-  // component that defaults its own would hand them two.
-  const session = sessionRegistry();
-
-  const withSurfaces: WithSurfaces = async (work) => {
+export function surfacesOver(tenant: string, session: SessionRegistry): WithSurfaces {
+  return async (work) => {
     const connection = await connectDb();
     try {
       // `tenantCtx`, not `ctx`. There are two contexts in scope here and they
@@ -396,6 +381,44 @@ export async function main(
       await connection.close();
     }
   };
+}
+
+/**
+ * Serves over stdio, opening and releasing the database around each tool call.
+ *
+ * **Does not return.** The promise settles only by the process exiting; see the
+ * end of the function.
+ *
+ * **Nothing is held between calls, and that is the point.** The embedded PGlite
+ * file is single-writer: a process that keeps it open locks every other process
+ * out of the project for as long as it lives, and the use case is several
+ * agents working one project at once. An MCP server lives as long as its agent's
+ * session, so holding the file for that long is the one thing it must not do.
+ *
+ * The cost is a lock, an open, a migration no-op and a tenant resolution per
+ * call — **80-96ms warm**, measured 2026-08-26 (open 70-85ms, migrate 2ms,
+ * resolve 7-8ms, close 2ms). That is noise against the domain work inside one
+ * tool call, and two overlapping calls serialise on the lock rather than racing
+ * the file.
+ *
+ * The tenant is resolved inside each scope and never cached: below the boundary
+ * every function takes a resolved context, and there is no "current tenant"
+ * anyone can change mid-session. Resolution is also the self-healing
+ * reconciliation pass PJ-005 argued for, so paying it per call is a feature
+ * rather than a tax.
+ */
+export async function main(
+  tenant = process.env.LABKIT_TENANT ?? "labkit",
+  { readOnly = false }: { readOnly?: boolean } = {},
+): Promise<void> {
+  // One registry for the life of the process, which over stdio is the life of
+  // one client's connection. Built here rather than defaulted inside
+  // `buildServer` for the same reason `pgEventLog` is: the tool that writes to
+  // it and the surface that reads from it must be looking at one object, and a
+  // component that defaults its own would hand them two.
+  const session = sessionRegistry();
+
+  const withSurfaces = surfacesOver(tenant, session);
 
   const server = buildServer(withSurfaces, session, { readOnly });
 
