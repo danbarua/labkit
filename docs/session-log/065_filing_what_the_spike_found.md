@@ -11,7 +11,9 @@ and into the queue, and clean up the branches.
 
 ## Changed
 
-**No code, and one commit.** This entry.
+**No code.** This entry, and its own later amendment; the range it sits in is
+much wider than the session and every other commit belongs to entries 063, 064,
+066 or 067, which are not restated here.
 
 The work was three issues, which is where it belongs — CLAUDE.md's own rule is
 that a queue is state and a markdown file is prose, and carrying findings
@@ -27,6 +29,18 @@ forward in `## Open` is the laundering it names by name:
 - **A comment on #81** — *claimed by somebody else* as a third provenance
   grade, from #91's shared-registry result. Not weaker than `Claimed`: false,
   and identical in presentation to true.
+- **#98** — a task cannot name the question it serves. Split out of #55, whose
+  own comment proposed it. `open question` + `domain model`: defined and
+  tracked, not ready to work on. Every edge a `Task` has runs downstream to
+  what it produced or upstream to the gate holding it; nothing reaches a
+  `Question`, and `planWork` takes neither a question nor an enquiry, so there
+  would be nothing to write even if an edge existed.
+- **#104** — the HTTP spike's findings have no watcher. `grep -rln
+  "spike-http\|StreamableHTTP\|surfacesOver" tests/` returns nothing: the
+  probes were scratchpad scripts and are gone. Only one of the three findings
+  needs a test, and the issue says which and why — the migration gap and the
+  one-tenant-per-process limit both fail loudly, while a shared registry fails
+  **silently and intermittently**.
 
 **A rename that was done twice, and the redundant half was mine.**
 `063_two_verbs_that_let_an_agent_start.md` needed to become `064`, and both
@@ -74,5 +88,7 @@ a commit whose message describes none of it.
 
 ## Next
 
-Nothing queued here. The open work is in the tracker, and **#94** is the one
-with the most behind it.
+Nothing queued here. The open work is in the tracker: **#94** has the most
+behind it, and **#104** is the one that decides whether the spike was a
+direction or an experiment — if `scripts/spike-http-server.ts` is deleted
+rather than kept, #104 closes as `not-doing` with it.
