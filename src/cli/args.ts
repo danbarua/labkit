@@ -131,3 +131,36 @@ export function rebuilt(raw: string): { part: ObservationsRef; hash: string } {
     hash: raw.slice(at + 1),
   };
 }
+
+/**
+ * One of a fixed set of states, or `undefined` when the flag was not given.
+ *
+ * **Absent and invalid are different answers**, which is the whole reason this
+ * is not `z.enum(...).optional().parse()`. `undefined` means *do not filter*
+ * and reaches the verb as "all of them"; a typo means the caller asked for
+ * something and is owed a message naming what was available, not a silent full
+ * list. `--state blockd` returning every gate is the failure mode this exists
+ * to prevent — it looks like the filter worked and nothing is wrong.
+ *
+ * The message lists the values because the enum is the whole vocabulary and a
+ * caller who mistyped one is exactly the person who needs to see it.
+ */
+function oneOf<T extends string>(values: readonly T[], flag: string) {
+  return (raw: string | undefined): T | undefined => {
+    if (raw === undefined) return undefined;
+    const parsed = z.enum(values as unknown as [T, ...T[]]).safeParse(raw);
+    if (!parsed.success) {
+      throw new InvalidArgumentError(`${flag} takes one of: ${values.join(", ")} — not \`${raw}\``);
+    }
+    return parsed.data;
+  };
+}
+
+/** `labkit gates --state ...` */
+export const gateState = oneOf(
+  ["never-evaluated", "incomplete", "blocked", "satisfied"] as const,
+  "--state",
+);
+
+/** `labkit work --state ...` */
+export const workState = oneOf(["planned", "blocked", "carried-out"] as const, "--state");

@@ -64,6 +64,8 @@ import {
   reproductionReportSchema,
   supportExplanationSchema,
   registeredSessionSchema,
+  gateListSchema,
+  workListSchema,
 } from "./schemas";
 
 /**
@@ -130,6 +132,43 @@ const WORK_PREFIX = "TASK_";
 const REVIEW_PREFIX = "REV_";
 
 export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
+  tool({
+    name: "gate_list",
+    title: "List the gates",
+    description:
+      "Every gate, with what it is holding up and whether it is satisfied. Start here when " +
+      "you do not already hold a handle: every other gate tool takes one, and until this " +
+      "existed the only route to a gate ran through a claim, so a record with work planned " +
+      "and nothing analysed yet looked empty. Pass `state` to filter — `blocked` is what " +
+      "is stopping work, `never-evaluated` is a condition nobody has checked. Use " +
+      "`gate_status` for the itemised checks behind any one of them.",
+    inputSchema: {
+      state: z
+        .enum(["never-evaluated", "incomplete", "blocked", "satisfied"])
+        .optional()
+        .describe("only gates in this state (default: all of them)"),
+    },
+    outputSchema: gateListSchema,
+    handler: async (read, { state }) => ({ gates: await read.gateList(state) }),
+  }),
+  tool({
+    name: "work_list",
+    title: "List the planned work",
+    description:
+      "Every piece of planned work, with whether anything has been done against it. " +
+      "`planned` is on the books with no analysis and nothing blocking — what is ready to " +
+      "start. `blocked` means a gate protecting it is not satisfied. `carried-out` means " +
+      "an analysis implements it. Not the same question as `gate_list`: a gate reaches only " +
+      "the work it protects, and work planned without one appears nowhere else.",
+    inputSchema: {
+      state: z
+        .enum(["planned", "blocked", "carried-out"])
+        .optional()
+        .describe("only work in this state (default: all of it)"),
+    },
+    outputSchema: workListSchema,
+    handler: async (read, { state }) => ({ work: await read.workList(state) }),
+  }),
   tool({
     name: "known",
     title: "What the programme knows",

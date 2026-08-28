@@ -12,6 +12,8 @@ import type {
   DesignHistory,
   GateRef,
   GateStatus,
+  ListedGate,
+  ListedWork,
   TaskContract,
 } from "../../domain";
 import type { Palette } from "../palette";
@@ -159,4 +161,62 @@ export function renderContract(contract: TaskContract, p: Palette): string {
     p.provisional("Not enforced. The record states what this work may look at; nothing stops"),
     p.provisional("a computation reading elsewhere."),
   ].join("\n");
+}
+
+/**
+ * Every gate, one per line, with its state.
+ *
+ * **The state is padded before it is coloured, and the colour is picked from
+ * the unpadded value.** Both halves earned themselves in `renderGate`: an
+ * escape sequence has length, so colouring first pads bytes nobody can see, and
+ * matching on the padded string means `"blocked  "` matches no case and every
+ * gate comes out the same colour.
+ *
+ * A gate's *consequence* is what a reader is scanning for — `blocked` alone
+ * says something is stuck, and the consequence says what it costs — so it is on
+ * the line rather than a hop away.
+ */
+export function renderGateList(gates: ListedGate[], p: Palette): string {
+  if (gates.length === 0) return "nothing";
+  const width = Math.max(...gates.map((g) => g.state.length));
+  return gates
+    .map((g) => {
+      const padded = g.state.padEnd(width);
+      const state =
+        g.state === "satisfied"
+          ? p.settled(padded)
+          : g.state === "blocked"
+            ? p.contested(padded)
+            : g.state === "never-evaluated"
+              ? p.untested(padded)
+              : p.provisional(padded);
+      return `${state}  ${p.handle(g.gate)}  ${g.consequence}`;
+    })
+    .join("\n");
+}
+
+/**
+ * Every planned piece of work, one per line, with its state.
+ *
+ * The same padding rule as above, for the same reason.
+ *
+ * `planned` is deliberately the *untested* colour rather than a warning one:
+ * work nobody has started is the ordinary state of a queue, not a problem, and
+ * colouring it as one is how a list becomes something people stop reading.
+ */
+export function renderWorkList(work: ListedWork[], p: Palette): string {
+  if (work.length === 0) return "nothing";
+  const width = Math.max(...work.map((w) => w.state.length));
+  return work
+    .map((w) => {
+      const padded = w.state.padEnd(width);
+      const state =
+        w.state === "carried-out"
+          ? p.settled(padded)
+          : w.state === "blocked"
+            ? p.contested(padded)
+            : p.untested(padded);
+      return `${state}  ${p.handle(w.work)}  ${w.objective}`;
+    })
+    .join("\n");
 }

@@ -20,7 +20,7 @@
  */
 
 import type { Command } from "commander";
-import { handle, rebuilt, whole } from "../args";
+import { gateState, handle, rebuilt, whole, workState } from "../args";
 import { answer } from "../output";
 import type { Run } from "../session";
 import type { ClaimRef, EventFilter } from "../../domain";
@@ -32,7 +32,14 @@ import {
   renderConflict,
 } from "../views/knowledge";
 import { renderEnquiry, renderOrigin, renderPursuits } from "../views/enquiry";
-import { renderContract, renderCriteria, renderDesign, renderGate } from "../views/gates";
+import {
+  renderContract,
+  renderCriteria,
+  renderDesign,
+  renderGate,
+  renderGateList,
+  renderWorkList,
+} from "../views/gates";
 import {
   renderAffects,
   renderInterpretation,
@@ -169,6 +176,32 @@ export function registerReads(program: Command, run: Run): void {
     .argument("<enquiry-id>", "e.g. LOE_7", handle("enquiry"))
     .action(async (enquiry) =>
       run(async ({ read }) => answer(await read.enquiryStatus(enquiry), renderEnquiry)),
+    );
+
+  program
+    .command("gates")
+    .summary("every gate and whether it is satisfied")
+    .description(
+      "Where to start with a record you do not know. Every other gate command takes a " +
+        "handle, and until this existed the only way to get one was to already hold a " +
+        "claim. `--state blocked` is what is stopping work.",
+    )
+    .option("--state <state>", "never-evaluated | incomplete | blocked | satisfied")
+    .action(async (opts: { state?: string }) =>
+      run(async ({ read }) => answer(await read.gateList(gateState(opts.state)), renderGateList)),
+    );
+
+  program
+    .command("work")
+    .summary("every planned piece of work and whether anything has been done")
+    .description(
+      "`--state planned` is what is ready to start: on the books, nothing blocking, no " +
+        "analysis against it yet. Not the same question as `gates` — a gate reaches only " +
+        "the work it protects, and work planned without one appears nowhere else.",
+    )
+    .option("--state <state>", "planned | blocked | carried-out")
+    .action(async (opts: { state?: string }) =>
+      run(async ({ read }) => answer(await read.workList(workState(opts.state)), renderWorkList)),
     );
 
   program
