@@ -1,4 +1,4 @@
-# 061: an agent signs before it writes
+# 061: an agent signs before it writes, and a reader is not offered a pen
 
 **Session wrap, 2026-08-28, on `feat/register-session`.** Not a decision record
 — `src/attribution.ts`'s `SessionRegistry` and `src/mcp/server.ts`'s
@@ -6,8 +6,9 @@
 
 ## Goal
 
-Give the MCP server a way to know which agent is on the other end, and refuse
-writes until it does.
+Close out #83: let the MCP server know which agent is on the other end, refuse
+writes until it does, and give a read-only client a tool list with no writes in
+it.
 
 ## Changed
 
@@ -46,7 +47,13 @@ something to attribute to. Open as PR **#88**.
 commit was being written, so pushing to `feat/register-session` would have
 succeeded and reached nothing. Recovered the way the hook says — a branch off
 the new `main`, cherry-picked. Fourth time that failure has been prevented
-rather than found afterwards.
+rather than found afterwards. Merged as `954536a`.
+
+**`214a57b`** — `labkit mcp --read-only`. `buildServer` takes
+`{ readOnly }` and returns early before the session and write loops;
+`serve.ts` grows the flag, with a note on why it does not hit that file's
+standing objection to levers. Open as PR **#89**, closing #86 and completing
+#83.
 
 **Not in the range, because they are not commits:** issues **#83** (parent),
 **#84**, **#85**, **#86** created and linked as GitHub sub-issues, and the E4
@@ -73,16 +80,21 @@ predicted and one was not:
   doc comment and `respond`**. Exactly what that check exists for, and it would
   have shipped.
 
+**`--read-only` was mutation-checked too.** `if (false && readOnly)` turns
+three of its four tests red; the fourth stays green *correctly*, being the
+control that asserts the full list with the flag off. Without that control the
+first test would pass equally against a server that never had write tools —
+which is a different thing from one that withheld them.
+
+One formatting round-trip: biome reflowed the new test block and
+`check:format` caught it before the commit.
+
 **E4, measured separately** against `@modelcontextprotocol/sdk@1.30.0` on bun
 1.4.0, three arms with a positive control: an omitted `sessionIdGenerator` is
 stateless (no `Mcp-Session-Id`, and a reused transport throws); a supplied one
 mints an id and enforces it (400 without, 200 with). Recorded on #81.
 
 ## Open
-
-**#86, `labkit mcp --read-only`.** Independent of this. It *hides* rather than
-refuses, and the distinction is the rule worth keeping: *not yet* refuses and
-names the remedy, *not here* hides because there is no remedy to name.
 
 **`mockSessionContext` is deliberately kept, and the reason is now on the
 declaration.** It reads as vestigial and would be culled on sight — #80's genre
@@ -116,18 +128,16 @@ wants an issue rather than a spike commit. **Unanswered.**
 
 ## Next
 
-**Answer the sharpened E4 question first**, because `labkit-dev-web` is wiring
-the HTTP transport now and the answer changes what it builds: does
-`@modelcontextprotocol/sdk` give a tool handler access to the `Mcp-Session-Id`
-of the client that called it? Read
-`node_modules/@modelcontextprotocol/sdk/dist/esm/server/webStandardStreamableHttp.js`
-and `mcp.js` for what reaches a registered tool's callback.
+`gh pr view 89`. With it merged, **#83 is complete** and there is no queued MCP
+work.
 
-Then `gh pr view 88`, and **#86**, which is small and touches the same registration
-loop in `buildServer` — one flag on the `mcp` subcommand, `main(tenant,
-{ readOnly })`, and a `tools/list` assertion derived from `TOOLS`/`WRITE_TOOLS`
-rather than a hand-written list of names.
+The live thread is `labkit-dev-web`'s HTTP spike, which now has E4b's answer:
+a registry keyed on `extra.sessionId` is the fix, and LabKit does **not** have
+to model an HTTP session itself. The finding has not been posted to #81 yet, on
+purpose — it belongs beside that session's E3 demonstration so the two read as
+one result rather than two.
 
-Decide one thing while there: whether `register_session` is itself visible in
-read-only mode. In a server that cannot write, a registration can never affect
-an event, so a visible tool is one whose effect is unobservable.
+If picking up something in this repo instead: **#55** (an agent that does not
+know an identifier cannot orient) is what #66's enumeration verbs were for, and
+#66 is decided and unbuilt — two verbs, `gateList(state)` and
+`workList(state)`, with the work-state enum the only thing still open.
