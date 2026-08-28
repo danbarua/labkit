@@ -558,10 +558,28 @@ Renaming it out of the namespace deleted the exclusion rather than documenting
 it. When a derived list needs a hand-written exception, check whether the thing
 being excepted is misnamed before writing the exception down.
 
-**The sweep does not run everything, and the one absence has a reason.**
-`bun run example` is for reading rather than checking. It was two until the
-concurrency probe was deleted; a second omission needs its own reason rather
-than joining a habit.
+**The sweep does not run everything, and each absence has its own reason.**
+`bun run example` is for reading rather than checking.
+
+`bun run probe:dogfood` is the second, and it is back in the namespace this
+paragraph said was empty. It loads one slice of this repository's own recursive
+work into a record and asks #56's question — *what should I investigate next,
+and why* — using only LabKit. Three of the four parts answer; the fourth cannot,
+because a `Task` hangs off nothing but a gate, and the interesting outcome is
+therefore a thing the tool **declines to do**. No exit code expresses that,
+which is what `probe:` means and why it is not a `check:`.
+
+It exists because its first run did not. That run happened, found the gap, and
+was deleted along with its record — so repeating it meant rebuilding it from an
+issue comment, which makes a measurement an anecdote. The gap it reports is
+expected to close if a task ever names the question it serves; this is what
+would show that, and nothing else would.
+
+**Nothing runs it, so it can rot**, exactly as `examples/full-lifecycle.ts` did
+for 221 commits. The difference is that it drives the CLI and nothing else, so a
+verb it calls disappearing is a non-zero exit rather than a silent wrong answer
+— and unlike that script, it is not cited anywhere as evidence that something
+works.
 
 **A check announces `OK:` or `FAILED:` and does not repeat its own name** —
 `bun run check` already said which one is running. `FAILED:` means the check ran
