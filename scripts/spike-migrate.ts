@@ -31,6 +31,43 @@ if (!url) {
   process.exit(2);
 }
 
+/**
+ * Creates the database if it is not there yet.
+ *
+ * **Here rather than in `docker/postgres/initdb/`, and that is the image's rule
+ * holding rather than being worked around.** That image may add only what a
+ * developer would otherwise type by hand and *nothing LabKit depends on* — the
+ * line `tests/tenancy-isolation.test.ts` and `bun run test:pg` against the raw
+ * upstream image exist to hold. The spike's server genuinely depends on this
+ * database, so putting it there would make the image a dependency and quietly
+ * retire that guarantee.
+ *
+ * A deploy step creating the database it is about to migrate is ordinary, and
+ * this is the deploy step. `CREATE DATABASE` cannot run inside a transaction
+ * and takes no parameter, so the name is interpolated — from a URL the operator
+ * supplied to their own server, checked against the identifier shape first
+ * because interpolating into SQL is the pattern the rest of this repo removed.
+ */
+async function ensureDatabase(target: string): Promise<void> {
+  const name = new URL(target).pathname.slice(1);
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) {
+    throw new Error(`spike-migrate: refusing an unusual database name: ${name}`);
+  }
+  const admin = new Client({ connectionString: new URL("/postgres", target).toString() });
+  await admin.connect();
+  try {
+    const { rows } = await admin.query("SELECT 1 FROM pg_database WHERE datname = $1", [name]);
+    if (rows.length === 0) {
+      await admin.query(`CREATE DATABASE ${name}`);
+      console.error(`spike-migrate: created database ${name}`);
+    }
+  } finally {
+    await admin.end();
+  }
+}
+
+await ensureDatabase(url);
+
 const client = new Client({ connectionString: url });
 await client.connect();
 try {
