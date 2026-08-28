@@ -20,6 +20,28 @@ services:
       timeout: 3s
       retries: 30
 
+  # The out-of-band deploy step, run once before any server starts.
+  #
+  # `directPostgresBackend` does not migrate on connect (PJ-004): N processes
+  # connecting concurrently with nothing serialising them would race. A service
+  # that runs to completion, with the servers waiting on
+  # `service_completed_successfully`, is that serialisation. Idempotent, so
+  # bringing the stack up again costs one no-op.
+  #
+  # In both profiles, because both need it and neither should own it.
+  migrate:
+    profiles: ["spike", "pooler"]
+    build:
+      context: .
+      dockerfile: docker/webapp/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - LABKIT_DB_URL=postgres://postgres:agens@db:5432/labkit_spike
+    command: ["bun", "scripts/spike-migrate.ts"]
+    restart: "no"
+
   # The MCP tools over HTTP, for the spike. **Behind a profile**, so
   # `docker compose up -d db` and `bun run test:pg` cannot start it by accident
   # — `scripts/test-postgres.sh` names `db` explicitly at every call site, and
@@ -41,10 +63,79 @@ services:
       context: .
       dockerfile: docker/webapp/Dockerfile
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       - LABKIT_DB_URL=postgres://postgres:agens@db:5432/labkit_spike
       - LABKIT_TENANT=labkit
     ports:
       - 8899:8899
+
+  # PgBouncer in **transaction** pooling mode, for one experiment.
+  #
+  # `src/db/scoped.ts` pins the tenant with `set_config(..., false)` and steps
+  # down with `SET ROLE` — both **session**-scoped, on the stated premise that
+  # "production resolves exactly one tenant per process, at assembly, and never
+  # again". Transaction pooling is what breaks that premise: each transaction
+  # may land on a different backend, and `scopeToTenant` runs *outside* any
+  # transaction while every verb opens its own.
+  #
+  # `default_pool_size=1` on purpose: one shared backend makes the interleaving
+  # deterministic rather than racy. Its own profile, so `spike:web` and
+  # `test:pg` cannot start it.
+  pgbouncer:
+    profiles: ["pooler"]
+    image: edoburu/pgbouncer:v1.23.1-p2
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=agens
+      # The variable under test. `transaction` is the arm; `session` is the
+      # control, and is what anyone would actually deploy.
+      - POOL_MODE=${LABKIT_POOL_MODE:-transaction}
+      - MAX_CLIENT_CONN=100
+      - DEFAULT_POOL_SIZE=1
+      - AUTH_TYPE=scram-sha-256
+      - ADMIN_USERS=postgres
+    ports:
+      - 6432:5432
+
+  # Two servers, two tenants, one pooler. Two are needed because a tenant is
+  # per process (measured: PR #91's finding 2), so "client A saw tenant B's
+  # rows" is unobservable with one.
+  web-alpha:
+    profiles: ["pooler"]
+    build:
+      context: .
+      dockerfile: docker/webapp/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_started
+    environment:
+      # `LABKIT_PG_HOST=db` is the no-pooler control.
+      - LABKIT_DB_URL=postgres://postgres:agens@${LABKIT_PG_HOST:-pgbouncer}:5432/labkit_spike
+      - LABKIT_TENANT=alpha
+    ports:
+      - 8901:8899
+
+  web-beta:
+    profiles: ["pooler"]
+    build:
+      context: .
+      dockerfile: docker/webapp/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_started
+    environment:
+      - LABKIT_DB_URL=postgres://postgres:agens@${LABKIT_PG_HOST:-pgbouncer}:5432/labkit_spike
+      - LABKIT_TENANT=beta
+    ports:
+      - 8902:8899
