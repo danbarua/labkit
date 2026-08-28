@@ -1,0 +1,14 @@
+-- lock-strategy: online
+--
+-- A nullable `ADD COLUMN` with no default. Postgres 11+ takes only an
+-- ACCESS EXCLUSIVE lock long enough to update the catalogue -- no table
+-- rewrite, no backfill, no scan -- so this is safe on a live table.
+--
+-- **Deliberately no DEFAULT, and that is the interesting half.** Every
+-- candidate default asserts something false about the rows already there:
+-- `'claimed'` invents an assertion nobody made, and `'unattributed'`
+-- contradicts the populated actor name sitting in the next column. NULL says
+-- the true thing -- *recorded before LabKit knew how it knew* -- and it is a
+-- value only this migration can produce, because the write side's
+-- `attribution_how` is required and a writer omitting it does not compile.
+ALTER TABLE "labkit_event" ADD COLUMN "attribution_how" text;

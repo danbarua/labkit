@@ -39,7 +39,13 @@
 import { spawnSync } from "node:child_process";
 import { userInfo } from "node:os";
 
-import { type AttributionContext, type Clock, type CommandContext, systemClock } from "./domain";
+import {
+  type AttributionContext,
+  type AttributionHow,
+  type Clock,
+  type CommandContext,
+  systemClock,
+} from "./domain";
 
 /** The commit a command ran against. */
 export interface GitContextProvider {
@@ -59,6 +65,21 @@ export interface SessionContextProvider {
   label(): string;
   /** Stable, for comparing two events. Never shown in place of the label. */
   id(): string;
+  /**
+   * How this provider came by the name it returns.
+   *
+   * **On the provider, not on the field, and that is the whole design.** #81
+   * spent a while proposing `Observed<string>` / `Claimed<string>` type aliases
+   * before noticing they cannot work: every member of the string taxonomy is
+   * erased before anything runs, so a brand never reaches an event row and no
+   * reader can ever act on it. The grade is a fact about *who answered*, and
+   * the thing that knows is the answerer.
+   *
+   * It is a method rather than a constant because one provider's grade depends
+   * on how it was built — {@link personContext} is `observed` when it reads the
+   * operating system and `claimed` under `--author`, from one implementation.
+   */
+  how(): AttributionHow;
 }
 
 /**
@@ -100,6 +121,12 @@ export const mockGitContext: GitContextProvider = {
 export const mockSessionContext: SessionContextProvider = {
   label: () => "mock-session",
   id: () => "mock-session-0",
+  // **`claimed`, not a fourth grade.** Nothing observed anything, and the
+  // harness asserted a name LabKit stored without checking -- which is exactly
+  // what `claimed` says. That it is a *stub* is a fact about how good the
+  // assertion is, and the grade does not rank assertions, it says where they
+  // came from.
+  how: () => "claimed",
 };
 
 /**
@@ -164,7 +191,13 @@ export function personContext(override?: string): SessionContextProvider {
         return process.env.USER ?? "unknown";
       }
     })();
-  return { label: () => who, id: () => who };
+  // **The grade is decided here, at construction, from how `who` was reached.**
+  // With an override a caller asserted a name and nothing checked it — true
+  // even when it happens to match the OS user, which is exactly the case that
+  // earned this field: `labkit --author dan` and `labkit` on dan's machine
+  // wrote byte-identical events, and only one of them had looked at anything.
+  const how: AttributionHow = override === undefined ? "observed" : "claimed";
+  return { label: () => who, id: () => who, how: () => how };
 }
 
 /**
@@ -233,6 +266,12 @@ export function registeredSession(registry: SessionRegistry): SessionContextProv
   return {
     label: () => registry.registered()?.label ?? mockSessionContext.label(),
     id: () => registry.registered()?.id ?? mockSessionContext.id(),
+    // **`claimed` either way, and there is no branch here on purpose.** A
+    // registered agent asserted its own id and LabKit stored it unchecked; the
+    // fallback is the harness asserting a stub. Both are assertions, and the
+    // grade says where a value came from rather than how much it is worth — a
+    // branch would imply the registered one had been verified.
+    how: () => "claimed",
   };
 }
 
@@ -253,6 +292,7 @@ export function commandContext(
   const attribution: AttributionContext = {
     attribution_label: session.label(),
     attribution_id: session.id(),
+    attribution_how: session.how(),
     git_hash: git.head(),
   };
   return { clock, attribution };

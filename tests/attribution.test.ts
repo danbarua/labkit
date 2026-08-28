@@ -52,7 +52,11 @@ const clock: Clock = { now: () => "2026-08-24T09:00:00.000Z" };
 const agent = (label: string, id: string, head: string): AttributionContext =>
   commandContext(
     { head: () => head } satisfies GitContextProvider,
-    { label: () => label, id: () => id } satisfies SessionContextProvider,
+    {
+      label: () => label,
+      id: () => id,
+      how: () => "claimed",
+    } satisfies SessionContextProvider,
     clock,
   ).attribution;
 

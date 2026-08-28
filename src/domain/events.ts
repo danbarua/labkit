@@ -73,8 +73,65 @@ export const systemClock: Clock = {
 export interface AttributionContext {
   attribution_label: string;
   attribution_id: string;
+  /**
+   * Required, not optional, and required on the **write** side specifically.
+   *
+   * A writer that could omit this would be a writer whose grade nobody
+   * recorded, which is the state this field exists to end. The read side is
+   * where `null` is possible — see `DomainEvent`, and the column comment in
+   * `src/db/schema.ts` for the one thing that produces it.
+   */
+  attribution_how: AttributionHow;
   git_hash: string;
 }
+
+/**
+ * How LabKit came by the actor's name — the grade of the claim, not the claim.
+ *
+ * **The record could not tell an observation from an assertion**, and that is
+ * what this exists for. Measured on `main` at `427fa7f`: `labkit pose` and
+ * `labkit --author dan pose` wrote **byte-identical** attribution, one read off
+ * the operating system and one taken from whoever typed it. The field was
+ * populated and uniform while the underlying facts differed, so a reader
+ * trusting both equally was misled about exactly one and could not tell which.
+ *
+ * That is not an *empty* answer, which is the distinction PJ-011 §5 turns on: a
+ * missing feature manufactures an empty result, and only a confidently wrong
+ * one shows the model claiming something it cannot support.
+ *
+ * | | means | producers |
+ * | --- | --- | --- |
+ * | `observed` | this process looked | `personContext()` with no override, reading the OS |
+ * | `claimed` | a caller asserted it and LabKit stored it | `--author`, `register_session`, the MCP stub |
+ * | `unattributed` | positively nobody — this ran unclaimed | {@link UNATTRIBUTED} |
+ *
+ * **Three values because three have producers.** `corroborated` — a party that
+ * is not the caller vouching for the id — is the grade the `agent-bus whoami`
+ * handshake would write, and it arrives with the code that writes it.
+ * `no_handshake` is a real distinction and has no producer while the MCP write
+ * gate refuses an unregistered write at all. Both are named on #81 and neither
+ * is declared: a value nothing writes is one whose absence a reader cannot
+ * interpret.
+ *
+ * **This is not authentication and grading it does not make it so.** A
+ * `claimed` id is still whatever the caller said. What the grade buys is a
+ * *precise* weak claim in place of a vague one — a dashboard can stop merging
+ * "the OS said so" with "a script asserted this", which is a merge #81 warned
+ * about before it had a name for it.
+ */
+export type AttributionHow = "observed" | "claimed" | "unattributed";
+
+/**
+ * Attribution as it comes back out of the store.
+ *
+ * Identical to {@link AttributionContext} but for the grade, which may be
+ * `null` for a row written before 2026-08-28. Splitting the type is what stops
+ * that `null` leaking backwards into the writers: if one type served both, a
+ * writer could omit the grade and the field would mean nothing again.
+ */
+export type RecordedAttribution = Omit<AttributionContext, "attribution_how"> & {
+  attribution_how: AttributionHow | null;
+};
 
 /**
  * What a command executes in.
@@ -109,6 +166,10 @@ export interface CommandContext {
 export const UNATTRIBUTED: AttributionContext = {
   attribution_label: "unattributed",
   attribution_id: "",
+  // The grade is its own value rather than an absence, for the reason the
+  // label is: *this ran unattributed* is a positive statement, and a reader
+  // meeting an empty field cannot tell it from one nobody filled in.
+  attribution_how: "unattributed",
   git_hash: "",
 };
 
@@ -174,8 +235,14 @@ export interface DomainEvent {
    * `WriteSurface.emit` is the only caller of `record`, so a required field
    * means the type system — not a convention — is what stops an event reaching
    * the sink without saying who caused it.
+   *
+   * **`attribution_how` is nullable here and required on the write side**, and
+   * the two are not the same type by accident. A writer that could omit the
+   * grade is the state the field exists to end; a *reader* meets rows written
+   * before the column existed, whose grade is genuinely unknown. `null` says
+   * that and nothing else — see the column comment in `src/db/schema.ts`.
    */
-  attribution: AttributionContext;
+  attribution: RecordedAttribution;
   operation: Operation;
   subject: string;
   /**

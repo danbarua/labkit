@@ -333,6 +333,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         created: [...(e.created ?? [])],
         attribution_label: e.attribution.attribution_label,
         attribution_id: e.attribution.attribution_id,
+        attribution_how: e.attribution.attribution_how,
         git_hash: e.attribution.git_hash,
         detail: e.detail ?? null,
       })),

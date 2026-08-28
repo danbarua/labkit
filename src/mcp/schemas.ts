@@ -127,6 +127,12 @@ export const whatHappenedSchema = z.strictObject({
       created: z.array(z.string()),
       attribution_label: z.string(),
       attribution_id: z.string(),
+      // **`.nullable()`, never `.optional()`.** The `Exact<>` gate at the
+      // bottom of this file has one measured hole -- a schema that DROPS an
+      // optional field is still assignable both ways -- so an optional grade
+      // would sail past both the compile check and the strictObject parse test,
+      // which is the exact shape this field exists to stop.
+      attribution_how: z.enum(["observed", "claimed", "unattributed"]).nullable(),
       git_hash: z.string(),
       detail: z.record(z.string(), z.unknown()).nullable(),
     }),
