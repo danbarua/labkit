@@ -464,14 +464,24 @@ about the pipe, not about that incident.
 
 **CI runs the gates on pull requests to `main`, and nothing else runs them for
 you** — there is no git hook, and a commit that is not in a PR is checked by
-whoever typed it. `cloudbuild.test.yaml` runs `bun run check` and
-`bun run test:pg` on Google Cloud Build; `infra/ci/` is the terraform, and its
-README carries the one step terraform cannot do (connecting the repo to Cloud
-Build, in the console, in the same region).
+whoever typed it. `cloudbuild.test.yaml` runs `bun run check` on Google Cloud
+Build; `infra/ci/` is the terraform, and its README carries the one step
+terraform cannot do (connecting the repo to Cloud Build, in the console, in the
+same region).
 
-**`test:pg` is why CI exists.** `bun run check` is a command anyone can type;
-`test:pg` needs a container, is excluded from the sweep deliberately, and had no
-watcher at all until the trigger existed.
+**`test:pg` runs on a second trigger, not on every pull request** — on changes
+to `src/db/**` and `drizzle/**`, and on every merge to main
+(`cloudbuild.pg.yaml`, split out 2026-08-28). It needs a container and is
+excluded from the sweep deliberately, so it still has no watcher but CI; what
+changed is *when*. The argument is in that file: measured 2026-08-28, the suite
+has exactly one `skipIf` and it skips **on** Postgres, so no test requires a
+real Postgres — the arm is a disagreeing measurement between two decoders
+rather than extra coverage, and ~153s of a ~394s build was buying it on pull
+requests that could not affect it.
+
+**A red `main` from that arm cannot be fixed by pushing to the merged branch**
+— that push succeeds and reaches nothing, which `.githooks/pre-push` exists to
+refuse. It means a fresh PR.
 
 ### The check sweep
 
@@ -1382,13 +1392,25 @@ git, the Postgres wiring. The *speed* half it only approximates: a shared-core
 (`docker-compose.yml`'s `apache/age:release_PG18_1.7.0`) by setting
 `LABKIT_DB_URL` — the same variable production reads. It is `test:` and not
 `check:` on purpose: `bun run check` derives its list from the `check:` prefix
-and must not need docker. **Nothing runs it for you.**
+and must not need docker. **Locally, nothing runs it for you**; in CI it runs on
+`src/db/**` and `drizzle/**` changes and on every merge to main.
 
-It is not decoration. It is the only backend on which **two connections can be
-live at once**, so anything about isolation, a session-scoped role or tenant, or
-advisory locking under contention can only be *demonstrated* there. It is also a
-disagreeing measurement — a `pg.Client` and a raw PGlite do not decode
-identically, and a suite that only sees one of them cannot notice.
+**What it is, stated narrowly: a disagreeing measurement.** A `pg.Client` and a
+raw PGlite do not decode identically, and a suite that only sees one of them
+cannot notice when they diverge.
+
+**What it is not, yet, is coverage** — and the distinction was measured on
+2026-08-28 rather than assumed. The suite has exactly one `skipIf`
+(`tests/connection-lock.test.ts`) and it skips **on** Postgres, its subject
+being the PGlite lockfile; `tests/tenancy-isolation.test.ts` runs on both, with
+`LABKIT_DB_URL` deciding only which. So **no test requires a real Postgres**.
+
+This paragraph used to say it was "the only backend on which two connections
+can be live at once, so anything about isolation, a session-scoped role or
+tenant, or advisory locking under contention can only be *demonstrated* there".
+The capability is real and nothing uses it. When a test does need two live
+connections it belongs in the Postgres arm, and this becomes coverage — say so
+then, rather than leaving a sentence that describes what the arm could do.
 
 First run, 2026-08-26: **360 pass, 4 skip, 0 fail, 56s**, against 364/0/52s on
 PGlite. The four skips are `tests/connection-lock.test.ts`, whose subject is the
