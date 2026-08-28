@@ -295,22 +295,21 @@ queue. It replaced `docs/TASKS.md` on 2026-08-27, which is the sixth principle
 applied to itself: a queue is state, a markdown file is prose, and keeping the
 two in step was a job nobody had.
 
-Six labels, one per section that file had grown:
+**`gh label list` is the label list**, and every label carries its own
+description saying what it holds. There was a table here until 2026-08-28 and it
+is the sixth principle's own example: it announced *"six labels"* above **eight**
+rows, had been wrong about its own row count since the day it was written, and
+went on naming `suite-margin` after that label was deleted and its issues moved
+to `tooling`. `gh label list` was right throughout, for free.
 
-| label | what it holds |
-| --- | --- |
-| `documents` | prose that has to stay true — this file, the journal, comments |
-| `suite-margin` | the suite's headroom, and the checks around it |
-| `agent-surface` | what an agent or researcher can reach through the tools |
-| `tooling` | scaffolding; necessary, and nothing there ships |
-| `not-doing` | decided against, and **closed as not planned** — searchable so nobody rediscovers it as a gap, without sitting in the open list |
-| `deferred` | understood and parked; the body says what would unpark it |
-| `open question` | a decision for the repo owner, not a defect to repair |
-| `domain model` | a claim about what the model must represent |
+Two conventions do not live in a label description, because they are about what
+you do rather than what the label means:
 
-A `deferred` issue names the issue that would unpark it rather than carrying its
-own copy of the condition — today that is the multi-tenancy issue, which exists
-for no other purpose.
+- A `not-doing` issue is **closed as not planned** — searchable so nobody
+  rediscovers it as a gap, without sitting in the open list.
+- A `deferred` issue names the issue that would unpark it rather than carrying
+  its own copy of the condition — today that is the multi-tenancy issue, which
+  exists for no other purpose.
 
 **An `open question` issue follows one shape**, borrowed from `agent-bus`: what
 it blocks and who owns it, what is **settled**, what is **undecided and what
