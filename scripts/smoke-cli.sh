@@ -208,6 +208,18 @@ refute "not as its first part" "$log" " pose "
 refute "nor its second" "$log" " pursue "
 expect "attribution names the script, not the account it ran under" "$log" "full-lifecycle.sh"
 
+# **The grade, which is the thing `--author` used to make invisible.** Every
+# `lab` call above passes `--author`, so every one of them is an assertion
+# nobody checked. This one does not, so the OS answers -- and before
+# 2026-08-28 the two were byte-identical in the record, which is what earned
+# the field.
+bare() { bun "$root/src/cli/cli.ts" --db "$db" "$@"; }
+bare pose 'written with no --author, so the OS answered' >/dev/null
+graded=$(lab happened)
+expect "an asserted actor is marked claimed" "$graded" "(claimed)"
+refute "an observed one is not marked, being the ordinary case" \
+  "$(bare happened | grep 'the OS answered' -A1 || true)" "(claimed)"
+
 # A handle appears in `created`, not only as a subject: six verbs mint a
 # Decision and only one names it as what the act was about.
 expect "an act is findable by what it minted" "$(lab happened "$claim")" "recordAnalysis"

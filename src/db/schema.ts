@@ -185,6 +185,25 @@ export const labkitEvents = p
       created: p.text().array().notNull().default([]),
       attribution_label: p.text().notNull(),
       attribution_id: p.text().notNull(),
+      /**
+       * How LabKit came by the name beside it — `observed`, `claimed` or
+       * `unattributed`. See `AttributionHow` in `src/domain/events.ts` for what
+       * each means and why there are three.
+       *
+       * **Nullable, and `null` is the one thing this column says that the enum
+       * cannot.** A row written before 2026-08-28 has an actor and no recorded
+       * grade, and every alternative to `null` asserts something false about
+       * it: a default of `claimed` invents an assertion nobody made, and
+       * `unattributed` contradicts the populated name sitting next to it. So
+       * `null` means **recorded before LabKit knew how it knew** — a value the
+       * migration itself produces, which is what keeps it from being a state
+       * with no writer.
+       *
+       * The write side cannot reach it: `AttributionContext.attribution_how` is
+       * required, so a writer that omitted the grade would not compile. Only
+       * history is null, and only ever history.
+       */
+      attribution_how: p.text(),
       git_hash: p.text().notNull(),
       detail: p.jsonb(),
     },

@@ -408,6 +408,7 @@ test("an empty event log does not read as an empty record", () => {
       attribution: {
         attribution_label: "claude-opus-5",
         attribution_id: "sess_1",
+        attribution_how: "claimed",
         git_hash: "0123456789abcdef",
       },
       operation: "recordAnalysis",

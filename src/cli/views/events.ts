@@ -28,6 +28,19 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
   return events
     .map((e) => {
       const who = e.attribution.attribution_label || "unattributed";
+      // **How the name was come by, printed beside it.** `labkit happened` is
+      // the command the grade exists for: it is where `--author dan` and a bare
+      // `labkit` on dan's machine used to be indistinguishable. `observed` is
+      // left silent because it is the ordinary case and a mark on every line
+      // marks nothing; what a reader needs to see is the line that was merely
+      // asserted. `null` is a row written before the grade existed and says so
+      // rather than being guessed at.
+      const how =
+        e.attribution.attribution_how === "claimed"
+          ? p.quiet(" (claimed)")
+          : e.attribution.attribution_how === null
+            ? p.quiet(" (grade not recorded)")
+            : "";
       // Short hash, because the full forty characters push the line past a
       // terminal and the first eight are what anybody types back into `git`.
       const commit = e.attribution.git_hash ? ` @${e.attribution.git_hash.slice(0, 8)}` : "";
@@ -36,7 +49,7 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
         : "";
       return [
         `${p.quiet(String(e.seq ?? 0).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${p.handle(e.subject)}`,
-        `         ${p.quiet(`by ${who}${commit}`)}${minted}`,
+        `         ${p.quiet(`by ${who}`)}${how}${p.quiet(commit)}${minted}`,
       ].join("\n");
     })
     .join("\n");

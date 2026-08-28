@@ -10,6 +10,7 @@ export { systemClock, inMemoryEventLog, UNATTRIBUTED } from "./events";
 export type {
   Clock,
   AttributionContext,
+  AttributionHow,
   CommandContext,
   DomainEvent,
   EventFilter,

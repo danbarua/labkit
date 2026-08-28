@@ -30,15 +30,19 @@ import { and, arrayContains, asc, eq, gt, or } from "drizzle-orm";
 import type { LabKitDB } from "../db/backend";
 import { ormOver, unwrapped } from "../db/orm";
 import { labkitEvents } from "../db/schema";
-import type { AttributionContext, DomainEvent, EventFilter, EventSink, Operation } from "./events";
+import type { RecordedAttribution, DomainEvent, EventFilter, EventSink, Operation } from "./events";
 
 /** The row shape, as drizzle hands it back — derived from the table, not restated. */
 type EventRow = typeof labkitEvents.$inferSelect;
 
 const toEvent = (r: EventRow): DomainEvent => {
-  const attribution: AttributionContext = {
+  const attribution: RecordedAttribution = {
     attribution_label: r.attribution_label,
     attribution_id: r.attribution_id,
+    // Read back as-is, including `null`. The column is nullable for exactly
+    // one population -- rows written before the grade existed -- and coercing
+    // that to a value here would invent the fact the column exists to record.
+    attribution_how: r.attribution_how as RecordedAttribution["attribution_how"],
     git_hash: r.git_hash,
   };
   return {
@@ -120,6 +124,7 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
           created: [...(event.created ?? [])],
           attribution_label: event.attribution.attribution_label,
           attribution_id: event.attribution.attribution_id,
+          attribution_how: event.attribution.attribution_how,
           git_hash: event.attribution.git_hash,
           // `jsonb` takes the value, not a string: the driver serialises it.
           // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded

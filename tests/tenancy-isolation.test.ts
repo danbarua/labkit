@@ -68,6 +68,7 @@ const anEvent = (subject: string): DomainEvent => ({
   attribution: {
     attribution_label: "rls-probe",
     attribution_id: "rls",
+    attribution_how: "claimed",
     git_hash: "0000000",
   },
 });
