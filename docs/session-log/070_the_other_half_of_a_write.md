@@ -67,6 +67,10 @@ S-5   Contradiction or dissociation?        7 steps  19 nodes  26 edges
 S-11  The analysis was wrong                5 steps  16 nodes  23 edges
 ```
 
+**`2a21524`** — `sharpenQuestion` and `amendLockedDesign` complete the set at
+sixteen fragments, reaching all eighteen write verbs; thirteen compositions,
+one per distinct scenario shape.
+
 Working tree clean. All of the above open as PR **#110**.
 
 **The range is far wider than this session.** Everything in it except the shas
@@ -168,11 +172,37 @@ picture and cannot tell what is missing. The 13-vs-12 step difference is honest
 by contrast — the mockup showed `gates --state blocked`, and a read writes no
 event.
 
-**Step 2 of the plan is now built; steps 3–4 are not**
-(`~/.claude/plans/async-napping-quiche.md`): the mockup consuming traces
-instead of hand-written `add: {nodes, edges}`, and the agent-authoring prompt
-that falls out of it. The mockup swap is now a data change rather than a
-rewrite.
+**The domain refused a composition and was right.** S-10 first tried to
+re-verify `"the coefficient is 0.61"` against an analysis that concluded 0.63:
+
+```
+analysis COMP_1 concluded nothing about "the coefficient is 0.61";
+there is nothing to re-verify
+```
+
+A re-verification re-checks the claim that was *made*. The error named the
+analysis and the proposition, so it cost one read — and the fix is the
+scenario's own point: the re-run answers the same question and gets a different
+number, which is not a reproduction.
+
+**The mockup is derived now, and one thing had to be removed rather than
+faked.** It used to colour nodes by *state* — settled, contested, provisional —
+turning them amber when a check failed. **A write-trace cannot carry that.**
+The event log records what each act wrote; whether a claim is currently
+contested is a computed answer from `whySupported`, and no number of writes
+adds up to it without issuing the read. Colour now groups by **family** and the
+legend says so.
+
+That is the boundary derivation exposes, and it is worth more than the feature
+lost: *the trace is what happened; the state is a question you have to ask.*
+Anyone wanting state back needs reads in the trace, which is a different thing
+from what was built here.
+
+**Step 3 of the plan is now built; step 4 is not**
+(`~/.claude/plans/async-napping-quiche.md`): the agent-authoring prompt that
+falls out of the decomposition. An agent writing a new scenario picks fragments
+and never names a node or edge label, which is PJ-008 §2's lint rule holding by
+construction — `fragments/compositions.ts`'s header carries that argument.
 
 **And the composability question was answered "no" for the suite**, which is the
 part most likely to be re-litigated. `openScenario().begin()` hands back an
@@ -183,14 +213,13 @@ fixtures.
 
 ## Next
 
-```sh
-bun scripts/build-traces.ts --out /tmp/traces
-```
+The authoring prompt. A composition is already the shape an agent would write,
+so the prompt is mostly: *pick moves from `fragments/`, name nothing else, and
+run `bun scripts/build-traces.ts` — the graph is not yours to write.*
 
-Then point the LabKit Explorer's `SCENARIOS` at those files instead of its
-hand-written `add: {nodes, edges}`. The measurement above says what that
-recovers: 39% more edges on the one scenario checked, and no invented ones to
-remove.
+```sh
+bun scripts/build-traces.ts --out /tmp/traces   # thirteen traces
+```
 
 `~/.claude/plans/async-napping-quiche.md` should be read against `fragments/`
 rather than followed from here — the plan predates the decomposition and its
