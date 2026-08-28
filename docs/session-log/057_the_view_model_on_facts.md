@@ -430,3 +430,37 @@ nothing, which is the test for whether the pointer was load-bearing.
 `CLAUDE.md`'s mention stays: past tense, and it records the replacement.
 
 `bun run check` — **19/19**. PR **#74**.
+
+### `24379f9` — culling merged branches found an orphaned entry
+
+Fourteen stale remote branches deleted, leaving `main` and the recovery branch.
+Six were `docs/*` and eight `feat/`/`fix/`; `git merge-base --is-ancestor` called
+all fourteen **unmerged**, and that reading was wrong for every one — a squash
+merge takes the branch as it stood and leaves no ancestry, which is the same
+blind spot `.githooks/pre-push` exists for.
+
+`docs/digest-status` is the one worth naming: it had **no PR at all**, having
+been merged by hand, so the hook would not have protected it either. Its content
+was verified by comparing files rather than subjects — `docs/digest-design.md`
+byte-identical to `main`'s.
+
+**The find: `main`'s session log had a gap at 054 → 056.** Entry **055** was
+written on `feat/survey-consults-checks`, which closed unmerged as PR #69 once
+#72 superseded its work. Every other file on that branch reached `main` by
+another route — the S-19 scenario, `read.ts`, `report.ts`, the glossary, the
+ledger — and the wrap entry did not. Deleting the branch would have taken the
+only copy, **silently**; the gap in the numbering is the only thing that showed
+it. Third time a squash has eaten a session-log entry, after the two #40
+restored.
+
+Restored verbatim on PR **#75**, `checksMetFor` account included. A session log
+is a dated record and says what was true on 2026-08-27.
+
+**Checked rather than assumed before deleting the two closed-unmerged
+branches.** #34's work is genuinely superseded by #35, and `main`'s entry 046
+says so itself — it names PR #34 as *"to be closed unmerged"* and explains it
+merged the two write-ups rather than describing one surface twice. The README
+defect is gone: `main` wires `"command": "labkit"` with `LABKIT_HOME` and has no
+`--cwd`.
+
+One correction to the record: #69's prose was imported into **#72**, not #74.
