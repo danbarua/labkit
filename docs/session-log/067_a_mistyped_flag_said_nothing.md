@@ -1,11 +1,16 @@
-# 066: a mistyped flag said nothing and made a database
+# 067: a mistyped flag said nothing and made a database
 
-**Session wrap, 2026-08-28, on `fix/enum-flag-typos-say-so`.** Not a decision
-record — each finding's reasoning is in the commit and PR #100.
+**Session wrap, 2026-08-28, on `fix/enum-flag-typos-say-so` then
+`chore/board-triage-as-a-script`.** Not a decision record — each finding's
+reasoning is in its commit and PR.
 
-**Only `72ea99a` is this session's.** Everything else between the baseline and
-HEAD is a peer merge (#82 through #96), with entries 064 and 065 covering the
-most recent.
+**Renumbered from 066.** A peer's entry took that number via #99 while this was
+in flight and merged first, so this one moves — the collision SKILL.md
+anticipates, resolved the way it says.
+
+**This session's commits are `72ea99a` and `d3365e4`**, plus this entry's own.
+Everything else between the baseline and HEAD is a peer merge (#82 onward),
+with entries 064, 065 and the other 066 covering the most recent.
 
 ## Goal
 
@@ -50,21 +55,39 @@ of the coercion the fix moved. Now covered over every state the fixture
 produces, with a length assertion so a filter returning `[]` cannot pass by
 agreeing with an empty expectation.
 
-**The backlog was read and ranked; nothing was changed on the board.** The
-finding worth keeping: **8 of 17 open issues cannot be started** — four are
+**The backlog is ranked and the board now says so.** The finding worth
+keeping: **8 of 17 open issues cannot be started** — four are
 `domain model` + `open question`, which CLAUDE.md defines as *defined and
 tracked, not ready to work on*; two are `deferred` behind #49; two wait on a
 Drizzle and a bun release. The labels already say this and the board's single
 Todo/In-progress/Done axis hides it. Recommended filtering the view by label
 rather than adding a Parked status, so nothing new can drift.
 
-Ranked for what is workable: **#57** (in progress; the hook that refuses a push
-to a squash-merged branch, which has eaten work three times), **#95** (a green
-`/healthz` describing another worktree's process), **#50** (the guard-comment
-sweep — 30 measured candidates, and four instances of the class turned up in
-two repos this week), then **#55** — which may be closeable now that #93 shipped
-the enumerations.
+Applied as 8 Todo, 2 Blocked, 6 Parked, 1 Done. **#57 closed** (by #99) while
+this was being written, so the top of Todo is **#95** — a green `/healthz`
+answering from another worktree's process — then **#50** (the guard-comment
+sweep, 30 measured candidates) and **#55**, which may be closeable now that #93
+shipped the enumerations.
+
+**`d3365e4` — the triage as a script, not a session.** PR #101, borrowed from
+`exo-ledger`'s PR #60. The first version of this triage was done by hand and
+thrown away, so the ranking survived only in this entry; `bun run board:status`
+is idempotent and checked in. Two changes from theirs, both refusals: an
+unlisted item is an error rather than defaulting to a backlog column, and an
+empty listing is an error rather than a loop that runs zero times and exits 0.
+Both were made red on purpose before being trusted.
+
+**A board hazard worth carrying.** `updateProjectV2Field` **replaces the entire
+option set** — adding `Blocked` and `Parked` cleared the Status of all
+seventeen items and regenerated every option id, with no warning and no error.
+Harmless here, since everything was `Todo` and the script was about to set them
+all, but on a populated board it is silent data loss. Recorded in the script,
+beside the thing that would break.
 
 ## Next
 
-`gh pr view 100`. Then #57 to done before anything new is started.
+**#95** — the top of Todo, and the cheapest real win on the board: a fixed host
+port means `bun run spike:web:down` cannot stop the stack you are looking at,
+and `/healthz` answers green from a process you did not start.
+
+Review of PR #101 is the only thing outstanding from this session.
