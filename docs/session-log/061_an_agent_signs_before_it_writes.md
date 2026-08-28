@@ -73,10 +73,12 @@ mints an id and enforces it (400 without, 200 with). Recorded on #81.
 refuses, and the distinction is the rule worth keeping: *not yet* refuses and
 names the remedy, *not here* hides because there is no remedy to name.
 
-**`mockSessionContext` after this.** The gate stops it reaching an event, but it
-is still the fallback inside `registeredSession` and still used directly by
-`tests/mcp-smoke.test.ts`. Whether it has a remaining `src/` caller worth having
-was not checked — #80's genre.
+**`mockSessionContext` is deliberately kept, and the reason is now on the
+declaration.** It reads as vestigial and would be culled on sight — #80's genre
+exactly. It survives because the HTTP surface is undesigned and the spike
+working it out needs something to attribute to before it knows the real answer.
+That is a bet on unfinished work with a date on it, not a claim that it is
+reachable, and the comment says to ask again when HTTP lands.
 
 **#81's `Observed`/`Claimed` aliases are not built.** That issue's own open
 question — the grade belongs to the *provider*, not the field — is unresolved,

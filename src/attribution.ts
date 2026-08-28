@@ -73,7 +73,30 @@ export const mockGitContext: GitContextProvider = {
   head: () => "0".repeat(40),
 };
 
-/** A stand-in session, named so it cannot be mistaken for a real agent. */
+/**
+ * A stand-in session, named so it cannot be mistaken for a real agent.
+ *
+ * **Do not cull this, and the reason is not that something still imports it.**
+ * As of 2026-08-28 it reads as vestigial: the stdio server registers a real
+ * agent, and {@link registeredSession}'s fallback to this one is what the write
+ * gate exists to stop reaching an event. An unused-looking export in this
+ * repository gets deleted, correctly and on sight.
+ *
+ * It is kept because **the HTTP surface has not been designed yet and will need
+ * a stand-in while it is.** Over stdio the process is the session, so a registry
+ * is the whole mechanism; over HTTP it is not, and the spike working that out
+ * needs something to attribute to before it knows what the real answer is.
+ * Measured on 2026-08-28 against `@modelcontextprotocol/sdk@1.30.0`: the default
+ * transport is stateless, mints no `Mcp-Session-Id`, and throws on a reused
+ * transport — so a registration has nowhere to live there until a
+ * `sessionIdGenerator` is supplied, and *what* it should hang on is the open
+ * question.
+ *
+ * **When that lands, ask this again.** If the HTTP surface ends up registering
+ * the way stdio does, this has no caller and should go. Keeping it is a bet on
+ * unfinished work, not a claim that it is reachable — and a bet with a date on
+ * it is a different thing from a thing nobody looked at.
+ */
 export const mockSessionContext: SessionContextProvider = {
   label: () => "mock-session",
   id: () => "mock-session-0",
