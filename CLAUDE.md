@@ -408,10 +408,49 @@ bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted
 bun run check:binary          # builds bin/labkit and drives it against a fresh database
 bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio -- `labkit mcp`, src/cli/commands/serve.ts
+bun run spike:web             # the same tools over HTTP in containers, against Postgres + AGE
+bun run spike:web:down        # stop it
+bun run ports                  # this worktree's host-port offset and the five ports it implies
+bun run board:status          # applies the ship-labkit board's Status column, idempotently
 ```
 
 Formatting and linting are both biome — `bun run format` writes,
 `check:format` and `check:lint` are in the sweep.
+
+**The spike lives in `scripts/`, not in a `spikes/` directory**, and the
+prefix is the namespace — as it is for `check-*.ts`, `test-*.sh`,
+`smoke-cli.sh` and `build-binary.sh`. `scripts/spike-http-server.ts` and
+`scripts/spike-migrate.ts` are the whole of it, plus `docker/webapp/` and the
+`spike` and `pooler` **profiles** in `docker-compose.yml` — which is why
+`docker compose config --services` shows only `db` until one is named.
+
+It composes `buildServer` and `surfacesOver` and adds no domain code, so
+nothing under `src/` knows it exists. That is deliberate and is what keeps it
+deletable on its own merits; see #104, which is the issue that decides whether
+it was a direction or an experiment.
+
+**Its ports are per-worktree and the main checkout keeps the defaults**
+(`bun run ports`, `scripts/compose.sh`). Two checkouts can have a stack up at
+once; a `curl` that reaches the wrong one is diagnosable because `/healthz` and
+`labkit --version` name the checkout that answered. That second half is the one
+that matters — isolation stops the collision, identity is what makes a
+collision that gets through say so, and the debugging session this came from was
+lost to a green health check describing somebody else's server.
+
+**The list above is hand-written and was wrong.** Derived on 2026-08-28,
+`package.json` had three scripts this file had never mentioned — `ports`,
+`board:status` and `postinstall` — two of them added the same afternoon.
+`postinstall` stays out because nobody types it; the other two are now here.
+The check is four lines and worth re-running rather than trusting:
+
+```sh
+python3 - <<'EOF'
+import json, re, pathlib
+s = set(json.load(open("package.json"))["scripts"])
+d = set(re.findall(r"bun run ([a-z0-9:._-]+)", pathlib.Path("CLAUDE.md").read_text()))
+print(sorted(s - d))
+EOF
+```
 
 ### Exit codes, and the script that told everyone to ignore its own
 
