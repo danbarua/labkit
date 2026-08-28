@@ -21,6 +21,7 @@
 import type { WriteSurface } from "../src/domain";
 import {
   acceptUnresolved,
+  amendLockedDesign,
   askAndPursue,
   closeOnEvidence,
   failedCheck,
@@ -33,6 +34,8 @@ import {
   reinterpretClaim,
   replaceAnalysis,
   rerunCheck,
+  reverifyEarlier,
+  sharpenQuestion,
 } from "./index";
 
 export interface Composition {
@@ -192,6 +195,170 @@ const deliberatelyUnresolved: Composition = {
   },
 };
 
+
+/** S-1: a hunch narrowed by what the first look found. */
+const aHunchNotYetAnExperiment: Composition = {
+  ref: "S-1",
+  name: "A hunch, not yet an experiment",
+  run: async (w) => {
+    const { question, enquiries } = await multiPursuit(w, {
+      question: "is the assay drifting?",
+      approaches: ["control chart, 6 months", "plate-level breakdown"],
+    });
+    const { claims } = await observeAndAnalyse(w, {
+      enquiry: enquiries[0]!,
+      name: "control-chart-6m",
+      finding: "plate 3 only, others flat",
+      method: "control chart",
+      concludes: [{ proposition: "drift is confined to plate 3", finding: "plate 3 only" }],
+    });
+    await sharpenQuestion(w, {
+      from: question,
+      into: "is plate 3 miscalibrated?",
+      because: claims[0]!.claim,
+    });
+  },
+};
+
+/** S-3: the primary test holds; its own robustness checks split. */
+const significantAndUntrustworthy: Composition = {
+  ref: "S-3",
+  name: "Significant, and untrustworthy",
+  run: async (w) => {
+    const { enquiry } = await askAndPursue(w, { question: "does the intervention raise yield?" });
+    const a = await prespecify(w, { proposition: "holds under leave-one-site-out" });
+    const b = await prespecify(w, { proposition: "holds with the outlier site removed" });
+    const { claims } = await observeAndAnalyse(w, {
+      enquiry,
+      name: "yield-trial",
+      finding: "+6%, p=0.03",
+      method: "mixed model",
+      concludes: [{ proposition: "yield rises by 6%", finding: "+6%, p=0.03" }],
+      heldTo: [a.criterion, b.criterion],
+    });
+    await rerunCheck(w, { criterion: a.criterion, value: "held", citing: claims[0]!.claim });
+    await failedCheck(w, { criterion: b.criterion, value: "did not hold", citing: claims[0]!.claim });
+  },
+};
+
+/** S-7: feasibility finds a mechanical defect after the design is locked. */
+const amendingALockedDesign: Composition = {
+  ref: "S-7",
+  name: "Amending a locked design",
+  run: async (w) => {
+    const { enquiry } = await askAndPursue(w, { question: "does arm B beat arm A at 12 weeks?" });
+    const { criterion } = await prespecify(w, {
+      proposition: "primary comparison: arm A vs arm B at 12 weeks",
+    });
+    await gatedWork(w, {
+      criterion,
+      consequence: "the analysis may not deviate",
+      objective: "run the 12-week comparison",
+      acceptance: "the comparison is the prespecified one",
+    });
+    const { claims } = await observeAndAnalyse(w, {
+      enquiry,
+      name: "feasibility-assay",
+      finding: "saturation at week 9",
+      method: "assay range check",
+      concludes: [
+        { proposition: "arm B assay saturates before week 12", finding: "saturation at week 9" },
+      ],
+    });
+    await amendLockedDesign(w, {
+      criterion,
+      nowRequires: "primary comparison: arm A vs arm B at 9 weeks",
+      because: "the assay cannot measure what was specified",
+      citing: claims[0]!.claim,
+    });
+  },
+};
+
+/** S-8: a criterion that gates work and qualifies no finding. */
+const dontSpendTheWholeBudget: Composition = {
+  ref: "S-8",
+  name: "Don't spend the whole budget",
+  run: async (w) => {
+    const { criterion } = await prespecify(w, {
+      proposition: "pilot recovers >90% of spiked control",
+    });
+    const { gate } = await gatedWork(w, {
+      criterion,
+      consequence: "the full run may not start",
+      objective: "the full 400-sample run",
+      acceptance: "the pilot recovered",
+      mayRead: ["pilot-output"],
+    });
+    await rerunCheck(w, { criterion, gate, value: "0.94" });
+  },
+};
+
+/** S-17: a gate nobody evaluated is not a gate that passed. */
+const doesTheGuardGuard: Composition = {
+  ref: "S-17",
+  name: "Does the guard actually guard?",
+  run: async (w) => {
+    const { criterion } = await prespecify(w, { proposition: "contamination below threshold" });
+    await gatedWork(w, {
+      criterion,
+      consequence: "results may not be released",
+      objective: "release the results",
+      acceptance: "contamination is below threshold",
+    });
+  },
+};
+
+/** S-18: scratch that turned out to matter, promoted before it was cited. */
+const scratchThatMattered: Composition = {
+  ref: "S-18",
+  name: "Scratch that mattered",
+  run: async (w) => {
+    const { enquiry } = await askAndPursue(w, {
+      question: "does the batch effect explain the drift?",
+    });
+    const { claims } = await observeAndAnalyse(w, {
+      enquiry,
+      name: "lunchtime-sweep",
+      finding: "R-squared 0.81",
+      method: "batch regression",
+      concludes: [{ proposition: "batch explains the drift", finding: "R-squared 0.81" }],
+    });
+    await promoteFinding(w, {
+      claim: claims[0]!.claim,
+      because: "re-run against the full batch series",
+    });
+  },
+};
+
+/** S-10: the protocol runs again; that is not a reproduction. */
+const rerunningIsNotReproducing: Composition = {
+  ref: "S-10",
+  name: "Rerunning is not reproducing",
+  run: async (w) => {
+    const { enquiry } = await askAndPursue(w, { question: "what is the coefficient?" });
+    const original = await observeAndAnalyse(w, {
+      enquiry,
+      name: "historical-run-1998",
+      finding: "0.63, initial conditions not recorded",
+      method: "original fit",
+      concludes: [{ proposition: "the coefficient is stable", finding: "0.63" }],
+    });
+    // **The same proposition, a different finding.** `reverify` re-checks the
+    // claim that was made, so the propositions must match — the domain refused
+    // a re-verification of "the coefficient is 0.61" against an analysis that
+    // concluded 0.63, naming both. Which is the scenario's own point: the
+    // re-run answers the same question and gets a different number, and that
+    // is not a reproduction.
+    await reverifyEarlier(w, {
+      historical: original.analysis,
+      enquiry,
+      method: "re-run under 2026 conditions",
+      under: [original.observations],
+      concludes: { proposition: "the coefficient is stable", finding: "0.61" },
+    });
+  },
+};
+
 /**
  * Every composition, in the order a reader would meet them.
  *
@@ -200,9 +367,16 @@ const deliberatelyUnresolved: Composition = {
  */
 export const COMPOSITIONS: readonly Composition[] = [
   gatedAdvance,
+  aHunchNotYetAnExperiment,
+  significantAndUntrustworthy,
   negativeClosure,
-  deliberatelyUnresolved,
-  theSentenceIsWrong,
   contradictionOrDissociation,
+  amendingALockedDesign,
+  dontSpendTheWholeBudget,
+  rerunningIsNotReproducing,
   theAnalysisWasWrong,
+  theSentenceIsWrong,
+  deliberatelyUnresolved,
+  doesTheGuardGuard,
+  scratchThatMattered,
 ];

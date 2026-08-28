@@ -337,3 +337,39 @@ export async function reverifyEarlier(
   });
   return { verification: report.verification, claims: report.claims };
 }
+
+/**
+ * A question narrowed in light of what has been found.
+ *
+ * The old question is not deleted — `NARROWS` carries the lineage, and the
+ * deciding act freezes the finding it was taken in light of, which is what
+ * makes "what was known then" answerable later from durable state.
+ */
+export async function sharpenQuestion(
+  w: W,
+  input: { from: QuestionRef; into: string; because: string },
+): Promise<{ sharper: QuestionRef }> {
+  return { sharper: await w.sharpen({ from: input.from, into: input.into, because: input.because }) };
+}
+
+/**
+ * A locked condition replaced with another, on the record.
+ *
+ * Returns `nature`, which is the whole point: an amendment that moves a
+ * prespecified comparison is **scientific**, and one that does not is
+ * mechanical. The classification is computed from what the criterion was
+ * implementing — with `IMPLEMENTS` deleted, S-7 showed the same amendment
+ * reporting itself mechanical, which is the wrong answer that earned the edge.
+ */
+export async function amendLockedDesign(
+  w: W,
+  input: { criterion: CriterionRef; nowRequires: string; because: string; citing: ClaimRef },
+): Promise<{ nature: "mechanical" | "scientific" }> {
+  const report = await w.amendDesign({
+    criterion: input.criterion,
+    nowRequires: input.nowRequires,
+    because: input.because,
+    citing: input.citing,
+  });
+  return { nature: report.nature };
+}
