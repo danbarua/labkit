@@ -16,7 +16,7 @@
  * chains sharing an intermediate wording is exactly what that cannot express:
  * both histories threw `is not a single line`, refusing a legitimate ask.
  *
- * **A prediction this refuted.** `docs/TASKS.md` said walking by id "wants the
+ * **A prediction this refuted.** The queued row said walking by id "wants the
  * revision chain to carry an edge a caller can follow, which is a model
  * question rather than a projection". It wanted nothing of the sort. Every
  * step was already reachable by identity — `reinterpret` writes

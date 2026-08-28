@@ -430,7 +430,7 @@ test("an empty event log does not read as an empty record", () => {
 // **Every assertion above renders with `PLAIN`**, which is what `bun test`
 // would get anyway — stdout is not a terminal, so `isColorSupported` is false
 // and the composition root hands out an identity palette. That is exactly the
-// trap `docs/TASKS.md` named when this was queued: if the palette were a
+// trap named when this work was queued: if the palette were a
 // module-level global rather than a parameter, all thirteen of those tests
 // would silently be checking the uncoloured path and nothing would check the
 // other one.

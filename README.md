@@ -146,7 +146,7 @@ Not in the sweep, because it needs Docker. Cloud Build runs it, and
 `bun run check`, on every pull request to `main`; see `infra/ci/`.
 
 The reasoning behind the domain model is in `docs/project-journal/`, oldest
-first; `docs/TASKS.md` is the work queue.
+first; `gh issue list` is the work queue.
 
 ## Licence
 
