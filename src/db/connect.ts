@@ -173,10 +173,18 @@ function gitProjectRoot(cwd: string): string | undefined {
  * correct from any depth — the same property the subprocess has.
  *
  * **Exported for its own tests, and that is a concession worth naming.** Under
- * bun 1.3.14 `spawnSync` finds `git` with `PATH` empty, unset, or pointing at
- * an empty directory — measured, all three — so there is no way to reach this
- * from {@link resolveProjectRoot} in-process by making the subprocess fail. The
- * composition is one `??`; the logic is here, and here is where it is tested.
+ * bun **1.3.14** `spawnSync` found `git` with `PATH` empty, unset, or pointing
+ * at an empty directory — measured, all three — so there was no way to reach
+ * this from {@link resolveProjectRoot} in-process by making the subprocess
+ * fail. The composition is one `??`; the logic is here, and here is where it is
+ * tested.
+ *
+ * **On bun 1.4.0 the third case fails.** Re-measured 2026-08-28: `PATH`
+ * pointing at an empty directory gives `ENOENT`, while empty and unset still
+ * find `git`. So the fallback *is* now reachable in-process, and the export may
+ * no longer be earned — check before removing it rather than assuming, since
+ * the first version of these tests was passing through the subprocess while
+ * claiming to test the filesystem and only its own control caught that.
  */
 export function dotGitProjectRoot(from: string): string | undefined {
   let dir = from;

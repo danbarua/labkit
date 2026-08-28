@@ -1,25 +1,26 @@
 # 059: the caveat was one file away
 
-**Session wrap, 2026-08-28, on `docs/caveat-nearest-the-claim`.** Not a decision
-record — the argument lives on `gitProjectRoot` in `src/db/connect.ts`, which is
-the point of the change.
+**Session wrap, 2026-08-28, on `docs/caveat-nearest-the-claim` then
+`docs/unstale-bun-claims`.** Not a decision record — each argument lives on the
+code it is about, which is the point of both changes.
 
 **Entry 058 is closed and covers the CI split** (merged as #73). This one opens
 because what followed is unrelated work and no single Goal line covers both.
 
-**The range is far wider than this session.** Nineteen commits sit between the
-baseline and HEAD; **`97d2c30` is the only one written here.** The rest are peer
-merges (#71 through #77).
+**The range is far wider than this session.** This session's commits are
+`97d2c30` and `7d0d86e`, plus this entry's own; everything else between the
+baseline and HEAD is a peer merge (#71 onward).
 
 ## Goal
 
-Act on a cross-repo report from `exo-ledger`: a doc comment in this repo states a
-general property of git worktrees that is false.
+Correct claims in this repo that had stopped being true — first one reported
+from `exo-ledger`, then every version-pinned claim the day's bun upgrade put in
+doubt.
 
 ## Changed
 
 **`97d2c30` — docs: the caveat belongs nearest the claim, not one file away.**
-Open as **PR #78**. Comment-only; no code changed.
+Merged as **#78**. Comment-only; no code changed.
 
 - `src/db/connect.ts` — `gitProjectRoot`'s doc comment said *"a worktree is a
   **sibling** of the main checkout, not a descendant"*. True of this
@@ -29,6 +30,11 @@ Open as **PR #78**. Comment-only; no code changed.
   now points at the code comment rather than restating the argument.
 
 `connect.ts:149` was already phrased conditionally and is untouched.
+
+**`7d0d86e` — docs: re-measure the bun-pinned claims on 1.4.0; two had gone
+stale.** Open as **PR #79**. `CLAUDE.md`, `src/cli/palette.ts`,
+`src/db/connect.ts`, `scripts/build-binary.sh`. Ten claims name bun 1.3.14; five
+were cheap to re-run and were re-run.
 
 ## Verified
 
@@ -42,6 +48,24 @@ Open as **PR #78**. Comment-only; no code changed.
   same answer `--git-common-dir` gives. The two agree; the fallback is not
   wrong there.
 - Grepped for a surviving flat claim in both files: none.
+
+**For `7d0d86e`, five claims re-measured on bun 1.4.0. Two had changed:**
+
+| claim | 1.3.14 | 1.4.0 |
+| --- | --- | --- |
+| `spawnSync` finds `git`, `PATH`=empty dir | found | **`ENOENT`** |
+| `styleText` writes escapes into a pipe | escapes | **bare text** |
+| `bun --cwd` sets `process.cwd()` | yes | yes |
+| `--compile` leaks a byte-identical `bun` | yes | yes (sha256) |
+| `bunfig.toml` `[test] timeout` honoured | no | no |
+
+The last row carries a **positive control** — the same probe passes at
+`--timeout 20000` — because three identical failures prove nothing unless the
+probe could have gone green.
+
+Also checked and clean: 82 paths and 30 symbols referenced by `CLAUDE.md` all
+resolve or are deliberately past-tense, and command parity is exact across 30
+`package.json` scripts.
 
 ## Open
 
@@ -63,12 +87,22 @@ reproduced the identical two files). #54 re-measured on bun 1.4.0 and left open
 — `bunfig.toml`'s `[test] timeout` is still ignored, with a positive control
 proving the probe could have passed.
 
-**bun on this machine is now 1.4.0**, upgraded to take that measurement. The
-sweep is green on it, but a dozen claims in `CLAUDE.md` are measured against
-1.3.14 *by name* and **none was re-checked**. They stand as dated records; they
-should not be assumed to have carried.
+**bun on this machine is now 1.4.0**, upgraded to take that measurement, and the
+sweep is green on it. Five of the version-pinned claims have since been
+re-measured (`7d0d86e`); **two have not**, and are named in that commit rather
+than left implicit: `$bunfs` streaming, and the stdin `data` listener keeping the
+MCP server alive. Both need a compiled binary and a live server.
+
+**`dotGitProjectRoot`'s export may no longer be earned.** The measurement that
+justified it — the subprocess being unfailable in-process — is false on 1.4.0.
+Deliberately flagged rather than acted on: the first version of those tests was
+passing through the subprocess while claiming to test the filesystem, and only
+its own control caught it. Removing the export on one re-measurement would be
+the same mistake facing the other way.
 
 ## Next
 
-`gh pr view 78` for review, then the ledger question Dan left open: whether the
-caveat-placement rule joins the DX Principles header.
+`gh pr view 79` for review (#78 is merged). Then two open calls, both Dan's:
+whether the caveat-placement rule joins the DX Principles header, and whether
+`dotGitProjectRoot`'s export can go now that the subprocess can be made to
+fail.

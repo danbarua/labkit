@@ -610,7 +610,8 @@ a commands section.
 `bun run build` compiles `src/cli/cli.ts` to a binary **from a scratch
 directory** (`scripts/build-binary.sh`), and that is not tidiness:
 `bun build --compile` leaves a **byte-identical copy of the `bun` binary
-itself** — 61MB, `.<hash>-00000000.bun-build` — in the current working
+itself** — `.<hash>-00000000.bun-build`, so whatever `bun` weighs: 61MB on
+1.3.14, 57MB on 1.4.0 — in the current working
 directory on every *successful* run, and never removes it. Verified by sha256
 against bun 1.3.14. The hash differs per build so they accumulate, and they are
 `.gitignore`d so nothing complains; thirty-two of them had reached **1.9GB** in
@@ -741,11 +742,17 @@ Two more things the tests caught rather than review:
   see. The first version padded first and then matched on the padded string, so
   `"failed             "` matched no case and every gate state came out the same
   colour.
-- picocolors was chosen **by measurement**: under Bun 1.3.14, `node:util`'s
-  `styleText` writes escapes into a pipe and ignores `NO_COLOR` entirely, and
-  `ansis` writes escapes into a pipe with no environment variables set at all.
+- picocolors was chosen **by measurement**: under Bun **1.3.14**, `node:util`'s
+  `styleText` wrote escapes into a pipe and ignored `NO_COLOR` entirely, and
+  `ansis` wrote escapes into a pipe with no environment variables set at all.
   Either would have broken `$(labkit …)`. `--no-ansi` only ever subtracts, and
   picocolors' own `isColorSupported` is reused rather than reimplemented.
+
+  **`styleText`'s half of that stopped being true on bun 1.4.0** — re-measured
+  2026-08-28, it now returns bare text into a pipe and under `NO_COLOR`. The
+  decision stands and the *reason* no longer does, which is worth the two lines:
+  a reader who checks the claim on a current bun finds it false and has no way
+  to tell a stale justification from a wrong one. `ansis` was not re-measured.
 
 ### Where the database lives
 
@@ -834,13 +841,18 @@ question from the other side.
 file names a directory with no `worktrees/` component and no reliable path back
 to a working tree.
 
-**`dotGitProjectRoot` is exported for its own tests, and that is a concession
-with a measured reason.** Under bun 1.3.14 `spawnSync` finds `git` with `PATH`
-set to the empty string, unset, *or* pointing at an empty directory — all three
-checked — so the subprocess cannot be made to fail in-process and the fallback
-cannot be reached that way. The first version of those tests tried, and its own
-control caught it: four tests were passing through the subprocess while claiming
-to test the filesystem.
+**`dotGitProjectRoot` is exported for its own tests, and that concession is now
+weaker than the measurement that earned it.** Under bun **1.3.14** `spawnSync`
+found `git` with `PATH` set to the empty string, unset, *or* pointing at an
+empty directory — all three checked — so the subprocess could not be made to
+fail in-process and the fallback could not be reached that way. The first
+version of those tests tried, and its own control caught it: four tests were
+passing through the subprocess while claiming to test the filesystem.
+
+**Re-measured on bun 1.4.0, 2026-08-28: the third case now fails.** `PATH`
+pointing at an empty directory gives `ENOENT`; empty and unset still find `git`.
+So the fallback *is* reachable in-process on 1.4.0, and the export may no longer
+be needed — which is a thing to check before removing it, not a licence to.
 
 **"A worktree is a sibling of the main checkout" is true of this repository's
 layout and not of worktrees generally**, and the whole argument now lives on
@@ -1526,7 +1538,9 @@ failure, so `check:test-ceiling` now refuses either spelling — the shell
 first version caught only the shell one, which would not have caught the bug it
 was written for; both are in its negative control.
 
-**`bunfig.toml` is not the way out.** Measured against bun 1.3.14, `[test]
+**`bunfig.toml` is not the way out.** Measured against bun 1.3.14 **and again
+on 1.4.0** (2026-08-28, with a positive control: the same probe passes at
+`--timeout 20000`), `[test]
 timeout = 20000` is ignored — a 6.5s `beforeAll` fails identically with and
 without it. If a later bun honours it, move the ceiling there and delete the
 check. It went up because CI found the edge:
