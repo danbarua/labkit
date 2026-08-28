@@ -325,34 +325,36 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus> {
  * consult prespecified checks and the historical one did not, four lines apart
  * in shape.
  *
- * Both bearings again, and for the same reason as {@link answeringClaim}: a
- * promoted *negative* result is settled by evidence that `CHALLENGES`, and
- * matching only `SUPPORTS` reads it as scratch (S-18b).
+ * Takes the bearing, like every other fact here. It was the last one holding
+ * two column names for one subject — `supported`/`challenged` with a fold
+ * reading both — which was *correct* and was the shape that failed elsewhere:
+ * `checksOf` held two names and its **grain** read one. This survived only
+ * because its consumer was the fold in the same object rather than a separate
+ * function. Uniform now, so the pattern is not there to be copied.
  */
-export function standingAsOf(at: string): Leaf<{ resolved: boolean; promoted: boolean }> {
+export function standingAsOf(
+  at: string,
+  bearing: "SUPPORTS" | "CHALLENGES",
+): Leaf<{ resolved: boolean; promoted: boolean }> {
   return {
     name: "standingAsOf",
     grain: byQuestion,
     clause: `OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
            OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
-           OPTIONAL MATCH (cited)-[:SUPPORTS]->(supported:Claim)
-           OPTIONAL MATCH (cited)-[:CHALLENGES]->(challenged:Claim)
-           OPTIONAL MATCH (promoting:Decision)-[:PROMOTES]->(supported)
-           OPTIONAL MATCH (denying:Decision)-[:PROMOTES]->(challenged)`,
+           OPTIONAL MATCH (cited)-[:${bearing}]->(answering:Claim)
+           OPTIONAL MATCH (vouching:Decision)-[:PROMOTES]->(answering)`,
     yields: {
       resolving: optional(vertexProps<{ decided_at: string }>()),
       cited: optional(vertexProps<Node>()),
-      supported: optional(vertexProps<ClaimNode>()),
-      challenged: optional(vertexProps<ClaimNode>()),
-      promoting: optional(vertexProps<{ decided_at: string }>()),
-      denying: optional(vertexProps<{ decided_at: string }>()),
+      answering: optional(vertexProps<ClaimNode>()),
+      vouching: optional(vertexProps<{ decided_at: string }>()),
     },
     empty: () => ({ resolved: false, promoted: false }),
     fold: (standing, row) => {
       const resolving = row.resolving as { decided_at: string } | null;
       // A decision taken after the moment asked about has not happened yet.
       const resolvedByThen = resolving !== null && resolving.decided_at <= at;
-      const vouched = (row.promoting ?? row.denying) as { decided_at: string } | null;
+      const vouched = row.vouching as { decided_at: string } | null;
       return {
         resolved: standing.resolved || (resolvedByThen && row.cited !== null),
         promoted:

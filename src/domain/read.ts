@@ -208,27 +208,39 @@ export class ReadSurface extends SessionCore {
     // — the current survey learned to consult prespecified checks and this one
     // did not, four lines apart in shape. Sharing the clause and the fold is
     // what stops that recurring; the *time* is the argument.
-    const standing = standingAsOf(asOf);
-    const { cypher, decoders } = compose(
-      `MATCH (q:Question)
+    // One bearing per query, merged — the same shape as `whatIsKnown`, and for
+    // the same reason.
+    const standings = new Map<string, { resolved: boolean; promoted: boolean }>();
+    const asked = new Map<string, { asks: string; accepted: boolean }>();
+
+    for (const bearing of BEARINGS) {
+      const standing = standingAsOf(asOf, bearing);
+      const { cypher, decoders } = compose(
+        `MATCH (q:Question)
        WHERE q.posed_at <= $at
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)`,
-      standing,
-      {
-        q: vertexProps<{ natural_id: string; name: string }>(),
-        accepting: optional(vertexProps<{ decided_at: string }>()),
-      },
-    );
-    const rows = (await this.graph.query(cypher, decoders, { at: asOf })) as unknown as Row[];
-    const standings = per(standing, rows);
+        standing,
+        {
+          q: vertexProps<{ natural_id: string; name: string }>(),
+          accepting: optional(vertexProps<{ decided_at: string }>()),
+        },
+      );
+      const rows = (await this.graph.query(cypher, decoders, { at: asOf })) as unknown as Row[];
 
-    const asked = new Map<string, { asks: string; accepted: boolean }>();
-    for (const row of rows) {
-      const q = row.q as { natural_id: string; name: string };
-      const entry = asked.get(q.natural_id) ?? { asks: q.name, accepted: false };
-      const accepting = row.accepting as { decided_at: string } | null;
-      entry.accepted ||= accepting !== null && accepting.decided_at <= asOf;
-      asked.set(q.natural_id, entry);
+      for (const [question, was] of per(standing, rows)) {
+        const seen = standings.get(question) ?? { resolved: false, promoted: false };
+        standings.set(question, {
+          resolved: seen.resolved || was.resolved,
+          promoted: seen.promoted || was.promoted,
+        });
+      }
+      for (const row of rows) {
+        const q = row.q as { natural_id: string; name: string };
+        const entry = asked.get(q.natural_id) ?? { asks: q.name, accepted: false };
+        const accepting = row.accepting as { decided_at: string } | null;
+        entry.accepted ||= accepting !== null && accepting.decided_at <= asOf;
+        asked.set(q.natural_id, entry);
+      }
     }
 
     const survey: HistoricalSurvey = {
