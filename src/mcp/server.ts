@@ -36,7 +36,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { logFailedRequest } from "../request-log";
+import { logFailedRequest, type Adapter } from "../request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { connectDb } from "../db/connect";
 import { resolveTenantContext } from "../db/tenant";
@@ -283,7 +283,7 @@ function respond(tool: string, run: (args: Record<string, unknown>) => Promise<u
         structuredContent: result as Record<string, unknown>,
       };
     } catch (error) {
-      logFailedRequest({ surface: "mcp", tool, args }, error);
+      logFailedRequest({ adapter: "mcp-stdio" satisfies Adapter, tool, args }, error);
       throw error;
     } finally {
       inFlight--;
