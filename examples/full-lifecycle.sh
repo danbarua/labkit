@@ -214,31 +214,87 @@ lab analyse "$enquiry" \
 analysis=$(handle COMP "$(printf '%s' "$LAST" | head -1)")
 claim=$(handle CLM "$(printf '%s' "$LAST" | tail -1)")
 
-chapter "Checking, promoting, closing" \
-  "Record the prespecified check's outcome. A gate's state is computed from the" \
-  "checks under it -- there is no field anyone can set to 'satisfied'."
+chapter "Promoting and closing, before the check has run" \
+  "Promotion is a separate act from concluding, and it is not the same as" \
+  "verification. Doing it in this order shows the difference."
+
+say "Until a finding is promoted it is scratch, and an answer resting on it is" \
+    "provisional. So promote it, and close the question on it:"
+
+lab promote "$claim" --because 'we are relying on this to ship'
+
+lab close "$enquiry" --answered-by "$claim"
+
+say "The question is answered on promoted work -- and the condition agreed" \
+    "before the run has still not been checked. LabKit will not call that" \
+    "established:"
+
+lab known
+
+say "Promotion says a person vouched for it. The prespecified check says" \
+    "nobody has confirmed it. A check nobody ran counts against the finding it" \
+    "qualifies, exactly as a failing one would."
+
+lab why "$claim"
+
+chapter "Running the check" \
+  "A gate's state is computed from the checks under it -- there is no field" \
+  "anyone can set to 'satisfied'."
 
 lab evaluate "$criterion" --gate "$gate" --value 'n=24 at every depth' --outcome pass
 
 lab gate "$gate"
 
-say "Promotion is a separate act from concluding. Until a finding is promoted" \
-    "it is scratch, and an answer resting on it is provisional rather than" \
-    "established. LabKit keeps those two apart on purpose."
+chapter "The rest of the programme" \
+  "One question in one state says nothing about the partition. A real" \
+  "programme has several at once, at different stages -- so here are four" \
+  "more, each stopped at a different point."
 
-lab promote "$claim" --because 'the prespecified check passed at every depth'
+say "Posed and nothing else. Nobody has pursued it:"
 
-lab close "$enquiry" --answered-by "$claim"
+lab pose 'does depth interact with the schedule?'
+
+say "Pursued and measured, with nothing concluded yet:"
+
+lab open 'is the effect stable across seeds?'
+seeds=$(handle LOE "$LAST")
+lab observe "$seeds" --name 'seed-sweep-raw' --finding 'convergence step counts over 20 seeds'
+
+say "Concluded and closed -- but nobody promoted the finding, so the answer" \
+    "rests on scratch:"
+
+lab open 'does it hold on the held-out split?'
+holdout=$(handle LOE "$LAST")
+lab observe "$holdout" --name 'holdout-raw' --finding 'convergence on the held-out split'
+holdout_obs=$(handle ART "$LAST")
+lab analyse "$holdout" \
+  --method 'paired comparison on the held-out split' \
+  --from "$holdout_obs" \
+  --concludes '{"proposition": "the effect holds on the held-out split", "finding": "converges ~2 steps earlier"}'
+holdout_claim=$(handle CLM "$(printf '%s' "$LAST" | tail -1)")
+lab close "$holdout" --answered-by "$holdout_claim"
+
+say "And one left open on purpose, with the condition that would reopen it." \
+    "That is not the same as nobody having got round to it:"
+
+lab open 'why does depth 12 behave differently?'
+anomaly=$(handle LOE "$LAST")
+lab accept "$anomaly" \
+  --because 'the confirmatory set is spent and this needs a fresh design' \
+  --until 'a data source other than the spent set' \
+  --in-light-of "$claim"
 
 chapter "Reading the record back" \
   "Everything below is derived from durable state, not replayed from a log."
 
-say "What does the programme know? Answers are partitioned by how well each one" \
-    "is held up, and those buckets are the distinction that matters:"
+say "Five questions, five states. The buckets are the distinction that matters," \
+    "and a reader scanning for what still needs doing must not find the" \
+    "deliberately-parked one among them:"
 
 lab known
 
-say "Every command takes --json, and it is the same document an MCP client gets:"
+say "Every command takes --json, and it is the same document an MCP client" \
+    "gets. Same five buckets, and now with something in each of them:"
 
 lab --json known
 

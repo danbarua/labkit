@@ -29,7 +29,7 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
     p.settled("Established"),
     list(survey.established),
     "",
-    p.provisional("Provisional (resting on work nobody promoted)"),
+    p.provisional("Provisional (answered, but not something to build on yet)"),
     list(survey.provisional),
     "",
     p.provisional("Accepted as unresolved"),

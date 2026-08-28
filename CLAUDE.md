@@ -387,6 +387,7 @@ bun run check:stdout          # nothing under src/ writes to stdout except the C
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
+bun run check:facts            # a fact's grain is named and its clause dependencies declared
 bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
@@ -971,6 +972,64 @@ A verb that composes others records **one** event, not one per step
 (`openEnquiry` is `pose` + `pursue` and emits only `openEnquiry`). The event
 stream is a record of research actions; a researcher who opened an enquiry did
 one thing, and a log that decomposes it describes the implementation instead.
+
+### The read side is a graph of facts
+
+**`src/domain/facts.ts` is the machinery; `src/domain/survey-facts.ts` is the
+vocabulary.** A *fact* is a named node carrying three things a hand-written
+query leaves unnamed: a **Cypher clause**, a **fold** over the rows it returns,
+and the **grain** — the subject it is computed per. `compose()` walks the facts
+a report needs and emits one query; `per()` folds it once per subject.
+
+**Write-side queries stay hand-rolled Cypher, deliberately.** They are the
+reference documentation for *why* the graph is shaped as it is, and that is a
+different job from answering a question about it.
+
+**What earned this**, and it is one defect with six occurrences rather than an
+argument about elegance. AGE has no edge alternation, so `[:SUPPORTS|CHALLENGES]`
+is a syntax error and reaching a claim takes two clauses. Naming only one is
+**silent** — the row is absent, and a reader concludes the record holds nothing.
+It appeared in the survey, in three parts of `whySupported`, in the historical
+survey, and in the spike written to demonstrate the problem. **Four were written
+by the author of the fix for the previous one**, two of them afterwards. This is
+PJ-028's rule arriving from a new direction with a bigger sample: *be more
+careful* is not an available remedy.
+
+A fact spells such a pair once, so every reader is right or wrong together.
+
+**Three rules the machinery needs, each learned by breaking it:**
+
+- **`empty` is a factory, not a value.** A shared mutable accumulator leaks one
+  subject's rows into the next subject's answer — invisible with one subject,
+  wrong with two.
+- **A leaf declares the clauses it reads.** Without that, `compose()` silently
+  omitted a clause whose variable another clause referenced: no error, a column
+  never returned, and a fact folding to `null` for every subject.
+- **Grains are shared named constants, never written at the use site.** `per()`
+  compares them by reference, so an inline `grain: (r) => …` would be
+  semantically identical, compare unequal, and fan a same-grain dependency into
+  a `Map` where the consumer expects one value.
+
+**Two of the three are `check:facts`**, because the type system cannot carry
+either: an inline grain and an undeclared clause dependency are both well-typed.
+Each was a live defect during the port and neither errored at the time. The
+third — `empty` returning a shared object rather than a fresh one — is left to
+the reader, since `() => T` is satisfied by both and telling them apart needs to
+know whether the value escapes.
+
+**`WITH coalesce(…)` works on AGE and is still the wrong tool** — measured,
+along with `UNION`. `WITH` collapses the query, so every clause appended after
+it must be projected forward by hand. That is a limit of *composition*, not of
+the engine, which makes it a different kind of trap from the ones under
+"AGE-specific gotchas" — and someone will reach for it precisely because it
+parses.
+
+**Where the line falls.** A fact earns its place when **more than one reader has
+to reach the same answer about the same subject**. That is what predicts the
+defect — it is *written once and forgotten the second time*, which requires a
+second time — and a single-reader query cannot have it whatever it computes.
+Queries with one reader stay raw until a second appears, which is the same rule
+this file applies to earning a relationship.
 
 ### The execution-context seam
 

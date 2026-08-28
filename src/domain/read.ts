@@ -36,7 +36,6 @@ import type {
   AnalysisRef,
   CheckStatus,
   EnquiryStatus,
-  EvaluationRecord,
   CriterionRef,
   BlockedWork,
   DecisionRef,
@@ -62,6 +61,16 @@ import type {
   SupportExplanation,
 } from "./report";
 import { ref, isRefOfKind } from "./report";
+import { compose, per, type Row } from "./facts";
+import {
+  BEARINGS,
+  answeringClaimBearing,
+  checkStatus,
+  checkStatusForGate,
+  checksAnchor,
+  checksMetBearing,
+  standingAsOf,
+} from "./survey-facts";
 import { SessionCore } from "./core";
 import type { DomainEvent, EventFilter } from "./events";
 
@@ -194,70 +203,46 @@ export class ReadSurface extends SessionCore {
     if (Number.isNaN(parsed)) throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
     const asOf = new Date(parsed).toISOString();
 
-    const rows = await this.graph.query(
-      `MATCH (q:Question)
-       WHERE q.posed_at <= $at
-       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
-       OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
-       OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
-       OPTIONAL MATCH (cited)-[:CHALLENGES]->(against:Claim)
-       OPTIONAL MATCH (promoting:Decision)-[:PROMOTES]->(settled)
-       OPTIONAL MATCH (denying:Decision)-[:PROMOTES]->(against)
-       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
-       RETURN q, resolving, cited, settled, against, promoting, denying, accepting`,
-      {
-        q: vertexProps<{ natural_id: string; name: string }>(),
-        resolving: optional(vertexProps<{ decided_at: string }>()),
-        cited: optional(vertexProps<{ natural_id: string }>()),
-        settled: optional(vertexProps<{ natural_id: string }>()),
-        // The claim the closing evidence bears AGAINST, and its promotion.
-        // A question answered *no* is settled that way and matched nothing
-        // above, so a promoted negative result read as scratch (S-18b). Two
-        // OPTIONAL MATCHes because AGE has no edge alternation, and the names
-        // are lower-case because a camelCase RETURN name decodes as null.
-        against: optional(vertexProps<{ natural_id: string }>()),
-        promoting: optional(vertexProps<{ decided_at: string }>()),
-        denying: optional(vertexProps<{ decided_at: string }>()),
-        accepting: optional(vertexProps<{ decided_at: string }>()),
-      },
-      { at: asOf },
-    );
+    // Composed from a time-scoped standing fact. `whatIsKnown` and this verb
+    // both decide "was this answer promoted", and the two drifted once already
+    // — the current survey learned to consult prespecified checks and this one
+    // did not, four lines apart in shape. Sharing the clause and the fold is
+    // what stops that recurring; the *time* is the argument.
+    // One bearing per query, merged — the same shape as `whatIsKnown`, and for
+    // the same reason.
+    const standings = new Map<string, { resolved: boolean; promoted: boolean }>();
+    const asked = new Map<string, { asks: string; accepted: boolean }>();
 
-    // The decision cutoffs stay in TypeScript while the question cutoff is in
-    // the query, and the split is not arbitrary. `posed_at` decides whether a
-    // row belongs in the answer at all, so filtering it in Cypher means the
-    // rows that arrive are already the right set. The decision stamps only
-    // decide which *bucket* a row lands in, and there are three of them across
-    // five OPTIONAL MATCHes — pushing those down would mean an OPTIONAL MATCH
-    // per predicate for no change in the result.
-    const by = new Map<
-      QuestionRef,
-      { asks: Prose; resolved: boolean; promoted: boolean; accepted: boolean }
-    >();
-    for (const row of rows) {
-      const entry = by.get(ref("question", row.q.natural_id)) ?? {
-        asks: row.q.name,
-        resolved: false,
-        promoted: false,
-        accepted: false,
-      };
-      const resolvedByThen = row.resolving !== null && row.resolving.decided_at <= asOf;
-      entry.resolved ||= resolvedByThen && row.cited !== null;
-      // A promotion only counts toward *this* question if the resolution it
-      // qualifies had also happened -- otherwise a claim promoted early would
-      // establish a question resolved later.
-      // Either promotion, and still read from the PROMOTES decision rather than
-      // the claim's current `kind` -- `kind` is right for now and wrong for any
-      // past instant, which is what this whole method is about.
-      const vouched = row.promoting ?? row.denying;
-      entry.promoted ||= resolvedByThen && vouched !== null && vouched.decided_at <= asOf;
-      entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= asOf;
-      by.set(ref("question", row.q.natural_id), entry);
+    for (const bearing of BEARINGS) {
+      const standing = standingAsOf(asOf, bearing);
+      const { cypher, decoders } = compose(
+        `MATCH (q:Question)
+       WHERE q.posed_at <= $at
+       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)`,
+        standing,
+        {
+          q: vertexProps<{ natural_id: string; name: string }>(),
+          accepting: optional(vertexProps<{ decided_at: string }>()),
+        },
+      );
+      const rows = (await this.graph.query(cypher, decoders, { at: asOf })) as unknown as Row[];
+
+      for (const [question, was] of per(standing, rows)) {
+        const seen = standings.get(question) ?? { resolved: false, promoted: false };
+        standings.set(question, {
+          resolved: seen.resolved || was.resolved,
+          promoted: seen.promoted || was.promoted,
+        });
+      }
+      for (const row of rows) {
+        const q = row.q as { natural_id: string; name: string };
+        const entry = asked.get(q.natural_id) ?? { asks: q.name, accepted: false };
+        const accepting = row.accepting as { decided_at: string } | null;
+        entry.accepted ||= accepting !== null && accepting.decided_at <= asOf;
+        asked.set(q.natural_id, entry);
+      }
     }
 
-    // The canonical instant, not the caller's text: it is what every comparison
-    // above actually used, and echoing back a form that was not compared would
-    // describe an answer nobody computed.
     const survey: HistoricalSurvey = {
       at: asOf,
       established: [],
@@ -265,15 +250,13 @@ export class ReadSurface extends SessionCore {
       accepted: [],
       open: [],
     };
-    for (const [question, e] of by) {
-      const standing: QuestionStanding = {
-        question: ref("question", question),
-        asks: e.asks,
-      };
-      if (e.resolved && e.promoted) survey.established.push(standing);
-      else if (e.resolved) survey.provisional.push(standing);
-      else if (e.accepted) survey.accepted.push(standing);
-      else survey.open.push(standing);
+    for (const [question, e] of asked) {
+      const entry: QuestionStanding = { question: ref("question", question), asks: e.asks };
+      const was = standings.get(question) ?? { resolved: false, promoted: false };
+      if (was.resolved && was.promoted) survey.established.push(entry);
+      else if (was.resolved) survey.provisional.push(entry);
+      else if (e.accepted) survey.accepted.push(entry);
+      else survey.open.push(entry);
     }
     return survey;
   }
@@ -290,51 +273,48 @@ export class ReadSurface extends SessionCore {
    * each question, not from what it says.
    */
   async whatIsKnown(): Promise<KnowledgeSurvey> {
-    const rows = await this.graph.query(
-      `MATCH (q:Question)
-       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
-       OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
-       OPTIONAL MATCH (cited)-[:SUPPORTS]->(settled:Claim)
-       OPTIONAL MATCH (cited)-[:CHALLENGES]->(against:Claim)
+    // Composed from named facts rather than written out, so that "the claim
+    // this answer rests on" and "did its prespecified checks pass" are the same
+    // definitions every other reader uses. Two defects came from those being
+    // written twice: a promoted *negative* result whose checks were unreachable
+    // because only `SUPPORTS` was matched, and a disagreement with
+    // `whySupported` about which claims a check belongs to. See
+    // `./survey-facts.ts`.
+    // One bearing per query, merged — because AGE has no edge alternation and
+    // the two-columns-in-one-query version is how the last defect survived: the
+    // fact collected both names and the grain read one, so a criterion reached
+    // down the challenged path was silently dropped. Downstream of this loop
+    // there is one `answering` and one `crit`.
+    const anchor = `MATCH (q:Question)
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
-       OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)
-       RETURN q, cited, work, accepting, settled, against`,
-      {
-        q: vertexProps<{ natural_id: string; name: string }>(),
-        cited: optional(vertexProps<{ natural_id: string }>()),
-        work: optional(vertexProps<{ natural_id: string }>()),
-        accepting: optional(vertexProps<{ natural_id: string }>()),
-        settled: optional(vertexProps<{ kind?: string }>()),
-        // The claim the closing evidence bears AGAINST. A question answered
-        // *no* is settled this way and matched nothing above, so a promoted
-        // negative result counted as scratch (S-18b).
-        against: optional(vertexProps<{ kind?: string }>()),
-      },
-    );
+       OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)`;
 
-    const byQuestion = new Map<
-      string,
-      {
-        asks: string;
-        cited: boolean;
-        worked: boolean;
-        accepted: boolean;
-        promoted: boolean;
+    const answering = new Map<string, { natural_id: string; kind?: string }>();
+    const met = new Map<string, boolean>();
+    const seen = new Map<string, { asks: string; accepted: boolean; worked: boolean }>();
+
+    for (const bearing of BEARINGS) {
+      const claimFact = answeringClaimBearing(bearing);
+      const metFact = checksMetBearing(bearing);
+      const { cypher, decoders } = compose(anchor, metFact, {
+        q: vertexProps<{ natural_id: string; name: string }>(),
+        accepting: optional(vertexProps<{ natural_id: string }>()),
+        work: optional(vertexProps<{ natural_id: string }>()),
+      });
+      const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
+
+      for (const [question, claim] of per(claimFact, rows)) {
+        if (claim !== null) answering.set(question, claim);
       }
-    >();
-    for (const row of rows) {
-      const entry = byQuestion.get(row.q.natural_id) ?? {
-        asks: row.q.name,
-        cited: false,
-        worked: false,
-        accepted: false,
-        promoted: false,
-      };
-      entry.cited ||= row.cited !== null;
-      entry.worked ||= row.work !== null;
-      entry.accepted ||= row.accepting !== null;
-      entry.promoted ||= (row.settled ?? row.against)?.kind === "confirmatory";
-      byQuestion.set(row.q.natural_id, entry);
+      for (const [claim, ok] of per(metFact, rows)) met.set(claim, ok);
+
+      for (const row of rows) {
+        const q = row.q as { natural_id: string; name: string };
+        const entry = seen.get(q.natural_id) ?? { asks: q.name, accepted: false, worked: false };
+        entry.accepted ||= row.accepting !== null;
+        entry.worked ||= row.work !== null;
+        seen.set(q.natural_id, entry);
+      }
     }
 
     const survey: KnowledgeSurvey = {
@@ -344,20 +324,23 @@ export class ReadSurface extends SessionCore {
       untested: [],
       accepted: [],
     };
-    for (const [question, entry] of byQuestion) {
-      const standing: QuestionStanding = {
-        question: ref("question", question),
-        asks: entry.asks,
-      };
+    for (const [question, entry] of seen) {
+      const standing: QuestionStanding = { question: ref("question", question), asks: entry.asks };
+      const claim = answering.get(question);
       // Settled beats accepted: a question answered after being accepted is
       // answered. Accepted beats worked, because a reader scanning for what
       // still needs doing must not find a deliberately-parked question there.
-      // Settled on a promoted finding is established; settled on scratch is
-      // provisional. Both are answered -- what differs is what the answer rests
-      // on, and a reader asking "what do we know" must not get the second
-      // silently mixed into the first (S-18).
-      if (entry.cited && entry.promoted) survey.established.push(standing);
-      else if (entry.cited) survey.provisional.push(standing);
+      //
+      // `established` is the strongest word this survey has and means the
+      // answer rests on promoted work **that met the standard it was held to**.
+      // Promotion alone is not enough — a claim held to a check that failed, or
+      // that nobody ran, is S-3b's case: a prespecified check nobody performed
+      // counts against the finding it qualifies (issue #62, S-19). A claim held
+      // to nothing is vacuously met, which keeps S-18's promoted scratch in
+      // `established`.
+      if (claim && claim.kind === "confirmatory" && met.get(claim.natural_id) !== false)
+        survey.established.push(standing);
+      else if (claim) survey.provisional.push(standing);
       else if (entry.accepted) survey.accepted.push(standing);
       else if (entry.worked) survey.unresolved.push(standing);
       else survey.untested.push(standing);
@@ -564,12 +547,26 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * Findings bearing on a proposition one way or the other.
+   * Findings bearing on a proposition **within an enquiry**, one way or the
+   * other — deliberately not by claim handle, which was tried and refuted.
    *
-   * `bearing` is interpolated because pglite-age rejects edge-type
-   * alternation outright — `[:SUPPORTS|CHALLENGES]` is a syntax error, not
-   * merely unsupported for variable-length patterns. The value comes from a
-   * closed set of literals here, never from a caller.
+   * `bearing` is interpolated because pglite-age rejects edge-type alternation
+   * outright — `[:SUPPORTS|CHALLENGES]` is a syntax error, not merely
+   * unsupported for variable-length patterns. The value comes from a closed set
+   * of literals here, never from a caller.
+   *
+   * Everything else in `whySupported` now selects by handle, because two
+   * analyses in one enquiry concluding the same sentence are two claims and a
+   * check held by one is not the other's standard. **Findings are the
+   * exception, and the corpus is what says so**: selecting them by handle
+   * turned 13 scenarios red, S-10's *"the re-run reads as independent
+   * confirmation"* among them.
+   *
+   * That is the distinction, and it is a domain fact rather than an oversight.
+   * A re-run producing the same conclusion **corroborates** — the findings
+   * aggregate over the proposition. A prespecified check **belongs to** the
+   * analysis that was held to it. Same two nodes, two different questions, and
+   * the answer differs.
    */
   private async findingsBearing(
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
@@ -1000,29 +997,18 @@ export class ReadSurface extends SessionCore {
     // OPTIONAL MATCH is load-bearing twice over: a criterion nobody evaluated
     // must still appear as a check, and `g` is bound from the first MATCH so
     // only evaluations triggering this gate count.
-    const rows = await this.graph.query(
-      `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})
-       OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)
-       OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
-       OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)
-       RETURN c, ev, basis, basisout`,
-      {
-        c: vertexProps<{ natural_id: string; proposition: string }>(),
-        ev: optional(
-          vertexProps<{
-            natural_id: string;
-            value: string;
-            outcome: "pass" | "fail";
-            evaluated_at: string;
-          }>(),
-        ),
-        basis: optional(vertexProps<{ statement: string } & Identified>()),
-        basisout: optional(vertexProps<{ invalidated?: boolean }>()),
-      },
-      { id: gate },
+    // Composed from the gate-scoped verdict fact. The scope is the argument
+    // rather than a paragraph: `verdictForGate` counts only evaluations
+    // reached FOR this gate, where `anyVerdict` counts every evaluation of the
+    // criterion. Collapsing the two made a gate nobody had evaluated report as
+    // blocked because its criterion had failed somewhere else.
+    const { cypher, decoders } = compose(
+      `MATCH (crit:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})`,
+      checkStatusForGate,
+      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
     );
-
-    const checks = this.checksFrom(rows);
+    const rows = (await this.graph.query(cypher, decoders, { id: gate })) as unknown as Row[];
+    const checks = [...per(checkStatusForGate, rows).values()];
     // Flattened in the same order the checks were assembled in.
     const evaluations = checks.flatMap((c) => c.evaluations);
     const unmetChecks = checks.filter((c) => c.state !== "passed");
@@ -1131,160 +1117,6 @@ export class ReadSurface extends SessionCore {
     }
     return out;
   }
-
-  /**
-   * Groups (criterion, evaluation, basis) rows into itemised checks.
-   *
-   * Shared by the two jobs a criterion does, which S-3 fused and S-3b took
-   * apart: gating work (`gateStatus`) and qualifying a finding
-   * (`whySupported`). The traversals that reach the criteria differ; how a
-   * check is reported must not, or the same condition would read one way
-   * through a gate and another through the finding it qualifies.
-   */
-  private checksFrom(
-    rows: Array<{
-      c: { natural_id: string; proposition: string };
-      ev: {
-        natural_id: string;
-        value: string;
-        outcome: "pass" | "fail";
-        evaluated_at: string;
-      } | null;
-      basis: ({ statement: string } & Identified) | null;
-      /**
-       * The artefact the cited finding was recorded in, carrying whether that
-       * analysis has since been replaced.
-       *
-       * Lower-case deliberately, and enforced: `basisOut` here returns present
-       * and NULL for every row, silently, because the AS clause AGE requires
-       * is unquoted SQL and Postgres folds it. See `buildAsClause`.
-       */
-      basisout: { invalidated?: boolean } | null;
-    }>,
-  ): CheckStatus[] {
-    // Keyed by natural id, not by proposition text. Two criteria worded
-    // identically are two criteria; whether they SHOULD be one is an identity
-    // question, and a read-side query must not settle it by string equality.
-    // `standing` counts the cited findings that have NOT been withdrawn. It
-    // is kept alongside `basis` rather than derived from it because `basis`
-    // is display text, and two withdrawn findings can share a sentence.
-    // `id` used to live here separately and be discarded by `strip`. It is
-    // `EvaluationRecord.evaluation` now, so there is one field rather than two
-    // and nothing to drop on the way out.
-    type TimedEvaluation = EvaluationRecord & {
-      cited: number;
-      standing: number;
-    };
-    const byCriterion = new Map<string, { proposition: string; evaluations: TimedEvaluation[] }>();
-    for (const row of rows) {
-      const id = row.c.natural_id;
-      const entry = byCriterion.get(id) ?? {
-        proposition: row.c.proposition,
-        evaluations: [],
-      };
-      if (row.ev) {
-        // One row per (evaluation, basis) pair, so an evaluation citing several
-        // findings arrives more than once. Accumulate rather than push.
-        const seen = entry.evaluations.find((e) => e.evaluation === row.ev!.natural_id);
-        const record = seen ?? {
-          evaluation: ref("evaluation", row.ev.natural_id),
-          criterion: ref("criterion", id),
-          value: row.ev.value,
-          outcome: row.ev.outcome,
-          at: row.ev.evaluated_at,
-          basis: [] as CitedFinding[],
-          cited: 0,
-          standing: 0,
-        };
-        if (row.basis) {
-          // By id, not by statement: two findings can say the same sentence.
-          if (!record.basis.some((b) => b.evidence === row.basis!.natural_id))
-            record.basis.push({
-              evidence: ref("evidence", row.basis.natural_id),
-              states: row.basis.statement,
-            });
-          record.cited += 1;
-          if (!row.basisout?.invalidated) record.standing += 1;
-        }
-        if (!seen) entry.evaluations.push(record);
-      }
-      byCriterion.set(id, entry);
-    }
-
-    /**
-     * A verdict is withdrawn when everything it was reached against has
-     * been. A verdict that cited nothing cannot be withdrawn at all — there
-     * is nothing to retract — which is what keeps S-8's asserted-versus-
-     * measured distinction (row W) from becoming a loophole.
-     */
-    const isWithdrawn = (e: TimedEvaluation): boolean => e.cited > 0 && e.standing === 0;
-
-    const strip = (e: TimedEvaluation): EvaluationRecord => ({
-      evaluation: e.evaluation,
-      criterion: e.criterion,
-      value: e.value,
-      outcome: e.outcome,
-      at: e.at,
-      basis: [...e.basis].sort((x, y) => x.evidence.localeCompare(y.evidence)),
-      // Present only when true, so a record that stands is byte-identical to
-      // what it was before this field existed.
-      ...(isWithdrawn(e) ? { withdrawn: true as const } : {}),
-    });
-
-    const checks: CheckStatus[] = [];
-    for (const [id, entry] of byCriterion) {
-      // Cypher imposes no ordering, so sort explicitly: by time, then by
-      // identity. Without this, which evaluation gets reported as "the" value
-      // of a check is not a stable contract between runs.
-      const ordered = entry.evaluations.sort(
-        (a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation),
-      );
-
-      // A failure sticks -- among verdicts that still stand. One failing
-      // evaluation is decisive even if a later run passed, so re-running
-      // until green is not evidence (S-3, and the case that earned this).
-      //
-      // S-3c narrowed it, and only here: a verdict whose entire basis has
-      // been reviewed and withdrawn is not a failure that stands, it is a
-      // failure that was retracted. Before this the two were the same state,
-      // so a check found to be defective, corrected and re-run went on
-      // disqualifying the finding and blocking the work for ever -- the same
-      // answer as re-rolling the dice, which is the one thing S-3 set out to
-      // prevent. Ledger row X.
-      //
-      // What did NOT change: the withdrawn verdict stays in `evaluations`,
-      // marked. Erasing it would leave no record of why the finding was ever
-      // in doubt, and re-running a check that nobody faulted still cannot
-      // clear it, because nothing withdraws it.
-      const standing = ordered.filter((e) => !isWithdrawn(e));
-      const decisive = standing.find((e) => e.outcome === "fail") ?? standing[0];
-      // Three ways to have no decisive verdict, and only one of them is
-      // "nobody ran this". A check every one of whose verdicts has been
-      // withdrawn *ran*, and saying `never-run` contradicted the evaluations
-      // listed beside it -- external review of S-3c.
-      const state: CheckStatus["state"] =
-        decisive !== undefined
-          ? decisive.outcome === "fail"
-            ? "failed"
-            : "passed"
-          : ordered.length > 0
-            ? "no-standing-verdict"
-            : "never-run";
-      checks.push({
-        criterion: ref("criterion", id),
-        proposition: entry.proposition,
-        state,
-        evaluations: ordered.map(strip),
-        ...(decisive ? { decidedBy: strip(decisive) } : {}),
-      });
-    }
-
-    return checks;
-  }
-
-  // -------------------------------------------------------------------------
-  // Revision
-  // -------------------------------------------------------------------------
 
   /**
    * An interpretation and every narrowing behind it, oldest first.
@@ -1564,28 +1396,16 @@ export class ReadSurface extends SessionCore {
     // computation, not a detour through the enquiry. Only currently-standing
     // findings count: a superseded analysis's inputs are not what the claim
     // rests on now.
-    const resting = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       ${this.withinScope(scope)}
-       MATCH (u)-[:USES]->(comp:Computation)
-       MATCH (comp)-[:CONSUMES]->(a:Artefact)
-       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL OR out.invalidated = false
-       RETURN a, e`,
-      {
-        // `natural_id` because `restingOn` deduplicates by identity, not by
-        // name -- see where it is built below, and S-9d. `invalidated` rides
-        // along on the same row: the filter above is on the evidence's OWN
-        // output, never on what the computation read, so a retracted input was
-        // reported with nothing marking it (S-11e).
-        a: vertexProps<ArtefactProps & { natural_id: string }>(),
-        e: vertexProps<{ natural_id: string }>(),
-      },
-      {
-        name: proposition,
-        ...this.scopeParams(scope),
-      },
-    );
+    // Both bearings and by handle, for the reasons on `checksAnchor` — a claim
+    // its evidence bears *against* rests on inputs exactly as one it supports
+    // does, and the one-sided walk reported `restingOn: []` for it.
+    const resting = (
+      await Promise.all(
+        (["SUPPORTS", "CHALLENGES"] as const).map((bearing) =>
+          this.artefactsConsumedBy(scope, bearing),
+        ),
+      )
+    ).flat();
 
     // The standard the finding was held to, if it was held to one. S-3b: the
     // criteria a researcher agreed before the run are what "does this stand?"
@@ -1604,35 +1424,25 @@ export class ReadSurface extends SessionCore {
     // is not qualified the way `supported` now is. Nothing in the corpus holds
     // a challenging analysis to a prespecified standard; the scenario that
     // would settle it is a null result whose robustness checks disagree.
-    const standardRows = await this.graph.query(
-      `MATCH (:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       ${this.withinScope(scope)}
-       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL OR out.invalidated = false
-       MATCH (crit:Criterion)-[:QUALIFIES]->(u)
-       OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
-       OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
-       OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)
-       RETURN crit AS c, ev, basis, basisout`,
-      {
-        c: vertexProps<{ natural_id: string; proposition: string }>(),
-        ev: optional(
-          vertexProps<{
-            natural_id: string;
-            value: string;
-            outcome: "pass" | "fail";
-            evaluated_at: string;
-          }>(),
-        ),
-        basis: optional(vertexProps<{ statement: string } & Identified>()),
-        basisout: optional(vertexProps<{ invalidated?: boolean }>()),
-      },
-      {
-        name: proposition,
-        ...this.scopeParams(scope),
-      },
-    );
-    const standard = this.checksFrom(standardRows);
+    // The same fact the survey and a gate read, so "which checks does this
+    // claim answer to" is one definition. Selected by handle: two analyses in
+    // one enquiry concluding the same sentence are two claims, and matching by
+    // wording made this verb and `whatIsKnown` contradict each other.
+    // Both bearings, merged — the idiom `findingsBearing` uses, and the reason
+    // it is a loop rather than two hand-written anchors is that the one-sided
+    // version is silent: a promoted negative result reported "held to no
+    // prespecified standard" while the record held the check.
+    const byCriterion = new Map<CriterionRef, CheckStatus>();
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const { cypher, decoders } = compose(checksAnchor(bearing), checkStatus, {
+        crit: vertexProps<{ natural_id: string; proposition: string }>(),
+      });
+      const rows = (await this.graph.query(cypher, decoders, { claim })) as unknown as Row[];
+      for (const [criterion, check] of per(checkStatus, rows)) {
+        byCriterion.set(ref("criterion", criterion), check);
+      }
+    }
+    const standard = [...byCriterion.values()];
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
     // and the two must agree, since in S-3 they are the same checks.
@@ -1655,16 +1465,24 @@ export class ReadSurface extends SessionCore {
 
     // Standing, and why it was conferred. Read from the claim rather than the
     // conclusion so a promotion taken later is visible here at all.
+    // By handle, and with no traversal at all. This used to reach the claim
+    // through `<-[:SUPPORTS]-`, which meant a **promoted negative result read
+    // as exploratory** — the promotion is on the claim, and the walk that found
+    // it could not reach a claim its evidence bears against. Selecting by name
+    // within an enquiry also let it return a *different* claim's promotion,
+    // since two analyses in one enquiry can conclude the same sentence.
+    //
+    // The traversal was never load-bearing: a promotion is an edge on the claim.
+    // Removing it deletes the footgun rather than handling it.
     const promotion = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       ${this.withinScope(scope)}
+      `MATCH (c:Claim {natural_id: $claim})
        OPTIONAL MATCH (d:Decision)-[:PROMOTES]->(c)
        RETURN c, d`,
       {
         c: vertexProps<{ kind?: string }>(),
         d: optional(vertexProps<{ reason: string }>()),
       },
-      { name: proposition, ...this.scopeParams(scope) },
+      { claim },
     );
     const confirmed = promotion.some((r) => r.c.kind === "confirmatory");
     const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
@@ -1916,6 +1734,51 @@ export class ReadSurface extends SessionCore {
       ],
       complete: false,
     };
+  }
+
+  /**
+   * The artefacts a claim's still-current analyses consumed, for one bearing.
+   *
+   * The inverse of {@link restingOnArtefact}, which walks artefact → claims.
+   * Named apart deliberately: `restingArtefacts` beside `restingOnArtefact` was
+   * two names one letter apart for opposite traversals.
+   *
+   * One hop from the computation, not a detour through the enquiry. Only
+   * currently-standing findings count: a superseded analysis's inputs are not
+   * what the claim rests on now — and the `invalidated` filter is on the
+   * evidence's **own** output, never on what the computation read, because a
+   * retracted input must still be reported and marked (S-11e).
+   *
+   * Called once per bearing: the single-bearing version reported an empty list
+   * for a claim its evidence bears *against* (S-18b's shape), the same silent
+   * hole `checksAnchor` exists to close.
+   *
+   * **Selected by proposition within the enquiry, not by handle** — the same
+   * exception `findingsBearing` documents, and refuted the same way: selecting
+   * by handle emptied `restingOn` for a two-stage pipeline in
+   * `tests/subject-identity.test.ts`. What a claim rests on aggregates over the
+   * proposition; what it was *held to* belongs to one analysis.
+   */
+  private async artefactsConsumedBy(
+    scope: { proposition: IndexedString; enquiry?: EnquiryRef },
+    bearing: "SUPPORTS" | "CHALLENGES",
+  ): Promise<{ a: ArtefactProps & Identified; e: Identified }[]> {
+    return this.graph.query(
+      `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+       ${this.withinScope(scope)}
+       MATCH (u)-[:USES]->(comp:Computation)
+       MATCH (comp)-[:CONSUMES]->(a:Artefact)
+       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
+       WHERE out.invalidated IS NULL OR out.invalidated = false
+       RETURN a, e`,
+      {
+        // `natural_id` because `restingOn` deduplicates by identity, not by
+        // name — see S-9d.
+        a: vertexProps<ArtefactProps & { natural_id: string }>(),
+        e: vertexProps<{ natural_id: string }>(),
+      },
+      { name: scope.proposition, ...this.scopeParams(scope) },
+    );
   }
 
   /** The claims and enquiries resting on one artefact, by the two direct routes. */
