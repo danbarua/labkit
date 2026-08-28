@@ -464,3 +464,36 @@ defect is gone: `main` wires `"command": "labkit"` with `LABKIT_HOME` and has no
 `--cwd`.
 
 One correction to the record: #69's prose was imported into **#72**, not #74.
+
+### `e39e1e3` — the label table, deleted rather than reconciled
+
+`labkit-review` proposed a table reconciliation job, then withdrew it on the
+grounds that a second copy of state is the defect and machinery to keep it true
+is the sixth principle inverted. Agreed and acted on: CLAUDE.md's label table is
+gone and `gh label list` is the label list.
+
+Re-measured here before deleting, and it is worse than reported: the sentence
+above the table said *"six labels"* over **eight** rows, and it had been wrong
+about its own row count **since the day it was written** — so no refresh would
+ever have caught it. `suite-margin` was gone, its issues (#52, #54) already
+moved to `tooling`. Two labels the table never knew about exist as well,
+`user-experience` and `accessibility`, carried by four issues.
+
+**The reviewer's own measurement was stale by the time it was checked**, which
+is the argument landing on itself rather than a criticism of it.
+
+A sync job and a `check:` script were both declined, in the commit message so
+neither is rediscovered as a gap. `check:ledger` is the precedent: it existed
+only to police a copy that should not have existed, and deleting the copy
+deleted the checker.
+
+Two conventions kept as prose, being about what you do rather than what a label
+means — `not-doing` is closed as not planned, and a `deferred` issue names the
+issue that would unpark it.
+
+Their substantive point — no label for build/CI — was **not** acted on. #43
+already sits in `tooling` and reads correctly there; only PR #73 is homeless,
+and one PR is not a case for a label. Left for the second one.
+
+Open as PR **#77**, off `main`, separate from #75 so the two do not both edit
+this entry.
