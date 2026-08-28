@@ -52,3 +52,18 @@ infra/**/*.tfstate.*
 
 # `.terraform.lock.hcl` is deliberately NOT ignored: it pins provider versions
 # and belongs in the repo for the same reason `bun.lock` does.
+
+
+# Rust. `cargo init` wrote a rooted `/target`, which does not cover the spike
+# crate at `spikes/labkit-rust/` — so the build directory was untracked-but-not-
+# ignored and would have gone into the first commit. Unrooted, so it covers a
+# crate at any depth.
+target/
+
+# `Cargo.lock` is NOT ignored: the spike ships a binary, and a binary's build
+# should be reproducible for the same reason `bun.lock` is tracked.
+
+# Grafeo writes a database directory named for the path it was given. A probe
+# run without `--db` leaves one at the repo root; `local:` is the bus inbox
+# landing in the same place.
+local:/
