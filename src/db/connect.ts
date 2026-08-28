@@ -66,11 +66,26 @@ export function resolveProjectRoot(
  *
  * `git rev-parse --git-common-dir` names the one `.git` a repository has,
  * whichever worktree you ask from — its parent is the project root. That is the
- * whole fix: a worktree is a **sibling** of the main checkout, not a
- * descendant, so no amount of walking up from
- * `…/labkit.worktrees/feat-mcp-server` ever passes through `…/labkit`. The walk
- * finds nothing, and the first command run in a fresh worktree therefore
+ * whole fix, and it holds **wherever the worktree sits**, which is the part to
+ * get right: `git worktree add` takes any path.
+ *
+ * This repository's worktrees are **siblings** — `…/labkit.worktrees/feat-mcp-server`
+ * beside `…/labkit` — so walking up from one never passes through the checkout,
+ * the walk finds nothing, and the first command run in a fresh worktree
  * *creates* a database instead of finding the project's.
+ *
+ * **Claude Code puts them at `<repo>/.claude/worktrees/<name>`, inside the
+ * repository**, and there the walk *does* find the parent's `.labkit/` — the
+ * same answer this function gives, so the two agree rather than the fallback
+ * being wrong. Measured 2026-08-28 in both layouts.
+ *
+ * So the property that decides anything is not nested-versus-adjacent, it is
+ * **whether a repository sits above you**. Here that only decides whether the
+ * walk has something to find, because one record per repository makes the
+ * parent the right answer either way; in a project whose rule is one record per
+ * *worktree* the same observation would be a defect. Reported from
+ * `exo-ledger`, which had it backwards in the other direction — "nested is
+ * dangerous" is false for both of us, for opposite reasons.
  *
  * That is not hypothetical. Measured 2026-08-27, three `.labkit/` directories
  * existed on this machine for one project — 41M, 60M and 41M, last written on
