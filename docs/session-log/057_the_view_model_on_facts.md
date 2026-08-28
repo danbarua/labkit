@@ -430,3 +430,70 @@ nothing, which is the test for whether the pointer was load-bearing.
 `CLAUDE.md`'s mention stays: past tense, and it records the replacement.
 
 `bun run check` — **19/19**. PR **#74**.
+
+### `24379f9` — culling merged branches found an orphaned entry
+
+Fourteen stale remote branches deleted, leaving `main` and the recovery branch.
+Six were `docs/*` and eight `feat/`/`fix/`; `git merge-base --is-ancestor` called
+all fourteen **unmerged**, and that reading was wrong for every one — a squash
+merge takes the branch as it stood and leaves no ancestry, which is the same
+blind spot `.githooks/pre-push` exists for.
+
+`docs/digest-status` is the one worth naming: it had **no PR at all**, having
+been merged by hand, so the hook would not have protected it either. Its content
+was verified by comparing files rather than subjects — `docs/digest-design.md`
+byte-identical to `main`'s.
+
+**The find: `main`'s session log had a gap at 054 → 056.** Entry **055** was
+written on `feat/survey-consults-checks`, which closed unmerged as PR #69 once
+#72 superseded its work. Every other file on that branch reached `main` by
+another route — the S-19 scenario, `read.ts`, `report.ts`, the glossary, the
+ledger — and the wrap entry did not. Deleting the branch would have taken the
+only copy, **silently**; the gap in the numbering is the only thing that showed
+it. Third time a squash has eaten a session-log entry, after the two #40
+restored.
+
+Restored verbatim on PR **#75**, `checksMetFor` account included. A session log
+is a dated record and says what was true on 2026-08-27.
+
+**Checked rather than assumed before deleting the two closed-unmerged
+branches.** #34's work is genuinely superseded by #35, and `main`'s entry 046
+says so itself — it names PR #34 as *"to be closed unmerged"* and explains it
+merged the two write-ups rather than describing one surface twice. The README
+defect is gone: `main` wires `"command": "labkit"` with `LABKIT_HOME` and has no
+`--cwd`.
+
+One correction to the record: #69's prose was imported into **#72**, not #74.
+
+### `e39e1e3` — the label table, deleted rather than reconciled
+
+`labkit-review` proposed a table reconciliation job, then withdrew it on the
+grounds that a second copy of state is the defect and machinery to keep it true
+is the sixth principle inverted. Agreed and acted on: CLAUDE.md's label table is
+gone and `gh label list` is the label list.
+
+Re-measured here before deleting, and it is worse than reported: the sentence
+above the table said *"six labels"* over **eight** rows, and it had been wrong
+about its own row count **since the day it was written** — so no refresh would
+ever have caught it. `suite-margin` was gone, its issues (#52, #54) already
+moved to `tooling`. Two labels the table never knew about exist as well,
+`user-experience` and `accessibility`, carried by four issues.
+
+**The reviewer's own measurement was stale by the time it was checked**, which
+is the argument landing on itself rather than a criticism of it.
+
+A sync job and a `check:` script were both declined, in the commit message so
+neither is rediscovered as a gap. `check:ledger` is the precedent: it existed
+only to police a copy that should not have existed, and deleting the copy
+deleted the checker.
+
+Two conventions kept as prose, being about what you do rather than what a label
+means — `not-doing` is closed as not planned, and a `deferred` issue names the
+issue that would unpark it.
+
+Their substantive point — no label for build/CI — was **not** acted on. #43
+already sits in `tooling` and reads correctly there; only PR #73 is homeless,
+and one PR is not a case for a label. Left for the second one.
+
+Open as PR **#77**, off `main`, separate from #75 so the two do not both edit
+this entry.
