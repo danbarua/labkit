@@ -702,7 +702,6 @@ export class WriteSurface extends SessionCore {
         mayRead: input.mayRead ?? [],
         outputs: "",
         acceptance: input.acceptance,
-        is_open: true,
       });
       await this.emit("planWork", ref("work", task.natural_id), {
         objective: input.objective,

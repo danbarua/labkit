@@ -638,6 +638,24 @@ export interface ComputationProps {
   environment_ref?: IdentityString;
 }
 
+/**
+ * **`is_open` was here until 2026-08-28, and it went for the reason
+ * {@link DecisionProps}'s did — the same defect, in the neighbouring type.**
+ *
+ * `planWork` passed `is_open: true` and nothing anywhere read it. That is
+ * `DecisionProps.is_open` exactly: written by every writer, consulted by no
+ * reader, removed on 2026-08-24 with the note above.
+ *
+ * Found while deriving the states for `workList` (#66), which is the moment it
+ * mattered: a stored flag is the obvious thing for a work-queue filter to read,
+ * and it would have been the first place the queue rotted. Whether a task is
+ * still open is computed from what the graph holds — a gate that protects it,
+ * an analysis that implements it — the same way `gateStatus` computes four
+ * states with no value anyone can set to `satisfied`.
+ *
+ * `outputs` stays, and the contrast is the point: it is also written-and-unread,
+ * and it carries a reason that names what is missing. This carried none.
+ */
 export interface TaskProps {
   objective: Prose;
   /**
@@ -656,7 +674,6 @@ export interface TaskProps {
   /** Hardcoded `""` by the only writer. What a task produced has nowhere to be said yet. */
   outputs: ReadOnlyString;
   acceptance: Prose;
-  is_open?: boolean;
 }
 
 /**
