@@ -24,7 +24,7 @@
  */
 
 import { buildProgram } from "./program";
-import { logFailedRequest } from "../request-log";
+import { logFailedRequest, type Adapter } from "../request-log";
 import { runner } from "./session";
 
 /**
@@ -56,7 +56,7 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
     // not the parsed options: a parse failure never produces options, and that
     // is the case this is most useful for — "unexpected input" is exactly what
     // you cannot reconstruct from a stack trace. See `src/request-log.ts`.
-    logFailedRequest({ surface: "cli", argv }, error);
+    logFailedRequest({ adapter: "cli" satisfies Adapter, argv }, error);
     console.error(`labkit: ${error.message}`);
     return 1;
   }

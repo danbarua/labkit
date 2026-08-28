@@ -73,7 +73,7 @@ describe("logFailedRequest", () => {
 
   test("writes one line of JSON naming the request and the error", () => {
     const line = captured(() =>
-      logFailedRequest({ surface: "cli", argv: ["why", "CLM_9"] }, new Error("no claim CLM_9")),
+      logFailedRequest({ adapter: "cli", argv: ["why", "CLM_9"] }, new Error("no claim CLM_9")),
     );
     expect(line.trim().split("\n")).toHaveLength(1);
     const parsed = JSON.parse(line) as {

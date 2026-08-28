@@ -98,11 +98,46 @@ export function truncated(value: unknown, depth = 0, seen = new WeakSet<object>(
 }
 
 /**
+ * Which door a request came through — ports and adapters, and these are the
+ * adapters.
+ *
+ * **Named `adapter` because it was `surface`, and `surface` is taken.**
+ * `ReadSurface` and `WriteSurface` are the read and write halves of the domain,
+ * 78 references' worth, so `surface: "mcp"` was a field whose value came from a
+ * different axis than its name. CLAUDE.md's architecture section already calls
+ * these *"two adapters over one domain"*, so this is the repository's own word
+ * rather than a borrowed one.
+ *
+ * **It is not the actor, and the name has to keep saying so.** This sits beside
+ * `attribution_id` wherever it goes next, and the reason the two exist
+ * separately is that *who acted* and *how they reached us* are different
+ * questions that have already been merged once. A name like `accessed_by` reads
+ * as an answer to the first.
+ *
+ * **The mcp split is by transport because #91 made it load-bearing.** One
+ * process per client (stdio) and one process serving many (http) is exactly the
+ * difference that produced a shared session registry writing one agent's name
+ * onto another's work. A reader who cannot separate them cannot see that class
+ * of defect.
+ *
+ * `mcp-http` has no producer yet and is declared anyway — unusually, and for a
+ * stated reason: it is the value whose *absence* a reader would otherwise take
+ * as evidence, and the peer session's HTTP work will emit it. If that work is
+ * abandoned, this value goes with it.
+ */
+export type Adapter = "cli" | "mcp-stdio" | "mcp-http";
+
+/**
  * Writes the failed request beside its error.
  *
  * Takes the error rather than throwing or formatting it: the caller decides
  * what the *user* sees, which differs between a CLI and an MCP server, and this
  * only ever adds a line to the log.
+ *
+ * `request` stays `unknown`: each adapter logs a different shape — the CLI its
+ * `argv`, the server its tool name and arguments — and the one field they share
+ * is typed by {@link Adapter} at the call site rather than by a wrapper here
+ * that would have to know both.
  */
 export function logFailedRequest(request: unknown, error: unknown): void {
   const e = error as { message?: string; code?: string; name?: string };
