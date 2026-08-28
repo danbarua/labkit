@@ -39,10 +39,19 @@ COPY scripts/spike-migrate.ts scripts/spike-http-server.ts ./scripts/
 ENV LABKIT_TENANT=labkit
 EXPOSE 8899
 
-# Migrate, then serve. Two steps rather than one because that is what the
-# design says they are: `directPostgresBackend` does not migrate on connect
-# (PJ-004) since N processes racing to migrate is the failure it avoids, so the
-# deploy step is separate and idempotent. Running it in the entrypoint of a
-# single-replica spike is fine; a second replica would want it lifted out into
-# a job that runs once.
-CMD ["sh", "-c", "bun scripts/spike-migrate.ts && exec bun scripts/spike-http-server.ts --port 8899"]
+# Serve, and nothing else. **Migration is a separate one-shot service** — see
+# the `migrate` service in `docker-compose.yml`.
+#
+# It was `migrate && serve` in this entrypoint until 2026-08-28, on the
+# reasoning that a single-replica spike could get away with it, with a note
+# that "a second replica would want it lifted out into a job that runs once".
+# The second replica arrived the same afternoon, for the pooler experiment, and
+# the two of them raced exactly as predicted:
+#
+#   web-beta-1 | code: "42P07"   (relation already exists)
+#   web-beta-1 | routine: "heap_create_with_catalog"
+#
+# Which is PJ-004's argument reproduced rather than argued: it is *why*
+# `directPostgresBackend` does not migrate on connect. A note saying a shortcut
+# will break under a condition is not a substitute for not taking it.
+CMD ["bun", "scripts/spike-http-server.ts", "--port", "8899"]
