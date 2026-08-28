@@ -141,16 +141,29 @@ TypeScript configuration problem and is not one. `bun run check:doc-comments`
 passes throughout, being a plain script with no dependencies, so a green check
 is available to mislead you. Found on 2026-08-22 in this state.
 
-Two more things a worktree will not have, because they are untracked:
+One more thing a worktree will not have, because it is untracked:
 
 - `.claude/settings.local.json`, `.claude/.wrap-state/` and
   `.claude/hookify.*.local.md`. The hookify rules are the ones worth copying
   across — they warn on mistakes already made in this repo. `.wrap-state/` must
   be **seeded** before the first Stop fire or the first wrap is silently
   swallowed; `.claude/skills/wrap/SKILL.md` §Forking has the command.
-- **Git hooks, which have to be turned on: `bun run dev:install-hooks`.** Hooks
-  are not cloned and `core.hooksPath` is per-repository config, so a fresh clone
-  or worktree has none and says nothing about it.
+
+**Git hooks are not one of them, and this file said they were until
+2026-08-28.** `core.hooksPath` is *per-repository* config, and a linked worktree
+shares the repository's `config` file — so a worktree inherits whatever the main
+checkout was given. Measured rather than reasoned about:
+
+```sh
+$ git config --show-origin core.hooksPath      # run inside a worktree
+file:/Users/dan/Code/science/labkit/.git/config	.githooks
+```
+
+That is the *main checkout's* config answering a worktree's question. A fresh
+**clone** is the case that really starts unprotected, and it is now closed by a
+`postinstall` on `bun install` — the one command a fresh clone cannot skip, as
+the top of this section says. `bun run dev:install-hooks` still exists and is
+still idempotent, for a checkout whose config was cleared by hand.
 
   There is one, `.githooks/pre-push`: it refuses a push to a branch whose pull
   request GitHub has already merged or closed. Such a push **succeeds and
