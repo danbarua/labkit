@@ -22,10 +22,16 @@
  * every fixture test check the uncoloured path only.
  *
  * picocolors was picked by measurement, not size — see PJ or the PR for the
- * table. Under Bun 1.3.14, `node:util`'s `styleText` writes escapes into a pipe
- * and ignores `NO_COLOR` entirely, and `ansis` writes escapes into a pipe with
- * no environment variables set at all. Either would have broken
+ * table. Under Bun **1.3.14**, `node:util`'s `styleText` wrote escapes into a
+ * pipe and ignored `NO_COLOR` entirely, and `ansis` wrote escapes into a pipe
+ * with no environment variables set at all. Either would have broken
  * `$(labkit analyse …)`, which every write command's output is built around.
+ *
+ * **`styleText` no longer behaves that way.** Re-measured on bun 1.4.0,
+ * 2026-08-28: it returns bare text into a pipe and under `NO_COLOR`. The choice
+ * stands — picocolors works and nothing here needs changing — but the reason
+ * above is now a dated record rather than a live fact, and a reader who tests
+ * it on a current bun will find it false. `ansis` was not re-measured.
  */
 
 import { createColors } from "picocolors";

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Compiles src/cli/cli.ts to bin/labkit, from a scratch directory.
 #
-# **`bun build --compile` leaves a 61MB file behind on every successful run**,
+# **`bun build --compile` leaves a copy of the `bun` binary behind on every
+# successful run** -- 61MB on bun 1.3.14, 57MB on 1.4.0; it is whatever `bun`
+# currently weighs, re-measured 2026-08-28 --
 # and the scratch directory is the whole reason this is a script rather than the
 # `package.json` one-liner it used to be.
 #
 # What it leaves is a **byte-identical copy of the `bun` binary itself** —
-# verified by sha256, against `bun --version` 1.3.14 — named
+# verified by sha256 against `bun --version` 1.3.14 and again on 1.4.0 — named
 # `.<hash>-00000000.bun-build`. Bun stages its own runtime, appends the bundle
 # to produce the outfile, and never removes the staged copy. It is not a crash
 # artefact and not a cache: the hash differs per build, so they accumulate, and
