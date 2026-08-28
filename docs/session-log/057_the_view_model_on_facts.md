@@ -39,6 +39,8 @@ graph, S-19 gains its fourth case, and ledger row **AL** gains a glossary
 entry.
 **`dd34e40`** — the last fact holding two names for one subject takes the
 bearing too.
+**`ffc598b`** — `check:facts` enforces two of the three fact rules; the
+glossary gains the severity test and the mutation-coverage numbers.
 
 ## Verified
 
@@ -236,6 +238,29 @@ result, and because what saved it was the design rather than the test.
 Better than empty-versus-wrong for deciding where to spend attention. Ours was
 the second kind: `established` is not a smaller answer than `provisional`, it is
 a prompt to build on something. Not yet written anywhere durable.
+
+**Two of the three fact rules are now a check, and the reason they can be is
+the reason they were needed: the type system cannot carry either.** An inline
+grain and an undeclared clause dependency are both well-typed; both were live
+defects during this port; neither errored at the time.
+
+The third is **not** checked and says so — `empty` returning a shared object
+rather than a fresh one satisfies `() => T` either way, and telling them apart
+needs to know whether the value escapes. Better admitted than half-checked.
+
+**Two things went wrong writing it, and the second is the one worth keeping.**
+
+The check was first **red for the wrong reason**: `answering` is bound by two
+facts since `standingAsOf` was parameterised, and the map held one. It resolves
+`needs` by *declaration* rather than by fact name, because a parameterised
+factory yields one name for several bearings.
+
+Then the **control for the second rule was a false green.** The substitution
+never matched, so nothing was mutated and the check reported OK on a mutation
+that did not exist. Caught by asserting the mutation applied before running.
+That is this repo's own *a check that cannot fail is not a check* arriving in
+the **control** rather than in the check — a place it had not been seen before,
+and the reason to assert that a negative control actually changed something.
 
 **PR #72 is ready.** Dan accepted the more-than-one-reader line — his words
 for it were better than mine: *"can't find a way to shrink one line of code into
