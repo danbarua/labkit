@@ -77,7 +77,18 @@ Raised with Dan, not yet on #81.
 
 `gh pr view 103`.
 
-Then #81's first commit, which is now shaped: `trace_id` and `adapter` on
-`CommandContext`, needing no migration and no new provenance grade. The `how`
-field is a migration and is earned separately, by #91's shared-registry result
-rather than by tidiness — see #81's own comment thread.
+Then #81, whose shape changed after this entry was written — **twice, and both
+corrections are on the issue rather than here.**
+
+`trace_id` on `CommandContext` was going to be the first commit *because* it
+needs no migration. It also has **no producer**: the CLI has none, stdio MCP has
+none, and `Mcp-Session-Id` exists only in stateful HTTP mode. A field nothing
+fills is the objection this session made twice to other people's enums, and it
+applies here.
+
+And `how` is **not** earned by #91. The HTTP transport is not in `src/` —
+`grep -rln "StreamableHTTP" src/` finds nothing — so the shared-registry
+failure is a spike finding against unshipped code, and this entry called it a
+demonstrated defect. What earns it is live and simpler: `labkit pose` and
+`labkit --author dan pose` write **byte-identical** attribution, one observed
+from the OS and one asserted by whoever typed it. Measured, on `main`.
