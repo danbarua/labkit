@@ -43,6 +43,13 @@
       "when": 1787942224208,
       "tag": "0005_equal_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787945703435,
+      "tag": "0006_sour_vermin",
+      "breakpoints": true
     }
   ]
 }

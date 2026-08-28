@@ -46,6 +46,10 @@
  * reaches the end of this process and stops. See PJ-031.
  */
 
+import type { MintedEdge } from "../db/domain";
+
+export type { MintedEdge };
+
 /** Injected so scenario tests can assert on exact timestamps instead of racing the wall clock. */
 export interface Clock {
   now(): string;
@@ -260,6 +264,28 @@ export interface DomainEvent {
    * empty if the act minted nothing.
    */
   created?: readonly string[];
+  /**
+   * Every edge this act created.
+   *
+   * The other half of {@link created}, and it did not exist until 2026-08-28.
+   * `createNode` had pushed to a buffer since the collector was written;
+   * `createEdge` pushed to nothing, so `recordAnalysis` wrote eight edges and
+   * the log reported none — the act's nodes were visible and what connected
+   * them was not.
+   *
+   * **Not earned by a wrong answer, and the commit says so.** An event missing
+   * its edges was *incomplete*, and PJ-011 §5 is explicit that an empty result
+   * is not a wrong one. What earned it is a consumer, exactly as attribution
+   * earned the durable log in PJ-032: which edges an act created is
+   * unreconstructable from the graph, because the graph holds the edge and not
+   * the act that made it — and unlike a node there is no `created` to fall back
+   * on.
+   *
+   * Optional for the same reason as {@link created}: rows written before the
+   * column existed have none, and `null` says that rather than "this act
+   * connected nothing".
+   */
+  edges?: readonly MintedEdge[];
   detail?: Record<string, unknown>;
 }
 

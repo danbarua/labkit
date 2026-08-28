@@ -147,6 +147,129 @@ describe("an event commits with the writes it describes, or not at all", () => {
     const [event] = await log.all();
     expect(event!.created).toEqual([question]);
   });
+
+  /**
+   * The same guard, for the other buffer.
+   *
+   * **It must fail on a verb whose failing edge is not its first**, and the
+   * obvious choice is wrong: `openEnquiry` mints `MOTIVATES` and nothing else,
+   * so injecting there leaves an empty buffer and the assertion below holds
+   * whether or not anything clears it. That version was written, run against a
+   * removed clear, and passed — a check that cannot fail.
+   *
+   * `recordAnalysis` writes eight edges. Failing on `SUPPORTS`, the last,
+   * leaves seven in the buffer at the throw.
+   */
+  test("after a failure, the next event claims only its own edges", async () => {
+    const { graph, ctx, write } = await surfaceFor("labkit");
+    const log = pgEventLog(db, ctx.tenantId);
+    const enquiry = await write.openEnquiry("the one that fails");
+    const raw = await write.recordObservations({
+      enquiry,
+      name: "panel-a",
+      finding: "120 panels",
+    });
+
+    const realCreateEdge = graph.createEdge.bind(graph);
+    graph.createEdge = (async (from: string, edge: string, to: string) => {
+      if (edge === "SUPPORTS") throw new Error("injected: SUPPORTS failed");
+      return realCreateEdge(from as never, edge as never, to as never);
+    }) as typeof graph.createEdge;
+    await expect(
+      write.recordAnalysis({
+        enquiry,
+        method: "regression",
+        from: [raw],
+        concludes: [{ proposition: "it holds", finding: "no failures" }],
+      }),
+    ).rejects.toThrow(/injected/);
+    graph.createEdge = realCreateEdge;
+
+    // `pose` connects nothing, so the only way this is non-empty is residue
+    // from the six edges the failed analysis had already written.
+    await write.pose("the one that succeeds");
+    const events = await log.select({ operation: "pose" });
+    expect(events.at(-1)!.edges).toEqual([]);
+  });
+});
+
+describe("an event records the edges the act created", () => {
+  /**
+   * **The asymmetry this closed.** `createNode` pushed to a buffer from the day
+   * the collector was written; `createEdge` pushed to nothing. So an act's
+   * nodes were visible in the log and what connected them was not —
+   * `recordAnalysis` writes five nodes and eight edges, and reported zero.
+   *
+   * Asserted on the compound verb rather than a one-edge one, because the
+   * single-edge case passes under a collector that only ever remembers the
+   * last write.
+   */
+  test("recordAnalysis reports every edge, not only its nodes", async () => {
+    const { ctx, write } = await surfaceFor("labkit");
+    const log = pgEventLog(db, ctx.tenantId);
+    const enquiry = await write.openEnquiry("does the coating hold?");
+    const raw = await write.recordObservations({
+      enquiry,
+      name: "panel-a",
+      finding: "120 panels, 90 days",
+    });
+    await write.recordAnalysis({
+      enquiry,
+      method: "regression",
+      from: [raw],
+      concludes: [{ proposition: "the coating holds", finding: "no failures at 90 days" }],
+    });
+
+    const [analysis] = await log.select({ operation: "recordAnalysis" });
+    // `string[]`, not `EdgeLabel[]`: the expectation below is a literal list
+    // and unifying the two on the branded union buys nothing here.
+    const labels: string[] = (analysis!.edges ?? []).map((e) => e.label);
+    labels.sort();
+
+    // Every one of these is written by `recorded()` and none appears in
+    // `detail`, which carries the enquiry, the method and the propositions.
+    //
+    // **Three `PRODUCES`, and the third is the point of writing this list
+    // out.** Two are obvious — the computation's artefact and the evidence
+    // unit's evidence. The third is `EvidenceUnit -> Artefact`, which CLAUDE.md
+    // names as the repository's one endpoint pair with a writer and no reader.
+    // It was invisible to the event log until this column existed, and the
+    // first run of this test expected two and found three.
+    expect(labels).toEqual(
+      [
+        "ADDRESSES",
+        "CONSUMES",
+        "PRODUCES",
+        "PRODUCES",
+        "PRODUCES",
+        "RECORDED_IN",
+        "SUPPORTS",
+        "USES",
+      ].sort(),
+    );
+
+    // Endpoints, not just labels: a collector that recorded the label and lost
+    // the pair would satisfy the assertion above.
+    const consumes = analysis!.edges!.find((e) => e.label === "CONSUMES");
+    expect(consumes!.to).toBe(raw);
+  });
+
+  /**
+   * An act that connects nothing says so, and `[]` is not `null`.
+   *
+   * The column is nullable for one population — rows written before the
+   * collector existed — and this is what stops that meaning leaking onto rows
+   * written after it.
+   */
+  test("an act that connects nothing records an empty list, not an absent one", async () => {
+    const { ctx, write } = await surfaceFor("labkit");
+    const log = pgEventLog(db, ctx.tenantId);
+    await write.pose("does the coating hold?");
+
+    const [event] = await log.all();
+    expect(event!.edges).toEqual([]);
+    expect(event!.edges).not.toBeUndefined();
+  });
 });
 
 describe("the log answers what the graph cannot", () => {

@@ -93,6 +93,23 @@ export const EDGE_LABELS = [
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
 
 /**
+ * One edge, as an act reports having created it.
+ *
+ * Endpoints are natural ids rather than `Ref`s: this is the persistence layer,
+ * where a handle's brand does not exist and `labelForNaturalId` is how a label
+ * is recovered. The domain re-reads them as handles on the way out.
+ *
+ * Declared here beside {@link EdgeLabel} rather than in `src/domain/events.ts`
+ * because the collector is in `TenantGraph.createEdge`, and `src/db` may not
+ * import `src/domain`.
+ */
+export interface MintedEdge {
+  from: string;
+  label: EdgeLabel;
+  to: string;
+}
+
+/**
  * Single authoritative source of truth for legal edge shapes (PJ-003 §8).
  * `createEdge` validates the resolved `(fromLabel, toLabel)` pair against
  * this table and throws before issuing any Cypher if the pair isn't listed.

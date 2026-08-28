@@ -29,6 +29,7 @@ import {
   type NodeLabel,
   type NodePropsByLabel,
   type PublicNode,
+  type MintedEdge,
 } from "./domain";
 import type { LabKitDB } from "./backend";
 import type { Transactor } from "./transactor";
@@ -57,6 +58,24 @@ export class TenantGraph {
    * by the next one.
    */
   private minted: string[] = [];
+
+  /**
+   * Edges created since the last {@link drainMintedEdges}.
+   *
+   * The same argument as {@link minted}, made for the other half of a write.
+   * That comment says a caller that mints three nodes and remembers two is a
+   * state nobody could see; until 2026-08-28 an act's edges were a state nobody
+   * could see *at all* — `createEdge` recorded nowhere, so `recordAnalysis`
+   * wrote eight edges and the event log reported none of them.
+   *
+   * **Pushed only where a row came back**, which is one of `createEdge`'s three
+   * exits and the only one that created anything. The duplicate check and the
+   * `23505` race both end at an edge that exists and that *this* act did not
+   * make; recording those would have two events claiming one edge. Same
+   * semantics as `minted`: what this act brought into existence, not what it
+   * found true afterwards.
+   */
+  private mintedEdges: MintedEdge[] = [];
 
   /**
    * `tx` is required and never defaulted. Two graphs over one connection must
@@ -120,7 +139,10 @@ export class TenantGraph {
       try {
         return await work();
       } finally {
-        if (outermost) this.minted.length = 0;
+        if (outermost) {
+          this.minted.length = 0;
+          this.mintedEdges.length = 0;
+        }
       }
     });
   }
@@ -134,6 +156,16 @@ export class TenantGraph {
    */
   drainMinted(): string[] {
     return this.minted.splice(0);
+  }
+
+  /**
+   * The edges created since the last call, and clears them.
+   *
+   * Drained per event alongside {@link drainMinted}, and for the same reason:
+   * two events in one transaction must not both claim the same new edges.
+   */
+  drainMintedEdges(): MintedEdge[] {
+    return this.mintedEdges.splice(0);
   }
 
   /**
@@ -340,7 +372,10 @@ export class TenantGraph {
       if ((err as { code?: string }).code === "23505") return; // lost the race to a concurrent caller — same edge now exists, which is the desired end state
       throw err;
     }
-    if (created.length > 0) return;
+    if (created.length > 0) {
+      this.mintedEdges.push({ from: fromId, label: edge, to: toId });
+      return;
+    }
 
     // Nothing was created, so one of the endpoints did not match. Only now is
     // it worth two queries to say which -- this is the slow path, and it ends
