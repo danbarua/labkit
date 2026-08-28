@@ -966,3 +966,108 @@ describe("the write gate, and what a registered write is signed with", () => {
     }
   });
 });
+
+/**
+ * **A server that cannot write does not offer to.**
+ *
+ * `--read-only` exists for a desktop client that should read the record and
+ * never change it. It *hides* the write tools where the registration gate
+ * *refuses* them, and the difference is `not here` against `not yet`: an
+ * unregistered caller has a remedy and the refusal names it, a read-only
+ * caller has none.
+ */
+describe("read-only", () => {
+  async function listToolsFrom(graph: TenantGraph, readOnly: boolean) {
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const events = inMemoryEventLog();
+    await buildServer(
+      (work) =>
+        work({
+          read: new ReadSurface(graph, { events }),
+          write: new WriteSurface(graph, { events }),
+        }),
+      registeredSessionRegistry(),
+      { readOnly },
+    ).connect(serverSide);
+    const client = new Client({ name: "read-only", version: "0" });
+    await client.connect(clientSide);
+    const { tools } = await client.listTools();
+    await client.close();
+    return tools.map((t) => t.name).sort();
+  }
+
+  test("a read-only server lists every read and no write", async () => {
+    const graph = await scenario.begin();
+    try {
+      const names = await listToolsFrom(graph, true);
+
+      // Derived from the declarations, never a hand-written list of names: a
+      // write tool added later must be absent here without anyone remembering
+      // to come and say so.
+      expect(names).toEqual(TOOLS.map((t) => t.name).sort());
+
+      for (const write of WRITE_TOOLS) expect(names).not.toContain(write.name);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("register_session goes with the writes, not with the reads", async () => {
+    const graph = await scenario.begin();
+    try {
+      const names = await listToolsFrom(graph, true);
+      // It exists to open a gate this server has nothing behind. Leaving it
+      // visible would offer an agent a tool whose effect nothing can observe --
+      // and worse, would say through the tool list that writing is possible.
+      for (const session of SESSION_TOOLS) expect(names).not.toContain(session.name);
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("the default is not read-only, so the flag is what decides it", async () => {
+    const graph = await scenario.begin();
+    try {
+      // The control. Without this the test above passes on a server that never
+      // had write tools at all, which is a different thing from one that
+      // withheld them.
+      const names = await listToolsFrom(graph, false);
+      expect(names).toEqual([...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort());
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("a hidden write tool cannot be called by name", async () => {
+    const graph = await scenario.begin();
+    try {
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      const events = inMemoryEventLog();
+      await buildServer(
+        (work) =>
+          work({
+            read: new ReadSurface(graph, { events }),
+            write: new WriteSurface(graph, { events }),
+          }),
+        registeredSessionRegistry(),
+        { readOnly: true },
+      ).connect(serverSide);
+      const client = new Client({ name: "read-only", version: "0" });
+      await client.connect(clientSide);
+
+      // Absent from `tools/list` is not the same as unreachable, and a client
+      // that cached an older list would ask anyway. Asserted from the wire
+      // rather than from the registration loop.
+      const result = await client.callTool({
+        name: "pose",
+        arguments: { question: "can a hidden tool still be called?" },
+      });
+      expect(result.isError).toBe(true);
+      expect(await events.all()).toHaveLength(0);
+
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+});

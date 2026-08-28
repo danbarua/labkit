@@ -85,6 +85,25 @@ export type WithSurfaces = <T>(
  * it owns the one real event log and for the same reason: a component that
  * defaults its own gives two halves of one call two different answers.
  *
+ * **`readOnly` hides the write tools, where the registration gate refuses
+ * them, and the difference is *not yet* against *not here*.** An unregistered
+ * caller has a remedy and the refusal names it; a caller on a read-only server
+ * has none, so a shorter `tools/list` is the honest description rather than a
+ * refusal that could only say "no". A tool absent from the list is
+ * indistinguishable from a server that never had it — which is the objection to
+ * hiding in the gate's case and the *point* here.
+ *
+ * **`register_session` goes with them.** It exists to open a gate this server
+ * has nothing behind, so a visible one would be a tool whose effect nothing can
+ * observe — and an agent that registered and then found itself unable to write
+ * would have been told, by the tool list, that writing was possible.
+ *
+ * It is decided at construction and never changes, which is the other half of
+ * the argument: `disable()` and `sendToolListChanged()` exist, but Claude
+ * Desktop is not believed to handle the notification, and a client that ignores
+ * it caches whatever list it first saw. A list that is static from the first
+ * `tools/list` needs no notification to be correct.
+ *
  * **Per call rather than per server, so attribution and the connection are
  * both per command.** A surface holds no query state — no constructor and no
  * field of its own beyond `SessionCore`'s three — so building one per tool call
@@ -113,7 +132,11 @@ export type WithSurfaces = <T>(
  * would convert a good refusal into an empty success, which is the one
  * outcome the domain went to trouble to avoid.
  */
-export function buildServer(withSurfaces: WithSurfaces, session: SessionRegistry): McpServer {
+export function buildServer(
+  withSurfaces: WithSurfaces,
+  session: SessionRegistry,
+  { readOnly = false }: { readOnly?: boolean } = {},
+): McpServer {
   const server = new McpServer({ name: "labkit", version: "0.0.1" });
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
@@ -157,6 +180,12 @@ export function buildServer(withSurfaces: WithSurfaces, session: SessionRegistry
       ),
     );
   }
+
+  // **Nothing below this line is registered on a read-only server**, and the
+  // early return is why the reads are registered above rather than in one loop
+  // with a filter: a filter would leave a reader wondering which list a tool
+  // came from, and this way the shape of the function is the answer.
+  if (readOnly) return server;
 
   // Registered before the writes, and reachable when they are not: this is the
   // one tool whose whole job is to open the gate below.
@@ -298,7 +327,10 @@ let inFlight = 0;
  * reconciliation pass PJ-005 argued for, so paying it per call is a feature
  * rather than a tax.
  */
-export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Promise<void> {
+export async function main(
+  tenant = process.env.LABKIT_TENANT ?? "labkit",
+  { readOnly = false }: { readOnly?: boolean } = {},
+): Promise<void> {
   // One registry for the life of the process, which over stdio is the life of
   // one client's connection. Built here rather than defaulted inside
   // `buildServer` for the same reason `pgEventLog` is: the tool that writes to
@@ -365,7 +397,7 @@ export async function main(tenant = process.env.LABKIT_TENANT ?? "labkit"): Prom
     }
   };
 
-  const server = buildServer(withSurfaces, session);
+  const server = buildServer(withSurfaces, session, { readOnly });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
