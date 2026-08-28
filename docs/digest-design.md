@@ -1,9 +1,21 @@
 # `labkit digest` and the list-shaped queries — a design, for review
 
-**2026-08-27. Reviewed and revised; the build order in §8 is settled.** Nothing
-is built. Every claim about
-what LabKit does today was run against a real record on that date; the
-transcripts below can be re-run in about a minute each.
+**Written 2026-08-27; §2 and part of §3 shipped 2026-08-28.** This is the
+argument, not a status board — **what is built and what is not is at the bottom
+of this header, and everything outstanding is a GitHub issue** rather than a
+sentence here that goes stale.
+
+Every transcript below was run against a real record on 2026-08-27 and can be
+re-run in about a minute. They are kept **as they were**: several show behaviour
+that has since been fixed, which is the point of a document that argued for
+fixing it.
+
+| | |
+| --- | --- |
+| **§2** — the survey consults the checks its answer was held to | **shipped**, PR #72, scenario S-19, ledger row AK |
+| **§3** — *what does this criterion block?* | **half shipped.** The drill-down is answered: an unmet check now carries what it blocks (`UnmetCheck.blocks`). No verb yet **takes** a `CriterionRef`, so the standup case still has nothing to start from — #55, and #66 for its shape |
+| **§5** — `digest` | **not built**, and correctly last: it composes §3's verb |
+| **§9's open question** — which bucket | **answered by the scenario, not by argument**: `provisional`, whose heading was false for the new case and now reads *answered, but not something to build on yet*. Ledger row AL |
 
 Input from Grok and `labkit-review`. Two of this document's claims were refuted
 by review and replaced: `labkit-review` refuted its original central argument
@@ -23,10 +35,17 @@ defects were found on the way, and neither of them is *"we lack list views"*:
 
 1. **§2 — `whatIsKnown()` and `gateStatus()` contradict each other**, and the
    reassuring one is the verb a researcher reads for orientation. A demonstrated
-   wrong answer. **It earns a fix, and the fix is not `digest`.**
+   wrong answer. **It earns a fix, and the fix is not `digest`.** *(Shipped. It
+   also turned out to have a mirror image nobody predicted here — a promoted
+   **negative** result was unreachable in six separate places, because AGE has
+   no edge alternation and naming one bearing is silent. See CLAUDE.md, "The
+   read side is a graph of facts".)*
 2. **§3 — `GOVERNS` is written and read in one direction only.** A researcher
    can hold a criterion, be told it is unmet, and have no verb that answers
-   *"what does this block?"* The record knows. It is unreachable.
+   *"what does this block?"* The record knows. It is unreachable. *(Half
+   shipped: the answer is now embedded where the researcher already is, which
+   was Dan's question — if the record can be asked, can it not just be shown?
+   The enumeration remains, and is a different question.)*
 
 `digest` itself is then argued **as a convenience** (§5), honestly, because the
 attempt to earn it as a gap failed and is written up in §4 rather than deleted.
@@ -192,6 +211,14 @@ the existing definition does not fit, and widening it is a real decision about
 what the word means. A new bucket is the alternative, and row Y is the standing
 warning against one: *a fifth bucket built for nobody is the ceremony S-14
 declined a field over.* **The scenario picks it, not this document.**
+
+> **It did.** S-19 landed in `provisional`, and the heading — *"resting on work
+> nobody promoted"* — was false for the new case the moment it existed, since
+> that claim **was** promoted. So `provisional` holds two opposite reasons and
+> is named for what they share: *answered, but not something to build on yet*.
+> One bucket rather than a sixth, because a reader acts identically on both.
+> Both candidate words failed on inspection: `contested` is taken by evidence
+> bearing *against*, and `unverified` fits never-run but not failed.
 
 **And the cost is not free**, which the recommendation should not hide: the
 survey buckets *questions*, so consulting check state means walking question →
@@ -417,6 +444,10 @@ any stored `queue_state`.
 
 ## 8. Build order
 
+> **§2 is done and §3 is half done.** What follows is the order as argued; it
+> held, including the prediction in step 2 that turned out **false** — see the
+> note under it.
+
 **§2 is the next build, full stop** — CLAUDE.md's *at most one confirmed wrong
 answer ships green at a time*, and no PJ-008 row is currently `demonstrated`
 (AH, AI and AJ are `open`, which is a different state).
@@ -429,6 +460,13 @@ answer ships green at a time*, and no PJ-008 row is currently `demonstrated`
    **Written after §2 lands, not in parallel** — §2's fix walks question →
    answering claim → held-to criteria inside the read surface, so part of §3 may
    exist as a by-product, and the scenario can then ask the sharper question.
+
+   > **The by-product did not materialise, and knowing why narrows what is
+   > left.** `checksMetFor` — now `checksMet` — is keyed by claim and answers
+   > one boolean. It takes claims the caller already holds, never enumerates,
+   > and cannot be asked *which gates are blocked* because there is no claim to
+   > start from. The traversal exists and is the **wrong shape**, which is a
+   > cleaner answer than "reuse it". Recorded on #66.
 3. **Only then `digest`**, as `{ blocked: …, untouched: …, open: known.unresolved, … }`.
 
 ### This wants a scenario, not more design
@@ -496,3 +534,10 @@ round trips per gate is a section to reconsider.
 
 **Not attempted:** any claim about how often a person would run `digest`. There
 is no usage data and this document does not pretend otherwise.
+
+**Re-checked 2026-08-28**, against `main` rather than from memory: `whatIsKnown`
+consults held-to checks (2 call sites); **no** read verb takes a `CriterionRef`
+(0); `UnmetCheck.blocks` exists; `known`'s prose view prints handles. The
+historical survey's heading still reads *"resolved, but on unpromoted work"* and
+that is correct for it — `whatWasKnown` deliberately does not consult checks,
+because "met as of then" is a different computation rather than a missing call.
