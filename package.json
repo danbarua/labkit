@@ -40,6 +40,7 @@
 		"check:binary": "bash scripts/smoke-binary.sh",
 		"check:cli": "bash scripts/smoke-cli.sh",
 		"example": "bash examples/full-lifecycle.sh",
+		"probe:dogfood": "bash scripts/probe-dogfood.sh",
 		"db:generate": "drizzle-kit generate",
 		"db:generate:custom": "drizzle-kit generate --custom",
 		"board:status": "bash scripts/apply-board-status.sh",
