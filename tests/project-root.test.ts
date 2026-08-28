@@ -2,7 +2,9 @@
  * Which directory holds the record, and the two ways of getting it wrong.
  *
  * `resolveProjectRoot()` (`src/db/connect.ts`) is the whole of that decision,
- * pure and parameterised so these cases cost no database. Both behaviours it
+ * pure and parameterised so these cases cost no database. The last `describe`
+ * is the exception and says why: it is about *when* the question is asked
+ * rather than how it is answered, which only `connectDb` can show. Both behaviours it
  * asserts were defects, and they failed in opposite directions: a mistyped
  * `LABKIT_HOME` used to be *created*, and a working directory below a project
  * root used to be taken at face value. Each produced a fresh empty record that
@@ -14,7 +16,7 @@ import { mkdtempSync, mkdirSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { dotGitProjectRoot, resolveProjectRoot } from "../src/db/connect";
+import { connectDb, dotGitProjectRoot, resolveProjectRoot } from "../src/db/connect";
 
 const scratch = () => mkdtempSync(join(tmpdir(), "labkit-root-"));
 
@@ -236,5 +238,49 @@ describe("dotGitProjectRoot — the answer with no git to ask", () => {
 
   test("outside a repository there is nothing to read", () => {
     expect(dotGitProjectRoot(realpathSync(scratch()))).toBeUndefined();
+  });
+});
+
+describe("connectDb asks for a project root only when it needs one", () => {
+  /**
+   * `LABKIT_DB_URL` is checked before the root is resolved.
+   *
+   * This was a default parameter until 2026-08-28 —
+   * `connectDb(projectRoot = resolveProjectRoot())` — and JavaScript evaluates
+   * a default on entry, before the body reads the environment. The doc comment
+   * claiming `LABKIT_DB_URL` "wins over both" was true of the outcome and false
+   * of the order.
+   *
+   * **Asserted on which error, not on success**, because a connection to a
+   * closed port must still fail. A `LABKIT_HOME` error means the root was
+   * resolved; anything else means it was not, which is the whole claim. Seen
+   * red before it was written: with the default parameter in place this threw
+   * `LABKIT_HOME names a directory that does not exist` and never reached the
+   * connection string.
+   */
+  test("a missing LABKIT_HOME does not stop a URL-backed connection", async () => {
+    const missing = join(scratch(), "not-here");
+    const url = process.env.LABKIT_DB_URL;
+    const home = process.env.LABKIT_HOME;
+    // Port 1 is refused immediately rather than timing out, so this costs no
+    // wall time and needs nothing listening.
+    process.env.LABKIT_DB_URL = "postgres://nobody@127.0.0.1:1/none";
+    process.env.LABKIT_HOME = missing;
+    try {
+      let message = "";
+      try {
+        await connectDb();
+      } catch (err) {
+        message = (err as Error).message;
+      }
+      expect(message).not.toBe("");
+      expect(message).not.toContain("LABKIT_HOME");
+      expect(message).not.toContain(missing);
+    } finally {
+      if (url === undefined) delete process.env.LABKIT_DB_URL;
+      else process.env.LABKIT_DB_URL = url;
+      if (home === undefined) delete process.env.LABKIT_HOME;
+      else process.env.LABKIT_HOME = home;
+    }
   });
 });

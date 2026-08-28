@@ -234,18 +234,34 @@ function discoverProjectRoot(from: string): string {
  * `<projectRoot>/.labkit/pglite`, held under an exclusive lock for the
  * duration of the work, since PGlite is single-writer/single-process.
  *
- * `projectRoot` defaults to {@link resolveProjectRoot}, so `LABKIT_HOME` is read here
- * and not by every caller. **`LABKIT_DB_URL` still wins over both** — a caller
- * pointed at a real Postgres is not asking for a file, and silently building
- * one beside it would be worse than ignoring the flag.
+ * `projectRoot` falls back to {@link resolveProjectRoot}, so `LABKIT_HOME` is
+ * read here and not by every caller. **`LABKIT_DB_URL` wins over both, and is
+ * checked first** — a caller pointed at a real Postgres is not asking for a
+ * file, and silently building one beside it would be worse than ignoring the
+ * flag.
+ *
+ * **The order is load-bearing and was wrong until 2026-08-28.** This was a
+ * default parameter — `connectDb(projectRoot = resolveProjectRoot())` — which
+ * JavaScript evaluates on entry, *before* the body reads the environment. So
+ * the sentence above was true of the outcome and false of the sequence: the
+ * URL path still resolved a root it then discarded. Two costs, both on the
+ * hosted path this repo is heading for. `resolveProjectRoot` shells out to
+ * `git rev-parse`, and `src/mcp/server.ts` calls `connectDb()` **per tool
+ * call** — so a server backed by Postgres spawned a subprocess per call for an
+ * answer nobody read. Worse, a `LABKIT_HOME` naming a directory that does not
+ * exist *throws*, deliberately, so a stray value in a container's environment
+ * killed a server that was never going to open a file. Measured before the
+ * fix: `LABKIT_DB_URL` set and `LABKIT_HOME` missing raised
+ * `LABKIT_HOME names a directory that does not exist` without reaching the
+ * connection string.
  */
-export async function connectDb(projectRoot = resolveProjectRoot()): Promise<LabKitDBConnection> {
+export async function connectDb(projectRoot?: string): Promise<LabKitDBConnection> {
   const url = process.env.LABKIT_DB_URL;
   if (url) {
     return withTrace(await directPostgresBackend({ connectionString: url }).connect(), "postgres");
   }
 
-  const labkitDir = join(projectRoot, ".labkit");
+  const labkitDir = join(projectRoot ?? resolveProjectRoot(), ".labkit");
   announceNewRecord(labkitDir);
   const connection = await pgliteBackend({
     dataDir: join(labkitDir, "pglite"),
