@@ -758,9 +758,11 @@ no port any more. `LABKIT_DB_URL` still wins over both.
 
 **With neither set, git is asked first: `rev-parse --git-common-dir` names the
 one `.git` a repository has, and its parent is the project root**
-(`resolveProjectRoot`, `src/db/connect.ts`). **A worktree is a sibling of the
-main checkout, not a descendant**, so walking up from one never passes through
-it — and three `.labkit/` directories had accumulated for this one project
+(`resolveProjectRoot`, `src/db/connect.ts`). **This repository's worktrees are
+siblings of the main checkout, not descendants** — Claude Code's are nested
+instead, and `gitProjectRoot`'s doc comment carries which layouts do what — so
+walking up from one of ours never passes through the checkout, and three
+`.labkit/` directories had accumulated for this one project
 before anyone looked, on 2026-08-27. All three were empty; a fresh database is
 42M, so their sizes said nothing. That is the fix's real lesson: the
 fragmentation was invisible *because* nothing had been recorded yet, and the
@@ -841,10 +843,12 @@ control caught it: four tests were passing through the subprocess while claiming
 to test the filesystem.
 
 **"A worktree is a sibling of the main checkout" is true of this repository's
-layout, not of worktrees generally** — `exo-ledger` nests them under
-`.claude/worktrees/`, where a walk *would* find the root. The fix is correct for
-both, which means it rests on `--git-common-dir` being the right question rather
-than on the sibling premise.
+layout and not of worktrees generally**, and the whole argument now lives on
+`gitProjectRoot` in `src/db/connect.ts` rather than being restated here. It is
+there rather than here on purpose: **this caveat was in this file and the flat
+claim was in the doc comment**, so the copy nearest the code was the wrong one —
+and the reader who needs a caveat is precisely the one who never opens
+`CLAUDE.md`. Found on 2026-08-28, from `exo-ledger`, reading this repo's code.
 
 **The walk remains, and still answers the nested case** — though git subsumes it
 at no cost, being correct from any depth without walking. A client launched from
