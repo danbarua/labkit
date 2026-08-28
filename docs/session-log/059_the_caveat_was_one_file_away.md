@@ -33,7 +33,7 @@ Merged as **#78**. Comment-only; no code changed.
 `connect.ts:149` was already phrased conditionally and is untouched.
 
 **`7d0d86e` — docs: re-measure the bun-pinned claims on 1.4.0; two had gone
-stale.** Open as **PR #79**. `CLAUDE.md`, `src/cli/palette.ts`,
+stale.** `CLAUDE.md`, `src/cli/palette.ts`,
 `src/db/connect.ts`, `scripts/build-binary.sh`. Ten claims name bun 1.3.14; five
 were cheap to re-run and were re-run. **Merged as #79.**
 
