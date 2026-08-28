@@ -387,6 +387,7 @@ bun run check:stdout          # nothing under src/ writes to stdout except the C
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
+bun run check:facts            # a fact's grain is named and its clause dependencies declared
 bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
@@ -1007,8 +1008,14 @@ A fact spells such a pair once, so every reader is right or wrong together.
 - **Grains are shared named constants, never written at the use site.** `per()`
   compares them by reference, so an inline `grain: (r) => …` would be
   semantically identical, compare unequal, and fan a same-grain dependency into
-  a `Map` where the consumer expects one value. The type system cannot carry
-  this.
+  a `Map` where the consumer expects one value.
+
+**Two of the three are `check:facts`**, because the type system cannot carry
+either: an inline grain and an undeclared clause dependency are both well-typed.
+Each was a live defect during the port and neither errored at the time. The
+third — `empty` returning a shared object rather than a fresh one — is left to
+the reader, since `() => T` is satisfied by both and telling them apart needs to
+know whether the value escapes.
 
 **`WITH coalesce(…)` works on AGE and is still the wrong tool** — measured,
 along with `UNION`. `WITH` collapses the query, so every clause appended after
