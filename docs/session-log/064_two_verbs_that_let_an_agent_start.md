@@ -1,4 +1,4 @@
-# 063: two verbs that let an agent start
+# 064: two verbs that let an agent start
 
 **Session wrap, 2026-08-28, on `feat/enumeration-verbs`.** Not a decision record
 — `WorkState` in `src/domain/report.ts` carries the enum's derivation, and #66
@@ -8,7 +8,15 @@ carries the argument that settled one verb versus two.
 is #83's — session registration, the write gate, `--read-only` — and no single
 `## Goal` line covers both it and this. The baseline is still 061's, so the
 range is wider than what is written below; 061 covers everything up to
-`214a57b`, and `062` is a peer session's HTTP work, not this one's.
+`214a57b`, and 062 and 063 are a peer session's HTTP and pooler work, not this
+one's.
+
+**Numbered 063 when written and renamed to 064.** Two sessions took the number
+within nine seconds — `f893b95` at 17:09:10 and `72eb0db` at 17:09:19 — and
+both merged before either noticed. SKILL.md says the number is taken at write
+time rather than reserved and the loser renames; this is the loser. Worth
+knowing that the re-check it prescribes does not help when the collision happens
+between a write and a merge rather than between two writes.
 
 ## Goal
 
@@ -77,6 +85,29 @@ from row AD's pair, which has a writer. No state is derived from either.
 **`digest` is still unbuilt and still behind #55**, deliberately: it composes
 these two, and putting it first would have let it paper over the one-verb-or-two
 decision.
+
+**Afterward, with #93 merged.** #83 closed — all three children in. And #55 was
+**driven cold rather than reasoned about**: a record built with one blocked
+task, one ready task, a failed prespecified check and a question accepted as
+unresolved, then its six questions asked through the CLI.
+
+Five and a half of six answer. `work --state blocked` and `--state planned`,
+`known`'s *Accepted as unresolved*, and `gate` naming the unmet condition cover
+four; *what decision is waiting on evidence* collapses into `known`'s
+*Unresolved*, LabKit modelling a decision as a closing act rather than a pending
+one.
+
+**The half that does not answer is a model gap, not a missing verb.** *Why does
+this work exist* is unanswerable: a `Task` hangs off nothing but a gate,
+`planWork` takes no question or enquiry, and `TaskContract` carries neither.
+Named rather than built — it produces an *unanswerable* question, and PJ-011 §5
+is explicit that only a confidently wrong answer earns new structure. The
+scenario that would change that is recorded on #55: a view grouping work under
+the question it serves fails today.
+
+**`digest` looks less earned than when the design doc placed it behind #55.**
+A facade over `{gates, work}` saves one command, and each of those already
+prints three columns a person can read.
 
 ## Next
 
