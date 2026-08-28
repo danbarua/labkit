@@ -1,0 +1,102 @@
+# The suite again, against a real Postgres. Split out of `cloudbuild.test.yaml`
+# on 2026-08-28.
+#
+# **What this arm is for, stated more narrowly than it used to be.** It is a
+# *disagreeing measurement*: a `pg.Client` and a raw PGlite do not decode
+# identically, and a suite that only ever sees one of them cannot notice when
+# they diverge. That is its whole job today.
+#
+# It is **not** extra coverage. Measured 2026-08-28: the suite has exactly one
+# `skipIf`, in `tests/connection-lock.test.ts`, and it skips *on* Postgres —
+# its subject is the PGlite lockfile. `tests/tenancy-isolation.test.ts` runs on
+# both backends; `LABKIT_DB_URL` only decides which. So **no test requires a
+# real Postgres**, and this arm runs the identical suite against a second
+# backend rather than reaching anything the first cannot.
+#
+# `cloudbuild.test.yaml` used to claim this was "the only backend on which two
+# connections can be live at once, so anything about roles, tenancy or
+# privileges can only be settled here". The capability is real and nothing
+# currently uses it. When a test does need two live connections, it belongs
+# here and this file becomes coverage rather than a differential — say so then.
+#
+# **Why it is no longer on every pull request.** ~153s of a ~394s build, on a
+# backend nothing deploys to yet, to check a divergence that has never been
+# observed (first green run 2026-08-26: 360 pass, 4 skip, 0 fail). Its trigger
+# now fires on changes to `src/db/**` and `drizzle/**`, and on every merge to
+# main. See `infra/ci/triggers.tf` for why that filter is an allowlist here and
+# a denylist there.
+
+steps:
+  # The gate's image: bun plus git. See docker/ci/Dockerfile for why git.
+  # Never pushed. Built here too, because this file runs independently of
+  # `cloudbuild.test.yaml` and cannot borrow its image.
+  - id: ci-image
+    name: gcr.io/cloud-builders/docker
+    args: [build, -t, labkit-ci, docker/ci]
+
+  # The database. `--network=cloudbuild` is what makes it reachable from later
+  # steps by name: every step joins that network, so `labkit-pg` resolves.
+  # Started early so initdb overlaps with the install rather than blocking it.
+  - id: postgres
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        docker build -t labkit-pg docker/postgres
+        docker run -d --name labkit-pg --network=cloudbuild \
+          -e POSTGRES_USER=postgres \
+          -e POSTGRES_PASSWORD=agens \
+          -e POSTGRES_DB=postgres \
+          labkit-pg
+
+  # `--frozen-lockfile` so a drifted lockfile fails here rather than being
+  # silently updated inside a build nobody keeps. Its own step now: when the
+  # two arms shared a build, this rode in on `check` and the Postgres arm
+  # reused the workspace.
+  - id: install
+    name: labkit-ci
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        bun install --frozen-lockfile
+
+  # **The wait is not optional and its absence would be invisible locally.**
+  # With `LABKIT_DB_URL` already set, `scripts/test-postgres.sh` skips the
+  # container management *and the readiness loop* it does when it owns the
+  # container -- so without this, the first connection races initdb.
+  #
+  # Over **TCP from this network**, not `docker exec`: the postgres entrypoint
+  # runs a temporary server during initdb that answers on the unix socket while
+  # TCP is still closed, so a socket-side check can pass before the database is
+  # actually reachable from here.
+  - id: test-pg
+    name: labkit-ci
+    entrypoint: bash
+    env:
+      - LABKIT_DB_URL=postgres://postgres:agens@labkit-pg:5432/labkit_tests
+    args:
+      - -c
+      - |
+        set -e
+        for _ in $(seq 1 60); do
+          if bun -e 'const {Client}=require("pg");const c=new Client({connectionString:process.env.LABKIT_DB_URL});c.connect().then(()=>c.end()).then(()=>process.exit(0)).catch(()=>process.exit(1))' 2>/dev/null; then
+            echo "postgres is accepting connections"
+            break
+          fi
+          sleep 1
+        done
+        bun run test:pg
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+# Measured 2026-08-26 as part of the combined build (`9907cb31`): ci-image 20s,
+# postgres 12s, test-pg 153s. Alone it should come in near 200s plus the
+# install this file now does for itself. 1800s is kept rather than tightened —
+# the combined build's own note says a worker is roughly 2x a Mac Studio, and a
+# timeout that fits today is a timeout that fails on a slower worker.
+timeout: 1800s
