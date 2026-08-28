@@ -25,13 +25,9 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { connectDb } from "../src/db/connect";
-import { resolveTenantContext } from "../src/db/tenant";
-import { scopeToTenant } from "../src/db/scoped";
-import { TenantGraph } from "../src/db/graph";
-import { WriteSurface, inMemoryEventLog, systemClock } from "../src/domain";
 import { COMPOSITIONS } from "../fragments/compositions";
-import { danglingEndpoints, graphOf, traceOf, type Trace } from "../fragments/trace";
+import { runComposition } from "../fragments/run";
+import { danglingEndpoints, graphOf, type Trace } from "../fragments/trace";
 
 const args = process.argv.slice(2);
 const at = args.indexOf("--out");
@@ -47,35 +43,23 @@ for (const composition of COMPOSITIONS) {
   // would make the second trace start at `Q_2` — readable, and a lie about what
   // that scenario built on its own.
   const dir = mkdtempSync(join(home, "run-"));
-  const connection = await connectDb(dir);
-  try {
-    const ctx = await resolveTenantContext(connection.db, connection.tx, "labkit");
-    await scopeToTenant(connection.db, ctx);
-    const graph = new TenantGraph(ctx, connection.db, connection.tx);
-    const events = inMemoryEventLog();
-    const w = new WriteSurface(graph, { clock: systemClock, events });
+  const trace = await runComposition(composition, dir);
 
-    await composition.run(w);
-
-    const trace = await traceOf(composition.name, events);
-    const dangling = danglingEndpoints(trace);
-    if (dangling.length > 0) {
-      // Only reachable if LabKit connected something it did not create, which
-      // the hand-written mockup could do freely and this cannot.
-      console.error(`FAILED: ${composition.ref} has edges into ${dangling.join(", ")}`);
-      process.exit(1);
-    }
-    traces.push(trace);
-
-    const { nodes, edges } = graphOf(trace);
-    console.error(
-      `  ${composition.ref.padEnd(5)} ${composition.name.padEnd(36)} ` +
-        `${String(trace.steps.length).padStart(2)} steps  ` +
-        `${String(nodes.length).padStart(2)} nodes  ${String(edges.length).padStart(2)} edges`,
-    );
-  } finally {
-    await connection.close();
+  const dangling = danglingEndpoints(trace);
+  if (dangling.length > 0) {
+    // Only reachable if LabKit connected something it did not create, which
+    // the hand-written mockup could do freely and this cannot.
+    console.error(`FAILED: ${composition.ref} has edges into ${dangling.join(", ")}`);
+    process.exit(1);
   }
+  traces.push(trace);
+
+  const { nodes, edges } = graphOf(trace);
+  console.error(
+    `  ${composition.ref.padEnd(5)} ${composition.name.padEnd(36)} ` +
+      `${String(trace.steps.length).padStart(2)} steps  ` +
+      `${String(nodes.length).padStart(2)} nodes  ${String(edges.length).padStart(2)} edges`,
+  );
 }
 
 if (outDir) {
