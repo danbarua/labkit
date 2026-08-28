@@ -95,6 +95,31 @@ that read as somebody else's work landing in yours. Nothing is lost; the fix is
 to check out a valid name. The wrong reflex is to commit it, which would produce
 a commit whose message describes none of it.
 
+**`digest` is unblocked, untracked, and less obviously earned than when it was
+designed.** Found while answering *do we have a `digest()` yet* — no, and
+`grep -rniE '\bdigest\b' src/ tests/` returns only unrelated hits. The two
+verbs it would compose both exist since #93.
+
+Two things follow, neither acted on:
+
+- **`docs/digest-design.md`'s status table asserts something false.** Its §3
+  row still reads *"no verb yet takes a `CriterionRef`, so the standup case
+  still has nothing to start from"*. `gateList` and `workList` shipped in #93.
+  That row is live prose in a document that says of itself it is not a status
+  board, which is the sixth principle catching the document that quotes it.
+- **There is no issue for `digest`.** Searched the tracker; the word does not
+  appear. It has been tracked only in a design document's header since
+  2026-08-27.
+
+And the case for building it got **weaker**, which is the part worth recording
+before someone reads the design doc and starts. `labkit work --state blocked`
+and `labkit gates --state blocked` each print readable columns; a facade
+returning `{gates, work}` now saves one command. The design doc placed `digest`
+behind the enumeration deliberately so it could not paper over that decision —
+it did not, and the gap it was for is mostly closed by two verbs a person can
+type. Whether that earns a third public verb and its coverage tests is an open
+question rather than a task.
+
 ## Next
 
 Nothing queued here. The open work is in the tracker: **#94** has the most
