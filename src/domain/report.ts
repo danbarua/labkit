@@ -854,8 +854,9 @@ export interface DependencyReport {
    * passed one otherwise cannot tell which record the name resolved to — the
    * report described a record it never identified. `kind` is `observations`
    * for the same reason the argument's is: the `ART_` prefix does not
-   * distinguish a raw input from an analysis output, which is an open item in
-   * `docs/TASKS.md` and not a claim being made here.
+   * distinguish a raw input from an analysis output — which PJ-008's row AG
+   * measured on 2026-08-24 and found to be reference-model debt rather than a
+   * missing distinction, so it is not a claim being made here either.
    */
   subject: ObservationsRef;
   /** Claims found to rest on the subject, supporting or challenging. */

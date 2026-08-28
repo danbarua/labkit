@@ -121,7 +121,7 @@ export async function openScenario(): Promise<Scenario> {
       // test's 5000ms allowance and pushes more tests over the ceiling than
       // the cascade ever cost: paired A/B gave BASE 0 failures in two runs,
       // that version 18 failures in one of two, at the lowest load of the
-      // four. See docs/TASKS.md.
+      // four.
       if (open.length === 0) await testDb.reset();
     },
     async close() {

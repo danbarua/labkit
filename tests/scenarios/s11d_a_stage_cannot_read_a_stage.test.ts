@@ -1,6 +1,6 @@
 /**
  * S-11d — "Reproducible, on top of something that isn't."
- * docs/TASKS.md, the missing verb S-11c exposed.
+ * The missing verb S-11c exposed.
  *
  * `recordAnalysis({ from })` takes only observations handles, and
  * `recordObservations()` is the only thing that makes one. So an analysis

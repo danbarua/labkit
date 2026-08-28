@@ -3,7 +3,7 @@
  *
  * **Why this exists.** Two separate investigations into the same intermittent
  * test failure each began by hand-instrumenting `tests/helpers/db.ts`, and
- * three documents — `CLAUDE.md`, `docs/TASKS.md` and that helper's own header —
+ * three documents — `CLAUDE.md`, the work queue and that helper's own header —
  * asserted a wrong cause in the meantime. What finally settled it was
  * measurable in one run once the instrumentation existed: every query tracked
  * from start to completion, so "it hangs" could be answered with *59,086
