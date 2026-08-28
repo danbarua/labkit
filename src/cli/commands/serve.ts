@@ -32,12 +32,18 @@ import type { Globals } from "../session";
  * domain verb has a command, never that every command has a verb, and names
  * `doctor` and `completions` as the same shape.
  *
- * **`--db` is not wired, and that is deliberate rather than an oversight.** The
- * server reads `LABKIT_HOME` (or falls back to the working directory) at
- * `connectDb()`, once per tool call. A `--db` flag would be a second way to say
- * the same thing, set at launch, in a process whose whole configuration is an
- * MCP client's `env` block — and the README's job is hard enough with one
- * lever. Use `LABKIT_HOME`.
+ * **`--db` is not wired, and that is deliberate rather than an oversight.** On
+ * the embedded path the server reads `LABKIT_HOME` (or falls back to the
+ * working directory) at `connectDb()`, once per tool call. A `--db` flag would
+ * be a second way to say the same thing, set at launch, in a process whose
+ * whole configuration is an MCP client's `env` block — and the README's job is
+ * hard enough with one lever. Use `LABKIT_HOME`.
+ *
+ * *On the embedded path* is the part that got narrower on 2026-08-28: with
+ * `LABKIT_DB_URL` set, `connectDb()` now returns before a project root is
+ * resolved at all, so neither `LABKIT_HOME` nor the working directory is
+ * consulted and no `git` subprocess is spawned. A server pointed at a real
+ * Postgres asks the filesystem nothing.
  */
 export function registerServe(program: Command): void {
   program
