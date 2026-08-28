@@ -43,7 +43,15 @@ interface, disagreeing. Dan asked why an atomic incrementer was not trivial;
 it is, and the comment saying "a process-lifetime array has nothing to number"
 is the reason the defect stood.
 
-Working tree clean. Both commits open as PR **#110**.
+**`99ddfb1`** — `fragments/`, a small library of composable research moves.
+
+Fourteen fragments covering the eighteen write verbs, plus
+`tests/fragments.test.ts`. Not in `tests/` because someone would import it into
+a scenario; not in `src/` because it adds no verbs and no ontology. `depcruise`
+reaches it transitively through the test, so the layering rules already apply
+with no config change.
+
+Working tree clean. All of the above open as PR **#110**.
 
 **The range is far wider than this session.** Everything in it except the shas
 above belongs to entries 063, 064 and 066–069 — #92, #93, #96 through #109 —
@@ -97,7 +105,7 @@ Where an interface has two implementations, a test that exercises one proves
 nothing about the other.
 
 **`fragments/` — Dan's decomposition, and it is better than this entry's.**
-Sketched mid-session as a small library of composable research moves:
+Now built (`99ddfb1`); this is what it was:
 
     ask-and-pursue  prespecify  gated-work  observe-and-analyse
     negative-result  failed-check  rerun-check  promote
@@ -113,7 +121,17 @@ sequence eight times.
 **The boundary that still holds:** fragments compose in the *trace*, not in the
 test suite. `s9b_rebuild_or_fresh_work.test.ts:86` duplicates S-9's opening
 deliberately so the difference is visible; a shared fragment there would couple
-independent probes.
+independent probes. `fragments/index.ts`'s header carries that argument, which
+is why it is not under `tests/`.
+
+**The branded handles caught four wrong assumptions at compile time**, which is
+worth recording because it is the type system doing the job it was argued for.
+`evaluateCriterion.citing` is a `ClaimRef`, not an `AnalysisRef`;
+`acceptAsUnresolved.inLightOf` is one claim, not a list; `reverify.concludes` is
+one conclusion, not a list; and `replaceAnalysis.because` is a **`ReviewRef`** —
+so an analysis cannot be superseded without a recorded verdict to point at,
+which is why that fragment is the review and the replacement together rather
+than two.
 
 **Steps 2–4 of the plan are not built**
 (`~/.claude/plans/async-napping-quiche.md`): a trace exporter over
@@ -129,16 +147,17 @@ fixtures.
 
 ## Next
 
-Sketch the fragment API against `~/.claude/plans/async-napping-quiche.md`
-before building — the plan predates the `fragments/` idea and its step 2 is the
-weaker version of it.
+The trace exporter, which is now nearly free: `fragments/` produces the stream,
+`fe886e7` put the edges in it and `f4db3a0` gave it an order.
 
 ```sh
 git checkout -b feat/scenario-trace origin/main   # after #110 merges
 ```
 
-A dump of `[{operation, subject, created, edges, detail}]` from
-`ResearchSession.events` after a scenario run. It reads the in-memory sink, so
-it adds nothing to `src/` and does not breach the harness's no-`src/db` rule.
-The `seq` caveat this line carried is gone — `f4db3a0` above is what removed
-it, so a trace can order by `seq` on either sink.
+A dump of `[{seq, operation, subject, created, edges, detail}]` from an
+`EventSink` after a composition runs. It reads the in-memory sink, so it adds
+nothing to `src/` and does not breach the harness's no-`src/db` rule.
+
+Then the mockup consumes traces instead of hand-written `add: {nodes, edges}` —
+and `~/.claude/plans/async-napping-quiche.md`'s step 2 should be read against
+`fragments/` rather than followed, since the plan predates it.
