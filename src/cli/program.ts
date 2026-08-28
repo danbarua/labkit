@@ -15,7 +15,7 @@ import { Command } from "commander";
 import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
 import { registerServe } from "./commands/serve";
-import type { Globals, Run } from "./session";
+import type { Run } from "./session";
 
 /**
  * The options every command shares.
@@ -41,11 +41,6 @@ export function globalOptions(program: Command): Command {
       // `NO_COLOR` is set, and `--json` is never coloured at all.
       .option("--no-ansi", "never colour the output")
   );
-}
-
-/** Reads the parsed global options back off the root, for {@link runner}. */
-export function globalsOf(program: Command): () => Globals {
-  return () => program.opts<Globals>();
 }
 
 /**
