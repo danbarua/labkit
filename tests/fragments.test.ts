@@ -37,6 +37,7 @@ import {
   promoteFinding,
   rerunCheck,
 } from "../fragments";
+import { danglingEndpoints, traceOf, type Trace } from "../fragments/trace";
 
 const clock: Clock = { now: () => "2026-08-28T09:00:00.000Z" };
 
@@ -151,6 +152,36 @@ describe("a composition writes the record its moves describe", () => {
     const [, first, second] = await events.all();
     expect(first!.detail!.question).toBe(question);
     expect(second!.detail!.question).toBe(question);
+  });
+
+  /**
+   * `danglingEndpoints` must be able to find one.
+   *
+   * It returns `[]` on every real trace, which is the shape of an assertion
+   * that cannot fail. A hand-built trace with an edge into a node nobody
+   * created is what shows it looks.
+   */
+  test("danglingEndpoints finds an edge into a node nobody created", async () => {
+    await askAndPursue(w, { question: "does it hold?" });
+    const trace = await traceOf("real", events);
+    expect(danglingEndpoints(trace)).toEqual([]);
+
+    const broken: Trace = {
+      ...trace,
+      steps: [
+        ...trace.steps,
+        {
+          seq: 99,
+          operation: "pose",
+          subject: "Q_9",
+          created: [],
+          edges: [{ from: "Q_9", label: "MOTIVATES", to: "LOE_9" }],
+          detail: {},
+          command: "labkit pose",
+        },
+      ],
+    };
+    expect(danglingEndpoints(broken)).toEqual(["LOE_9", "Q_9"]);
   });
 
   /**
