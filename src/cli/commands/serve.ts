@@ -44,16 +44,32 @@ import type { Globals } from "../session";
  * resolved at all, so neither `LABKIT_HOME` nor the working directory is
  * consulted and no `git` subprocess is spawned. A server pointed at a real
  * Postgres asks the filesystem nothing.
+ *
+ * **`--read-only` is wired, and does not hit the objection above.** That
+ * objection is specifically to a *second way to say the same thing* — `--db`
+ * duplicates `LABKIT_HOME`, and two levers for one setting is how they
+ * disagree. `--read-only` duplicates nothing: there is no environment variable
+ * for it and there deliberately is not going to be, because adding one would
+ * create exactly the duplication the paragraph above refuses.
+ *
+ * It is a flag rather than a runtime toggle because the tool list has to be
+ * static from the first `tools/list` — see `buildServer`. Its consumer is a
+ * desktop client that should read the record and never write it, which is a
+ * decision made when the client is configured, not one an agent revisits.
  */
 export function registerServe(program: Command): void {
   program
     .command("mcp")
     .description("run the MCP server over stdio (for an agent, not a terminal)")
-    .action(async () => {
+    .option(
+      "--read-only",
+      "expose only the tools that answer questions, never the ones that change the record",
+    )
+    .action(async (opts: { readOnly?: boolean }) => {
       // `optsWithGlobals` rather than `opts`: `--tenant` is declared on the
       // root, so `labkit --tenant x mcp` and `labkit mcp` must read the same
       // place. The default is applied there, so this is never undefined.
       const globals = program.opts<Globals>();
-      await serveMcp(globals.tenant);
+      await serveMcp(globals.tenant, { readOnly: opts.readOnly ?? false });
     });
 }
