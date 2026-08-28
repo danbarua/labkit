@@ -159,6 +159,38 @@ describe("enumerating gates and work", () => {
     }
   });
 
+  test("gateList's state filter returns exactly the gates in that state", async () => {
+    const s = await session();
+    try {
+      await fixture(s);
+      const all = await s.gateList();
+
+      // Every state the fixture actually produces, so this cannot pass by
+      // filtering to nothing: a filter that always returned `[]` would agree
+      // with an `all` that had no gates in that state, and would not agree
+      // with the count.
+      for (const state of new Set(all.map((g) => g.state))) {
+        const filtered = await s.gateList(state);
+        expect(filtered.map((g) => g.gate).sort()).toEqual(
+          all
+            .filter((g) => g.state === state)
+            .map((g) => g.gate)
+            .sort(),
+        );
+        expect(filtered.length).toBeGreaterThan(0);
+      }
+
+      // And a state nothing is in returns empty rather than everything --
+      // the failure `oneOf` guards on the CLI side, here at the verb.
+      const unused = (["never-evaluated", "incomplete", "blocked", "satisfied"] as const).find(
+        (st) => !all.some((g) => g.state === st),
+      );
+      if (unused) expect(await s.gateList(unused)).toEqual([]);
+    } finally {
+      await scenario.end();
+    }
+  });
+
   test("gateList and gateStatus cannot disagree about any gate", async () => {
     const s = await session();
     try {

@@ -186,9 +186,17 @@ export function registerReads(program: Command, run: Run): void {
         "handle, and until this existed the only way to get one was to already hold a " +
         "claim. `--state blocked` is what is stopping work.",
     )
-    .option("--state <state>", "never-evaluated | incomplete | blocked | satisfied")
-    .action(async (opts: { state?: string }) =>
-      run(async ({ read }) => answer(await read.gateList(gateState(opts.state)), renderGateList)),
+    // **The coercion is commander's parser, not called in the action.** Passed
+    // here, commander catches the `InvalidArgumentError`, prints it with usage
+    // and exits before any command body runs. Called inside `.action()` it
+    // still threw, but `main()`'s catch sees a `CommanderError` with
+    // `exitCode` already set and returns early on the assumption commander has
+    // printed it -- so `labkit gates --state blockd` exited 1 in **silence**,
+    // and created a database on the way, because the run wrapper opens one
+    // before the body validates anything.
+    .option("--state <state>", "never-evaluated | incomplete | blocked | satisfied", gateState)
+    .action(async (opts: { state?: ReturnType<typeof gateState> }) =>
+      run(async ({ read }) => answer(await read.gateList(opts.state), renderGateList)),
     );
 
   program
@@ -199,9 +207,10 @@ export function registerReads(program: Command, run: Run): void {
         "analysis against it yet. Not the same question as `gates` — a gate reaches only " +
         "the work it protects, and work planned without one appears nowhere else.",
     )
-    .option("--state <state>", "planned | blocked | carried-out")
-    .action(async (opts: { state?: string }) =>
-      run(async ({ read }) => answer(await read.workList(workState(opts.state)), renderWorkList)),
+    // Commander's parser, for the reason given on `gates` above.
+    .option("--state <state>", "planned | blocked | carried-out", workState)
+    .action(async (opts: { state?: ReturnType<typeof workState> }) =>
+      run(async ({ read }) => answer(await read.workList(opts.state), renderWorkList)),
     );
 
   program

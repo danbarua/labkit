@@ -1911,11 +1911,19 @@ export class ReadSurface extends SessionCore {
       byGate.set(gate.natural_id, bucket);
     }
 
-    const listed = [...byGate.entries()].map(([id, { consequence, rows: forGate }]) => ({
-      gate: ref("gate", id),
-      consequence,
-      state: gateStateFrom([...per(checkStatusForGate, forGate).values()]),
-    }));
+    // **Sorted by handle, because Cypher imposes no ordering.** Without it the
+    // rows come back in whatever order the query produced them, so two runs of
+    // `labkit gates` can print the same record differently and an agent
+    // diffing successive `gate_list` calls sees change where nothing changed.
+    // `checkStatusOver` already makes this argument about evaluations; the
+    // same one applies to the list itself.
+    const listed = [...byGate.entries()]
+      .map(([id, { consequence, rows: forGate }]) => ({
+        gate: ref("gate", id),
+        consequence,
+        state: gateStateFrom([...per(checkStatusForGate, forGate).values()]),
+      }))
+      .sort((a, b) => a.gate.localeCompare(b.gate));
 
     // Filtering here rather than in Cypher, because the state is computed and
     // there is nothing in the graph to filter on -- which is the same reason
@@ -1986,11 +1994,14 @@ export class ReadSurface extends SessionCore {
     // rather than per task: several tasks commonly share one gate.
     const gateStates = new Map((await this.gateList()).map((g) => [g.gate as string, g.state]));
 
-    const listed = [...tasks.entries()].map(([id, t]) => ({
-      work: ref("work", id),
-      objective: t.objective,
-      state: workStateFrom(t, gateStates),
-    }));
+    // Sorted by handle, for the reason given in `gateList`.
+    const listed = [...tasks.entries()]
+      .map(([id, t]) => ({
+        work: ref("work", id),
+        objective: t.objective,
+        state: workStateFrom(t, gateStates),
+      }))
+      .sort((a, b) => a.work.localeCompare(b.work));
 
     return state ? listed.filter((w) => w.state === state) : listed;
   }

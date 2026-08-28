@@ -130,3 +130,40 @@ test("a command with no bad arguments reaches its action", async () => {
   const { ran } = await parse(["known"]);
   expect(ran).toBe(true);
 });
+
+test("a bad --state names the values it would have accepted", async () => {
+  // `oneOf`'s whole purpose: a typo means the caller asked for something and is
+  // owed a message naming what was available, not a silent full list.
+  expect(await refusal(["gates", "--state", "blockd"])).toContain(
+    "never-evaluated, incomplete, blocked, satisfied",
+  );
+  expect(await refusal(["work", "--state", "carriedout"])).toContain(
+    "planned, blocked, carried-out",
+  );
+});
+
+test("a bad --state is refused before the action, so no database is opened", async () => {
+  // **This is the assertion that would have caught it, and the message one
+  // would not.** `gateState` was called *inside* `.action()`, so it did throw --
+  // but by then `run` had been reached and the run wrapper had created a
+  // database. Worse, `main()`'s catch returns early on any error carrying an
+  // `exitCode`, on the assumption commander has already printed it. Commander
+  // had not: `labkit gates --state blockd` exited 1 in complete silence, having
+  // created a 42MB record on the way. Measured before the fix.
+  //
+  // As a parser the refusal happens during `parseAsync`, so `ran` stays false.
+  for (const argv of [
+    ["gates", "--state", "blockd"],
+    ["work", "--state", "carriedout"],
+  ]) {
+    let ran = false;
+    const program = buildProgram(async () => {
+      ran = true;
+    });
+    const silence = { writeErr: () => {}, writeOut: () => {} };
+    program.exitOverride().configureOutput(silence);
+    for (const command of program.commands) command.exitOverride().configureOutput(silence);
+    await expect(program.parseAsync(argv, { from: "user" })).rejects.toThrow();
+    expect(ran).toBe(false);
+  }
+});
