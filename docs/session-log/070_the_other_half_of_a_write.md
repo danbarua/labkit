@@ -51,6 +51,22 @@ a scenario; not in `src/` because it adds no verbs and no ontology. `depcruise`
 reaches it transitively through the test, so the layering rules already apply
 with no config change.
 
+**`1a72428`** — traces, derived from a real run.
+
+`fragments/trace.ts` turns an `EventSink` into steps a picture can be drawn
+from; `fragments/compositions.ts` is six named arcs built from moves and
+nothing else; `scripts/build-traces.ts` runs them against a real database, one
+temp directory per composition, removed on exit.
+
+```
+S-19  A gated advance                      12 steps  25 nodes  38 edges
+S-4   A negative result that closes it      4 steps  11 nodes  15 edges
+S-14  Deliberately left unresolved          4 steps  11 nodes  15 edges
+S-12  The sentence about them is wrong      4 steps  13 nodes  17 edges
+S-5   Contradiction or dissociation?        7 steps  19 nodes  26 edges
+S-11  The analysis was wrong                5 steps  16 nodes  23 edges
+```
+
 Working tree clean. All of the above open as PR **#110**.
 
 **The range is far wider than this session.** Everything in it except the shas
@@ -133,10 +149,30 @@ so an analysis cannot be superseded without a recorded verdict to point at,
 which is why that fragment is the review and the replacement together rather
 than two.
 
-**Steps 2–4 of the plan are not built**
-(`~/.claude/plans/async-napping-quiche.md`): a trace exporter over
-`ResearchSession.events`, the mockup consuming traces instead of hand-written
-`add: {nodes, edges}`, and the agent-authoring prompt that falls out of it.
+**What hand-drawing a graph actually costs, measured.** The mockup drew S-19's
+arc by hand; the same arc derived from a run:
+
+| | hand-written | derived |
+| --- | --- | --- |
+| steps | 13 | 12 |
+| nodes | 18 | **25** |
+| edges | 23 | **38** |
+
+It omitted **15 edges, 39% of them** — every `RECORDED_IN`, both `REQUIRES`,
+the `MOTIVATES`: three labels it never mentions at all. **And it invented
+nothing.** Every edge it named is real.
+
+That is the failure mode worth carrying forward: hand-drawing produces an
+*under-connected* graph rather than a wrong one, so a reader sees a plausible
+picture and cannot tell what is missing. The 13-vs-12 step difference is honest
+by contrast — the mockup showed `gates --state blocked`, and a read writes no
+event.
+
+**Step 2 of the plan is now built; steps 3–4 are not**
+(`~/.claude/plans/async-napping-quiche.md`): the mockup consuming traces
+instead of hand-written `add: {nodes, edges}`, and the agent-authoring prompt
+that falls out of it. The mockup swap is now a data change rather than a
+rewrite.
 
 **And the composability question was answered "no" for the suite**, which is the
 part most likely to be re-litigated. `openScenario().begin()` hands back an
@@ -147,17 +183,15 @@ fixtures.
 
 ## Next
 
-The trace exporter, which is now nearly free: `fragments/` produces the stream,
-`fe886e7` put the edges in it and `f4db3a0` gave it an order.
-
 ```sh
-git checkout -b feat/scenario-trace origin/main   # after #110 merges
+bun scripts/build-traces.ts --out /tmp/traces
 ```
 
-A dump of `[{seq, operation, subject, created, edges, detail}]` from an
-`EventSink` after a composition runs. It reads the in-memory sink, so it adds
-nothing to `src/` and does not breach the harness's no-`src/db` rule.
+Then point the LabKit Explorer's `SCENARIOS` at those files instead of its
+hand-written `add: {nodes, edges}`. The measurement above says what that
+recovers: 39% more edges on the one scenario checked, and no invented ones to
+remove.
 
-Then the mockup consumes traces instead of hand-written `add: {nodes, edges}` —
-and `~/.claude/plans/async-napping-quiche.md`'s step 2 should be read against
-`fragments/` rather than followed, since the plan predates it.
+`~/.claude/plans/async-napping-quiche.md` should be read against `fragments/`
+rather than followed from here — the plan predates the decomposition and its
+step 2 describes the weaker version.
