@@ -7,7 +7,6 @@
       "dependencies": {
         "@electric-sql/pglite": "^0.5.7",
         "@electric-sql/pglite-age": "^0.0.8",
-        "@electric-sql/pglite-prepopulatedfs": "^0.5.7",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "commander": "^15.0.0",
         "drizzle-orm": "^0.45.2",
@@ -51,8 +50,6 @@
     "@electric-sql/pglite": ["@electric-sql/pglite@0.5.7", "", {}, "sha512-6WBks0NFO6YUhGP03mCNkbJuVFWwrZPrzZ/vsnAPnsCD28pybdZ+yoTrlLlWFoZst3kdaju5pxIslV/jrr36nQ=="],
 
     "@electric-sql/pglite-age": ["@electric-sql/pglite-age@0.0.8", "", { "peerDependencies": { "@electric-sql/pglite": "0.5.7" } }, "sha512-w9lZ5UClBKLlmx5aIxOF+w6FHdL2CnUQ315r9xiFJROg0RB+3ocnmjXMYf2LX8gLxhNJ2MHWkmdqDb2jzs97mg=="],
-
-    "@electric-sql/pglite-prepopulatedfs": ["@electric-sql/pglite-prepopulatedfs@0.5.7", "", { "peerDependencies": { "@electric-sql/pglite": "0.5.7" } }, "sha512-IQqMYqSyMHeQeYWrCaOpLnrNJ8jmV/Pjqb0VJDvuAJjaiTx08ek6JhIDeQnT63TArOb9CrZ2khdImadR4zndkg=="],
 
     "@esbuild-kit/core-utils": ["@esbuild-kit/core-utils@3.3.2", "", { "dependencies": { "esbuild": "~0.18.20", "source-map-support": "^0.5.21" } }, "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ=="],
 

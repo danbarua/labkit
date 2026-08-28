@@ -1,21 +1,22 @@
 # 059: the caveat was one file away
 
-**Session wrap, 2026-08-28, on `docs/caveat-nearest-the-claim` then
-`docs/unstale-bun-claims`.** Not a decision record — each argument lives on the
+**Session wrap, 2026-08-28, across `docs/caveat-nearest-the-claim`,
+`docs/unstale-bun-claims` and `chore/cull-three-dead-things`.** Not a decision record — each argument lives on the
 code it is about, which is the point of both changes.
 
 **Entry 058 is closed and covers the CI split** (merged as #73). This one opens
 because what followed is unrelated work and no single Goal line covers both.
 
 **The range is far wider than this session.** This session's commits are
-`97d2c30` and `7d0d86e`, plus this entry's own; everything else between the
-baseline and HEAD is a peer merge (#71 onward).
+`97d2c30`, `7d0d86e` and `6e1625e`, plus this entry's own; everything else
+between the baseline and HEAD is a peer merge (#71 onward).
 
 ## Goal
 
-Correct claims in this repo that had stopped being true — first one reported
-from `exo-ledger`, then every version-pinned claim the day's bun upgrade put in
-doubt.
+Dan's, in one instruction: keep `CLAUDE.md` fresh, and cull unused code. Which
+turned into correcting claims that had stopped being true — one reported from
+`exo-ledger`, then every version-pinned claim the day's bun upgrade put in doubt
+— and then deleting what nothing reaches.
 
 ## Changed
 
@@ -32,9 +33,16 @@ Merged as **#78**. Comment-only; no code changed.
 `connect.ts:149` was already phrased conditionally and is untouched.
 
 **`7d0d86e` — docs: re-measure the bun-pinned claims on 1.4.0; two had gone
-stale.** Open as **PR #79**. `CLAUDE.md`, `src/cli/palette.ts`,
+stale.** `CLAUDE.md`, `src/cli/palette.ts`,
 `src/db/connect.ts`, `scripts/build-binary.sh`. Ten claims name bun 1.3.14; five
-were cheap to re-run and were re-run.
+were cheap to re-run and were re-run. **Merged as #79.**
+
+**`6e1625e` — chore: cull three things nothing reaches.** Open as **PR #80**.
+`@electric-sql/pglite-prepopulatedfs` (a *runtime* dependency with no reference
+anywhere, and not transitive through pglite, which declares none),
+`globalsOf` in `src/cli/program.ts` (superseded — `cli.ts` builds that getter
+inline), and the `LabKitOrm` type alias. The `Globals` import went with
+`globalsOf`, being its only consumer.
 
 ## Verified
 
@@ -66,6 +74,18 @@ probe could have gone green.
 Also checked and clean: 82 paths and 30 symbols referenced by `CLAUDE.md` all
 resolve or are deliberately past-tense, and command parity is exact across 30
 `package.json` scripts.
+
+**For `6e1625e`:** `bun run check` 19/19 including **`check:binary`**, which is
+the control that matters when removing a pglite-adjacent dependency — it builds
+the binary and drives it against a database that does not exist yet.
+`bun install --frozen-lockfile` clean. `bin/labkit` unchanged at 76M, which is
+the expected result: nothing imported the dependency, so it was never in there.
+
+**A crude sweep returns 71 unreferenced exports and most are false positives.**
+Two clusters are load-bearing and were left: the forty `_Xxx` in
+`src/mcp/schemas.ts` are `Assert<Exact<…>>` checks holding each Zod schema to
+its interface, unreferenced *by design*; and the grain constants in
+`survey-facts.ts`, because `per()` compares grains by reference.
 
 ## Open
 
@@ -102,7 +122,7 @@ the same mistake facing the other way.
 
 ## Next
 
-`gh pr view 79` for review (#78 is merged). Then two open calls, both Dan's:
+`gh pr view 80` for review (#78 and #79 are merged). Then two open calls, both Dan's:
 whether the caveat-placement rule joins the DX Principles header, and whether
 `dotGitProjectRoot`'s export can go now that the subprocess can be made to
 fail.

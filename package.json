@@ -57,7 +57,6 @@
 	"dependencies": {
 		"@electric-sql/pglite": "^0.5.7",
 		"@electric-sql/pglite-age": "^0.0.8",
-		"@electric-sql/pglite-prepopulatedfs": "^0.5.7",
 		"@modelcontextprotocol/sdk": "^1.30.0",
 		"commander": "^15.0.0",
 		"drizzle-orm": "^0.45.2",

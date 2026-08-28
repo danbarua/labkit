@@ -51,8 +51,6 @@
 import { drizzle } from "drizzle-orm/pg-proxy";
 import type { LabKitDB } from "./backend";
 
-export type LabKitOrm = ReturnType<typeof ormOver>;
-
 /**
  * The ORM for one connection.
  *
