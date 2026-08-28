@@ -192,8 +192,8 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(status.state).toBe("satisfied");
 
       // The two enumeration tools, driven the way an agent without a handle
-      // would: no arguments, then filtered.  must agree with the
-      //  above about this very gate -- they compute the state
+      // would: no arguments, then filtered. `gate_list` must agree with
+      // `gate_status` above about this very gate -- they compute the state
       // through the same function and a disagreement here is the defect the
       // shared helper exists to prevent.
       const gates = await call(c, "gate_list", {});

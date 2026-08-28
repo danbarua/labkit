@@ -157,7 +157,9 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     description:
       "Every piece of planned work, with whether anything has been done against it. " +
       "`planned` is on the books with no analysis and nothing blocking — what is ready to " +
-      "start. `blocked` means a gate protecting it is not satisfied. `carried-out` means " +
+      "start. `blocked` means a gate protecting it has a **failed** condition; a gate whose " +
+      "conditions are merely never-evaluated or incomplete does not hold work back, so such " +
+      "work still reads `planned`. `carried-out` means " +
       "an analysis implements it. Not the same question as `gate_list`: a gate reaches only " +
       "the work it protects, and work planned without one appears nowhere else.",
     inputSchema: {
