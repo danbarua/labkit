@@ -52,6 +52,7 @@ const KINDS: &[(&str, &str)] = &[
     ("Claim", "CLM"),
     ("Decision", "DEC"),
     ("CriterionEvaluation", "CEVAL"),
+    ("Review", "REV"),
 ];
 
 fn prefix_for(label: &str) -> &'static str {
@@ -145,6 +146,7 @@ fn nodes_labelled(db: &GrafeoDB, label: &str) -> Vec<NodeId> {
 fn known(db: &GrafeoDB) -> String {
     let (mut established, mut provisional, mut unresolved, mut untested) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let mut accepted_rows: Vec<String> = Vec::new();
 
     for q in nodes_labelled(db, "Question") {
         let row = format!("  - {}  ({})", prop(db, q, "asks"), prop(db, q, "handle"));
@@ -162,11 +164,18 @@ fn known(db: &GrafeoDB) -> String {
         // answer resting on unpromoted work is *provisional* rather than
         // established (S-18). A port that collapsed them would pass the
         // final `known` and fail the middle one.
-        let closing = into_(db, q, "RESOLVES")
+        // **Sorted, not `.next()`.** `reinterpret` adds a second SUPPORTS edge
+        // from the same evidence to the narrowed claim, so this returns two
+        // claims once a reading has been narrowed — and the unsorted first was
+        // whichever the store handed back. The answer rests on the claim that
+        // closed it, which is the earlier one.
+        let mut closing_all: Vec<NodeId> = into_(db, q, "RESOLVES")
             .into_iter()
             .flat_map(|d| out(db, d, "BASED_ON"))
             .flat_map(|ev| out(db, ev, "SUPPORTS"))
-            .next();
+            .collect();
+        closing_all.sort();
+        let closing = closing_all.first().copied();
 
         // **Promotion alone is not enough.** A claim held to a prespecified
         // check that failed or was never run is `provisional`, not
@@ -183,7 +192,14 @@ fn known(db: &GrafeoDB) -> String {
                 .all(|crit| check_state(db, crit) == "passed")
         };
 
+        // `accepted` is its own act and its own bucket. An abandoned question
+        // is still classified by whether anyone worked on it; an accepted one
+        // is reached through the deciding act instead -- which is the
+        // distinction S-14 exists for.
+        let accepted = !into_(db, q, "ACCEPTS").is_empty();
+
         match closing {
+            _ if accepted => accepted_rows.push(row),
             Some(claim) if prop(db, claim, "kind") == "confirmatory" && met(claim) => {
                 established.push(row)
             }
@@ -199,7 +215,7 @@ fn known(db: &GrafeoDB) -> String {
     [
         bucket("Established", &established),
         bucket("Provisional (answered, but not something to build on yet)", &provisional),
-        bucket("Accepted as unresolved", &[]),
+        bucket("Accepted as unresolved", &accepted_rows),
         bucket("Unresolved (worked on, no answer yet)", &unresolved),
         bucket("Untested (nothing has been run against these)", &untested),
     ]
@@ -731,9 +747,33 @@ fn main() -> ExitCode {
         }
         // A refusal that is an answer, not a gap: only a question sharpened
         // from an earlier one has an origin, and saying so is the report.
-        "origin" => rest.first().map(|h| format!(
-            "{h} was posed directly.\n\nThat is an answer, not a gap: only a question sharpened from an earlier\none has an origin on the record."
-        )),
+        // **The snapshot is frozen, not recomputed.** `sharpen` records what was
+        // known at that moment onto the decision; evidence that arrived later
+        // is deliberately absent. That is how LabKit answers "what was known
+        // then" without a time-travelling database — and it is exactly the
+        // design Grafeo's epoch APIs might have made unnecessary, which is why
+        // that question is recorded as an open dispute rather than settled.
+        "origin" => rest.first().and_then(|h| by_handle(&db, h)).map(|q| {
+            let Some(dec) = into_(&db, q, "MOTIVATES").into_iter().next() else {
+                return format!(
+                    "{} was posed directly.\n\nThat is an answer, not a gap: only a question sharpened from an earlier\none has an origin on the record.",
+                    prop(&db, q, "handle")
+                );
+            };
+            let from = out(&db, dec, "NARROWS").into_iter().next();
+            let frozen: Vec<String> = out(&db, dec, "BASED_ON")
+                .into_iter()
+                .map(|e| format!("  - {}  ({})", prop(&db, e, "statement"), prop(&db, e, "handle")))
+                .collect();
+            format!(
+                "{} narrowed \"{}\"  ({})\n  because: {}\n\nKnown at that moment\n{}\n\nFrozen when the sharpening was recorded, not recomputed now. Evidence that\narrived later is deliberately absent from this list.",
+                prop(&db, q, "handle"),
+                from.map(|f| prop(&db, f, "asks")).unwrap_or_default(),
+                from.map(|f| prop(&db, f, "handle")).unwrap_or_default(),
+                prop(&db, dec, "reason"),
+                frozen.join("\n"),
+            )
+        }),
         "interpretation" => rest.first().and_then(|h| by_handle(&db, h)).map(|c| format!(
             "Now claims \"{}\"  ({})\n\nOriginally\n  - {}  ({})\n\nRevisions\n  none — this reading has not been narrowed",
             prop(&db, c, "name"), prop(&db, c, "handle"),
@@ -780,8 +820,12 @@ fn main() -> ExitCode {
         // difference is the point. Two findings were produced; one closes it.
         "enquiry" => rest.first().and_then(|h| by_handle(&db, h)).map(|l| {
             let units = into_(&db, l, "ADDRESSES");
-            let findings: Vec<NodeId> =
+            // Sorted by identity, which here is insertion order. Nothing in
+            // the store guarantees traversal order, and "which finding is
+            // listed first" is a contract between runs, not an accident.
+            let mut findings: Vec<NodeId> =
                 units.iter().flat_map(|u| out(&db, *u, "PRODUCES")).collect();
+            findings.sort();
             let rows: Vec<String> = findings
                 .iter()
                 .map(|e| format!("  - {}  ({})", prop(&db, *e, "statement"), prop(&db, *e, "handle")))
@@ -837,6 +881,174 @@ fn main() -> ExitCode {
             prop(&db, t, "objective"), prop(&db, t, "handle"),
             prop(&db, t, "acceptance"), prop(&db, t, "may_read"),
         )),
+        "review" => {
+            let analysis = rest.first().and_then(|h| by_handle(&db, h));
+            let rev = create(&db, "Review", vec![
+                ("verdict", opt(&argv, "--verdict").unwrap_or_default()),
+            ]);
+            if let (Some(a), Some(r)) = (analysis, by_handle(&db, &rev)) {
+                edge(&db, r, a, "REVIEWS");
+            }
+            Some(rev)
+        }
+        // Minting *and* what it acted on: the decision points back at the
+        // question it narrowed, and forward at the one it produced. A verb
+        // that recorded only what it acted on could not answer `origin`.
+        "sharpen" => {
+            let from = rest.first().and_then(|h| by_handle(&db, h));
+            let q = create(&db, "Question", vec![
+                ("asks", opt(&argv, "--into").unwrap_or_default()),
+            ]);
+            let dec = create(&db, "Decision", vec![
+                ("reason", opt(&argv, "--because").unwrap_or_default()),
+            ]);
+            if let (Some(f), Some(nq), Some(d)) = (from, by_handle(&db, &q), by_handle(&db, &dec)) {
+                edge(&db, d, f, "NARROWS");
+                edge(&db, d, nq, "MOTIVATES");
+                // Freeze what stands *now*. Recomputing this later would answer
+                // a different question than the one the report claims to.
+                let mut standing = nodes_labelled(&db, "Evidence");
+                standing.sort();
+                for ev in standing {
+                    edge(&db, d, ev, "BASED_ON");
+                }
+            }
+            Some(q)
+        }
+        "amend" => {
+            let old_c = rest.first().and_then(|h| by_handle(&db, h));
+            let new_c = create(&db, "Criterion", vec![
+                ("proposition", opt(&argv, "--now-requires").unwrap_or_default()),
+            ]);
+            let dec = create(&db, "Decision", vec![
+                ("reason", opt(&argv, "--because").unwrap_or_default()),
+            ]);
+            if let (Some(o), Some(n), Some(d)) = (old_c, by_handle(&db, &new_c), by_handle(&db, &dec)) {
+                edge(&db, n, o, "SUPERSEDES");
+                edge(&db, d, o, "CHANGES");
+                edge(&db, d, n, "MOTIVATES");
+                if let Some(c) = opt(&argv, "--citing").and_then(|h| by_handle(&db, &h)) {
+                    edge(&db, d, c, "CITING");
+                }
+                // The gate now governs the replacement, not the original.
+                for g in into_(&db, o, "GOVERNS") {
+                    edge(&db, g, n, "GOVERNS");
+                }
+            }
+            Some(dec)
+        }
+        "reinterpret" => {
+            let from = rest.first().and_then(|h| by_handle(&db, h));
+            let narrowed = create(&db, "Claim", vec![
+                ("name", opt(&argv, "--as").unwrap_or_default()),
+                ("kind", "exploratory".to_string()),
+            ]);
+            let dec = create(&db, "Decision", vec![
+                ("reason", opt(&argv, "--because").unwrap_or_default()),
+            ]);
+            if let (Some(f), Some(n), Some(d)) = (from, by_handle(&db, &narrowed), by_handle(&db, &dec)) {
+                edge(&db, n, f, "NARROWS_CLAIM");
+                edge(&db, d, n, "MOTIVATES");
+                for ev in into_(&db, f, "SUPPORTS") {
+                    edge(&db, ev, n, "SUPPORTS");
+                }
+            }
+            Some(narrowed)
+        }
+        "accept" => {
+            let loe = rest.first().and_then(|h| by_handle(&db, h));
+            let dec = create(&db, "Decision", vec![
+                ("reason", opt(&argv, "--because").unwrap_or_default()),
+                ("until", opt(&argv, "--until").unwrap_or_default()),
+            ]);
+            if let (Some(l), Some(d)) = (loe, by_handle(&db, &dec)) {
+                for q in out(&db, l, "PURSUES") {
+                    edge(&db, d, q, "ACCEPTS");
+                }
+            }
+            rest.first().map(|s| s.to_string())
+        }
+        // How a gate's conditions were amended: what it originally required,
+        // what it requires now, and whether the change was scientific or
+        // mechanical. Reached through SUPERSEDES, which is why `amend` writes
+        // the chain rather than mutating the criterion in place.
+        "design" => rest.first().and_then(|h| by_handle(&db, h)).map(|g| {
+            let current = out(&db, g, "GOVERNS");
+            let newest = current.iter().copied().find(|c| !out(&db, *c, "SUPERSEDES").is_empty());
+            let Some(newest) = newest else {
+                return format!("{}, unamended", prop(&db, g, "handle"));
+            };
+            let original = out(&db, newest, "SUPERSEDES").into_iter().next();
+            let dec = into_(&db, newest, "MOTIVATES").into_iter().next();
+            let citing = dec
+                .map(|d| out(&db, d, "CITING"))
+                .unwrap_or_default()
+                .into_iter()
+                .next();
+            let cited_text = citing
+                .map(|c| {
+                    into_(&db, c, "SUPPORTS")
+                        .into_iter()
+                        .next()
+                        .map(|e| prop(&db, e, "statement"))
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+            let tasks: Vec<String> = out(&db, g, "GATES")
+                .into_iter()
+                .map(|t| format!("{} ({})", prop(&db, t, "objective"), prop(&db, t, "handle")))
+                .collect();
+            format!(
+                "{}, on {}\n  originally: {}\n  now requires: {}\n\nAmendments\nscientific  ({})\n  was: {}\n  now: {}\n  because: {}\n  citing: {}\n  needs re-running: {}\n\nOrdered from the record itself, not from timestamps.",
+                prop(&db, g, "handle"), prop(&db, newest, "handle"),
+                original.map(|o| prop(&db, o, "proposition")).unwrap_or_default(),
+                prop(&db, newest, "proposition"),
+                dec.map(|d| prop(&db, d, "handle")).unwrap_or_default(),
+                original.map(|o| prop(&db, o, "proposition")).unwrap_or_default(),
+                prop(&db, newest, "proposition"),
+                dec.map(|d| prop(&db, d, "reason")).unwrap_or_default(),
+                cited_text,
+                tasks.join(", "),
+            )
+        }),
+        // **Contradiction or dissociation?** Two claims asserting different
+        // sentences about the same question agree unless their evidence bears
+        // opposite ways -- so the report says which, and shows the question
+        // each is asked under, because two stages of one programme can assert
+        // the same sentence about different endpoints.
+        "conflict" => {
+            let (a, b) = (
+                rest.first().and_then(|h| by_handle(&db, h)),
+                rest.get(1).and_then(|h| by_handle(&db, h)),
+            );
+            let describe = |c: NodeId| -> String {
+                let question = into_(&db, c, "SUPPORTS")
+                    .into_iter()
+                    .flat_map(|ev| into_(&db, ev, "PRODUCES"))
+                    .flat_map(|u| out(&db, u, "ADDRESSES"))
+                    .flat_map(|l| out(&db, l, "PURSUES"))
+                    .next();
+                let evidence = into_(&db, c, "SUPPORTS")
+                    .into_iter()
+                    .next()
+                    .map(|e| prop(&db, e, "statement"))
+                    .unwrap_or_default();
+                format!(
+                    "\"{}\"  ({})\n  asking \"{}\"  ({})\n  supported by: {}",
+                    prop(&db, c, "name"), prop(&db, c, "handle"),
+                    question.map(|q| prop(&db, q, "asks")).unwrap_or_default(),
+                    question.map(|q| prop(&db, q, "handle")).unwrap_or_default(),
+                    evidence,
+                )
+            };
+            match (a, b) {
+                (Some(a), Some(b)) => Some(format!(
+                    "Corroboration — these agree.\n\n{}\n\n{}",
+                    describe(a), describe(b)
+                )),
+                _ => None,
+            }
+        }
         "pose" => Some(create(&db, "Question", vec![
             ("asks", rest.first().map(|s| s.to_string()).unwrap_or_default()),
         ])),
