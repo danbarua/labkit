@@ -359,6 +359,193 @@ const rerunningIsNotReproducing: Composition = {
   },
 };
 
+
+/**
+ * An eighteen-month programme, and the reason a long one is worth building.
+ *
+ * The other twelve borrow a single scenario's arc, which is the right size for
+ * showing one mechanic and the wrong size for showing what a record *is*. Real
+ * work is several threads that interact: a question that gets sharpened
+ * halfway through, work that is gated and then released, an analysis that is
+ * replaced after a review, a claim narrowed once somebody reads it properly,
+ * and one question nobody could settle.
+ *
+ * Nothing here is a new capability — it is the same sixteen moves, more of
+ * them, threaded. That is the claim being tested: **length costs handles, not
+ * machinery.** If a long arc needed something a short one did not, the
+ * decomposition would be wrong.
+ *
+ * `implementing` appears here and nowhere else: it links the analysis to the
+ * gated work it carries out, which only exists once an arc is long enough to
+ * have planned work *and* an analysis that discharges it.
+ */
+const aProgramme: Composition = {
+  // **Not a scenario's ref, because it is not one scenario.** It borrows from
+  // S-19, S-4, S-5, S-11, S-12, S-14 and S-1 at once, which is the point — the
+  // interaction between them is what a single-scenario arc cannot show. The
+  // skill says to leave `ref` as the closest match rather than invent a number;
+  // there is no closest match here, so it says what it is.
+  ref: "PROGRAMME",
+  name: "An eighteen-month programme",
+  run: async (w) => {
+    // --- phase I: is it safe enough to continue? ------------------------
+    const { question, enquiries } = await multiPursuit(w, {
+      question: "should this compound go forward?",
+      approaches: ["phase I safety", "phase II efficacy"],
+    });
+    const safety = enquiries[0]!;
+    const efficacy = enquiries[1]!;
+
+    const safeEnough = await prespecify(w, {
+      proposition: "no grade 3 events at the target dose",
+    });
+    const phaseII = await gatedWork(w, {
+      criterion: safeEnough.criterion,
+      consequence: "phase II may not start until safety holds",
+      objective: "run the phase II efficacy study",
+      acceptance: "safety held at the target dose",
+    });
+
+    const doseFinding = await observeAndAnalyse(w, {
+      enquiry: safety,
+      name: "dose-escalation",
+      finding: "no grade 3 events in 36 subjects",
+      method: "3+3 escalation",
+      concludes: [
+        { proposition: "the target dose is tolerated", finding: "no grade 3 events in 36" },
+      ],
+      heldTo: [safeEnough.criterion],
+    });
+    await rerunCheck(w, {
+      criterion: safeEnough.criterion,
+      gate: phaseII.gate,
+      value: "0 events",
+      citing: doseFinding.claims[0]!.claim,
+    });
+
+    // --- phase II: the efficacy check fails, then does not ---------------
+    const worksAtAll = await prespecify(w, {
+      proposition: "response rate above 30% at 12 weeks",
+    });
+    const firstRead = await observeAndAnalyse(w, {
+      enquiry: efficacy,
+      name: "phase-ii-primary",
+      finding: "response rate 24%",
+      method: "intention to treat",
+      concludes: [{ proposition: "the compound is effective", finding: "24% response" }],
+      heldTo: [worksAtAll.criterion],
+      // The work this analysis carries out. Only expressible once an arc has
+      // both planned work and an analysis that discharges it.
+      implementing: phaseII.work,
+    });
+    await failedCheck(w, {
+      criterion: worksAtAll.criterion,
+      value: "0.24",
+      citing: firstRead.claims[0]!.claim,
+    });
+
+    // A review finds the analysis wrong, not the data.
+    const corrected = await replaceAnalysis(w, {
+      supersedes: firstRead.analysis,
+      verdict: "non-responders at week 4 were carried forward, inflating the denominator",
+      enquiry: efficacy,
+      method: "intention to treat, corrected denominator",
+      from: [firstRead.observations],
+      concludes: [{ proposition: "the compound is effective", finding: "34% response" }],
+    });
+    await rerunCheck(w, {
+      criterion: worksAtAll.criterion,
+      value: "0.34",
+      citing: corrected.claims[0]!.claim,
+    });
+
+    // --- the question narrows in light of what was found -----------------
+    const { sharper } = await sharpenQuestion(w, {
+      from: question,
+      into: "should this compound go forward in the biomarker-positive subgroup?",
+      because: corrected.claims[0]!.claim,
+    });
+    const subgroup = await multiPursuit(w, {
+      question: "does the effect concentrate in the biomarker-positive subgroup?",
+      approaches: ["prespecified subgroup analysis", "exploratory secondary endpoints"],
+    });
+    const confirmatory = subgroup.enquiries[0]!;
+    const exploratory = subgroup.enquiries[1]!;
+
+    const subgroupRead = await observeAndAnalyse(w, {
+      enquiry: confirmatory,
+      name: "biomarker-stratified",
+      finding: "51% vs 12%",
+      method: "stratified analysis",
+      concludes: [
+        { proposition: "the compound works in the biomarker-positive subgroup", finding: "51% vs 12%" },
+      ],
+    });
+
+    // The numbers are right; the sentence was too strong.
+    await reinterpretClaim(w, {
+      of: subgroupRead.claims[0]!.claim,
+      as: "response is higher in the biomarker-positive subgroup",
+      because: "the design cannot separate the biomarker from the confounders it tracks",
+    });
+
+    // --- a secondary endpoint that does not hold ------------------------
+    const secondary = await negativeResult(w, {
+      enquiry: exploratory,
+      name: "quality-of-life",
+      finding: "difference 1.1 points [-2.4, 4.6]",
+      method: "EORTC QLQ-C30",
+      proposition: "the compound improves quality of life",
+    });
+    await acceptUnresolved(w, {
+      enquiry: exploratory,
+      because: "the study was never powered for this endpoint",
+      until: "a trial powered for quality of life is run",
+      inLightOf: secondary.claims[0]!.claim,
+    });
+
+    // --- and the programme closes on what it can support -----------------
+    await promoteFinding(w, {
+      claim: corrected.claims[0]!.claim,
+      because: "held at the prespecified bar after the denominator was corrected",
+    });
+    // **One close, not two, and the domain is what taught this.** Closing
+    // `efficacy` and then `safety` was refused:
+    //
+    //   enquiry LOE_1 is already closed by decision DEC_5 (answered on "the
+    //   compound is effective"); closing it again would leave two decisions
+    //   resolving one question
+    //
+    // Both pursuits address the *same* question, and closure attaches to the
+    // question rather than to the line of enquiry — which is S-4's finding,
+    // met here from the other side. The safety result is not lost: it is on
+    // the record, supports its own claim, and released the gate. It simply
+    // does not get a second closing act.
+    //
+    // No short arc could have found this. It needs one question carrying two
+    // pursuits *and* both of them reaching an answer.
+    await closeOnEvidence(w, { enquiry: efficacy, answeredBy: corrected.claims[0]!.claim });
+
+    // A year later, under fresh inputs.
+    await reverifyEarlier(w, {
+      // `replacement`, not `analysis`. `observeAndAnalyse` returns the latter
+      // and `replaceAnalysis` the former, and both are an `AnalysisRef` — the
+      // first thing a long arc found, because nothing shorter threads one into
+      // the other. Left as it is: `replacement` says *which* analysis, and a
+      // uniform `analysis` everywhere would lose that at the call site.
+      historical: corrected.replacement,
+      enquiry: confirmatory,
+      method: "re-run on the registry cohort",
+      under: [firstRead.observations],
+      concludes: { proposition: "the compound is effective", finding: "31% response, registry" },
+    });
+
+    // The sharpened question is left standing, unpursued and undecided --
+    // which is a real state and not an oversight.
+    void sharper;
+  },
+};
+
 /**
  * Every composition, in the order a reader would meet them.
  *
@@ -366,6 +553,7 @@ const rerunningIsNotReproducing: Composition = {
  * worth landing on, and the rest run shortest-first from there.
  */
 export const COMPOSITIONS: readonly Composition[] = [
+  aProgramme,
   gatedAdvance,
   aHunchNotYetAnExperiment,
   significantAndUntrustworthy,

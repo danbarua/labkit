@@ -74,7 +74,14 @@ one per distinct scenario shape.
 **`044f1f2`** — `check:compositions`, `fragments/run.ts`, and
 `.claude/skills/compose-scenario`. The sweep is **20** now.
 
-Working tree clean. All of the above open as PR **#110**.
+All of the above merged as **#110** (`a74c345`).
+
+**`083a125`** — an eighteen-month programme, 29 steps / 64 nodes / 98 edges,
+2.6x the previous largest. Same sixteen fragments, no new machinery, which was
+the claim under test: *length costs handles, not machinery*. Open as PR
+**#112**, on a fresh branch because #110 merged mid-work — see `## Open`.
+
+Working tree clean.
 
 **The range is far wider than this session.** Everything in it except the shas
 above belongs to entries 063, 064 and 066–069 — #92, #93, #96 through #109 —
@@ -212,6 +219,40 @@ concluded fails 1 of 13 and names both the composition and the refusal.
 Two copies of *connect, resolve, step down, build a surface* would drift, with
 the check passing against a composition the builder can no longer run.
 
+**What length found, which twelve short arcs had not.** The domain refused the
+long programme twice, and the second refusal is a finding about the model:
+
+```
+enquiry LOE_1 is already closed by decision DEC_5 (answered on "the compound
+is effective"); closing it again would leave two decisions resolving one
+question
+```
+
+Both pursuits address the **same question**, and closure attaches to the
+question rather than to the line of enquiry — S-4's finding met from the other
+side. **No short arc could have reached it**: it needs one question carrying two
+pursuits *and* both reaching an answer. The safety result is not lost; it
+supports its own claim and released the gate. It simply gets no second closing
+act.
+
+The smaller one: `replaceAnalysis` returns `replacement` where
+`observeAndAnalyse` returns `analysis`, both `AnalysisRef`. Nothing shorter
+threads one into the other. Left as it is — `replacement` says *which* analysis
+— with the friction noted at the call site.
+
+**The pre-push hook saved this work.** #110 merged while the programme was
+being written, and the first push was refused:
+
+```
+pre-push: REFUSED — PR #110 for 'feat/edges-in-the-event-log' is already merged.
+```
+
+That push would have succeeded and reached nothing. Verified by *content* that
+everything from #110 was on `main` and only the programme was new — ancestry
+claimed thirteen unmerged commits, which is the squash blind spot the hook
+exists for — then cherry-picked onto `feat/a-long-programme` as the hook
+instructed.
+
 **All four steps of the plan are built**
 (`~/.claude/plans/async-napping-quiche.md`). The authoring prompt is
 `.claude/skills/compose-scenario`, and its §4 is the point of the whole shape:
@@ -234,8 +275,8 @@ fixtures.
 
 ## Next
 
-Nothing queued — the plan is finished and #110 is ten commits waiting on
-review. If it merges and something else is wanted here:
+Nothing queued. #110 is merged; **#112** carries the long programme. If more is
+wanted here:
 
 ```sh
 /compose-scenario                 # write a new arc
