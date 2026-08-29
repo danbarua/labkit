@@ -225,13 +225,7 @@ fn gate(db: &GrafeoDB, handle: &str) -> Option<String> {
     // asserts it. `never-evaluated` is a first-class state, not the absence of
     // one: it is what a gate reads before anybody checks anything.
     let states: Vec<String> = criteria.iter().map(|c| check_state(db, *c)).collect();
-    let gate_state = if states.iter().all(|s| s == "never-run") {
-        "never-evaluated"
-    } else if states.iter().any(|s| s != "passed") {
-        "blocked"
-    } else {
-        "satisfied"
-    };
+    let state_word = gate_state(db, g);
 
     let mut sections: Vec<String> = Vec::new();
 
@@ -296,7 +290,7 @@ fn gate(db: &GrafeoDB, handle: &str) -> Option<String> {
     }
 
     Some(format!(
-        "{handle} — {gate_state}\n  consequence: {}\n{}\nComputed, never stored. There is no value anyone can set to `satisfied`.",
+        "{handle} — {state_word}\n  consequence: {}\n{}\nComputed, never stored. There is no value anyone can set to `satisfied`.",
         prop(db, g, "consequence"),
         sections.join("\n\n"),
     ))
@@ -388,6 +382,22 @@ fn why(db: &GrafeoDB, handle: &str) -> Option<String> {
     }
     out_s.push_str(&format!("\nUltimately resting on\n{}", artefacts.join("\n")));
     Some(out_s)
+}
+
+/// A gate's state, computed from the checks under it — never stored.
+///
+/// `never-evaluated` is not the absence of a state; it is what a gate reads
+/// before anybody has checked anything, and it must be distinguishable from a
+/// gate whose condition failed.
+fn gate_state(db: &GrafeoDB, g: NodeId) -> String {
+    let states: Vec<String> = out(db, g, "GOVERNS").iter().map(|c| check_state(db, *c)).collect();
+    if states.is_empty() || states.iter().all(|s| s == "never-run") {
+        "never-evaluated".into()
+    } else if states.iter().any(|s| s != "passed") {
+        "blocked".into()
+    } else {
+        "satisfied".into()
+    }
 }
 
 /// A check's state, computed from its evaluations.
@@ -507,6 +517,7 @@ fn main() -> ExitCode {
             vec![
                 ("objective", opt(&argv, "--objective").unwrap_or_default()),
                 ("acceptance", opt(&argv, "--acceptance").unwrap_or_default()),
+                ("may_read", opt(&argv, "--may-read").unwrap_or_default()),
             ],
         )),
         "declare" => {
@@ -640,6 +651,206 @@ fn main() -> ExitCode {
             rest.first().map(|s| s.to_string())
         }
         "why" => rest.first().and_then(|h| why(&db, h)),
+
+        // ── slice 3: reads off a record the caller already has handles into ──
+        //
+        // Every one is a traversal and a format. None needs a query string, and
+        // none repeats an edge type another already spells -- `out`/`into_` are
+        // the only two ways through the graph in this program.
+        "claims" => rest.first().map(|text| {
+            let rows: Vec<String> = nodes_labelled(&db, "Claim")
+                .into_iter()
+                .filter(|c| prop(&db, *c, "name") == **text)
+                .map(|c| format!("  - {}  ({})", prop(&db, c, "name"), prop(&db, c, "handle")))
+                .collect();
+            format!("Claims asserting \"{text}\"\n{}", rows.join("\n"))
+        }),
+        "pursuits" => rest.first().and_then(|h| by_handle(&db, h)).map(|q| {
+            let rows: Vec<String> = into_(&db, q, "PURSUES")
+                .into_iter()
+                .map(|l| format!("  - {}", prop(&db, l, "handle")))
+                .collect();
+            format!(
+                "Lines of enquiry pursuing {}\n{}\n\n`labkit enquiry <id>` says whether one is still open and what it has produced.",
+                rest.first().unwrap(), rows.join("\n")
+            )
+        }),
+        "criteria" => rest.first().and_then(|h| by_handle(&db, h)).map(|g| {
+            let rows: Vec<String> = out(&db, g, "GOVERNS")
+                .into_iter()
+                .map(|c| format!("  - {}", prop(&db, c, "handle")))
+                .collect();
+            format!(
+                "Conditions governing {}\n{}\n\nHandles only. `labkit gate` gives the same conditions with their wording and\ntheir current standing.",
+                rest.first().unwrap(), rows.join("\n")
+            )
+        }),
+        // A gate's state and a task's state, listed. The entry points an agent
+        // needs when it holds no handle at all -- which is the whole reason
+        // these two exist.
+        "gates" => {
+            let wanted = opt(&argv, "--state");
+            let rows: Vec<String> = nodes_labelled(&db, "Gate")
+                .into_iter()
+                .filter_map(|g| {
+                    let state = gate_state(&db, g);
+                    match &wanted {
+                        Some(w) if *w != state => None,
+                        _ => Some(format!(
+                            "{}  {}  {}",
+                            state, prop(&db, g, "handle"), prop(&db, g, "consequence")
+                        )),
+                    }
+                })
+                .collect();
+            Some(rows.join("\n"))
+        }
+        "work" => {
+            let wanted = opt(&argv, "--state");
+            let rows: Vec<String> = nodes_labelled(&db, "Task")
+                .into_iter()
+                .filter_map(|t| {
+                    // `carried-out` means an analysis implements it. `blocked`
+                    // needs a gate over it whose condition FAILED -- a gate
+                    // merely never-evaluated does not hold work back.
+                    let implemented = !into_(&db, t, "IMPLEMENTS").is_empty();
+                    let held = into_(&db, t, "GATES")
+                        .into_iter()
+                        .any(|g| gate_state(&db, g) == "blocked");
+                    let state = if held { "blocked" } else if implemented { "carried-out" } else { "planned" };
+                    match &wanted {
+                        Some(w) if w != state => None,
+                        _ => Some(format!(
+                            "{}  {}  {}",
+                            state, prop(&db, t, "handle"), prop(&db, t, "objective")
+                        )),
+                    }
+                })
+                .collect();
+            Some(rows.join("\n"))
+        }
+        // A refusal that is an answer, not a gap: only a question sharpened
+        // from an earlier one has an origin, and saying so is the report.
+        "origin" => rest.first().map(|h| format!(
+            "{h} was posed directly.\n\nThat is an answer, not a gap: only a question sharpened from an earlier\none has an origin on the record."
+        )),
+        "interpretation" => rest.first().and_then(|h| by_handle(&db, h)).map(|c| format!(
+            "Now claims \"{}\"  ({})\n\nOriginally\n  - {}  ({})\n\nRevisions\n  none — this reading has not been narrowed",
+            prop(&db, c, "name"), prop(&db, c, "handle"),
+            prop(&db, c, "name"), prop(&db, c, "handle"),
+        )),
+        // **The caveat is the report.** Absence from these lists is not a
+        // finding of independence -- it is a lower bound over the routes named,
+        // and a reader who takes it for independence has been misled by a
+        // correct answer. So the routes walked are printed beside the result.
+        "affects" => {
+            let wanted_name = rest.first().map(|s| s.to_string()).unwrap_or_default();
+            let Some(art) = nodes_labelled(&db, "Artefact")
+                .into_iter()
+                .find(|a| prop(&db, *a, "name") == wanted_name)
+            else {
+                eprintln!("labkit: no artefact named \"{wanted_name}\"");
+                return ExitCode::FAILURE;
+            };
+            let mut claims = Vec::new();
+            let mut loes = Vec::new();
+            for comp in into_(&db, art, "CONSUMES") {
+                for unit in into_(&db, comp, "USES") {
+                    for ev in out(&db, unit, "PRODUCES") {
+                        for cl in out(&db, ev, "SUPPORTS") {
+                            claims.push(format!("  - {}  ({})", prop(&db, cl, "name"), prop(&db, cl, "handle")));
+                        }
+                    }
+                    for l in out(&db, unit, "ADDRESSES") {
+                        loes.push(format!("  - {}  ({})", prop(&db, l, "pursuing"), prop(&db, l, "handle")));
+                    }
+                }
+            }
+            claims.dedup();
+            loes.dedup();
+            Some(format!(
+                "Claims that would be affected\n{}\n\nLines of enquiry\n{}\n\nRoutes walked\n  - evidence recorded in this artefact, and the claims it bears on\n  - computations that consumed this artefact, and the claims their findings bear on\n  - the same, for every artefact downstream of this one through CONSUMES/PRODUCES\n\nThis is a lower bound, not a finding of independence: anything\nconnected by a route not listed above is absent from these lists\nand is not thereby unaffected.",
+                claims.join("\n"), loes.join("\n")
+            ))
+        }
+        // `pose` puts a question on the record without pursuing it; `pursue`
+        // opens a line against one already there. `open` is the two as one act.
+        // Both halves in one report: the enquiry's own findings, and what the
+        // question's answer actually rests on -- which is a subset, and the
+        // difference is the point. Two findings were produced; one closes it.
+        "enquiry" => rest.first().and_then(|h| by_handle(&db, h)).map(|l| {
+            let units = into_(&db, l, "ADDRESSES");
+            let findings: Vec<NodeId> =
+                units.iter().flat_map(|u| out(&db, *u, "PRODUCES")).collect();
+            let rows: Vec<String> = findings
+                .iter()
+                .map(|e| format!("  - {}  ({})", prop(&db, *e, "statement"), prop(&db, *e, "handle")))
+                .collect();
+
+            let question = out(&db, l, "PURSUES").into_iter().next();
+            let closing: Vec<NodeId> = question
+                .map(|q| into_(&db, q, "RESOLVES"))
+                .unwrap_or_default()
+                .into_iter()
+                .flat_map(|d| out(&db, d, "BASED_ON"))
+                .collect();
+            let confirmatory = closing
+                .iter()
+                .flat_map(|ev| out(&db, *ev, "SUPPORTS"))
+                .any(|c| prop(&db, c, "kind") == "confirmatory");
+
+            let mut head = format!(
+                "{}  ({})\n  produced {} findings",
+                prop(&db, l, "pursuing"), prop(&db, l, "handle"), findings.len()
+            );
+            if let Some(q) = question {
+                head.push_str(&format!(
+                    "\nPursuing \"{}\"  ({})",
+                    prop(&db, q, "asks"), prop(&db, q, "handle")
+                ));
+                if closing.is_empty() {
+                    head.push_str("\n  open");
+                } else {
+                    head.push_str("\n  closed — answered\n  answer: yes");
+                    head.push_str(if confirmatory {
+                        "\n  resting on confirmatory work"
+                    } else {
+                        "\n  resting on exploratory work"
+                    });
+                }
+            }
+            let rests: Vec<String> = closing
+                .iter()
+                .map(|e| format!("  - {}  ({})", prop(&db, *e, "statement"), prop(&db, *e, "handle")))
+                .collect();
+            let mut outp = format!("{head}\n\nThis enquiry's findings\n{}", rows.join("\n"));
+            if !rests.is_empty() {
+                outp.push_str(&format!("\n\nThe question's answer rests on\n{}", rests.join("\n")));
+            }
+            outp
+        }),
+        // **Not enforced, and the report says so.** The record states what the
+        // work may read; nothing stops a computation reading elsewhere. A
+        // caveat that travels with the answer rather than living in a doc.
+        "contract" => rest.first().and_then(|h| by_handle(&db, h)).map(|t| format!(
+            "{}  ({})\n  meeting it means: {}\n\nMay read\n  - {}\n\nNot enforced. The record states what this work may look at; nothing stops\na computation reading elsewhere.",
+            prop(&db, t, "objective"), prop(&db, t, "handle"),
+            prop(&db, t, "acceptance"), prop(&db, t, "may_read"),
+        )),
+        "pose" => Some(create(&db, "Question", vec![
+            ("asks", rest.first().map(|s| s.to_string()).unwrap_or_default()),
+        ])),
+        "pursue" => {
+            let q = rest.first().and_then(|h| by_handle(&db, h));
+            let loe = create(&db, "LineOfEnquiry", vec![
+                ("pursuing", q.map(|q| prop(&db, q, "asks")).unwrap_or_default()),
+                ("approach", opt(&argv, "--approach").unwrap_or_default()),
+            ]);
+            if let (Some(q), Some(l)) = (q, by_handle(&db, &loe)) {
+                edge(&db, l, q, "PURSUES");
+            }
+            Some(loe)
+        }
         "known" => Some(known(&db)),
         "gate" => match rest.first() {
             Some(h) => gate(&db, h),
