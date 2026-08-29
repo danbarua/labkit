@@ -99,9 +99,9 @@ export function resolveProjectRoot(
  * direction: there, every project shared one record; here, one project
  * fragments into several.
  *
- * `--show-toplevel` names the *worktree* and would reintroduce the bug. This is
- * the same distinction `.claude/skills/wrap/wrap-hook.sh` drew when it stopped
- * resolving from `$CLAUDE_PROJECT_DIR`, one level further out.
+ * `--show-toplevel` names the *worktree* and would reintroduce the bug. The
+ * wrap hook drew the same distinction when it stopped resolving from
+ * `$CLAUDE_PROJECT_DIR`; that hook is deleted, and the distinction is not.
  *
  * Returns `undefined` outside a repository — `git rev-parse` fails, and
  * LabKit does not require git — so {@link discoverProjectRoot} stays as the
