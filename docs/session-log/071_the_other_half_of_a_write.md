@@ -1,4 +1,4 @@
-# 070: the other half of a write
+# 071: the other half of a write
 
 **Session wrap, 2026-08-28, on `feat/edges-in-the-event-log`.** Not a decision
 record — `DomainEvent.edges` and `TenantGraph.mintedEdges` carry the argument,
