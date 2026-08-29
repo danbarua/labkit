@@ -59,35 +59,56 @@ OWNER=danbarua
 NUM=3
 
 # ── the triage ───────────────────────────────────────────────────────────────
-# Ranked highest-first within Todo. The reasoning lives in the issues and in
-# docs/session-log/066; this is only the assignment.
-TODO="95 50 55 52 49 81 56 76"
+# The reasoning lives in the issues; this is only the assignment.
+#
+# Status says whether it can be picked up. Priority says what to look at first,
+# and exists because Todo alone gives eight items in no order — which is a list,
+# not a focus.
+#
+#   P0  clear it next: a demonstrated wrong answer shipping green, or something
+#       that loses work. CLAUDE.md permits at most one of the first kind at a
+#       time and requires that clearing it be the next thing built, so P0 is
+#       normally one issue and never many.
+#   P1  real, unblocked, and it slides if nobody ranks it.
+#   P2  everything else, Blocked and Parked included — not competing for
+#       attention. Every item carries one so the completeness check below stays
+#       total; P2 is the honest value for a thing nobody should be looking at.
+TODO="81 50 55 104 52 49 56 76"
 BLOCKED="94 60"   # both behind #49
 PARKED="63 64 65 98 51 54"
 IN_PROGRESS=""
-DONE="57"
+DONE="57 95"
+
+P0="81"           # attribution: two writes, byte-identical, one of them a claim nobody checked
+P1="50 55 104 52"
+P2="49 56 76 94 60 63 64 65 98 51 54 57 95"
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ID=$(gh project view "$NUM" --owner "$OWNER" --format json -q .id)
 
-STATUS_JSON=$(gh project field-list "$NUM" --owner "$OWNER" --format json |
+FIELDS_JSON=$(gh project field-list "$NUM" --owner "$OWNER" --format json |
   python3 -c "
 import sys, json
-for f in json.load(sys.stdin)['fields']:
-    if f.get('name') == 'Status':
-        print(json.dumps({'id': f['id'], 'options': {o['name']: o['id'] for o in f['options']}}))
-        break
-else:
-    raise SystemExit('no Status field on the board')
+want = {'Status', 'Priority'}
+out = {
+    f['name']: {'id': f['id'], 'options': {o['name']: o['id'] for o in f['options']}}
+    for f in json.load(sys.stdin)['fields']
+    if f.get('name') in want and 'options' in f
+}
+missing = want - set(out)
+if missing:
+    raise SystemExit('the board has no ' + ', '.join(sorted(missing)) + ' field')
+print(json.dumps(out))
 ")
 
-export STATUS_JSON TODO BLOCKED PARKED IN_PROGRESS DONE
+export FIELDS_JSON TODO BLOCKED PARKED IN_PROGRESS DONE P0 P1 P2
 
 gh project item-list "$NUM" --owner "$OWNER" --limit 200 --format json |
   python3 -c "
 import sys, json, os
 
-status = json.loads(os.environ['STATUS_JSON'])
+fields = json.loads(os.environ['FIELDS_JSON'])
+status, priority = fields['Status'], fields['Priority']
 plan = {
     'Todo': os.environ['TODO'].split(),
     'In progress': os.environ['IN_PROGRESS'].split(),
@@ -95,7 +116,30 @@ plan = {
     'Parked': os.environ['PARKED'].split(),
     'Done': os.environ['DONE'].split(),
 }
+ranks = {
+    'P0': os.environ['P0'].split(),
+    'P1': os.environ['P1'].split(),
+    'P2': os.environ['P2'].split(),
+}
 wanted = {n: s for s, nums in plan.items() for n in nums}
+ranked = {n: p for p, nums in ranks.items() for n in nums}
+
+# **Both lists must name the same issues.** Two hand-written lists drift, and a
+# priority silently missing from one of them is exactly the untriaged-by-default
+# case this script exists to refuse -- one level in, where it is harder to see.
+only_status = sorted(set(wanted) - set(ranked), key=int)
+only_rank = sorted(set(ranked) - set(wanted), key=int)
+if only_status or only_rank:
+    raise SystemExit(
+        'the Status and Priority lists disagree:\n'
+        + (('  no priority for: ' + ', '.join('#' + n for n in only_status) + '\n') if only_status else '')
+        + (('  no status for:   ' + ', '.join('#' + n for n in only_rank) + '\n') if only_rank else '')
+        + '  Every item gets both. P2 is the value for one nobody should be looking at.'
+    )
+
+dupes = sorted({n for p in ranks for n in ranks[p] if sum(n in v for v in ranks.values()) > 1}, key=int)
+if dupes:
+    raise SystemExit('these issues have more than one priority: ' + ', '.join('#' + n for n in dupes))
 
 items = json.load(sys.stdin)['items']
 if not items:
@@ -123,13 +167,16 @@ if stale:
         + '\n  Remove them here, or add them to the board.'
     )
 
-for n, s in sorted(wanted.items(), key=lambda kv: (list(plan).index(kv[1]), int(kv[0]))):
-    print(by_number[n], status['id'], status['options'][s], n, s)
+for n, s in sorted(wanted.items(), key=lambda kv: (ranked[kv[0]], list(plan).index(kv[1]), int(kv[0]))):
+    print(by_number[n], status['id'], status['options'][s],
+          priority['id'], priority['options'][ranked[n]], n, s, ranked[n])
 " |
-  while read -r item field option number label; do
+  while read -r item sfield soption pfield poption number label rank; do
     gh project item-edit --id "$item" --project-id "$PROJECT_ID" \
-      --field-id "$field" --single-select-option-id "$option" >/dev/null
-    printf '  %-12s #%s\n' "$label" "$number"
+      --field-id "$sfield" --single-select-option-id "$soption" >/dev/null
+    gh project item-edit --id "$item" --project-id "$PROJECT_ID" \
+      --field-id "$pfield" --single-select-option-id "$poption" >/dev/null
+    printf '  %-3s %-12s #%s\n' "$rank" "$label" "$number"
   done
 
-echo "OK: every board item has a status."
+echo "OK: every board item has a status and a priority."
