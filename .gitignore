@@ -9,6 +9,11 @@ bin/
 
 *.bun-build
 .labkit
+# The exo-ledger belief store, when a session has exo-memory wired up. Same
+# reason as `.labkit` above: it is an embedded PGlite database, machine-local,
+# and rewritten by whichever session is holding it. The beliefs are the point;
+# the file is a cache of them for this checkout.
+.exo/
 
 # This is a Bun project — `bun.lock` is the lockfile. A tracked
 # `package-lock.json` was removed after the two disagreed about drizzle-kit
