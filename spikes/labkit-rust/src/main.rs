@@ -45,6 +45,13 @@ const KINDS: &[(&str, &str)] = &[
     ("LineOfEnquiry", "LOE"),
     ("Task", "TASK"),
     ("Gate", "GATE"),
+    ("Artefact", "ART"),
+    ("Evidence", "EV"),
+    ("EvidenceUnit", "EU"),
+    ("Computation", "COMP"),
+    ("Claim", "CLM"),
+    ("Decision", "DEC"),
+    ("CriterionEvaluation", "CEVAL"),
 ];
 
 fn prefix_for(label: &str) -> &'static str {
@@ -103,6 +110,22 @@ fn out(db: &GrafeoDB, src: NodeId, edge_type: &str) -> Vec<NodeId> {
         .collect()
 }
 
+/// Nodes reaching `dst` along one edge type — the same traversal backwards.
+///
+/// Both directions are one filter over `iter_edges`, which is the point: on
+/// AGE the "in" direction is a different Cypher pattern that has to be written
+/// out again, and writing it again is how a direction gets forgotten.
+fn into_(db: &GrafeoDB, dst: NodeId, edge_type: &str) -> Vec<NodeId> {
+    db.iter_edges()
+        .filter(|e| e.dst == dst && &*e.edge_type == edge_type)
+        .map(|e| e.src)
+        .collect()
+}
+
+fn edge(db: &GrafeoDB, a: NodeId, b: NodeId, t: &str) {
+    db.create_edge_with_props(a, b, t, [] as [(&str, &str); 0]);
+}
+
 fn nodes_labelled(db: &GrafeoDB, label: &str) -> Vec<NodeId> {
     db.iter_nodes()
         .filter(|n| n.labels.iter().any(|l| &**l == label))
@@ -120,23 +143,64 @@ fn nodes_labelled(db: &GrafeoDB, label: &str) -> Vec<NodeId> {
 /// bucket the fixture asserts, so a port that stored a status and defaulted it
 /// to something friendlier would fail the diff.
 fn known(db: &GrafeoDB) -> String {
-    let mut untested = Vec::new();
+    let (mut established, mut provisional, mut unresolved, mut untested) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+
     for q in nodes_labelled(db, "Question") {
-        untested.push(format!(
-            "  - {}  ({})",
-            prop(db, q, "asks"),
-            prop(db, q, "handle")
-        ));
+        let row = format!("  - {}  ({})", prop(db, q, "asks"), prop(db, q, "handle"));
+
+        // Has any evidence unit addressed a line of enquiry pursuing this
+        // question? That is "worked on" — and it is a traversal, not a stored
+        // flag, which is why observing something moves the question without
+        // anything setting a status.
+        let worked = into_(db, q, "PURSUES")
+            .iter()
+            .any(|loe| !into_(db, *loe, "ADDRESSES").is_empty());
+
+        // Closed on a cited claim, and whether that claim was promoted. The
+        // two facts are separate on purpose: promotion is its own act, so an
+        // answer resting on unpromoted work is *provisional* rather than
+        // established (S-18). A port that collapsed them would pass the
+        // final `known` and fail the middle one.
+        let closing = into_(db, q, "RESOLVES")
+            .into_iter()
+            .flat_map(|d| out(db, d, "BASED_ON"))
+            .flat_map(|ev| out(db, ev, "SUPPORTS"))
+            .next();
+
+        // **Promotion alone is not enough.** A claim held to a prespecified
+        // check that failed or was never run is `provisional`, not
+        // `established` — a check nobody performed counts against the finding
+        // it qualifies. The first version of this port had promoted+cited go
+        // straight to `established`, which is the defect LabKit itself carried
+        // until S-19: the survey said `established` about a claim its own
+        // `why` was simultaneously calling unmet. The fixture caught it here.
+        let met = |claim: NodeId| -> bool {
+            into_(db, claim, "SUPPORTS")
+                .iter()
+                .flat_map(|ev| into_(db, *ev, "PRODUCES"))
+                .flat_map(|u| into_(db, u, "QUALIFIES"))
+                .all(|crit| check_state(db, crit) == "passed")
+        };
+
+        match closing {
+            Some(claim) if prop(db, claim, "kind") == "confirmatory" && met(claim) => {
+                established.push(row)
+            }
+            Some(_) => provisional.push(row),
+            None if worked => unresolved.push(row),
+            None => untested.push(row),
+        }
     }
     let bucket = |title: &str, rows: &[String]| -> String {
         let body = if rows.is_empty() { "  nothing".to_string() } else { rows.join("\n") };
         format!("{title}\n{body}\n")
     };
     [
-        bucket("Established", &[]),
-        bucket("Provisional (answered, but not something to build on yet)", &[]),
+        bucket("Established", &established),
+        bucket("Provisional (answered, but not something to build on yet)", &provisional),
         bucket("Accepted as unresolved", &[]),
-        bucket("Unresolved (worked on, no answer yet)", &[]),
+        bucket("Unresolved (worked on, no answer yet)", &unresolved),
         bucket("Untested (nothing has been run against these)", &untested),
     ]
     .join("\n")
@@ -156,36 +220,189 @@ fn gate(db: &GrafeoDB, handle: &str) -> Option<String> {
     let criteria = out(db, g, "GOVERNS");
     let gating = out(db, g, "GATES");
 
-    // Padded to the longest state name (`no-standing-verdict`, 19) so the
-    // columns line up. Pad the value, never a coloured copy of it: an escape
-    // sequence has length and would pad bytes nobody can see.
+    // **Computed, never stored**, which is why there is no value anyone can
+    // set to `satisfied` — the report says so on its last line and the fixture
+    // asserts it. `never-evaluated` is a first-class state, not the absence of
+    // one: it is what a gate reads before anybody checks anything.
+    let states: Vec<String> = criteria.iter().map(|c| check_state(db, *c)).collect();
+    let gate_state = if states.iter().all(|s| s == "never-run") {
+        "never-evaluated"
+    } else if states.iter().any(|s| s != "passed") {
+        "blocked"
+    } else {
+        "satisfied"
+    };
+
+    let mut sections: Vec<String> = Vec::new();
+
+    // Padded to the longest state name (`no-standing-verdict`, 19). Pad the
+    // value, never a coloured copy: an escape sequence has length and would
+    // pad bytes nobody can see.
     let conditions: Vec<String> = criteria
         .iter()
-        .map(|c| {
-            format!(
+        .zip(&states)
+        .map(|(c, state)| {
+            let mut row = format!(
                 "  - {:<19} {}  ({})",
-                "never-run",
+                state,
                 prop(db, *c, "proposition"),
                 prop(db, *c, "handle")
-            )
+            );
+            if let Some(e) = out(db, *c, "EVALUATED_AS").first() {
+                row.push_str(&format!(
+                    "  decided {} on \"{}\"",
+                    if prop(db, *e, "outcome") == "fail" { "failed" } else { "passed" },
+                    prop(db, *e, "value")
+                ));
+            }
+            row
         })
         .collect();
+    sections.push(format!("Conditions\n{}", conditions.join("\n")));
+
+    // Omitted entirely when everything is met -- a section listing nothing is
+    // noise, and the fixture has no empty one.
     let unmet: Vec<String> = criteria
         .iter()
-        .map(|c| format!("  - {}  ({})", prop(db, *c, "proposition"), prop(db, *c, "handle")))
+        .zip(&states)
+        .filter(|(_, st)| *st != "passed")
+        .map(|(c, _)| format!("  - {}  ({})", prop(db, *c, "proposition"), prop(db, *c, "handle")))
         .collect();
+    if !unmet.is_empty() {
+        sections.push(format!("Not currently met\n{}", unmet.join("\n")));
+    }
+
     let gated: Vec<String> = gating
         .iter()
         .map(|t| format!("  - {}  ({})", prop(db, *t, "objective"), prop(db, *t, "handle")))
         .collect();
+    sections.push(format!("Gating\n{}", gated.join("\n")));
+
+    let evals: Vec<String> = criteria
+        .iter()
+        .flat_map(|c| out(db, *c, "EVALUATED_AS"))
+        .map(|e| {
+            format!(
+                "  - {}  {}  \"{}\"  ({})",
+                prop(db, e, "at"),
+                if prop(db, e, "outcome") == "fail" { "failed" } else { "passed" },
+                prop(db, e, "value"),
+                prop(db, e, "handle")
+            )
+        })
+        .collect();
+    if !evals.is_empty() {
+        sections.push(format!("Evaluations\n{}", evals.join("\n")));
+    }
 
     Some(format!(
-        "{handle} — never-evaluated\n  consequence: {}\nConditions\n{}\n\nNot currently met\n{}\n\nGating\n{}\nComputed, never stored. There is no value anyone can set to `satisfied`.",
+        "{handle} — {gate_state}\n  consequence: {}\n{}\nComputed, never stored. There is no value anyone can set to `satisfied`.",
         prop(db, g, "consequence"),
-        conditions.join("\n"),
-        unmet.join("\n"),
-        gated.join("\n"),
+        sections.join("\n\n"),
     ))
+}
+
+/// `labkit why <claim>` — why a conclusion counts as supported.
+///
+/// The composed report, and the one that would have been hardest on AGE: it
+/// reaches a claim's evidence, the standard it was held to, what that standard
+/// blocks, and the artefacts underneath — four traversals that on AGE are four
+/// hand-written Cypher clauses, each of which has to remember both bearings.
+fn why(db: &GrafeoDB, handle: &str) -> Option<String> {
+    let claim = by_handle(db, handle)?;
+    let promoted = prop(db, claim, "kind") == "confirmatory";
+
+    let mut resting = Vec::new();
+    let mut artefacts = Vec::new();
+    for ev in into_(db, claim, "SUPPORTS") {
+        for unit in into_(db, ev, "PRODUCES") {
+            for comp in out(db, unit, "USES") {
+                resting.push(format!(
+                    "  - {}  (via {}, {})",
+                    prop(db, ev, "statement"),
+                    prop(db, comp, "method"),
+                    prop(db, comp, "handle")
+                ));
+                for art in out(db, comp, "CONSUMES") {
+                    artefacts.push(format!(
+                        "  - {}  [{}]",
+                        prop(db, art, "name"),
+                        prop(db, art, "handle")
+                    ));
+                }
+            }
+        }
+    }
+
+    // The standard: criteria qualifying the unit that produced the evidence.
+    // Written when the analysis is recorded, not when the check is evaluated —
+    // a check nobody ran must still count against the finding it qualifies.
+    let mut held = Vec::new();
+    let mut unmet = Vec::new();
+    for ev in into_(db, claim, "SUPPORTS") {
+        for unit in into_(db, ev, "PRODUCES") {
+            for crit in into_(db, unit, "QUALIFIES") {
+                let state = check_state(db, crit);
+                held.push(format!("  - {} — {}", prop(db, crit, "proposition"), state));
+                if state != "passed" {
+                    let mut row = format!(
+                        "  - {}  ({})",
+                        prop(db, crit, "proposition"),
+                        prop(db, crit, "handle")
+                    );
+                    // What the unmet check *blocks*. Reached backwards along
+                    // GOVERNS — the direction that does not exist as a verb in
+                    // LabKit today, and is one filter here.
+                    for g in into_(db, crit, "GOVERNS") {
+                        row.push_str(&format!(
+                            "\n      blocks {} — {}",
+                            prop(db, g, "handle"),
+                            prop(db, g, "consequence")
+                        ));
+                        for t in out(db, g, "GATES") {
+                            row.push_str(&format!(
+                                "\n        holding up {}  ({})",
+                                prop(db, t, "objective"),
+                                prop(db, t, "handle")
+                            ));
+                        }
+                    }
+                    unmet.push(row);
+                }
+            }
+        }
+    }
+
+    let supported = if promoted { "supported, confirmatory" } else { "NOT supported, exploratory" };
+    let mut out_s = format!(
+        "\"{}\"\n  {}\nResting on\n{}\n",
+        prop(db, claim, "name"),
+        supported,
+        resting.join("\n")
+    );
+    if !held.is_empty() {
+        out_s.push_str(&format!("\nHeld to\n{}\n", held.join("\n")));
+    }
+    if !unmet.is_empty() {
+        out_s.push_str(&format!("\nNot currently met\n{}\n", unmet.join("\n")));
+    }
+    out_s.push_str(&format!("\nUltimately resting on\n{}", artefacts.join("\n")));
+    Some(out_s)
+}
+
+/// A check's state, computed from its evaluations.
+///
+/// `never-run` is a first-class value rather than the absence of one: a check
+/// nobody performed must be distinguishable from one that failed.
+fn check_state(db: &GrafeoDB, crit: NodeId) -> String {
+    let evals = out(db, crit, "EVALUATED_AS");
+    if evals.is_empty() {
+        return "never-run".into();
+    }
+    if evals.iter().any(|e| prop(db, *e, "outcome") == "fail") {
+        return "failed".into();
+    }
+    "passed".into()
 }
 
 // ── argument parsing ─────────────────────────────────────────────────────────
@@ -194,6 +411,32 @@ fn gate(db: &GrafeoDB, handle: &str) -> Option<String> {
 ///
 /// A spike earns no dependencies it has not needed twice. This is the second
 /// use, and it is nine lines.
+/// An ISO-8601 stamp to the millisecond, the shape the Bun CLI emits.
+///
+/// Hand-rolled rather than pulling in `chrono`: the parity harness normalises
+/// this field to `<timestamp>` because it differs on every run, so what has to
+/// be right is the *shape*, and one dependency for one format string is not a
+/// trade a spike should make.
+fn now_iso() -> String {
+    let d = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock before 1970");
+    let (secs, ms) = (d.as_secs(), d.subsec_millis());
+    let days = secs / 86_400;
+    let (h, m, sec) = ((secs % 86_400) / 3600, (secs % 3600) / 60, secs % 60);
+    // Civil-from-days, Howard Hinnant's algorithm.
+    let z = days as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!("{year:04}-{month:02}-{day:02}T{h:02}:{m:02}:{sec:02}.{ms:03}Z")
+}
+
 fn opt(args: &[String], name: &str) -> Option<String> {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
 }
@@ -286,6 +529,117 @@ fn main() -> ExitCode {
             }
             Some(handle)
         }
+        // One act, many records: an artefact, an evidence unit, and the
+        // evidence itself. The caller names none of them and gets the artefact
+        // back, because that is the one the next command consumes.
+        "observe" => {
+            let loe = rest.first().and_then(|h| by_handle(&db, h));
+            let art = create(&db, "Artefact", vec![
+                ("name", opt(&argv, "--name").unwrap_or_default()),
+                ("hash", opt(&argv, "--hash").unwrap_or_default()),
+            ]);
+            let ev = create(&db, "Evidence", vec![
+                ("statement", opt(&argv, "--finding").unwrap_or_default()),
+            ]);
+            let eu = create(&db, "EvidenceUnit", vec![]);
+            if let (Some(l), Some(a), Some(e), Some(u)) =
+                (loe, by_handle(&db, &art), by_handle(&db, &ev), by_handle(&db, &eu))
+            {
+                edge(&db, u, l, "ADDRESSES");
+                edge(&db, u, e, "PRODUCES");
+                edge(&db, e, a, "RECORDED_IN");
+            }
+            Some(art)
+        }
+        // Answers with the analysis first, then one claim per conclusion — the
+        // order the caller gave them. Both handles, because a caller cannot
+        // cite a claim it cannot name.
+        "analyse" => {
+            let loe = rest.first().and_then(|h| by_handle(&db, h));
+            let concludes = opt(&argv, "--concludes").unwrap_or_default();
+            let field = |k: &str| -> String {
+                concludes
+                    .split(&format!("\"{k}\""))
+                    .nth(1)
+                    .and_then(|t| t.split('"').nth(1))
+                    .unwrap_or_default()
+                    .to_string()
+            };
+            let comp = create(&db, "Computation", vec![
+                ("method", opt(&argv, "--method").unwrap_or_default()),
+            ]);
+            let eu = create(&db, "EvidenceUnit", vec![]);
+            let ev = create(&db, "Evidence", vec![("statement", field("finding"))]);
+            let claim = create(&db, "Claim", vec![
+                ("name", field("proposition")),
+                ("kind", "exploratory".to_string()),
+            ]);
+            if let (Some(c), Some(u), Some(e), Some(cl)) = (
+                by_handle(&db, &comp), by_handle(&db, &eu),
+                by_handle(&db, &ev), by_handle(&db, &claim),
+            ) {
+                if let Some(l) = loe { edge(&db, u, l, "ADDRESSES"); }
+                edge(&db, u, c, "USES");
+                edge(&db, u, e, "PRODUCES");
+                edge(&db, e, cl, "SUPPORTS");
+                if let Some(a) = opt(&argv, "--from").and_then(|h| by_handle(&db, &h)) {
+                    edge(&db, c, a, "CONSUMES");
+                }
+                if let Some(t) = opt(&argv, "--implementing").and_then(|h| by_handle(&db, &h)) {
+                    edge(&db, c, t, "IMPLEMENTS");
+                }
+                // QUALIFIES at record time, not evaluate time — an edge minted
+                // at the later moment cannot express a check nobody ran.
+                if let Some(cr) = opt(&argv, "--held-to").and_then(|h| by_handle(&db, &h)) {
+                    edge(&db, cr, u, "QUALIFIES");
+                }
+            }
+            Some(format!("{comp}\n{claim}"))
+        }
+        // Promotion is its own act. Until it happens the finding is scratch,
+        // and an answer resting on it is provisional rather than established.
+        "promote" => {
+            let claim = rest.first().and_then(|h| by_handle(&db, h));
+            let dec = create(&db, "Decision", vec![
+                ("reason", opt(&argv, "--because").unwrap_or_default()),
+            ]);
+            if let (Some(c), Some(d)) = (claim, by_handle(&db, &dec)) {
+                edge(&db, d, c, "PROMOTES");
+                db.set_node_property(c, "kind", Value::from("confirmatory"));
+            }
+            rest.first().map(|s| s.to_string())
+        }
+        "close" => {
+            let loe = rest.first().and_then(|h| by_handle(&db, h));
+            let dec = create(&db, "Decision", vec![]);
+            if let (Some(l), Some(d)) = (loe, by_handle(&db, &dec)) {
+                for q in out(&db, l, "PURSUES") {
+                    edge(&db, d, q, "RESOLVES");
+                }
+                if let Some(cl) = opt(&argv, "--answered-by").and_then(|h| by_handle(&db, &h)) {
+                    for ev in into_(&db, cl, "SUPPORTS") {
+                        edge(&db, d, ev, "BASED_ON");
+                    }
+                }
+            }
+            rest.first().map(|s| s.to_string())
+        }
+        "evaluate" => {
+            let crit = rest.first().and_then(|h| by_handle(&db, h));
+            let ev = create(&db, "CriterionEvaluation", vec![
+                ("value", opt(&argv, "--value").unwrap_or_default()),
+                ("outcome", opt(&argv, "--outcome").unwrap_or_default()),
+                ("at", now_iso()),
+            ]);
+            if let (Some(c), Some(e)) = (crit, by_handle(&db, &ev)) {
+                edge(&db, c, e, "EVALUATED_AS");
+                if let Some(g) = opt(&argv, "--gate").and_then(|h| by_handle(&db, &h)) {
+                    edge(&db, e, g, "TRIGGERS");
+                }
+            }
+            rest.first().map(|s| s.to_string())
+        }
+        "why" => rest.first().and_then(|h| why(&db, h)),
         "known" => Some(known(&db)),
         "gate" => match rest.first() {
             Some(h) => gate(&db, h),
