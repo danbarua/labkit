@@ -143,11 +143,9 @@ is available to mislead you. Found on 2026-08-22 in this state.
 
 One more thing a worktree will not have, because it is untracked:
 
-- `.claude/settings.local.json`, `.claude/.wrap-state/` and
-  `.claude/hookify.*.local.md`. The hookify rules are the ones worth copying
-  across — they warn on mistakes already made in this repo. `.wrap-state/` must
-  be **seeded** before the first Stop fire or the first wrap is silently
-  swallowed; `.claude/skills/wrap/SKILL.md` §Forking has the command.
+- `.claude/settings.local.json` and `.claude/hookify.*.local.md`. The hookify
+  rules are the ones worth copying across — they warn on mistakes already made
+  in this repo.
 
 **Git hooks are not one of them, and this file said they were until
 2026-08-28.** `core.hooksPath` is *per-repository* config, and a linked worktree
@@ -351,14 +349,23 @@ next records what happened. Bare numerals elsewhere in this file mean
 directory, because both chains have an `029`. The pile closed with the
 inferred-verb corpus.
 
-`docs/session-log/` holds mechanical per-session handovers written by the
-`wrap` skill (`.claude/skills/wrap/`) — disposable, not decisions, numbered
-independently; see its README. The Stop/SessionStart wiring lives in
-`.claude/settings.json`, which is **checked in** — it was gitignored until
-2026-08-20, so a clone got the skill without the hook that runs it. What stays
-out of the repo is `.claude/settings.local.json` (machine-local) and
-`.claude/.wrap-state/` (one file per session, derived from git; a tracked copy
-would hand a new worktree another session's pinned baseline).
+**`docs/session-log/` is closed.** Seventy-two dated handovers, 18-29 August;
+they stay as written, being dated records. Nothing writes there any more and the
+`wrap` skill, its Stop/SessionStart hooks and `.claude/settings.json` are
+deleted — see its README, and PR #117 for the argument.
+
+**The pull request body is the work log.** What was done, what was measured,
+what was *not* run, and what is left open. It is durable, addressable, attached
+to the diff it describes, reviewable by the other sessions, and costs no commit
+— which the session log did, 174 times: **a third of this repository's history
+was commits touching nothing but `docs/session-log/`.** The two had become
+duplicates, because a PR body already carried everything the entry repeated.
+
+**A belief that will be revised does not go in either.** Contested claims,
+and the reason one was overturned, live in the exo-ledger store — see the
+`exo-ledger` plugin's `introduction` prompt. A markdown file cannot hold two
+positions open until evidence settles them, and pretending otherwise is what
+made the log grow.
 
 ### Working alongside another session
 
