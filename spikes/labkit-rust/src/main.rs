@@ -761,7 +761,16 @@ fn main() -> ExitCode {
                 );
             };
             let from = out(&db, dec, "NARROWS").into_iter().next();
-            let frozen: Vec<String> = out(&db, dec, "BASED_ON")
+            // **Sorted, not the traversal's own order.** `iter_edges()` is
+            // unordered once more than one BASED_ON edge leaves the same
+            // decision — `sharpen` writes them in NodeId order, but reading
+            // them back without re-sorting let the list come back reordered
+            // on some runs and not others. Same defect as `known`'s
+            // `closing_all.sort()`, found the same way: by running the
+            // fixture, not by reading this traversal and trusting it.
+            let mut based_on = out(&db, dec, "BASED_ON");
+            based_on.sort();
+            let frozen: Vec<String> = based_on
                 .into_iter()
                 .map(|e| format!("  - {}  ({})", prop(&db, e, "statement"), prop(&db, e, "handle")))
                 .collect();

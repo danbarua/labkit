@@ -124,9 +124,9 @@ rather than settled either way — "I could not find the advance path" is not
 "there isn't one", and an in-memory database may simply never advance where a
 persistent one with WAL would.
 
-## Two defects the fixture found that no type could
+## Three defects the fixture found that no type could
 
-Worth naming because both are about *reports*, not about Rust or Grafeo.
+Worth naming because all three are about *reports*, not about Rust or Grafeo.
 
 **The port independently reproduced a bug LabKit itself had until PR #69.**
 After `promote` and `close`, `known` reported the question `established`. The
@@ -142,6 +142,27 @@ whichever the store handed back, making `known` wrong intermittently by
 construction. The same shape in `sharpen`'s frozen snapshot. The fix is not
 *be careful*: **a report is a contract between runs, and an unordered read
 cannot be one.**
+
+**Fixing the write side of that same defect left the read side broken, and
+the fixture went flaky rather than red — worse, because flaky reads as "run it
+again."** (2026-08-30.) `sharpen` sorts its `Evidence` nodes by `NodeId` before
+writing the `BASED_ON` edges that freeze what was known — the fix above. But
+`origin` read that frozen snapshot back with a bare `out(&db, dec,
+"BASED_ON")`, trusting `iter_edges()`'s own order. It doesn't have one:
+`slice-4` went from clean to failing on roughly half of twenty otherwise
+identical runs, same binary, same fixture, same commands — the two `Evidence`
+nodes in the frozen list traded places. Sorting only where a value is written
+does not make reading it back ordered; the same `.sort()` was needed again at
+the read site. This is the lesson two paragraphs up, recurring in the other
+half of the same verb after the first half had already been fixed — which is
+this repo's own finding about itself (CLAUDE.md, "'Be more careful' is not an
+available remedy") arriving here by an independent route.
+
+**Only the two sites the fixture actually exercised twice are sorted; every
+other `out()`/`into_()` call in this file still trusts traversal order.** That
+is a named risk, not a cleared one — the fixture is what turned each of the
+three defects above from a theory into a fact, and nothing has done that for
+the rest.
 
 ## Divergences from the Bun implementation, named rather than hidden
 
