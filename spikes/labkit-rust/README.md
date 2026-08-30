@@ -105,24 +105,43 @@ Dated, because each was run rather than reasoned about.
   query string anywhere in the port. (2026-08-29. The fixtures are the
   authority; run them rather than trusting this sentence.)
 
-### What is open, and should not be built on
+### The epoch question, resolved — and it decomposes rather than settles one way
 
-**Whether Grafeo's epoch APIs are real time travel or recovery internals.**
-`GrafeoDB` publicly exposes `get_node_at_epoch`, `execute_at_epoch`,
-`epoch_range` and `restore_to_epoch` — but **no public method advances an
-epoch**, a write left `current_epoch` at 0 so the past read identical to the
-present even with `features = ["temporal"]`, and the internal setter is
-documented *"(for snapshot/WAL recovery)"*.
+**Whether Grafeo's epoch APIs are real time travel or recovery internals** was
+open pending a runnable probe. `examples/epoch_probe.rs` and
+`examples/epoch_probe_session.rs` are that probe (2026-08-30). The answer is
+both poles were half right, about different paths:
 
-This matters more than it looks. LabKit answers *"what was known then"* by
-**freezing** findings onto a decision at write time, because AGE cannot be
-asked. `labkit origin <sharpened-question>` prints that snapshot and says so:
-*"Frozen when the sharpening was recorded, not recomputed now."* If Grafeo's
-epochs are queryable history, that design becomes unnecessary; if they are
-recovery plumbing, it stays. Recorded as an **open dispute** in the exo-ledger
-rather than settled either way — "I could not find the advance path" is not
-"there isn't one", and an in-memory database may simply never advance where a
-persistent one with WAL would.
+- **On the typed CRUD API this port actually uses** (`create_node_with_props`,
+  `set_node_property`), there is no history to query. `epoch_probe` advances
+  the epoch counter with `LpgStore::new_epoch()` — which *is* public, just
+  `#[doc(hidden)]`, so `db.store()` reaches it even though rustdoc never shows
+  it — and `get_node_at_epoch` still can't tell the epoch before a property
+  write from the epoch after: both read the post-write value. Advancing the
+  counter is not the same as recording history, and nothing on this path
+  records any.
+- **On the session/query path, with `temporal` enabled, it works.**
+  `epoch_probe_session` runs a write through `session.execute("MATCH ... SET
+  ...")`, which commits a real transaction, then reads the *pre-write* value
+  back with `session.execute_at_epoch(query, epoch_1)` — a public, ordinarily-
+  documented method, not a hidden one. It returns the old value; a plain
+  `execute` at the same point returns the new one. That is genuine, working
+  time travel.
+
+So the dispute wasn't wrong on either side, it was under-scoped: "Grafeo's
+epoch APIs" turned out to name two different mechanisms, one per write path,
+and the port's own design goal — a typed API with no query strings — is
+exactly the path epochs don't reach. Getting LabKit's "what was known then"
+from Grafeo's own history would mean writing through `session.execute(...)`
+instead, which is the *less* interesting bet this port deliberately avoided
+(see "Why typed calls and not Cypher," above). `sharpen`'s freeze-at-write-time
+snapshot stays: not because Grafeo lacks real time travel, but because taking
+it would mean giving up the property that motivated this port in the first
+place.
+
+`Cargo.toml`'s `temporal`, `cypher` and `gql` features exist only for these two
+probes — the port itself (`src/main.rs`) still builds and runs on `lpg` alone,
+unchanged; see the comment there.
 
 ## Three defects the fixture found that no type could
 
@@ -181,8 +200,10 @@ the rest.
 - `reproduction`, `reproducibility`, `replace`, `reverify` — all read
   supersession chains, so they need more of the `SUPERSEDES` / `REVERIFIES`
   structure than `amend` currently writes.
-- `happened` — reads the event log the port does not have. Deciding whether to
-  keep a separate log or derive history from the graph is **the same question**
-  as the epoch dispute above, which is why it is last rather than next.
+- `happened` — reads the event log the port does not have. The epoch question
+  above answers this rather than leaving it tied to it: deriving history from
+  the graph would mean writing through `session.execute(...)` for epochs to
+  mean anything, which this port isn't doing, so `happened` needs an actual
+  event log, kept separately, same as LabKit's own.
 - `mcp` is a server, not a CLI command. 35 is the realistic ceiling for a
   command-parity spike.
