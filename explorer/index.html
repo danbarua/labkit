@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LabKit Explorer</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header id="bar">
+    <h1>LabKit <span>Explorer</span></h1>
+
+    <label class="field">
+      <span>scenario</span>
+      <select id="scenario"></select>
+    </label>
+
+    <div class="view-toggle" role="group" aria-label="view mode">
+      <button id="view-2d" class="active" data-view="2d">2D</button>
+      <button id="view-3d" data-view="3d">3D</button>
+    </div>
+
+    <div class="transport">
+      <button id="reset" title="Back to the start">⟲</button>
+      <button id="play" title="Play / pause">▶</button>
+      <button id="next" title="Step forward">Next ▸</button>
+    </div>
+
+    <label class="field speed">
+      <span>speed</span>
+      <input id="speed" type="range" min="0.5" max="8" step="0.5" value="2" />
+    </label>
+  </header>
+
+  <div id="progress"><div id="progress-fill"></div></div>
+
+  <main>
+    <div id="stage-wrap">
+      <canvas id="stage"></canvas>
+      <div id="hint" class="hint"></div>
+      <div id="popover" class="popover hidden"></div>
+    </div>
+
+    <aside id="queue">
+      <h2>Queued commands</h2>
+      <ol id="queue-list"></ol>
+    </aside>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
