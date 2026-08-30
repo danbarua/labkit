@@ -17,6 +17,7 @@ import { scopeToTenant } from "../src/db/scoped";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, inMemoryEventLog, systemClock } from "../src/domain";
 import type { Composition } from "./compositions";
+import { withProvenance } from "./derive";
 import { traceOf, type Trace } from "./trace";
 
 /**
@@ -32,9 +33,10 @@ export async function runComposition(composition: Composition, dir: string): Pro
     const ctx = await resolveTenantContext(connection.db, connection.tx, "labkit");
     await scopeToTenant(connection.db, ctx);
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
-    const events = inMemoryEventLog();
+    const baseEvents = inMemoryEventLog();
+    const { events, provenance } = withProvenance(graph, baseEvents);
     await composition.run(new WriteSurface(graph, { clock: systemClock, events }));
-    return await traceOf(composition.name, events);
+    return await traceOf(composition.name, baseEvents, provenance);
   } finally {
     await connection.close();
   }

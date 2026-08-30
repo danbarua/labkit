@@ -36,7 +36,7 @@ import {
   rerunCheck,
   reverifyEarlier,
   sharpenQuestion,
-} from "./index";
+} from "./tagged";
 
 export interface Composition {
   /** The scenario whose arc this borrows, for a reader who wants the real one. */

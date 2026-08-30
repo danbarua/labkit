@@ -15,10 +15,19 @@
       <select id="scenario"></select>
     </label>
 
-    <div class="view-toggle" role="group" aria-label="view mode">
+    <div id="view-toggle" class="view-toggle" role="group" aria-label="view mode">
       <button id="view-2d" class="active" data-view="2d">2D</button>
       <button id="view-3d" data-view="3d">3D</button>
     </div>
+
+    <label class="field">
+      <span>colour</span>
+      <div id="overlay-toggle" class="view-toggle" role="group" aria-label="colour overlay">
+        <button class="active" data-overlay="structural">kind</button>
+        <button data-overlay="standing">standing</button>
+        <button data-overlay="temporal">temporal</button>
+      </div>
+    </label>
 
     <div class="transport">
       <button id="reset" title="Back to the start">⟲</button>
@@ -39,6 +48,17 @@
       <canvas id="stage"></canvas>
       <div id="hint" class="hint"></div>
       <div id="popover" class="popover hidden"></div>
+      <div id="derived-panel">
+        <div class="derived-col" id="derived-act">
+          <h3>act</h3>
+        </div>
+        <div class="derived-col" id="derived-delta">
+          <h3>record delta</h3>
+        </div>
+        <div class="derived-col" id="derived-changes">
+          <h3>derived changes</h3>
+        </div>
+      </div>
     </div>
 
     <aside id="queue">
