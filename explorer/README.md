@@ -58,7 +58,9 @@ Given a sequence of research-verb calls (`pose`, `pursue`, `recordAnalysis`,
    never mistaken for either kind of composition. Unlike the other two, this
    one is re-read on every request rather than fixed at boot: a real record
    can still be growing, and the Explorer showing it stale would be worse
-   than not showing it.
+   than not showing it. bonsai-2026's own record, rendered this way, is a
+   live example of exactly what this was for: it holds a confidently wrong
+   answer, not a synthetic one — see #132 and PJ-008 row AM.
 
 ## What it does not do
 
