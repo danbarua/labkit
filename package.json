@@ -19,6 +19,7 @@
 		"spike:web": "bash scripts/compose.sh --profile spike up -d --build && bash scripts/compose.sh logs -f web",
 		"explorer": "bun scripts/serve-explorer.ts",
 		"demo:rust-explorer": "bash scripts/demo-rust-explorer.sh",
+		"demo:db-explorer": "bash scripts/demo-db-explorer.sh",
 		"spike:web:down": "bash scripts/compose.sh --profile spike down",
 		"test:pg": "bash scripts/test-postgres.sh",
 		"test:in-docker": "bash scripts/test-in-docker.sh",

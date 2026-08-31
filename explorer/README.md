@@ -2,18 +2,21 @@
 
 A step-by-step, force-directed (2D and 3D) renderer of a research record as
 LabKit actually built it. Not a mockup, not a fixture — every trace it shows
-is derived fresh from the real domain (or a real port of it) each time the
-server boots.
+is either derived fresh from the real domain (a composition, a real port of
+it) or read straight off a real, durable record, each time the server boots
+or, for a real record, on every request.
 
 ## Where the code lives
 
 | Path | What it is |
 | --- | --- |
 | `explorer/` (this directory) | The frontend: `index.html`, `style.css`, `app.js`. Vanilla JS, no build step, no dependency — reads `GET /api/traces` and renders. |
-| `scripts/serve-explorer.ts` | The server. Builds every `fragments/compositions.ts` arc through the real TS domain at boot, optionally reads Rust/Grafeo NDJSON traces (`--rust-traces <dir>`), and serves both plus the static frontend. `bun run explorer`. |
+| `scripts/serve-explorer.ts` | The server. Builds every `fragments/compositions.ts` arc through the real TS domain at boot, optionally reads Rust/Grafeo NDJSON traces (`--rust-traces <dir>`), optionally re-reads a real durable record on every request (`--db <dir>`), and serves all three plus the static frontend. `bun run explorer`. |
 | `fragments/` | The composable research moves and arcs a trace is built from — see below, this is the part worth reading first. |
 | `scripts/read-rust-traces.ts` | Parses `LABKIT_TRACE_OUT` NDJSON from the Rust/Grafeo port (`spikes/labkit-rust/`) into the same trace shape. |
+| `scripts/read-db-trace.ts` | Opens a real `.labkit/` record (built by the CLI or the MCP server, over real time — not a composition), reads its full event history, and returns one `Trace`. Acquires and releases the connection per call, same as the MCP server does per tool call, so a long-lived Explorer process never sits on the lock a real writer needs (#124, #126). |
 | `scripts/demo-rust-explorer.sh` | `bun run demo:rust-explorer` — builds the Rust port, generates one trace, serves it. The commands that connect the two pieces above, runnable rather than reconstructed from reading both files. |
+| `scripts/demo-db-explorer.sh` | `bun run demo:db-explorer` — writes a few real CLI events into a kept record, serves it, and shows how to grow it live in a second shell without restarting the server. |
 | `scripts/check-compositions.ts` | The check (`bun run check:compositions`) that every arc still runs and connects only what it creates. |
 
 Nothing here is a spike. It ships, `bun run check` covers it, and
@@ -49,6 +52,13 @@ Given a sequence of research-verb calls (`pose`, `pursue`, `recordAnalysis`,
    Building this side-by-side view is what surfaced six places the two models
    actually disagree on edge shape (#123) — a discussion, not a verdict, per
    Dan's correction: neither implementation is automatically the reference.
+6. Renders a real record — one built through the CLI or the MCP server over
+   real time, not a scripted arc at all — read straight off its durable
+   `pgEventLog` (`--db <dir>`, #124/#126), tagged with a third origin so it's
+   never mistaken for either kind of composition. Unlike the other two, this
+   one is re-read on every request rather than fixed at boot: a real record
+   can still be growing, and the Explorer showing it stale would be worse
+   than not showing it.
 
 ## What it does not do
 
@@ -60,9 +70,18 @@ Given a sequence of research-verb calls (`pose`, `pursue`, `recordAnalysis`,
   produced. Whether that's the *right* graph is a question for
   `tests/scenarios/` (PJ-008's acceptance corpus) and the exo-ledger, not for
   this viewer. A wrong edge renders exactly as confidently as a right one.
-- **It is not a fixture.** There is no committed trace JSON. Every trace is
-  rebuilt from the domain on every server start, so the picture cannot drift
-  out of sync with the code the way a checked-in mockup did.
+- **It is not a fixture.** There is no committed trace JSON. A composition or
+  a Rust trace is rebuilt from the domain on every server start; a `--db`
+  record is re-read on every request; either way the picture cannot drift out
+  of sync with what actually happened, the way a checked-in mockup did.
+- **A `--db` record is read, never written.** The Explorer opens it and closes
+  the connection within one request, the same acquire-and-release shape the
+  MCP server uses per tool call — it never holds the PGlite lock for the
+  life of the process, which would block every real writer trying to touch
+  that record. It also never fills in `derived` for a `--db` trace:
+  `fragments/derive.ts`'s enquiry/gate snapshots are taken live, and there is
+  no way to ask a durable log what a query would have answered at a past
+  step after the fact.
 - **It does not reconstruct the CLI.** The command line shown per step
   (`labkit pose --question "..."`) is assembled for display from the event's
   `operation` and `detail` fields and is explicitly not a claim that string

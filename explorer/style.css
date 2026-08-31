@@ -71,6 +71,11 @@ body {
   border-color: color-mix(in srgb, var(--amber) 35%, transparent);
   background: color-mix(in srgb, var(--amber) 12%, transparent);
 }
+.origin-badge.db {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
 
 select, button, input[type="range"] {
   font-family: inherit;
