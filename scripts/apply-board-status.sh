@@ -75,13 +75,13 @@ NUM=3
 #       total; P2 is the honest value for a thing nobody should be looking at.
 TODO="81 50 55 104 52 49 56 76 124 132"
 BLOCKED="94 60 127 128 129"   # 94, 60 behind #49; 127-129 behind #125
-PARKED="63 64 65 98 51 54 123 133 134 139"   # 123 waits on a scope go/no-go from Dan; 133, 139 open questions; 134 an absence, unparks on a wrong answer
+PARKED="63 64 65 98 51 54 123 133 134 139 143"   # 123 waits on a scope go/no-go from Dan; 133, 139, 143 open questions; 134 an absence, unparks on a wrong answer
 IN_PROGRESS="119 125 126"   # 119 shipped in #121/#122 and 126 in #131, open under review; 125 is PR #135
 DONE="57 95 137"
 
 P0="132"          # partial supersession, the one demonstrated wrong answer (PJ-008 row AM). #137 shared this slot for a few hours on 2026-08-31 and was cleared by #141; #81 held it until Dan called it a special case the same day
 P1="81 50 55 104 52 124 125 126"   # 124-126: the Bonsai record, the first real consumer
-P2="49 56 76 94 60 63 64 65 98 51 54 57 95 119 123 127 128 129 133 134 137 139"
+P2="49 56 76 94 60 63 64 65 98 51 54 57 95 119 123 127 128 129 133 134 137 139 143"
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ID=$(gh project view "$NUM" --owner "$OWNER" --format json -q .id)
