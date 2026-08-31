@@ -38,23 +38,30 @@
 #    explicitly and deliberately by `DESIGN_v2_log_scale.md`, standing as
 #    final. `replace COMP_3 --because <review>` with only 3 of the 4
 #    conclusions still marks the 4th claim "Superseded", citing a review
-#    that never mentions it -- and the same call withdraws every
-#    `CriterionEvaluation` that had cited any of v1's four claims, so
-#    `labkit gate GATE_1` afterward reports the self-contradictory
-#    "satisfied (has failed at least once)" with every evaluation shown
-#    withdrawn. **Not worked around** -- splitting v1 into separate
-#    per-comparison analyses to dodge this would be Bonsai's shape bent to
-#    fit the model, which PJ-008 §1 forbids. `why CLM_6` below reproduces
-#    the wrong answer on every run. This is the demonstrated wrong answer
-#    per CLAUDE.md's "When a deferral stops being acceptable" -- the slot
-#    #81 held until 2026-08-31. Filed as `domain model` (labkit#132);
-#    PJ-008 §3 row AM.
+#    that never mentions it. **Not worked around** -- splitting v1 into
+#    separate per-comparison analyses to dodge this would be Bonsai's shape
+#    bent to fit the model, which PJ-008 §1 forbids. `why CLM_6` below
+#    reproduces the wrong answer on every run. This is the demonstrated
+#    wrong answer per CLAUDE.md's "When a deferral stops being acceptable"
+#    -- the slot #81 held until 2026-08-31. Filed as `domain model`
+#    (labkit#132); PJ-008 §3 row AM.
 #
-# A third thing worth knowing and not filing on its own: there is no verb
-# that corrects a mis-entered claim. `review` + `replace` is the nearest,
-# and finding 2 shows what that costs. An absence earns nothing under
-# PJ-011 §5 by itself -- named so nobody rediscovers it as a gap
-# (labkit#134), no verb proposed.
+#    **A related but SEPARATE bug, found reviewing this script, not caused
+#    by the partial supersession above:** the same `replace` call also
+#    withdraws every `CriterionEvaluation` that had cited any of v1's four
+#    claims, and `labkit gate GATE_1` afterward reports the
+#    self-contradictory "satisfied (has failed at least once)" with every
+#    evaluation shown withdrawn. Reproduced independently with a FULL,
+#    non-partial replacement (`gateStateFrom`, src/domain/read.ts:2032, has
+#    no branch for S-3c's `no-standing-verdict` check state and falls
+#    through to `satisfied`). Filed separately as `domain model`
+#    (labkit#137); PJ-008 §3 row AN.
+#
+# A third thing worth knowing, filed on its own even though it is an
+# absence and PJ-011 §5 says an absence earns nothing alone: there is no
+# verb that corrects a mis-entered claim. `review` + `replace` is the
+# nearest, and finding 2 shows what that costs. Named so nobody
+# rediscovers it as a gap (labkit#134), no verb proposed.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -150,6 +157,14 @@ say "re-verification v2: log-scale re-analysis of the SAME data -- and finding 2
 
 rev1=$(lab review "$comp3" --verdict "the nominally Holm-significant p-values (historical random, rewiring) are artifacts of aggregating a heavy-right-tailed AUC distribution by arithmetic mean across only 25 seeds; raw-scale aggregation is not sufficient to get a stable read on the stochastic-control comparisons")
 
+# The moment v2 was locked, in Bonsai's own sense -- DESIGN_v2_log_scale.md's
+# own header: "committed and locked before running any log-scale analysis."
+# That is here: after the review that motivated it, before the replacement
+# that runs it. `known --at` answers what #125 first called unanswerable --
+# it wasn't; `sharpen`'s freeze isn't the only way to ask "what was known
+# then", `known --at <instant>` reads durable state as of any moment.
+locked=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+
 # `replace`, not `amend` or `reverify` -- the verb choice #125 asks for.
 # `reverify` means "under fresh inputs"; v2 reuses v1's SAME 770 raw values
 # by design (DESIGN_v2_log_scale.md: "no new simulation ... only the
@@ -183,10 +198,7 @@ printf '\n-- why was Stage 1A re-verified?\n'
 ask origin "$q2"
 
 printf '\n-- what was known when v2 was locked?\n'
-printf '   UNANSWERABLE as transcribed: sharpen freezes state at Q2'"'"'s narrowing,\n'
-printf '   which precedes both v1 and v2 -- nothing freezes state again at v2'"'"'s own\n'
-printf '   lock moment specifically. No label; PJ-011 %s5 -- an absence, not a wrong\n' "§"
-printf '   answer.\n'
+ask known --at "$locked"
 
 printf '\n-- what closed the stage, and how?\n'
 ask enquiry "$loe2"
