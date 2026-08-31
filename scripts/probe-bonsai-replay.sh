@@ -34,6 +34,18 @@
 #     evaluate in probe-bonsai-2b.sh -- and a stripped diff that could not
 #     catch a broken --author override would not be proving what this
 #     script exists to prove.
+#
+# Two distinct failure shapes, not conflated into one exit code:
+#   ERROR   the checker itself could not run -- a replay script died, or a
+#           `labkit` read errored. Nothing about the record was compared,
+#           so nothing about it is asserted either way.
+#   FAILED  both sides read cleanly and disagree. This is the real defect
+#           this script exists to catch.
+# Without the distinction, a replay that dies partway through (a guard
+# firing, say) leaves a short fresh record, and every later live event
+# reads as "drift" -- the right exit code for the wrong reason, which is
+# worse than no check at all because it points the reader at a handle
+# that never actually moved.
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,7 +59,10 @@ trap 'rm -rf "$fresh"' EXIT
 echo "replaying the four scripts into $fresh" >&2
 for script in probe-bonsai-1a.sh probe-bonsai-1b2-1d.sh probe-bonsai-2a.sh probe-bonsai-2b.sh; do
   echo "  $script" >&2
-  bash "$root/scripts/$script" "$fresh" >/dev/null
+  if ! bash "$root/scripts/$script" "$fresh" >/dev/null; then
+    echo "ERROR: $script failed replaying; the record was not compared." >&2
+    exit 2
+  fi
 done
 
 normalize() {
@@ -58,16 +73,48 @@ normalize() {
     -e 's/ @[0-9a-f]+,/,/'
 }
 
-live_happened=$(bun "$root/src/cli/cli.ts" --db "$live" happened --limit 1000 2>&1 | normalize)
-fresh_happened=$(bun "$root/src/cli/cli.ts" --db "$fresh" happened --limit 1000 2>&1 | normalize)
+# stdout and stderr kept apart deliberately: a CLI error on stderr must
+# not be silently absorbed into the diff as if it were event text. Not
+# called inside a pipeline -- `exit` from within one only ends that
+# subshell, which is the same "$? after a pipeline" trap CLAUDE.md
+# already names, one level up.
+read_side() {
+  local db="$1"; shift
+  local err out rc
+  err="$(mktemp)"
+  out="$(bun "$root/src/cli/cli.ts" --db "$db" "$@" 2>"$err")"
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "ERROR: labkit $* against $db failed:" >&2
+    cat "$err" >&2
+    rm -f "$err"
+    exit 2
+  fi
+  rm -f "$err"
+  printf '%s' "$out"
+}
 
-if diff_out=$(diff <(printf '%s\n' "$live_happened") <(printf '%s\n' "$fresh_happened")); then
-  echo "OK: the live record is exactly what the four scripts produce, timestamps and commit hashes aside."
+# `happened` proves the event STREAM matches; `known` reads the graph
+# itself and is cheap to add, so both sides of "what a script did" and
+# "what the record now says" are covered, not just the former.
+live_happened="$(read_side "$live" happened --limit 1000)"
+live_happened="$(printf '%s' "$live_happened" | normalize)"
+fresh_happened="$(read_side "$fresh" happened --limit 1000)"
+fresh_happened="$(printf '%s' "$fresh_happened" | normalize)"
+live_known="$(read_side "$live" known)"
+fresh_known="$(read_side "$fresh" known)"
+
+happened_diff=$(diff <(printf '%s\n' "$live_happened") <(printf '%s\n' "$fresh_happened")) && happened_ok=1 || happened_ok=0
+known_diff=$(diff <(printf '%s\n' "$live_known") <(printf '%s\n' "$fresh_known")) && known_ok=1 || known_ok=0
+
+if [ "$happened_ok" = 1 ] && [ "$known_ok" = 1 ]; then
+  echo "OK: the live event stream and graph state are exactly what the four scripts produce, timestamps and commit hashes aside."
   exit 0
 fi
 
 echo "FAILED: the live record has drifted from what the four scripts produce." >&2
-echo "$diff_out"
+[ "$happened_ok" = 0 ] && { echo "-- event stream (happened) --"; echo "$happened_diff"; }
+[ "$known_ok" = 0 ] && { echo "-- graph state (known) --"; echo "$known_diff"; }
 echo >&2
 echo "A handle name below is the usual cause -- probe-bonsai-2a.sh's hardcoded" >&2
 echo "q6=\"Q_6\" / loe6=\"LOE_6\" inheritance from probe-bonsai-1b2-1d.sh is the" >&2
