@@ -482,6 +482,25 @@ export interface EnquiryStatus {
 }
 
 /**
+ * `EnquiryStatus`, alongside what the record currently knows overall.
+ *
+ * Earned by #128: "is this reopening/closure decision warranted?" recurred
+ * three times, verbatim, across the real Bonsai transcript, and every
+ * instance chained `enquiry` with `known` by hand to check one enquiry's
+ * closure against the programme's current standing. `knownNow` is the
+ * *current* survey (`whatIsKnown()`), not a point-in-time one: two of the
+ * three transcript instances checked the present-day survey right after
+ * closing, and the one that needed a specific historical instant supplied it
+ * from Bonsai's own git history (#166) -- not something this record can
+ * derive on its own, so it stays a separate `known --at` call rather than
+ * something this report guesses at.
+ */
+export interface EnquiryInContext {
+  enquiry: EnquiryStatus;
+  knownNow: KnowledgeSurvey;
+}
+
+/**
  * A proposition whose support changed when an analysis was replaced.
  *
  * `before`/`after` are the supporting findings verbatim. LabKit deliberately
@@ -1440,6 +1459,26 @@ export interface ConflictVerdict {
 }
 
 /**
+ * The line of enquiry (and the question behind it) a task exists to advance
+ * (#98). Carries wording alongside each handle, matching `EnquiryStatus.pursuing`
+ * and `QuestionClosure.asks` -- the demonstrated need was "why does this task
+ * exist" answering nothing, and a bare handle answers that only for a caller
+ * willing to chain a second read. `question` is never absent when `enquiry`
+ * is present: `pursue()` requires a question to open a line of enquiry, so
+ * every `LineOfEnquiry` has exactly one `MOTIVATES` edge behind it by
+ * construction.
+ *
+ * Named and shared (not inlined per report) because #128 gave it a second
+ * reader: `ListedWorkWithWhy` carries the same shape `TaskContract` does.
+ */
+export interface Addressing {
+  enquiry: EnquiryRef;
+  pursuing: string;
+  question: QuestionRef;
+  asks: string;
+}
+
+/**
  * What a planned task is permitted to touch.
  *
  * Closed-world: `mayRead` is the whole contract, and anything absent is
@@ -1459,25 +1498,8 @@ export interface TaskContract {
   acceptance: string;
   mayRead: string[];
   enforced: false;
-  /**
-   * The line of enquiry this work exists to advance, and the question behind
-   * it, if `planWork` was told one (#98). Absent, not `null`, when it wasn't
-   * -- ungated work (#91) is a genuine case, not a gap in this report.
-   *
-   * Carries wording alongside each handle, matching `EnquiryStatus.pursuing`
-   * and `QuestionClosure.asks` -- the demonstrated need was "why does this
-   * task exist" answering nothing, and a bare handle answers that only for a
-   * caller willing to chain a second read. `question` is never absent when
-   * `enquiry` is present: `pursue()` requires a question to open a line of
-   * enquiry, so every `LineOfEnquiry` has exactly one `MOTIVATES` edge behind
-   * it by construction.
-   */
-  addressing?: {
-    enquiry: EnquiryRef;
-    pursuing: string;
-    question: QuestionRef;
-    asks: string;
-  };
+  /** Absent, not `null`, when `planWork` wasn't told one -- ungated work (#91) is a genuine case. */
+  addressing?: Addressing;
 }
 
 /**
@@ -1538,4 +1560,18 @@ export interface ListedWork {
   work: WorkRef;
   objective: string;
   state: WorkState;
+}
+
+/**
+ * `ListedWork`, with why each task exists alongside it.
+ *
+ * Earned by #128: the real Bonsai transcript never answered "what work exists
+ * and why" in one command -- `work` names the tasks, `contract` resolves one
+ * at a time, and every instance of the question in the transcript chained
+ * both. This is that chain, done once for the whole list rather than once per
+ * task (the same "ask once for all of them" the list's own `gateStates`
+ * already does).
+ */
+export interface ListedWorkWithWhy extends ListedWork {
+  addressing?: Addressing;
 }

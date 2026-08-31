@@ -207,6 +207,15 @@ describe("every tool answers when an agent actually calls it", () => {
       // satisfied, so nothing is blocking it.
       expect((workRows.work as Array<{ work: string }>).map((w) => w.work)).toContain(id(work));
 
+      // #128: the same list, with why each task exists. This task was
+      // planned with no enquiry (line 149), so its own row carries no
+      // `addressing` -- confirmed here rather than assumed.
+      const workWithWhy = await call(c, "work_list_with_why", { state: "carried-out" });
+      const thisWork = (workWithWhy.work as Array<{ work: string; addressing?: unknown }>).find(
+        (w) => w.work === id(work),
+      );
+      expect(thisWork?.addressing).toBeUndefined();
+
       await call(c, "promote", {
         claim,
         because: "re-timed on a quiet machine",
@@ -346,6 +355,13 @@ describe("every tool answers when an agent actually calls it", () => {
       });
       const closed = await call(c, "enquiry_status", { enquiry: id(enquiry) });
       expect((closed.question as Json).closure).toBe("answered");
+
+      // #128: the same closure, alongside what the record currently knows
+      // overall -- checking one enquiry's decision against the programme's
+      // present standing, the way the real Bonsai transcript did by hand.
+      const inContext = await call(c, "enquiry_in_context", { enquiry: id(enquiry) });
+      expect(inContext.enquiry).toEqual(closed);
+      expect(inContext.knownNow).toBeTruthy();
       await c.close();
     } finally {
       await scenario.end();

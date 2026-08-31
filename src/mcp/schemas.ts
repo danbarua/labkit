@@ -39,6 +39,7 @@ import { z } from "zod";
 import type {
   ListedGate,
   ListedWork,
+  ListedWorkWithWhy,
   RecordedAnalysis,
   RecordedObservations,
   OpenedEnquiry,
@@ -79,6 +80,7 @@ import type {
   DependencyReport,
   DesignHistory,
   EnquiryStatus,
+  EnquiryInContext,
   EvaluationRecord,
   HistoricalSurvey,
   IdentifiedArtefact,
@@ -386,6 +388,12 @@ export const enquiryStatusSchema = z.strictObject({
   question: questionClosureSchema.nullable(),
 });
 
+/** `enquiry_in_context` — `enquiryStatusSchema` alongside the current knowledge survey (#128). */
+export const enquiryInContextSchema = z.strictObject({
+  enquiry: enquiryStatusSchema,
+  knownNow: knowledgeSurveySchema,
+});
+
 export const designHistorySchema = z.strictObject({
   gate: ref("gate"),
   originally: condition,
@@ -435,6 +443,18 @@ export const originOfSchema = z.strictObject({
   origin: questionOriginSchema.nullable(),
 });
 
+/**
+ * The line of enquiry (and question) a task exists to advance -- see
+ * `Addressing` in `src/domain/report.ts`. Shared, not inlined per schema:
+ * `taskContractSchema` and `workListWithWhySchema` (#128) both carry it.
+ */
+const addressingSchema = z.strictObject({
+  enquiry: ref("enquiry"),
+  pursuing: z.string(),
+  question: ref("question"),
+  asks: z.string(),
+});
+
 export const taskContractSchema = z.strictObject({
   work: ref("work"),
   objective: z.string(),
@@ -445,15 +465,7 @@ export const taskContractSchema = z.strictObject({
   // `enforced: true` from this.
   enforced: z.literal(false),
   // Absent, not null, for ungated work (#91) -- see PlanWorkCommand.addressing.
-  // Wording alongside each handle, matching EnquiryStatus/QuestionClosure.
-  addressing: z
-    .strictObject({
-      enquiry: ref("enquiry"),
-      pursuing: z.string(),
-      question: ref("question"),
-      asks: z.string(),
-    })
-    .optional(),
+  addressing: addressingSchema.optional(),
 });
 
 /** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */
@@ -711,6 +723,9 @@ export type _QuestionClosure = Assert<
   Exact<z.infer<typeof questionClosureSchema>, QuestionClosure>
 >;
 export type _EnquiryStatus = Assert<Exact<z.infer<typeof enquiryStatusSchema>, EnquiryStatus>>;
+export type _EnquiryInContext = Assert<
+  Exact<z.infer<typeof enquiryInContextSchema>, EnquiryInContext>
+>;
 export type _DesignHistory = Assert<Exact<z.infer<typeof designHistorySchema>, DesignHistory>>;
 export type _InterpretationHistory = Assert<
   Exact<z.infer<typeof interpretationHistorySchema>, InterpretationHistory>
@@ -842,5 +857,18 @@ export const workListSchema = z.strictObject({
   work: z.array(listedWork),
 });
 
+/** One task in a list, with why it exists alongside it (#128). */
+const listedWorkWithWhy = listedWork.extend({
+  addressing: addressingSchema.optional(),
+});
+
+/** `work_list_with_why` — the same wrapping, for the same reason. */
+export const workListWithWhySchema = z.strictObject({
+  work: z.array(listedWorkWithWhy),
+});
+
 export type _ListedGate = Assert<Exact<z.infer<typeof listedGate>, ListedGate>>;
 export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;
+export type _ListedWorkWithWhy = Assert<
+  Exact<z.infer<typeof listedWorkWithWhy>, ListedWorkWithWhy>
+>;

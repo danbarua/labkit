@@ -39,10 +39,13 @@ import type {
   AnalysisRef,
   CheckStatus,
   EnquiryStatus,
+  EnquiryInContext,
   CriterionRef,
   BlockedWork,
   ListedGate,
   ListedWork,
+  ListedWorkWithWhy,
+  Addressing,
   WorkState,
   DecisionRef,
   EvidenceRef,
@@ -585,6 +588,13 @@ export class ReadSurface extends SessionCore {
           : "exploratory",
       },
     };
+  }
+
+  /** `enquiryStatus`, alongside what the record currently knows overall (#128). */
+  async enquiryInContext(enquiry: EnquiryRef): Promise<EnquiryInContext> {
+    const status = await this.enquiryStatus(enquiry);
+    const knownNow = await this.whatIsKnown();
+    return { enquiry: status, knownNow };
   }
 
   /**
@@ -2163,6 +2173,43 @@ export class ReadSurface extends SessionCore {
       .sort((a, b) => a.work.localeCompare(b.work));
 
     return state ? listed.filter((w) => w.state === state) : listed;
+  }
+
+  /**
+   * `workList`, with why each task exists alongside it (#128).
+   *
+   * The addressing lookup is one query for every task, not one per task --
+   * the same "ask once for all of them" `workList` already does for
+   * `gateStates`, for the reason given there.
+   */
+  async workListWithWhy(state?: WorkState): Promise<ListedWorkWithWhy[]> {
+    const listed = await this.workList(state);
+    const rows = await this.graph.query(
+      `MATCH (t:Task)-[:ADDRESSES]->(loe:LineOfEnquiry)
+       MATCH (q:Question)-[:MOTIVATES]->(loe)
+       RETURN t, loe, q`,
+      {
+        t: vertexProps<{ natural_id: string }>(),
+        loe: vertexProps<{ natural_id: string; name: string }>(),
+        q: vertexProps<{ natural_id: string; name: string }>(),
+      },
+      {},
+    );
+    const addressing = new Map<string, Addressing>(
+      rows.map((r) => [
+        r.t.natural_id,
+        {
+          enquiry: ref("enquiry", r.loe.natural_id),
+          pursuing: r.loe.name,
+          question: ref("question", r.q.natural_id),
+          asks: r.q.name,
+        },
+      ]),
+    );
+    return listed.map((w) => {
+      const found = addressing.get(w.work);
+      return found ? { ...w, addressing: found } : w;
+    });
   }
 }
 

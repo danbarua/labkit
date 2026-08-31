@@ -5,9 +5,16 @@
  * why the comments came with the code.
  */
 
-import type { EnquiryRef, EnquiryStatus, QuestionOrigin, QuestionRef } from "../../domain";
+import type {
+  EnquiryInContext,
+  EnquiryRef,
+  EnquiryStatus,
+  QuestionOrigin,
+  QuestionRef,
+} from "../../domain";
 import type { Palette } from "../palette";
 import { bullets } from "./format";
+import { renderKnown } from "./knowledge";
 
 /**
  * An enquiry's standing.
@@ -64,6 +71,20 @@ export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * `renderEnquiry`, followed by what the record currently knows overall
+ * (#128) -- for checking a closure decision against the programme's present
+ * standing, which the real Bonsai transcript did by hand three times.
+ */
+export function renderEnquiryInContext(status: EnquiryInContext, p: Palette): string {
+  return [
+    renderEnquiry(status.enquiry, p),
+    "",
+    p.heading("What the record currently knows overall"),
+    renderKnown(status.knownNow, p),
+  ].join("\n");
 }
 
 export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef, p: Palette): string {

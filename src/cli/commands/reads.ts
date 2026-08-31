@@ -32,7 +32,12 @@ import {
   renderConflict,
   renderSearch,
 } from "../views/knowledge";
-import { renderEnquiry, renderOrigin, renderPursuits } from "../views/enquiry";
+import {
+  renderEnquiry,
+  renderEnquiryInContext,
+  renderOrigin,
+  renderPursuits,
+} from "../views/enquiry";
 import {
   renderContract,
   renderCriteria,
@@ -40,6 +45,7 @@ import {
   renderGate,
   renderGateList,
   renderWorkList,
+  renderWorkListWithWhy,
 } from "../views/gates";
 import {
   renderAffects,
@@ -188,11 +194,18 @@ export function registerReads(program: Command, run: Run): void {
     .summary("is this enquiry open, and how did it close")
     .description(
       "Whether a line of enquiry is still open, and if not how it closed — answered, abandoned, " +
-        "or deliberately left open — with the answer and the evidence behind it.",
+        "or deliberately left open — with the answer and the evidence behind it. `--in-context` " +
+        "adds what the record currently knows overall, for checking a closure decision against " +
+        "the programme's present standing rather than in isolation.",
     )
     .argument("<enquiry-id>", "e.g. LOE_7", handle("enquiry"))
-    .action(async (enquiry) =>
-      run(async ({ read }) => answer(await read.enquiryStatus(enquiry), renderEnquiry)),
+    .option("--in-context", "also show what the record currently knows overall")
+    .action(async (enquiry, opts: { inContext?: boolean }) =>
+      run(async ({ read }) =>
+        opts.inContext
+          ? answer(await read.enquiryInContext(enquiry), renderEnquiryInContext)
+          : answer(await read.enquiryStatus(enquiry), renderEnquiry),
+      ),
     );
 
   program
@@ -222,12 +235,19 @@ export function registerReads(program: Command, run: Run): void {
     .description(
       "`--state planned` is what is ready to start: on the books, nothing blocking, no " +
         "analysis against it yet. Not the same question as `gates` — a gate reaches only " +
-        "the work it protects, and work planned without one appears nowhere else.",
+        "the work it protects, and work planned without one appears nowhere else. " +
+        "`--with-why` adds the line of enquiry (and question) each task exists to advance, " +
+        "where `planWork` was told one.",
     )
     // Commander's parser, for the reason given on `gates` above.
     .option("--state <state>", "planned | blocked | carried-out", workState)
-    .action(async (opts: { state?: ReturnType<typeof workState> }) =>
-      run(async ({ read }) => answer(await read.workList(opts.state), renderWorkList)),
+    .option("--with-why", "also show why each task exists, where it was told")
+    .action(async (opts: { state?: ReturnType<typeof workState>; withWhy?: boolean }) =>
+      run(async ({ read }) =>
+        opts.withWhy
+          ? answer(await read.workListWithWhy(opts.state), renderWorkListWithWhy)
+          : answer(await read.workList(opts.state), renderWorkList),
+      ),
     );
 
   program
