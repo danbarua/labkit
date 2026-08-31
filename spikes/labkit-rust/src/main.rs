@@ -139,6 +139,62 @@ fn has_label(db: &GrafeoDB, n: NodeId, label: &str) -> bool {
         .is_some_and(|node| node.labels.iter().any(|l| &**l == label))
 }
 
+/// Whether a line is exactly one handle (`PREFIX_123`) and nothing else —
+/// what every write command's stdout is, and what no rendered report line
+/// ever is on its own (they read `text  (HANDLE)`, never a bare handle).
+fn looks_like_handle(s: &str) -> bool {
+    match s.rfind('_') {
+        Some(i) => {
+            let (prefix, rest) = (&s[..i], &s[i + 1..]);
+            !prefix.is_empty()
+                && prefix.chars().all(|c| c.is_ascii_uppercase())
+                && !rest.is_empty()
+                && rest.chars().all(|c| c.is_ascii_digit())
+        }
+        None => false,
+    }
+}
+
+/// `labkit happened` — the acts themselves, oldest first. **Deliberately not
+/// what LabKit's `happened` is**, and the gap is the finding, not an
+/// oversight: `iter_nodes()` preserves creation order for free (measured,
+/// `examples/graph_history_probe.rs`), so *ordering* needed no new state at
+/// all — every headline node already carries a `verb` property, tagged
+/// centrally in `main()` rather than per command. What is missing is
+/// attribution: LabKit's real `happened` exists specifically to say **who**
+/// ran an act (PJ-031) — `renderHappened`'s whole reason to read the event
+/// log instead of the graph — and this port has no concept of that at all,
+/// not even a `--author` flag. Adding it would mean inventing attribution
+/// from nothing, which is a different, larger piece of work than "derive
+/// history from the graph," and the two should not be conflated.
+fn happened(db: &GrafeoDB) -> String {
+    // **Sorted by NodeId, not `iter_nodes()`'s own order.** Measured
+    // (`examples/graph_history_probe.rs`) rather than assumed: on a handful
+    // of nodes of a few labels, `iter_nodes()` happened to come back in
+    // creation order and looked like a free lunch. On a real run it came
+    // back in a different, unstable order on every one of three repeats of
+    // the identical command sequence — a randomised-hasher backing store,
+    // not a list. `NodeId` allocation order is what's actually reliable
+    // (already leaned on throughout this port, e.g. `nodes_by_label`), so
+    // sorting by it is the same fix `origin`'s `BASED_ON` read and `known`'s
+    // `closing_all` needed: a report is a contract between runs, and reading
+    // this store's own order back unsorted is not one.
+    let mut tagged: Vec<(NodeId, String)> = db
+        .iter_nodes()
+        .filter_map(|n| match n.get_property("verb") {
+            Some(Value::String(v)) => Some((n.id, format!("{v}  {}", prop(db, n.id, "handle")))),
+            _ => None,
+        })
+        .collect();
+    tagged.sort_by_key(|(id, _)| *id);
+    let acts: Vec<String> = tagged.into_iter().map(|(_, line)| line).collect();
+    if acts.is_empty() {
+        "Nothing matching.\n\nAn empty log is not an empty record: every other command answers from\nthe graph, and answers there are durable whether or not an act was logged.".to_string()
+    } else {
+        acts.join("\n")
+    }
+}
+
 /// Pulls one field out of the `--concludes` JSON blob
 /// (`{"proposition": "…", "finding": "…"}`) by string splitting, not parsing —
 /// enough for the two keys every conclusion carries, matching the shape
@@ -1435,6 +1491,7 @@ fn main() -> ExitCode {
             Some(loe)
         }
         "known" => Some(known(&db)),
+        "happened" => Some(happened(&db)),
         "gate" => match rest.first() {
             Some(h) => gate(&db, h),
             None => None,
@@ -1444,6 +1501,23 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+
+    // `happened`'s ordering half, for free: every write command's whole
+    // stdout is the handle(s) it minted (see the module note on this
+    // convention), so tagging each of those nodes with the verb that
+    // produced it needs no new sink -- it reuses `create()`'s own node and
+    // `by_handle()`'s own lookup. A read command's prose never matches
+    // `looks_like_handle`, so this is a no-op for every command but the 26
+    // that mint something.
+    if let Some(text) = &output {
+        for line in text.lines() {
+            if looks_like_handle(line) {
+                if let Some(n) = by_handle(&db, line) {
+                    db.set_node_property(n, "verb", Value::from(command));
+                }
+            }
+        }
+    }
 
     match output {
         Some(text) => {

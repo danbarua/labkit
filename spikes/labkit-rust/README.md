@@ -103,13 +103,20 @@ Dated, because each was run rather than reasoned about.
 - **Grafeo has a typed native write API** — `create_node_with_props`,
   `create_edge_with_props`, `set_node_property` — needing no query strings.
   (2026-08-28.)
-- **35 of 35 non-`mcp` CLI commands reached byte-for-byte parity** on that
+- **35 of 36 non-`mcp` CLI commands reached byte-for-byte parity** on that
   typed API, with no query string anywhere in the port. (2026-08-29 at 31;
-  2026-08-31 for the last four — `reverify`, `replace`, `reproduction`,
+  2026-08-31 for the next four — `reverify`, `replace`, `reproduction`,
   `reproducibility` — after widening `design` to the full amendment chain
-  they read. The fixtures are the authority; run them rather than trusting
-  this sentence.) `happened` is the one CLI command left, and `mcp` is a
-  server rather than a command — see "What is left."
+  they read.) **The denominator itself was wrong in every earlier revision of
+  this file** — counted twice today (`grep -oP '\.command\("\K[^"]+'` over
+  `src/cli/commands/*.ts`, then the port's own match arms), directly rather
+  than carried forward: 37 CLI commands exist in total, 36 excluding `mcp`,
+  not the 35/36 split this file used to state. The fixtures are the
+  authority for the 35 that have one; run them rather than trusting this
+  sentence. `happened` is the 36th, written 2026-08-31 (see "What is left")
+  but unable to reach byte parity even in principle, so it is verified a
+  different way and stays out of this count on purpose. `mcp` is a server,
+  not a command.
 
 ### The epoch question, resolved — and it decomposes rather than settles one way
 
@@ -243,16 +250,48 @@ five slices say whether it's still deterministic. It is.
 
 ## What is left
 
-**Command parity is done.** `reproduction`, `reproducibility`, `replace` and
+**Byte-parity command coverage is done, for the 35 commands byte-parity is a
+coherent question for.** `reproduction`, `reproducibility`, `replace` and
 `reverify` landed 2026-08-31, on a `design` widened to walk the full
 amendment chain LabKit's `designHistory()` does (`src/domain/read.ts`) rather
 than report only the immediately prior step — needed once a chain could be
-more than one amendment long, and tested at two. That leaves:
+more than one amendment long, and tested at two. `mcp` is a server, not a CLI
+command; 36 non-`mcp` commands exist, and 35 of them now have a fixture.
 
-- `happened` — reads the event log the port does not have. The epoch question
-  (above) answers this rather than leaving it tied to it: deriving history
-  from the graph would mean writing through `session.execute(...)` for epochs
-  to mean anything, which this port isn't doing, so `happened` needs an
-  actual event log, kept separately, same as LabKit's own.
-- `mcp` is a server, not a CLI command. 35 was the realistic ceiling for a
-  command-parity spike, and it's reached.
+### `happened`, tried — half of it turned out free, and half of it can't exist here
+
+Went in on the instinct that a minimal event log is close to what the port
+already has: every write is durable in the graph the moment it happens, so
+maybe *ordering* alone gets you most of `happened` for nothing. Ran it rather
+than reasoning about it (`examples/graph_history_probe.rs`), and it split
+cleanly into a part that held up and a part that can't be built here at all.
+
+**Held up, once the first attempt's false positive was caught.** A 3-node
+probe showed `iter_nodes()` returning nodes in creation order and it was
+tempting to stop there — a small-hash-table coincidence, not a property of
+the store. The real test is the discriminating one: the same 27-command
+`slice-5` sequence, replayed against a fresh `--db` in three separate
+processes, gave **three different `iter_nodes()` orders** for the identical
+history — a randomised-hasher-backed store, not a list, the same shape as the
+`iter_edges()` flakiness `origin` and `known` already hit. `NodeId`
+allocation order is the reliable part (it's a counter, leaned on all through
+this port), so `happened()` sorts by it explicitly rather than trusting
+`iter_nodes()` — the same fix, a third time in this file.
+
+**What ordering doesn't buy you is which *verb* ran.** Two different commands
+can produce the same graph shape, and the graph itself carries no record of
+which one did it. The fix needed no new sink, only reusing what's already
+there: every write command's whole stdout is the handle(s) it minted (the
+convention this port already follows), so `main()` tags each of those nodes
+with the verb name that produced it, in one place, after the match — not a
+separate log, one property on a node that already existed.
+
+**What can't be built at all: who ran it.** LabKit's real `happened` exists
+specifically to answer that (PJ-031) — `renderHappened`'s whole reason to
+read the event log instead of the graph is the attribution line. This port
+has no concept of attribution whatsoever: no `--author`, no git-context
+provider, nothing a verb could tag a node with even if it wanted to. Adding
+it would mean inventing a piece of LabKit this port never had, which is a
+different, larger undertaking than "derive history from what's already
+written" — so `happened` here reports the acts and their order, honestly
+short of what the name promises on the real CLI.
