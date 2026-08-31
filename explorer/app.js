@@ -300,19 +300,26 @@ function formatCommand(command) {
     ? `${esc(verbMatch[1])} <span class="cmd-verb">${esc(verbMatch[2])}</span>`
     : esc(head);
 
-  // Each segment opens its own line and is responsible for nothing after
-  // it -- no trailing newline. .cmd-prose is `display: block`, which already
-  // starts a new line for whatever follows; a flag that also opened with
-  // "\n" stacked an extra blank line under every prose value that was
-  // followed by another flag.
+  // .cmd-prose is `display: block`, which already starts a new line for
+  // whatever comes after it -- so the segment *following* a prose value must
+  // not also open with "\n", or the two line breaks stack into a blank line.
+  // This bit stacked twice, in both directions, before this fix: prose
+  // followed by prose, and (found afterwards, looking at a real render) prose
+  // followed by any other flag, handle-shaped or not.
+  let previousWasProse = false;
   const flagHtml = (part) => {
     const m = part.match(/^(--[a-z-]+) (.*)$/s);
-    if (!m) return `\n  ${esc(part.trim())}`;
+    const lead = previousWasProse ? "" : "\n";
+    if (!m) {
+      previousWasProse = false;
+      return `${lead}  ${esc(part.trim())}`;
+    }
     const [, flag, rawValue] = m;
     const value = formatValue(rawValue.trim());
+    previousWasProse = value.isProse;
     return value.isProse
-      ? `\n  ${esc(flag)}<span class="cmd-prose">${value.html}</span>`
-      : `\n  ${esc(flag)} ${value.html}`;
+      ? `${lead}  ${esc(flag)}<span class="cmd-prose">${value.html}</span>`
+      : `${lead}  ${esc(flag)} ${value.html}`;
   };
 
   return [headHtml, ...parts.map(flagHtml)].join("");
@@ -394,6 +401,15 @@ function renderDerivedPanel() {
   if (!step.derived.length) {
     derivedChanges.innerHTML = `<h3>derived changes</h3><div class="empty">nothing derived tracks yet (only enquiries and gates)</div>`;
   } else {
+    // The full roster prints every step, changed or not -- Dan's own call:
+    // dropping a row when it's stable would make the panel's contents
+    // inconsistent from one step to the next, and consistency is what lets
+    // the eye track one enquiry or gate down the list as playback advances.
+    // What used to say the word "unchanged" on every stable row (misleading
+    // mid-playback -- the panel is visibly changing even when this one row
+    // isn't) is now carried by .changed/.unchanged's existing colour
+    // distinction alone: a changed row states its transition, a stable one
+    // just states where it stands, dimmed.
     const lines = step.derived
       .map((d) => {
         const label = d.kind === "gate" ? "Gate" : "Enquiry";
@@ -401,7 +417,7 @@ function renderDerivedPanel() {
           const from = d.from ? `${esc(d.from)} <span class="arrow">→</span> ` : "";
           return `<div class="change-line changed"><span class="kind">${label}</span> ${esc(d.handle)}  ${from}${esc(d.state)}</div>`;
         }
-        return `<div class="change-line unchanged"><span class="kind">${label}</span> ${esc(d.handle)}  unchanged: ${esc(d.state)}</div>`;
+        return `<div class="change-line unchanged"><span class="kind">${label}</span> ${esc(d.handle)}  ${esc(d.state)}</div>`;
       })
       .join("");
     derivedChanges.innerHTML = `<h3>derived changes</h3>${lines}`;
