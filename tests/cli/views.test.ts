@@ -220,7 +220,11 @@ test("an evaluation with no basis reads as asserted, not as measured", () => {
       {
         evaluation: ref("evaluation", "CEVAL_2"),
         criterion: ref("criterion", "CRIT_2"),
-        value: "0.31",
+        // Same value and outcome as CEVAL_1 on purpose: if the two lines
+        // differed only because 0.61 != 0.31, this would pass even with the
+        // basis-driven suffix broken or missing entirely. Identical values
+        // mean the only thing that can make the lines differ is basis.
+        value: "0.61",
         outcome: "pass",
         at: "2026-03-01T00:00:00.000Z",
         basis: [{ evidence: ref("evidence", "EV_1"), states: "cracks at 40MPa" }],
@@ -232,6 +236,9 @@ test("an evaluation with no basis reads as asserted, not as measured", () => {
   const out = renderGate(status, PLAIN);
   expect(out).toContain("asserted");
   expect(out).toContain("cracks at 40MPa");
+  // The handle, not just the finding text -- a reader following a verdict to
+  // its evidence needs something the next command can take, same as enquiry.
+  expect(out).toContain("(EV_1)");
   // The two verdicts must not read alike -- an asserted one is not a synonym
   // for "rests on nothing named" the way a cited one's finding text would be.
   const lines = out.split("\n").filter((l) => l.includes("CEVAL_"));

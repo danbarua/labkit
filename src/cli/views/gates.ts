@@ -90,7 +90,7 @@ export function renderGate(status: GateStatus, p: Palette): string {
               `${p.quiet(e.at)}  ${state(e.outcome === "pass" ? "passed" : "failed")}  "${e.value}"  ${p.handle(`(${e.evaluation})`)}${e.withdrawn ? `  ${p.provisional("withdrawn")}` : ""}` +
               (e.basis.length === 0
                 ? `  ${p.untested("asserted")}`
-                : `  resting on: ${e.basis.map((f) => f.states).join("; ")}`),
+                : `  resting on: ${e.basis.map((f) => `${f.states}  ${p.handle(`(${f.evidence})`)}`).join("; ")}`),
           ),
           "",
         )}`
