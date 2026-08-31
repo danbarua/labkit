@@ -408,6 +408,7 @@ bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedStri
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
 bun run check:facts            # a fact's grain is named and its clause dependencies declared
 bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
+bun run check:compositions     # every fragments/ arc runs, and connects only what it created
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
@@ -418,7 +419,9 @@ bun run mcp                    # the MCP server over stdio -- `labkit mcp`, src/
 bun run spike:web             # the same tools over HTTP in containers, against Postgres + AGE
 bun run spike:web:down        # stop it
 bun run ports                  # this worktree's host-port offset and the five ports it implies
-bun run board:status          # applies the ship-labkit board's Status column, idempotently
+bun run explorer               # the LabKit Explorer, serving traces derived from fragments/ (explorer/README.md)
+bun run demo:rust-explorer     # builds the Rust port, generates one trace, serves it in the Explorer
+bun run demo:db-explorer       # builds a real record through the CLI and serves it in the Explorer
 ```
 
 Formatting and linting are both biome — `bun run format` writes,
@@ -447,7 +450,11 @@ lost to a green health check describing somebody else's server.
 **The list above is hand-written and was wrong.** Derived on 2026-08-28,
 `package.json` had three scripts this file had never mentioned — `ports`,
 `board:status` and `postinstall` — two of them added the same afternoon.
-`postinstall` stays out because nobody types it; the other two are now here.
+`postinstall` stays out because nobody types it; `ports` is above. `board:status`
+was deleted on 2026-08-31: its hand-written `TODO="81 50 55 …"` lists were
+`docs/TASKS.md` reborn as a shell script, and cost three pull requests in one
+afternoon to keep in step with the board. The board is the only copy now; what
+survived is the vocabulary, in `.claude/skills/triage/SKILL.md`.
 The check is four lines and worth re-running rather than trusting:
 
 ```sh
