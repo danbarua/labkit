@@ -198,6 +198,58 @@ export interface ConcludedClaim {
   asserts: string;
 }
 
+/**
+ * The inverse of {@link LABEL_BY_KIND} — a label's research-concept kind,
+ * where one exists. Not every label has one (`EvidenceUnit` and `Computation`
+ * do not name a kind a caller would type a verb argument as), so this is
+ * partial, not total.
+ *
+ * Built rather than hand-duplicated: `LABEL_BY_KIND` is the one place the
+ * thirteen-way mapping is written down, and a second table would be the same
+ * fact stated twice, in the direction that fails silently — an entry here
+ * with no matching entry there would mint a `Ref` `isRefOfKind` could never
+ * agree with.
+ */
+export const KIND_BY_LABEL: { readonly [L in NodeLabel]?: string } = Object.fromEntries(
+  Object.entries(LABEL_BY_KIND).map(([kind, label]) => [label, kind]),
+);
+
+/**
+ * One record `search()` found containing the wording, and the text it
+ * matched on — not necessarily the record's only `Prose` property, so a
+ * caller who wants to know *why* it matched needs this, not just the
+ * handle.
+ *
+ * `handle` is a proper `Ref` — a union of every kind {@link
+ * SEARCHABLE_PROSE} names a label for, all nine of which have an entry in
+ * {@link KIND_BY_LABEL} — not the bare string `fragments/trace.ts`'s
+ * `created` field uses. That precedent does not transfer: `trace.ts` is the
+ * rendering pipeline, not a report, and PJ-030's rule ("every handle in a
+ * report is a `Ref`") makes no exception for a report whose results happen
+ * to span several kinds. {@link SearchGroup} already narrows to one label
+ * per group, so the kind is never actually mixed within one `matches` array
+ * — only across groups, which a union still expresses honestly.
+ */
+export interface SearchMatch {
+  handle:
+    | QuestionRef
+    | EnquiryRef
+    | EvidenceRef
+    | DecisionRef
+    | CriterionRef
+    | EvaluationRef
+    | GateRef
+    | ReviewRef
+    | WorkRef;
+  wording: string;
+}
+
+/** Every match for one label, grouped — `search()` never flattens labels into one list. */
+export interface SearchGroup {
+  label: NodeLabel;
+  matches: SearchMatch[];
+}
+
 /** One proposition an analysis concluded, and the finding that bears on it. */
 export interface Conclusion {
   proposition: string;

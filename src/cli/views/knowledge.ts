@@ -16,6 +16,7 @@ import type {
   HistoricalSurvey,
   KnowledgeSurvey,
   QuestionStanding,
+  SearchGroup,
   SupportExplanation,
 } from "../../domain";
 import type { Palette } from "../palette";
@@ -183,6 +184,28 @@ export function renderClaims(claims: ConcludedClaim[], proposition: string, p: P
           "\nMore than one, and none of them is redundant: two lines of enquiry can\nassert the same sentence about different endpoints. Name the one you mean.",
         )
       : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function renderSearch(groups: SearchGroup[], text: string, p: Palette): string {
+  const total = groups.reduce((n, g) => n + g.matches.length, 0);
+  return [
+    p.heading(`Records containing "${text}"`),
+    total === 0
+      ? p.untested("none — nothing on the record contains this text")
+      : groups
+          .map((g) =>
+            [
+              p.quiet(`${g.label}:`),
+              bullets(
+                g.matches.map((m) => `${m.wording}  ${p.handle(`(${m.handle})`)}`),
+                "nothing",
+              ),
+            ].join("\n"),
+          )
+          .join("\n\n"),
   ]
     .filter(Boolean)
     .join("\n");

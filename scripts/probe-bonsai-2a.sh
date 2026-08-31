@@ -11,11 +11,15 @@
 # Answers Q_6/LOE_6 -- accepted as unresolved in the previous chain's Stage
 # 1B.2 ("can this structured mapping be linked to an externally defined task
 # or information-processing objective (Level 3)?"), reopening condition
-# "define and run against an external task." Q_6/LOE_6 are hardcoded below,
-# not re-posed -- they are this script's own inheritance from the prior
-# script's `accept` call, confirmed directly against the real record
-# (`labkit known`, `labkit enquiry LOE_6`) before being trusted, not assumed
-# stable across scripts.
+# "define and run against an external task." Q_6/LOE_6 are FOUND, not
+# hardcoded (#155's `labkit search`, added 2026-08-31) -- this script's
+# inheritance from the prior script's `accept` call is real (the wording is
+# theirs, not this script's own), but the handle numbering is not this
+# script's to assume. `search` finds the question by its distinctive
+# wording, refuses to pick if more than one match comes back, and
+# `pursuits` finds the one line of enquiry pursuing it -- both fail loudly
+# rather than silently writing Stage 2A's answer onto a question a prior
+# script's handle numbering happened to shift onto.
 #
 # ## What transcribing this found
 #
@@ -70,21 +74,27 @@ lab() { bun "$root/src/cli/cli.ts" --db "$db" --author probe-bonsai-2a.sh "$@"; 
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 
-say "inherited from the prior script: Q_6 / LOE_6, confirmed before use"
-q6="Q_6"
-loe6="LOE_6"
+say "found via search, not hardcoded: the Level-3 question the prior script accepted"
+# `search` replaces both the old hardcoded q6="Q_6" and the guard that
+# checked it against LOE_6's own wording after the fact -- the search
+# itself is the guard now: it fails loudly (empty, or more than one
+# match) rather than silently writing Stage 2A's answer onto a question
+# a prior script's handle numbering happened to shift onto.
+search_out=$(lab search "externally defined task or information-processing objective")
+q6_matches=$(printf '%s\n' "$search_out" | grep -oE '\(Q_[0-9]+\)' | tr -d '()')
+q6_count=$(printf '%s\n' "$q6_matches" | grep -c '^Q_' || true)
+if [ "$q6_count" -ne 1 ]; then
+  echo "probe-bonsai-2a.sh: expected exactly one question for the Level-3 wording, found $q6_count -- refusing to pick" >&2
+  exit 1
+fi
+q6="$q6_matches"
+loe6=$(lab pursuits "$q6" | grep -oE 'LOE_[0-9]+')
+loe6_count=$(printf '%s\n' "$loe6" | grep -c '^LOE_' || true)
+if [ "$loe6_count" -ne 1 ]; then
+  echo "probe-bonsai-2a.sh: expected exactly one line of enquiry pursuing $q6, found $loe6_count" >&2
+  exit 1
+fi
 ask enquiry "$loe6"
-# A guard, not just a print: if a prior script's handle numbering ever
-# shifts, this must go red rather than silently write Stage 2A's answer
-# onto the wrong question.
-enquiry_check=$(lab enquiry "$loe6" 2>&1)
-case "$enquiry_check" in
-  *"can this structured mapping be linked to an externally defined task or information-processing objective"*) ;;
-  *)
-    echo "probe-bonsai-2a.sh: LOE_6 is no longer pursuing the expected question -- inheritance from probe-bonsai-1b2-1d.sh has moved, stopping before writing Stage 2A's answer onto the wrong enquiry" >&2
-    exit 1
-    ;;
-esac
 
 say "the feasibility ladder's go/no-go gate -- a quality bar, not a hypothesis"
 

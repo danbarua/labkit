@@ -334,6 +334,12 @@ describe("every tool answers when an agent actually calls it", () => {
         narrowedClaim,
       ]);
 
+      const searched = await call(c, "search", { text: "induction period" });
+      const reviewGroup = (
+        searched.groups as Array<{ label: string; matches: Array<{ handle: string }> }>
+      ).find((g) => g.label === "Review");
+      expect(reviewGroup?.matches.map((m) => m.handle)).toEqual([id(review)]);
+
       await call(c, "close_enquiry", {
         enquiry: id(enquiry),
         answered_by: narrowedClaim,
