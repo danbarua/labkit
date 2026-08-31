@@ -708,7 +708,7 @@ this document's original analysis are marked as such.
 | AK | The survey's strongest word ignored the standard its answer was held to | **S-19** | resolved |
 | AL | Findings aggregate over a proposition; a prespecified check belongs to one analysis | **S-10**, **S-19** | resolved |
 | AM | `replaceAnalysis` supersedes a whole analysis; a re-analysis may address only some of its conclusions | Bonsai #125 (`scripts/probe-bonsai-1a.sh`) | demonstrated |
-| AN | `gateStateFrom`'s four branches have no case for a retracted verdict; it falls through to `satisfied` | Bonsai #125 (`scripts/probe-bonsai-1a.sh`) | demonstrated |
+| AN | `gateStateFrom`'s four branches have no case for a retracted verdict; it falls through to `satisfied` | Bonsai #125 (`scripts/probe-bonsai-1a.sh`) | resolved |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -899,11 +899,21 @@ criterion whose only evaluation was retracted; `gateStateFrom`
 before that state existed, and a check matching none of its three explicit
 branches falls into the `else` → `satisfied`. `gate <id>` reports
 `GATE_1 — satisfied`, listing the same condition as `no-standing-verdict`
-under "Not currently met" in the same report. Issue #137. Two rows
-`demonstrated` at once is a real tension with CLAUDE.md's one-at-a-time
-rule — flagged, not resolved here; which clears first is Dan's call.
-Refutation condition: a gate whose every verdict is retracted does not read
-`satisfied`.
+under "Not currently met" in the same report. Issue #137.
+
+**Resolved 2026-08-31, on external review.** An outside reviewer of #137
+reclassified it as an ordinary bug rather than a model question — `CheckState`
+already carries `no-standing-verdict`, and the itemised per-check report
+already lists it correctly under "not met"; only `gateStateFrom`'s aggregate
+disagreed. The fix makes `satisfied` require positive proof (`checks.every(c
+=> c.state === "passed")`) rather than being the branch left over once the
+others are ruled out, so a sixth `CheckState` added later lands in
+`incomplete` by construction rather than needing a fourth reader to remember
+a fourth branch. Verified against all three readers `gateStateFrom` feeds —
+`gateStatus`, `gateList`, and `work` (via `workStateFrom`'s `gateStates` map)
+— with a negative control: the new test, run against the pre-fix four-branch
+function, failed exactly as expected (`Expected: "incomplete", Received:
+"satisfied"`).
 
 Each row's narrative is below, oldest verdict first. A row's `Status` is taken
 from its **latest** dated verdict; earlier verdicts are kept verbatim, because

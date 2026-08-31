@@ -531,4 +531,88 @@ describe("S-3c: the check was wrong, not the result", () => {
     const after = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
     expect(after).toEqual(before);
   });
+
+  /**
+   * External review of labkit#137, found reviewing #135's Bonsai transcript.
+   * The itemised check above is right — `no-standing-verdict` is exactly what
+   * "a check whose every verdict has been withdrawn" test asserts. This is
+   * the *aggregate*: `gateStateFrom` fed on the same checks fell through its
+   * `else` branch to `satisfied`, because a retracted verdict matched neither
+   * `failed` nor `never-run`. One function, three readers — `gateStatus`,
+   * `gateList`, and `work` (via `workStateFrom`, which treats anything short
+   * of `blocked` as not holding a task) — so all three are asserted here,
+   * not just the one `gate <id>` prints.
+   *
+   * The passing evaluation (not a failing one, unlike the test above) is
+   * deliberate: it is #137's own repro, and it is the sharper case — a
+   * *retracted pass* is the one a stale four-branch chain can misreport as
+   * `satisfied` outright, where a retracted fail at least used to read as
+   * something-other-than-satisfied by accident.
+   */
+  test("a gate whose only verdict was withdrawn reads incomplete, not satisfied", async () => {
+    const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();
+    const tertiary = await session.planWork({
+      objective: "fit the tertiary model",
+      acceptance: "converges",
+      mayRead: ["per-image results"],
+    });
+    const gate = await session.declareGate({
+      governedBy: [robustness],
+      consequence: "the tertiary model may be fitted",
+      protecting: [tertiary],
+    });
+
+    const { analysis: passing, claims: passingClaims } = await theCheckIsRun(
+      enquiry,
+      observations,
+      "median-aggregation",
+      { proposition: AGREES, finding: "median p = 0.04" },
+    );
+    await session.evaluateCriterion({
+      criterion: robustness,
+      gate,
+      value: "median p = 0.04",
+      outcome: "pass",
+      citing: claimOf(passingClaims, AGREES),
+    });
+    expect((await session.gateStatus(gate)).state).toBe("satisfied");
+
+    // The passing check turns out to have been defective and is replaced.
+    // Nobody has re-run it yet: the only evaluation of `robustness` now cites
+    // withdrawn evidence, so the criterion has no standing verdict at all.
+    const review = await session.recordReview({
+      of: passing,
+      verdict: "the aggregation dropped the last fold",
+    });
+    await session.replaceAnalysis({
+      supersedes: passing,
+      because: review,
+      enquiry,
+      method: "median-aggregation, all folds",
+      from: [observations],
+      concludes: [{ proposition: AGREES, finding: "median p = 0.05" }],
+    });
+
+    const reader = await afterwards();
+
+    // 1. gateStatus (src/domain/read.ts:1030).
+    const status = await reader.gateStatus(gate);
+    expect(status.state).toBe("incomplete");
+    expect(status.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
+
+    // 2. gateList (src/domain/read.ts:1924) -- the same fact, the other reader.
+    const listed = await reader.gateList();
+    const ourGate = listed.find((g) => g.gate === gate);
+    expect(ourGate?.state).toBe("incomplete");
+    expect((await reader.gateList("incomplete")).some((g) => g.gate === gate)).toBe(true);
+    expect((await reader.gateList("satisfied")).some((g) => g.gate === gate)).toBe(false);
+
+    // 3. work, via workStateFrom's gateStates map (src/domain/read.ts:2065).
+    // A retracted verdict is not a failure -- S-3c's own distinction -- so the
+    // task it protects is not blocked, only still short of satisfied.
+    const listedWork = await reader.workList();
+    const ourWork = listedWork.find((w) => w.work === tertiary);
+    expect(ourWork?.state).not.toBe("blocked");
+    expect(ourWork?.state).toBe("planned");
+  });
 });

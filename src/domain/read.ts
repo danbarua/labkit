@@ -2023,6 +2023,20 @@ export class ReadSurface extends SessionCore {
  * `satisfied` (S-17); failure is checked before incompleteness because a
  * failure is decisive (S-3).
  *
+ * **`satisfied` requires positive proof — every check passed — rather than
+ * being the branch left over once the others are ruled out.** Until
+ * 2026-08-31 it was `else`, on the same "absence is checked before
+ * satisfaction" argument above — and that argument covered `never-run` but
+ * not the `no-standing-verdict` state S-3c added afterward: a criterion whose
+ * only evaluation(s) were retracted by a later `replace` matched neither
+ * `failed` nor `never-run`, so it fell through to `satisfied` — the itemised
+ * per-check report already listed it correctly under "not met"
+ * (`CheckStatus.state`'s own doc comment), only this aggregate disagreed with
+ * it. Found transcribing Bonsai's real research record by hand (labkit#137).
+ * Requiring every check to have positively `passed` closes the general case:
+ * a sixth `CheckState` added later lands in `incomplete` by construction,
+ * not by whoever edits this function next remembering to add a branch for it.
+ *
  * **A gate with no criteria at all reports `never-evaluated`.** `every` over an
  * empty list is `true`, which is the right answer for the wrong-looking reason:
  * a gate governing nothing has certainly not been shown to hold, and
@@ -2034,9 +2048,9 @@ function gateStateFrom(checks: readonly { state: CheckState }[]): GateStatus["st
     ? "never-evaluated"
     : checks.some((c) => c.state === "failed")
       ? "blocked"
-      : checks.some((c) => c.state === "never-run")
-        ? "incomplete"
-        : "satisfied";
+      : checks.every((c) => c.state === "passed")
+        ? "satisfied"
+        : "incomplete";
 }
 
 /**
