@@ -73,15 +73,15 @@ NUM=3
 #   P2  everything else, Blocked and Parked included — not competing for
 #       attention. Every item carries one so the completeness check below stays
 #       total; P2 is the honest value for a thing nobody should be looking at.
-TODO="81 50 55 104 52 49 56 76"
-BLOCKED="94 60"   # both behind #49
-PARKED="63 64 65 98 51 54"
-IN_PROGRESS=""
+TODO="81 50 55 104 52 49 56 76 124 125 126"
+BLOCKED="94 60 127 128 129"   # 94, 60 behind #49; 127-129 behind #125
+PARKED="63 64 65 98 51 54 123"   # 123 waits on a scope go/no-go from Dan
+IN_PROGRESS="119"   # shipped in #121/#122, open under review
 DONE="57 95"
 
 P0="81"           # attribution: two writes, byte-identical, one of them a claim nobody checked
-P1="50 55 104 52"
-P2="49 56 76 94 60 63 64 65 98 51 54 57 95"
+P1="50 55 104 52 124 125 126"   # 124-126: the Bonsai record, the first real consumer
+P2="49 56 76 94 60 63 64 65 98 51 54 57 95 119 123 127 128 129"
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ID=$(gh project view "$NUM" --owner "$OWNER" --format json -q .id)
@@ -168,8 +168,11 @@ if stale:
     )
 
 for n, s in sorted(wanted.items(), key=lambda kv: (ranked[kv[0]], list(plan).index(kv[1]), int(kv[0]))):
+    # The label is printed with its space replaced: `read` below splits on
+    # whitespace, and "In progress" is the one status with a space in it --
+    # which nothing noticed while IN_PROGRESS was empty.
     print(by_number[n], status['id'], status['options'][s],
-          priority['id'], priority['options'][ranked[n]], n, s, ranked[n])
+          priority['id'], priority['options'][ranked[n]], n, s.replace(' ', '-'), ranked[n])
 " |
   while read -r item sfield soption pfield poption number label rank; do
     gh project item-edit --id "$item" --project-id "$PROJECT_ID" \
