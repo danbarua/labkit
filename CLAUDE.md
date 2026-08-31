@@ -330,15 +330,18 @@ is a different job from a task, and mixing the two is how a decision gets made
 by whoever happened to implement first.
 
 **`domain model` + `open question` means defined and tracked, not ready to
-work on.** Those are PJ-008 §3's open rows — AH, AI and AJ — which had been
+work on.** The first three were PJ-008 §3's open rows — AH, AI and AJ, now
+#63, #64 and #65 — which had been
 carried forward from one session log to the next, *"which feels like tracking
 and is closer to laundering, since every restatement sits in a document the next
 reader will not open"*.
 
-**PJ-008 §3's index is still authoritative on what the model knows.** The issue
-tracks the work; the ledger row holds the evidence, the owner and the refutation
-condition. An issue is a piece of work, not a verdict about the domain, and the
-two must not both carry a status.
+**PJ-008 §3's ledger is closed — see PJ-008b, the appendix that closes it.**
+Its forty rows stay as dated records of the validation era; issues carry
+findings now, and the one-demonstrated-wrong-answer slot lives on the project
+board's P0 column. Closed on 2026-08-31, the day the ledger required its first
+double entry (row AM beside #132, row AN beside #137) — the session log's own
+failure shape, caught at two instances instead of 174.
 
 ### The dated records
 
@@ -1084,7 +1087,9 @@ back up to the caller. One verb may write many nodes and edges:
 `recordAnalysis()` writes a computation, an evidence unit, an output artefact,
 and one evidence plus one claim per conclusion.
 
-**Verbs are added when a scenario needs them, not in anticipation.** The
+**Verbs are added when a consumer needs them, not in anticipation** — a
+scenario, or since PJ-008b a real user (`search`, #155, shipped for a stated
+need with no scenario). The
 current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8,
 S-3b, S-3c, S-10, S-9, S-14 and S-18 required. Return types are derived one-per-bullet from a scenario's
 "Afterward" questions
@@ -1222,10 +1227,13 @@ did not:
 1. A service query must return a **wrong answer** without the relationship —
    demonstrated by running the test against the old traversal, not argued
    from an ugly query path.
-2. An **empty** result is not a wrong one (PJ-011 §5). It is *unanswerable*,
-   which is true of any question the model has never been asked, and any
-   missing feature manufactures one. Only a confidently incorrect answer
-   shows the model claiming something it cannot support. The same rule read
+2. An **empty** result is not a wrong one (PJ-011 §5) — for a *correctness*
+   change: an edge redirected, a grain moved, a derivation fixed. Since
+   PJ-008b, a *capability* change — a new verb, or an edge that exists so a
+   question can be asked at all — is instead earned by a **demonstrated
+   consumer need**: a real user or agent asked, and the record could not
+   answer. `search` (#155) is the precedent. Only a confidently incorrect
+   answer shows the model claiming something it cannot support. The same rule read
    from the other side: **a refusal needs something real to refuse.** S-5's
    decline-rather-than-guess pattern applies to a verb a caller would
    otherwise use wrongly; inventing a verb in order to reject its arguments
@@ -1416,8 +1424,9 @@ Two rules, so this is checkable rather than remembered:
    cleared another row is nominated too, demonstrated or not** — otherwise
    clearing one row can quietly make a second worse while the rule that would
    have caught it stops applying, which is exactly what happened to row X when
-   S-3b cleared row V (PJ-017 §3). Which row, if any, is currently
-   `demonstrated` is in PJ-008 §3's index table and nowhere else. A checker
+   S-3b cleared row V (PJ-017 §3). Which issue, if any, is currently the
+   demonstrated wrong answer is the project board's P0 column and nowhere
+   else — PJ-008b closed the ledger that used to hold it. A checker
    held two copies of that status to each other until 2026-08-22; the copies
    were deleted instead, and a fact in one place needs no checker.
    Row AD held it for a few hours on
