@@ -255,7 +255,9 @@ export interface DomainEvent {
   operation: Operation;
   subject: string;
   /**
-   * Every handle this act minted.
+   * Every handle this act minted. Always an array, empty if the act minted
+   * nothing — never absent. See {@link domainEvent}, the one place that
+   * default is applied, for why nothing downstream needs a null check.
    *
    * `subject` says what the act was *about*; this says what came into
    * existence, and for most verbs they differ. Six verbs mint a `Decision` and
@@ -263,14 +265,11 @@ export interface DomainEvent {
    * enquiry or the claim, because that is what the researcher was doing. So
    * "which act created this record?" is answerable from here and not from
    * `subject`.
-   *
-   * Optional, and only because an event that predates the collector or comes
-   * from a hand-built fixture has none. `WriteSurface.emit` always supplies it,
-   * empty if the act minted nothing.
    */
-  created?: readonly string[];
+  created: readonly string[];
   /**
-   * Every edge this act created.
+   * Every edge this act created. Always an array, for the same reason as
+   * {@link created} — see {@link domainEvent}.
    *
    * The other half of {@link created}, and it did not exist until 2026-08-28.
    * `createNode` had pushed to a buffer since the collector was written;
@@ -285,13 +284,34 @@ export interface DomainEvent {
    * unreconstructable from the graph, because the graph holds the edge and not
    * the act that made it — and unlike a node there is no `created` to fall back
    * on.
-   *
-   * Optional for the same reason as {@link created}: rows written before the
-   * column existed have none, and `null` says that rather than "this act
-   * connected nothing".
    */
-  edges?: readonly MintedEdge[];
+  edges: readonly MintedEdge[];
   detail?: Record<string, unknown>;
+}
+
+/**
+ * Builds a `DomainEvent`, defaulting `created`/`edges` to `[]` so a caller
+ * building one by hand never states "this minted nothing" twice.
+ *
+ * This used to be the type's own job: both fields were optional, and a
+ * consumer three call-sites away had to know that "absent" meant "empty" —
+ * `?? []` at every read, and a `null` sentinel in the store to tell "empty"
+ * apart from "nobody was collecting yet" (`event-store.ts`). That distinction
+ * had a real use once, for rows written before `edges` existed — but this
+ * repo's one durable record (`bonsai-2026`) postdates every column it has,
+ * and is itself script-derived: `probe-bonsai-replay.sh` regenerates it byte
+ * for byte, so there is no data anywhere a schema change could strand.
+ * Nothing here is preserved rather than regenerated, so the case the `null`
+ * sentinel was protecting never occurs and never will.
+ *
+ * `WriteSurface.emit` already supplies both fields unconditionally, from
+ * `TenantGraph`'s drain calls — this constructor is for the other caller, a
+ * fixture built by hand in a test that never went through `emit` at all.
+ */
+export function domainEvent(
+  fields: Omit<DomainEvent, "created" | "edges"> & Partial<Pick<DomainEvent, "created" | "edges">>,
+): DomainEvent {
+  return { ...fields, created: fields.created ?? [], edges: fields.edges ?? [] };
 }
 
 /**
@@ -364,9 +384,7 @@ export function inMemoryEventLog(): EventSink {
     (f.since === undefined || (e.seq ?? 0) > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
-    (f.touching === undefined ||
-      e.subject === f.touching ||
-      (e.created ?? []).includes(f.touching));
+    (f.touching === undefined || e.subject === f.touching || e.created.includes(f.touching));
   return {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is

@@ -48,7 +48,7 @@ import { connectDb, type LabKitDBConnection } from "../src/db/connect";
 import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
 import { scopeToTenant } from "../src/db/scoped";
 import { pgEventLog } from "../src/domain/event-store";
-import type { DomainEvent } from "../src/domain/events";
+import { domainEvent, type DomainEvent } from "../src/domain/events";
 
 let home: string;
 
@@ -60,18 +60,19 @@ afterAll(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
-const anEvent = (subject: string): DomainEvent => ({
-  at: "2026-01-01T00:00:00.000Z",
-  operation: "pose",
-  subject,
-  created: [subject],
-  attribution: {
-    attribution_label: "rls-probe",
-    attribution_id: "rls",
-    attribution_how: "claimed",
-    git_hash: "0000000",
-  },
-});
+const anEvent = (subject: string): DomainEvent =>
+  domainEvent({
+    at: "2026-01-01T00:00:00.000Z",
+    operation: "pose",
+    subject,
+    created: [subject],
+    attribution: {
+      attribution_label: "rls-probe",
+      attribution_id: "rls",
+      attribution_how: "claimed",
+      git_hash: "0000000",
+    },
+  });
 
 /**
  * One connection, resolved and stepped down, for the duration of `work`.

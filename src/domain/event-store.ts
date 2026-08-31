@@ -61,10 +61,11 @@ const toEvent = (r: EventRow): DomainEvent => {
     operation: r.operation as Operation,
     subject: r.subject,
     created: r.created,
-    // Absent rather than `[]` when the column is null, so a reader can tell
-    // "this act connected nothing" from "nobody was collecting yet". Same
-    // treatment as `detail` below and for the same reason.
-    ...(r.edges === null ? {} : { edges: r.edges as DomainEvent["edges"] }),
+    // `null` only ever meant "written before this column existed" (2026-08-28),
+    // and this repo's one durable record postdates it -- see `domainEvent`'s
+    // doc comment. `?? []` is the whole of what a genuine legacy row would
+    // still need, with no sentinel required to tell it apart from anything.
+    edges: (r.edges as DomainEvent["edges"] | null) ?? [],
     ...(r.detail === null ? {} : { detail: r.detail as Record<string, unknown> }),
   };
 };
@@ -125,13 +126,12 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
             at: event.at,
             operation: event.operation,
             subject: event.subject,
-            // Copied: `DomainEvent.created` is `readonly string[]` and drizzle's
-            // insert type is not.
-            created: [...(event.created ?? [])],
-            // `null` and not `[]` when the act connected nothing: see the column
-            // comment. An event that genuinely created no edges writes `[]`,
-            // which is a different statement from a row that predates collection.
-            edges: event.edges ? [...event.edges] : null,
+            // Copied: `DomainEvent.created`/`.edges` are `readonly` and
+            // drizzle's insert type is not. Always a real array -- see
+            // `domainEvent`'s doc comment for why nothing here defaults to
+            // `null` any more.
+            created: [...event.created],
+            edges: [...event.edges],
             attribution_label: event.attribution.attribution_label,
             attribution_id: event.attribution.attribution_id,
             attribution_how: event.attribution.attribution_how,

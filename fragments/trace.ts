@@ -130,11 +130,11 @@ export async function traceOf(
         seq,
         operation: e.operation,
         subject: e.subject,
-        created: (e.created ?? []).map((handle) => ({
+        created: e.created.map((handle) => ({
           handle,
           label: labelForNaturalId(handle),
         })),
-        edges: [...(e.edges ?? [])],
+        edges: [...e.edges],
         detail: e.detail ?? {},
         command: commandOf(e),
         fragment: provenance?.get(seq)?.fragment,

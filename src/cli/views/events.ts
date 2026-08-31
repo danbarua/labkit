@@ -44,13 +44,13 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
       // Short hash, because the full forty characters push the line past a
       // terminal and the first eight are what anybody types back into `git`.
       const commit = e.attribution.git_hash ? ` @${e.attribution.git_hash.slice(0, 8)}` : "";
-      const minted = e.created?.length
+      const minted = e.created.length
         ? p.quiet(", minting ") + e.created.map((h) => p.handle(h)).join(p.quiet(", "))
         : "";
       // Its own lines, not appended to the `minting` one. An act that writes
       // five nodes writes eight edges, and both on one line pushes past a
       // terminal -- the reason the commit hash above is already truncated.
-      const wired = (e.edges ?? []).map(
+      const wired = e.edges.map(
         (x) => `           ${p.handle(x.from)} ${p.quiet(`-[${x.label}]->`)} ${p.handle(x.to)}`,
       );
       return [

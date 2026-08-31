@@ -225,8 +225,8 @@ export const domainEventSchema = z.strictObject({
   attribution: recordedAttribution,
   operation,
   subject: z.string(),
-  created: createdList.optional(),
-  edges: mintedEdgeList.optional(),
+  created: createdList,
+  edges: mintedEdgeList,
   detail: z.record(z.string(), z.unknown()).optional(),
 });
 

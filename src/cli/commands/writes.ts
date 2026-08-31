@@ -43,7 +43,7 @@ import type { ClaimRef, DomainEvent, GateRef } from "../../domain";
  * having to know which case it is.
  */
 const mintedHandles = (events: readonly DomainEvent[]): readonly string[] =>
-  events.flatMap((e) => e.created ?? []);
+  events.flatMap((e) => e.created);
 
 /**
  * Uncoloured on purpose — see {@link asHandles}. The whole of stdout here is

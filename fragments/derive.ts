@@ -68,7 +68,7 @@ export function withProvenance(
   const events: EventSink = {
     record: async (event) => {
       const stamped = await base.record(event);
-      for (const handle of stamped.created ?? []) {
+      for (const handle of stamped.created) {
         if (labelForNaturalId(handle) === "LineOfEnquiry") enquiryHandles.push(handle);
         if (labelForNaturalId(handle) === "Gate") gateHandles.push(handle);
       }
