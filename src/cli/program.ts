@@ -14,6 +14,7 @@
 import { Command } from "commander";
 import pkg from "../../package.json" with { type: "json" };
 import { worktreeName } from "../worktree";
+import { isoInstant } from "./args";
 import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
 import { registerServe } from "./commands/serve";
@@ -55,6 +56,7 @@ export function globalOptions(program: Command): Command {
             "--date <iso>",
             "record every write in this command as having happened then",
           )
+          .argParser(isoInstant)
           .hideHelp(),
       )
   );

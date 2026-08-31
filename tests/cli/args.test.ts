@@ -142,6 +142,27 @@ test("a bad --state names the values it would have accepted", async () => {
   );
 });
 
+test("a non-ISO --date is refused, not stamped into the record", async () => {
+  // `--date` reaches `Clock.now()` unwrapped, straight into every write's
+  // `DomainEvent.at` -- an unvalidated string there is not a CLI typo caught
+  // at the boundary, it is a bad timestamp durably stamped into the record.
+  expect(await refusal(["--date", "banana", "pose", "does it hold?"])).toContain("--date");
+  // Same shape as the `--state blockd` case below: refused during parsing, so
+  // `ran` -- and therefore the database connection `pose`'s action would open
+  // -- is never reached.
+  let ran = false;
+  const program = buildProgram(async () => {
+    ran = true;
+  });
+  const silence = { writeErr: () => {}, writeOut: () => {} };
+  program.exitOverride().configureOutput(silence);
+  for (const command of program.commands) command.exitOverride().configureOutput(silence);
+  await expect(
+    program.parseAsync(["--date", "banana", "pose", "does it hold?"], { from: "user" }),
+  ).rejects.toThrow();
+  expect(ran).toBe(false);
+});
+
 test("a bad --state is refused before the action, so no database is opened", async () => {
   // **This is the assertion that would have caught it, and the message one
   // would not.** `gateState` was called *inside* `.action()`, so it did throw --

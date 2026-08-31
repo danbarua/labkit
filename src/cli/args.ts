@@ -36,6 +36,25 @@ export function whole(raw: string): number {
 }
 
 /**
+ * An ISO instant, in the one shape `systemClock` ever produces —
+ * `new Date().toISOString()`, always `Z`-suffixed. `--date` reaches
+ * `Clock.now()` unwrapped, straight into `DomainEvent.at` on every write the
+ * command makes; an unvalidated string there is not a CLI mistake caught at
+ * the boundary, it is a bad timestamp durably stamped into the record. Offset
+ * forms (`+01:00`) and a bare date are refused rather than normalised, so
+ * every `at` in the record — backfilled or not — is the one shape a reader
+ * can compare without parsing first.
+ */
+export function isoInstant(raw: string): string {
+  const parsed = z.iso.datetime().safeParse(raw);
+  if (!parsed.success)
+    throw new InvalidArgumentError(
+      `takes an ISO instant like 2026-07-15T12:34:56.000Z, not \`${raw}\``,
+    );
+  return parsed.data;
+}
+
+/**
  * A handle of a named kind.
  *
  * `ref()` already refuses a mismatch — `ref("gate", "CLM_1")` throws, because
