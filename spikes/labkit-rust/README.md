@@ -66,7 +66,9 @@ the record slice 1 built, because `known` only becomes interesting once
 something has been run against a question. Slice 1 is the five acts that mint
 handles; 2 adds the analysis verbs and the composed reports; 3 the reads that
 work off a record the caller already has handles into; 4 the verbs that record
-a change of mind.
+a change of mind; 5 the supersession chain and everything that reads it —
+a second amendment, a re-check, a replacement, and whether an analysis can be
+accounted for from what it read.
 
 ### Three properties the harness has, each checked rather than assumed
 
@@ -101,9 +103,13 @@ Dated, because each was run rather than reasoned about.
 - **Grafeo has a typed native write API** — `create_node_with_props`,
   `create_edge_with_props`, `set_node_property` — needing no query strings.
   (2026-08-28.)
-- **31 of 36 commands reached byte-for-byte parity** on that typed API, with no
-  query string anywhere in the port. (2026-08-29. The fixtures are the
-  authority; run them rather than trusting this sentence.)
+- **35 of 35 non-`mcp` CLI commands reached byte-for-byte parity** on that
+  typed API, with no query string anywhere in the port. (2026-08-29 at 31;
+  2026-08-31 for the last four — `reverify`, `replace`, `reproduction`,
+  `reproducibility` — after widening `design` to the full amendment chain
+  they read. The fixtures are the authority; run them rather than trusting
+  this sentence.) `happened` is the one CLI command left, and `mcp` is a
+  server rather than a command — see "What is left."
 
 ### The epoch question, resolved — and it decomposes rather than settles one way
 
@@ -143,9 +149,12 @@ place.
 probes — the port itself (`src/main.rs`) still builds and runs on `lpg` alone,
 unchanged; see the comment there.
 
-## Three defects the fixture found that no type could
+## Defects the fixture found that no type could
 
-Worth naming because all three are about *reports*, not about Rust or Grafeo.
+Worth naming because every one is about *reports* or *unwalked structure*, not
+about Rust or Grafeo. (This heading used to say "three" — a count that goes
+stale the next time this file finds one, which is exactly the state-in-prose
+mistake the parent repo's CLAUDE.md names and this file just repeated.)
 
 **The port independently reproduced a bug LabKit itself had until PR #69.**
 After `promote` and `close`, `known` reported the question `established`. The
@@ -183,6 +192,35 @@ is a named risk, not a cleared one — the fixture is what turned each of the
 three defects above from a theory into a fact, and nothing has done that for
 the rest.
 
+**Widening `design` and adding `reverify`/`replace` found two more gaps in the
+same family — a node the port never wrote, and a reader that didn't guard
+against a new one existing.** (2026-08-31.) Both were invisible for the same
+reason as `SUPERSEDES`: nothing in slices 1-4 printed the handle that would
+have shown them.
+
+- `analyse` never minted the output `Artefact` a real analysis produces
+  (`recordAnalysis`'s `output` — the thing `replaceAnalysis` invalidates and
+  `outputArtefactOf` reads back). Slices 1-4 never name it, so `analyse` had
+  minted one fewer `Artefact` than Bun on every call, silently, the whole
+  time. It surfaced only once slice 5 named a *later* handle by number and
+  got a different node than Bun did — the exact mechanism that hid
+  `SUPERSEDES`, arriving a second time from a different verb.
+- Once `analyse`'s `EvidenceUnit` produced two things instead of one, `enquiry`
+  broke: it collected *every* `PRODUCES` target off a unit and assumed they
+  were all findings, so it started reporting the output `Artefact` as a
+  finding with no statement. This is `PRODUCES: [EvidenceUnit, Artefact]`
+  from CLAUDE.md's own unwalked-pair table, arriving in a Rust port with a
+  compiler that cannot catch it either — a wrongly-included *pair* isn't a
+  type error any more than a wrongly-typed *edge* is.
+- `reinterpret` was also missing the `Review` node LabKit's real verb mints
+  (`"the review records that someone objected; the decision records that the
+  objection was acted on"`) — invisible for the same reason, until slice 5's
+  own explicit `review` call landed on `REV_2` where Bun's landed on `REV_3`.
+
+All three fixed the same way as `SUPERSEDES`: read the real domain code,
+change the port, regenerate every `.expected` from Bun, and let 75 runs across
+five slices say whether it's still deterministic. It is.
+
 ## Divergences from the Bun implementation, named rather than hidden
 
 - **Handle minting counts nodes.** `CRIT_1` is `count + 1`. LabKit uses a
@@ -205,17 +243,16 @@ the rest.
 
 ## What is left
 
-- `reproduction`, `reproducibility`, `replace`, `reverify` — all read
-  supersession chains, so they need more of the `SUPERSEDES` / `REVERIFIES`
-  structure than `amend` currently writes. `SUPERSEDES` itself is now the
-  right shape (see "Divergences," above); `design` still only reports the
-  immediately prior step, not the full chain LabKit's `designHistory()` walks
-  — untested beyond two amendments, and worth widening before these four
-  verbs build on it.
+**Command parity is done.** `reproduction`, `reproducibility`, `replace` and
+`reverify` landed 2026-08-31, on a `design` widened to walk the full
+amendment chain LabKit's `designHistory()` does (`src/domain/read.ts`) rather
+than report only the immediately prior step — needed once a chain could be
+more than one amendment long, and tested at two. That leaves:
+
 - `happened` — reads the event log the port does not have. The epoch question
-  above answers this rather than leaving it tied to it: deriving history from
-  the graph would mean writing through `session.execute(...)` for epochs to
-  mean anything, which this port isn't doing, so `happened` needs an actual
-  event log, kept separately, same as LabKit's own.
-- `mcp` is a server, not a CLI command. 35 is the realistic ceiling for a
-  command-parity spike.
+  (above) answers this rather than leaving it tied to it: deriving history
+  from the graph would mean writing through `session.execute(...)` for epochs
+  to mean anything, which this port isn't doing, so `happened` needs an
+  actual event log, kept separately, same as LabKit's own.
+- `mcp` is a server, not a CLI command. 35 was the realistic ceiling for a
+  command-parity spike, and it's reached.

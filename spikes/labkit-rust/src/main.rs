@@ -134,6 +134,101 @@ fn nodes_labelled(db: &GrafeoDB, label: &str) -> Vec<NodeId> {
         .collect()
 }
 
+fn has_label(db: &GrafeoDB, n: NodeId, label: &str) -> bool {
+    db.get_node(n)
+        .is_some_and(|node| node.labels.iter().any(|l| &**l == label))
+}
+
+/// Pulls one field out of the `--concludes` JSON blob
+/// (`{"proposition": "…", "finding": "…"}`) by string splitting, not parsing —
+/// enough for the two keys every conclusion carries, matching the shape
+/// `src/cli/args.ts`'s `conclusion()` validates on the Bun side.
+fn conclusion_field(concludes: &str, key: &str) -> String {
+    concludes
+        .split(&format!("\"{key}\""))
+        .nth(1)
+        .and_then(|t| t.split('"').nth(1))
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// The write half shared by `analyse`, `reverify` and `replace`: a
+/// Computation, the EvidenceUnit that ran it, the output Artefact it
+/// produced, and one Evidence + Claim for the conclusion. Mirrors LabKit's
+/// private `recorded()` (`src/domain/write.ts`) — composed verbs call this
+/// rather than duplicating it, the same rule that keeps `open` as `pose` +
+/// `pursue` under one event.
+///
+/// **The output Artefact was missing until this fix (2026-08-31).** LabKit's
+/// `Artefact` label covers both a raw observation and an analysis's own
+/// output — `recorded()` mints one of the latter, `outputArtefactOf()` reads
+/// it back, and `replaceAnalysis()` invalidates it. Slices 1-4 never print
+/// its handle, so the gap was invisible: `analyse` minted one fewer Artefact
+/// than Bun on every call, and nothing downstream ever named the number that
+/// shifted. It surfaced only once slice 5 named a *later* Artefact by
+/// handle and got a different one than Bun did.
+fn record_analysis(
+    db: &GrafeoDB,
+    enquiry: Option<NodeId>,
+    method: &str,
+    from: Option<&str>,
+    implementing: Option<&str>,
+    held_to: Option<&str>,
+    proposition: &str,
+    finding: &str,
+) -> (String, String, String) {
+    let comp = create(db, "Computation", vec![("method", method.to_string())]);
+    let eu = create(db, "EvidenceUnit", vec![]);
+    let output = create(db, "Artefact", vec![
+        ("name", format!("{method} output")),
+        ("kind", "analysis-output".to_string()),
+    ]);
+    let ev = create(db, "Evidence", vec![("statement", finding.to_string())]);
+    let claim = create(db, "Claim", vec![
+        ("name", proposition.to_string()),
+        ("kind", "exploratory".to_string()),
+    ]);
+    if let (Some(c), Some(u), Some(out_art), Some(e), Some(cl)) = (
+        by_handle(db, &comp), by_handle(db, &eu), by_handle(db, &output),
+        by_handle(db, &ev), by_handle(db, &claim),
+    ) {
+        if let Some(l) = enquiry {
+            edge(db, u, l, "ADDRESSES");
+        }
+        edge(db, u, c, "USES");
+        edge(db, u, e, "PRODUCES");
+        edge(db, u, out_art, "PRODUCES");
+        edge(db, c, out_art, "PRODUCES");
+        edge(db, e, cl, "SUPPORTS");
+        if let Some(a) = from.and_then(|h| by_handle(db, h)) {
+            edge(db, c, a, "CONSUMES");
+        }
+        if let Some(t) = implementing.and_then(|h| by_handle(db, h)) {
+            edge(db, c, t, "IMPLEMENTS");
+        }
+        // QUALIFIES at record time, not evaluate time — an edge minted at the
+        // later moment cannot express a check nobody ran.
+        if let Some(cr) = held_to.and_then(|h| by_handle(db, h)) {
+            edge(db, cr, u, "QUALIFIES");
+        }
+    }
+    (comp, ev, claim)
+}
+
+/// The single finding by which an analysis concluded something about one
+/// proposition. Mirrors `ResearchSession.findingFor` (`src/domain/core.ts`).
+fn finding_for(db: &GrafeoDB, analysis: NodeId, proposition: &str) -> Option<NodeId> {
+    into_(db, analysis, "USES")
+        .into_iter()
+        .flat_map(|u| out(db, u, "PRODUCES"))
+        .find(|&e| {
+            out(db, e, "SUPPORTS")
+                .into_iter()
+                .chain(out(db, e, "CHALLENGES"))
+                .any(|c| prop(db, c, "name") == proposition)
+        })
+}
+
 // ── the commands ─────────────────────────────────────────────────────────────
 
 /// `labkit known` — what the programme knows, in five buckets.
@@ -222,6 +317,103 @@ fn known(db: &GrafeoDB) -> String {
     .join("\n")
     .trim_end()
     .to_string()
+}
+
+/// `labkit design <gate-id>` — the full amendment chain, oldest first.
+///
+/// Mirrors LabKit's `amendmentChain()` + `designHistory()`
+/// (`src/domain/read.ts`): every Decision that `CHANGES` a criterion this
+/// gate has ever been governed by (GOVERNS is additive — `amend` never
+/// retracts the old edge), ordered by walking `SUPERSEDES` forward from the
+/// one decision with no older sibling. The order comes from the record
+/// itself, never from a timestamp or from natural-id allocation order.
+fn design(db: &GrafeoDB, g: NodeId) -> String {
+    let governed = out(db, g, "GOVERNS");
+    let Some(newest) = governed.iter().copied().find(|c| into_(db, *c, "CHANGES").is_empty())
+    else {
+        return format!("{}, unamended", prop(db, g, "handle"));
+    };
+
+    let changed_by: Vec<(NodeId, NodeId)> = governed
+        .iter()
+        .flat_map(|c| into_(db, *c, "CHANGES").into_iter().map(|d| (d, *c)))
+        .collect();
+    if changed_by.is_empty() {
+        return format!("{}, unamended", prop(db, g, "handle"));
+    }
+    let criterion_changed_by = |d: NodeId| -> Option<NodeId> {
+        changed_by.iter().find(|(dec, _)| *dec == d).map(|(_, c)| *c)
+    };
+
+    let older_of: Vec<(NodeId, Option<NodeId>)> = changed_by
+        .iter()
+        .map(|(d, _)| (*d, out(db, *d, "SUPERSEDES").into_iter().next()))
+        .collect();
+    // The root is the one step with no older sibling. Every other step is
+    // reached by walking forward, so a malformed chain (a cycle, or more than
+    // one root) simply stops early rather than looping -- this is a spike
+    // report, not a validator.
+    let Some(root) = older_of.iter().find(|(_, older)| older.is_none()).map(|(d, _)| *d) else {
+        return format!("{}, unamended", prop(db, g, "handle"));
+    };
+    let mut ordered = vec![root];
+    while let Some(next) = older_of
+        .iter()
+        .find(|(_, older)| *older == ordered.last().copied())
+        .map(|(d, _)| *d)
+    {
+        ordered.push(next);
+    }
+
+    let tasks: Vec<String> = out(db, g, "GATES")
+        .into_iter()
+        .map(|t| format!("{} ({})", prop(db, t, "objective"), prop(db, t, "handle")))
+        .collect();
+
+    let steps: Vec<String> = ordered
+        .iter()
+        .enumerate()
+        .map(|(i, &dec)| {
+            let was = criterion_changed_by(dec);
+            let now = if i + 1 < ordered.len() {
+                criterion_changed_by(ordered[i + 1])
+            } else {
+                Some(newest)
+            };
+            let citing = out(db, dec, "CITING").into_iter().next();
+            let cited_text = citing
+                .map(|c| {
+                    into_(db, c, "SUPPORTS")
+                        .into_iter()
+                        .next()
+                        .map(|e| prop(db, e, "statement"))
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+            format!(
+                "scientific  ({})\n  was: {}\n  now: {}\n  because: {}\n  citing: {}\n  needs re-running: {}",
+                prop(db, dec, "handle"),
+                was.map(|o| prop(db, o, "proposition")).unwrap_or_default(),
+                now.map(|o| prop(db, o, "proposition")).unwrap_or_default(),
+                prop(db, dec, "reason"),
+                cited_text,
+                tasks.join(", "),
+            )
+        })
+        .collect();
+
+    let originally = criterion_changed_by(ordered[0])
+        .map(|o| prop(db, o, "proposition"))
+        .unwrap_or_default();
+
+    format!(
+        "{}, on {}\n  originally: {}\n  now requires: {}\n\nAmendments\n{}\n\nOrdered from the record itself, not from timestamps.",
+        prop(db, g, "handle"),
+        prop(db, newest, "handle"),
+        originally,
+        prop(db, newest, "proposition"),
+        steps.join("\n\n"),
+    )
 }
 
 /// `labkit gate <id>` — itemised, and computed from the checks under it.
@@ -318,6 +510,141 @@ fn gate(db: &GrafeoDB, handle: &str) -> Option<String> {
 /// reaches a claim's evidence, the standard it was held to, what that standard
 /// blocks, and the artefacts underneath — four traversals that on AGE are four
 /// hand-written Cypher clauses, each of which has to remember both bearings.
+/// A bullet list, or one line naming what an empty one means. Mirrors
+/// `src/cli/views/format.ts`'s `bullets()`.
+fn bullets(items: &[String], empty: &str) -> String {
+    if items.is_empty() {
+        format!("  {empty}")
+    } else {
+        items.iter().map(|i| format!("  - {i}")).collect::<Vec<_>>().join("\n")
+    }
+}
+
+/// `labkit reproduction <analysis>` — a re-run, against what its original
+/// read. Mirrors `reproductionOf()` (`src/domain/read.ts`): finds what the
+/// verifying analysis `REVERIFIES`, then compares `CONSUMES` on both sides.
+/// Never says "reproduced" — only `agrees`/`disagrees`, because whether
+/// reading the same inputs is the same execution depends on the method, which
+/// the record does not know.
+fn reproduction(db: &GrafeoDB, handle: &str) -> Option<String> {
+    let verification = by_handle(db, handle)?;
+    let new_ev = into_(db, verification, "USES")
+        .into_iter()
+        .flat_map(|u| out(db, u, "PRODUCES"))
+        .find(|&e| !out(db, e, "REVERIFIES").is_empty())?;
+    let old_ev = out(db, new_ev, "REVERIFIES").into_iter().next()?;
+    let old_comp = into_(db, old_ev, "PRODUCES")
+        .into_iter()
+        .flat_map(|u| out(db, u, "USES"))
+        .next()?;
+
+    let read_of = |c: NodeId| -> Vec<(String, String)> {
+        out(db, c, "CONSUMES")
+            .into_iter()
+            .map(|a| (prop(db, a, "name"), prop(db, a, "handle")))
+            .collect()
+    };
+    let mine = read_of(verification);
+    let theirs = read_of(old_comp);
+    let their_handles: Vec<&str> = theirs.iter().map(|(_, h)| h.as_str()).collect();
+    let my_handles: Vec<&str> = mine.iter().map(|(_, h)| h.as_str()).collect();
+
+    // Absence on both sides is still absence, not agreement: an original with
+    // no recorded provenance makes every one of the re-run's inputs
+    // `unrecorded-in-the-original` rather than silently `differs: []`.
+    let mut differs: Vec<(String, String)> = if theirs.is_empty() {
+        mine.iter()
+            .map(|(n, h)| (format!("{n}  ({h})"), "unrecorded-in-the-original".to_string()))
+            .collect()
+    } else {
+        let mut d: Vec<(String, String)> = mine
+            .iter()
+            .filter(|(_, h)| !their_handles.contains(&h.as_str()))
+            .map(|(n, h)| (format!("{n}  ({h})"), "changed".to_string()))
+            .collect();
+        d.extend(
+            theirs
+                .iter()
+                .filter(|(_, h)| !my_handles.contains(&h.as_str()))
+                .map(|(n, h)| (format!("{n}  ({h})"), "not-used-by-the-re-run".to_string())),
+        );
+        d
+    };
+    differs.sort();
+
+    let new_challenges = !out(db, new_ev, "CHALLENGES").is_empty();
+    let old_challenges = !out(db, old_ev, "CHALLENGES").is_empty();
+    let agrees = new_challenges == old_challenges;
+
+    let line = |(n, h): &(String, String)| format!("{n}  ({h})");
+    let differs_block = if differs.is_empty() {
+        "\nNothing differs in what the two runs read.".to_string()
+    } else {
+        let rows: Vec<String> =
+            differs.iter().map(|(what, standing)| format!("{what} — {standing}")).collect();
+        format!("\nDiffering\n{}", bullets(&rows, ""))
+    };
+
+    Some(format!(
+        "{}  ({})\n  re-checking {}  ({})\n  the two runs' findings {} — this {} confidence\n\nThe re-run read\n{}\n\nThe original read\n{}\n{}\n\nThis does not say the original was reproduced. Whether reading the same\nrecords is the same execution depends on what the method does, and the\nrecord does not know that.",
+        prop(db, verification, "method"),
+        prop(db, verification, "handle"),
+        prop(db, old_comp, "method"),
+        prop(db, old_comp, "handle"),
+        if agrees { "agrees" } else { "disagrees" },
+        if new_challenges { "lowers" } else { "raises" },
+        bullets(&mine.iter().map(line).collect::<Vec<_>>(), "nothing on the record"),
+        bullets(&theirs.iter().map(line).collect::<Vec<_>>(), "nothing on the record"),
+        differs_block,
+    ))
+}
+
+/// `labkit reproducibility <analysis> [part=hash...]` — whether an analysis
+/// can be accounted for from what it read. Mirrors `reproducibilityOf()`
+/// (`src/domain/read.ts`): `CONSUMES` names what was read, and each part
+/// lands in exactly one of four buckets. Unverifiable (no hash on record) is
+/// the record admitting it cannot answer, not the same as answering no.
+fn reproducibility(db: &GrafeoDB, handle: &str, rebuilt: &[&String]) -> Option<String> {
+    let analysis = by_handle(db, handle)?;
+    let offered: Vec<(&str, &str)> =
+        rebuilt.iter().filter_map(|s| s.split_once('=')).collect();
+
+    let (mut exact, mut differing, mut unverifiable, mut not_rebuilt) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for a in out(db, analysis, "CONSUMES") {
+        let a_handle = prop(db, a, "handle");
+        let entry = format!("{}  ({})", prop(db, a, "name"), a_handle);
+        let recorded_hash = prop(db, a, "hash");
+        let candidate = offered.iter().find(|(p, _)| *p == a_handle).map(|(_, h)| *h);
+        if recorded_hash.is_empty() {
+            unverifiable.push(entry);
+        } else if let Some(h) = candidate {
+            if h == recorded_hash {
+                exact.push(entry);
+            } else {
+                differing.push(entry);
+            }
+        } else {
+            not_rebuilt.push(entry);
+        }
+    }
+    for bucket in [&mut exact, &mut differing, &mut unverifiable, &mut not_rebuilt] {
+        bucket.sort();
+    }
+    let reproducible =
+        !exact.is_empty() && differing.is_empty() && unverifiable.is_empty() && not_rebuilt.is_empty();
+
+    Some(format!(
+        "{} — {}\n\nRebuilt and identical\n{}\n\nRebuilt and different\n{}\n\nUnverifiable (the record kept no hash, so nothing can be said either way)\n{}\n\nNot rebuilt\n{}",
+        prop(db, analysis, "handle"),
+        if reproducible { "accounted for" } else { "not accounted for" },
+        bullets(&exact, "nothing"),
+        bullets(&differing, "nothing"),
+        bullets(&unverifiable, "nothing"),
+        bullets(&not_rebuilt, "nothing"),
+    ))
+}
+
 fn why(db: &GrafeoDB, handle: &str) -> Option<String> {
     let claim = by_handle(db, handle)?;
     let promoted = prop(db, claim, "kind") == "confirmatory";
@@ -584,43 +911,21 @@ fn main() -> ExitCode {
         "analyse" => {
             let loe = rest.first().and_then(|h| by_handle(&db, h));
             let concludes = opt(&argv, "--concludes").unwrap_or_default();
-            let field = |k: &str| -> String {
-                concludes
-                    .split(&format!("\"{k}\""))
-                    .nth(1)
-                    .and_then(|t| t.split('"').nth(1))
-                    .unwrap_or_default()
-                    .to_string()
-            };
-            let comp = create(&db, "Computation", vec![
-                ("method", opt(&argv, "--method").unwrap_or_default()),
-            ]);
-            let eu = create(&db, "EvidenceUnit", vec![]);
-            let ev = create(&db, "Evidence", vec![("statement", field("finding"))]);
-            let claim = create(&db, "Claim", vec![
-                ("name", field("proposition")),
-                ("kind", "exploratory".to_string()),
-            ]);
-            if let (Some(c), Some(u), Some(e), Some(cl)) = (
-                by_handle(&db, &comp), by_handle(&db, &eu),
-                by_handle(&db, &ev), by_handle(&db, &claim),
-            ) {
-                if let Some(l) = loe { edge(&db, u, l, "ADDRESSES"); }
-                edge(&db, u, c, "USES");
-                edge(&db, u, e, "PRODUCES");
-                edge(&db, e, cl, "SUPPORTS");
-                if let Some(a) = opt(&argv, "--from").and_then(|h| by_handle(&db, &h)) {
-                    edge(&db, c, a, "CONSUMES");
-                }
-                if let Some(t) = opt(&argv, "--implementing").and_then(|h| by_handle(&db, &h)) {
-                    edge(&db, c, t, "IMPLEMENTS");
-                }
-                // QUALIFIES at record time, not evaluate time — an edge minted
-                // at the later moment cannot express a check nobody ran.
-                if let Some(cr) = opt(&argv, "--held-to").and_then(|h| by_handle(&db, &h)) {
-                    edge(&db, cr, u, "QUALIFIES");
-                }
-            }
+            let (from, implementing, held_to) = (
+                opt(&argv, "--from"),
+                opt(&argv, "--implementing"),
+                opt(&argv, "--held-to"),
+            );
+            let (comp, _ev, claim) = record_analysis(
+                &db,
+                loe,
+                &opt(&argv, "--method").unwrap_or_default(),
+                from.as_deref(),
+                implementing.as_deref(),
+                held_to.as_deref(),
+                &conclusion_field(&concludes, "proposition"),
+                &conclusion_field(&concludes, "finding"),
+            );
             Some(format!("{comp}\n{claim}"))
         }
         // Promotion is its own act. Until it happens the finding is scratch,
@@ -792,6 +1097,12 @@ fn main() -> ExitCode {
         // finding of independence -- it is a lower bound over the routes named,
         // and a reader who takes it for independence has been misled by a
         // correct answer. So the routes walked are printed beside the result.
+        "reproduction" => rest.first().and_then(|h| reproduction(&db, h)),
+        "reproducibility" => {
+            let handle = rest.first();
+            let extra: Vec<&String> = rest.iter().skip(1).copied().collect();
+            handle.and_then(|h| reproducibility(&db, h, &extra))
+        }
         "affects" => {
             let wanted_name = rest.first().map(|s| s.to_string()).unwrap_or_default();
             let Some(art) = nodes_labelled(&db, "Artefact")
@@ -832,8 +1143,20 @@ fn main() -> ExitCode {
             // Sorted by identity, which here is insertion order. Nothing in
             // the store guarantees traversal order, and "which finding is
             // listed first" is a contract between runs, not an accident.
-            let mut findings: Vec<NodeId> =
-                units.iter().flat_map(|u| out(&db, *u, "PRODUCES")).collect();
+            //
+            // **Filtered to Evidence.** A unit behind `analyse`/`reverify`/
+            // `replace` also PRODUCES its analysis's own output Artefact
+            // (`record_analysis`) — the exact unwalked-pair shape CLAUDE.md
+            // names for `PRODUCES: [EvidenceUnit, Artefact]`. Every other
+            // PRODUCES reader in this file starts from a specific Evidence
+            // and is unaffected; this is the one that scans a unit's PRODUCES
+            // targets indiscriminately, so it is the one that needed the
+            // guard once a second target type existed.
+            let mut findings: Vec<NodeId> = units
+                .iter()
+                .flat_map(|u| out(&db, *u, "PRODUCES"))
+                .filter(|&n| has_label(&db, n, "Evidence"))
+                .collect();
             findings.sort();
             let rows: Vec<String> = findings
                 .iter()
@@ -953,8 +1276,72 @@ fn main() -> ExitCode {
             }
             Some(dec)
         }
+        // One conclusion behind the same claim as before, plus one edge:
+        // `recordAnalysis` again, and REVERIFIES is the whole point — without
+        // it a re-check is a second independent finding, not a re-check.
+        "reverify" => {
+            let historical = rest.first().and_then(|h| by_handle(&db, h));
+            let concludes = opt(&argv, "--concludes").unwrap_or_default();
+            let proposition = conclusion_field(&concludes, "proposition");
+            let original = historical.and_then(|h| finding_for(&db, h, &proposition));
+            let loe = opt(&argv, "--enquiry").and_then(|h| by_handle(&db, &h));
+            let under = opt(&argv, "--under");
+            let (comp, ev, claim) = record_analysis(
+                &db,
+                loe,
+                &opt(&argv, "--method").unwrap_or_default(),
+                under.as_deref(),
+                None,
+                None,
+                &proposition,
+                &conclusion_field(&concludes, "finding"),
+            );
+            if let (Some(restated), Some(original)) = (by_handle(&db, &ev), original) {
+                edge(&db, restated, original, "REVERIFIES");
+            }
+            Some(format!("{comp}\n{claim}"))
+        }
+        // Invalidates the superseded analysis's own output and records the
+        // replacement in the same call -- not a Decision, and no SUPERSEDES:
+        // `invalidated = true` means "no longer a source of current
+        // inference", which coincides with supersession here without being
+        // it (see `src/domain/write.ts`'s own note on `replaceAnalysis`).
+        "replace" => {
+            let superseded = rest.first().and_then(|h| by_handle(&db, h));
+            let concludes = opt(&argv, "--concludes").unwrap_or_default();
+            let loe = opt(&argv, "--enquiry").and_then(|h| by_handle(&db, &h));
+            let from = opt(&argv, "--from");
+            let (comp, _ev, claim) = record_analysis(
+                &db,
+                loe,
+                &opt(&argv, "--method").unwrap_or_default(),
+                from.as_deref(),
+                None,
+                None,
+                &conclusion_field(&concludes, "proposition"),
+                &conclusion_field(&concludes, "finding"),
+            );
+            if let Some(old) = superseded {
+                if let Some(old_output) = out(&db, old, "PRODUCES").into_iter().next() {
+                    db.set_node_property(old_output, "invalidated", Value::from("true"));
+                    if let Some(review) = opt(&argv, "--because").and_then(|h| by_handle(&db, &h)) {
+                        edge(&db, old_output, review, "INVALIDATED_BY");
+                    }
+                }
+            }
+            Some(format!("{comp}\n{claim}"))
+        }
+        // LabKit's real `reinterpret` mints a Review too -- "the review
+        // records that someone objected; the decision records that the
+        // objection was acted on" (src/domain/write.ts). Missing here until
+        // 2026-08-31: no fixture printed a Review handle downstream of this
+        // verb, so the gap was invisible until slice 5 named one by number
+        // and got a different Review than Bun did.
         "reinterpret" => {
             let from = rest.first().and_then(|h| by_handle(&db, h));
+            let review = create(&db, "Review", vec![
+                ("verdict", opt(&argv, "--because").unwrap_or_default()),
+            ]);
             let narrowed = create(&db, "Claim", vec![
                 ("name", opt(&argv, "--as").unwrap_or_default()),
                 ("kind", "exploratory".to_string()),
@@ -962,7 +1349,11 @@ fn main() -> ExitCode {
             let dec = create(&db, "Decision", vec![
                 ("reason", opt(&argv, "--because").unwrap_or_default()),
             ]);
-            if let (Some(f), Some(n), Some(d)) = (from, by_handle(&db, &narrowed), by_handle(&db, &dec)) {
+            if let (Some(f), Some(r), Some(n), Some(d)) = (
+                from, by_handle(&db, &review), by_handle(&db, &narrowed), by_handle(&db, &dec),
+            ) {
+                edge(&db, r, f, "EVALUATES");
+                edge(&db, d, f, "CHANGES");
                 edge(&db, n, f, "NARROWS_CLAIM");
                 edge(&db, d, n, "MOTIVATES");
                 for ev in into_(&db, f, "SUPPORTS") {
@@ -990,52 +1381,7 @@ fn main() -> ExitCode {
         // can be governed by more than one criterion after an amendment; the
         // one in force is whichever has no incoming CHANGES from a Decision
         // (LabKit's own designHistory() reads it the same way).
-        "design" => rest.first().and_then(|h| by_handle(&db, h)).map(|g| {
-            let governed = out(&db, g, "GOVERNS");
-            let newest = governed
-                .into_iter()
-                .find(|c| into_(&db, *c, "CHANGES").is_empty());
-            let Some(newest) = newest else {
-                return format!("{}, unamended", prop(&db, g, "handle"));
-            };
-            let Some(dec) = into_(&db, newest, "MOTIVATES").into_iter().next() else {
-                return format!("{}, unamended", prop(&db, g, "handle"));
-            };
-            // The old criterion is CHANGES's own target, not reached through
-            // SUPERSEDES -- that edge now chains Decisions, not Criteria.
-            let original = out(&db, dec, "CHANGES").into_iter().next();
-            let dec = Some(dec);
-            let citing = dec
-                .map(|d| out(&db, d, "CITING"))
-                .unwrap_or_default()
-                .into_iter()
-                .next();
-            let cited_text = citing
-                .map(|c| {
-                    into_(&db, c, "SUPPORTS")
-                        .into_iter()
-                        .next()
-                        .map(|e| prop(&db, e, "statement"))
-                        .unwrap_or_default()
-                })
-                .unwrap_or_default();
-            let tasks: Vec<String> = out(&db, g, "GATES")
-                .into_iter()
-                .map(|t| format!("{} ({})", prop(&db, t, "objective"), prop(&db, t, "handle")))
-                .collect();
-            format!(
-                "{}, on {}\n  originally: {}\n  now requires: {}\n\nAmendments\nscientific  ({})\n  was: {}\n  now: {}\n  because: {}\n  citing: {}\n  needs re-running: {}\n\nOrdered from the record itself, not from timestamps.",
-                prop(&db, g, "handle"), prop(&db, newest, "handle"),
-                original.map(|o| prop(&db, o, "proposition")).unwrap_or_default(),
-                prop(&db, newest, "proposition"),
-                dec.map(|d| prop(&db, d, "handle")).unwrap_or_default(),
-                original.map(|o| prop(&db, o, "proposition")).unwrap_or_default(),
-                prop(&db, newest, "proposition"),
-                dec.map(|d| prop(&db, d, "reason")).unwrap_or_default(),
-                cited_text,
-                tasks.join(", "),
-            )
-        }),
+        "design" => rest.first().and_then(|h| by_handle(&db, h)).map(|g| design(&db, g)),
         // **Contradiction or dissociation?** Two claims asserting different
         // sentences about the same question agree unless their evidence bears
         // opposite ways -- so the report says which, and shows the question
