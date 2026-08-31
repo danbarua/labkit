@@ -1,3 +1,19 @@
+# PJ-034: the digest design, retired from `docs/` into the record
+
+**Moved here unchanged on 2026-09-01; it was `docs/digest-design.md` from
+2026-08-27.** Everything below this line is as it was, dated, and stays so.
+It was retired because a design document that carries its own status table is
+state in prose — the thing this repository keeps in one place and never in a
+sentence. What it still owed was filed the same day: #174 (its §3, the read
+that takes a criterion — still unbuilt, measured), #175 (its §7, the verbs it
+declined, closed as not planned so nobody rediscovers them), and #55 (its §5,
+`digest` itself, now the *every-45-minutes-on-Bonsai* read with the delta at
+its centre). Its §2 shipped as PR #72 and its §3's first half as #61 and #93.
+Session-log entries 050–057 and 065 refer to it by its old path; they are
+dated records and were not edited.
+
+---
+
 # `labkit digest` and the list-shaped queries — a design, for review
 
 **Written 2026-08-27; §2 and part of §3 shipped 2026-08-28.** This is the
