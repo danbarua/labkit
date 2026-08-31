@@ -824,6 +824,18 @@ session id is worth taking on the caller's word because it is checkable in
 principle against a bus that knows its sessions, and a commit is not checkable
 against anything. Asking for one would buy a value nothing could contradict.
 
+#### The vocabulary is the user's
+
+**`labkit why <handle>` is one verb whatever the handle names** — a claim, a
+task, an enquiry — and the dispatch on kind is the machine's job, not a flag
+the person learns. Dan, 2026-09-01: *we are not surfacing storage shape
+outwards; we are capturing intent at the CLI and answering that intent.* The
+tell that a flag vocabulary is forming is the same intent spelled twice —
+`why`, `--with-why`, `--in-context` were three spellings of *explain this* in
+one afternoon (#177), and the flags went. A new read earns a **verb a
+researcher would say**, or a case of one that exists; it does not earn a flag
+that names how the answer is stored.
+
 #### Colour is a parameter, not a global
 
 **Colour is a `Palette` a view is handed, never a module-level global**
