@@ -707,6 +707,8 @@ this document's original analysis are marked as such.
 | AJ | `(proposition, enquiry)` is a hidden entity | **story 15**° | open |
 | AK | The survey's strongest word ignored the standard its answer was held to | **S-19** | resolved |
 | AL | Findings aggregate over a proposition; a prespecified check belongs to one analysis | **S-10**, **S-19** | resolved |
+| AM | `replaceAnalysis` supersedes a whole analysis; a re-analysis may address only some of its conclusions | Bonsai #125 (`scripts/probe-bonsai-1a.sh`) | demonstrated |
+| AN | `gateStateFrom`'s four branches have no case for a retracted verdict; it falls through to `satisfied` | Bonsai #125 (`scripts/probe-bonsai-1a.sh`) | demonstrated |
 
 **Status vocabulary.** `open` — still exerting pressure. `resolved` — settled,
 with or without a model change. `refuted` — the predicted gap turned out not to
@@ -875,6 +877,33 @@ T's is **row O**. An owner from §4 is a live claim that the story would settle
 the row, and story 18 did: it was promoted and built as S-18. And an owner being built is not the same as it returning a verdict —
 row K's owner S-8 *was* built and gave none, which is recorded as a verdict in
 its own right rather than left as an omission.
+
+**AM — `replaceAnalysis` supersedes a whole analysis; a re-analysis may
+address only some of its conclusions.** Demonstrated 2026-08-31 by Bonsai's
+real Stage 1A re-verification (issue #125, transcribed in
+`scripts/probe-bonsai-1a.sh`): a log-scale re-analysis revisits 3 of a prior
+analysis's 4 conclusions, deliberately excluding the 4th
+(`DESIGN_v2_log_scale.md`: "stands as final"). `replace()` invalidates the
+whole analysis anyway — `why` reports the untouched claim `Superseded`,
+citing a review that never mentions it. This is the demonstrated row (issue
+#132) — the slot CLAUDE.md limits to one at a time, held by #81 until
+2026-08-31. Refutation condition: the untouched claim reads as standing, not
+superseded, after a partial replacement.
+
+**AN — `gateStateFrom`'s four branches have no case for a retracted
+verdict.** Found reviewing #135, reproduced independently of AM with a FULL,
+non-partial replacement — one criterion, one gate, one evaluation, fully
+re-addressed. `S-3c` added a fifth `CheckState`, `no-standing-verdict`, for a
+criterion whose only evaluation was retracted; `gateStateFrom`
+(`src/domain/read.ts:2032`) is still the four-branch precedence chain from
+before that state existed, and a check matching none of its three explicit
+branches falls into the `else` → `satisfied`. `gate <id>` reports
+`GATE_1 — satisfied`, listing the same condition as `no-standing-verdict`
+under "Not currently met" in the same report. Issue #137. Two rows
+`demonstrated` at once is a real tension with CLAUDE.md's one-at-a-time
+rule — flagged, not resolved here; which clears first is Dan's call.
+Refutation condition: a gate whose every verdict is retracted does not read
+`satisfied`.
 
 Each row's narrative is below, oldest verdict first. A row's `Status` is taken
 from its **latest** dated verdict; earlier verdicts are kept verbatim, because
