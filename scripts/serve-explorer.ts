@@ -17,10 +17,20 @@
  *
  * Usage:
  *
- *   bun scripts/serve-explorer.ts [--port 8850]
+ *   bun scripts/serve-explorer.ts [--port 8850] [--rust-traces <dir>]
  *
  * `LABKIT_PORT_EXPLORER` (see `bun run ports`) picks the port when `--port`
  * is not given, so two worktrees can run this at once without competing.
+ *
+ * `--rust-traces <dir>` (default `spikes/labkit-rust/traces`) additionally
+ * serves every `*.ndjson` file there as a `Trace` from the Rust/Grafeo port
+ * (labkit#119, #121) — a second, independently built model of the same
+ * domain, not a reference implementation and a copy of it. See
+ * `scripts/read-rust-traces.ts`'s header for why the two sometimes disagree
+ * on real questions (edge direction, which node kinds an edge connects) and
+ * why that's tagged rather than treated as one side being wrong. Missing or
+ * empty is not an error: the Rust port is a spike this checkout may not have
+ * built, and the TS traces are served regardless.
  */
 
 import { mkdtempSync, rmSync } from "node:fs";
@@ -31,6 +41,7 @@ import { COMPOSITIONS } from "../fragments/compositions";
 import { runComposition } from "../fragments/run";
 import type { Trace } from "../fragments/trace";
 import { worktreeName } from "../src/worktree";
+import { readRustTraces } from "./read-rust-traces";
 
 const args = process.argv.slice(2);
 const value = (name: string, fallback: string): string => {
@@ -38,6 +49,7 @@ const value = (name: string, fallback: string): string => {
   return i === -1 || i === args.length - 1 ? fallback : (args[i + 1] as string);
 };
 const port = Number(value("--port", process.env.LABKIT_PORT_EXPLORER ?? "8850"));
+const rustTracesDir = resolve(value("--rust-traces", join("spikes", "labkit-rust", "traces")));
 
 const home = mkdtempSync(join(tmpdir(), "labkit-explorer-"));
 process.on("exit", () => rmSync(home, { recursive: true, force: true }));
@@ -48,8 +60,14 @@ for (const composition of COMPOSITIONS) {
   const dir = mkdtempSync(join(home, "run-"));
   traces.push(await runComposition(composition, dir));
 }
+
+const rustTraces = await readRustTraces(rustTracesDir);
+traces.push(...rustTraces);
+
 const totalSteps = traces.reduce((n, t) => n + t.steps.length, 0);
-console.error(`OK: ${traces.length} traces, ${totalSteps} steps total.`);
+console.error(
+  `OK: ${traces.length} traces (${rustTraces.length} from ${rustTracesDir}), ${totalSteps} steps total.`,
+);
 
 const staticRoot = resolve(import.meta.dir, "..", "explorer");
 const MIME: Record<string, string> = {

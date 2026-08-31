@@ -63,6 +63,11 @@ target/
 # `Cargo.lock` is NOT ignored: the spike ships a binary, and a binary's build
 # should be reproducible for the same reason `bun.lock` is tracked.
 
+# `LABKIT_TRACE_OUT` output (labkit#119, #121) — generated per-run, read by
+# scripts/serve-explorer.ts's --rust-traces. Same rule as everything else this
+# repo generates: into the running program, not into the tree.
+spikes/labkit-rust/traces/
+
 # Grafeo writes a database directory named for the path it was given. A probe
 # run without `--db` leaves one at the repo root; `local:` is the bus inbox
 # landing in the same place.
