@@ -207,7 +207,10 @@ export class ReadSurface extends SessionCore {
    */
   async whatWasKnown(at: Timestamp): Promise<HistoricalSurvey> {
     const parsed = Date.parse(at);
-    if (Number.isNaN(parsed)) throw new Error(`whatWasKnown: "${at}" is not a parseable instant`);
+    if (Number.isNaN(parsed))
+      throw new Error(
+        `whatWasKnown expected an ISO instant like 2026-07-15T12:34:56.000Z, got "${at}"`,
+      );
     const asOf = new Date(parsed).toISOString();
 
     // Composed from a time-scoped standing fact. `whatIsKnown` and this verb
@@ -363,7 +366,10 @@ export class ReadSurface extends SessionCore {
       { id: enquiry },
     );
     const loe = named[0];
-    if (!loe) throw new Error(`no enquiry ${enquiry}`);
+    if (!loe)
+      throw new Error(
+        `no enquiry ${enquiry}; an enquiry is opened against a question, and 'search' finds its handle by the approach it was opened with`,
+      );
 
     // Closure attaches to the question the enquiry pursues, not to the
     // enquiry itself -- an enquiry is a way of pursuing a question, and it is
@@ -614,7 +620,10 @@ export class ReadSurface extends SessionCore {
       { id: work },
     );
     const task = rows[0]?.t;
-    if (!task) throw new Error(`no planned work ${work}`);
+    if (!task)
+      throw new Error(
+        `no planned work ${work}; work is planned before it can be read back, and 'search' finds its handle by the objective`,
+      );
 
     // No fallback, and that is checked rather than assumed. `planWork` writes
     // `mayRead: input.mayRead ?? []`, so the property is always present and an
@@ -674,7 +683,10 @@ export class ReadSurface extends SessionCore {
       { id: verification },
     );
     const found = link[0];
-    if (!found) throw new Error(`analysis ${verification} re-verifies nothing`);
+    if (!found)
+      throw new Error(
+        `analysis ${verification} re-verifies nothing; a reproduction report is about a re-verification, so name one recorded by 'reverify'`,
+      );
 
     const method = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
@@ -826,7 +838,10 @@ export class ReadSurface extends SessionCore {
       },
       { id: gate },
     );
-    if (conditions.length === 0) throw new Error(`gate ${gate} is governed by no condition`);
+    if (conditions.length === 0)
+      throw new Error(
+        `gate ${gate} is governed by no condition; a design history is the record of its conditions being amended, and this gate has none to amend`,
+      );
 
     // The two maps used to say `Map<string, string>` with `// decision ->
     // criterion it replaced` beside one of them. The comment was a type written
@@ -987,7 +1002,10 @@ export class ReadSurface extends SessionCore {
       { id: gate },
     );
     const found = declared[0];
-    if (!found) throw new Error(`no gate ${gate}`);
+    if (!found)
+      throw new Error(
+        `no gate ${gate}; a gate is declared over a criterion and the work it protects, and 'search' finds its handle by the consequence`,
+      );
 
     // Every governing criterion with the evaluations that pertain to THIS
     // gate. Two scopes are deliberately kept apart, and S-17 plus S-3
@@ -1137,7 +1155,10 @@ export class ReadSurface extends SessionCore {
     // the other chain's claim and its decision. Same text is not same claim,
     // which is this repo's oldest lesson arriving from an external review.
     const proposition = await this.assertedBy(claim);
-    if (proposition === undefined) throw new Error(`no claim ${claim}`);
+    if (proposition === undefined)
+      throw new Error(
+        `no claim ${claim}; a claim exists once an analysis concludes it, and 'search' turns its proposition into a handle`,
+      );
     const steps: Revision[] = [];
     let current: ConcludedClaim[] = [{ claim, asserts: proposition }];
 
@@ -1186,7 +1207,9 @@ export class ReadSurface extends SessionCore {
 
       for (const w of withdrew) {
         if (seen.has(w.claim))
-          throw new Error(`interpretation history for "${proposition}" loops at "${w.asserts}"`);
+          throw new Error(
+            `interpretation history for "${proposition}" loops at "${w.asserts}"; a narrowing chain must not revisit a claim, so this history cannot be walked`,
+          );
         seen.add(w.claim);
       }
 
@@ -1644,7 +1667,10 @@ export class ReadSurface extends SessionCore {
       { c: vertexProps<{ natural_id: string }>() },
       { id: analysis },
     );
-    if (subject.length === 0) throw new Error(`no analysis ${analysis}`);
+    if (subject.length === 0)
+      throw new Error(
+        `no analysis ${analysis}; an analysis is recorded before it can be read back, and 'search' finds its handle by the method`,
+      );
 
     const parts = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
@@ -1931,7 +1957,10 @@ export class ReadSurface extends SessionCore {
       { a: vertexProps<{ natural_id: string }>() },
       { name },
     );
-    if (rows.length === 0) throw new Error(`no artefact named "${name}"`);
+    if (rows.length === 0)
+      throw new Error(
+        `no artefact named "${name}"; observations are named when recorded — 'search' finds one by its name or finding`,
+      );
     if (rows.length > 1) {
       throw new Error(
         `${rows.length} artefacts are named "${name}"; name which, by the record that produced it`,
