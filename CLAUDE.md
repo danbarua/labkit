@@ -1235,7 +1235,11 @@ did not:
    PJ-008b, a *capability* change — a new verb, or an edge that exists so a
    question can be asked at all — is instead earned by a **demonstrated
    consumer need**: a real user or agent asked, and the record could not
-   answer. `search` (#155) is the precedent. Only a confidently incorrect
+   answer. `search` (#155) is the precedent. The test to put to every
+   speculative modelling question, in Dan's words (2026-09-01): **would this
+   have saved the user weeks of frustration and cost building it in Markdown
+   + Git, when he never asked for JIRA in Markdown + Git?** A read that saves
+   one command and zero reading fails it. Only a confidently incorrect
    answer shows the model claiming something it cannot support. The same rule read
    from the other side: **a refusal needs something real to refuse.** S-5's
    decline-rather-than-guess pattern applies to a verb a caller would
