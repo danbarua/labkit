@@ -178,6 +178,7 @@ describe("a composition writes the record its moves describe", () => {
           edges: [{ from: "Q_9", label: "MOTIVATES", to: "LOE_9" }],
           detail: {},
           command: "labkit pose",
+          derived: [],
         },
       ],
     };

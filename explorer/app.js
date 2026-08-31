@@ -20,6 +20,9 @@ const scenarioSelect = document.getElementById("scenario");
 const progressFill = document.getElementById("progress-fill");
 const speedInput = document.getElementById("speed");
 const playBtn = document.getElementById("play");
+const derivedAct = document.getElementById("derived-act");
+const derivedDelta = document.getElementById("derived-delta");
+const derivedChanges = document.getElementById("derived-changes");
 
 const state = {
   traces: [],
@@ -28,13 +31,31 @@ const state = {
   playing: false,
   speed: Number(speedInput.value),
   view: "2d",
+  overlay: "structural", // "structural" | "standing" | "temporal"
   nodes: new Map(), // handle -> node
   edges: [], // {from, to, label}
   hoverHandle: null,
   screenPos: new Map(), // handle -> {x, y} last-projected screen position, for hit testing
   camera: { yaw: 0.5, pitch: -0.35, distance: 620 },
   drag: null,
+  lastStepSeq: null, // seq of the most recently applied step, for the temporal overlay
+  lastTouched: new Set(), // handles created, connected, or named as subject by the last step
 };
+
+const STANDING_COLOR = {
+  open: "hsl(178deg 60% 60%)",
+  answered: "hsl(140deg 55% 62%)",
+  "accepted-as-unresolved": "hsl(38deg 65% 62%)",
+  abandoned: "hsl(220deg 10% 55%)",
+  "never-evaluated": "hsl(220deg 10% 45%)",
+  incomplete: "hsl(38deg 65% 62%)",
+  blocked: "hsl(350deg 60% 65%)",
+  satisfied: "hsl(140deg 55% 62%)",
+};
+const STANDING_UNKNOWN = "hsl(220deg 12% 38%)"; // a kind derive.ts doesn't snapshot yet (only enquiry/gate today)
+const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
+const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
+const TEMPORAL_HISTORICAL = "hsl(220deg 10% 34%)";
 
 const ZSPACING = 46; // px of depth per step, in 3D
 const FOCAL = 640;
@@ -46,6 +67,20 @@ function colorFor(kind) {
     KIND_COLOR[kind] = `hsl(${hue.toFixed(0)}deg 70% 68%)`;
   }
   return KIND_COLOR[kind];
+}
+
+// Three orthogonal readings of the same node, per the ChatGPT review this
+// session acted on: structural (what kind of thing), standing (what LabKit
+// currently says about it — only known for enquiries and gates, the two
+// kinds fragments/derive.ts snapshots), and temporal (when it last changed).
+function colorForNode(node) {
+  if (state.overlay === "standing") return STANDING_COLOR[node.standing] ?? STANDING_UNKNOWN;
+  if (state.overlay === "temporal") {
+    if (node.createdStep === state.lastStepSeq) return TEMPORAL_CREATED;
+    if (state.lastTouched.has(node.handle)) return TEMPORAL_TOUCHED;
+    return TEMPORAL_HISTORICAL;
+  }
+  return colorFor(node.label);
 }
 
 function resizeCanvas() {
@@ -85,10 +120,13 @@ function resetRun() {
   state.nodes.clear();
   state.edges = [];
   state.playing = false;
+  state.lastStepSeq = null;
+  state.lastTouched = new Set();
   playBtn.textContent = "▶";
   playBtn.classList.remove("playing");
   renderQueue();
   updateProgress();
+  renderDerivedPanel();
 }
 
 // One step: mint nodes at a random position near the graph's current
@@ -116,6 +154,16 @@ function applyStep(step) {
     const node = state.nodes.get(step.subject);
     if (node) node.concluded = true;
   }
+  for (const item of step.derived) {
+    const node = state.nodes.get(item.handle);
+    if (node) node.standing = item.state;
+  }
+  state.lastStepSeq = step.seq;
+  state.lastTouched = new Set([
+    step.subject,
+    ...step.created.map((c) => c.handle),
+    ...step.edges.flatMap((e) => [e.from, e.to]),
+  ]);
 }
 
 function centroid() {
@@ -140,14 +188,27 @@ function next() {
   state.step++;
   renderQueue();
   updateProgress();
+  renderDerivedPanel();
 }
 
 // ---------------------------------------------------------------- queue panel
 
+// Groups consecutive steps by which fragments/compositions.ts move produced
+// them (fragments/tagged.ts stamps this at record time). A step with no
+// fragment -- a composition run against ./index directly -- gets no header.
 function renderQueue() {
   queueList.innerHTML = "";
   if (!state.current) return;
+  let lastFragment;
   for (const [i, step] of state.current.steps.entries()) {
+    if (step.fragment && step.fragment !== lastFragment) {
+      const header = document.createElement("li");
+      header.className = "queue-group";
+      header.textContent = step.fragment;
+      queueList.appendChild(header);
+    }
+    lastFragment = step.fragment;
+
     const li = document.createElement("li");
     li.className = i < state.step ? "done" : i === state.step ? "current" : "";
     const n = document.createElement("span");
@@ -158,14 +219,69 @@ function renderQueue() {
     li.title = step.command;
     queueList.appendChild(li);
   }
-  const activeLi = queueList.children[Math.min(state.step, queueList.children.length - 1)];
-  activeLi?.scrollIntoView({ block: "nearest" });
+  const activeStepLi = [...queueList.querySelectorAll("li:not(.queue-group)")][
+    Math.min(state.step, state.current.steps.length - 1)
+  ];
+  activeStepLi?.scrollIntoView({ block: "nearest" });
 }
 
 function updateProgress() {
   const total = state.current?.steps.length ?? 0;
   const pct = total === 0 ? 0 : (100 * state.step) / total;
   progressFill.style.width = `${pct}%`;
+}
+
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+
+// The Explorer's answer to the ChatGPT review's "two simultaneous views":
+// the physical mutation an act made (RECORD DELTA, straight off the event)
+// next to what LabKit now says about the research (DERIVED CHANGES, from
+// fragments/derive.ts's per-step snapshots). They can and do disagree in
+// count -- a step can write eight edges and change no enquiry's closure.
+function renderDerivedPanel() {
+  const step = state.current && state.step > 0 ? state.current.steps[state.step - 1] : null;
+  if (!step) {
+    derivedAct.innerHTML = "<h3>act</h3><div class=\"empty\">no steps applied yet</div>";
+    derivedDelta.innerHTML = "<h3>record delta</h3>";
+    derivedChanges.innerHTML = "<h3>derived changes</h3>";
+    return;
+  }
+
+  derivedAct.innerHTML = `
+    <h3>act</h3>
+    <div><span class="act-op">${esc(step.operation)}</span> <span class="act-subject">${esc(step.subject)}</span></div>
+    <div class="act-command">${esc(step.command)}</div>
+  `;
+
+  const createdLines = step.created
+    .map((c) => `<div class="delta-line"><span class="plus">+</span> ${esc(c.label)} ${esc(c.handle)}</div>`)
+    .join("");
+  const edgeLines = step.edges
+    .map(
+      (e) =>
+        `<div class="delta-line"><span class="plus">+</span> ${esc(e.from)} -[<span class="edge-label">${esc(e.label)}</span>]-&gt; ${esc(e.to)}</div>`,
+    )
+    .join("");
+  derivedDelta.innerHTML =
+    step.created.length || step.edges.length
+      ? `<h3>record delta</h3>${createdLines}${edgeLines}`
+      : `<h3>record delta</h3><div class="empty">nothing minted</div>`;
+
+  if (!step.derived.length) {
+    derivedChanges.innerHTML = `<h3>derived changes</h3><div class="empty">nothing derived tracks yet (only enquiries and gates)</div>`;
+  } else {
+    const lines = step.derived
+      .map((d) => {
+        const label = d.kind === "gate" ? "Gate" : "Enquiry";
+        if (d.changed) {
+          const from = d.from ? `${esc(d.from)} <span class="arrow">→</span> ` : "";
+          return `<div class="change-line changed"><span class="kind">${label}</span> ${esc(d.handle)}  ${from}${esc(d.state)}</div>`;
+        }
+        return `<div class="change-line unchanged"><span class="kind">${label}</span> ${esc(d.handle)}  unchanged: ${esc(d.state)}</div>`;
+      })
+      .join("");
+    derivedChanges.innerHTML = `<h3>derived changes</h3>${lines}`;
+  }
 }
 
 // ---------------------------------------------------------------- physics
@@ -296,7 +412,7 @@ function render() {
     const isHover = handle === state.hoverHandle;
 
     ctx.globalAlpha = node.alpha;
-    ctx.fillStyle = colorFor(node.label);
+    ctx.fillStyle = colorForNode(node);
     ctx.beginPath();
     ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
     ctx.fill();
@@ -360,11 +476,18 @@ speedInput.addEventListener("input", () => {
   state.speed = Number(speedInput.value);
 });
 
-for (const btn of document.querySelectorAll(".view-toggle button")) {
+for (const btn of document.querySelectorAll("#view-toggle button")) {
   btn.addEventListener("click", () => {
     state.view = btn.dataset.view;
-    for (const b of document.querySelectorAll(".view-toggle button")) b.classList.toggle("active", b === btn);
+    for (const b of document.querySelectorAll("#view-toggle button")) b.classList.toggle("active", b === btn);
     hint.textContent = state.view === "3d" ? "drag to orbit · scroll to zoom · z = step sequence" : "";
+  });
+}
+
+for (const btn of document.querySelectorAll("#overlay-toggle button")) {
+  btn.addEventListener("click", () => {
+    state.overlay = btn.dataset.overlay;
+    for (const b of document.querySelectorAll("#overlay-toggle button")) b.classList.toggle("active", b === btn);
   });
 }
 

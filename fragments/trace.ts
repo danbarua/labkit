@@ -23,6 +23,20 @@
 
 import { labelForNaturalId } from "../src/db/domain";
 import type { EventSink, DomainEvent, MintedEdge } from "../src/domain";
+import type { DerivedSnapshot, StepProvenance } from "./derive";
+
+/**
+ * One entity's researcher-language state at a step, and whether this step
+ * changed it — see `fragments/derive.ts`'s header for why this is a
+ * different question from `created`/`edges`.
+ */
+export interface DerivedItem {
+  kind: "enquiry" | "gate";
+  handle: string;
+  state: string;
+  changed: boolean;
+  from?: string;
+}
 
 /** One act, and what it did to the graph. */
 export interface TraceStep {
@@ -42,6 +56,10 @@ export interface TraceStep {
   detail: Record<string, unknown>;
   /** For display. See the file header — not a runnable command. */
   command: string;
+  /** Which `fragments/index.ts` move produced this step, if any composition was tagged (`fragments/tagged.ts`). */
+  fragment?: string;
+  /** Every known enquiry and gate's state after this step, and which of them this step changed. */
+  derived: DerivedItem[];
 }
 
 export interface Trace {
@@ -72,24 +90,66 @@ export function commandOf(e: DomainEvent): string {
  * Ordered by `seq`, which every sink assigns since `f4db3a0` — before that the
  * in-memory one left it undefined and this would have had only array order to
  * go on.
+ *
+ * `provenance` is optional so a caller with no derived-state tracking (a
+ * fragment run directly against `./index` rather than `./tagged`) still gets
+ * a trace — every step's `derived` is simply empty and `fragment` absent.
  */
-export async function traceOf(name: string, events: EventSink): Promise<Trace> {
+export async function traceOf(
+  name: string,
+  events: EventSink,
+  provenance?: ReadonlyMap<number, StepProvenance>,
+): Promise<Trace> {
   const stream = [...(await events.all())].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+  let previous: DerivedSnapshot = { enquiries: [], gates: [] };
   return {
     name,
-    steps: stream.map((e) => ({
-      seq: e.seq ?? 0,
-      operation: e.operation,
-      subject: e.subject,
-      created: (e.created ?? []).map((handle) => ({
-        handle,
-        label: labelForNaturalId(handle),
-      })),
-      edges: [...(e.edges ?? [])],
-      detail: e.detail ?? {},
-      command: commandOf(e),
-    })),
+    steps: stream.map((e) => {
+      const seq = e.seq ?? 0;
+      const snapshot = provenance?.get(seq)?.derived;
+      const derived = snapshot ? diffDerived(previous, snapshot) : [];
+      if (snapshot) previous = snapshot;
+      return {
+        seq,
+        operation: e.operation,
+        subject: e.subject,
+        created: (e.created ?? []).map((handle) => ({
+          handle,
+          label: labelForNaturalId(handle),
+        })),
+        edges: [...(e.edges ?? [])],
+        detail: e.detail ?? {},
+        command: commandOf(e),
+        fragment: provenance?.get(seq)?.fragment,
+        derived,
+      };
+    }),
   };
+}
+
+/** State a gate or enquiry snapshot reads as, in the researcher's own vocabulary. */
+function gateState(g: { state: string }): string {
+  return g.state;
+}
+function enquiryState(q: { open: boolean; closure: string | null }): string {
+  return q.closure ?? (q.open ? "open" : "closed");
+}
+
+function diffDerived(previous: DerivedSnapshot, next: DerivedSnapshot): DerivedItem[] {
+  const items: DerivedItem[] = [];
+  for (const gate of next.gates) {
+    const before = previous.gates.find((g) => g.handle === gate.handle);
+    const state = gateState(gate);
+    const from = before ? gateState(before) : undefined;
+    items.push({ kind: "gate", handle: gate.handle, state, changed: from !== state, from });
+  }
+  for (const enquiry of next.enquiries) {
+    const before = previous.enquiries.find((q) => q.handle === enquiry.handle);
+    const state = enquiryState(enquiry);
+    const from = before ? enquiryState(before) : undefined;
+    items.push({ kind: "enquiry", handle: enquiry.handle, state, changed: from !== state, from });
+  }
+  return items;
 }
 
 /**
