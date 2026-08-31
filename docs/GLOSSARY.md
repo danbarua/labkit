@@ -20,7 +20,8 @@ or ranges — see CLAUDE.md, "The one rule about documents".
 | Term | Means | Defined in |
 | --- | --- | --- |
 | **PJ-NNN** | A project-journal entry — a decision and its reasoning | `docs/project-journal/` |
-| **the ledger** | PJ-008 §3's table of design pressure on the model. Authoritative on what the model knows | `docs/project-journal/008_user_story_mining.md` §3 |
+| **the ledger** | PJ-008 §3's table of design pressure on the model — **closed as a dated record on 2026-08-31**; findings live in issues, and the one demonstrated-wrong-answer slot is the project board's P0 column | PJ-008b, `docs/project-journal/008b_appendix_the_corpus_era_closes.md` |
+| **the corpus era / the usage era** | Before and after PJ-008b: validating the model against authored scenarios, then building it against a real record and real use | PJ-008b |
 | **S-N** (S-3, S-9b…) | A scenario from PJ-008's corpus, built as an executable conversation. Letters mark variants built later | PJ-008 §2, `tests/scenarios/` |
 | **row X** | One row of the ledger — one predicted or found gap in the model | PJ-008 §3 |
 | **D1 / D2 / D3** | **Designer 1/2/3** — the three cold-context designers of the consumer-contract exercise. 1 = `claude-opus-5`, 2 = `gpt-5.6-sol`, 3 = `grok-4.6`. **Beware:** `D1`/`D2` also appear in PJ-001 and PJ-003 as *Decision* nodes in ASCII diagrams. Different thing entirely | `docs/consumer-contract/020_synthesis_blinded.md` |
@@ -52,7 +53,9 @@ it).
 
 | Term | Means | Defined in |
 | --- | --- | --- |
-| **§5** | PJ-011 §5: a model change needs a **demonstrated wrong answer**, not an empty result. An unanswerable question earns nothing | CLAUDE.md, "Changing the graph model" |
+| **§5** | PJ-011 §5: a **correctness** change to the model needs a **demonstrated wrong answer**, not an empty result. Since PJ-008b that is one of **two bars** — a **capability** change is earned by a **demonstrated consumer need** instead | CLAUDE.md, "Changing the graph model" |
+| **the usage-era bar** | Dan's test for every speculative modelling question: *would this have saved the user weeks of frustration and cost building it in Markdown + Git, when he never asked for JIRA in Markdown + Git?* A read that saves one command and zero reading fails it | CLAUDE.md, same section |
+| **the slot / the one-wrong-answer rule** | At most one demonstrated wrong answer ships green at a time, and clearing it is the next thing built. Its state is the board's P0 | CLAUDE.md, "When a deferral stops being acceptable"; PJ-008b |
 | **bar 1–3** | The original three: a wrong answer without the change; an empty result is not one; a new edge needs a reader, not just a writer | CLAUDE.md, same section |
 | **bar 4** | *Contract necessity* — does losing this distinction prevent or corrupt a read the frozen consumer contract requires? Weaker than §5: *prevent* covers absence | `docs/consumer-contract/023` §3 |
 | **the change bar / the rungs** | The order a remedy must be tried in: reader semantics → existing relationships → new relationship, property or reference → a new noun only if unavoidable | CLAUDE.md, "Changing the graph model" |
@@ -62,9 +65,38 @@ it).
 `open` + owned / `open` + unowned / `demonstrated` / `resolved` /
 `resolved (argued)` / `refuted` / `boundary`.
 
-**Defined in PJ-008 §3's Kind table, and which row is which is in §3's index
-table.** Neither is copied here; a status written in two places is what
-CLAUDE.md's document rule exists to stop.
+**Defined in PJ-008 §3's Kind table, historical since PJ-008b closed the
+ledger.** The rows still read with these words; nothing new is written in them.
+`demonstrated` now means *the board's P0 issue*; `open` means an `open question`
+issue, Parked.
+
+## The record, and what is said about it
+
+Shorthand from the Bonsai work (#124) and the verbs it earned.
+
+| Term | Means | Defined in |
+| --- | --- | --- |
+| **the record / the live record** | `~/Code/pycharm/bonsai-2026/.labkit/` — the real research programme LabKit was built for, entered as a LabKit record. Not synthetic, not a fixture | #124 |
+| **script-derived** | The live record is exactly what the four `scripts/probe-bonsai-*.sh` produce, and is rebuilt from them rather than repaired in place | #157, `scripts/probe-bonsai-replay.sh` |
+| **the replay checker** | Replays the four scripts into a fresh directory and byte-diffs `happened` and `known` against the live record. OK / FAILED / ERROR are three different outcomes | `scripts/probe-bonsai-replay.sh` |
+| **a snapshot** | A dated copy of `.labkit/` taken at a milestone, outside both repositories, never updated in place | `~/labkit-snapshots/`, #129 |
+| **minted / `created`** | What a write act brought into existence. *A verb that mints something returns what it minted* — every write returns its events, and `created` on the event is the drained list, so a return type cannot under-report | #161, `WriteSurface.emit` |
+| **measured vs asserted** (a verdict) | An evaluation resting on cited evidence versus one citing nothing. Empty `basis` means asserted. `gate` prints the difference since #151; a measured quality-bar check still records as asserted because a verdict can cite only a claim | S-8, `Verdict.basis`, #150 |
+| **observed vs claimed** (attribution) | Whether LabKit saw who acted or was told. `--author` is claimed. Time has the same split: `at` is the claimed instant (`--date` can set it), `seq` the observed order the store assigned | #81, #154 |
+| **standard vs hypothesis** (a criterion) | A criterion is the quality bar a result is *held to*, which passes or fails whichever way the science comes out — *primary, median and sign-flip agree at the locked bound*. It is not the hypothesis under test; direction lives in a conclusion's `bearing` | PR #147's review; `.claude/skills/compose-scenario` |
+| **a three-part refusal** | Every refusal names what was expected, what it got, and what would satisfy it, and may name a concept or a verb both surfaces spell the same — never a command | `ReadSurface` doc comment, `src/domain/read.ts`; #164, #169 |
+| **partial supersession** | A re-analysis that revisits some of a prior analysis's conclusions and says nothing about the rest. `replace` retracts all of them today (#132, the demonstrated wrong answer); the fix is #173 | #132, #173 |
+| **`conclude`** | The proposed primitive under `analyse`/`replace`/`reverify`: one conclusion per call, so a compound act is built by successive handle-carrying calls rather than described in a JSON blob | #173 |
+
+## The Explorer, and what it draws
+
+| Term | Means | Defined in |
+| --- | --- | --- |
+| **a move / a fragment** | One composable research action over `WriteSurface`, returning the handles the next move needs — `askAndPursue`, `gatedWork`, `replaceAnalysis`… Adds no verbs and no ontology | `fragments/index.ts` |
+| **a composition / an arc** | A named sequence of moves run against a real database to produce a trace; not an acceptance scenario, and must not become one | `fragments/compositions.ts`, `.claude/skills/compose-scenario` |
+| **a trace** | The steps a picture is drawn from: per act, what it created, which edges, the derived state afterwards. Never hand-written; read off the event sink | `fragments/trace.ts` |
+| **origin** (`labkit-ts` / `labkit-rust` / `labkit-db`) | Which producer a trace came from: the TypeScript domain run fresh, the Rust/Grafeo port, or a real record read back from its durable log. The Explorer badges it so a rehearsal is never mistaken for someone's research | `Trace.origin`, `fragments/trace.ts` |
+| **derived state** | What LabKit's own reports say about an enquiry or gate after a step, as distinct from the nodes and edges the step wrote — the two can and do disagree in count | `fragments/derive.ts`, the Explorer's bottom panel |
 
 ## Method
 
