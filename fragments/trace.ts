@@ -65,15 +65,21 @@ export interface TraceStep {
 export interface Trace {
   name: string;
   /**
-   * Which implementation produced this trace. Two independent models of the
-   * same domain exist now — this TS/Postgres one and the Rust/Grafeo spike
-   * (#114) — and they diverge on real questions (edge direction, which node
-   * kinds an edge connects) that neither side has settled as "correct". The
-   * Explorer renders both; this field is what stops a viewer mistaking one
-   * model's trace for the other's, which matters exactly because they
-   * disagree sometimes.
+   * Which implementation, or which kind of record, produced this trace.
+   *
+   * `"labkit-ts"` and `"labkit-rust"` are two independent implementations of
+   * the same domain (#114) and diverge on real questions — edge direction,
+   * which node kinds an edge connects — that neither side has settled as
+   * "correct". `"labkit-db"` (#124/#126) is a different axis entirely: not a
+   * different implementation, but a real record built through the CLI or MCP
+   * server over real time, read back from its durable `pgEventLog` rather
+   * than run fresh in a temp directory. A composition is a rehearsal; this is
+   * the thing being rehearsed for. The Explorer must not present one as the
+   * other, for the same reason it tags the two implementations — a viewer
+   * needs to know whether they're looking at a scripted arc or somebody's
+   * actual research.
    */
-  origin: "labkit-ts" | "labkit-rust";
+  origin: "labkit-ts" | "labkit-rust" | "labkit-db";
   steps: TraceStep[];
 }
 

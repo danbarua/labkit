@@ -99,6 +99,13 @@ window.addEventListener("resize", resizeCanvas);
 
 // ---------------------------------------------------------------- data
 
+const ORIGIN_TAG = { "labkit-rust": "[rust] ", "labkit-db": "[db] " };
+const ORIGIN_LABEL = {
+  "labkit-rust": "rust/grafeo model",
+  "labkit-db": "real record",
+  "labkit-ts": "TS domain model",
+};
+
 async function loadTraces() {
   const res = await fetch("/api/traces");
   state.traces = await res.json();
@@ -106,18 +113,20 @@ async function loadTraces() {
   for (const [i, trace] of state.traces.entries()) {
     const opt = document.createElement("option");
     opt.value = String(i);
-    const badge = trace.origin === "labkit-rust" ? "[rust] " : "";
+    const badge = ORIGIN_TAG[trace.origin] ?? "";
     opt.textContent = `${badge}${trace.name}  (${trace.steps.length} steps)`;
     scenarioSelect.appendChild(opt);
   }
   selectTrace(0);
 }
 
-// Two independent models of the same domain can be in this list -- the TS
-// domain and the Rust/Grafeo spike (labkit#119) -- and they don't always
-// agree on things like edge direction. originBadge keeps that visible
-// throughout the run, not just in the picker, so nobody mistakes one for a
-// correction of the other mid-playback.
+// Three kinds of trace can be in this list -- the TS domain, the Rust/Grafeo
+// spike (labkit#119), and a real record read from a live .labkit/ (#124,
+// #126) -- and none of them is a correction of another: the first two are
+// independent implementations that don't always agree (edge direction), and
+// the third isn't a composition at all, just something that actually
+// happened. originBadge keeps which one is showing visible throughout the
+// run, not just in the picker.
 function originBadge() {
   return document.getElementById("origin-badge");
 }
@@ -127,9 +136,10 @@ function selectTrace(index) {
   scenarioSelect.value = String(index);
   const badge = originBadge();
   if (badge) {
-    const isRust = state.current?.origin === "labkit-rust";
-    badge.textContent = isRust ? "rust/grafeo model" : "TS domain model";
-    badge.classList.toggle("rust", isRust);
+    const origin = state.current?.origin ?? "labkit-ts";
+    badge.textContent = ORIGIN_LABEL[origin] ?? origin;
+    badge.classList.toggle("rust", origin === "labkit-rust");
+    badge.classList.toggle("db", origin === "labkit-db");
   }
   resetRun();
 }
