@@ -25,8 +25,9 @@ const derivedDelta = document.getElementById("derived-delta");
 const derivedChanges = document.getElementById("derived-changes");
 
 // Exposed on window for browser-console debugging only -- not read by any
-// production code path, and safe to leave: nothing else on the page reads
-// window.__labkitExplorerState.
+// production code path. window.__labkitExplorer.state (below) is the same
+// object; this direct alias exists because it was the first thing built and
+// nothing stops working if both stay reachable.
 const state = (window.__labkitExplorerState = {
   traces: [],
   current: null,
@@ -240,11 +241,7 @@ function renderQueue() {
 
     const li = document.createElement("li");
     li.className = i < state.step ? "done" : i === state.step ? "current" : "";
-    const n = document.createElement("span");
-    n.className = "n";
-    n.textContent = String(i + 1);
-    li.appendChild(n);
-    li.appendChild(document.createTextNode(` ${step.command}`));
+    li.innerHTML = `<span class="n">${i + 1}</span> ${formatCommand(step.command)}`;
     li.title = step.command;
     queueList.appendChild(li);
   }
@@ -261,6 +258,73 @@ function updateProgress() {
 }
 
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+
+// A handle looks like PREFIX_digits -- Q_1, LOE_12, CEVAL_3 -- across every
+// label src/db/domain.ts declares. Not imported from there: the frontend has
+// no build step to pull it through, and the shape is stable enough (a
+// natural-id prefix is always uppercase letters, always followed by
+// underscore-digits) that duplicating the pattern here costs less than wiring
+// up a fetch for a list that only ever gets checked against, never rendered.
+const HANDLE = /^[A-Z]+_\d+$/;
+const isHandle = (s) => HANDLE.test(s);
+
+// Splits `labkit <verb> --flag "value" --flag2 [...]` into one line per flag,
+// colouring the verb, every handle-shaped value, and (in the delta/queue
+// columns only) leaving prose as the reader's own colour -- the same
+// three-way split record-delta already draws between a `+`, an edge label,
+// and the plain node/handle text either side of it. Untouched by a formatter
+// change if the flag ever adds a value shape this hasn't seen: unrecognised
+// tokens render as plain text rather than throwing.
+//
+// Prose values (the common case: --because, --method, --proposition, most of
+// what a research act actually says) get their own line, word-wrapped by the
+// browser's own line-wrapping rather than measured here -- CSS white-space
+// handles that, and there is no case where re-implementing it would be more
+// correct than what the renderer already does for free.
+function formatCommand(command) {
+  const parts = command.split(/(?=--[a-z-]+ )/);
+  const head = parts.shift() ?? command;
+  const verbMatch = head.match(/^(labkit) (\S+)/);
+  const headHtml = verbMatch
+    ? `${esc(verbMatch[1])} <span class="cmd-verb">${esc(verbMatch[2])}</span>`
+    : esc(head);
+
+  const flagHtml = (part) => {
+    const m = part.match(/^(--[a-z-]+) (.*)$/s);
+    if (!m) return `  ${esc(part.trim())}`;
+    const [, flag, rawValue] = m;
+    return `\n  ${esc(flag)} ${formatValue(rawValue.trim())}`;
+  };
+
+  return [headHtml, ...parts.map(flagHtml)].join("");
+}
+
+// A flag's value is one of: a bare handle in quotes ("CRIT_1"), a prose
+// string in quotes, or a JSON array of either -- commandOf() never emits
+// anything else. Handles are coloured; prose passes through escaped.
+function formatValue(value) {
+  const quoted = value.match(/^"(.*)"$/s);
+  if (quoted) {
+    const inner = quoted[1];
+    return isHandle(inner) ? `"${handleSpan(inner)}"` : `"${esc(inner)}"`;
+  }
+  const array = value.match(/^\[(.*)\]$/s);
+  if (array) {
+    // JSON.parse rather than a split: an array element can itself contain a
+    // comma ("degree-preserving rewiring, matched-sparsity random, ..."),
+    // and splitting on "," would cut it apart.
+    try {
+      const items = JSON.parse(value);
+      const rendered = items.map((v) => `"${isHandle(v) ? handleSpan(v) : esc(v)}"`);
+      return `[${rendered.join(", ")}]`;
+    } catch {
+      return esc(value);
+    }
+  }
+  return isHandle(value) ? handleSpan(value) : esc(value);
+}
+
+const handleSpan = (h) => `<span class="cmd-handle">${esc(h)}</span>`;
 
 // The Explorer's answer to the ChatGPT review's "two simultaneous views":
 // the physical mutation an act made (RECORD DELTA, straight off the event)
@@ -279,7 +343,7 @@ function renderDerivedPanel() {
   derivedAct.innerHTML = `
     <h3>act</h3>
     <div><span class="act-op">${esc(step.operation)}</span> <span class="act-subject">${esc(step.subject)}</span></div>
-    <div class="act-command">${esc(step.command)}</div>
+    <div class="act-command">${formatCommand(step.command)}</div>
   `;
 
   const createdLines = step.created
@@ -484,40 +548,59 @@ function handlePlayback(ts) {
 
 // ---------------------------------------------------------------- input
 
-scenarioSelect.addEventListener("change", () => selectTrace(Number(scenarioSelect.value)));
-
-document.getElementById("next").addEventListener("click", () => {
+function pause() {
   state.playing = false;
   playBtn.textContent = "▶";
   playBtn.classList.remove("playing");
+}
+
+function play() {
+  state.playing = true;
+  playBtn.textContent = "⏸";
+  playBtn.classList.add("playing");
+}
+
+function stepForward() {
+  pause();
   next();
-});
+}
+
+function setSpeed(speed) {
+  state.speed = speed;
+  speedInput.value = String(speed);
+}
+
+scenarioSelect.addEventListener("change", () => selectTrace(Number(scenarioSelect.value)));
+
+document.getElementById("next").addEventListener("click", stepForward);
 
 document.getElementById("reset").addEventListener("click", resetRun);
 
-playBtn.addEventListener("click", () => {
-  state.playing = !state.playing;
-  playBtn.textContent = state.playing ? "⏸" : "▶";
-  playBtn.classList.toggle("playing", state.playing);
-});
+playBtn.addEventListener("click", () => (state.playing ? pause() : play()));
 
 speedInput.addEventListener("input", () => {
   state.speed = Number(speedInput.value);
 });
 
+function setView(view) {
+  state.view = view;
+  for (const b of document.querySelectorAll("#view-toggle button"))
+    b.classList.toggle("active", b.dataset.view === view);
+  hint.textContent = view === "3d" ? "drag to orbit · scroll to zoom · z = step sequence" : "";
+}
+
+function setOverlay(overlay) {
+  state.overlay = overlay;
+  for (const b of document.querySelectorAll("#overlay-toggle button"))
+    b.classList.toggle("active", b.dataset.overlay === overlay);
+}
+
 for (const btn of document.querySelectorAll("#view-toggle button")) {
-  btn.addEventListener("click", () => {
-    state.view = btn.dataset.view;
-    for (const b of document.querySelectorAll("#view-toggle button")) b.classList.toggle("active", b === btn);
-    hint.textContent = state.view === "3d" ? "drag to orbit · scroll to zoom · z = step sequence" : "";
-  });
+  btn.addEventListener("click", () => setView(btn.dataset.view));
 }
 
 for (const btn of document.querySelectorAll("#overlay-toggle button")) {
-  btn.addEventListener("click", () => {
-    state.overlay = btn.dataset.overlay;
-    for (const b of document.querySelectorAll("#overlay-toggle button")) b.classList.toggle("active", b === btn);
-  });
+  btn.addEventListener("click", () => setOverlay(btn.dataset.overlay));
 }
 
 canvas.addEventListener("mousedown", (e) => {
@@ -591,3 +674,45 @@ function showPopover(handle, clientX, clientY, rect) {
 resizeCanvas();
 requestAnimationFrame(loop);
 loadTraces();
+
+// ---------------------------------------------------------------- debug API
+//
+// A console-driveable surface, for the same reason window.__labkitExplorerState
+// is exposed: browser-automation sessions (Claude-in-Chrome) drive this page by
+// clicking coordinates, and a batch of rapid clicks is unreliable in that
+// environment -- several sessions' worth of debugging this Explorer have hit
+// exactly that, needing 1s waits between clicks and still losing some. Every
+// method here calls the same function a click handler calls; nothing is
+// reimplemented, so this can never drift from what a real click does.
+window.__labkitExplorer = {
+  /** Every trace's index and name, so a session doesn't have to guess one. */
+  listScenarios: () => state.traces.map((t, i) => ({ index: i, name: t.name, origin: t.origin })),
+  /** Select by index (as the <select> does) or by a substring of the name. */
+  selectScenario: (indexOrName) => {
+    const index =
+      typeof indexOrName === "number"
+        ? indexOrName
+        : state.traces.findIndex((t) => t.name.includes(indexOrName));
+    if (index < 0 || index >= state.traces.length)
+      throw new Error(`no scenario matching ${JSON.stringify(indexOrName)}`);
+    selectTrace(index);
+    return state.current.name;
+  },
+  reset: resetRun,
+  next: stepForward,
+  /** Steps forward from wherever the trace currently is -- never resets first,
+   * so calling this twice with n=10 lands on step 20, not back on step 10. */
+  goToStep: (n) => {
+    if (!state.current) throw new Error("no scenario selected");
+    const target = Math.max(0, Math.min(n, state.current.steps.length));
+    while (state.step < target) stepForward();
+    return state.step;
+  },
+  play,
+  pause,
+  setSpeed,
+  setView,
+  setOverlay,
+  /** The full state object, for anything the methods above don't cover. */
+  state,
+};

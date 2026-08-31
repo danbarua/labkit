@@ -155,7 +155,17 @@ main {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 158px;
+  /* Measured against the real bonsai-2026 record (2026-08-31, 104 events):
+     delta-line count per step is heavily skewed (median 3, p90 14, max 33 at
+     one compound recordAnalysis -- this repo's own domain records a
+     compound act as one event, so a step's delta has no smaller bound than
+     "everything one act minted"). A fixed height for the true max would give
+     every step ~560px of panel regardless of size, burying the graph most of
+     the time for the sake of the rare outlier. 300px fits the p90 case
+     (measured content height 255px) with headroom; #record-delta's own
+     overflow-y: auto (below) is what the 10% of steps past that scroll
+     inside, same as it always has. */
+  height: 300px;
   display: flex;
   gap: 0;
   background: rgba(18, 21, 29, 0.94);
@@ -183,7 +193,18 @@ main {
 
 .derived-col .act-op { color: var(--accent); font-weight: 600; }
 .derived-col .act-subject { color: var(--text-dim); }
-.derived-col .act-command { margin-top: 6px; color: var(--text-dim); word-break: break-word; }
+.derived-col .act-command {
+  margin-top: 6px;
+  color: var(--text-dim);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* Shared by .act-command and #queue-list li -- formatCommand() emits the same
+   markup in both places, so one rule set keeps the two views reading as one
+   visual language rather than two things that happen to be near each other. */
+.cmd-verb { color: var(--accent); font-weight: 600; }
+.cmd-handle { color: var(--danger); }
 
 .derived-col .delta-line { margin: 2px 0; }
 .derived-col .delta-line .plus { color: var(--accent); }
@@ -221,7 +242,7 @@ main {
 .popover dd { margin: 0; word-break: break-word; }
 
 #queue {
-  flex: 0 0 320px;
+  flex: 0 0 368px;
   border-left: 1px solid var(--panel-border);
   background: var(--panel);
   overflow-y: auto;
@@ -247,9 +268,8 @@ main {
   font-size: 12px;
   border-left: 2px solid transparent;
   color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 #queue-list li .n {
