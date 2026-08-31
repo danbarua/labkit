@@ -66,7 +66,7 @@ import type {
   IdentifiedArtefact,
   SupportExplanation,
 } from "./report";
-import { ref, isRefOfKind } from "./report";
+import { ref, isRefOfKind, KIND_BY_LABEL } from "./report";
 import { compose, per, type Row } from "./facts";
 import {
   BEARINGS,
@@ -1348,7 +1348,19 @@ export class ReadSurface extends SessionCore {
       const scalarProps = SEARCHABLE_PROSE[label] ?? [];
       const arrayProps = SEARCHABLE_PROSE_ARRAYS[label] ?? [];
       if (scalarProps.length === 0 && arrayProps.length === 0) continue;
-
+      // Every label reachable here is a key of SEARCHABLE_PROSE or
+      // SEARCHABLE_PROSE_ARRAYS, and check:prop-classes holds both to the
+      // Prose annotations -- so a label with no research-concept kind would
+      // be a finding worth its own sentence, not a runtime case to guard.
+      const kind = KIND_BY_LABEL[label];
+      if (!kind) throw new Error(`${label} is searchable but names no research-concept kind`);
+      // `ref()`'s own kind<->label check is what makes the cast below safe:
+      // `kind` is looked up FROM `label`, so the two cannot disagree, and
+      // `ref` would throw before an actually-mismatched handle ever reached
+      // `SearchMatch`. The cast narrows a dynamically-looked-up `string` to
+      // the specific union `KIND_BY_LABEL`'s own type can't express without
+      // a label-indexed conditional type -- more machinery than the
+      // fact ("this group is one label, hence one kind") needs.
       const matches: SearchMatch[] = [];
       for (const prop of scalarProps) {
         const rows = await this.graph.query(
@@ -1357,7 +1369,10 @@ export class ReadSurface extends SessionCore {
           { needle: text },
         );
         for (const row of rows) {
-          matches.push({ handle: row.n.natural_id, wording: String(row.n[prop]) });
+          matches.push({
+            handle: ref(kind, row.n.natural_id) as SearchMatch["handle"],
+            wording: String(row.n[prop]),
+          });
         }
       }
       for (const prop of arrayProps) {
@@ -1370,7 +1385,7 @@ export class ReadSurface extends SessionCore {
           const list = row.n[prop] as string[];
           const needle = text.toLowerCase();
           const wording = list.find((x) => x.toLowerCase().includes(needle)) ?? list.join("; ");
-          matches.push({ handle: row.n.natural_id, wording });
+          matches.push({ handle: ref(kind, row.n.natural_id) as SearchMatch["handle"], wording });
         }
       }
       if (matches.length > 0) groups.push({ label, matches });
