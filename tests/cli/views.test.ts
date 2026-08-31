@@ -198,6 +198,46 @@ test("a gate that failed and was re-checked does not read as though it never fai
   expect(renderGate({ ...base, everFailed: false }, PLAIN)).not.toContain("failed at least once");
 });
 
+test("an evaluation with no basis reads as asserted, not as measured", () => {
+  // S-8's distinction (report.ts's EvaluationRecord.basis doc comment): empty
+  // means asserted, not measured. #151 -- the type carries it, nothing in the
+  // view read it, so an asserted verdict and a cited one printed identically.
+  const status: GateStatus = {
+    gate: ref("gate", "GATE_2"),
+    consequence: "the release is blocked",
+    state: "satisfied",
+    checks: [],
+    unmet: [],
+    evaluations: [
+      {
+        evaluation: ref("evaluation", "CEVAL_1"),
+        criterion: ref("criterion", "CRIT_1"),
+        value: "0.61",
+        outcome: "pass",
+        at: "2026-03-01T00:00:00.000Z",
+        basis: [],
+      },
+      {
+        evaluation: ref("evaluation", "CEVAL_2"),
+        criterion: ref("criterion", "CRIT_2"),
+        value: "0.31",
+        outcome: "pass",
+        at: "2026-03-01T00:00:00.000Z",
+        basis: [{ evidence: ref("evidence", "EV_1"), states: "cracks at 40MPa" }],
+      },
+    ],
+    gating: [],
+    everFailed: false,
+  };
+  const out = renderGate(status, PLAIN);
+  expect(out).toContain("asserted");
+  expect(out).toContain("cracks at 40MPa");
+  // The two verdicts must not read alike -- an asserted one is not a synonym
+  // for "rests on nothing named" the way a cited one's finding text would be.
+  const lines = out.split("\n").filter((l) => l.includes("CEVAL_"));
+  expect(lines[0]).not.toBe(lines[1]);
+});
+
 test("never-run and no-standing-verdict are printed apart, not as one 'not passed'", () => {
   const status: GateStatus = {
     gate: ref("gate", "GATE_2"),
@@ -478,7 +518,16 @@ const gateFixture: GateStatus = {
   unmet: [
     { criterion: ref("criterion", "CRIT_1"), requires: "the effect holds at n>=20", blocks: [] },
   ],
-  evaluations: [],
+  evaluations: [
+    {
+      evaluation: ref("evaluation", "CEVAL_1"),
+      criterion: ref("criterion", "CRIT_1"),
+      value: "0.31",
+      outcome: "fail",
+      at: "2026-03-01T00:00:00.000Z",
+      basis: [],
+    },
+  ],
   gating: [],
   everFailed: true,
 };

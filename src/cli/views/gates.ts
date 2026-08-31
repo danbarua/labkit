@@ -31,6 +31,13 @@ import { bullets } from "./format";
  *
  * Withdrawn evaluations are listed rather than dropped, marked as withdrawn.
  * A check that was decided and then withdrawn is not a check nobody ran.
+ *
+ * An evaluation's `basis` (S-8) is the same shape of omission (#151): empty
+ * means the verdict was asserted, not measured, and the type has carried that
+ * since S-8 with no view printing it — `labkit gate` read an asserted verdict
+ * and a four-times-cited one identically. Prints `asserted` for the former,
+ * what it rests on for the latter, the same way `enquiry` prints "The
+ * question's answer rests on".
  */
 export function renderGate(status: GateStatus, p: Palette): string {
   // The four states are the whole point of this page, so each gets its own
@@ -80,7 +87,10 @@ export function renderGate(status: GateStatus, p: Palette): string {
       ? `\n${p.heading("Evaluations")}\n${bullets(
           status.evaluations.map(
             (e) =>
-              `${p.quiet(e.at)}  ${state(e.outcome === "pass" ? "passed" : "failed")}  "${e.value}"  ${p.handle(`(${e.evaluation})`)}${e.withdrawn ? `  ${p.provisional("withdrawn")}` : ""}`,
+              `${p.quiet(e.at)}  ${state(e.outcome === "pass" ? "passed" : "failed")}  "${e.value}"  ${p.handle(`(${e.evaluation})`)}${e.withdrawn ? `  ${p.provisional("withdrawn")}` : ""}` +
+              (e.basis.length === 0
+                ? `  ${p.untested("asserted")}`
+                : `  resting on: ${e.basis.map((f) => f.states).join("; ")}`),
           ),
           "",
         )}`
