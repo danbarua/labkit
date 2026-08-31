@@ -13,6 +13,7 @@
  */
 
 import { edgeProps, optional, scalar, vertexProps } from "../db/cypher";
+import { NODE_LABELS, SEARCHABLE_PROSE, SEARCHABLE_PROSE_ARRAYS } from "../db/domain";
 import type {
   ArtefactProps,
   ClaimProps,
@@ -31,6 +32,8 @@ import type {
   TaskContract,
   ClaimRef,
   ConcludedClaim,
+  SearchGroup,
+  SearchMatch,
   ConflictSide,
   ConflictVerdict,
   AnalysisRef,
@@ -1309,6 +1312,70 @@ export class ReadSurface extends SessionCore {
       claim: ref("claim", r.c.natural_id),
       asserts: r.c.name,
     }));
+  }
+
+  /**
+   * Every record containing the text, as `{handle, wording}` pairs grouped
+   * by label — the read the Bonsai transcription scripts needed and could
+   * not have (a question's wording had to be hardcoded to its handle
+   * because nothing turned one into the other).
+   *
+   * **Returns every match and refuses to pick, exactly as {@link
+   * claimsAsserting} does** — this is a second seam where wording is
+   * resolved, not the same one widened, because the two answer different
+   * questions: `claimsAsserting` finds a claim by its *exact* asserted
+   * sentence (its wording behaves like a key); this finds a *substring*
+   * across every kind of record that carries free text. A caller wanting
+   * one specific claim by its sentence should still use that verb — it is
+   * both narrower and cheaper.
+   *
+   * **Scans `Prose` only** — `src/db/domain.ts`'s `SEARCHABLE_PROSE`/
+   * `SEARCHABLE_PROSE_ARRAYS`, derived from the string taxonomy and held to
+   * it by `check:prop-classes`. `IndexedString` properties (`Claim.name`,
+   * `Artefact.logical_name`) are exact-match territory — a claim's own
+   * wording is already searchable by `claimsAsserting`, and this does not
+   * duplicate that with a weaker substring version of it.
+   *
+   * Case-insensitive (`toLower` both sides — measured against AGE 2026-08-31:
+   * plain `CONTAINS` works, `toLower(...) CONTAINS toLower(...)` also
+   * works, `ANY(x IN list WHERE ...)` does not — a list property needs
+   * `size([x IN list WHERE ...]) > 0` instead, which is why array and
+   * scalar properties are two tables and two query shapes here, not one).
+   */
+  async search(text: Prose): Promise<SearchGroup[]> {
+    const groups: SearchGroup[] = [];
+    for (const label of NODE_LABELS) {
+      const scalarProps = SEARCHABLE_PROSE[label] ?? [];
+      const arrayProps = SEARCHABLE_PROSE_ARRAYS[label] ?? [];
+      if (scalarProps.length === 0 && arrayProps.length === 0) continue;
+
+      const matches: SearchMatch[] = [];
+      for (const prop of scalarProps) {
+        const rows = await this.graph.query(
+          `MATCH (n:${label}) WHERE toLower(n.${prop}) CONTAINS toLower($needle) RETURN n`,
+          { n: vertexProps<Record<string, unknown> & Identified>() },
+          { needle: text },
+        );
+        for (const row of rows) {
+          matches.push({ handle: row.n.natural_id, wording: String(row.n[prop]) });
+        }
+      }
+      for (const prop of arrayProps) {
+        const rows = await this.graph.query(
+          `MATCH (n:${label}) WHERE size([x IN n.${prop} WHERE toLower(x) CONTAINS toLower($needle)]) > 0 RETURN n`,
+          { n: vertexProps<Record<string, unknown> & Identified>() },
+          { needle: text },
+        );
+        for (const row of rows) {
+          const list = row.n[prop] as string[];
+          const needle = text.toLowerCase();
+          const wording = list.find((x) => x.toLowerCase().includes(needle)) ?? list.join("; ");
+          matches.push({ handle: row.n.natural_id, wording });
+        }
+      }
+      if (matches.length > 0) groups.push({ label, matches });
+    }
+    return groups;
   }
 
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */

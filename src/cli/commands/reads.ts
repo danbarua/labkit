@@ -30,6 +30,7 @@ import {
   renderWhy,
   renderClaims,
   renderConflict,
+  renderSearch,
 } from "../views/knowledge";
 import { renderEnquiry, renderOrigin, renderPursuits } from "../views/enquiry";
 import {
@@ -118,6 +119,22 @@ export function registerReads(program: Command, run: Run): void {
       run(async ({ read }) => {
         const claims = await read.claimsAsserting(proposition);
         return answer(claims, (c, p) => renderClaims(c, proposition, p));
+      }),
+    );
+
+  program
+    .command("search")
+    .summary("every record containing this text — a second seam where wording is resolved")
+    .description(
+      "Substring, case-insensitive, across every Prose property in the string taxonomy. " +
+        "Returns every match grouped by label rather than picking one -- narrower than this, " +
+        "and cheaper, is `claims`, which finds a claim by its exact asserted sentence.",
+    )
+    .argument("<text>", "the text to search for")
+    .action(async (text: string) =>
+      run(async ({ read }) => {
+        const groups = await read.search(text);
+        return answer(groups, (g, p) => renderSearch(g, text, p));
       }),
     );
 

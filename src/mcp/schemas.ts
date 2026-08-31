@@ -109,6 +109,26 @@ export const claimsAssertingSchema = z.strictObject({
 });
 
 /**
+ * `{handle, wording}` — plain `z.string()` for `handle`, not `ref()`, because
+ * one result set spans as many kinds as the string taxonomy has `Prose`
+ * labels. `label` on the enclosing group is how a caller tells them apart.
+ */
+const searchMatch = z.strictObject({
+  handle: z.string(),
+  wording: z.string(),
+});
+
+/** `search` — every match, grouped by label. */
+export const searchSchema = z.strictObject({
+  groups: z.array(
+    z.strictObject({
+      label: z.string(),
+      matches: z.array(searchMatch),
+    }),
+  ),
+});
+
+/**
  * `what_happened` — the acts themselves, which is the one thing the graph does
  * not hold.
  *

@@ -36,6 +36,7 @@ import { ref } from "../domain/report";
 import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
   claimsAssertingSchema,
+  searchSchema,
   whatHappenedSchema,
   conflictVerdictSchema,
   criteriaGoverningSchema,
@@ -355,6 +356,23 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     outputSchema: claimsAssertingSchema,
     handler: async (read, { proposition }) => ({
       claims: await read.claimsAsserting(proposition),
+    }),
+  }),
+
+  tool({
+    name: "search",
+    title: "Every record containing this text",
+    description:
+      "Substring, case-insensitive, across every Prose property in the string taxonomy. " +
+      "Returns every match grouped by label rather than picking one — a second seam where " +
+      "wording is resolved, narrower than by `claims_asserting`, which finds a claim by its " +
+      "exact asserted sentence and is cheaper when that is what you have.",
+    inputSchema: {
+      text: z.string().describe("the text to search for"),
+    },
+    outputSchema: searchSchema,
+    handler: async (read, { text }) => ({
+      groups: await read.search(text),
     }),
   }),
 

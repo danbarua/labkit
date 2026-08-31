@@ -63,6 +63,58 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
   Computation: ["started_at", "finished_at"],
 };
 
+/**
+ * Which scalar node properties `search()` scans, per label.
+ *
+ * Every entry must be a property annotated `Prose` (not `Prose[]` — see
+ * {@link SEARCHABLE_PROSE_ARRAYS}), and every such scalar property must
+ * appear here — `bun run check:prop-classes` fails when the two disagree,
+ * the same guarantee it already gives {@link INDEXED_PROPS}.
+ *
+ * **This table has no hand-written exclusions, and that is the point.**
+ * Three properties hold free text a person might reasonably search for and
+ * are absent anyway, each for a different, derivable reason rather than a
+ * name typed into a skip list:
+ * - `Computation.method` is `ReadOnlyString`, not `Prose` — its own doc
+ *   comment already says the annotation is probably wrong ("either this
+ *   property is misnamed, or the writes are misusing it"). A real type bug,
+ *   left as one rather than compensated for here.
+ * - `Claim.name` and `Artefact.logical_name` are `IndexedString` —
+ *   deliberately, not a bug: `ClaimProps.name`'s own doc comment says
+ *   wording is treated as a key there, and `claimsAsserting()` is already
+ *   the exact-match search for it. `IndexedString` is a different search
+ *   mode from `Prose`'s substring one, not a smaller version of it.
+ *
+ * None of the three needed naming in this table's own logic — deriving
+ * strictly from the written annotation excludes all three for free. They
+ * are named here only so a reader does not have to rediscover why.
+ */
+export const SEARCHABLE_PROSE: { readonly [L in NodeLabel]?: readonly string[] } = {
+  Question: ["name"],
+  LineOfEnquiry: ["name"],
+  Evidence: ["statement"],
+  Decision: ["reason", "invalidation_check"],
+  Criterion: ["proposition"],
+  CriterionEvaluation: ["value"],
+  Gate: ["consequence"],
+  Review: ["verdict"],
+  Task: ["objective", "acceptance"],
+};
+
+/**
+ * Which `Prose[]` (array) node properties `search()` scans, per label.
+ *
+ * Split from {@link SEARCHABLE_PROSE} because AGE's Cypher has no `ANY(x IN
+ * list WHERE cond)` form (measured 2026-08-31: syntax error) — an array
+ * property needs `size([x IN n.prop WHERE toLower(x) CONTAINS
+ * toLower($needle)]) > 0` instead of a plain `toLower(n.prop) CONTAINS …`,
+ * so the query layer needs to know which shape it is building before it
+ * runs, not just which properties are searchable.
+ */
+export const SEARCHABLE_PROSE_ARRAYS: { readonly [L in NodeLabel]?: readonly string[] } = {
+  Task: ["mayRead"],
+};
+
 export const EDGE_LABELS = [
   "MOTIVATES", // Question -> LineOfEnquiry
   "REQUIRES", // LineOfEnquiry -> Evidence

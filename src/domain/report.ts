@@ -198,6 +198,29 @@ export interface ConcludedClaim {
   asserts: string;
 }
 
+/**
+ * One record `search()` found containing the wording, and the text it
+ * matched on — not necessarily the record's only `Prose` property, so a
+ * caller who wants to know *why* it matched needs this, not just the
+ * handle.
+ *
+ * `handle` is a plain string, not a branded `Ref`, because a single result
+ * set spans as many kinds as {@link SEARCHABLE_PROSE} has labels — the same
+ * reason `fragments/trace.ts`'s `created` field is `{handle: string; label:
+ * string}` rather than a union of every `Ref<K>`. `label` on the enclosing
+ * {@link SearchGroup} is what a caller reads to know which one it is.
+ */
+export interface SearchMatch {
+  handle: string;
+  wording: string;
+}
+
+/** Every match for one label, grouped — `search()` never flattens labels into one list. */
+export interface SearchGroup {
+  label: NodeLabel;
+  matches: SearchMatch[];
+}
+
 /** One proposition an analysis concluded, and the finding that bears on it. */
 export interface Conclusion {
   proposition: string;

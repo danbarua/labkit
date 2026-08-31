@@ -42,6 +42,8 @@ export type {
   TaskContract,
   Conclusion,
   ConcludedClaim,
+  SearchGroup,
+  SearchMatch,
   RecordedAnalysis,
   ClaimRef,
   EvidenceRef,
