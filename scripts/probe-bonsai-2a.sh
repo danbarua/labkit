@@ -74,6 +74,17 @@ say "inherited from the prior script: Q_6 / LOE_6, confirmed before use"
 q6="Q_6"
 loe6="LOE_6"
 ask enquiry "$loe6"
+# A guard, not just a print: if a prior script's handle numbering ever
+# shifts, this must go red rather than silently write Stage 2A's answer
+# onto the wrong question.
+enquiry_check=$(lab enquiry "$loe6" 2>&1)
+case "$enquiry_check" in
+  *"can this structured mapping be linked to an externally defined task or information-processing objective"*) ;;
+  *)
+    echo "probe-bonsai-2a.sh: LOE_6 is no longer pursuing the expected question -- inheritance from probe-bonsai-1b2-1d.sh has moved, stopping before writing Stage 2A's answer onto the wrong enquiry" >&2
+    exit 1
+    ;;
+esac
 
 say "the feasibility ladder's go/no-go gate -- a quality bar, not a hypothesis"
 
