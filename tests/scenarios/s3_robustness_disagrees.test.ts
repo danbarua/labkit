@@ -62,14 +62,14 @@ const SEED = "seed-to-seed variation is within tolerance";
  * result AND both robustness conditions hold.
  */
 async function aPrespecifiedRobustnessDesign() {
-  const tertiary = await session.planWork({
+  const { work: tertiary } = await session.planWork({
     objective: "fit the tertiary model",
     acceptance: "reached only if the preceding checks are consistent",
   });
-  const primary = await session.stateCriterion(PRIMARY);
-  const median = await session.stateCriterion(MEDIAN);
-  const seed = await session.stateCriterion(SEED);
-  const gate = await session.declareGate({
+  const { criterion: primary } = await session.stateCriterion(PRIMARY);
+  const { criterion: median } = await session.stateCriterion(MEDIAN);
+  const { criterion: seed } = await session.stateCriterion(SEED);
+  const { gate } = await session.declareGate({
     governedBy: [primary, median, seed],
     consequence: "the tertiary analysis is reached only if the preceding checks are consistent",
     protecting: [tertiary],
@@ -240,8 +240,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     // Both jobs, named explicitly: the same three checks gate the tertiary
     // model and are the standard this analysis is held to. Before S-3b only
     // the first was expressible.
-    const enquiry = await session.openEnquiry("does T differ from rewired?");
-    const observations = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry("does T differ from rewired?");
+    const { observations } = await session.recordObservations({
       enquiry,
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
@@ -308,13 +308,13 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    * project so far (PJ-012 §1).
    */
   test("two criteria worded identically are two separate checks", async () => {
-    const work = await session.planWork({
+    const { work } = await session.planWork({
       objective: "downstream work",
       acceptance: "both hold",
     });
-    const first = await session.stateCriterion("seed stability is adequate");
-    const second = await session.stateCriterion("seed stability is adequate");
-    const gate = await session.declareGate({
+    const { criterion: first } = await session.stateCriterion("seed stability is adequate");
+    const { criterion: second } = await session.stateCriterion("seed stability is adequate");
+    const { gate } = await session.declareGate({
       governedBy: [first, second],
       consequence: "block unless both hold",
       protecting: [work],

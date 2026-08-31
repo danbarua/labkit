@@ -62,8 +62,8 @@ async function afterwards(): Promise<ResearchSession> {
  * bootstrap analysis drawing six pairwise conclusions from them.
  */
 async function bootstrapAnalysisAsShipped() {
-  const enquiry = await session.openEnquiry("which graph construction classifies best?");
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("which graph construction classifies best?");
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "per-image classification results",
     finding: "per-image accuracy for all five constructions, 10,000 images",
@@ -118,7 +118,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
 
     // Reviewer: your bootstrap is centred on the observed effect. It isn't a null test.
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict:
         "bootstrap is centred on the observed effect; it does not implement the intended null",
@@ -159,7 +159,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
@@ -196,7 +196,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
@@ -223,7 +223,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 4: the replacement conclusion is supported via a different inference", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
@@ -247,7 +247,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 5: what the superseded inference claimed is still readable", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
@@ -281,13 +281,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    * same question -- and it returned both observation sets for both claims.
    */
   test("a claim rests only on what its own analysis consumed, not on everything in the enquiry", async () => {
-    const enquiry = await session.openEnquiry("which construction classifies best?");
-    const mnist = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry("which construction classifies best?");
+    const { observations: mnist } = await session.recordObservations({
       enquiry,
       name: "mnist per-image results",
       finding: "per-image accuracy on MNIST",
     });
-    const fashion = await session.recordObservations({
+    const { observations: fashion } = await session.recordObservations({
       enquiry,
       name: "fashion-mnist per-image results",
       finding: "per-image accuracy on Fashion-MNIST",
@@ -317,7 +317,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("why support was withdrawn is answerable from the graph, not just the event log", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict:
         "bootstrap is centred on the observed effect; it does not implement the intended null",
@@ -347,8 +347,8 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    * referred to the withdrawn work.
    */
   test("a replacement cannot cite a review of some other analysis", async () => {
-    const enquiry = await session.openEnquiry("which construction classifies best?");
-    const observations = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry("which construction classifies best?");
+    const { observations } = await session.recordObservations({
       enquiry,
       name: "obs",
       finding: "raw",
@@ -366,7 +366,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       from: [observations],
       concludes: [{ proposition: "something else entirely", finding: "n/a" }],
     });
-    const reviewOfUnrelated = await session.recordReview({
+    const { review: reviewOfUnrelated } = await session.recordReview({
       of: unrelated,
       verdict: "a verdict about other work",
     });
@@ -394,7 +394,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("the temporal seam records the invalidation, with its time and what it moved", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
@@ -412,7 +412,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     expect(replacement[0]!.at).toBe(FIXED_NOW);
     expect(replacement[0]!.detail).toMatchObject({
       supersedes: analysis,
-      changed: ["T beats rewired"],
+      replaced: [expect.objectContaining({ proposition: "T beats rewired" })],
     });
 
     // Every research action left a trace, in order — one per action, not one

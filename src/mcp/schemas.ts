@@ -40,6 +40,19 @@ import type {
   ListedGate,
   ListedWork,
   RecordedAnalysis,
+  RecordedObservations,
+  OpenedEnquiry,
+  SharpenedQuestion,
+  Posed,
+  Pursued,
+  RecordedReview,
+  ClosedEnquiry,
+  PlannedWork,
+  StatedCriterion,
+  DeclaredGate,
+  EvaluatedCriterion,
+  AcceptedAsUnresolved,
+  Promoted,
   QuestionClosure,
   ConflictSide,
   ConflictVerdict,
@@ -77,6 +90,8 @@ import type {
   SupportExplanation,
 } from "../domain/report";
 import type { Ref } from "../domain/report";
+import type { DomainEvent, MintedEdge, Operation } from "../domain/events";
+import type { EdgeLabel } from "../db/domain";
 
 /**
  * `Ref<K>` — the natural-id handle the domain passes around, which over the
@@ -101,6 +116,10 @@ const ref = <K extends string>(_kind: K) => z.string() as unknown as z.ZodType<R
 const concludedClaim = z.strictObject({
   claim: ref("claim"),
   asserts: z.string(),
+  // Populated by `recordAnalysis`/`reverify`/`replaceAnalysis`, absent for a
+  // claim reached by wording (`claimsAsserting`) or one narrowing several
+  // prior findings (`reinterpret`'s `nowClaims`) — see `ConcludedClaim.finding`.
+  finding: ref("evidence").optional(),
 });
 
 /** `claims_asserting` — an array, wrapped because structuredContent must be an object. */
@@ -136,6 +155,14 @@ export const searchSchema = z.strictObject({
  * is asking *who* and would otherwise have to reach through a wrapper to find
  * out. `seq` is the order and the cursor: pass the last one back as
  * `since_seq`.
+ *
+ * **Not `domainEventSchema` below**, on purpose: a row read back from the sink
+ * always has a `seq` and a grade, so this shape says so with `.nullable()`
+ * rather than `.optional()` — the one thing `Exact<>` cannot catch is an
+ * optional field a schema silently drops, and a row genuinely read back always
+ * carries these keys. `domainEventSchema` describes the event as `emit` hands
+ * it to a caller in the same call that created it, where the type allows all
+ * four for a hand-built fixture predating the collector; here they never are.
  */
 export const whatHappenedSchema = z.strictObject({
   events: z.array(
@@ -157,6 +184,50 @@ export const whatHappenedSchema = z.strictObject({
       detail: z.record(z.string(), z.unknown()).nullable(),
     }),
   ),
+});
+
+/**
+ * A `DomainEvent` as a write verb hands it back — #161's mechanism. Every
+ * write tool's output includes `events`, and this is the one mirror all of
+ * them share.
+ *
+ * `operation`/`edges[].label` are `z.string()` cast to the domain's union
+ * types, the same trick `ref()` above uses: this is an output schema with
+ * nothing to validate, since LabKit only ever emits values it minted itself.
+ */
+const operation = z.string() as unknown as z.ZodType<Operation>;
+const edgeLabel = z.string() as unknown as z.ZodType<EdgeLabel>;
+
+const mintedEdge = z.strictObject({
+  from: z.string(),
+  label: edgeLabel,
+  to: z.string(),
+});
+
+// `readonly` casts: `DomainEvent.created`/`.edges` are `readonly`, and
+// `z.array()` infers a mutable array -- `Exact<>` treats the two as different
+// types (a mutable array is assignable to its readonly counterpart but not
+// back), so an uncast `z.array()` here would fail every schema that embeds
+// `events`, including this one.
+const createdList = z.array(z.string()) as unknown as z.ZodType<readonly string[]>;
+const mintedEdgeList = z.array(mintedEdge) as unknown as z.ZodType<readonly MintedEdge[]>;
+
+const recordedAttribution = z.strictObject({
+  attribution_label: z.string(),
+  attribution_id: z.string(),
+  attribution_how: z.enum(["observed", "claimed", "unattributed"]).nullable(),
+  git_hash: z.string(),
+});
+
+export const domainEventSchema = z.strictObject({
+  seq: z.number().optional(),
+  at: z.string(),
+  attribution: recordedAttribution,
+  operation,
+  subject: z.string(),
+  created: createdList.optional(),
+  edges: mintedEdgeList.optional(),
+  detail: z.record(z.string(), z.unknown()).optional(),
 });
 
 const questionStanding = z.strictObject({
@@ -446,11 +517,80 @@ export const analysisRefSchema = ref("analysis");
 export const recordedAnalysisSchema = z.strictObject({
   analysis: analysisRefSchema,
   claims: z.array(concludedClaim),
+  events: z.array(domainEventSchema),
 });
 export const reviewRefSchema = minted("review");
 export const workRefSchema = minted("work");
 export const criterionRefSchema = minted("criterion");
 export const gateRefSchema = minted("gate");
+
+/** What `pose` returns. */
+export const posedSchema = z.strictObject({
+  question: ref("question"),
+  events: z.array(domainEventSchema),
+});
+/** What `pursue` returns. */
+export const pursuedSchema = z.strictObject({
+  enquiry: ref("enquiry"),
+  events: z.array(domainEventSchema),
+});
+/** What `open_enquiry` returns — #161's audit: the `Question` was withheld. */
+export const openedEnquirySchema = z.strictObject({
+  enquiry: ref("enquiry"),
+  question: ref("question"),
+  events: z.array(domainEventSchema),
+});
+/** What `record_observations` returns — #161's audit: withheld entirely. */
+export const recordedObservationsSchema = z.strictObject({
+  observations: ref("observations"),
+  events: z.array(domainEventSchema),
+});
+/** What `sharpen` returns — #161's audit: the frozen `Decision` was withheld. */
+export const sharpenedQuestionSchema = z.strictObject({
+  question: ref("question"),
+  decision: ref("decision"),
+  events: z.array(domainEventSchema),
+});
+/** What `record_review` returns. */
+export const recordedReviewSchema = z.strictObject({
+  review: ref("review"),
+  events: z.array(domainEventSchema),
+});
+/** What `close_enquiry` returns — #161's audit: this verb returned nothing. */
+export const closedEnquirySchema = z.strictObject({
+  decision: ref("decision"),
+  events: z.array(domainEventSchema),
+});
+/** What `plan_work` returns. */
+export const plannedWorkSchema = z.strictObject({
+  work: ref("work"),
+  events: z.array(domainEventSchema),
+});
+/** What `state_criterion` returns. */
+export const statedCriterionSchema = z.strictObject({
+  criterion: ref("criterion"),
+  events: z.array(domainEventSchema),
+});
+/** What `declare_gate` returns. */
+export const declaredGateSchema = z.strictObject({
+  gate: ref("gate"),
+  events: z.array(domainEventSchema),
+});
+/** What `evaluate_criterion` returns — #161's audit: this verb returned nothing. */
+export const evaluatedCriterionSchema = z.strictObject({
+  evaluation: ref("evaluation"),
+  events: z.array(domainEventSchema),
+});
+/** What `accept_as_unresolved` returns — #161's audit: this verb returned nothing. */
+export const acceptedAsUnresolvedSchema = z.strictObject({
+  decision: ref("decision"),
+  events: z.array(domainEventSchema),
+});
+/** What `promote` returns — #161's audit: this verb returned nothing. */
+export const promotedSchema = z.strictObject({
+  decision: ref("decision"),
+  events: z.array(domainEventSchema),
+});
 
 const changedConclusion = z.strictObject({
   proposition: z.string(),
@@ -482,6 +622,7 @@ export const verificationReportSchema = z.strictObject({
   verification: analysisRefSchema,
   of: analysisRefSchema,
   claims: z.array(concludedClaim),
+  events: z.array(domainEventSchema),
 });
 
 export const amendmentReportSchema = z.strictObject({
@@ -492,6 +633,7 @@ export const amendmentReportSchema = z.strictObject({
   rerun: z.array(gatedWork),
   confirmatoryAffected: z.array(concludedClaim),
   nature: z.enum(["mechanical", "scientific"]),
+  events: z.array(domainEventSchema),
 });
 
 export const replacementReportSchema = z.strictObject({
@@ -502,6 +644,7 @@ export const replacementReportSchema = z.strictObject({
   unaffected: z.array(unaffectedRecord),
   changed: z.array(changedConclusion),
   unchanged: z.array(concludedClaim),
+  events: z.array(domainEventSchema),
 });
 
 export const reinterpretationReportSchema = z.strictObject({
@@ -511,6 +654,7 @@ export const reinterpretationReportSchema = z.strictObject({
   evidenceStanding: z.array(citedFinding),
   restingOnTheOldReading: z.array(z.strictObject({ question: ref("question"), asks: z.string() })),
   requiresRecomputation: z.boolean(),
+  events: z.array(domainEventSchema),
 });
 
 /** `pursuits_of` — `ReadSurface.pursuitsOf` returns an array, which is not an object. */
@@ -519,21 +663,6 @@ export const pursuitsSchema = z.strictObject({
   // tool whose *whole* answer is one handle has an object to return.
   enquiries: z.array(ref("enquiry")),
 });
-
-/**
- * What a verb returning `void` says over the wire.
- *
- * `closeEnquiry` returns nothing, and `JSON.stringify(undefined)` is the string
- * `"undefined"` — the content block breaks and `structuredContent` is not an
- * object, so an outputSchema cannot be declared either. An explicit
- * acknowledgement is the smallest honest thing: it names what was acted on, so
- * a caller can tell an accepted call from a dropped one.
- */
-export const acknowledgementSchema = z.strictObject({
-  ok: z.literal(true),
-  acted: z.string(),
-});
-export type Acknowledgement = z.infer<typeof acknowledgementSchema>;
 
 /* -- the gate ------------------------------------------------------------- */
 
@@ -626,6 +755,30 @@ export type _ReplacementReport = Assert<
 export type _ReinterpretationReport = Assert<
   Exact<z.infer<typeof reinterpretationReportSchema>, ReinterpretationReport>
 >;
+export type _DomainEvent = Assert<Exact<z.infer<typeof domainEventSchema>, DomainEvent>>;
+export type _Posed = Assert<Exact<z.infer<typeof posedSchema>, Posed>>;
+export type _Pursued = Assert<Exact<z.infer<typeof pursuedSchema>, Pursued>>;
+export type _OpenedEnquiry = Assert<Exact<z.infer<typeof openedEnquirySchema>, OpenedEnquiry>>;
+export type _RecordedObservations = Assert<
+  Exact<z.infer<typeof recordedObservationsSchema>, RecordedObservations>
+>;
+export type _SharpenedQuestion = Assert<
+  Exact<z.infer<typeof sharpenedQuestionSchema>, SharpenedQuestion>
+>;
+export type _RecordedReview = Assert<Exact<z.infer<typeof recordedReviewSchema>, RecordedReview>>;
+export type _ClosedEnquiry = Assert<Exact<z.infer<typeof closedEnquirySchema>, ClosedEnquiry>>;
+export type _PlannedWork = Assert<Exact<z.infer<typeof plannedWorkSchema>, PlannedWork>>;
+export type _StatedCriterion = Assert<
+  Exact<z.infer<typeof statedCriterionSchema>, StatedCriterion>
+>;
+export type _DeclaredGate = Assert<Exact<z.infer<typeof declaredGateSchema>, DeclaredGate>>;
+export type _EvaluatedCriterion = Assert<
+  Exact<z.infer<typeof evaluatedCriterionSchema>, EvaluatedCriterion>
+>;
+export type _AcceptedAsUnresolved = Assert<
+  Exact<z.infer<typeof acceptedAsUnresolvedSchema>, AcceptedAsUnresolved>
+>;
+export type _Promoted = Assert<Exact<z.infer<typeof promotedSchema>, Promoted>>;
 
 /**
  * What `register_session` recorded.

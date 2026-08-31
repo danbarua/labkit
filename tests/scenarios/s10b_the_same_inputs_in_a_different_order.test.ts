@@ -62,14 +62,14 @@ async function anAlignmentRunInOneOrder(
   s: ResearchSession,
   order: "first-then-second" | "second-then-first",
 ) {
-  const enquiry = await s.openEnquiry("is the second series shifted relative to the first?");
-  const first = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("is the second series shifted relative to the first?");
+  const { observations: first } = await s.recordObservations({
     enquiry,
     name: "series A",
     finding: "baseline trace",
     contentHash: "sha256:A",
   });
-  const second = await s.recordObservations({
+  const { observations: second } = await s.recordObservations({
     enquiry,
     name: "series B",
     finding: "comparison trace",

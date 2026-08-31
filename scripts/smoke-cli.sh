@@ -118,9 +118,25 @@ handle() {
   printf '%s' "$value"
 }
 
+# The one line carrying this prefix, out of a multi-handle answer. `open` and
+# `observe` each mint more than one thing (#161: prose prints every handle the
+# act created, one per line) and a caller chaining one specific handle into a
+# later command has to name which line is theirs.
+pick() {
+  local prefix="$1" blob="$2" line
+  while IFS= read -r line; do
+    if [[ "$line" == "$prefix"_* ]]; then
+      printf '%s' "$line"
+      return 0
+    fi
+  done <<<"$blob"
+  printf '\nFAILED: no %s_ handle in: %s\n' "$prefix" "$blob" >&2
+  exit 1
+}
+
 echo "== asking =="
 
-enquiry=$(handle LOE "$(lab open 'does the pruning schedule move convergence?')")
+enquiry=$(pick LOE "$(lab open 'does the pruning schedule move convergence?')")
 echo "  enquiry $enquiry"
 
 echo "== prespecifying =="
@@ -145,7 +161,7 @@ expect "a gate nobody has evaluated is never-evaluated" \
 
 echo "== measuring, then analysing =="
 
-observations=$(handle ART "$(lab observe "$enquiry" \
+observations=$(pick ART "$(lab observe "$enquiry" \
   --name 'depth-sweep-raw' \
   --finding 'convergence step counts at depths 4, 8, 12, 16, 20' \
   --hash 'sha256:9f2b')")

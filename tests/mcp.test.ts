@@ -663,9 +663,9 @@ describe("behaviour — the same answers, over the wire", () => {
     const graph = await scenario.begin();
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
 
-    const enquiry = await s.openEnquiry("does the pruning schedule move convergence?");
+    const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
     await s.pose("does depth move convergence?");
-    const observations = await s.recordObservations({
+    const { observations } = await s.recordObservations({
       enquiry,
       name: "sweep readings",
       finding: "twelve runs at five seeds",

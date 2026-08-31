@@ -98,9 +98,9 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
    */
   test("a finding whose prespecified check failed reads differently from one whose check passed", async () => {
     const build = (outcome: "pass" | "fail") => async (s: ResearchSession) => {
-      const enquiry = await s.openEnquiry("does the pruning schedule move convergence?");
-      const seedStability = await s.stateCriterion("stable across five seeds");
-      const observations = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
+      const { criterion: seedStability } = await s.stateCriterion("stable across five seeds");
+      const { observations } = await s.recordObservations({
         enquiry,
         name: "sweep readings",
         finding: "twelve runs across the schedule",
@@ -168,8 +168,8 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
   };
 
   const settle = async (s: ResearchSession, asks: string, proposition: string) => {
-    const enquiry = await s.openEnquiry(asks);
-    const observations = await s.recordObservations({
+    const { enquiry } = await s.openEnquiry(asks);
+    const { observations } = await s.recordObservations({
       enquiry,
       name: `${proposition} readings`,
       finding: `measurements for ${proposition}`,
@@ -291,10 +291,10 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
         clock,
         events: inMemoryEventLog(),
       });
-      const enquiry = await s.openEnquiry("does the encoding beat the historical control?");
+      const { enquiry } = await s.openEnquiry("does the encoding beat the historical control?");
 
       // The historical control, as it survives: recorded, hashed.
-      const historical = await s.recordObservations({
+      const { observations: historical } = await s.recordObservations({
         enquiry,
         name: "random control",
         finding: "the 2024 control, as archived",
@@ -364,8 +364,8 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
    */
   test("who closed the question survives only as prose, and cannot be asked for", async () => {
     const build = (closer: string) => async (s: ResearchSession) => {
-      const enquiry = await s.openEnquiry("is the marginal split difference real?");
-      const observations = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry("is the marginal split difference real?");
+      const { observations } = await s.recordObservations({
         enquiry,
         name: "marginal split results",
         // The only place a name can go. It is evidence prose, not attribution.

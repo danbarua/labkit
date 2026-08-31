@@ -98,8 +98,8 @@ describe("what was known, as of an instant", () => {
     const clock = windableClock("2026-03-01T08:00:00.000Z");
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
 
-    const enquiry = await s.openEnquiry("does the schedule move convergence?");
-    const observations = await s.recordObservations({
+    const { enquiry } = await s.openEnquiry("does the schedule move convergence?");
+    const { observations } = await s.recordObservations({
       enquiry,
       name: "sweep readings",
       finding: "twelve runs",

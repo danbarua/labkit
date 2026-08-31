@@ -321,7 +321,8 @@ export interface EventFilter {
  * or letting an event land outside the transaction it belongs to.
  */
 export interface EventSink {
-  record(event: DomainEvent): Promise<void>;
+  /** Returns the stored event, `seq` included -- the caller built one without it. */
+  record(event: DomainEvent): Promise<DomainEvent>;
   /** Everything recorded so far, oldest first. */
   all(): Promise<readonly DomainEvent[]>;
   /** The subset a caller asked for, oldest first. */
@@ -370,7 +371,11 @@ export function inMemoryEventLog(): EventSink {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is
     // a surprise nobody asked for.
-    record: async (event) => void events.push({ ...event, seq: ++n }),
+    record: async (event) => {
+      const stored = { ...event, seq: ++n };
+      events.push(stored);
+      return stored;
+    },
     all: async () => events,
     // Filtered in TypeScript, which is the whole difference between the two
     // sinks: this one holds every event it has ever seen, so `select` is a

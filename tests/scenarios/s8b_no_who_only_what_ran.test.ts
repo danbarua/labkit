@@ -82,14 +82,14 @@ describe("S-8b: there is no who, only what ran", () => {
    */
   test("what produced an analysis is recoverable, and two configurations are distinguishable", async () => {
     const result = await inOneWorld(async (s) => {
-      const enquiry = await s.openEnquiry("does the pruning schedule move convergence?");
-      const readings = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
+      const { observations: readings } = await s.recordObservations({
         enquiry,
         name: "sweep readings",
         finding: "twelve runs across the schedule",
         contentHash: "sha256:sweep",
       });
-      const older = await s.recordObservations({
+      const { observations: older } = await s.recordObservations({
         enquiry,
         name: CONFIG,
         finding: "opus-5, temperature 0, prompt v3",
@@ -102,7 +102,7 @@ describe("S-8b: there is no who, only what ran", () => {
         concludes: [{ proposition: MOVES, finding: "convergence moves by ~3 steps" }],
       });
 
-      const newer = await s.recordObservations({
+      const { observations: newer } = await s.recordObservations({
         enquiry,
         name: CONFIG,
         finding: "opus-5, temperature 0.7, prompt v4",
@@ -155,9 +155,9 @@ describe("S-8b: there is no who, only what ran", () => {
    */
   test("approval is a decision on evidence against a condition, with no signer", async () => {
     const answer = await inOneWorld(async (s) => {
-      const enquiry = await s.openEnquiry("should the run be scaled up?");
-      const budget = await s.stateCriterion("projected cost under 40 GPU-hours");
-      const readings = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry("should the run be scaled up?");
+      const { criterion: budget } = await s.stateCriterion("projected cost under 40 GPU-hours");
+      const { observations: readings } = await s.recordObservations({
         enquiry,
         name: "cost projection",
         finding: "projected 31 GPU-hours at target scale",

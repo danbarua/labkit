@@ -83,11 +83,23 @@ import type {
   Ref,
   GateRef,
   UnitRef,
-  WorkRef,
   ChangedConclusion,
   ClaimRef,
   ConcludedClaim,
   RecordedAnalysis,
+  RecordedObservations,
+  OpenedEnquiry,
+  SharpenedQuestion,
+  Posed,
+  Pursued,
+  RecordedReview,
+  ClosedEnquiry,
+  PlannedWork,
+  StatedCriterion,
+  DeclaredGate,
+  EvaluatedCriterion,
+  AcceptedAsUnresolved,
+  Promoted,
   CitedFinding,
   Conclusion,
   EnquiryRef,
@@ -117,7 +129,7 @@ import type {
   SharpenCommand,
 } from "./commands";
 import { SessionCore } from "./core";
-import type { Operation } from "./events";
+import type { DomainEvent, Operation } from "./events";
 
 /**
  * A conclusion **already on the record**, as read back from the graph.
@@ -147,11 +159,11 @@ export class WriteSurface extends SessionCore {
    * twice gives two questions, because two people can ask the same thing for
    * different reasons and only the asker knows whether they meant one.
    */
-  async pose(question: Prose): Promise<QuestionRef> {
+  async pose(question: Prose): Promise<Posed> {
     return this.graph.inTransaction(async () => {
       const asked = await this.posed(question);
-      await this.emit("pose", asked, { question });
-      return asked;
+      const events = await this.emit("pose", asked, { question });
+      return { question: asked, events };
     });
   }
 
@@ -179,14 +191,14 @@ export class WriteSurface extends SessionCore {
    * pursuit, not the question, and carrying similar words to another pursuit
    * of the same question has no effect on identity either way.
    */
-  async pursue(input: PursueCommand): Promise<EnquiryRef> {
+  async pursue(input: PursueCommand): Promise<Pursued> {
     return this.graph.inTransaction(async () => {
       const enquiry = await this.pursued(input);
-      await this.emit("pursue", enquiry, {
+      const events = await this.emit("pursue", enquiry, {
         question: input.question,
         approach: input.approach,
       });
-      return enquiry;
+      return { enquiry, events };
     });
   }
 
@@ -210,15 +222,15 @@ export class WriteSurface extends SessionCore {
    * collapse, not a gap in the model: `MOTIVATES` and `RESOLVES` both already
    * existed. See PJ-008 row Q.
    */
-  async openEnquiry(question: Prose): Promise<EnquiryRef> {
+  async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
     return this.graph.inTransaction(async () => {
       const asked = await this.posed(question);
       const enquiry = await this.pursued({
         question: asked,
         approach: question,
       });
-      await this.emit("openEnquiry", enquiry, { question, asked: asked });
-      return enquiry;
+      const events = await this.emit("openEnquiry", enquiry, { question, asked: asked });
+      return { enquiry, question: asked, events };
     });
   }
 
@@ -241,7 +253,7 @@ export class WriteSurface extends SessionCore {
    * decision. S-1 asks this question after more evidence has arrived, for
    * exactly that reason.
    */
-  async sharpen(input: SharpenCommand): Promise<QuestionRef> {
+  async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
     return this.graph.inTransaction(async () => {
       const original = await this.graph.query(
         `MATCH (q:Question {natural_id: $id}) RETURN q`,
@@ -263,12 +275,12 @@ export class WriteSurface extends SessionCore {
 
       const sharper = await this.posed(input.into);
       await this.graph.createEdge(decision.natural_id, "MOTIVATES", sharper);
-      await this.emit("sharpen", sharper, {
+      const events = await this.emit("sharpen", sharper, {
         from: input.from,
         because: input.because,
         via: decision.natural_id,
       });
-      return sharper;
+      return { question: sharper, decision: ref("decision", decision.natural_id), events };
     });
   }
 
@@ -315,7 +327,7 @@ export class WriteSurface extends SessionCore {
    * `Evidence -SUPPORTS|CHALLENGES-> Claim`, which observation evidence has
    * neither of, or through a required `USES -> Computation`.
    */
-  async recordObservations(input: RecordObservationsCommand): Promise<ObservationsRef> {
+  async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
     return this.graph.inTransaction(async () => {
       // Atomic, and this is the sharper half of row AD's fix. Before the unit
       // existed there was nothing an interrupted call could leave behind that the
@@ -323,7 +335,7 @@ export class WriteSurface extends SessionCore {
       // would write *precisely* the invariant this verb was changed to stop --
       // durably, and looking exactly like the eighteen scenarios of records that
       // predate the fix. See TenantGraph.inTransaction.
-      const artefact = await this.graph.inTransaction(async () => {
+      const { artefact } = await this.graph.inTransaction(async () => {
         const artefact = await this.graph.createNode("Artefact", {
           kind: "observations",
           logical_name: input.name,
@@ -355,13 +367,18 @@ export class WriteSurface extends SessionCore {
         // the enquiry depends on this evidence, ADDRESSES says this work was done
         // towards the enquiry, and `whatDependsOn()` reads the first.
         await this.graph.createEdge(input.enquiry, "REQUIRES", evidence.natural_id);
-        return artefact;
+        return { artefact, evidence };
       });
 
-      await this.emit("recordObservations", ref("observations", artefact.natural_id), {
-        name: input.name,
-      });
-      return ref("observations", artefact.natural_id);
+      const events = await this.emit(
+        "recordObservations",
+        ref("observations", artefact.natural_id),
+        { name: input.name },
+      );
+      return {
+        observations: ref("observations", artefact.natural_id),
+        events,
+      };
     });
   }
 
@@ -379,12 +396,12 @@ export class WriteSurface extends SessionCore {
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
       const analysis = await this.graph.inTransaction(() => this.recorded(input));
-      await this.emit("recordAnalysis", analysis.analysis, {
+      const events = await this.emit("recordAnalysis", analysis.analysis, {
         enquiry: input.enquiry,
         method: input.method,
-        concludes: input.concludes.map((c) => c.proposition),
+        conclusions: this.conclusionEvents(analysis.claims),
       });
-      return analysis;
+      return { ...analysis, events };
     });
   }
 
@@ -397,7 +414,9 @@ export class WriteSurface extends SessionCore {
    * external review found it had lapsed: `reverify()` and `replaceAnalysis()`
    * were each emitting two events while their journals claimed one.
    */
-  private async recorded(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
+  private async recorded(
+    input: RecordAnalysisCommand,
+  ): Promise<{ analysis: AnalysisRef; claims: ConcludedClaim[] }> {
     // Checked before anything is written. A proposition the record has
     // withdrawn cannot be re-asserted as a side effect of recording an
     // analysis: a fresh claim node would restore it while the objection that
@@ -525,6 +544,7 @@ export class WriteSurface extends SessionCore {
       minted.push({
         claim: ref("claim", claim.natural_id),
         asserts: conclusion.proposition,
+        finding: ref("evidence", evidence.natural_id),
       });
     }
 
@@ -534,6 +554,11 @@ export class WriteSurface extends SessionCore {
     };
   }
 
+  /** `{claim, finding, proposition}` per conclusion — the event's own record of the pairing, independent of the typed report. */
+  private conclusionEvents(claims: ConcludedClaim[]): Record<string, unknown>[] {
+    return claims.map((c) => ({ claim: c.claim, finding: c.finding, proposition: c.asserts }));
+  }
+
   /**
    * Records a reviewer's finding about an analysis.
    *
@@ -541,7 +566,7 @@ export class WriteSurface extends SessionCore {
    * to the execution that ran it — what gets criticized in S-11 is the
    * method, and nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
-  async recordReview(input: RecordReviewCommand): Promise<ReviewRef> {
+  async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
     return this.graph.inTransaction(async () => {
       const review = await this.graph.createNode("Review", {
         verdict: input.verdict,
@@ -551,11 +576,11 @@ export class WriteSurface extends SessionCore {
         "EVALUATES",
         await this.unitOf(input.of).then((u) => u),
       );
-      await this.emit("recordReview", ref("review", review.natural_id), {
+      const events = await this.emit("recordReview", ref("review", review.natural_id), {
         of: input.of,
         verdict: input.verdict,
       });
-      return ref("review", review.natural_id);
+      return { review: ref("review", review.natural_id), events };
     });
   }
 
@@ -570,7 +595,7 @@ export class WriteSurface extends SessionCore {
    * closing with nothing cited is a real and different act, and the two must
    * not read alike.
    */
-  async closeEnquiry(input: CloseEnquiryCommand): Promise<void> {
+  async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
     return this.graph.inTransaction(async () => {
       // Everything is validated before anything is written. A rejected close
       // must leave no Decision behind, and an analysis from some other enquiry
@@ -660,7 +685,7 @@ export class WriteSurface extends SessionCore {
       // question that was answered "no" on cited evidence. The answer is not
       // inverted — it is erased, and PJ-011 §5 does not cover it, because
       // "abandoned" is a positive classification and not an empty result.
-      await this.graph.inTransaction(async () => {
+      const decision = await this.graph.inTransaction(async () => {
         const decision = await this.graph.createNode("Decision", {
           decided_at: this.clock.now(),
           reason: answeredProposition
@@ -671,12 +696,14 @@ export class WriteSurface extends SessionCore {
         await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
         if (answerBearing)
           await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
+        return decision;
       });
 
-      await this.emit("closeEnquiry", input.enquiry, {
+      const events = await this.emit("closeEnquiry", input.enquiry, {
         answeredBy: input.answeredBy ?? null,
         proposition: answeredProposition ?? null,
       });
+      return { decision: ref("decision", decision.natural_id), events };
     });
   }
 
@@ -695,7 +722,7 @@ export class WriteSurface extends SessionCore {
   // -------------------------------------------------------------------------
 
   /** Records a piece of work whose start a gate may protect. */
-  async planWork(input: PlanWorkCommand): Promise<WorkRef> {
+  async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
     return this.graph.inTransaction(async () => {
       const task = await this.graph.createNode("Task", {
         objective: input.objective,
@@ -703,21 +730,23 @@ export class WriteSurface extends SessionCore {
         outputs: "",
         acceptance: input.acceptance,
       });
-      await this.emit("planWork", ref("work", task.natural_id), {
+      const events = await this.emit("planWork", ref("work", task.natural_id), {
         objective: input.objective,
       });
-      return ref("work", task.natural_id);
+      return { work: ref("work", task.natural_id), events };
     });
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
-  async stateCriterion(proposition: Prose): Promise<CriterionRef> {
+  async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
     return this.graph.inTransaction(async () => {
       const criterion = await this.graph.createNode("Criterion", {
         proposition,
       });
-      await this.emit("stateCriterion", ref("criterion", criterion.natural_id), { proposition });
-      return ref("criterion", criterion.natural_id);
+      const events = await this.emit("stateCriterion", ref("criterion", criterion.natural_id), {
+        proposition,
+      });
+      return { criterion: ref("criterion", criterion.natural_id), events };
     });
   }
 
@@ -726,7 +755,7 @@ export class WriteSurface extends SessionCore {
    * work. Declaring a gate must not make it satisfied — that is the entire
    * subject of S-17.
    */
-  async declareGate(input: DeclareGateCommand): Promise<GateRef> {
+  async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
     return this.graph.inTransaction(async () => {
       if (input.governedBy.length === 0)
         throw new Error("a gate governed by no condition is not a gate");
@@ -746,11 +775,11 @@ export class WriteSurface extends SessionCore {
       for (const work of input.protecting) {
         await this.graph.createEdge(gate.natural_id, "GATES", work);
       }
-      await this.emit("declareGate", ref("gate", gate.natural_id), {
+      const events = await this.emit("declareGate", ref("gate", gate.natural_id), {
         governedBy: input.governedBy.map((c) => c),
         protecting: input.protecting.map((w) => w),
       });
-      return ref("gate", gate.natural_id);
+      return { gate: ref("gate", gate.natural_id), events };
     });
   }
 
@@ -770,7 +799,7 @@ export class WriteSurface extends SessionCore {
    * Same invariant class as `assertReviewOf`, and both are checked before
    * anything is written so a rejected command leaves no partial state.
    */
-  async evaluateCriterion(input: EvaluateCriterionCommand): Promise<void> {
+  async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
     return this.graph.inTransaction(async () => {
       if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
       // Same invariant class as `assertCriterionGovernsGate`, for the other job
@@ -816,11 +845,16 @@ export class WriteSurface extends SessionCore {
         if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
         return ev;
       });
-      await this.emit("evaluateCriterion", ref("evaluation", evaluation.natural_id), {
-        criterion: input.criterion,
-        ...(input.gate ? { gate: input.gate } : {}),
-        outcome: input.outcome,
-      });
+      const events = await this.emit(
+        "evaluateCriterion",
+        ref("evaluation", evaluation.natural_id),
+        {
+          criterion: input.criterion,
+          ...(input.gate ? { gate: input.gate } : {}),
+          outcome: input.outcome,
+        },
+      );
+      return { evaluation: ref("evaluation", evaluation.natural_id), events };
     });
   }
 
@@ -865,15 +899,17 @@ export class WriteSurface extends SessionCore {
         return recorded;
       });
 
-      await this.emit("reverify", verification.analysis, {
+      const events = await this.emit("reverify", verification.analysis, {
         of: input.historical,
         proposition: input.concludes.proposition,
+        conclusions: this.conclusionEvents(verification.claims),
       });
       return {
         at,
         verification: verification.analysis,
         of: input.historical,
         claims: verification.claims,
+        events,
       };
     });
   }
@@ -901,10 +937,10 @@ export class WriteSurface extends SessionCore {
    * Writes `DEFERS`, which is its first writer since PJ-004 declared it —
    * CLAUDE.md's standing example of a reader with no writer, now walked.
    */
-  async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<void> {
+  async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
-      await this.graph.inTransaction(async () => {
+      const decision = await this.graph.inTransaction(async () => {
         const question = await this.questionBehind(input.enquiry);
         if (!question) throw new Error(`enquiry ${input.enquiry} pursues no question`);
 
@@ -921,13 +957,15 @@ export class WriteSurface extends SessionCore {
         // What was known when the call was made -- S-1's requirement, and the
         // reason `evidence` is answerable afterwards rather than only now.
         await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
+        return decision;
       });
 
-      await this.emit("acceptAsUnresolved", input.enquiry, {
+      const events = await this.emit("acceptAsUnresolved", input.enquiry, {
         because: input.because,
         until: input.until,
         at,
       });
+      return { decision: ref("decision", decision.natural_id), events };
     });
   }
 
@@ -958,9 +996,9 @@ export class WriteSurface extends SessionCore {
    * unevaluated confirmatory gate reading exploratory, and S-7's amendment
    * check would miss a scientific change. Promotion is an act with a reason.
    */
-  async promote(input: PromoteCommand): Promise<void> {
+  async promote(input: PromoteCommand): Promise<Promoted> {
     return this.graph.inTransaction(async () => {
-      await this.graph.inTransaction(async () => {
+      const decision = await this.graph.inTransaction(async () => {
         const claim = input.claim;
         // `invalidation_check` is the verb's own sentence about what would make a
         // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
@@ -978,10 +1016,12 @@ export class WriteSurface extends SessionCore {
           { c: vertexProps<ClaimProps>() },
           { id: claim },
         );
+        return decision;
       });
-      await this.emit("promote", input.claim, {
+      const events = await this.emit("promote", input.claim, {
         proposition: await this.assertedBy(input.claim),
       });
+      return { decision: ref("decision", decision.natural_id), events };
     });
   }
 
@@ -1074,7 +1114,7 @@ export class WriteSurface extends SessionCore {
       const rerun = await this.workGatedBy(gates);
       const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
 
-      await this.emit("amendDesign", ref("decision", decision.natural_id), {
+      const events = await this.emit("amendDesign", ref("decision", decision.natural_id), {
         criterion: input.criterion,
         replaced,
         nowRequires: input.nowRequires,
@@ -1099,6 +1139,7 @@ export class WriteSurface extends SessionCore {
         // which is the difference between repairing a solver and moving the
         // goalposts, and is not a thing the person amending gets to assert.
         nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
+        events,
       };
     });
   }
@@ -1278,28 +1319,34 @@ export class WriteSurface extends SessionCore {
           : "not produced by the replaced analysis, and the replacement rests on it",
       }));
 
-      const report: ReplacementReport = {
+      const affected = before.map((b) => ({
+        claim: b.claim,
+        asserts: b.proposition,
+      }));
+      const events = await this.emit("replaceAnalysis", replacement.analysis, {
+        supersedes: input.supersedes,
+        because: input.because,
+        conclusions: this.conclusionEvents(replacement.claims),
+        // Which findings this act replaced with which -- the sentence-level
+        // pairing `changed` already computed, not a second lookup.
+        replaced: changed.map((c) => ({
+          proposition: c.proposition,
+          was: c.was,
+          before: c.before,
+          claim: c.claim,
+          after: c.after,
+        })),
+      });
+      return {
         at,
         replacement: replacement.analysis,
         claims: replacement.claims,
-        affected: before.map((b) => ({
-          claim: b.claim,
-          asserts: b.proposition,
-        })),
+        affected,
         unaffected,
         changed,
         unchanged,
+        events,
       };
-      await this.emit("replaceAnalysis", replacement.analysis, {
-        supersedes: input.supersedes,
-        because: input.because,
-        // Sentences, not handles. `detail` is Record<string, unknown>, so
-        // nothing would have complained had this silently become objects when
-        // `affected` grew handles -- the one shape PJ-030 §5 warns tsc misses.
-        affected: report.affected.map((a) => a.asserts),
-        changed: report.changed.map((c) => c.proposition),
-      });
-      return report;
     });
   }
 
@@ -1394,12 +1441,12 @@ export class WriteSurface extends SessionCore {
           carried.set(evidence, { evidence, states: row.e.statement });
         }
 
-        return { narrower, carried };
+        return { narrower, carried, review, decision };
       });
 
       const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
-      await this.emit("reinterpret", ref("claim", narrower.natural_id), {
+      const events = await this.emit("reinterpret", ref("claim", narrower.natural_id), {
         previously,
         because: input.because,
       });
@@ -1420,6 +1467,7 @@ export class WriteSurface extends SessionCore {
         ),
         restingOnTheOldReading,
         requiresRecomputation: false,
+        events,
       };
     });
   }
@@ -1433,13 +1481,20 @@ export class WriteSurface extends SessionCore {
    * Both context fields are read at the moment of the emit, not captured at
    * construction, so a surface built per command reports that command's clock
    * and that command's attribution.
+   *
+   * Returns an array, always -- one entry per event `emit` recorded, which
+   * today is always exactly one (CLAUDE.md: "a verb that composes others
+   * records one event, not one per step"). The uniform shape is for the
+   * caller: every write verb hands its own return value's `events` field
+   * straight through from here, so a `--json` renderer or a future verb that
+   * genuinely needs more than one event needs no new plumbing.
    */
   private async emit(
     operation: Operation,
     subject: Ref<string>,
     detail?: Record<string, unknown>,
-  ): Promise<void> {
-    await this.events.record({
+  ): Promise<DomainEvent[]> {
+    const recorded = await this.events.record({
       at: this.clock.now(),
       attribution: this.attribution,
       operation,
@@ -1453,6 +1508,7 @@ export class WriteSurface extends SessionCore {
       edges: this.graph.drainMintedEdges(),
       detail,
     });
+    return [recorded];
   }
   private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(

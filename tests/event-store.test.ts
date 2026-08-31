@@ -60,7 +60,7 @@ describe("the event log outlives the process that wrote it", () => {
    */
   test("an event written through one connection is readable through another", async () => {
     const { write } = await surfaceFor("labkit");
-    const question = await write.pose("does the coating hold?");
+    const { question } = await write.pose("does the coating hold?");
 
     const other = await testDb.openClient();
     try {
@@ -143,7 +143,7 @@ describe("an event commits with the writes it describes, or not at all", () => {
     await expect(write.openEnquiry("the one that fails")).rejects.toThrow(/injected/);
     graph.createEdge = realCreateEdge;
 
-    const question = await write.pose("the one that succeeds");
+    const { question } = await write.pose("the one that succeeds");
     const [event] = await log.all();
     expect(event!.created).toEqual([question]);
   });
@@ -163,8 +163,8 @@ describe("an event commits with the writes it describes, or not at all", () => {
   test("after a failure, the next event claims only its own edges", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);
-    const enquiry = await write.openEnquiry("the one that fails");
-    const raw = await write.recordObservations({
+    const { enquiry } = await write.openEnquiry("the one that fails");
+    const { observations: raw } = await write.recordObservations({
       enquiry,
       name: "panel-a",
       finding: "120 panels",
@@ -244,8 +244,8 @@ describe("an event records the edges the act created", () => {
   test("recordAnalysis reports every edge, not only its nodes", async () => {
     const { ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);
-    const enquiry = await write.openEnquiry("does the coating hold?");
-    const raw = await write.recordObservations({
+    const { enquiry } = await write.openEnquiry("does the coating hold?");
+    const { observations: raw } = await write.recordObservations({
       enquiry,
       name: "panel-a",
       finding: "120 panels, 90 days",
@@ -322,7 +322,7 @@ describe("the log answers what the graph cannot", () => {
   test("an act is found by what it created, not only by what it was about", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);
-    const enquiry = await write.openEnquiry("does the coating hold?");
+    const { enquiry } = await write.openEnquiry("does the coating hold?");
     await write.closeEnquiry({ enquiry });
 
     const decisions = await graph.query(`MATCH (d:Decision) RETURN d`, {

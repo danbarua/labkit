@@ -54,14 +54,14 @@ const NAME = "control series";
  * a regenerated part naturally carries the name of the part it replaces.
  */
 async function anAnalysisComparingBothControls(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("do the two controls agree?");
-  const original = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("do the two controls agree?");
+  const { observations: original } = await s.recordObservations({
     enquiry,
     name: NAME,
     finding: "the historical series",
     contentHash: "sha256:orig",
   });
-  const regenerated = await s.recordObservations({
+  const { observations: regenerated } = await s.recordObservations({
     enquiry,
     name: NAME,
     finding: "regenerated from an inferred algorithm",
@@ -109,7 +109,7 @@ describe("S-9c: two parts, one name", () => {
   /** The same for the two absences, which S-9 fought to keep apart. */
   test("unverifiable and not-rebuilt stay distinguishable under a shared name", async () => {
     const { enquiry } = await anAnalysisComparingBothControls(session);
-    const noHash = await session.recordObservations({
+    const { observations: noHash } = await session.recordObservations({
       enquiry,
       name: NAME,
       finding: "a third copy, no hash recorded",

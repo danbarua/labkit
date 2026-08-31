@@ -66,31 +66,39 @@ const PROPOSITION = "the accelerated path matches the reference";
  * down what generated it, which is the whole situation.
  */
 async function aCachedConstructionWithOneUnrecordedPart() {
-  const enquiry = await session.openEnquiry("does the accelerated path match the reference?");
+  const { enquiry } = await session.openEnquiry("does the accelerated path match the reference?");
   const parts = [
-    await session.recordObservations({
-      enquiry,
-      name: "weights",
-      finding: "layer weights",
-      contentHash: "sha256:aaa",
-    }),
-    await session.recordObservations({
-      enquiry,
-      name: "splits",
-      finding: "fold assignment",
-      contentHash: "sha256:bbb",
-    }),
-    await session.recordObservations({
-      enquiry,
-      name: "priors",
-      finding: "prior draws",
-      contentHash: "sha256:ccc",
-    }),
-    await session.recordObservations({
-      enquiry,
-      name: CONTROL,
-      finding: "randomised control series",
-    }),
+    (
+      await session.recordObservations({
+        enquiry,
+        name: "weights",
+        finding: "layer weights",
+        contentHash: "sha256:aaa",
+      })
+    ).observations,
+    (
+      await session.recordObservations({
+        enquiry,
+        name: "splits",
+        finding: "fold assignment",
+        contentHash: "sha256:bbb",
+      })
+    ).observations,
+    (
+      await session.recordObservations({
+        enquiry,
+        name: "priors",
+        finding: "prior draws",
+        contentHash: "sha256:ccc",
+      })
+    ).observations,
+    (
+      await session.recordObservations({
+        enquiry,
+        name: CONTROL,
+        finding: "randomised control series",
+      })
+    ).observations,
   ];
   const { analysis, claims: analysisClaims } = await session.recordAnalysis({
     enquiry,
@@ -158,7 +166,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     // The researcher regenerates the control by inferring the old algorithm.
     // Same name, because it is a regeneration of that part -- and a different
     // thing, because nobody knows the original was made this way.
-    const regenerated = await session.recordObservations({
+    const { observations: regenerated } = await session.recordObservations({
       enquiry,
       name: CONTROL,
       finding: "randomised control series, regenerated from an inferred algorithm",
@@ -195,7 +203,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
    */
   test("Afterward 4: regenerating does not close the question of what made the original", async () => {
     const { enquiry } = await aCachedConstructionWithOneUnrecordedPart();
-    const unresolved = await session.openEnquiry("what generated the historical random control?");
+    const { enquiry: unresolved } = await session.openEnquiry(
+      "what generated the historical random control?",
+    );
 
     await session.recordObservations({
       enquiry,
@@ -330,7 +340,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     const { enquiry, parts } = await aCachedConstructionWithOneUnrecordedPart();
     const original = parts[3]!;
 
-    const regenerated = await session.recordObservations({
+    const { observations: regenerated } = await session.recordObservations({
       enquiry,
       name: CONTROL,
       finding: "randomised control series, regenerated from an inferred algorithm",

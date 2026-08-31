@@ -105,7 +105,7 @@ crit_gono=$(lab criterion "Stage 2A go/no-go gate: zero solver failures, zero no
 gate_gono=$(lab declare --governed-by "$crit_gono" --consequence "stage 4 does not run against the official test set, pending investigation" --protecting "$task_ladder")
 art_gono=$(lab observe "$loe6" --name stage2a_go_no_go \
   --finding "0/240,000 (image,topology) evolutions failed; 0 non-finite features in any condition, any topology; 270/270 fold/C fits converged, 6/6 final refits converged" \
-  --hash sha256:9da6b908)
+  --hash sha256:9da6b908 | grep '^ART_')
 lab evaluate "$crit_gono" --value "0/240,000 solver failures, 0 non-finite features, 270/270 + 6/6 classifier fits converged -- OVERALL: GO" --outcome pass --gate "$gate_gono" >/dev/null
 ask gate "$gate_gono"
 
@@ -116,7 +116,7 @@ say "the locked confirmatory result: T-evolved vs. encoded-pre-evolution, and th
 
 art_confirm2=$(lab observe "$loe6" --name stage2a_confirmatory_test_results \
   --finding "six conditions (raw pixels, encoded pre-evolution, evolved T/lattice/rewired/curr_random), each refit once at its already-selected C on the full 60,000-image official training set, then applied unchanged to the untouched 10,000-image official test set; 20,000 paired class-stratified bootstrap resamples per comparison" \
-  --hash sha256:203e56ff)
+  --hash sha256:203e56ff | grep '^ART_')
 out=$(lab analyse "$loe6" \
   --method "paired class-stratified bootstrap on per-image log-loss difference (evolved minus pre-evolution), 20,000 resamples, two-sided 95% percentile interval; locked success criterion: the entire interval below zero; secondary confirmation via exact McNemar's test on classification disagreement" \
   --from "$art_confirm2" \
@@ -125,10 +125,10 @@ out=$(lab analyse "$loe6" \
   --concludes '{"proposition": "runtime graph evolution on the canonical rewired control improves classification over pre-evolution", "finding": "mean d_i=-0.2819, 95% CI [-0.3074,-0.2570], entirely below zero, McNemar p=9.76e-133", "bearing": "supports"}' \
   --concludes '{"proposition": "runtime graph evolution on the canonical current-random control improves classification over pre-evolution", "finding": "mean d_i=-0.3049, 95% CI [-0.3303,-0.2797], entirely below zero, McNemar p=8.42e-138", "bearing": "supports"}')
 comp_confirm2=$(printf '%s\n' "$out" | sed -n 1p)
-clm_primary=$(printf '%s\n' "$out" | sed -n 2p)
-clm_sec_lattice=$(printf '%s\n' "$out" | sed -n 3p)
-clm_sec_rewired=$(printf '%s\n' "$out" | sed -n 4p)
-clm_sec_curr=$(printf '%s\n' "$out" | sed -n 5p)
+clm_primary=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
+clm_sec_lattice=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 2p)
+clm_sec_rewired=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 3p)
+clm_sec_curr=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 4p)
 
 # Promoted: this is the primary, locked, sole confirmatory comparison
 # (DESIGN.md) and the strongest positive Level 3 result this project has
@@ -149,13 +149,13 @@ q_cost=$(lab pose "does the oscillator readout's runtime graph evolution ever be
 loe_cost=$(lab pursue "$q_cost" --approach "per-topology train/inference cost accounting (encode, evolve, feature-post, CV search, final refit, single-image latency measured 100 repeats per condition), parameter-matched (H=13) and competent-context (H=128) MLP baselines; cuml.accel gated first (confirmed it does not accelerate MLPClassifier -- identical n_iter, near-identical wall-clock -- so MLP stays CPU sklearn, oscillator stays GPU, a real disclosed hardware asymmetry); break-even N solved algebraically per topology/baseline pair")
 art_cost=$(lab observe "$loe_cost" --name stage2a_compute_cost_accounting \
   --finding "at N=1: oscillator (evolved_T, GPU evolution) costs 13.7x MLP_H128; at N=1,000,000: 375.6x; at N=100,000,000: 551.8x; every algebraic break-even point (any topology, either baseline) solves to a negative N" \
-  --hash sha256:f9ec47d3)
+  --hash sha256:f9ec47d3 | grep '^ART_')
 out=$(lab analyse "$loe_cost" \
   --method "closed-form per-image cost model (Train_readout + N*Infer_readout vs Train_MLP + N*Infer_MLP), solved algebraically for the break-even N at every topology/baseline pair" \
   --from "$art_cost" \
   --concludes '{"proposition": "the oscillator readout becomes cheaper than an MLP baseline at some deployment scale", "finding": "no crossover exists at any plausible deployment scale -- the oscillator is strictly more expensive than either MLP baseline from N=1 to N=100,000,000, and the gap widens with scale rather than narrowing", "bearing": "challenges"}')
 comp_cost=$(printf '%s\n' "$out" | sed -n 1p)
-clm_cost=$(printf '%s\n' "$out" | sed -n 2p)
+clm_cost=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 lab close "$loe_cost" --answered-by "$clm_cost" >/dev/null
 ask enquiry "$loe_cost"
 

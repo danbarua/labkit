@@ -55,19 +55,19 @@ const clock: Clock = (() => {
 describe("commands are values a caller can hold", () => {
   test("a command built ahead of time issues the same act as an inline argument", async () => {
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
-    const question = await s.pose("does the pruning schedule move convergence?");
+    const { question } = await s.pose("does the pruning schedule move convergence?");
 
     // Built and held, not passed inline. The type annotation is the point:
     // it names a shape that had no name before this commit.
     const pursuing: PursueCommand = { question, approach: "paired sweep" };
-    const enquiry = await s.pursue(pursuing);
+    const { enquiry } = await s.pursue(pursuing);
 
     const observing: RecordObservationsCommand = {
       enquiry,
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     };
-    const observations = await s.recordObservations(observing);
+    const { observations } = await s.recordObservations(observing);
 
     const { claims: analysisClaims } = await s.recordAnalysis({
       enquiry,

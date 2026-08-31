@@ -53,8 +53,8 @@ const PROP = "the series does not differ from itself";
 
 describe("S-10e — the same record, read twice by one run", () => {
   test("a run that read one record twice is not reported as having read it once", async () => {
-    const enquiry = await session.openEnquiry("does the series differ from itself?");
-    const series = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry("does the series differ from itself?");
+    const { observations: series } = await session.recordObservations({
       enquiry,
       name: "series",
       finding: "twelve points",
@@ -88,13 +88,13 @@ describe("S-10e — the same record, read twice by one run", () => {
   });
 
   test("and the order of a repeat is kept, not just its count", async () => {
-    const enquiry = await session.openEnquiry("does the sandwich cancel?");
-    const a = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry("does the sandwich cancel?");
+    const { observations: a } = await session.recordObservations({
       enquiry,
       name: "series A",
       finding: "twelve points",
     });
-    const b = await session.recordObservations({
+    const { observations: b } = await session.recordObservations({
       enquiry,
       name: "series B",
       finding: "twelve points",

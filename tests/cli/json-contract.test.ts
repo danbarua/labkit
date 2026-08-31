@@ -43,15 +43,17 @@ import {
   reproductionReportSchema,
   supportExplanationSchema,
   taskContractSchema,
-  acknowledgementSchema,
-  criterionRefSchema,
-  enquiryRefSchema,
-  gateRefSchema,
-  observationsRefSchema,
+  openedEnquirySchema,
+  recordedObservationsSchema,
+  plannedWorkSchema,
+  statedCriterionSchema,
+  declaredGateSchema,
   recordedAnalysisSchema,
-  reviewRefSchema,
+  recordedReviewSchema,
   verificationReportSchema,
-  workRefSchema,
+  evaluatedCriterionSchema,
+  promotedSchema,
+  closedEnquirySchema,
 } from "../../src/mcp/schemas";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
@@ -318,20 +320,17 @@ test("every write command's --json parses against the MCP schema for the same ve
   // Captured while seeding, above — the seed drives the write commands rather
   // than the surfaces, so these are the real answers and not a fixture.
   const cases: Array<[command: string, schema: z.ZodType]> = [
-    ["open", enquiryRefSchema],
-    ["observe", observationsRefSchema],
-    ["plan", workRefSchema],
-    ["criterion", criterionRefSchema],
-    ["declare", gateRefSchema],
+    ["open", openedEnquirySchema],
+    ["observe", recordedObservationsSchema],
+    ["plan", plannedWorkSchema],
+    ["criterion", statedCriterionSchema],
+    ["declare", declaredGateSchema],
     ["analyse", recordedAnalysisSchema],
-    ["review", reviewRefSchema],
+    ["review", recordedReviewSchema],
     ["reverify", verificationReportSchema],
-    // The five verbs that return `void` answer with an acknowledgement. The CLI
-    // declares that shape itself rather than importing it, so this is where the
-    // two adapters are held to each other.
-    ["evaluate", acknowledgementSchema],
-    ["promote", acknowledgementSchema],
-    ["close", acknowledgementSchema],
+    ["evaluate", evaluatedCriterionSchema],
+    ["promote", promotedSchema],
+    ["close", closedEnquirySchema],
   ];
 
   expect(cases.length).toBeGreaterThan(8);

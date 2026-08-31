@@ -1,18 +1,28 @@
 /**
  * The write commands — one per public verb on `WriteSurface`.
  *
- * **Handles in, handles out.** Every command here prints what it minted, one
- * per line and nothing else, because that is what the next command takes:
- * `labkit close "$(labkit analyse …)"` only composes if the id is the whole of
- * stdout. That is the transport half of the repo's rule that *a verb that mints
- * something returns what it minted* — the verbs already do, and a CLI printing
+ * **Handles in, handles out.** Every command here prints the handles its act
+ * minted, one per line and nothing else, because that is what the next
+ * command takes: `labkit close "$(labkit analyse …)"` only composes if the id
+ * is the whole of stdout. That is the transport half of the repo's rule that
+ * *a verb that mints something returns what it minted* — the verbs already
+ * do, by way of the event `WriteSurface.emit` records, and a CLI printing
  * "done" would put the caller back to searching for what they had just made.
  *
- * `--json` gives the full report where a verb has one, in the same shape the
- * MCP tool returns for the same verb — including `{ok, acted}` for the five
- * verbs that return `void`. The old CLI answered those with `{enquiry: "LOE_1"}`,
- * which reads like something was minted; an acknowledgement says what was acted
- * on and claims nothing more.
+ * **The handles printed are `events[0].created`** — every verb's return value
+ * carries `events: DomainEvent[]`, and `created` is the drained list of
+ * everything the act minted. Before #161, a verb that minted more than one
+ * thing (an enquiry and its question; a decision alongside a claim) withheld
+ * every handle but the one its return type happened to name, and `close`,
+ * `evaluate`, `accept` and `promote` withheld all of theirs — they returned
+ * nothing, so the CLI answered with an acknowledgement that named what was
+ * *acted on* and nothing that was *created*. `mintedHandles()` below reads
+ * every event's `created` uniformly, so a verb minting several things and one
+ * minting nothing both fall out of the same line rather than a per-command
+ * special case.
+ *
+ * `--json` gives the full return value — the same shape the MCP tool answers
+ * with for the same verb, `events` included.
  *
  * Each body calls `write.someVerb(` literally, and `tests/cli/coverage.test.ts`
  * greps this directory for exactly that.
@@ -22,42 +32,28 @@ import type { Command } from "commander";
 import { collect, conclusion, handle, inputRef } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
-import type { ClaimRef, GateRef } from "../../domain";
+import type { ClaimRef, DomainEvent, GateRef } from "../../domain";
 
 /**
- * What a verb returning `void` answers with.
- *
- * Five verbs return nothing, and `JSON.stringify(undefined)` is not an answer.
- * An acknowledgement names what was acted on and claims nothing more, which is
- * the smallest honest thing — the old CLI said `{"enquiry": "LOE_1"}` for a
- * close, and that reads like something was minted.
- *
- * The shape is declared here rather than imported from `src/mcp/schemas.ts`,
- * deliberately. A type-only import would be cheap and would make the CLI's
- * answer a *consequence* of MCP's schema instead of an agreement between two
- * adapters — and an agreement is what `tests/cli/json-contract.test.ts` is for.
- * The layering is the same reason: `src/cli` and `src/mcp` are siblings over
- * the domain, not one over the other.
+ * Every handle an act minted, across however many events it recorded — in
+ * practice one, per CLAUDE.md's "a verb that composes others records one
+ * event, not one per step". Reading `events` rather than a per-verb field is
+ * what makes this the same line for every command: a verb minting nothing
+ * prints nothing, one minting several prints all of them, with no command
+ * having to know which case it is.
  */
-interface Acknowledgement {
-  ok: true;
-  acted: string;
-}
-
-const acknowledged = (acted: string) => {
-  const ack: Acknowledgement = { ok: true, acted };
-  return answer(ack, () => acted);
-};
+const mintedHandles = (events: readonly DomainEvent[]): readonly string[] =>
+  events.flatMap((e) => e.created ?? []);
 
 /**
- * A verb that mints one thing: `{question: "Q_1"}` in JSON, `Q_1` in prose.
- *
- * Uncoloured on purpose — see {@link asHandles}. The whole of stdout here is an
- * id the next command consumes, and an escape sequence in it breaks
- * `$(labkit …)` the moment someone sets `FORCE_COLOR`.
+ * Uncoloured on purpose — see {@link asHandles}. The whole of stdout here is
+ * an id (or several) the next command consumes, and an escape sequence in it
+ * breaks `$(labkit …)` the moment someone sets `FORCE_COLOR`.
  */
-const mintedOne = <K extends string>(kind: K, id: string) =>
-  answer({ [kind]: id } as Record<K, string>, () => id);
+const mintedView =
+  <T extends { events: readonly DomainEvent[] }>() =>
+  (r: T, p: Parameters<typeof asHandles>[1]) =>
+    asHandles(mintedHandles(r.events), p);
 
 export function registerWrites(program: Command, run: Run): void {
   program
@@ -66,7 +62,7 @@ export function registerWrites(program: Command, run: Run): void {
     .description("A question, without starting work on it. `open` does both at once.")
     .argument("<question>", "the question, as worded")
     .action(async (question: string) =>
-      run(async ({ write }) => mintedOne("question", await write.pose(question))),
+      run(async ({ write }) => answer(await write.pose(question), mintedView())),
     );
 
   program
@@ -79,7 +75,7 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<question>", "the question, as worded")
     .action(async (question: string) =>
-      run(async ({ write }) => mintedOne("enquiry", await write.openEnquiry(question))),
+      run(async ({ write }) => answer(await write.openEnquiry(question), mintedView())),
     );
 
   program
@@ -88,7 +84,7 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<question-id>", "e.g. Q_12", handle("question"))
     .requiredOption("--approach <text>", "how this line of enquiry will go about it")
     .action(async (question, { approach }: { approach: string }) =>
-      run(async ({ write }) => mintedOne("enquiry", await write.pursue({ question, approach }))),
+      run(async ({ write }) => answer(await write.pursue({ question, approach }), mintedView())),
     );
 
   program
@@ -103,7 +99,7 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--into <question>", "the sharper question")
     .requiredOption("--because <text>", "what prompted the narrowing")
     .action(async (from, { into, because }: { into: string; because: string }) =>
-      run(async ({ write }) => mintedOne("question", await write.sharpen({ from, into, because }))),
+      run(async ({ write }) => answer(await write.sharpen({ from, into, because }), mintedView())),
     );
 
   program
@@ -115,14 +111,14 @@ export function registerWrites(program: Command, run: Run): void {
     .option("--hash <text>", "a content hash, if there is one")
     .action(async (enquiry, opts: { name: string; finding: string; hash?: string }) =>
       run(async ({ write }) =>
-        mintedOne(
-          "observations",
+        answer(
           await write.recordObservations({
             enquiry,
             name: opts.name,
             finding: opts.finding,
             ...(opts.hash === undefined ? {} : { contentHash: opts.hash }),
           }),
+          mintedView(),
         ),
       ),
     );
@@ -132,8 +128,7 @@ export function registerWrites(program: Command, run: Run): void {
     .summary("record a computation, what it read, and what it concluded")
     .description(
       "The compound verb: a computation, its evidence unit, an output artefact, and one claim " +
-        "per conclusion. Answers with the analysis and then a claim per conclusion, in the " +
-        "order given.",
+        "per conclusion. Answers with every handle the act minted.",
     )
     .argument("<enquiry-id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what was done")
@@ -154,19 +149,19 @@ export function registerWrites(program: Command, run: Run): void {
       collect(handle("criterion")),
     )
     .action(async (enquiry, opts) =>
-      run(async ({ write }) => {
-        const recorded = await write.recordAnalysis({
-          enquiry,
-          method: opts.method,
-          from: opts.from,
-          concludes: opts.concludes,
-          ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
-          ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
-        });
-        return answer(recorded, (r, p) =>
-          asHandles([r.analysis, ...r.claims.map((c) => c.claim)], p),
-        );
-      }),
+      run(async ({ write }) =>
+        answer(
+          await write.recordAnalysis({
+            enquiry,
+            method: opts.method,
+            from: opts.from,
+            concludes: opts.concludes,
+            ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
+            ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
+          }),
+          mintedView(),
+        ),
+      ),
     );
 
   program
@@ -176,7 +171,7 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<analysis-id>", "the analysis being reviewed", handle("analysis"))
     .requiredOption("--verdict <text>", "what the review found")
     .action(async (of, { verdict }: { verdict: string }) =>
-      run(async ({ write }) => mintedOne("review", await write.recordReview({ of, verdict }))),
+      run(async ({ write }) => answer(await write.recordReview({ of, verdict }), mintedView())),
     );
 
   program
@@ -192,13 +187,15 @@ export function registerWrites(program: Command, run: Run): void {
     // `answeredBy` arrives already coerced -- the option declares `handle("claim")`
     // as its parser, so a wrong-kind id was refused before this ran.
     .action(async (enquiry, { answeredBy }: { answeredBy?: ClaimRef }) =>
-      run(async ({ write }) => {
-        await write.closeEnquiry({
-          enquiry,
-          ...(answeredBy === undefined ? {} : { answeredBy }),
-        });
-        return acknowledged(enquiry);
-      }),
+      run(async ({ write }) =>
+        answer(
+          await write.closeEnquiry({
+            enquiry,
+            ...(answeredBy === undefined ? {} : { answeredBy }),
+          }),
+          mintedView(),
+        ),
+      ),
     );
 
   program
@@ -213,13 +210,13 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .action(async (opts: { objective: string; acceptance: string; mayRead?: string[] }) =>
       run(async ({ write }) =>
-        mintedOne(
-          "work",
+        answer(
           await write.planWork({
             objective: opts.objective,
             acceptance: opts.acceptance,
             ...(opts.mayRead === undefined ? {} : { mayRead: opts.mayRead }),
           }),
+          mintedView(),
         ),
       ),
     );
@@ -234,7 +231,7 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<proposition>", "what must hold")
     .action(async (proposition: string) =>
-      run(async ({ write }) => mintedOne("criterion", await write.stateCriterion(proposition))),
+      run(async ({ write }) => answer(await write.stateCriterion(proposition), mintedView())),
     );
 
   program
@@ -253,13 +250,13 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .action(async (opts) =>
       run(async ({ write }) =>
-        mintedOne(
-          "gate",
+        answer(
           await write.declareGate({
             governedBy: opts.governedBy,
             consequence: opts.consequence,
             protecting: opts.protecting,
           }),
+          mintedView(),
         ),
       ),
     );
@@ -291,16 +288,18 @@ export function registerWrites(program: Command, run: Run): void {
           citing?: ClaimRef;
         },
       ) =>
-        run(async ({ write }) => {
-          await write.evaluateCriterion({
-            criterion,
-            value: opts.value,
-            outcome: opts.outcome,
-            ...(opts.gate === undefined ? {} : { gate: opts.gate }),
-            ...(opts.citing === undefined ? {} : { citing: opts.citing }),
-          });
-          return acknowledged(criterion);
-        }),
+        run(async ({ write }) =>
+          answer(
+            await write.evaluateCriterion({
+              criterion,
+              value: opts.value,
+              outcome: opts.outcome,
+              ...(opts.gate === undefined ? {} : { gate: opts.gate }),
+              ...(opts.citing === undefined ? {} : { citing: opts.citing }),
+            }),
+            mintedView(),
+          ),
+        ),
     );
 
   program
@@ -316,18 +315,18 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(inputRef))
     .requiredOption("--concludes <json>", `'{"proposition": "…", "finding": "…"}'`, conclusion)
     .action(async (historical, opts) =>
-      run(async ({ write }) => {
-        const report = await write.reverify({
-          historical,
-          enquiry: opts.enquiry,
-          method: opts.method,
-          under: opts.under,
-          concludes: opts.concludes,
-        });
-        return answer(report, (r, p) =>
-          asHandles([r.verification, ...r.claims.map((c) => c.claim)], p),
-        );
-      }),
+      run(async ({ write }) =>
+        answer(
+          await write.reverify({
+            historical,
+            enquiry: opts.enquiry,
+            method: opts.method,
+            under: opts.under,
+            concludes: opts.concludes,
+          }),
+          mintedView(),
+        ),
+      ),
     );
 
   program
@@ -347,15 +346,17 @@ export function registerWrites(program: Command, run: Run): void {
       handle("claim"),
     )
     .action(async (enquiry, opts: { because: string; until: string; inLightOf: ClaimRef }) =>
-      run(async ({ write }) => {
-        await write.acceptAsUnresolved({
-          enquiry,
-          because: opts.because,
-          until: opts.until,
-          inLightOf: opts.inLightOf,
-        });
-        return acknowledged(enquiry);
-      }),
+      run(async ({ write }) =>
+        answer(
+          await write.acceptAsUnresolved({
+            enquiry,
+            because: opts.because,
+            until: opts.until,
+            inLightOf: opts.inLightOf,
+          }),
+          mintedView(),
+        ),
+      ),
     );
 
   program
@@ -368,10 +369,7 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<claim-id>", "the claim being promoted", handle("claim"))
     .requiredOption("--because <text>", "what justifies promoting it")
     .action(async (claim, { because }: { because: string }) =>
-      run(async ({ write }) => {
-        await write.promote({ claim, because });
-        return acknowledged(claim);
-      }),
+      run(async ({ write }) => answer(await write.promote({ claim, because }), mintedView())),
     );
 
   program
@@ -387,15 +385,17 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--because <text>", "what prompted the amendment")
     .requiredOption("--citing <claim-id>", "the diagnosis it rests on", handle("claim"))
     .action(async (criterion, opts: { nowRequires: string; because: string; citing: ClaimRef }) =>
-      run(async ({ write }) => {
-        const report = await write.amendDesign({
-          criterion,
-          nowRequires: opts.nowRequires,
-          because: opts.because,
-          citing: opts.citing,
-        });
-        return answer(report, (r, p) => asHandles([r.amendment], p));
-      }),
+      run(async ({ write }) =>
+        answer(
+          await write.amendDesign({
+            criterion,
+            nowRequires: opts.nowRequires,
+            because: opts.because,
+            citing: opts.citing,
+          }),
+          mintedView(),
+        ),
+      ),
     );
 
   program
@@ -404,7 +404,7 @@ export function registerWrites(program: Command, run: Run): void {
     .description(
       "Invalidates the superseded output and records the replacement in one transaction, so a " +
         "failure between the halves cannot leave an earlier failure no longer deciding its " +
-        "check with no corrected check in existence. Answers with the replacement and its claims.",
+        "check with no corrected check in existence. Answers with every handle it minted.",
     )
     .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
     .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))
@@ -413,19 +413,19 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--from <id>", "an input it read (repeatable)", collect(inputRef))
     .requiredOption("--concludes <json>", "a conclusion (repeatable)", collect(conclusion))
     .action(async (supersedes, opts) =>
-      run(async ({ write }) => {
-        const report = await write.replaceAnalysis({
-          supersedes,
-          because: opts.because,
-          enquiry: opts.enquiry,
-          method: opts.method,
-          from: opts.from,
-          concludes: opts.concludes,
-        });
-        return answer(report, (r, p) =>
-          asHandles([r.replacement, ...r.claims.map((c) => c.claim)], p),
-        );
-      }),
+      run(async ({ write }) =>
+        answer(
+          await write.replaceAnalysis({
+            supersedes,
+            because: opts.because,
+            enquiry: opts.enquiry,
+            method: opts.method,
+            from: opts.from,
+            concludes: opts.concludes,
+          }),
+          mintedView(),
+        ),
+      ),
     );
 
   program
@@ -440,13 +440,15 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--as <text>", "the narrower reading")
     .requiredOption("--because <text>", "what prompted the narrowing")
     .action(async (of, opts: { as: string; because: string }) =>
-      run(async ({ write }) => {
-        const report = await write.reinterpret({
-          of,
-          as: opts.as,
-          because: opts.because,
-        });
-        return answer(report, (r, p) => asHandles([r.nowClaims.claim], p));
-      }),
+      run(async ({ write }) =>
+        answer(
+          await write.reinterpret({
+            of,
+            as: opts.as,
+            because: opts.because,
+          }),
+          mintedView(),
+        ),
+      ),
     );
 }

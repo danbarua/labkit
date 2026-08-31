@@ -53,9 +53,13 @@ afterAll(async () => {
 const BUCKETS = ["established", "provisional", "unresolved", "untested", "accepted"] as const;
 
 test("a reinterpretation does not move the question between buckets", async () => {
-  const enquiry = await s.openEnquiry("does the drug work?");
-  const crit = await s.stateCriterion("holds under leave-one-out");
-  const obs = await s.recordObservations({ enquiry, name: "cohort", finding: "+11%" });
+  const { enquiry } = await s.openEnquiry("does the drug work?");
+  const { criterion: crit } = await s.stateCriterion("holds under leave-one-out");
+  const { observations: obs } = await s.recordObservations({
+    enquiry,
+    name: "cohort",
+    finding: "+11%",
+  });
   const rec = await s.recordAnalysis({
     enquiry,
     method: "fit",

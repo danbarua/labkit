@@ -55,8 +55,10 @@ const TRANSFORMATION = "the encoding performs structured internal transformation
  * separate enquiry asks whether the learned construction is special.
  */
 async function aProgrammeWithOneOpenQuestion() {
-  const established = await session.openEnquiry("does the encoding transform structure at all?");
-  const priorObs = await session.recordObservations({
+  const { enquiry: established } = await session.openEnquiry(
+    "does the encoding transform structure at all?",
+  );
+  const { observations: priorObs } = await session.recordObservations({
     enquiry: established,
     name: "response-map measurements",
     finding: "response maps across 40 initial conditions",
@@ -73,10 +75,10 @@ async function aProgrammeWithOneOpenQuestion() {
     ],
   });
 
-  const specificity = await session.openEnquiry(
+  const { enquiry: specificity } = await session.openEnquiry(
     "is the learned construction special on the internal measure?",
   );
-  const observations = await session.recordObservations({
+  const { observations } = await session.recordObservations({
     enquiry: specificity,
     name: "five-construction comparison",
     finding: "internal mapping strength for all five graph constructions",
@@ -281,7 +283,7 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("an analysis from a different enquiry cannot answer this question", async () => {
     const { established, specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const elsewhere = await session.recordObservations({
+    const { observations: elsewhere } = await session.recordObservations({
       enquiry: established,
       name: "unrelated measurements",
       finding: "unrelated",
@@ -404,7 +406,7 @@ describe("S-4: a negative result that closes the question", () => {
     expect(before.challenged).toBe(true);
     expect(before.against).toHaveLength(1);
 
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: refutation,
       verdict: "the clustering metric was misapplied",
     });

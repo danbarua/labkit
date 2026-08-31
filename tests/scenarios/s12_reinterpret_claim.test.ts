@@ -55,11 +55,11 @@ const NARROWER = "discriminative signal attenuates less than non-discriminative 
  * withdraw all of it.
  */
 async function assertedTwice() {
-  const enquiry = await session.openEnquiry(
+  const { enquiry } = await session.openEnquiry(
     "does the encoding preferentially preserve discriminative signal?",
   );
 
-  const firstReadings = await session.recordObservations({
+  const { observations: firstReadings } = await session.recordObservations({
     enquiry,
     name: "attenuation readings, cohort A",
     finding: "signal amplitude before and after encoding, both signal types, cohort A",
@@ -76,7 +76,7 @@ async function assertedTwice() {
     ],
   });
 
-  const secondReadings = await session.recordObservations({
+  const { observations: secondReadings } = await session.recordObservations({
     enquiry,
     name: "attenuation readings, cohort B",
     finding: "signal amplitude before and after encoding, both signal types, cohort B",
@@ -317,7 +317,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   test("challenging a claim leaves its evidence standing", async () => {
     const programme = await assertedTwice();
 
-    const contrary = await session.recordObservations({
+    const { observations: contrary } = await session.recordObservations({
       enquiry: programme.enquiry,
       name: "attenuation readings, cohort C",
       finding: "signal amplitude before and after encoding, cohort C",
@@ -369,7 +369,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       because: "both types attenuate",
     });
 
-    const moreReadings = await session.recordObservations({
+    const { observations: moreReadings } = await session.recordObservations({
       enquiry: programme.enquiry,
       name: "attenuation readings, cohort D",
       finding: "signal amplitude before and after encoding, cohort D",

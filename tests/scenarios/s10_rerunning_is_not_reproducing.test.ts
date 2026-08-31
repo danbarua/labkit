@@ -65,7 +65,9 @@ const PROPOSITION = "the annealed protocol converges below tolerance";
  * situation, and is expressible today.
  */
 async function aHistoricalResultWithNoRecordedInputs() {
-  const enquiry = await session.openEnquiry("does the annealed protocol converge below tolerance?");
+  const { enquiry } = await session.openEnquiry(
+    "does the annealed protocol converge below tolerance?",
+  );
   const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
     enquiry,
     method: "annealing-v1",
@@ -97,7 +99,7 @@ describe("S-10: rerunning is not reproducing", () => {
   test("recorded as two analyses, the re-run reads as independent confirmation", async () => {
     const { enquiry, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
 
-    const conditions = await session.recordObservations({
+    const { observations: conditions } = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
@@ -127,7 +129,7 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 1: the conclusion may be reproduced; the execution is not", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
-    const conditions = await session.recordObservations({
+    const { observations: conditions } = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
@@ -160,7 +162,7 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 2: the difference is named as unrecorded, not as equal", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
-    const conditions = await session.recordObservations({
+    const { observations: conditions } = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
@@ -193,7 +195,7 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 3: bearing on the historical claim is answerable and is not confirmation", async () => {
     const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
-    const conditions = await session.recordObservations({
+    const { observations: conditions } = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
@@ -237,7 +239,7 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 4: the record says the original never recorded what it read", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
-    const conditions = await session.recordObservations({
+    const { observations: conditions } = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
@@ -272,10 +274,10 @@ describe("S-10: rerunning is not reproducing", () => {
    * or it is just a blanket caveat on every second run.
    */
   test("two runs over the same recorded inputs are a reproduction, and comparable", async () => {
-    const enquiry = await session.openEnquiry(
+    const { enquiry } = await session.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const conditions = await session.recordObservations({
+    const { observations: conditions } = await session.recordObservations({
       enquiry,
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
@@ -314,15 +316,15 @@ describe("S-10: rerunning is not reproducing", () => {
    * Two runs can each record "initial conditions" and mean different data.
    */
   test("two inputs sharing a name are not the same input", async () => {
-    const enquiry = await session.openEnquiry(
+    const { enquiry } = await session.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const theirs = await session.recordObservations({
+    const { observations: theirs } = await session.recordObservations({
       enquiry,
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const mine = await session.recordObservations({
+    const { observations: mine } = await session.recordObservations({
       enquiry,
       name: "initial conditions",
       finding: "seed 91, tolerance 1e-3, 64 steps",
@@ -399,15 +401,15 @@ describe("S-10: rerunning is not reproducing", () => {
    * `not-reproduced` with nothing named as differing.
    */
   test("an input the original used and the re-run did not is named", async () => {
-    const enquiry = await session.openEnquiry(
+    const { enquiry } = await session.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const a = await session.recordObservations({
+    const { observations: a } = await session.recordObservations({
       enquiry,
       name: "conditions A",
       finding: "seed 4",
     });
-    const b = await session.recordObservations({
+    const { observations: b } = await session.recordObservations({
       enquiry,
       name: "conditions B",
       finding: "warm start",
@@ -441,7 +443,7 @@ describe("S-10: rerunning is not reproducing", () => {
    * *against* the proposition were reported as disagreeing with each other.
    */
   test("two runs that both find against the proposition agree with each other", async () => {
-    const enquiry = await session.openEnquiry(
+    const { enquiry } = await session.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
     const { analysis: historical } = await session.recordAnalysis({
@@ -456,7 +458,7 @@ describe("S-10: rerunning is not reproducing", () => {
         },
       ],
     });
-    const conditions = await session.recordObservations({
+    const { observations: conditions } = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
@@ -487,10 +489,10 @@ describe("S-10: rerunning is not reproducing", () => {
    * report had just said was not an independent supporting finding.
    */
   test("the claim does not rest on the re-run's inputs", async () => {
-    const enquiry = await session.openEnquiry(
+    const { enquiry } = await session.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const original = await session.recordObservations({
+    const { observations: original } = await session.recordObservations({
       enquiry,
       name: "original conditions",
       finding: "seed 1",
@@ -501,7 +503,7 @@ describe("S-10: rerunning is not reproducing", () => {
       from: [original],
       concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
     });
-    const fresh = await session.recordObservations({
+    const { observations: fresh } = await session.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",

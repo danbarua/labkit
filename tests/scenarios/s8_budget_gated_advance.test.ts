@@ -67,24 +67,24 @@ const COST = "a full run costs roughly 9,000 GPU-hours at the current throughput
  * them, which is the whole point of this scenario.
  */
 async function aStagedProgramme() {
-  const enquiry = await session.openEnquiry(
+  const { enquiry } = await session.openEnquiry(
     "does the learned topology classify better than the baseline?",
   );
 
-  const feasibility = await session.planWork({
+  const { work: feasibility } = await session.planWork({
     objective: "feasibility slice: 1,000 training images",
     acceptance: "the pipeline runs end to end and reports throughput",
     mayRead: ["the 1,000-image training slice"],
   });
-  const fullRun = await session.planWork({
+  const { work: fullRun } = await session.planWork({
     objective: "the full classification run",
     acceptance: "all folds complete on the full training set",
     mayRead: ["the full training set"],
   });
 
-  const throughput = await session.stateCriterion(THROUGHPUT);
-  const solverHealth = await session.stateCriterion(SOLVER_HEALTH);
-  const advancement = await session.declareGate({
+  const { criterion: throughput } = await session.stateCriterion(THROUGHPUT);
+  const { criterion: solverHealth } = await session.stateCriterion(SOLVER_HEALTH);
+  const { gate: advancement } = await session.declareGate({
     governedBy: [throughput, solverHealth],
     consequence: "the full run may start",
     protecting: [fullRun],
@@ -115,7 +115,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     expect(contract.mayRead).not.toContain("the held-out official test set");
 
     // Agent:      first step passed.
-    const readings = await session.recordObservations({
+    const { observations: readings } = await session.recordObservations({
       enquiry: programme.enquiry,
       name: "feasibility slice timings",
       finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
@@ -321,7 +321,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
 /** The feasibility step, run and measured. */
 async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aStagedProgramme>>) {
-  const readings = await session.recordObservations({
+  const { observations: readings } = await session.recordObservations({
     enquiry: programme.enquiry,
     name: "feasibility slice timings",
     finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",

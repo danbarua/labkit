@@ -102,20 +102,20 @@ q2b=$(lab pose "does runtime graph evolution, on top of an already dynamically-e
 loe2b=$(lab pursue "$q2b" --approach "a four-stage feasibility ladder (n=1,000, n=5,000, Phase A/B at 60,000, one locked stage-4 confirmatory evaluation) reusing Stage 2A's encoder/evolution machinery against a ridge-based reconstruction readout, plus a separately-tested CNN baseline; corruption/RNG, the intercept-aware SVD ridge, studentized sign-flip and two Holm families locked before any ladder rung ran")
 
 art_ladder2b=$(lab observe "$loe2b" --name stage2b_feasibility_ladder \
-  --finding "stages 1 (n=1,000) and 2 (n=5,000) both _OK; Phase A (corrupt+encode, 60,000 images, moved to local CPU, 11.3 min) and Phase B (evolution/ridge/CNN on GPU) both complete; the encoder gate's own first real run FAILED honestly at ENCODER_STEPS=150 (rho=169.851 vs threshold 10), diagnosed as slow convergence not a floor, and re-ran PASS at 1,200 steps -- disclosed as a post-lock amendment, not silently raised")
+  --finding "stages 1 (n=1,000) and 2 (n=5,000) both _OK; Phase A (corrupt+encode, 60,000 images, moved to local CPU, 11.3 min) and Phase B (evolution/ridge/CNN on GPU) both complete; the encoder gate's own first real run FAILED honestly at ENCODER_STEPS=150 (rho=169.851 vs threshold 10), diagnosed as slow convergence not a floor, and re-ran PASS at 1,200 steps -- disclosed as a post-lock amendment, not silently raised" | grep '^ART_')
 
 say "the locked stage-4 confirmatory result"
 
 art_confirm2b=$(lab observe "$loe2b" --name stage2b_stage4_official_result \
-  --finding "STAGE4_OK, run_ladder_stage4.py, commit 431d90a, one evaluation on the official 10,000-image KMNIST test corpus, active-support post-clip MSE; primary and denoising-gate tests outside both multiplicity families per the locked design, two Holm families (3-way controls-vs-pre, 6-way pairwise) run separately")
+  --finding "STAGE4_OK, run_ladder_stage4.py, commit 431d90a, one evaluation on the official 10,000-image KMNIST test corpus, active-support post-clip MSE; primary and denoising-gate tests outside both multiplicity families per the locked design, two Holm families (3-way controls-vs-pre, 6-way pairwise) run separately" | grep '^ART_')
 out=$(lab analyse "$loe2b" \
   --method "primary paired class-stratified bootstrap (d_i = MSE_i(T) - MSE_i(pre_evolution), 20,000 resamples, seed=42, two-sided 95% percentile interval); denoising gate (T vs identity) evaluated only because the primary succeeded, never rescuing a failed primary; two Holm-corrected families (3-way controls-vs-pre, 6-way pairwise among the four evolved graphs) with a 100,000-flip sign-flip robustness check on family 2" \
   --from "$art_confirm2b" \
   --concludes '{"proposition": "runtime graph evolution on T improves single-step active-support reconstruction over the already dynamically-encoded pre-evolution state", "finding": "primary: mean d_i=-0.0044509, 95% CI [-0.0046028,-0.0043002], entirely below zero; denoising gate (T vs identity) also entirely below zero, CI [-0.1335739,-0.1328960] -- the actual-denoising claim is added to the primary reconstruction claim, not just the weaker relative one", "bearing": "supports"}' \
   --concludes '{"proposition": "T is the unique winner among the four tested evolved graphs on this task", "finding": "all three controls beat pre_evolution (Family 1, Holm-rejected); T beats each of the other three evolved graphs after Family-2 Holm correction (vs lattice t=-8.74 p=2.73e-18; vs rewired t=-38.10; vs curr_random t=-26.85), all six pairwise Holm-rejected, sign-flip robustness agreeing in direction and significance on all six; not established that T beats the CNN overall -- a separate model class outside both statistics families, mean clipped MSE 0.063069 vs T'\''s 0.065623, reported descriptively per DESIGN.md'\''s own framing", "bearing": "supports"}')
 comp_confirm2b=$(printf '%s\n' "$out" | sed -n 1p)
-clm_primary2b=$(printf '%s\n' "$out" | sed -n 2p)
-clm_winner2b=$(printf '%s\n' "$out" | sed -n 3p)
+clm_primary2b=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
+clm_winner2b=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 2p)
 
 lab promote "$clm_primary2b" --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, with the denoising gate against identity also passing on its own paired bootstrap" >/dev/null
 

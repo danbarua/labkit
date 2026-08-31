@@ -55,8 +55,8 @@ const TRENDS = "the response trends upward with dose";
  * inherits that, in the world if not in the record.
  */
 async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("does the response trend upward with dose?");
-  const raw = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("does the response trend upward with dose?");
+  const { observations: raw } = await s.recordObservations({
     enquiry,
     name: "raw sensor series",
     finding: "eleven dose levels, instrument settings not logged",

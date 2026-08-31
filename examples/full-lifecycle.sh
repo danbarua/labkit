@@ -134,6 +134,22 @@ handle() {
   printf '%s' "$value"
 }
 
+# The one line carrying this prefix, out of a multi-handle answer. `open` and
+# `observe` each mint more than one thing (#161: prose prints every handle the
+# act created, one per line), so `$LAST` after one of those is several lines
+# and a caller needing one specific handle has to name which line is theirs.
+pick() {
+  local prefix="$1" blob="$2" line
+  while IFS= read -r line; do
+    if [[ "$line" == "$prefix"_* ]]; then
+      printf '%s' "$line"
+      return 0
+    fi
+  done <<<"$blob"
+  printf '\nno %s_ handle in: %s\n' "$prefix" "$blob" >&2
+  exit 1
+}
+
 # ---------------------------------------------------------------------------
 
 # The document's own title is a heading, not prose. It was inside the prose
@@ -163,7 +179,7 @@ chapter "Asking a question" \
   "Handles are how every later command names this work."
 
 lab open 'does the pruning schedule move convergence?'
-enquiry=$(handle LOE "$LAST")
+enquiry=$(pick LOE "$LAST")
 
 chapter "Saying in advance what would count" \
   "Before any measurement: the work's objective and what would meet it, then" \
@@ -199,7 +215,7 @@ lab observe "$enquiry" \
   --name 'depth-sweep-raw' \
   --finding 'convergence step counts at depths 4, 8, 12, 16, 20' \
   --hash 'sha256:9f2b'
-observations=$(handle ART "$LAST")
+observations=$(pick ART "$LAST")
 
 say "One act, many records: a computation, an evidence unit, an output" \
     "artefact, and one claim per conclusion. It answers with the analysis" \
@@ -257,16 +273,16 @@ lab pose 'does depth interact with the schedule?'
 say "Pursued and measured, with nothing concluded yet:"
 
 lab open 'is the effect stable across seeds?'
-seeds=$(handle LOE "$LAST")
+seeds=$(pick LOE "$LAST")
 lab observe "$seeds" --name 'seed-sweep-raw' --finding 'convergence step counts over 20 seeds'
 
 say "Concluded and closed -- but nobody promoted the finding, so the answer" \
     "rests on scratch:"
 
 lab open 'does it hold on the held-out split?'
-holdout=$(handle LOE "$LAST")
+holdout=$(pick LOE "$LAST")
 lab observe "$holdout" --name 'holdout-raw' --finding 'convergence on the held-out split'
-holdout_obs=$(handle ART "$LAST")
+holdout_obs=$(pick ART "$LAST")
 lab analyse "$holdout" \
   --method 'paired comparison on the held-out split' \
   --from "$holdout_obs" \
@@ -278,7 +294,7 @@ say "And one left open on purpose, with the condition that would reopen it." \
     "That is not the same as nobody having got round to it:"
 
 lab open 'why does depth 12 behave differently?'
-anomaly=$(handle LOE "$LAST")
+anomaly=$(pick LOE "$LAST")
 lab accept "$anomaly" \
   --because 'the confirmatory set is spent and this needs a fresh design' \
   --until 'a data source other than the spent set' \

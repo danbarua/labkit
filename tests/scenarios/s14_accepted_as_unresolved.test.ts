@@ -64,8 +64,8 @@ const CONDITION = "a genuinely new design, or a data source other than the spent
  * the whole point of the first Afterward bullet.
  */
 async function aMarginalComparisonWithNothingLeftToRunIt() {
-  const enquiry = await session.openEnquiry(MARGINAL);
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry(MARGINAL);
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "marginal split results",
     finding: "per-image accuracy on the marginal split",
@@ -217,7 +217,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
     });
 
     // A new data source turns up -- the named condition, met.
-    const fresh = await session.recordObservations({
+    const { observations: fresh } = await session.recordObservations({
       enquiry,
       name: "external replication cohort",
       finding: "per-image accuracy, independent cohort",
