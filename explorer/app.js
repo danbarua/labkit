@@ -616,6 +616,82 @@ function render() {
     }
     ctx.globalAlpha = 1;
   }
+
+  if (state.view === "3d") drawCompass();
+}
+
+// A small always-visible orientation gizmo, 3D only: three axis ticks and an
+// arrowhead-plus-label on the time (z) axis, so a viewer who has rotated past
+// the point of recognising which way is "forward in time" -- the report that
+// prompted this -- can read it off the corner instead of re-deriving it from
+// the graph's shape. Anchored to the visible canvas (above #derived-panel),
+// live-measured the same way autofit() is rather than hardcoded, because
+// style.css's own #hint already went stale against a panel-height change
+// once.
+//
+// Orthographic, not run through project()'s perspective divide: this is a
+// compass, not a scene object, and shrinking it as camera.distance changes
+// would read as the compass drifting rather than the camera moving. The
+// axis directions are project()'s own rotation (yaw then pitch) applied to
+// the three unit vectors by hand, since project() only accepts a node.
+function drawCompass() {
+  const rect = canvas.getBoundingClientRect();
+  const panelHeight = derivedPanel.getBoundingClientRect().height;
+  const margin = 34;
+  const cx = margin;
+  const cy = rect.height - panelHeight - margin;
+  if (cy < margin) return; // panel covers the whole canvas -- nothing to anchor to
+
+  const { yaw, pitch } = state.camera;
+  const cosY = Math.cos(yaw);
+  const sinY = Math.sin(yaw);
+  const cosX = Math.cos(pitch);
+  const sinX = Math.sin(pitch);
+  const len = 26;
+
+  const axes = [
+    { x1: cosY, y1: -sinY * sinX, z2: sinY * cosX, color: "#e0687a", label: null },
+    { x1: 0, y1: cosX, z2: sinX, color: "#5ad1c9", label: null },
+    { x1: -sinY, y1: -cosY * sinX, z2: cosY * cosX, color: "#e0b25a", label: "time" },
+  ];
+  // Farthest-into-the-screen axis drawn first, so a nearer one overlaps it.
+  axes.sort((a, b) => a.z2 - b.z2);
+
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.font = "10px ui-monospace, monospace";
+  for (const axis of axes) {
+    const ex = cx + axis.x1 * len;
+    const ey = cy + axis.y1 * len;
+    const depthAlpha = 0.55 + 0.45 * ((axis.z2 + 1) / 2); // nearer = more opaque
+    ctx.globalAlpha = depthAlpha;
+    ctx.strokeStyle = axis.color;
+    ctx.fillStyle = axis.color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    const armLen = Math.hypot(ex - cx, ey - cy);
+    if (armLen < 3) {
+      // Looking straight down this axis -- an arrow of ~zero length reads as
+      // "missing", not "pointing at the camera". A ring says so instead.
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (axis.label) {
+      const ang = Math.atan2(ey - cy, ex - cx);
+      const headLen = 6;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - headLen * Math.cos(ang - 0.4), ey - headLen * Math.sin(ang - 0.4));
+      ctx.lineTo(ex - headLen * Math.cos(ang + 0.4), ey - headLen * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillText(axis.label, ex + 5, ey + 3);
+    }
+  }
+  ctx.restore();
 }
 
 // Grows state.zoom (2D only -- see its declaration) so a node the sim has
