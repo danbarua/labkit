@@ -145,6 +145,26 @@ interface RecordedConclusion {
   finding: string;
 }
 
+/**
+ * The refusal a caller meets when they cite a claim nothing has concluded.
+ *
+ * **One spelling, because four is this repository's oldest defect shape.** The
+ * text was hand-written at four call sites, which is written-once and forgotten
+ * the second time — the same shape as the `SUPPORTS`/`CHALLENGES` traversal that
+ * appeared six times and was corrected five. A message is not a traversal, but
+ * the arithmetic is identical: the next person to improve this wording improves
+ * one of four, and the record then refuses the same act in two different voices.
+ *
+ * It is the highest-frequency refusal in the domain — every verb that cites a
+ * claim reaches it — so it is the one most worth having exactly once.
+ *
+ * Ordered fact, rule, implication, which is the order every rewritten refusal
+ * under #164 uses: what the domain got, what it expected, what would satisfy it.
+ */
+const noFindingBearsOn = (claim: ClaimRef): string =>
+  `no finding bears on claim ${claim}; a claim can be cited only once an analysis ` +
+  `has concluded it and produced the evidence bearing on it`;
+
 export class WriteSurface extends SessionCore {
   /**
    * Puts a question on the record without pursuing it.
@@ -671,10 +691,7 @@ export class WriteSurface extends SessionCore {
           );
         }
         const found = await this.findingOn(input.answeredBy);
-        if (!found)
-          throw new Error(
-            `no finding bears on claim ${input.answeredBy}; a claim can be cited only once an analysis has concluded it and produced the evidence bearing on it`,
-          );
+        if (!found) throw new Error(noFindingBearsOn(input.answeredBy));
         answerBearing = found.evidence;
         answeredProposition = found.asserts;
       }
@@ -826,10 +843,7 @@ export class WriteSurface extends SessionCore {
       let basis: EvidenceRef | undefined;
       if (input.citing) {
         const found = await this.findingOn(input.citing);
-        if (!found)
-          throw new Error(
-            `no finding bears on claim ${input.citing}; a claim can be cited only once an analysis has concluded it and produced the evidence bearing on it`,
-          );
+        if (!found) throw new Error(noFindingBearsOn(input.citing));
         basis = found.evidence;
       }
       const at = this.clock.now();
@@ -968,10 +982,7 @@ export class WriteSurface extends SessionCore {
           );
 
         const found = await this.findingOn(input.inLightOf);
-        if (!found)
-          throw new Error(
-            `no finding bears on claim ${input.inLightOf}; a claim can be cited only once an analysis has concluded it and produced the evidence bearing on it`,
-          );
+        if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
         const basis = found.evidence;
 
         const decision = await this.graph.createNode("Decision", {
@@ -1090,10 +1101,7 @@ export class WriteSurface extends SessionCore {
         );
 
       const cited = await this.findingOn(input.citing);
-      if (!cited)
-        throw new Error(
-          `no finding bears on claim ${input.citing}; a claim can be cited only once an analysis has concluded it and produced the evidence bearing on it`,
-        );
+      if (!cited) throw new Error(noFindingBearsOn(input.citing));
       const diagnosis = cited.evidence;
 
       const gates = await this.gatesGovernedBy(input.criterion);
