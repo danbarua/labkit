@@ -96,6 +96,34 @@ function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
   return [...new Map(items.map((item) => [id(item), item])).values()];
 }
 
+/**
+ * **What a refusal may point a caller at, and what it may not.**
+ *
+ * Two near-misses in two pull requests produced this, and both looked done
+ * because the first case checked out.
+ *
+ * **A refusal may not name a command.** The domain does not know which surface
+ * is calling, and the two do not agree: `pursuits`/`pursuits_of`,
+ * `claims`/`claims_asserting`, `work`/`work_list`, `gates`/`gate_list`. Four of
+ * the five checked differ, so naming one hands the other audience
+ * `unknown command`. Name the **act** instead — *an enquiry is opened against a
+ * question* — which is true wherever the caller is.
+ *
+ * **A verb may be named only if both surfaces spell it identically AND its
+ * promise has been checked against the code that implements it.** `search` is
+ * spelled the same on both, which is why the first version of this file pointed
+ * six refusals at it — and three of those promised something it cannot do.
+ * `search` scans {@link SEARCHABLE_PROSE}, and `Computation`, `Claim` and
+ * `Artefact` are absent from that table: one is the `ReadOnlyString` bug #159
+ * excluded, two are deliberate `IndexedString` exclusions. *"'search' finds its
+ * handle by the method"* sent a caller to a search that returns nothing.
+ *
+ * **A taught remedy that fails is worse than the opacity it replaced**, because
+ * the caller believes it and spends the trust before finding out. That is the
+ * whole reason this comment sits here rather than in CLAUDE.md: the reader who
+ * needs it is the one adding the next refusal, and they are looking at this
+ * file.
+ */
 export class ReadSurface extends SessionCore {
   /**
    * What was done, in order — the one read that answers from the event log
@@ -1157,7 +1185,7 @@ export class ReadSurface extends SessionCore {
     const proposition = await this.assertedBy(claim);
     if (proposition === undefined)
       throw new Error(
-        `no claim ${claim}; a claim exists once an analysis concludes it, and 'search' turns its proposition into a handle`,
+        `no claim ${claim}; a claim exists once an analysis concludes it, and its handle comes back from that act or from looking up the exact proposition it asserts`,
       );
     const steps: Revision[] = [];
     let current: ConcludedClaim[] = [{ claim, asserts: proposition }];
@@ -1669,7 +1697,7 @@ export class ReadSurface extends SessionCore {
     );
     if (subject.length === 0)
       throw new Error(
-        `no analysis ${analysis}; an analysis is recorded before it can be read back, and 'search' finds its handle by the method`,
+        `no analysis ${analysis}; an analysis is recorded before it can be read back, and its handle comes back from the act that recorded it`,
       );
 
     const parts = await this.graph.query(
@@ -1959,7 +1987,7 @@ export class ReadSurface extends SessionCore {
     );
     if (rows.length === 0)
       throw new Error(
-        `no artefact named "${name}"; observations are named when recorded — 'search' finds one by its name or finding`,
+        `no artefact named "${name}"; observations are named when they are recorded, and the handle comes back from that act`,
       );
     if (rows.length > 1) {
       throw new Error(
