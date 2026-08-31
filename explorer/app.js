@@ -13,6 +13,7 @@ const CLOSING_OPS = new Set(["closeEnquiry", "acceptAsUnresolved"]);
 
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d");
+const derivedPanel = document.getElementById("derived-panel");
 const queueList = document.getElementById("queue-list");
 const popover = document.getElementById("popover");
 const hint = document.getElementById("hint");
@@ -42,6 +43,12 @@ const state = (window.__labkitExplorerState = {
   screenPos: new Map(), // handle -> {x, y} last-projected screen position, for hit testing
   camera: { yaw: 0.5, pitch: -0.35, distance: 620 },
   drag: null,
+  // A 2D-only zoom-out factor (>=1). autofit() grows this when a node lands
+  // outside the visible canvas; nothing shrinks it back -- the mouse wheel
+  // already owns 3D's zoom via camera.distance, and a view that zoomed itself
+  // both in and out under a still-settling physics sim would fight a viewer's
+  // own scroll input constantly.
+  zoom: 1,
   lastStepSeq: null, // seq of the most recently applied step, for the temporal overlay
   lastTouched: new Set(), // handles created, connected, or named as subject by the last step
 });
@@ -152,6 +159,7 @@ function resetRun() {
   state.playing = false;
   state.lastStepSeq = null;
   state.lastTouched = new Set();
+  state.zoom = 1;
   playBtn.textContent = "▶";
   playBtn.classList.remove("playing");
   renderQueue();
@@ -515,7 +523,13 @@ function tickPhysics() {
 function project(node) {
   if (state.view === "2d") {
     const rect = canvas.getBoundingClientRect();
-    return { sx: rect.width / 2 + node.x, sy: rect.height / 2 + node.y, scale: 1, depth: 0 };
+    const z = 1 / state.zoom;
+    return {
+      sx: rect.width / 2 + node.x * z,
+      sy: rect.height / 2 + node.y * z,
+      scale: z,
+      depth: 0,
+    };
   }
   const rect = canvas.getBoundingClientRect();
   const { yaw, pitch, distance } = state.camera;
@@ -602,10 +616,113 @@ function render() {
     }
     ctx.globalAlpha = 1;
   }
+
+  if (state.view === "3d") drawCompass();
+}
+
+// A small always-visible orientation gizmo, 3D only: three axis ticks and an
+// arrowhead-plus-label on the time (z) axis, so a viewer who has rotated past
+// the point of recognising which way is "forward in time" -- the report that
+// prompted this -- can read it off the corner instead of re-deriving it from
+// the graph's shape. Anchored to the visible canvas (above #derived-panel),
+// live-measured the same way autofit() is rather than hardcoded, because
+// style.css's own #hint already went stale against a panel-height change
+// once.
+//
+// Orthographic, not run through project()'s perspective divide: this is a
+// compass, not a scene object, and shrinking it as camera.distance changes
+// would read as the compass drifting rather than the camera moving. The
+// axis directions are project()'s own rotation (yaw then pitch) applied to
+// the three unit vectors by hand, since project() only accepts a node.
+function drawCompass() {
+  const rect = canvas.getBoundingClientRect();
+  const panelHeight = derivedPanel.getBoundingClientRect().height;
+  const margin = 34;
+  const cx = margin;
+  const cy = rect.height - panelHeight - margin;
+  if (cy < margin) return; // panel covers the whole canvas -- nothing to anchor to
+
+  const { yaw, pitch } = state.camera;
+  const cosY = Math.cos(yaw);
+  const sinY = Math.sin(yaw);
+  const cosX = Math.cos(pitch);
+  const sinX = Math.sin(pitch);
+  const len = 26;
+
+  const axes = [
+    { x1: cosY, y1: -sinY * sinX, z2: sinY * cosX, color: "#e0687a", label: null },
+    { x1: 0, y1: cosX, z2: sinX, color: "#5ad1c9", label: null },
+    { x1: -sinY, y1: -cosY * sinX, z2: cosY * cosX, color: "#e0b25a", label: "time" },
+  ];
+  // Farthest-into-the-screen axis drawn first, so a nearer one overlaps it.
+  axes.sort((a, b) => a.z2 - b.z2);
+
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.font = "10px ui-monospace, monospace";
+  for (const axis of axes) {
+    const ex = cx + axis.x1 * len;
+    const ey = cy + axis.y1 * len;
+    const depthAlpha = 0.55 + 0.45 * ((axis.z2 + 1) / 2); // nearer = more opaque
+    ctx.globalAlpha = depthAlpha;
+    ctx.strokeStyle = axis.color;
+    ctx.fillStyle = axis.color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    const armLen = Math.hypot(ex - cx, ey - cy);
+    if (armLen < 3) {
+      // Looking straight down this axis -- an arrow of ~zero length reads as
+      // "missing", not "pointing at the camera". A ring says so instead.
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (axis.label) {
+      const ang = Math.atan2(ey - cy, ex - cx);
+      const headLen = 6;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - headLen * Math.cos(ang - 0.4), ey - headLen * Math.sin(ang - 0.4));
+      ctx.lineTo(ex - headLen * Math.cos(ang + 0.4), ey - headLen * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillText(axis.label, ex + 5, ey + 3);
+    }
+  }
+  ctx.restore();
+}
+
+// Grows state.zoom (2D only -- see its declaration) so a node the sim has
+// pushed outside the visible canvas comes back into view, rather than
+// leaving a viewer to notice the graph has quietly grown past the edge and
+// go hunting for what fell off. "Visible" excludes #derived-panel's own
+// height, which sits on top of the canvas at the bottom -- a node fitting
+// the full canvas but hidden under that panel is not actually visible.
+// Never shrinks zoom back in: the physics sim never stops nudging positions,
+// so a fit tight enough to shrink on would flicker in and out as nodes drift
+// by a pixel. Only 2D has a zoom concept; 3D's "zoom" is camera.distance,
+// which the mouse wheel already owns and this must not fight.
+function autofit() {
+  if (state.view !== "2d" || state.nodes.size === 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const visibleHeight = rect.height - derivedPanel.getBoundingClientRect().height;
+  if (visibleHeight <= 0) return;
+  const margin = 0.9; // 10% headroom inside the box a node must fit within
+  const halfW = (rect.width / 2) * margin;
+  const halfH = (visibleHeight / 2) * margin;
+  let needed = 1;
+  for (const n of state.nodes.values()) {
+    if (halfW > 0) needed = Math.max(needed, Math.abs(n.x) / halfW);
+    if (halfH > 0) needed = Math.max(needed, Math.abs(n.y) / halfH);
+  }
+  if (needed > state.zoom) state.zoom += (needed - state.zoom) * 0.08; // ease, not snap
 }
 
 function loop(ts) {
   tickPhysics();
+  autofit();
   handlePlayback(ts);
   render();
   requestAnimationFrame(loop);
@@ -693,8 +810,14 @@ window.addEventListener("mousemove", (e) => {
   if (state.drag) {
     const dx = e.clientX - state.drag.x;
     const dy = e.clientY - state.drag.y;
+    // Neither axis is clamped. yaw never was -- project()'s sin/cos handle any
+    // magnitude -- but pitch was capped to +-1.4 rad (~80 degrees), which is
+    // why "rotate to look back down the stack from the far end" felt blocked:
+    // physics-v2 (#163) put time on the z-axis and made that exact gesture the
+    // point of the 3D view, and 80 degrees of tilt can't complete a look-back
+    // flip. Both axes now wrap freely, the same way yaw already did.
     state.camera.yaw = state.drag.yaw + dx * 0.006;
-    state.camera.pitch = Math.max(-1.4, Math.min(1.4, state.drag.pitch - dy * 0.006));
+    state.camera.pitch = state.drag.pitch - dy * 0.006;
     return;
   }
   handleHover(e);
@@ -800,7 +923,10 @@ window.__labkitExplorer = {
    * layout change would otherwise be unverifiable from outside a real,
    * focused browser window. */
   tick: (n = 1) => {
-    for (let i = 0; i < n; i++) tickPhysics();
+    for (let i = 0; i < n; i++) {
+      tickPhysics();
+      autofit();
+    }
     render();
   },
 };
