@@ -74,10 +74,15 @@ normalize() {
 }
 
 # stdout and stderr kept apart deliberately: a CLI error on stderr must
-# not be silently absorbed into the diff as if it were event text. Not
-# called inside a pipeline -- `exit` from within one only ends that
-# subshell, which is the same "$? after a pipeline" trap CLAUDE.md
-# already names, one level up.
+# not be silently absorbed into the diff as if it were event text.
+#
+# `read_side`'s own `exit 2` only ends the subshell it runs in --
+# `$(read_side ...)` is one too, the same trap a pipeline sets, one level
+# up. Without checking `$?` at every call site, that `exit` is swallowed:
+# the assignment "succeeds" with an empty string and the script carries
+# on to print ERROR and then a bogus FAILED diff on top of it. Every
+# caller below is `x="$(read_side ...)" || exit $?` for exactly that
+# reason -- do not move the check back inside this function.
 read_side() {
   local db="$1"; shift
   local err out rc
@@ -97,12 +102,12 @@ read_side() {
 # `happened` proves the event STREAM matches; `known` reads the graph
 # itself and is cheap to add, so both sides of "what a script did" and
 # "what the record now says" are covered, not just the former.
-live_happened="$(read_side "$live" happened --limit 1000)"
+live_happened="$(read_side "$live" happened --limit 1000)" || exit $?
 live_happened="$(printf '%s' "$live_happened" | normalize)"
-fresh_happened="$(read_side "$fresh" happened --limit 1000)"
+fresh_happened="$(read_side "$fresh" happened --limit 1000)" || exit $?
 fresh_happened="$(printf '%s' "$fresh_happened" | normalize)"
-live_known="$(read_side "$live" known)"
-fresh_known="$(read_side "$fresh" known)"
+live_known="$(read_side "$live" known)" || exit $?
+fresh_known="$(read_side "$fresh" known)" || exit $?
 
 happened_diff=$(diff <(printf '%s\n' "$live_happened") <(printf '%s\n' "$fresh_happened")) && happened_ok=1 || happened_ok=0
 known_diff=$(diff <(printf '%s\n' "$live_known") <(printf '%s\n' "$fresh_known")) && known_ok=1 || known_ok=0
