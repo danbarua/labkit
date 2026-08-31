@@ -145,6 +145,26 @@ interface RecordedConclusion {
   finding: string;
 }
 
+/**
+ * The refusal a caller meets when they cite a claim nothing has concluded.
+ *
+ * **One spelling, because four is this repository's oldest defect shape.** The
+ * text was hand-written at four call sites, which is written-once and forgotten
+ * the second time — the same shape as the `SUPPORTS`/`CHALLENGES` traversal that
+ * appeared six times and was corrected five. A message is not a traversal, but
+ * the arithmetic is identical: the next person to improve this wording improves
+ * one of four, and the record then refuses the same act in two different voices.
+ *
+ * It is the highest-frequency refusal in the domain — every verb that cites a
+ * claim reaches it — so it is the one most worth having exactly once.
+ *
+ * Ordered fact, rule, implication, which is the order every rewritten refusal
+ * under #164 uses: what the domain got, what it expected, what would satisfy it.
+ */
+const noFindingBearsOn = (claim: ClaimRef): string =>
+  `no finding bears on claim ${claim}; a claim can be cited only once an analysis ` +
+  `has concluded it and produced the evidence bearing on it`;
+
 export class WriteSurface extends SessionCore {
   /**
    * Puts a question on the record without pursuing it.
@@ -260,7 +280,10 @@ export class WriteSurface extends SessionCore {
         { q: vertexProps<{ name: string }>() },
         { id: input.from },
       );
-      if (original.length === 0) throw new Error(`no question ${input.from} to sharpen`);
+      if (original.length === 0)
+        throw new Error(
+          `no question ${input.from} to sharpen; pose it first, or name a question already on the record`,
+        );
 
       const decision = await this.graph.createNode("Decision", {
         decided_at: this.clock.now(),
@@ -602,7 +625,9 @@ export class WriteSurface extends SessionCore {
       // must not become the stated basis for resolving this question.
       const question = await this.questionBehind(input.enquiry);
       if (!question)
-        throw new Error(`enquiry ${input.enquiry} has no motivating question to resolve`);
+        throw new Error(
+          `enquiry ${input.enquiry} has no motivating question to resolve; closure attaches to the question an enquiry pursues, so pursue one before closing`,
+        );
 
       // **Closing a closed question is refused, not recorded.** A second close
       // writes a second `RESOLVES`, and `enquiryStatus()` picks between them with
@@ -662,11 +687,11 @@ export class WriteSurface extends SessionCore {
         }
         if (addresses.length === 0) {
           throw new Error(
-            `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question`,
+            `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question — cite a claim this enquiry concluded, or close the enquiry that concluded this one`,
           );
         }
         const found = await this.findingOn(input.answeredBy);
-        if (!found) throw new Error(`no finding bears on claim ${input.answeredBy}`);
+        if (!found) throw new Error(noFindingBearsOn(input.answeredBy));
         answerBearing = found.evidence;
         answeredProposition = found.asserts;
       }
@@ -758,14 +783,23 @@ export class WriteSurface extends SessionCore {
   async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
     return this.graph.inTransaction(async () => {
       if (input.governedBy.length === 0)
-        throw new Error("a gate governed by no condition is not a gate");
+        throw new Error(
+          "a gate needs at least one criterion to govern it: a gate enforces a condition, and one " +
+            "governed by nothing could never be satisfied or blocked — name them in governedBy",
+        );
       // And a gate protecting nothing is not a gate either. Before S-3b there
       // was no way to record a check that qualifies a finding without minting
       // one: `gateStatus()` then answered "what is blocked?" with `blocked` and
       // an empty `gating` list -- a control-plane object asserting a consequence
       // for work that does not exist. `recordAnalysis({ heldTo })` is how a
       // standard with nothing downstream is recorded now.
-      if (input.protecting.length === 0) throw new Error("a gate protecting nothing is not a gate");
+      if (input.protecting.length === 0)
+        throw new Error(
+          "a gate needs at least one piece of work to protect: a gate attaches a consequence to " +
+            "work, and one protecting nothing asserts a consequence for work that does not exist " +
+            "— name it in protecting, or hold the analysis to the criterion instead if nothing " +
+            "downstream depends on it",
+        );
       const gate = await this.graph.createNode("Gate", {
         consequence: input.consequence,
       });
@@ -809,7 +843,7 @@ export class WriteSurface extends SessionCore {
       let basis: EvidenceRef | undefined;
       if (input.citing) {
         const found = await this.findingOn(input.citing);
-        if (!found) throw new Error(`no finding bears on claim ${input.citing}`);
+        if (!found) throw new Error(noFindingBearsOn(input.citing));
         basis = found.evidence;
       }
       const at = this.clock.now();
@@ -942,10 +976,13 @@ export class WriteSurface extends SessionCore {
       const at = this.clock.now();
       const decision = await this.graph.inTransaction(async () => {
         const question = await this.questionBehind(input.enquiry);
-        if (!question) throw new Error(`enquiry ${input.enquiry} pursues no question`);
+        if (!question)
+          throw new Error(
+            `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
+          );
 
         const found = await this.findingOn(input.inLightOf);
-        if (!found) throw new Error(`no finding bears on claim ${input.inLightOf}`);
+        if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
         const basis = found.evidence;
 
         const decision = await this.graph.createNode("Decision", {
@@ -1058,10 +1095,13 @@ export class WriteSurface extends SessionCore {
         { id: input.criterion },
       );
       const replaced = existing[0]?.c.proposition;
-      if (!replaced) throw new Error(`no condition ${input.criterion} to amend`);
+      if (!replaced)
+        throw new Error(
+          `no condition ${input.criterion} to amend; state the criterion first, or name one already on the record`,
+        );
 
       const cited = await this.findingOn(input.citing);
-      if (!cited) throw new Error(`no finding bears on claim ${input.citing}`);
+      if (!cited) throw new Error(noFindingBearsOn(input.citing));
       const diagnosis = cited.evidence;
 
       const gates = await this.gatesGovernedBy(input.criterion);
@@ -1391,7 +1431,10 @@ export class WriteSurface extends SessionCore {
       const withdrawn: ConcludedClaim[] = [...new Set(claims.map((c) => c.c.natural_id))].map(
         (id) => ({ claim: ref("claim", id), asserts: previously }),
       );
-      if (claims.length === 0) throw new Error(`no claim ${input.of} to reinterpret`);
+      if (claims.length === 0)
+        throw new Error(
+          `no claim ${input.of} to reinterpret; a claim exists once an analysis concludes it`,
+        );
 
       // Atomic. Interrupted between withdrawing the original and carrying its
       // evidence across, this retracts a finding and puts nothing in its place.
@@ -1548,7 +1591,10 @@ export class WriteSurface extends SessionCore {
       { id: analysis },
     );
     const found = rows[0];
-    if (!found) throw new Error(`analysis ${analysis} has no output record`);
+    if (!found)
+      throw new Error(
+        `analysis ${analysis} has no output record; every recorded analysis produces one, so this handle names something recorded another way`,
+      );
     return ref("observations", found.a.natural_id);
   }
 
@@ -1616,7 +1662,10 @@ export class WriteSurface extends SessionCore {
       { id: analysis },
     );
     const found = rows[0];
-    if (!found) throw new Error(`analysis ${analysis} has no inferential unit`);
+    if (!found)
+      throw new Error(
+        `analysis ${analysis} has no inferential unit; every recorded analysis has one, so this handle names something recorded another way`,
+      );
     return ref("unit", found.u.natural_id);
   }
 }

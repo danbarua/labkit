@@ -98,7 +98,9 @@ export function isRefOfKind(kind: string, id: string): boolean {
 
 export const ref = <K extends string>(kind: K, id: string): Ref<K> => {
   if (!isRefOfKind(kind, id))
-    throw new Error(`${kind} handle expected a ${LABEL_BY_KIND[kind]} id, got "${id}"`);
+    throw new Error(
+      `${kind} handle expected a ${LABEL_BY_KIND[kind]} id, got "${id}" — pass the handle the act that minted it returned`,
+    );
   return id as Ref<K>;
 };
 

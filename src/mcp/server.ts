@@ -254,7 +254,8 @@ export function buildServer(
 function requireRegistered(session: SessionRegistry, tool: string): void {
   if (session.registered()) return;
   throw new Error(
-    `${tool} needs to know who is calling: call register_session first. ` +
+    `${tool} expected a registered session and this connection has none: ` +
+      "call register_session with the id your harness gives you, then retry. " +
       "LabKit records what you tell it and checks nothing — the id is yours to " +
       "state, and an unsigned entry is worse than none because it looks attributed.",
   );
