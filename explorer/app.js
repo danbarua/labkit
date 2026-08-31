@@ -24,7 +24,10 @@ const derivedAct = document.getElementById("derived-act");
 const derivedDelta = document.getElementById("derived-delta");
 const derivedChanges = document.getElementById("derived-changes");
 
-const state = {
+// Exposed on window for browser-console debugging only -- not read by any
+// production code path, and safe to leave: nothing else on the page reads
+// window.__labkitExplorerState.
+const state = (window.__labkitExplorerState = {
   traces: [],
   current: null,
   step: 0, // number of steps already applied
@@ -40,7 +43,7 @@ const state = {
   drag: null,
   lastStepSeq: null, // seq of the most recently applied step, for the temporal overlay
   lastTouched: new Set(), // handles created, connected, or named as subject by the last step
-};
+});
 
 const STANDING_COLOR = {
   open: "hsl(178deg 60% 60%)",
