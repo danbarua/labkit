@@ -58,14 +58,14 @@ const PROP = "the two series differ in magnitude";
 
 /** Two series, and a run that takes the difference between them. */
 async function aDifference() {
-  const enquiry = await session.openEnquiry("do the two series differ?");
-  const treated = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("do the two series differ?");
+  const { observations: treated } = await session.recordObservations({
     enquiry,
     name: "treated series",
     finding: "twelve points",
     contentHash: "sha256:treated",
   });
-  const control = await session.recordObservations({
+  const { observations: control } = await session.recordObservations({
     enquiry,
     name: "control series",
     finding: "twelve points",

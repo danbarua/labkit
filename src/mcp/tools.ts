@@ -44,20 +44,25 @@ import {
   originOfSchema,
   reproducibilityReportSchema,
   taskContractSchema,
-  acknowledgementSchema,
   amendmentReportSchema,
-  criterionRefSchema,
-  gateRefSchema,
+  posedSchema,
+  pursuedSchema,
+  openedEnquirySchema,
+  recordedObservationsSchema,
+  sharpenedQuestionSchema,
+  recordedReviewSchema,
+  closedEnquirySchema,
+  plannedWorkSchema,
+  statedCriterionSchema,
+  declaredGateSchema,
+  evaluatedCriterionSchema,
+  acceptedAsUnresolvedSchema,
+  promotedSchema,
   reinterpretationReportSchema,
   replacementReportSchema,
-  reviewRefSchema,
   verificationReportSchema,
-  workRefSchema,
   recordedAnalysisSchema,
-  enquiryRefSchema,
-  observationsRefSchema,
   pursuitsSchema,
-  questionRefSchema,
   dependencyReportSchema,
   designHistorySchema,
   enquiryStatusSchema,
@@ -331,7 +336,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         at: e.at,
         operation: e.operation,
         subject: e.subject,
-        created: [...(e.created ?? [])],
+        created: [...e.created],
         attribution_label: e.attribution.attribution_label,
         attribution_id: e.attribution.attribution_id,
         attribution_how: e.attribution.attribution_how,
@@ -542,10 +547,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "untested — on the books, never pursued, which is not a failure and not an " +
       "inconclusive result. Use `open_enquiry` instead to ask and start in one act.",
     inputSchema: { question: z.string().describe("the question, as asked") },
-    outputSchema: questionRefSchema,
-    handler: async (write, { question }) => ({
-      question: await write.pose(question),
-    }),
+    outputSchema: posedSchema,
+    handler: (write, { question }) => write.pose(question),
   }),
 
   writeTool({
@@ -558,11 +561,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
       approach: z.string().describe("how this line of enquiry means to answer it"),
     },
-    outputSchema: enquiryRefSchema,
+    outputSchema: pursuedSchema,
     handler: (write, { question, approach }) =>
-      write
-        .pursue({ question: ref("question", question), approach })
-        .then((enquiry) => ({ enquiry })),
+      write.pursue({ question: ref("question", question), approach }),
   }),
 
   writeTool({
@@ -572,10 +573,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "Ask and pursue in one act — the usual way work begins. Records one event, not two: " +
       "a researcher who opened an enquiry did one thing.",
     inputSchema: { question: z.string().describe("the question, as asked") },
-    outputSchema: enquiryRefSchema,
-    handler: async (write, { question }) => ({
-      enquiry: await write.openEnquiry(question),
-    }),
+    outputSchema: openedEnquirySchema,
+    handler: (write, { question }) => write.openEnquiry(question),
   }),
 
   writeTool({
@@ -595,16 +594,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("a hash of the underlying data, if there is one"),
     },
-    outputSchema: observationsRefSchema,
+    outputSchema: recordedObservationsSchema,
     handler: (write, { enquiry, name, finding, content_hash }) =>
-      write
-        .recordObservations({
-          enquiry: ref("enquiry", enquiry),
-          name,
-          finding,
-          ...(content_hash === undefined ? {} : { contentHash: content_hash }),
-        })
-        .then((observations) => ({ observations })),
+      write.recordObservations({
+        enquiry: ref("enquiry", enquiry),
+        name,
+        finding,
+        ...(content_hash === undefined ? {} : { contentHash: content_hash }),
+      }),
   }),
 
   writeTool({
@@ -666,14 +663,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe(`id of the claim that answers it, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
     },
-    outputSchema: acknowledgementSchema,
-    handler: async (write, { enquiry, answered_by }) => {
-      await write.closeEnquiry({
+    outputSchema: closedEnquirySchema,
+    handler: (write, { enquiry, answered_by }) =>
+      write.closeEnquiry({
         enquiry: ref("enquiry", enquiry),
         ...(answered_by === undefined ? {} : { answeredBy: ref("claim", answered_by) }),
-      });
-      return { ok: true as const, acted: enquiry };
-    },
+      }),
   }),
 
   writeTool({
@@ -689,11 +684,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       into: z.string().describe("the sharper question, as asked"),
       because: z.string().describe("why it was sharpened"),
     },
-    outputSchema: questionRefSchema,
+    outputSchema: sharpenedQuestionSchema,
     handler: (write, { from, into, because }) =>
-      write
-        .sharpen({ from: ref("question", from), into, because })
-        .then((question) => ({ question })),
+      write.sharpen({ from: ref("question", from), into, because }),
   }),
 
   writeTool({
@@ -706,9 +699,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       of: z.string().describe(`id of the analysis reviewed, e.g. ${ANALYSIS_PREFIX}3`),
       verdict: z.string().describe("what the review found"),
     },
-    outputSchema: reviewRefSchema,
-    handler: (write, { of, verdict }) =>
-      write.recordReview({ of: ref("analysis", of), verdict }).then((review) => ({ review })),
+    outputSchema: recordedReviewSchema,
+    handler: (write, { of, verdict }) => write.recordReview({ of: ref("analysis", of), verdict }),
   }),
 
   writeTool({
@@ -726,15 +718,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("what this work may look at — recorded, not enforced"),
     },
-    outputSchema: workRefSchema,
+    outputSchema: plannedWorkSchema,
     handler: (write, { objective, acceptance, may_read }) =>
-      write
-        .planWork({
-          objective,
-          acceptance,
-          ...(may_read === undefined ? {} : { mayRead: may_read as string[] }),
-        })
-        .then((work) => ({ work })),
+      write.planWork({
+        objective,
+        acceptance,
+        ...(may_read === undefined ? {} : { mayRead: may_read as string[] }),
+      }),
   }),
 
   writeTool({
@@ -747,10 +737,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       proposition: z.string().describe("the condition, as a sentence"),
     },
-    outputSchema: criterionRefSchema,
-    handler: async (write, { proposition }) => ({
-      criterion: await write.stateCriterion(proposition),
-    }),
+    outputSchema: statedCriterionSchema,
+    handler: (write, { proposition }) => write.stateCriterion(proposition),
   }),
 
   writeTool({
@@ -765,15 +753,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       consequence: z.string().describe("what this gate decides"),
       protecting: z.array(z.string()).describe(`work ids, e.g. ${WORK_PREFIX}1`),
     },
-    outputSchema: gateRefSchema,
+    outputSchema: declaredGateSchema,
     handler: (write, { governed_by, consequence, protecting }) =>
-      write
-        .declareGate({
-          governedBy: (governed_by as string[]).map((id) => ref("criterion", id)),
-          consequence,
-          protecting: (protecting as string[]).map((id) => ref("work", id)),
-        })
-        .then((gate) => ({ gate })),
+      write.declareGate({
+        governedBy: (governed_by as string[]).map((id) => ref("criterion", id)),
+        consequence,
+        protecting: (protecting as string[]).map((id) => ref("work", id)),
+      }),
   }),
 
   writeTool({
@@ -793,17 +779,15 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe(`id of the claim the verdict rests on, e.g. ${CLAIM_PREFIX}4`),
     },
-    outputSchema: acknowledgementSchema,
-    handler: async (write, { criterion, value, outcome, gate, citing }) => {
-      await write.evaluateCriterion({
+    outputSchema: evaluatedCriterionSchema,
+    handler: (write, { criterion, value, outcome, gate, citing }) =>
+      write.evaluateCriterion({
         criterion: ref("criterion", criterion),
         value,
         outcome: outcome as "pass" | "fail",
         ...(gate === undefined ? {} : { gate: ref("gate", gate) }),
         ...(citing === undefined ? {} : { citing: ref("claim", citing) }),
-      });
-      return { ok: true as const, acted: criterion };
-    },
+      }),
   }),
 
   writeTool({
@@ -858,16 +842,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       until: z.string().describe("what would reopen it"),
       in_light_of: z.string().describe(`id of the claim this rests on, e.g. ${CLAIM_PREFIX}4`),
     },
-    outputSchema: acknowledgementSchema,
-    handler: async (write, { enquiry, because, until, in_light_of }) => {
-      await write.acceptAsUnresolved({
+    outputSchema: acceptedAsUnresolvedSchema,
+    handler: (write, { enquiry, because, until, in_light_of }) =>
+      write.acceptAsUnresolved({
         enquiry: ref("enquiry", enquiry),
         because,
         until,
         inLightOf: ref("claim", in_light_of),
-      });
-      return { ok: true as const, acted: enquiry };
-    },
+      }),
   }),
 
   writeTool({
@@ -882,11 +864,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       claim: z.string().describe(`id of the claim being promoted, e.g. ${CLAIM_PREFIX}4`),
       because: z.string().describe("what justifies promoting it"),
     },
-    outputSchema: acknowledgementSchema,
-    handler: async (write, { claim, because }) => {
-      await write.promote({ claim: ref("claim", claim), because });
-      return { ok: true as const, acted: claim };
-    },
+    outputSchema: promotedSchema,
+    handler: (write, { claim, because }) => write.promote({ claim: ref("claim", claim), because }),
   }),
 
   writeTool({

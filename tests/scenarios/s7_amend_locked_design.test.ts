@@ -61,32 +61,34 @@ const MULTICOLLINEAR =
  * touching.
  */
 async function lockedProgramme() {
-  const enquiry = await session.openEnquiry("does the evolved condition beat the rewired control?");
+  const { enquiry } = await session.openEnquiry(
+    "does the evolved condition beat the rewired control?",
+  );
 
-  const confirmatoryWork = await session.planWork({
+  const { work: confirmatoryWork } = await session.planWork({
     objective: "the prespecified comparison against the rewired control",
     acceptance: "one run, held-out data, no reanalysis",
   });
-  const prespecified = await session.stateCriterion(PRESPECIFIED);
-  const confirmatoryBoundary = await session.declareGate({
+  const { criterion: prespecified } = await session.stateCriterion(PRESPECIFIED);
+  const { gate: confirmatoryBoundary } = await session.declareGate({
     governedBy: [prespecified],
     consequence: "the confirmatory comparison may be relied on",
     protecting: [confirmatoryWork],
   });
 
-  const feasibilityWork = await session.planWork({
+  const { work: feasibilityWork } = await session.planWork({
     objective: "feasibility sweep of the evolved condition",
     acceptance: "the sweep converges and returns a usable fit",
   });
-  const iterationLimit = await session.stateCriterion(LOCKED_LIMIT);
-  const feasibilityBoundary = await session.declareGate({
+  const { criterion: iterationLimit } = await session.stateCriterion(LOCKED_LIMIT);
+  const { gate: feasibilityBoundary } = await session.declareGate({
     governedBy: [iterationLimit],
     consequence: "feasibility results may be relied on",
     protecting: [feasibilityWork],
   });
 
   // One confirmatory result, already on the record before anything is amended.
-  const heldOut = await session.recordObservations({
+  const { observations: heldOut } = await session.recordObservations({
     enquiry,
     name: "held-out comparison readings",
     finding: "evolved and rewired conditions measured on the held-out split",
@@ -122,7 +124,7 @@ async function diagnose(
   enquiry: Awaited<ReturnType<typeof lockedProgramme>>["enquiry"],
   work: Awaited<ReturnType<typeof lockedProgramme>>["feasibilityWork"],
 ) {
-  const traces = await session.recordObservations({
+  const { observations: traces } = await session.recordObservations({
     enquiry,
     name: "non-convergence traces",
     finding: "solver hits the iteration cap on 9 of 10 sweeps",
@@ -344,7 +346,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
     // An unrelated decision elsewhere in the programme, to show what this can
     // and cannot order.
-    const aside = await session.pose("should the sweep width be capped at all?");
+    const { question: aside } = await session.pose("should the sweep width be capped at all?");
     await session.sharpen({
       from: aside,
       into: "does sweep width interact with convergence?",

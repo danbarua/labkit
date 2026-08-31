@@ -21,7 +21,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
+import {
+  ResearchSession,
+  inMemoryEventLog,
+  type Clock,
+  type EventSink,
+  type EnquiryRef,
+  type ObservationsRef,
+} from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 
@@ -75,9 +82,9 @@ const AGREES = "median aggregation agrees";
  * The standard is stated before the run it qualifies, as S-3b requires.
  */
 async function aResultHeldToARobustnessCheck() {
-  const robustness = await session.stateCriterion(ROBUSTNESS);
-  const enquiry = await session.openEnquiry("does T differ from rewired?");
-  const observations = await session.recordObservations({
+  const { criterion: robustness } = await session.stateCriterion(ROBUSTNESS);
+  const { enquiry } = await session.openEnquiry("does T differ from rewired?");
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
@@ -98,8 +105,8 @@ async function aResultHeldToARobustnessCheck() {
  * it something a later reviewer can find fault with.
  */
 async function theCheckIsRun(
-  enquiry: Awaited<ReturnType<typeof session.openEnquiry>>,
-  observations: Awaited<ReturnType<typeof session.recordObservations>>,
+  enquiry: EnquiryRef,
+  observations: ObservationsRef,
   method: string,
   concludes: { proposition: string; finding: string },
 ) {
@@ -209,7 +216,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     // The fault is found in the check, and the check is replaced -- the same
     // act S-11 established for an analysis that was wrong, aimed at a piece of
     // work that happens to be a check.
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
@@ -252,12 +259,12 @@ describe("S-3c: the check was wrong, not the result", () => {
    */
   test("the same distinction holds for work a check gates, not just findings it qualifies", async () => {
     const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();
-    const tertiary = await session.planWork({
+    const { work: tertiary } = await session.planWork({
       objective: "fit the tertiary model",
       acceptance: "converges",
       mayRead: ["per-image results"],
     });
-    const gate = await session.declareGate({
+    const { gate } = await session.declareGate({
       governedBy: [robustness],
       consequence: "the tertiary model may be fitted",
       protecting: [tertiary],
@@ -281,7 +288,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
     expect((await session.gateStatus(gate)).state).toBe("blocked");
 
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
@@ -355,7 +362,7 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     // Now, and only now, is the first run found to have been faulty. Nothing
     // else about the record changes -- no new evaluation, no new check.
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: failed,
       verdict: "the aggregation dropped the last fold",
     });
@@ -397,7 +404,7 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.04",
       },
     );
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: unrelated,
       verdict: "the aggregation dropped the last fold",
     });
@@ -445,7 +452,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     // The check is found faulty and retired. Nobody has re-run it yet.
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
@@ -512,7 +519,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     const before = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
@@ -551,12 +558,12 @@ describe("S-3c: the check was wrong, not the result", () => {
    */
   test("a gate whose only verdict was withdrawn reads incomplete, not satisfied", async () => {
     const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();
-    const tertiary = await session.planWork({
+    const { work: tertiary } = await session.planWork({
       objective: "fit the tertiary model",
       acceptance: "converges",
       mayRead: ["per-image results"],
     });
-    const gate = await session.declareGate({
+    const { gate } = await session.declareGate({
       governedBy: [robustness],
       consequence: "the tertiary model may be fitted",
       protecting: [tertiary],
@@ -580,7 +587,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     // The passing check turns out to have been defective and is replaced.
     // Nobody has re-run it yet: the only evaluation of `robustness` now cites
     // withdrawn evidence, so the criterion has no standing verdict at all.
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: passing,
       verdict: "the aggregation dropped the last fold",
     });

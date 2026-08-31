@@ -70,9 +70,9 @@ async function afterwards(): Promise<ResearchSession> {
  * and a scenario that states it late would be testing a different story.
  */
 async function aPromotedAnswerNobodyChecked() {
-  const check = await session.stateCriterion(CHECK);
-  const enquiry = await session.openEnquiry(QUESTION);
-  const observations = await session.recordObservations({
+  const { criterion: check } = await session.stateCriterion(CHECK);
+  const { enquiry } = await session.openEnquiry(QUESTION);
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "8k-step run logs",
     finding: "loss plateaus at 4.1 by step 6k",
@@ -181,9 +181,9 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
    * the case that could have been positive and was not.
    */
   test("a promoted negative result whose check passed is established", async () => {
-    const check = await session.stateCriterion(CHECK);
-    const enquiry = await session.openEnquiry(QUESTION);
-    const observations = await session.recordObservations({
+    const { criterion: check } = await session.stateCriterion(CHECK);
+    const { enquiry } = await session.openEnquiry(QUESTION);
+    const { observations } = await session.recordObservations({
       enquiry,
       name: "8k-step run logs",
       finding: "loss plateaus at 4.1 by step 6k",

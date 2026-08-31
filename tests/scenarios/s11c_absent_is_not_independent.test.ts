@@ -69,8 +69,8 @@ const TREND = "the response trends upward with dose";
  * the chain breaks in the record while holding perfectly well in the world.
  */
 async function aTwoStagePipeline(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("does the response trend upward with dose?");
-  const raw = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("does the response trend upward with dose?");
+  const { observations: raw } = await s.recordObservations({
     enquiry,
     name: "raw sensor series",
     finding: "eleven dose levels, uncalibrated",
@@ -90,7 +90,7 @@ async function aTwoStagePipeline(s: ResearchSession) {
 
   // Stage two. The calibrated series is re-recorded because nothing on the
   // surface hands stage one's output to stage two.
-  const calibrated = await s.recordObservations({
+  const { observations: calibrated } = await s.recordObservations({
     enquiry,
     name: "calibrated series",
     finding: "eleven dose levels, calibrated",
@@ -143,7 +143,7 @@ describe("S-11c: nothing found is not nothing there", () => {
    */
   test("an empty answer says it is a lower bound rather than a finding of independence", async () => {
     const { raw, enquiry } = await aTwoStagePipeline(session);
-    const unrelated = await session.recordObservations({
+    const { observations: unrelated } = await session.recordObservations({
       enquiry,
       name: "lab humidity log",
       finding: "42% throughout, nothing read it",

@@ -70,9 +70,9 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
         events: inMemoryEventLog(),
       });
 
-      const enquiry = await s.openEnquiry("does the schedule move convergence?");
-      const check = await s.stateCriterion("stable across five seeds");
-      const observations = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry("does the schedule move convergence?");
+      const { criterion: check } = await s.stateCriterion("stable across five seeds");
+      const { observations } = await s.recordObservations({
         enquiry,
         name: "sweep readings",
         finding: "twelve runs",
@@ -177,8 +177,8 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         events: inMemoryEventLog(),
       });
 
-      const enquiry = await s.openEnquiry(FIRST.asks);
-      const obs = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry(FIRST.asks);
+      const { observations: obs } = await s.recordObservations({
         enquiry,
         name: "readings",
         finding: "twelve runs",
@@ -225,9 +225,9 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
      * instants and differ **only** in which question is closed first.
      */
     const prepare = async (s: ResearchSession, asks: string, prop: string) => {
-      const enquiry = await s.openEnquiry(asks);
-      const check = await s.stateCriterion(`prespecified check for ${prop}`);
-      const obs = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry(asks);
+      const { criterion: check } = await s.stateCriterion(`prespecified check for ${prop}`);
+      const { observations: obs } = await s.recordObservations({
         enquiry,
         name: `${prop} readings`,
         finding: `runs for ${prop}`,
@@ -344,8 +344,8 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         analysis: AnalysisRef;
       }> = [];
       for (const q of [FIRST, SECOND]) {
-        const enquiry = await s.openEnquiry(q.asks);
-        const obs = await s.recordObservations({
+        const { enquiry } = await s.openEnquiry(q.asks);
+        const { observations: obs } = await s.recordObservations({
           enquiry,
           name: `${q.prop} readings`,
           finding: `runs for ${q.prop}`,
@@ -422,8 +422,8 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         events: inMemoryEventLog(),
       });
 
-      const enquiry = await s.openEnquiry(FIRST.asks);
-      const obs = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry(FIRST.asks);
+      const { observations: obs } = await s.recordObservations({
         enquiry,
         name: "readings",
         finding: "twelve runs",
@@ -494,8 +494,8 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         clock: c,
         events: inMemoryEventLog(),
       });
-      const enquiry = await s.openEnquiry(FIRST.asks);
-      const obs = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry(FIRST.asks);
+      const { observations: obs } = await s.recordObservations({
         enquiry,
         name: "readings",
         finding: "runs",

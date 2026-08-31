@@ -20,6 +20,7 @@
 
 import { expect, test } from "bun:test";
 import { ref } from "../../src/domain/report";
+import { domainEvent } from "../../src/domain/events";
 import { asHandles } from "../../src/cli/output";
 import { PLAIN, palette } from "../../src/cli/palette";
 import {
@@ -449,7 +450,7 @@ test("an empty event log does not read as an empty record", () => {
   expect(empty).toContain("every other command answers from");
 
   const events: DomainEvent[] = [
-    {
+    domainEvent({
       seq: 7,
       at: "2026-03-01T00:00:00.000Z",
       attribution: {
@@ -461,7 +462,7 @@ test("an empty event log does not read as an empty record", () => {
       operation: "recordAnalysis",
       subject: "COMP_1",
       created: ["CLM_1", "EV_1"],
-    },
+    }),
   ];
   const out = renderHappened(events, PLAIN);
   expect(out).toContain("7");

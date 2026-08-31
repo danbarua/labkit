@@ -69,8 +69,8 @@ const TREND = "the response trends upward with dose";
 
 /** Raw measurement, a calibration reading it, and a trend fit reading that. */
 async function twoStages() {
-  const enquiry = await session.openEnquiry("does the response trend upward?");
-  const raw = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does the response trend upward?");
+  const { observations: raw } = await session.recordObservations({
     enquiry,
     name: "raw series",
     finding: "uncalibrated instrument output",

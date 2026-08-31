@@ -130,11 +130,11 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
   test("closing one pursuit no longer reports the other as having produced it", async () => {
     const s = await session();
     try {
-      const question = await s.pose("does depth move convergence?");
-      const anasSweep = await s.pursue({ question, approach: "seed sweep" });
-      const brunosAblation = await s.pursue({ question, approach: "ablation" });
+      const { question } = await s.pose("does depth move convergence?");
+      const { enquiry: anasSweep } = await s.pursue({ question, approach: "seed sweep" });
+      const { enquiry: brunosAblation } = await s.pursue({ question, approach: "ablation" });
 
-      const readings = await s.recordObservations({
+      const { observations: readings } = await s.recordObservations({
         enquiry: anasSweep,
         name: "seed sweep readings",
         finding: "five seeds, consistent",
@@ -190,14 +190,14 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
     // enquiry's name, which made it look like the enquiry's own.
     const s = await session();
     try {
-      const question = await s.pose("does width matter?");
-      const worked = await s.pursue({ question, approach: "width sweep" });
-      const untouched = await s.pursue({
+      const { question } = await s.pose("does width matter?");
+      const { enquiry: worked } = await s.pursue({ question, approach: "width sweep" });
+      const { enquiry: untouched } = await s.pursue({
         question,
         approach: "second opinion",
       });
 
-      const readings = await s.recordObservations({
+      const { observations: readings } = await s.recordObservations({
         enquiry: worked,
         name: "width readings",
         finding: "it does",
@@ -238,8 +238,8 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
   test("observations and an analysis's output share one identity space", async () => {
     const s = await session();
     try {
-      const enquiry = await s.openEnquiry("does it hold?");
-      const observations = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry("does it hold?");
+      const { observations } = await s.recordObservations({
         enquiry,
         name: "raw readings",
         finding: "twelve runs",
@@ -284,8 +284,8 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
     // verb takes it to mean the artefact the computation produced.
     const s = await session();
     try {
-      const enquiry = await s.openEnquiry("two stage?");
-      const raw = await s.recordObservations({
+      const { enquiry } = await s.openEnquiry("two stage?");
+      const { observations: raw } = await s.recordObservations({
         enquiry,
         name: "raw",
         finding: "f",
@@ -343,19 +343,19 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
   async function programme() {
     const s = await session();
-    const question = await s.pose("does depth move convergence?");
-    const enquiry = await s.pursue({ question, approach: "seed sweep" });
-    const criterion = await s.stateCriterion("holds at five seeds");
-    const work = await s.planWork({
+    const { question } = await s.pose("does depth move convergence?");
+    const { enquiry } = await s.pursue({ question, approach: "seed sweep" });
+    const { criterion } = await s.stateCriterion("holds at five seeds");
+    const { work } = await s.planWork({
       objective: "publish the result",
       acceptance: "the check passes",
     });
-    const gate = await s.declareGate({
+    const { gate } = await s.declareGate({
       governedBy: [criterion],
       consequence: "may it be published?",
       protecting: [work],
     });
-    const observations = await s.recordObservations({
+    const { observations } = await s.recordObservations({
       enquiry,
       name: "sweep readings",
       finding: "five seeds, consistent",

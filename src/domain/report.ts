@@ -1,4 +1,5 @@
 import { labelForNaturalId, type NodeLabel } from "../db/domain";
+import type { DomainEvent } from "./events";
 
 /**
  * What the domain layer hands back — research answers, not graph rows.
@@ -178,6 +179,43 @@ export type EvaluationRef = Ref<"evaluation">;
 export type DecisionRef = Ref<"decision">;
 
 /**
+ * What `recordObservations` produced — #161's audit: withheld entirely, a
+ * caller had no handle back at all.
+ *
+ * `evidence` is not named here: it is exactly what `events[0].created` already
+ * carries, and naming it a second time is the per-verb echo #161's mechanism
+ * is meant to replace. `observations` stays because it is what the caller
+ * asked to create and is the one thing every reader of this return wants
+ * without going via the event.
+ */
+export interface RecordedObservations {
+  observations: ObservationsRef;
+  events: DomainEvent[];
+}
+
+/**
+ * What `openEnquiry` produced — #161's audit: the `Question` was withheld,
+ * even though it is the half a caller needs to `sharpen` or `accept` later.
+ */
+export interface OpenedEnquiry {
+  enquiry: EnquiryRef;
+  question: QuestionRef;
+  events: DomainEvent[];
+}
+
+/**
+ * What `sharpen` produced — #161's audit: the `Decision` holding the frozen
+ * what-was-known snapshot was withheld, unlike every other verb that mints
+ * one alongside its main effect (`closeEnquiry`, `promote`, `amendDesign`,
+ * `reinterpret`).
+ */
+export interface SharpenedQuestion {
+  question: QuestionRef;
+  decision: DecisionRef;
+  events: DomainEvent[];
+}
+
+/**
  * What `recordAnalysis` produced — the analysis, and **the claims it minted**.
  *
  * The claims are here because CLAUDE.md asks of every minting verb: *does the
@@ -186,16 +224,88 @@ export type DecisionRef = Ref<"decision">;
  * re-identify it **by wording** — which is what {@link ConclusionRef} was, and
  * why it existed. A caller now holds a {@link ClaimRef} the moment the claim
  * exists and never has to describe it again.
+ *
+ * The output artefact is not named here — #161 first added it directly, then
+ * dropped it once `events` existed: it is exactly `events[0].created`'s other
+ * member, and `outputArtefactOf()` still earns its keep resolving *other*
+ * analyses' artefacts, which this act's own event cannot supply.
  */
 export interface RecordedAnalysis {
   analysis: AnalysisRef;
   claims: ConcludedClaim[];
+  events: DomainEvent[];
 }
 
-/** One claim an analysis minted: its handle, and the proposition it asserts. */
+/**
+ * One claim an analysis minted: its handle, and the proposition it asserts.
+ *
+ * `finding` is optional, not always-populated the way `claim`/`asserts` are:
+ * `recordAnalysis`/`reverify`/`replaceAnalysis` each mint exactly one
+ * `Evidence` per conclusion and can name it directly (#132's own step one).
+ * A claim reached by wording (`claimsAsserting`) or one that narrows several
+ * prior findings into a single reading (`reinterpret`'s `nowClaims`) has no
+ * single canonical finding to name here — `evidenceStanding` is where that
+ * report lists them instead. Left absent rather than guessed at either way.
+ */
 export interface ConcludedClaim {
   claim: ClaimRef;
   asserts: string;
+  finding?: EvidenceRef;
+}
+
+/**
+ * What each of the eight single-mint write verbs produced — a name for the one
+ * thing the act minted, plus the event that recorded it.
+ *
+ * Before #161 these returned the bare ref alone (`pose`, `pursue`,
+ * `recordReview`, `planWork`, `stateCriterion`, `declareGate`) or nothing at
+ * all (`closeEnquiry`, `evaluateCriterion`, `acceptAsUnresolved`, `promote`
+ * returned `void`, or later a bare ref once each got its own type-safe
+ * widening). `events` is added uniformly rather than case-by-case: "did my
+ * write land as event 103" is the same question for every verb, and a
+ * surface where six verbs answer one shape and twelve another is the
+ * exception-accretion CLAUDE.md's "delete the reason, not the exception"
+ * warns about, built on purpose.
+ */
+export interface Posed {
+  question: QuestionRef;
+  events: DomainEvent[];
+}
+export interface Pursued {
+  enquiry: EnquiryRef;
+  events: DomainEvent[];
+}
+export interface RecordedReview {
+  review: ReviewRef;
+  events: DomainEvent[];
+}
+export interface ClosedEnquiry {
+  decision: DecisionRef;
+  events: DomainEvent[];
+}
+export interface PlannedWork {
+  work: WorkRef;
+  events: DomainEvent[];
+}
+export interface StatedCriterion {
+  criterion: CriterionRef;
+  events: DomainEvent[];
+}
+export interface DeclaredGate {
+  gate: GateRef;
+  events: DomainEvent[];
+}
+export interface EvaluatedCriterion {
+  evaluation: EvaluationRef;
+  events: DomainEvent[];
+}
+export interface AcceptedAsUnresolved {
+  decision: DecisionRef;
+  events: DomainEvent[];
+}
+export interface Promoted {
+  decision: DecisionRef;
+  events: DomainEvent[];
 }
 
 /**
@@ -440,6 +550,14 @@ export interface ReplacementReport {
    * report a withdrawn record as unchanged.
    */
   unchanged: ConcludedClaim[];
+  /**
+   * The event this act recorded — `events[0].created` names the replacement's
+   * own output artefact, which is the handle #161 first added a dedicated
+   * `artefact` field for and then withdrew once this existed.
+   * `outputArtefactOf()` still earns its keep here: it resolves the
+   * *superseded* analysis's artefact, which no event of this act can name.
+   */
+  events: DomainEvent[];
 }
 
 export interface UnaffectedRecord {
@@ -759,6 +877,8 @@ export interface VerificationReport {
    * it and a caller holding only the refs can name neither.
    */
   claims: ConcludedClaim[];
+  /** The event this act recorded — `events[0].created` names the output artefact. */
+  events: DomainEvent[];
 }
 
 /**
@@ -1191,6 +1311,7 @@ export interface AmendmentReport {
   /** Confirmatory results in the blast radius. Empty is the claim "none", and it is computed rather than assumed. */
   confirmatoryAffected: ConfirmatoryResult[];
   nature: "mechanical" | "scientific";
+  events: DomainEvent[];
 }
 
 /** One amendment in a design's history, as read back long afterwards. */
@@ -1248,6 +1369,14 @@ export interface ReinterpretationReport {
   /** Things decided on the strength of the old sentence — not things computed from the numbers. */
   restingOnTheOldReading: DecidedQuestion[];
   requiresRecomputation: boolean;
+  /**
+   * The event this act recorded — `events[0].created` names the `Review` and
+   * the `Decision` this act minted, both withheld entirely before #161: every
+   * other act that mints a `Decision` and/or a `Review` alongside its main
+   * effect (`closeEnquiry`, `promote`, `replaceAnalysis`) hands the caller a
+   * dedicated field, and the event carries the same information without one.
+   */
+  events: DomainEvent[];
 }
 
 /** One revision of an interpretation, read back long afterwards. */

@@ -69,8 +69,8 @@ const CONFIRMING = "numbers check out; independently recomputed the same values"
  * checked is not a review approving the whole analysis.
  */
 async function anAnalysisWithTwoReviews(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("does the coating shift the onset temperature?");
-  const readings = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("does the coating shift the onset temperature?");
+  const { observations: readings } = await s.recordObservations({
     enquiry,
     name: "onset sweep",
     finding: "onset across twelve coatings",
@@ -81,8 +81,8 @@ async function anAnalysisWithTwoReviews(s: ResearchSession) {
     from: [readings],
     concludes: [{ proposition: SHIFTS, finding: "onset moves by 4.2 K" }],
   });
-  const critical = await s.recordReview({ of: analysis, verdict: UNSOUND });
-  const confirming = await s.recordReview({
+  const { review: critical } = await s.recordReview({ of: analysis, verdict: UNSOUND });
+  const { review: confirming } = await s.recordReview({
     of: analysis,
     verdict: CONFIRMING,
   });

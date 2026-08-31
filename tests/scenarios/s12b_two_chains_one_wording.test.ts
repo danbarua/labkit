@@ -76,8 +76,8 @@ const B3 = "the instrument drifts above 40 degrees";
  */
 async function twoChains() {
   const chain = async (opens: string, first: string, middle: string, last: string) => {
-    const enquiry = await session.openEnquiry(opens);
-    const observations = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry(opens);
+    const { observations } = await session.recordObservations({
       enquiry,
       name: `${opens} readings`,
       finding: "measured",

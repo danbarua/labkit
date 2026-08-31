@@ -20,6 +20,7 @@ import { TenantGraph } from "../db/graph";
 import { ReadSurface, WriteSurface } from "../domain";
 import { pgEventLog } from "../domain/event-store";
 import { commandContext, gitContext, personContext } from "../attribution";
+import type { Clock } from "../domain";
 import { asJson, type Answer } from "./output";
 import { isColorSupported } from "picocolors";
 import { type Palette, palette } from "./palette";
@@ -32,6 +33,12 @@ export interface Globals {
   json?: boolean;
   /** Commander's negatable `--no-ansi`: present and `false` when passed. */
   ansi?: boolean;
+  /**
+   * `--date`, hidden from `--help` — see {@link globalOptions}. An ISO
+   * instant every write in this command is recorded as having happened at,
+   * in place of the wall clock.
+   */
+  date?: string;
 }
 
 /**
@@ -81,6 +88,12 @@ export type Run = (work: (surfaces: Surfaces) => Promise<Answer>) => Promise<voi
  * One `TenantGraph` for both halves, so `inTransaction`'s re-entrancy depth is
  * shared — the composition `src/domain/session.ts` specifies for an adapter
  * holding both.
+ *
+ * **`--date` overrides the clock, not the fact of writing now.** A backfill
+ * genuinely runs at the moment the command executes; what it lies about is
+ * only what a later reader is told the act happened at, for the case a real
+ * historical record (bonsai-2026) is being entered after the fact. See
+ * `globalOptions` for why it is hidden rather than a documented feature.
  */
 export function runner(globals: () => Globals, write: (line: string) => void): Run {
   return async (work) => {
@@ -96,10 +109,11 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
       await scopeToTenant(connection.db, ctx);
       const events = pgEventLog(connection.db, ctx.tenantId);
       const graph = new TenantGraph(ctx, connection.db, connection.tx);
+      const clock: Clock | undefined = opts.date ? { now: () => opts.date! } : undefined;
       const answered = await work({
         read: new ReadSurface(graph, { events }),
         write: new WriteSurface(graph, {
-          ...commandContext(gitContext, personContext(opts.author)),
+          ...commandContext(gitContext, personContext(opts.author), clock),
           events,
         }),
       });

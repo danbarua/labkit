@@ -60,14 +60,14 @@ const DIVERGE = "the treated and control arms diverge";
  * provenance nobody can vouch for, which is the situation that matters.
  */
 async function anAnalysisRestingOnBothControls(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("do the treated and control arms diverge?");
-  const surviving = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("do the treated and control arms diverge?");
+  const { observations: surviving } = await s.recordObservations({
     enquiry,
     name: NAME,
     finding: "the surviving fragment of the original series",
     contentHash: "sha256:surviving",
   });
-  const regenerated = await s.recordObservations({
+  const { observations: regenerated } = await s.recordObservations({
     enquiry,
     name: NAME,
     finding: "the remainder, regenerated from an inferred algorithm",

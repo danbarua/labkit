@@ -63,12 +63,12 @@ const PROPOSITION = "T differs from rewired";
  * result is the thing this scenario's researcher is protecting against.
  */
 async function aFindingHeldToAgreedChecks() {
-  const primary = await session.stateCriterion(PRIMARY);
-  const median = await session.stateCriterion(MEDIAN);
-  const seed = await session.stateCriterion(SEED);
+  const { criterion: primary } = await session.stateCriterion(PRIMARY);
+  const { criterion: median } = await session.stateCriterion(MEDIAN);
+  const { criterion: seed } = await session.stateCriterion(SEED);
 
-  const enquiry = await session.openEnquiry("does T differ from rewired?");
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does T differ from rewired?");
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
@@ -222,8 +222,8 @@ describe("S-3b: the same design with nothing downstream", () => {
    * is why they still pass.
    */
   test("a finding held to no agreed standard is neither qualified nor disqualified", async () => {
-    const enquiry = await session.openEnquiry("does T differ from rewired?");
-    const observations = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry("does T differ from rewired?");
+    const { observations } = await session.recordObservations({
       enquiry,
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
@@ -250,7 +250,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * govern, and checked before anything is written.
    */
   test("a check that qualifies nothing and gates nothing cannot be evaluated", async () => {
-    const orphan = await session.stateCriterion("the pipeline was sane");
+    const { criterion: orphan } = await session.stateCriterion("the pipeline was sane");
     await expect(
       session.evaluateCriterion({
         criterion: orphan,
@@ -281,7 +281,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       false,
     );
 
-    const review = await session.recordReview({
+    const { review } = await session.recordReview({
       of: analysis,
       verdict: "the aggregation was the wrong one",
     });
@@ -320,8 +320,10 @@ describe("S-3b: the same design with nothing downstream", () => {
       outcome: "fail",
     });
 
-    const other = await session.openEnquiry("does T differ from rewired on the held-out split?");
-    const otherObservations = await session.recordObservations({
+    const { enquiry: other } = await session.openEnquiry(
+      "does T differ from rewired on the held-out split?",
+    );
+    const { observations: otherObservations } = await session.recordObservations({
       enquiry: other,
       name: "held-out results",
       finding: "per-image accuracy, held-out split",

@@ -96,8 +96,8 @@ async function inTwoWorlds<T>(
  * scenario adds is visible against it.
  */
 async function theCachedConstruction(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("does the accelerated path match the reference?");
-  const control = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("does the accelerated path match the reference?");
+  const { observations: control } = await s.recordObservations({
     enquiry,
     name: CONTROL,
     finding: "randomised control series",
@@ -134,7 +134,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("two worlds that differ in what the record says are told apart", async () => {
     const build = (recorded: string) => async (s: ResearchSession) => {
       const { enquiry } = await theCachedConstruction(s);
-      const second = await s.recordObservations({
+      const { observations: second } = await s.recordObservations({
         enquiry,
         name: "second control",
         finding: "control series, second pass",
@@ -184,7 +184,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("a reconstruction and independent fresh work leave the same durable record", async () => {
     const build = (finding: string) => async (s: ResearchSession) => {
       const { enquiry } = await theCachedConstruction(s);
-      const second = await s.recordObservations({
+      const { observations: second } = await s.recordObservations({
         enquiry,
         name: CONTROL,
         finding,
@@ -239,7 +239,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("what the record claims when the second control is a rebuild", async () => {
     const why = await inOneWorld(async (s) => {
       const { enquiry } = await theCachedConstruction(s);
-      const regenerated = await s.recordObservations({
+      const { observations: regenerated } = await s.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
@@ -274,7 +274,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("the rebuild recorded through the verb that already exists", async () => {
     const why = await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
-      const regenerated = await s.recordObservations({
+      const { observations: regenerated } = await s.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
@@ -325,7 +325,9 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("a reconstruction attempt that fails is not a question nobody has looked at", async () => {
     const { untested, unresolved } = await inOneWorld(async (s) => {
       const { enquiry } = await theCachedConstruction(s);
-      const provenance = await s.openEnquiry("what generated the historical random control?");
+      const { enquiry: provenance } = await s.openEnquiry(
+        "what generated the historical random control?",
+      );
 
       // The attempt, recorded against the question it is an attempt to answer.
       await s.recordObservations({
@@ -375,7 +377,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("a rebuild that concludes nothing has no act to be recorded as", async () => {
     await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
-      const regenerated = await s.recordObservations({
+      const { observations: regenerated } = await s.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
@@ -411,7 +413,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("what was this artefact rebuilding — still nothing answers", async () => {
     await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
-      const regenerated = await s.recordObservations({
+      const { observations: regenerated } = await s.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",

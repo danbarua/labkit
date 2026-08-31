@@ -51,8 +51,8 @@ const PROP = "the coating reduces fatigue cracking";
 
 /** A question answered *no*, on a finding somebody then vouched for. */
 async function aVouchedForNo() {
-  const enquiry = await session.openEnquiry(ASKS);
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry(ASKS);
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "cycle counts",
     finding: "forty coupons, coated and bare",
@@ -124,8 +124,8 @@ describe("S-18b — a negative result that somebody vouched for", () => {
    * or the fix above would have made every closure look vouched-for.
    */
   test("an unpromoted negative result still reads as provisional", async () => {
-    const enquiry = await session.openEnquiry("does the sealant reduce cracking?");
-    const observations = await session.recordObservations({
+    const { enquiry } = await session.openEnquiry("does the sealant reduce cracking?");
+    const { observations } = await session.recordObservations({
       enquiry,
       name: "sealant counts",
       finding: "forty coupons",

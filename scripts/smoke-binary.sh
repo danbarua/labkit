@@ -41,9 +41,11 @@ fail() {
   exit 1
 }
 
-# A write, which is what has to migrate first.
+# A write, which is what has to migrate first. `open` mints a Question and a
+# LineOfEnquiry and prints both handles, one per line (#161) -- the enquiry is
+# whichever line carries the LOE_ prefix, not the whole answer.
 enquiry="$(lab open 'does the packaged binary work?')"
-[[ "$enquiry" == LOE_* ]] || fail "the binary could not open an enquiry" "got: $enquiry"
+[[ "$enquiry" == *LOE_* ]] || fail "the binary could not open an enquiry" "got: $enquiry"
 
 # A second process against the same directory. If the ledger were not written,
 # or the hashes disagreed with a disk-read run, this re-applies migration 0000

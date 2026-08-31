@@ -61,10 +61,11 @@ const toEvent = (r: EventRow): DomainEvent => {
     operation: r.operation as Operation,
     subject: r.subject,
     created: r.created,
-    // Absent rather than `[]` when the column is null, so a reader can tell
-    // "this act connected nothing" from "nobody was collecting yet". Same
-    // treatment as `detail` below and for the same reason.
-    ...(r.edges === null ? {} : { edges: r.edges as DomainEvent["edges"] }),
+    // `null` only ever meant "written before this column existed" (2026-08-28),
+    // and this repo's one durable record postdates it -- see `domainEvent`'s
+    // doc comment. `?? []` is the whole of what a genuine legacy row would
+    // still need, with no sentinel required to tell it apart from anything.
+    edges: (r.edges as DomainEvent["edges"] | null) ?? [],
     ...(r.detail === null ? {} : { detail: r.detail as Record<string, unknown> }),
   };
 };
@@ -118,27 +119,34 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
   return {
     record: (event) =>
       unwrapped(async () => {
-        await orm.insert(labkitEvents).values({
-          tenant_id: tenantId,
-          at: event.at,
-          operation: event.operation,
-          subject: event.subject,
-          // Copied: `DomainEvent.created` is `readonly string[]` and drizzle's
-          // insert type is not.
-          created: [...(event.created ?? [])],
-          // `null` and not `[]` when the act connected nothing: see the column
-          // comment. An event that genuinely created no edges writes `[]`,
-          // which is a different statement from a row that predates collection.
-          edges: event.edges ? [...event.edges] : null,
-          attribution_label: event.attribution.attribution_label,
-          attribution_id: event.attribution.attribution_id,
-          attribution_how: event.attribution.attribution_how,
-          git_hash: event.attribution.git_hash,
-          // `jsonb` takes the value, not a string: the driver serialises it.
-          // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
-          // payload is the classic way that goes wrong.
-          detail: event.detail ?? null,
-        });
+        const rows = await orm
+          .insert(labkitEvents)
+          .values({
+            tenant_id: tenantId,
+            at: event.at,
+            operation: event.operation,
+            subject: event.subject,
+            // Copied: `DomainEvent.created`/`.edges` are `readonly` and
+            // drizzle's insert type is not. Always a real array -- see
+            // `domainEvent`'s doc comment for why nothing here defaults to
+            // `null` any more.
+            created: [...event.created],
+            edges: [...event.edges],
+            attribution_label: event.attribution.attribution_label,
+            attribution_id: event.attribution.attribution_id,
+            attribution_how: event.attribution.attribution_how,
+            git_hash: event.attribution.git_hash,
+            // `jsonb` takes the value, not a string: the driver serialises it.
+            // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
+            // payload is the classic way that goes wrong.
+            detail: event.detail ?? null,
+          })
+          .returning({ seq: labkitEvents.seq });
+        // `seq` is the one field the caller could not have supplied -- the
+        // store assigns it. Everything else on the returned event is what was
+        // just written, not a second read of the row. `rows[0]!`: a single
+        // insert always returns exactly one row.
+        return { ...event, seq: rows[0]!.seq };
       }),
     all: () => select({}),
     select,

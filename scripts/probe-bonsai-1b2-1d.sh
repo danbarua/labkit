@@ -82,7 +82,7 @@ q3=$(lab pose "does a structured internal transformation exist in response to lo
 loe3=$(lab pursue "$q3" --approach "controlled state-conditioning design: one baseline trajectory (KMNIST class 0, T, seed=3000), 4 perturbation times, 6 fixed nearby-state replicas per time, 3 nodes x 2 signs x 3 amplitudes = 432 trials, Delta_map=B-W permutation test")
 art_b2=$(lab observe "$loe3" --name stage1b2_results \
   --finding "432 trials' event-aligned q/r vectors across finite, tangent-only, nonlinear-residual, and common-support-excluded response representations" \
-  --hash sha256:d5addc8a)
+  --hash sha256:d5addc8a | grep '^ART_')
 crit_b2=$(lab criterion "Delta_map hits the Monte Carlo permutation floor (p_MC ~ 0.00010, 10,000 permutations) for every response representation tested")
 
 out=$(lab analyse "$loe3" \
@@ -90,7 +90,7 @@ out=$(lab analyse "$loe3" \
   --from "$art_b2" --held-to "$crit_b2" \
   --concludes '{"proposition": "a structured internal transformation exists in response to local perturbations", "finding": "finite response Delta_map=0.3505, p_MC~0.00010; survives common-support exclusion of all three candidate source coordinates (Delta_map=0.3418, p_MC~0.00010); tangent-only (0.3248) and nonlinear-residual (0.3896) each separately significant; all three input factors (node, sign, amplitude) separately significant, Holm-corrected"}')
 comp_b2=$(printf '%s\n' "$out" | sed -n 1p)
-clm_b2=$(printf '%s\n' "$out" | sed -n 2p)
+clm_b2=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 
 lab evaluate "$crit_b2" --value "all four representations hit p_MC~0.00010; 432/432 trials numerically valid" --outcome pass --citing "$clm_b2" >/dev/null
 lab promote "$clm_b2" --because "Level 2 (structured internal transformation) established: source-retention objection resolved with an audited common-support mask, both linear and nonlinear structure separately carry the mapping, all three input factors separately significant" >/dev/null
@@ -124,13 +124,13 @@ say "Stage 1C: does item 1 (generalization) hold? -- and the reopening hesitatio
 loe7=$(lab pursue "$q4" --approach "identical 432-trial design, 9 further independent baseline trajectories (seeds 3010-3090) plus seed=3000 read read-only from Stage 1B2's own committed results, same permutation test")
 art_c=$(lab observe "$loe7" --name stage1c_trajectories \
   --finding "10 trajectories' pooled Delta_map: mean 0.3296, range 0.2964-0.3505, SD 0.0172 (CV ~5.2%); every one of 40 per-t_p values positive; 10/10 hit the permutation floor" \
-  --hash sha256:4634d7aa)
+  --hash sha256:4634d7aa | grep '^ART_')
 out=$(lab analyse "$loe7" \
   --method "same design as Stage 1B2 (stage1b2_core.py functions imported directly, not reimplemented), applied to 9 new independent baseline trajectories plus the frozen seed=3000 reference" \
   --from "$art_c" \
   --concludes '{"proposition": "the structured transformation generalizes across independent baseline trajectories", "finding": "10 of 10 trajectories hit the Monte Carlo floor; mean Delta_map 0.3296, CV ~5.2% -- tight clustering, not a wide scatter with a few outliers"}')
 comp_c=$(printf '%s\n' "$out" | sed -n 1p)
-clm_c=$(printf '%s\n' "$out" | sed -n 2p)
+clm_c=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 lab close "$loe7" --answered-by "$clm_c" >/dev/null
 
 say "checking the reopening hesitation with real data, not assumed"
@@ -142,13 +142,13 @@ say "Stage 1D Part 1: T vs. lattice"
 crit_lattice=$(lab criterion "T vs lattice: agreement standard -- the primary paired t-test, exact sign-flip, and Wilcoxon signed-rank on the 10 matched d_k=Delta_map(T,k)-Delta_map(lattice,k) values must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
 art_lattice=$(lab observe "$loe5" --name stage1d_lattice_trajectories \
   --finding "lattice's own 10-trajectory run on Stage 1C's matched seeds (3000-3090); T's own values read read-only from Stage 1C, not recomputed" \
-  --hash sha256:2df1d2c3)
+  --hash sha256:2df1d2c3 | grep '^ART_')
 out=$(lab analyse "$loe5" \
   --method "two-sided paired t-test (primary), exact sign-flip and Wilcoxon signed-rank (robustness), on the 10 matched d_k values" \
   --from "$art_c" --from "$art_lattice" --held-to "$crit_lattice" \
   --concludes '{"proposition": "T shows a Delta_map advantage over the matched lattice control", "finding": "mean d_k=-0.0085 (lattice nominally higher), paired t-test p=0.2815, sign-flip p=0.2871, Wilcoxon p=0.4316 -- all three agree, no detectable difference", "bearing": "challenges"}')
 comp_lattice=$(printf '%s\n' "$out" | sed -n 1p)
-clm_lattice=$(printf '%s\n' "$out" | sed -n 2p)
+clm_lattice=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 # The criterion is a QUALITY BAR (do the methods agree?), not the
 # hypothesis (does T beat lattice?) -- direction lives in the
 # conclusion's own bearing, above. All three methods agree on
@@ -158,7 +158,7 @@ lab evaluate "$crit_lattice" --value "paired t p=0.2815, sign-flip p=0.2871, Wil
 say "Stage 1D Part 2: the pilot (non-confirmatory), a fresh-input reverify, and the confirmatory run"
 
 art_pilot=$(lab observe "$loe5" --name stage1d_pilot_realizations \
-  --finding "3 graph realizations (seeds 0,1,2) x first 3 of Stage 1C's matched trajectory seeds, for each of rewired/hist_random/curr_random -- a runtime and variance-allocation pilot; no confirmatory inference is drawn from it")
+  --finding "3 graph realizations (seeds 0,1,2) x first 3 of Stage 1C's matched trajectory seeds, for each of rewired/hist_random/curr_random -- a runtime and variance-allocation pilot; no confirmatory inference is drawn from it" | grep '^ART_')
 out=$(lab analyse "$loe5" \
   --method "3x3 crossed-variance pilot (mu_g + b_gr + tau_k + epsilon_grk, balanced two-way ANOVA method-of-moments), sizing only -- not confirmatory" \
   --from "$art_pilot" \
@@ -166,9 +166,9 @@ out=$(lab analyse "$loe5" \
   --concludes '{"proposition": "hist_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05", "finding": "own minimal (15,3) nominally, but sigma^2_b fit on df_r=1 after excluding a fully degenerate realization (seed=2, isolated fixed-coordinate node) -- reported indeterminate, not usable as-is"}' \
   --concludes '{"proposition": "curr_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05", "finding": "own minimal (15,3), cost 45, power 0.883, reliable"}')
 comp_pilot=$(printf '%s\n' "$out" | sed -n 1p)
-clm_pilot_rewired=$(printf '%s\n' "$out" | sed -n 2p)
-clm_pilot_hist=$(printf '%s\n' "$out" | sed -n 3p)
-clm_pilot_curr=$(printf '%s\n' "$out" | sed -n 4p)
+clm_pilot_rewired=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
+clm_pilot_hist=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 2p)
+clm_pilot_curr=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 3p)
 # None promoted -- deliberately. The pilot's own claims stay exploratory,
 # and `known` buckets them provisional rather than established, which
 # communicates "don't build on this" without needing a dedicated
@@ -181,13 +181,13 @@ clm_pilot_curr=$(printf '%s\n' "$out" | sed -n 4p)
 # v1->v2 (same pkl, no fresh inputs at all).
 art_followup=$(lab observe "$loe5" --name stage1d_hist_random_followup \
   --finding "2 further hist_random realizations (seeds 3, 4), same construction recipe, same 3 matched trajectory seeds, full simulation + permutation validation" \
-  --hash sha256:5deaff59)
+  --hash sha256:5deaff59 | grep '^ART_')
 out=$(lab reverify "$comp_pilot" --enquiry "$loe5" \
   --method "refit crossed variance decomposition on 4 valid realizations (seeds 0,1,3,4; seed 2 still excluded) -- df_r=3 now clears this project's reliability threshold, both variance components get a proper 95% chi-squared bound" \
   --under "$art_followup" \
   --concludes '{"proposition": "hist_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05", "finding": "refit: own minimal design is (R=25,K=3), cost 75, power 0.827 -- larger than the currently-locked common (15,3) and larger than rewired'\''s/curr_random'\''s own requirements", "bearing": "challenges"}')
 comp_followup=$(printf '%s\n' "$out" | sed -n 1p)
-clm_followup=$(printf '%s\n' "$out" | sed -n 2p)
+clm_followup=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 
 crit_rewired=$(lab criterion "T vs rewired: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
 crit_hist=$(lab criterion "T vs historical-random: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences (conditional on fixed-coordinate evaluability) must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
@@ -195,7 +195,7 @@ crit_curr=$(lab criterion "T vs current-random: agreement standard -- the primar
 
 art_confirm=$(lab observe "$loe5" --name stage1d_confirmatory_gpu \
   --finding "225 trajectories (25 realizations x 3 matched seeds x 3 families), locked (R=25,K=3) allocation, GPU/JAX; hist_random pre-screened, 7 of 32 candidates rejected for fixed-coordinate isolation before 25 evaluable realizations were reached" \
-  --hash sha256:75d8ca29)
+  --hash sha256:75d8ca29 | grep '^ART_')
 out=$(lab analyse "$loe5" \
   --method "two-sided one-sample t-test on realization-level mean differences (primary), studentized bootstrap / Wilcoxon / exact sign-flip (robustness), Holm-corrected across rewired/hist_random/curr_random/lattice" \
   --from "$art_confirm" --held-to "$crit_rewired" --held-to "$crit_hist" --held-to "$crit_curr" \
@@ -203,9 +203,9 @@ out=$(lab analyse "$loe5" \
   --concludes '{"proposition": "T shows a Delta_map advantage over historical-random", "finding": "conditional on evaluability: mean d_bar_gr=-0.0025, SD=0.0154, t(24)=-0.824, p=0.4179; sign-flip p=0.4217, Wilcoxon p=0.2521, bootstrap 95% CI [-0.0109,0.0060]; 21.9% of candidate realizations were unevaluable (95% CI 9.3-40.0%), disclosed separately, not folded into this estimate", "bearing": "challenges"}' \
   --concludes '{"proposition": "T shows a Delta_map advantage over current-random", "finding": "mean d_bar_gr=-0.0004, SD=0.0158, t(24)=-0.132, p=0.8958; sign-flip p=0.8950, Wilcoxon p=0.8119, bootstrap 95% CI [-0.0096,0.0084]", "bearing": "challenges"}')
 comp_confirm=$(printf '%s\n' "$out" | sed -n 1p)
-clm_confirm_rewired=$(printf '%s\n' "$out" | sed -n 2p)
-clm_confirm_hist=$(printf '%s\n' "$out" | sed -n 3p)
-clm_confirm_curr=$(printf '%s\n' "$out" | sed -n 4p)
+clm_confirm_rewired=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
+clm_confirm_hist=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 2p)
+clm_confirm_curr=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 3p)
 
 # Same reasoning as crit_lattice: these criteria ask whether the four
 # methods agree, not which way the science came out. All four methods
@@ -227,13 +227,13 @@ say "the GPU bug: a clean, total-supersession replace"
 # on disk), so this is observed honestly without a hash, the same way
 # art_pilot is above.
 art_gpu_pilot=$(lab observe "$loe5" --name stage1d_gpu_pilot_buggy \
-  --finding "JAX/GPU pilot benchmark on an A100, as-shipped build_432_batch(), Delta_map=0.2842 for T seed=3000 -- no raw output file preserved locally")
+  --finding "JAX/GPU pilot benchmark on an A100, as-shipped build_432_batch(), Delta_map=0.2842 for T seed=3000 -- no raw output file preserved locally" | grep '^ART_')
 out=$(lab analyse "$loe5" \
   --method "JAX/GPU port of the per-trial simulator (run_one_trial_jax_faithful), pilot benchmark on an A100" \
   --from "$art_c" --from "$art_gpu_pilot" \
   --concludes '{"proposition": "the GPU port reproduces Stage 1C'\''s cached Delta_map for T, seed=3000", "finding": "GPU reported 0.2842 vs. Stage 1C'\''s cached 0.3505 -- a real, non-trivial discrepancy", "bearing": "challenges"}')
 comp_gpu_bug=$(printf '%s\n' "$out" | sed -n 1p)
-clm_gpu_bug=$(printf '%s\n' "$out" | sed -n 2p)
+clm_gpu_bug=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 
 rev_gpu=$(lab review "$comp_gpu_bug" --verdict "wrong replica-direction distribution -- uniform(-1,1) instead of normal-then-rotation-projected-then-normalized -- fully reproduces the discrepancy on its own (confirmed by a 4-way factorial: correct/buggy directions x correct/buggy E_min gating); a dropped E_min validity gate was also found but confirmed inert for this specific trajectory")
 # Same reasoning: the corrected run's own 0.3505 is its own observation,
@@ -241,7 +241,7 @@ rev_gpu=$(lab review "$comp_gpu_bug" --verdict "wrong replica-direction distribu
 # No raw file for this specific smoke-test run survives locally either --
 # only the later confirmatory run (art_confirm) is on disk.
 art_gpu_fix=$(lab observe "$loe5" --name stage1d_gpu_fix_smoketest \
-  --finding "corrected build_432_batch() re-run on a fresh A100 session, Delta_map=0.3505 for T seed=3000, verify_on_gpu.py's field-by-field precision check passed -- no raw output file preserved locally beyond the later confirmatory run")
+  --finding "corrected build_432_batch() re-run on a fresh A100 session, Delta_map=0.3505 for T seed=3000, verify_on_gpu.py's field-by-field precision check passed -- no raw output file preserved locally beyond the later confirmatory run" | grep '^ART_')
 lab replace "$comp_gpu_bug" --because "$rev_gpu" --enquiry "$loe5" \
   --method "corrected build_432_batch(), calling the real generate_fixed_replica_directions() instead of a hand-rolled uniform draw; smoke-tested against an independently computed replica state before touching a GPU, then re-verified end-to-end on a fresh A100 session" \
   --from "$art_c" --from "$art_gpu_fix" \

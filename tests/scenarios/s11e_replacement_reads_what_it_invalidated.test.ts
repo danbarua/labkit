@@ -51,8 +51,8 @@ const PROP = "the treatment shortens recovery";
 
 /** An analysis, reviewed as defective — everything a replacement needs. */
 async function aDefectiveAnalysis() {
-  const enquiry = await session.openEnquiry("does the treatment shorten recovery?");
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does the treatment shorten recovery?");
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "recovery times",
     finding: "sixty patients, two arms",
@@ -63,7 +63,7 @@ async function aDefectiveAnalysis() {
     from: [observations],
     concludes: [{ proposition: PROP, finding: "three days shorter" }],
   });
-  const review = await session.recordReview({
+  const { review } = await session.recordReview({
     of: analysis,
     verdict: "unadjusted for baseline severity",
   });

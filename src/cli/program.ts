@@ -14,6 +14,7 @@
 import { Command } from "commander";
 import pkg from "../../package.json" with { type: "json" };
 import { worktreeName } from "../worktree";
+import { isoInstant } from "./args";
 import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
 import { registerServe } from "./commands/serve";
@@ -44,6 +45,20 @@ export function globalOptions(program: Command): Command {
       // subtracts: colour is off already when stdout is not a terminal or
       // `NO_COLOR` is set, and `--json` is never coloured at all.
       .option("--no-ansi", "never colour the output")
+      // Hidden from `--help` deliberately -- a `sudo` for the clock, not a
+      // documented feature. It exists for backfilling real historical work
+      // (bonsai-2026: a record whose events predate labkit's own existence),
+      // not for stating "this is happening now" a different way, and a
+      // caller reaching for it has to already know it is there.
+      .addOption(
+        program
+          .createOption(
+            "--date <iso>",
+            "record every write in this command as having happened then",
+          )
+          .argParser(isoInstant)
+          .hideHelp(),
+      )
   );
 }
 

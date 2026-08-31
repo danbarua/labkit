@@ -49,28 +49,31 @@ describe("enumerating gates and work", () => {
    * broken.
    */
   async function fixture(s: ResearchSession) {
-    const question = await s.pose("does the enumeration hold?");
-    const enquiry = await s.pursue({ question, approach: "build one of each" });
+    const { question } = await s.pose("does the enumeration hold?");
+    const { enquiry } = await s.pursue({ question, approach: "build one of each" });
 
     // 1. never-evaluated: a criterion nobody has checked.
-    const untouched = await s.stateCriterion("nobody has looked at this");
-    const readyWork = await s.planWork({ objective: "ready to start", acceptance: "done" });
-    const neverGate = await s.declareGate({
+    const { criterion: untouched } = await s.stateCriterion("nobody has looked at this");
+    const { work: readyWork } = await s.planWork({
+      objective: "ready to start",
+      acceptance: "done",
+    });
+    const { gate: neverGate } = await s.declareGate({
       governedBy: [untouched],
       consequence: "unchecked",
       protecting: [readyWork],
     });
 
     // 2. blocked: a criterion evaluated and failed.
-    const failing = await s.stateCriterion("this one fails");
-    const blockedWork = await s.planWork({ objective: "held up", acceptance: "done" });
-    const blockedGate = await s.declareGate({
+    const { criterion: failing } = await s.stateCriterion("this one fails");
+    const { work: blockedWork } = await s.planWork({ objective: "held up", acceptance: "done" });
+    const { gate: blockedGate } = await s.declareGate({
       governedBy: [failing],
       consequence: "cannot proceed",
       protecting: [blockedWork],
     });
 
-    const readings = await s.recordObservations({
+    const { observations: readings } = await s.recordObservations({
       enquiry,
       name: "the readings",
       finding: "measured",
@@ -91,9 +94,12 @@ describe("enumerating gates and work", () => {
     });
 
     // 3. satisfied: a criterion evaluated and passed, with work implementing it.
-    const passing = await s.stateCriterion("this one passes");
-    const doneWork = await s.planWork({ objective: "already carried out", acceptance: "done" });
-    const okGate = await s.declareGate({
+    const { criterion: passing } = await s.stateCriterion("this one passes");
+    const { work: doneWork } = await s.planWork({
+      objective: "already carried out",
+      acceptance: "done",
+    });
+    const { gate: okGate } = await s.declareGate({
       governedBy: [passing],
       consequence: "fine",
       protecting: [doneWork],
@@ -115,10 +121,13 @@ describe("enumerating gates and work", () => {
     });
 
     // 4. incomplete: two criteria, one checked and one not.
-    const half = await s.stateCriterion("half-checked");
-    const alsoHalf = await s.stateCriterion("the unchecked half");
-    const partialWork = await s.planWork({ objective: "partly gated", acceptance: "done" });
-    const partialGate = await s.declareGate({
+    const { criterion: half } = await s.stateCriterion("half-checked");
+    const { criterion: alsoHalf } = await s.stateCriterion("the unchecked half");
+    const { work: partialWork } = await s.planWork({
+      objective: "partly gated",
+      acceptance: "done",
+    });
+    const { gate: partialGate } = await s.declareGate({
       governedBy: [half, alsoHalf],
       consequence: "partly checked",
       protecting: [partialWork],
@@ -220,23 +229,23 @@ describe("enumerating gates and work", () => {
       // give both gates one answer. Here the same criterion is evaluated for
       // one gate and not the other -- which is S-17 and S-3's case reached from
       // a new direction.
-      const shared = await s.stateCriterion("one check, two gates");
-      const workA = await s.planWork({ objective: "A", acceptance: "done" });
-      const workB = await s.planWork({ objective: "B", acceptance: "done" });
-      const gateA = await s.declareGate({
+      const { criterion: shared } = await s.stateCriterion("one check, two gates");
+      const { work: workA } = await s.planWork({ objective: "A", acceptance: "done" });
+      const { work: workB } = await s.planWork({ objective: "B", acceptance: "done" });
+      const { gate: gateA } = await s.declareGate({
         governedBy: [shared],
         consequence: "A",
         protecting: [workA],
       });
-      const gateB = await s.declareGate({
+      const { gate: gateB } = await s.declareGate({
         governedBy: [shared],
         consequence: "B",
         protecting: [workB],
       });
 
-      const question = await s.pose("does the scope hold?");
-      const enquiry = await s.pursue({ question, approach: "evaluate one side" });
-      const readings = await s.recordObservations({
+      const { question } = await s.pose("does the scope hold?");
+      const { enquiry } = await s.pursue({ question, approach: "evaluate one side" });
+      const { observations: readings } = await s.recordObservations({
         enquiry,
         name: "readings",
         finding: "measured",
@@ -292,17 +301,17 @@ describe("enumerating gates and work", () => {
       // branch order.** An analysis implements this task AND its gate failed.
       // The other reading -- that work already carried out is not "blocked"
       // whatever its gate says -- is defensible, so this pins which was chosen.
-      const criterion = await s.stateCriterion("fails after the work is done");
-      const work = await s.planWork({ objective: "done but held", acceptance: "done" });
-      const gate = await s.declareGate({
+      const { criterion } = await s.stateCriterion("fails after the work is done");
+      const { work } = await s.planWork({ objective: "done but held", acceptance: "done" });
+      const { gate } = await s.declareGate({
         governedBy: [criterion],
         consequence: "cannot be built on",
         protecting: [work],
       });
 
-      const question = await s.pose("does precedence hold?");
-      const enquiry = await s.pursue({ question, approach: "do the work, fail the check" });
-      const readings = await s.recordObservations({
+      const { question } = await s.pose("does precedence hold?");
+      const { enquiry } = await s.pursue({ question, approach: "do the work, fail the check" });
+      const { observations: readings } = await s.recordObservations({
         enquiry,
         name: "readings",
         finding: "measured",
@@ -341,7 +350,10 @@ describe("enumerating gates and work", () => {
       // `planWork` requires no gate, so this task hangs off nothing at all --
       // reachable from no other verb in the read surface. It is also the
       // commonest thing in a standup.
-      const orphan = await s.planWork({ objective: "nobody has touched this", acceptance: "done" });
+      const { work: orphan } = await s.planWork({
+        objective: "nobody has touched this",
+        acceptance: "done",
+      });
       const planned = await s.workList("planned");
       expect(planned.map((w) => w.work as string)).toContain(orphan as string);
       expect(planned.find((w) => w.work === orphan)?.objective).toBe("nobody has touched this");

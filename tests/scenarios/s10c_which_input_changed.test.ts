@@ -55,8 +55,8 @@ const HOLDS = "the effect holds against the control";
  * the report of the re-run says changed.
  */
 async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("does the effect hold against the control?");
-  const original = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("does the effect hold against the control?");
+  const { observations: original } = await s.recordObservations({
     enquiry,
     name: NAME,
     finding: "the original series",
@@ -69,7 +69,7 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
     concludes: [{ proposition: HOLDS, finding: "effect survives the control" }],
   });
 
-  const regenerated = await s.recordObservations({
+  const { observations: regenerated } = await s.recordObservations({
     enquiry,
     name: NAME,
     finding: "regenerated from an inferred algorithm",

@@ -61,12 +61,12 @@ const EXTERNAL = "does the graph construction matter for external classification
  * utility and ranked the constructions. Same sentence, different endpoints.
  */
 async function twoStages() {
-  const internal = await session.pose(INTERNAL);
-  const internalWork = await session.pursue({
+  const { question: internal } = await session.pose(INTERNAL);
+  const { enquiry: internalWork } = await session.pursue({
     question: internal,
     approach: "internal mapping-strength comparison",
   });
-  const internalReadings = await session.recordObservations({
+  const { observations: internalReadings } = await session.recordObservations({
     enquiry: internalWork,
     name: "mapping-strength readings across constructions",
     finding: "mapping strength measured for five graph constructions",
@@ -83,12 +83,12 @@ async function twoStages() {
     ],
   });
 
-  const external = await session.pose(EXTERNAL);
-  const externalWork = await session.pursue({
+  const { question: external } = await session.pose(EXTERNAL);
+  const { enquiry: externalWork } = await session.pursue({
     question: external,
     approach: "downstream classification comparison",
   });
-  const externalReadings = await session.recordObservations({
+  const { observations: externalReadings } = await session.recordObservations({
     enquiry: externalWork,
     name: "downstream classification readings",
     finding: "held-out classification accuracy measured for the same five constructions",
@@ -185,7 +185,7 @@ describe("S-5 — contradiction or dissociation?", () => {
   test("two opposing findings within one question are a contradiction", async () => {
     const programme = await twoStages();
 
-    const rerun = await session.recordObservations({
+    const { observations: rerun } = await session.recordObservations({
       enquiry: programme.internalWork,
       name: "mapping-strength readings, wider construction set",
       finding: "mapping strength measured for twelve graph constructions",
@@ -269,14 +269,14 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
 
     // A third line of work asserting the same sentence, and settling on it.
-    const alsoInternal = await session.pose(
+    const { question: alsoInternal } = await session.pose(
       "does the graph construction matter for reconstruction error?",
     );
-    const work = await session.pursue({
+    const { enquiry: work } = await session.pursue({
       question: alsoInternal,
       approach: "reconstruction-error comparison",
     });
-    const readings = await session.recordObservations({
+    const { observations: readings } = await session.recordObservations({
       enquiry: work,
       name: "reconstruction-error readings",
       finding: "reconstruction error measured for the same five constructions",
@@ -332,14 +332,14 @@ describe("S-5 — contradiction or dissociation?", () => {
       because: "immaterial overstates it",
     });
 
-    const elsewhere = await session.pose(
+    const { question: elsewhere } = await session.pose(
       "does the graph construction matter for reconstruction error?",
     );
-    const work = await session.pursue({
+    const { enquiry: work } = await session.pursue({
       question: elsewhere,
       approach: "reconstruction-error comparison",
     });
-    const readings = await session.recordObservations({
+    const { observations: readings } = await session.recordObservations({
       enquiry: work,
       name: "reconstruction-error readings",
       finding: "reconstruction error measured across constructions",
@@ -424,12 +424,12 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
     const solo = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
 
-    const enquiryOnly = await session.pose("does the encoding respond nonlinearly?");
-    const work = await session.pursue({
+    const { question: enquiryOnly } = await session.pose("does the encoding respond nonlinearly?");
+    const { enquiry: work } = await session.pursue({
       question: enquiryOnly,
       approach: "curvature sweep",
     });
-    const readings = await session.recordObservations({
+    const { observations: readings } = await session.recordObservations({
       enquiry: work,
       name: "curvature readings",
       finding: "response measured across the sweep",

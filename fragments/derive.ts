@@ -21,7 +21,7 @@
 
 import { labelForNaturalId } from "../src/db/domain";
 import type { TenantGraph } from "../src/db/graph";
-import type { DomainEvent, EventFilter, EventSink } from "../src/domain";
+import type { EventFilter, EventSink } from "../src/domain";
 import { ReadSurface, systemClock } from "../src/domain";
 import { ref } from "../src/domain/report";
 import { currentFragment } from "./provenance";
@@ -67,10 +67,8 @@ export function withProvenance(
 
   const events: EventSink = {
     record: async (event) => {
-      await base.record(event);
-      const all = await base.all();
-      const stamped = all[all.length - 1] as DomainEvent;
-      for (const handle of stamped.created ?? []) {
+      const stamped = await base.record(event);
+      for (const handle of stamped.created) {
         if (labelForNaturalId(handle) === "LineOfEnquiry") enquiryHandles.push(handle);
         if (labelForNaturalId(handle) === "Gate") gateHandles.push(handle);
       }
@@ -95,6 +93,7 @@ export function withProvenance(
         fragment: currentFragment.name,
         derived: { enquiries, gates },
       });
+      return stamped;
     },
     all: () => base.all(),
     select: (filter: EventFilter) => base.select(filter),

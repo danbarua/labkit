@@ -66,7 +66,7 @@ const HOLDS = "the simulation converges";
  * a *reader* may conclude from it.
  */
 async function anAnalysisThatConsumedNothing(s: ResearchSession) {
-  const enquiry = await s.openEnquiry("does the simulation converge?");
+  const { enquiry } = await s.openEnquiry("does the simulation converge?");
   const { analysis, claims: analysisClaims } = await s.recordAnalysis({
     enquiry,
     method: "pure-sim",

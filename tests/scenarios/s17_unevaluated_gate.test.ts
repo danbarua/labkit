@@ -55,14 +55,14 @@ async function afterwards(): Promise<ResearchSession> {
 
 /** The state the agent describes as "the verification gate is implemented". */
 async function aDeclaredButUnevaluatedGate() {
-  const promotion = await session.planWork({
+  const { work: promotion } = await session.planWork({
     objective: "promote the accelerated implementation to reference",
     acceptance: "protected artefact matches its recorded hash",
   });
-  const criterion = await session.stateCriterion(
+  const { criterion } = await session.stateCriterion(
     "the protected artefact matches its recorded hash",
   );
-  const gate = await session.declareGate({
+  const { gate } = await session.declareGate({
     governedBy: [criterion],
     consequence: "block promotion unless the artefact verifies",
     protecting: [promotion],
@@ -151,24 +151,24 @@ describe("S-17: does the guard actually guard?", () => {
    * those that happened to trigger this particular gate.
    */
   test("a criterion shown to fail on one gate counts as demonstrated for another it governs", async () => {
-    const criterion = await session.stateCriterion(
+    const { criterion } = await session.stateCriterion(
       "the protected artefact matches its recorded hash",
     );
-    const stagingWork = await session.planWork({
+    const { work: stagingWork } = await session.planWork({
       objective: "publish to staging",
       acceptance: "verified",
     });
-    const releaseWork = await session.planWork({
+    const { work: releaseWork } = await session.planWork({
       objective: "publish to release",
       acceptance: "verified",
     });
 
-    const stagingGate = await session.declareGate({
+    const { gate: stagingGate } = await session.declareGate({
       governedBy: [criterion],
       consequence: "block staging unless the artefact verifies",
       protecting: [stagingWork],
     });
-    const releaseGate = await session.declareGate({
+    const { gate: releaseGate } = await session.declareGate({
       governedBy: [criterion],
       consequence: "block release unless the artefact verifies",
       protecting: [releaseWork],
@@ -198,8 +198,8 @@ describe("S-17: does the guard actually guard?", () => {
    */
   test("a criterion cannot be evaluated against a gate it does not govern", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
-    const unrelated = await session.stateCriterion("an unrelated condition");
-    const otherWork = await session.planWork({
+    const { criterion: unrelated } = await session.stateCriterion("an unrelated condition");
+    const { work: otherWork } = await session.planWork({
       objective: "other work",
       acceptance: "n/a",
     });

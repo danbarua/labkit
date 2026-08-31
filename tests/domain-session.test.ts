@@ -45,8 +45,8 @@ afterEach(async () => {
  * report supported-but-resting-on-nothing, with no error.
  */
 test("whySupported treats an explicit invalidated:false the same as an absent one", async () => {
-  const enquiry = await session.openEnquiry("q");
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("q");
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "obs",
     finding: "raw",
@@ -123,8 +123,8 @@ function failingOn(
  * guessing anywhere else in this project.
  */
 test("an interrupted reinterpret does not retract a finding it cannot replace", async () => {
-  const enquiry = await session.openEnquiry("does T differ from rewired?");
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does T differ from rewired?");
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "per-image results",
     finding: "per-image accuracy",
@@ -167,18 +167,18 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
  * conditions -- one of which the researcher intended to retire.
  */
 test("an interrupted amendDesign leaves the gate governed by its original condition alone", async () => {
-  const criterion = await session.stateCriterion("solver converges within 500 iterations");
-  const work = await session.planWork({
+  const { criterion } = await session.stateCriterion("solver converges within 500 iterations");
+  const { work } = await session.planWork({
     objective: "fit the tertiary model",
     acceptance: "converges",
   });
-  const gate = await session.declareGate({
+  const { gate } = await session.declareGate({
     governedBy: [criterion],
     consequence: "the tertiary model may be fitted",
     protecting: [work],
   });
-  const enquiry = await session.openEnquiry("does the solver converge?");
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does the solver converge?");
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "solver traces",
     finding: "iteration counts",
@@ -241,7 +241,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
  * on why `Promise.all()` against two live connections is not an option here.
  */
 test("recordObservations writes the unit and the evidence together or not at all", async () => {
-  const enquiry = await session.openEnquiry("does the coating hold at temperature?");
+  const { enquiry } = await session.openEnquiry("does the coating hold at temperature?");
 
   const realCreateNode = graph.createNode.bind(graph);
   let unitAttempted = false;
@@ -277,7 +277,7 @@ test("recordObservations writes the unit and the evidence together or not at all
 
   // And the verb still works afterwards -- the rollback released the
   // transaction rather than leaving the session wedged in a failed one.
-  const again = await session.recordObservations({
+  const { observations: again } = await session.recordObservations({
     enquiry,
     name: "thermal cycling run",
     finding: "no delamination after 200 cycles",
@@ -324,8 +324,8 @@ test("recordObservations writes the unit and the evidence together or not at all
  * checking the record after a failure would expect.
  */
 test("an interrupted sharpen leaves nothing at all", async () => {
-  const enquiry = await session.openEnquiry("does the coating hold?");
-  const obs = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does the coating hold?");
+  const { observations: obs } = await session.recordObservations({
     enquiry,
     name: "run A",
     finding: "no delamination",
@@ -345,7 +345,7 @@ test("an interrupted sharpen leaves nothing at all", async () => {
       },
     ],
   });
-  const original = await session.pose("is the coating durable?");
+  const { question: original } = await session.pose("is the coating durable?");
 
   // Fail on the second BASED_ON edge: the decision keeps one finding of three.
   const realCreateEdge = graph.createEdge.bind(graph);
@@ -396,8 +396,8 @@ test("an interrupted sharpen leaves nothing at all", async () => {
  * third window discriminates between. See `041` for the verdict.
  */
 const aGatedCheck = async () => {
-  const enquiry = await session.openEnquiry("does the solver converge?");
-  const obs = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does the solver converge?");
+  const { observations: obs } = await session.recordObservations({
     enquiry,
     name: "sweep",
     finding: "residuals recorded",
@@ -408,12 +408,12 @@ const aGatedCheck = async () => {
     from: [obs],
     concludes: [{ proposition: "the solver converges", finding: "residual 1e-9" }],
   });
-  const work = await session.planWork({
+  const { work } = await session.planWork({
     objective: "scale to the full grid",
     acceptance: "convergence holds",
   });
-  const criterion = await session.stateCriterion("residual below 1e-8");
-  const gate = await session.declareGate({
+  const { criterion } = await session.stateCriterion("residual below 1e-8");
+  const { gate } = await session.declareGate({
     governedBy: [criterion],
     consequence: "do not scale up",
     protecting: [work],
@@ -481,8 +481,8 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
  * `enquiryStatus` picks with `.find()` over unordered rows.
  */
 test("a close interrupted before BASED_ON, then retried, leaves two resolving decisions", async () => {
-  const enquiry = await session.openEnquiry("does the coating fail under load?");
-  const obs = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does the coating fail under load?");
+  const { observations: obs } = await session.recordObservations({
     enquiry,
     name: "load runs",
     finding: "cracks at 40MPa",
@@ -553,7 +553,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
   expect(before.checks[0]?.evaluations[0]?.basis?.map((b) => b.states)).toEqual(["residual 1e-9"]);
   expect(before.state).toBe("blocked");
 
-  const review = await session.recordReview({
+  const { review } = await session.recordReview({
     of: analysis,
     verdict: "the sweep dropped the last decade",
   });
@@ -589,8 +589,8 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
 test("an enquiry cannot be closed twice, and the refusal names the existing close", async () => {
   const s = session;
 
-  const enquiry = await s.openEnquiry("does pruning move convergence?");
-  const observations = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("does pruning move convergence?");
+  const { observations } = await s.recordObservations({
     enquiry,
     name: "readings",
     finding: "twelve runs",
@@ -637,8 +637,8 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
  */
 test("a question accepted as unresolved can still be closed when evidence arrives", async () => {
   const s = session;
-  const enquiry = await s.openEnquiry("does depth move convergence?");
-  const observations = await s.recordObservations({
+  const { enquiry } = await s.openEnquiry("does depth move convergence?");
+  const { observations } = await s.recordObservations({
     enquiry,
     name: "sweep",
     finding: "runs",
@@ -693,7 +693,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
  * becomes reachable and `pursue` needs the transaction.
  */
 test("an interrupted pursue leaves no enquiry at all", async () => {
-  const question = await session.pose("does the coating hold at temperature?");
+  const { question } = await session.pose("does the coating hold at temperature?");
 
   const realCreateEdge = graph.createEdge.bind(graph);
   graph.createEdge = (async (from: string, edge: string, to: string) => {
@@ -723,7 +723,7 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
 
   // And pursuing again works — no phantom blocks it, and two enquiries on one
   // question would be legitimate anyway.
-  const retried = await session.pursue({
+  const { enquiry: retried } = await session.pursue({
     question,
     approach: "thermal cycling",
   });
@@ -748,8 +748,8 @@ test("stateCriterion and planWork have no interruption window to have", async ()
     return (realCreateEdge as (...a: unknown[]) => unknown)(...args);
   }) as typeof graph.createEdge;
 
-  const criterion = await session.stateCriterion("residual below 1e-8");
-  const work = await session.planWork({
+  const { criterion } = await session.stateCriterion("residual below 1e-8");
+  const { work } = await session.planWork({
     objective: "scale up",
     acceptance: "converges",
   });
@@ -767,8 +767,8 @@ test("stateCriterion and planWork have no interruption window to have", async ()
  * orphan `Review` node — `pursue`'s argument, checked rather than assumed.
  */
 test("an interrupted recordReview leaves a review nothing can reach", async () => {
-  const enquiry = await session.openEnquiry("does it hold?");
-  const obs = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry("does it hold?");
+  const { observations: obs } = await session.recordObservations({
     enquiry,
     name: "run",
     finding: "data",
@@ -822,9 +822,9 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
  * nothing on the read surface ever enumerating gates.
  */
 test("an interrupted declareGate leaves no gate at all", async () => {
-  const c1 = await session.stateCriterion("residual below 1e-8");
-  const c2 = await session.stateCriterion("runtime under an hour");
-  const work = await session.planWork({
+  const { criterion: c1 } = await session.stateCriterion("residual below 1e-8");
+  const { criterion: c2 } = await session.stateCriterion("runtime under an hour");
+  const { work } = await session.planWork({
     objective: "scale up",
     acceptance: "both hold",
   });
@@ -880,11 +880,11 @@ test("an interrupted declareGate leaves no gate at all", async () => {
  * never appear.
  */
 test("a task planned with no readable inputs reports an empty contract, not a missing one", async () => {
-  const omitted = await session.planWork({
+  const { work: omitted } = await session.planWork({
     objective: "write the discussion section",
     acceptance: "a draft exists",
   });
-  const explicit = await session.planWork({
+  const { work: explicit } = await session.planWork({
     objective: "tidy the repository",
     acceptance: "no stray files",
     mayRead: [],
@@ -895,7 +895,7 @@ test("a task planned with no readable inputs reports an empty contract, not a mi
 
   // And the populated case still round-trips through the same read, so this
   // test fails for the right reason if arrays stop working altogether.
-  const populated = await session.planWork({
+  const { work: populated } = await session.planWork({
     objective: "rerun the sweep",
     acceptance: "all seeds complete",
     mayRead: ["seeds.csv", "config.toml"],

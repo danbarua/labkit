@@ -70,8 +70,8 @@ type W = WriteSurface;
 export async function askAndPursue(
   w: W,
   input: { question: string },
-): Promise<{ enquiry: EnquiryRef }> {
-  return { enquiry: await w.openEnquiry(input.question) };
+): Promise<{ enquiry: EnquiryRef; question: QuestionRef }> {
+  return await w.openEnquiry(input.question);
 }
 
 /**
@@ -86,10 +86,11 @@ export async function multiPursuit(
   w: W,
   input: { question: string; approaches: readonly [string, string, ...string[]] },
 ): Promise<{ question: QuestionRef; enquiries: EnquiryRef[] }> {
-  const question = await w.pose(input.question);
+  const { question } = await w.pose(input.question);
   const enquiries: EnquiryRef[] = [];
   for (const approach of input.approaches) {
-    enquiries.push(await w.pursue({ question, approach }));
+    const { enquiry } = await w.pursue({ question, approach });
+    enquiries.push(enquiry);
   }
   return { question, enquiries };
 }
@@ -99,7 +100,8 @@ export async function prespecify(
   w: W,
   input: { proposition: string },
 ): Promise<{ criterion: CriterionRef }> {
-  return { criterion: await w.stateCriterion(input.proposition) };
+  const { criterion } = await w.stateCriterion(input.proposition);
+  return { criterion };
 }
 
 /**
@@ -119,12 +121,12 @@ export async function gatedWork(
     mayRead?: string[];
   },
 ): Promise<{ gate: GateRef; work: WorkRef }> {
-  const work = await w.planWork({
+  const { work } = await w.planWork({
     objective: input.objective,
     acceptance: input.acceptance,
     ...(input.mayRead === undefined ? {} : { mayRead: input.mayRead }),
   });
-  const gate = await w.declareGate({
+  const { gate } = await w.declareGate({
     governedBy: [input.criterion],
     consequence: input.consequence,
     protecting: [work],
@@ -151,7 +153,7 @@ export async function observeAndAnalyse(
     implementing?: WorkRef;
   },
 ): Promise<{ observations: ObservationsRef; analysis: AnalysisRef; claims: ConcludedClaim[] }> {
-  const observations = await w.recordObservations({
+  const { observations } = await w.recordObservations({
     enquiry: input.enquiry,
     name: input.name,
     finding: input.finding,
@@ -185,7 +187,7 @@ export async function negativeResult(
     proposition: string;
   },
 ): Promise<{ observations: ObservationsRef; analysis: AnalysisRef; claims: ConcludedClaim[] }> {
-  const observations = await w.recordObservations({
+  const { observations } = await w.recordObservations({
     enquiry: input.enquiry,
     name: input.name,
     finding: input.finding,
@@ -289,7 +291,7 @@ export async function replaceAnalysis(
   // **The review is not optional scene-setting.** `because` is a `ReviewRef`,
   // so the domain will not let an analysis be superseded without a recorded
   // verdict to point at — which is why this fragment is the pair and not two.
-  const review = await w.recordReview({ of: input.supersedes, verdict: input.verdict });
+  const { review } = await w.recordReview({ of: input.supersedes, verdict: input.verdict });
   const report = await w.replaceAnalysis({
     supersedes: input.supersedes,
     because: review,
@@ -349,7 +351,12 @@ export async function sharpenQuestion(
   w: W,
   input: { from: QuestionRef; into: string; because: string },
 ): Promise<{ sharper: QuestionRef }> {
-  return { sharper: await w.sharpen({ from: input.from, into: input.into, because: input.because }) };
+  const { question } = await w.sharpen({
+    from: input.from,
+    into: input.into,
+    because: input.because,
+  });
+  return { sharper: question };
 }
 
 /**

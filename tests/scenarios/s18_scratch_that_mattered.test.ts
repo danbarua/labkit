@@ -63,8 +63,8 @@ const PROPOSITION = "the pruning schedule shifts the convergence point";
  * nobody knew it would matter.
  */
 async function scratchExploration() {
-  const enquiry = await session.openEnquiry(QUESTION);
-  const observations = await session.recordObservations({
+  const { enquiry } = await session.openEnquiry(QUESTION);
+  const { observations } = await session.recordObservations({
     enquiry,
     name: "lunchtime sweep",
     finding: "twelve runs, no seed control",
@@ -201,10 +201,10 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   test("promoting one line of enquiry's finding does not promote another's", async () => {
     const { analysisClaims } = await scratchExploration();
 
-    const other = await session.openEnquiry(
+    const { enquiry: other } = await session.openEnquiry(
       "does the pruning schedule change convergence on the small model?",
     );
-    const otherObservations = await session.recordObservations({
+    const { observations: otherObservations } = await session.recordObservations({
       enquiry: other,
       name: "small-model sweep",
       finding: "eight runs, small model",

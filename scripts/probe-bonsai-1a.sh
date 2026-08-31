@@ -78,7 +78,7 @@ q1=$(lab pose "does learned topology (T) produce distinguishable finite-time inf
 loe1=$(lab pursue "$q1" --approach "tangent-linear response vs three matched controls (degree-preserving rewiring, matched-sparsity random, regular lattice) across 10 KMNIST class topologies, joint tangent-matrix integration")
 art1=$(lab observe "$loe1" --name stage1a_all_classes \
   --finding "AUC per (class, construction) for T vs rewired/random/lattice, all 10 KMNIST classes, joint tangent-matrix response, RK45+DOP853 cross-checked, revalidated against finite differences under the actual inference solver" \
-  --hash sha256:d7a89526)
+  --hash sha256:d7a89526 | grep '^ART_')
 crit_orig=$(lab criterion "no T-vs-control comparison reaches significance under paired Wilcoxon, Bonferroni threshold 0.05/3 ~ 0.0167")
 
 out=$(lab analyse "$loe1" \
@@ -86,7 +86,7 @@ out=$(lab analyse "$loe1" \
   --from "$art1" --held-to "$crit_orig" \
   --concludes '{"proposition": "learned topology (T) produces distinguishable finite-time infinitesimal perturbation dynamics from matched controls", "finding": "none of three comparisons reach significance: T-vs-rewired p=0.695, T-vs-random p=0.275, T-vs-lattice p=0.084 (closest, still above uncorrected 0.05)", "bearing": "challenges"}')
 comp1=$(printf '%s\n' "$out" | sed -n 1p)
-clm1=$(printf '%s\n' "$out" | sed -n 2p)
+clm1=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 
 lab evaluate "$crit_orig" --value "T-vs-rewired p=0.695, T-vs-random p=0.275, T-vs-lattice p=0.084; all above 0.0167" --outcome pass --citing "$clm1" >/dev/null
 lab promote "$clm1" --because "high evidence strength: validated simulator, adaptive integration, independent-solver agreement, tangent-linear verification against finite differences, paired comparisons with multiplicity control; a genuine negative finding, not an exploratory null" >/dev/null
@@ -96,7 +96,7 @@ out=$(lab analyse "$loe1" \
   --from "$art1" \
   --concludes '{"proposition": "the T-vs-random AUC ratio direction is stable across random-construction seeds", "finding": "sign of log(T/random) flips in 7/20 seeds (historical control, CV=2.37) and 2/20 seeds (current control, CV=1.08); reinforces rather than contradicts the original null but reveals undocumented within-class seed variance", "bearing": "challenges"}')
 comp2=$(printf '%s\n' "$out" | sed -n 1p)
-clm2=$(printf '%s\n' "$out" | sed -n 2p)
+clm2=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
 
 lab close "$loe1" --answered-by "$clm1" >/dev/null
 
@@ -104,7 +104,8 @@ say "the sharpening: why a re-verification"
 
 q2=$(lab sharpen "$q1" \
   --into "does the T-vs-stochastic-control comparison hold up under proper seed accounting (multiple seeds per class, explicit within-class aggregation and robustness checks)?" \
-  --because "a class-0 pilot found the random control's AUC ratio sign is seed-sensitive (7/20 flips under the historical definition), an undocumented source of within-class variance the original single-seed-per-class design did not account for")
+  --because "a class-0 pilot found the random control's AUC ratio sign is seed-sensitive (7/20 flips under the historical definition), an undocumented source of within-class variance the original single-seed-per-class design did not account for" \
+  | grep '^Q_')
 
 say "re-verification v1: raw-scale aggregation, and its own gate"
 
@@ -132,7 +133,7 @@ gate1=$(lab declare \
 
 art2=$(lab observe "$loe2" --name stage1a_reverification_results \
   --finding "770 raw AUC values: 10 classes x (T + lattice, 1 each) + 10 classes x 3 stochastic controls x 25 seeds; zero errors, all pre-run assertions passed (T rebuild byte-exact against cached pkl for all 10 classes)" \
-  --hash sha256:4a4bf3d7)
+  --hash sha256:4a4bf3d7 | grep '^ART_')
 
 out=$(lab analyse "$loe2" \
   --method "mean-aggregated paired Wilcoxon signed-rank across 10 class-level differences, 25 seeds per class per stochastic control, Holm-corrected across 4 comparisons (raw AUC scale, as DESIGN.md specifies)" \
@@ -143,10 +144,10 @@ out=$(lab analyse "$loe2" \
   --concludes '{"proposition": "T vs degree-preserving rewiring is distinguishable", "finding": "nominally Holm-significant (p_holm=0.04102, 1/10 sign+) but median aggregation collapses it (p=0.19336, 3/10 sign+)", "bearing": "challenges"}' \
   --concludes '{"proposition": "T vs lattice is distinguishable", "finding": "not significant (p_holm=0.13086); the one comparison with no seed axis, so no mean/median/MCSE ambiguity is possible; reproduces the original Stage 1A conclusion cleanly", "bearing": "challenges"}')
 comp3=$(printf '%s\n' "$out" | sed -n 1p)
-clm3=$(printf '%s\n' "$out" | sed -n 2p)  # historical random
-clm4=$(printf '%s\n' "$out" | sed -n 3p)  # current random
-clm5=$(printf '%s\n' "$out" | sed -n 4p)  # rewiring
-clm6=$(printf '%s\n' "$out" | sed -n 5p)  # lattice
+clm3=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)  # historical random
+clm4=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 2p)  # current random
+clm5=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 3p)  # rewiring
+clm6=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 4p)  # lattice
 
 lab evaluate "$crit_hist"    --gate "$gate1" --value "primary p=0.00195 vs median p=0.92188; MCSE exceeds |d| in class 6 (93.5 vs 58.9)" --outcome fail --citing "$clm3" >/dev/null
 lab evaluate "$crit_curr"    --gate "$gate1" --value "primary p=0.02734 vs median p=0.49219; MCSE exceeds |d| in 1/10 classes" --outcome fail --citing "$clm4" >/dev/null
@@ -183,9 +184,9 @@ out=$(lab replace "$comp3" --because "$rev1" --enquiry "$loe2" \
   --concludes '{"proposition": "T vs current edge-count-matched random is distinguishable", "finding": "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320); 95% CI x[0.146, 1.250] brackets 1.0", "bearing": "challenges"}' \
   --concludes '{"proposition": "T vs degree-preserving rewiring is distinguishable", "finding": "NOT resolved: primary (p=0.037) and sign-flip (p=0.041) still say significant, median (p=0.084) still says not -- narrowed from v1 but not closed; per pre-commitment, no further transformation attempted, reported as genuinely inconclusive at n=10/25 seeds. Bearing set to challenges as the least-wrong of two choices -- LabKit'\''s bearing is binary (supports/challenges); there is no way to record \"inconclusive\".", "bearing": "challenges"}')
 comp4=$(printf '%s\n' "$out" | sed -n 1p)
-clm7=$(printf '%s\n' "$out" | sed -n 2p)  # historical random, resolved
-clm8=$(printf '%s\n' "$out" | sed -n 3p)  # current random, resolved
-clm9=$(printf '%s\n' "$out" | sed -n 4p)  # rewiring, still inconclusive
+clm7=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)  # historical random, resolved
+clm8=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 2p)  # current random, resolved
+clm9=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 3p)  # rewiring, still inconclusive
 
 lab close "$loe2" --answered-by "$clm7" >/dev/null
 
