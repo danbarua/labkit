@@ -8,6 +8,11 @@
 #   LABKIT_HOME=~/Code/pycharm/bonsai-2026 bash scripts/probe-bonsai-2a.sh
 #   bash scripts/probe-bonsai-2a.sh <db-dir>
 #
+# **Every write below carries `--date`, mined from bonsai-2026's own git
+# history and verified against it (#166), not invented.** Each is the commit
+# that introduced or completed the real work the line transcribes -- see the
+# comment above each block for the commit it came from.
+#
 # Answers Q_6/LOE_6 -- accepted as unresolved in the previous chain's Stage
 # 1B.2 ("can this structured mapping be linked to an externally defined task
 # or information-processing objective (Level 3)?"), reopening condition
@@ -98,15 +103,27 @@ ask enquiry "$loe6"
 
 say "the feasibility ladder's go/no-go gate -- a quality bar, not a hypothesis"
 
-task_ladder=$(lab plan \
+# "Stage 2A DESIGN.md: LOCKED -- fourth review round's clarifications",
+# 2026-08-02T23:23:11+01:00.
+STAGE2A_DESIGN_LOCK=2026-08-02T22:23:11.000Z
+
+task_ladder=$(lab --date "$STAGE2A_DESIGN_LOCK" plan \
   --objective "advance Stage 2A's feasibility ladder (stages 1-3, up to the full 60,000-image official KMNIST training set) to the locked stage-4 confirmatory evaluation against the untouched official test set" \
   --acceptance "zero solver failures, zero non-finite feature vectors, every required fold/C classifier fit converges")
-crit_gono=$(lab criterion "Stage 2A go/no-go gate: zero solver failures, zero non-finite feature vectors, and every required fold/C classifier fit converges, across the full feasibility ladder -- a pipeline-health quality bar, not a scientific result, locked before running")
-gate_gono=$(lab declare --governed-by "$crit_gono" --consequence "stage 4 does not run against the official test set, pending investigation" --protecting "$task_ladder")
-art_gono=$(lab observe "$loe6" --name stage2a_go_no_go \
+crit_gono=$(lab --date "$STAGE2A_DESIGN_LOCK" criterion "Stage 2A go/no-go gate: zero solver failures, zero non-finite feature vectors, and every required fold/C classifier fit converges, across the full feasibility ladder -- a pipeline-health quality bar, not a scientific result, locked before running")
+gate_gono=$(lab --date "$STAGE2A_DESIGN_LOCK" declare --governed-by "$crit_gono" --consequence "stage 4 does not run against the official test set, pending investigation" --protecting "$task_ladder")
+
+# "Stage 2A: replace fixed gradient norm threshold with C*n_train-scaled
+# GRAD_NORM_REL for convergence, update solver interfaces. FINDINGS.md
+# updated with mixed GPU/CPU architecture results.", 2026-08-03T19:06:35+01:00
+# -- the last stabilization of the feasibility ladder before the confirmatory
+# run below.
+STAGE2A_LADDER_GO=2026-08-03T18:06:35.000Z
+
+art_gono=$(lab --date "$STAGE2A_LADDER_GO" observe "$loe6" --name stage2a_go_no_go \
   --finding "0/240,000 (image,topology) evolutions failed; 0 non-finite features in any condition, any topology; 270/270 fold/C fits converged, 6/6 final refits converged" \
   --hash sha256:9da6b908 | grep '^ART_')
-lab evaluate "$crit_gono" --value "0/240,000 solver failures, 0 non-finite features, 270/270 + 6/6 classifier fits converged -- OVERALL: GO" --outcome pass --gate "$gate_gono" >/dev/null
+lab --date "$STAGE2A_LADDER_GO" evaluate "$crit_gono" --value "0/240,000 solver failures, 0 non-finite features, 270/270 + 6/6 classifier fits converged -- OVERALL: GO" --outcome pass --gate "$gate_gono" >/dev/null
 ask gate "$gate_gono"
 
 say "#98, checked directly: does the ladder's own task know why it exists?"
@@ -114,10 +131,15 @@ ask contract "$task_ladder"
 
 say "the locked confirmatory result: T-evolved vs. encoded-pre-evolution, and three secondary graphs"
 
-art_confirm2=$(lab observe "$loe6" --name stage2a_confirmatory_test_results \
+# "Stage 2A: locked confirmatory result -- graph evolution improves
+# classification (official test set, first and only touch)",
+# 2026-08-03T19:44:23+01:00.
+STAGE2A_CONFIRMATORY=2026-08-03T18:44:23.000Z
+
+art_confirm2=$(lab --date "$STAGE2A_CONFIRMATORY" observe "$loe6" --name stage2a_confirmatory_test_results \
   --finding "six conditions (raw pixels, encoded pre-evolution, evolved T/lattice/rewired/curr_random), each refit once at its already-selected C on the full 60,000-image official training set, then applied unchanged to the untouched 10,000-image official test set; 20,000 paired class-stratified bootstrap resamples per comparison" \
   --hash sha256:203e56ff | grep '^ART_')
-out=$(lab analyse "$loe6" \
+out=$(lab --date "$STAGE2A_CONFIRMATORY" analyse "$loe6" \
   --method "paired class-stratified bootstrap on per-image log-loss difference (evolved minus pre-evolution), 20,000 resamples, two-sided 95% percentile interval; locked success criterion: the entire interval below zero; secondary confirmation via exact McNemar's test on classification disagreement" \
   --from "$art_confirm2" \
   --concludes '{"proposition": "runtime graph evolution on T improves classification over the already dynamically-encoded pre-evolution state", "finding": "mean d_i=-0.2491, 95% CI [-0.2721,-0.2266], entirely below zero; McNemar p=6.68e-104 (1,234 test images correct only under evolved_T vs 384 only under pre-evolution)", "bearing": "supports"}' \
@@ -136,28 +158,40 @@ clm_sec_curr=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 4p)
 # context per DESIGN.md's own primary/secondary hierarchy, same treatment
 # 1D's four non-promoted "challenges" claims got, mirrored here for
 # "supports" claims that are real but not the locked primary.
-lab promote "$clm_primary" --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, confirmed by an independent McNemar test on the same disagreement" >/dev/null
+lab --date "$STAGE2A_CONFIRMATORY" promote "$clm_primary" --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, confirmed by an independent McNemar test on the same disagreement" >/dev/null
 
 say "closing Q_6/LOE_6, and checking the reopening hesitation a third time"
-lab close "$loe6" --answered-by "$clm_primary" >/dev/null
+lab --date "$STAGE2A_CONFIRMATORY" close "$loe6" --answered-by "$clm_primary" >/dev/null
 ask enquiry "$loe6"
 ask known
 
 say "a genuinely separate research question: does the oscillator ever become cheaper at scale?"
 
-q_cost=$(lab pose "does the oscillator readout's runtime graph evolution ever become cheaper per image than an ordinary MLP baseline, at some deployment scale?")
-loe_cost=$(lab pursue "$q_cost" --approach "per-topology train/inference cost accounting (encode, evolve, feature-post, CV search, final refit, single-image latency measured 100 repeats per condition), parameter-matched (H=13) and competent-context (H=128) MLP baselines; cuml.accel gated first (confirmed it does not accelerate MLPClassifier -- identical n_iter, near-identical wall-clock -- so MLP stays CPU sklearn, oscillator stays GPU, a real disclosed hardware asymmetry); break-even N solved algebraically per topology/baseline pair")
-art_cost=$(lab observe "$loe_cost" --name stage2a_compute_cost_accounting \
+# "Stage 2A follow-on: lock compute-cost design (round 2), name 'no crossover'
+# as a legitimate outcome", 2026-08-04T05:50:39+01:00.
+STAGE2A_COST_DESIGN_LOCK=2026-08-04T04:50:39.000Z
+
+q_cost=$(lab --date "$STAGE2A_COST_DESIGN_LOCK" pose "does the oscillator readout's runtime graph evolution ever become cheaper per image than an ordinary MLP baseline, at some deployment scale?")
+loe_cost=$(lab --date "$STAGE2A_COST_DESIGN_LOCK" pursue "$q_cost" --approach "per-topology train/inference cost accounting (encode, evolve, feature-post, CV search, final refit, single-image latency measured 100 repeats per condition), parameter-matched (H=13) and competent-context (H=128) MLP baselines; cuml.accel gated first (confirmed it does not accelerate MLPClassifier -- identical n_iter, near-identical wall-clock -- so MLP stays CPU sklearn, oscillator stays GPU, a real disclosed hardware asymmetry); break-even N solved algebraically per topology/baseline pair")
+
+# "Stage 2A follow-on: compute-cost accounting results -- no crossover exists
+# at any deployment scale", 2026-08-04T06:19:56+01:00.
+STAGE2A_COST_RESULTS=2026-08-04T05:19:56.000Z
+
+art_cost=$(lab --date "$STAGE2A_COST_RESULTS" observe "$loe_cost" --name stage2a_compute_cost_accounting \
   --finding "at N=1: oscillator (evolved_T, GPU evolution) costs 13.7x MLP_H128; at N=1,000,000: 375.6x; at N=100,000,000: 551.8x; every algebraic break-even point (any topology, either baseline) solves to a negative N" \
   --hash sha256:f9ec47d3 | grep '^ART_')
-out=$(lab analyse "$loe_cost" \
+out=$(lab --date "$STAGE2A_COST_RESULTS" analyse "$loe_cost" \
   --method "closed-form per-image cost model (Train_readout + N*Infer_readout vs Train_MLP + N*Infer_MLP), solved algebraically for the break-even N at every topology/baseline pair" \
   --from "$art_cost" \
   --concludes '{"proposition": "the oscillator readout becomes cheaper than an MLP baseline at some deployment scale", "finding": "no crossover exists at any plausible deployment scale -- the oscillator is strictly more expensive than either MLP baseline from N=1 to N=100,000,000, and the gap widens with scale rather than narrowing", "bearing": "challenges"}')
 comp_cost=$(printf '%s\n' "$out" | sed -n 1p)
 clm_cost=$(printf '%s\n' "$out" | grep '^CLM_' | sed -n 1p)
-lab close "$loe_cost" --answered-by "$clm_cost" >/dev/null
+lab --date "$STAGE2A_COST_RESULTS" close "$loe_cost" --answered-by "$clm_cost" >/dev/null
 ask enquiry "$loe_cost"
+
+printf '\n-- what was known the moment this stage actually closed (#166)?\n'
+ask known --at "$STAGE2A_COST_RESULTS"
 
 say "the events this script generated"
 ask happened

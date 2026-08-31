@@ -25,7 +25,6 @@
 # disposable directory.
 #
 # What gets stripped before the diff, and why each survives or doesn't:
-#   - ISO timestamps: always differ between the live run and today's replay.
 #   - `@<git-hash>` in each event's attribution line: differs whenever the
 #     scripts themselves have been committed since the live record was
 #     built -- not a reproducibility defect, just which commit was HEAD.
@@ -34,6 +33,17 @@
 #     evaluate in probe-bonsai-2b.sh -- and a stripped diff that could not
 #     catch a broken --author override would not be proving what this
 #     script exists to prove.
+#
+# **ISO timestamps used to be stripped here too, and no longer are (#166).**
+# They differed because every write ran against `date -u` at the moment the
+# script executed, so a replay run today could never match a live record
+# built on an earlier day. Once the four scripts backfill real, verified
+# dates via `--date` instead, `at` is deterministic content like any other
+# field -- checked directly, 2026-08-31: a replay with the stripping simply
+# deleted matched the live record byte for byte, with nothing left for the
+# regex to remove. Leaving it stripped would have hidden the one thing this
+# check exists to catch if a future edit ever made a script's `--date`
+# non-deterministic again.
 #
 # Two distinct failure shapes, not conflated into one exit code:
 #   ERROR   the checker itself could not run -- a replay script died, or a
@@ -66,11 +76,9 @@ for script in probe-bonsai-1a.sh probe-bonsai-1b2-1d.sh probe-bonsai-2a.sh probe
 done
 
 normalize() {
-  # 1) drop the ISO timestamp column on a numbered event line
-  # 2) drop the @<hash> token from an attribution line, wherever it sits
-  sed -E \
-    -e 's/^([[:space:]]*[0-9]+[[:space:]]+)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z([[:space:]]+)/\1\2/' \
-    -e 's/ @[0-9a-f]+,/,/'
+  # Drop the @<hash> token from an attribution line, wherever it sits.
+  # No longer strips ISO timestamps -- see the header comment (#166).
+  sed -E -e 's/ @[0-9a-f]+,/,/'
 }
 
 # stdout and stderr kept apart deliberately: a CLI error on stderr must
@@ -113,7 +121,7 @@ happened_diff=$(diff <(printf '%s\n' "$live_happened") <(printf '%s\n' "$fresh_h
 known_diff=$(diff <(printf '%s\n' "$live_known") <(printf '%s\n' "$fresh_known")) && known_ok=1 || known_ok=0
 
 if [ "$happened_ok" = 1 ] && [ "$known_ok" = 1 ]; then
-  echo "OK: the live event stream and graph state are exactly what the four scripts produce, timestamps and commit hashes aside."
+  echo "OK: the live event stream and graph state are exactly what the four scripts produce, commit hashes aside."
   exit 0
 fi
 
