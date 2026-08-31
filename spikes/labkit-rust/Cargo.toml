@@ -9,3 +9,6 @@ edition = "2024"
 # exo-ledger; the binary itself never calls a session or a query string.
 [dependencies]
 grafeo = { version = "0.5.42", default-features = false, features = ["lpg", "temporal", "cypher", "gql"] }
+# For LABKIT_TRACE_OUT's NDJSON — a peer team's reader parses this, so
+# hand-rolled string escaping is the wrong place to save a dependency.
+serde_json = "1"

@@ -31,9 +31,14 @@
 //! exists in slice 1, so the two agree here and would diverge the moment one
 //! did. Named rather than hidden: it is the first thing to fix if this grows.
 
-use std::{env, fs, path::PathBuf, process::ExitCode};
+use std::{
+    env, fs,
+    io::Write,
+    path::PathBuf,
+    process::ExitCode,
+};
 
-use grafeo::{GrafeoDB, NodeId, Value};
+use grafeo::{EdgeId, GrafeoDB, NodeId, Value};
 
 /// The one place a label's handle prefix is written.
 ///
@@ -167,6 +172,116 @@ fn looks_like_handle(s: &str) -> bool {
 /// not even a `--author` flag. Adding it would mean inventing attribution
 /// from nothing, which is a different, larger piece of work than "derive
 /// history from the graph," and the two should not be conflated.
+/// One `TraceStep` (loosely — see the field notes below), appended as one
+/// NDJSON line to `LABKIT_TRACE_OUT` when set. Built for labkit#119: the
+/// Explorer (`fragments/trace.ts`, `scripts/serve-explorer.ts` on `main`)
+/// renders a domain's growth from exactly this shape, derived fresh from
+/// LabKit's real event log on every boot rather than a committed fixture —
+/// this is the same idea, on this port's own record.
+///
+/// **Range, not traversal.** `nodes_before`/`edges_before` were counts taken
+/// before this command dispatched; everything with an id in `[before, after)`
+/// is what THIS command created. `NodeId`/`EdgeId` are plain sequential
+/// `u64`s (`grafeo-common`'s `types/id.rs`), so this is a direct point lookup
+/// per id, not a read of the store's own iteration order — which
+/// `examples/graph_history_probe.rs` measured as neither creation-ordered nor
+/// stable across processes. A trace built by diffing `iter_nodes()` output
+/// would have inherited that exact flakiness.
+///
+/// **Approximated fields, named so nobody mistakes them for the real
+/// thing:** `subject` is the first created handle — this port doesn't
+/// distinguish "what the act was about" from "what it created" the way
+/// `ResearchSession` does. `detail` is raw `argv`, not LabKit's hand-written
+/// per-verb payload. `fragment` (`LABKIT_TRACE_FRAGMENT`, optional) is
+/// whatever the caller names — a slice script, say — since this port has no
+/// `fragments/compositions.ts` equivalent. `derived` (per-step enquiry/gate
+/// state) is not computed at all yet; deferred, per the design discussion
+/// with `labkit-dev-web` on #119, until a plain trace proves worth building
+/// on.
+///
+/// **One thing this port's version gets more honestly than the TS one:**
+/// `command` here is the literal `argv` this process was actually invoked
+/// with — genuinely re-runnable — where `fragments/trace.ts`'s `commandOf()`
+/// is explicit that its rendering is *not* a claim the string would run.
+/// `argv` with `--db <path>` removed, for display only.
+fn display_argv(argv: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut skip_next = false;
+    for a in argv {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if a == "--db" {
+            skip_next = true;
+            continue;
+        }
+        out.push(a.clone());
+    }
+    out
+}
+
+fn emit_trace(
+    db: &GrafeoDB,
+    path: &str,
+    command: &str,
+    argv: &[String],
+    nodes_before: usize,
+    edges_before: usize,
+) {
+    let nodes_after = db.graph_store().node_count();
+    let edges_after = db.graph_store().edge_count();
+    if nodes_after == nodes_before && edges_after == edges_before {
+        return; // a read: nothing to trace
+    }
+
+    let created: Vec<serde_json::Value> = (nodes_before..nodes_after)
+        .filter_map(|i| db.get_node(NodeId(i as u64)))
+        .map(|n| {
+            serde_json::json!({
+                "handle": prop(db, n.id, "handle"),
+                "label": n.labels.first().map(|l| l.to_string()).unwrap_or_default(),
+            })
+        })
+        .collect();
+
+    let edges: Vec<serde_json::Value> = (edges_before..edges_after)
+        .filter_map(|i| db.get_edge(EdgeId(i as u64)))
+        .map(|e| {
+            serde_json::json!({
+                "from": prop(db, e.src, "handle"),
+                "label": e.edge_type.to_string(),
+                "to": prop(db, e.dst, "handle"),
+            })
+        })
+        .collect();
+
+    let subject = created
+        .first()
+        .and_then(|c| c.get("handle"))
+        .and_then(|h| h.as_str())
+        .unwrap_or_default();
+
+    let step = serde_json::json!({
+        "operation": command,
+        "subject": subject,
+        "created": created,
+        "edges": edges,
+        "detail": { "argv": argv },
+        // `--db <path>` filtered out here only -- it's this run's throwaway
+        // harness detail, not part of the act. `detail.argv` keeps it, so
+        // nothing is actually lost.
+        "command": format!("labkit {}", display_argv(argv).join(" ")),
+        "fragment": env::var("LABKIT_TRACE_FRAGMENT").ok(),
+    });
+
+    let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) else {
+        eprintln!("labkit: could not open LABKIT_TRACE_OUT={path}");
+        return;
+    };
+    let _ = writeln!(file, "{step}");
+}
+
 fn happened(db: &GrafeoDB) -> String {
     // **Sorted by NodeId, not `iter_nodes()`'s own order.** Measured
     // (`examples/graph_history_probe.rs`) rather than assumed: on a handful
@@ -893,6 +1008,10 @@ fn main() -> ExitCode {
     };
     let rest: Vec<&String> = positional.iter().skip(1).collect();
 
+    // Snapshot before dispatch, for the trace this command may emit — see
+    // `emit_trace` below for why a count, not a traversal.
+    let (nodes_before, edges_before) = (db.graph_store().node_count(), db.graph_store().edge_count());
+
     let output = match command {
         "criterion" => {
             let text = rest.first().map(|s| s.to_string()).unwrap_or_default();
@@ -1517,6 +1636,12 @@ fn main() -> ExitCode {
                 }
             }
         }
+    }
+
+    // Explorer-compatible trace, opt-in (labkit#119) -- off unless a caller
+    // asks, so every one of the 35 parity fixtures is unaffected.
+    if let Ok(path) = env::var("LABKIT_TRACE_OUT") {
+        emit_trace(&db, &path, command, &argv, nodes_before, edges_before);
     }
 
     match output {
