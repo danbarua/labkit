@@ -933,7 +933,14 @@ fn main() -> ExitCode {
                 ("reason", opt(&argv, "--because").unwrap_or_default()),
             ]);
             if let (Some(o), Some(n), Some(d)) = (old_c, by_handle(&db, &new_c), by_handle(&db, &dec)) {
-                edge(&db, n, o, "SUPERSEDES");
+                // LabKit's SUPERSEDES is Decision -> Decision, not
+                // Criterion -> Criterion (src/db/domain.ts). The prior
+                // decision, if any, is whichever Decision MOTIVATES the
+                // criterion now being amended -- present only when that
+                // criterion was itself the product of an earlier amend.
+                if let Some(prior_dec) = into_(&db, o, "MOTIVATES").into_iter().next() {
+                    edge(&db, d, prior_dec, "SUPERSEDES");
+                }
                 edge(&db, d, o, "CHANGES");
                 edge(&db, d, n, "MOTIVATES");
                 if let Some(c) = opt(&argv, "--citing").and_then(|h| by_handle(&db, &h)) {
@@ -979,16 +986,25 @@ fn main() -> ExitCode {
         }
         // How a gate's conditions were amended: what it originally required,
         // what it requires now, and whether the change was scientific or
-        // mechanical. Reached through SUPERSEDES, which is why `amend` writes
-        // the chain rather than mutating the criterion in place.
+        // mechanical. `amend` never removes the old GOVERNS edge, so a gate
+        // can be governed by more than one criterion after an amendment; the
+        // one in force is whichever has no incoming CHANGES from a Decision
+        // (LabKit's own designHistory() reads it the same way).
         "design" => rest.first().and_then(|h| by_handle(&db, h)).map(|g| {
-            let current = out(&db, g, "GOVERNS");
-            let newest = current.iter().copied().find(|c| !out(&db, *c, "SUPERSEDES").is_empty());
+            let governed = out(&db, g, "GOVERNS");
+            let newest = governed
+                .into_iter()
+                .find(|c| into_(&db, *c, "CHANGES").is_empty());
             let Some(newest) = newest else {
                 return format!("{}, unamended", prop(&db, g, "handle"));
             };
-            let original = out(&db, newest, "SUPERSEDES").into_iter().next();
-            let dec = into_(&db, newest, "MOTIVATES").into_iter().next();
+            let Some(dec) = into_(&db, newest, "MOTIVATES").into_iter().next() else {
+                return format!("{}, unamended", prop(&db, g, "handle"));
+            };
+            // The old criterion is CHANGES's own target, not reached through
+            // SUPERSEDES -- that edge now chains Decisions, not Criteria.
+            let original = out(&db, dec, "CHANGES").into_iter().next();
+            let dec = Some(dec);
             let citing = dec
                 .map(|d| out(&db, d, "CITING"))
                 .unwrap_or_default()

@@ -194,12 +194,24 @@ the rest.
 - **No event log.** LabKit emits one durable event per verb, on the same
   connection as the graph, so an event commits with the writes it describes.
   The port has none.
+- **`SUPERSEDES` was modelled `Criterion -> Criterion`; fixed 2026-08-31 to
+  `Decision -> Decision`** (`src/db/domain.ts`'s actual schema). The fixture
+  never caught it — slice 4 has one amendment, and one hop reads the same
+  either way. Found via exo-ledger, not the fixture; verified by hand-driving
+  two amendments on the same gate and checking `design` reports the immediate
+  prior value at each step, which it does. Recorded in exo-ledger pair
+  `ecb648b2`, evidence for the antithesis (a typed API removes one silent
+  class of defect, not silence as such).
 
 ## What is left
 
 - `reproduction`, `reproducibility`, `replace`, `reverify` — all read
   supersession chains, so they need more of the `SUPERSEDES` / `REVERIFIES`
-  structure than `amend` currently writes.
+  structure than `amend` currently writes. `SUPERSEDES` itself is now the
+  right shape (see "Divergences," above); `design` still only reports the
+  immediately prior step, not the full chain LabKit's `designHistory()` walks
+  — untested beyond two amendments, and worth widening before these four
+  verbs build on it.
 - `happened` — reads the event log the port does not have. The epoch question
   above answers this rather than leaving it tied to it: deriving history from
   the graph would mean writing through `session.execute(...)` for epochs to
