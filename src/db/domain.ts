@@ -212,7 +212,31 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Claim"],
   ],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
-  ADDRESSES: [["EvidenceUnit", "LineOfEnquiry"]],
+  // A Task earns this pair by #98: `labkit contract` had no way to say why a
+  // piece of planned work exists. Reusing ADDRESSES rather than minting a new
+  // label -- an EvidenceUnit already ADDRESSES the enquiry it was recorded
+  // towards, and a Task addressing the same enquiry before any evidence
+  // exists is the same claim, one step earlier.
+  //
+  // Checked against the precedent that went the other way (PJ-016 §4, row V):
+  // reusing GATES for qualification was rejected because GATES was "fully
+  // occupied with control semantics", and one edge with two readings is
+  // PJ-012 §1's shape -- the one that "has caused every expensive mistake in
+  // this project". The difference here is not surface similarity, it's
+  // whether the two readings can ever meet in a query. GATES governs which
+  // work may proceed; folding qualification into it would have made a
+  // control-flow edge also carry a content judgement, indistinguishable at
+  // read time. ADDRESSES already has one reading -- "this work was done
+  // towards this enquiry" -- and a planned Task's edge is the *same* reading
+  // one step earlier in time, not a second one. Every existing reader
+  // (`whatIsKnown`, `withinScope`, `enquiryStatus`'s `mine` query) binds its
+  // source variable to `:EvidenceUnit` explicitly before matching the edge,
+  // so the two node types never collide in a traversal even though they
+  // share a label.
+  ADDRESSES: [
+    ["EvidenceUnit", "LineOfEnquiry"],
+    ["Task", "LineOfEnquiry"],
+  ],
   SUPPORTS: [["Evidence", "Claim"]],
   CHALLENGES: [["Evidence", "Claim"]],
   USES: [["EvidenceUnit", "Computation"]],

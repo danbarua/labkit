@@ -119,6 +119,17 @@ export interface PlanWorkCommand {
    * when it becomes a real list property rather than a serialised one.
    */
   mayRead?: string[];
+  /**
+   * The line of enquiry this work exists to advance, if any.
+   *
+   * Earned by #98: `labkit contract` could not say why a piece of planned
+   * work exists, and the real Bonsai record has a task (Stage 2A's
+   * feasibility-ladder gate) that exists specifically to serve a question,
+   * with nothing to say so. Optional because `planWork` allows ungated work
+   * (#91) — a task with no enquiry is still an honest answer, not a missing
+   * one, matching PJ-011 §5.
+   */
+  addressing?: EnquiryRef;
 }
 
 /** `declareGate` — bind criteria to the work they gate. */

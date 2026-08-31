@@ -444,6 +444,16 @@ export const taskContractSchema = z.strictObject({
   // computation reading elsewhere, and a caller must not be able to read
   // `enforced: true` from this.
   enforced: z.literal(false),
+  // Absent, not null, for ungated work (#91) -- see PlanWorkCommand.addressing.
+  // Wording alongside each handle, matching EnquiryStatus/QuestionClosure.
+  addressing: z
+    .strictObject({
+      enquiry: ref("enquiry"),
+      pursuing: z.string(),
+      question: ref("question"),
+      asks: z.string(),
+    })
+    .optional(),
 });
 
 /** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */

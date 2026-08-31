@@ -902,3 +902,31 @@ test("a task planned with no readable inputs reports an empty contract, not a mi
   });
   expect((await session.contractFor(populated)).mayRead).toEqual(["seeds.csv", "config.toml"]);
 });
+
+/**
+ * #98: a task can now name the question it serves, and honestly declines to
+ * when it wasn't told one -- `planWork` allows ungated work (#91), so an
+ * absent `addressing` is a real case, not a gap in this report.
+ */
+test("a task planned against an enquiry reports it, with wording; one planned without reports none", async () => {
+  const { enquiry, question } = await session.openEnquiry(
+    "can this mapping reach an external task?",
+  );
+  const { work: served } = await session.planWork({
+    objective: "advance the feasibility ladder",
+    acceptance: "every fold converges",
+    addressing: enquiry,
+  });
+  const { work: unaddressed } = await session.planWork({
+    objective: "tidy the repository",
+    acceptance: "no stray files",
+  });
+
+  expect((await session.contractFor(served)).addressing).toEqual({
+    enquiry,
+    pursuing: "can this mapping reach an external task?",
+    question,
+    asks: "can this mapping reach an external task?",
+  });
+  expect((await session.contractFor(unaddressed)).addressing).toBeUndefined();
+});

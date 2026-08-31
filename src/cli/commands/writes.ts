@@ -32,7 +32,7 @@ import type { Command } from "commander";
 import { collect, conclusion, handle, inputRef } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
-import type { ClaimRef, DomainEvent, GateRef } from "../../domain";
+import type { ClaimRef, DomainEvent, EnquiryRef, GateRef } from "../../domain";
 
 /**
  * Every handle an act minted, across however many events it recorded — in
@@ -208,17 +208,25 @@ export function registerWrites(program: Command, run: Run): void {
       "what this work is permitted to read (repeatable)",
       collect(String),
     )
-    .action(async (opts: { objective: string; acceptance: string; mayRead?: string[] }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.planWork({
-            objective: opts.objective,
-            acceptance: opts.acceptance,
-            ...(opts.mayRead === undefined ? {} : { mayRead: opts.mayRead }),
-          }),
-          mintedView(),
+    .option("--enquiry <id>", "the line of enquiry this work exists to advance", handle("enquiry"))
+    .action(
+      async (opts: {
+        objective: string;
+        acceptance: string;
+        mayRead?: string[];
+        enquiry?: EnquiryRef;
+      }) =>
+        run(async ({ write }) =>
+          answer(
+            await write.planWork({
+              objective: opts.objective,
+              acceptance: opts.acceptance,
+              ...(opts.mayRead === undefined ? {} : { mayRead: opts.mayRead }),
+              ...(opts.enquiry === undefined ? {} : { addressing: opts.enquiry }),
+            }),
+            mintedView(),
+          ),
         ),
-      ),
     );
 
   program

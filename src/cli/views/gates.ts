@@ -164,6 +164,12 @@ export function renderContract(contract: TaskContract, p: Palette): string {
   return [
     `${p.heading(contract.objective)}  ${p.handle(`(${contract.work})`)}`,
     `  meeting it means: ${contract.acceptance}`,
+    ...(contract.addressing
+      ? [
+          `  addressing: ${p.handle(contract.addressing.enquiry)} "${contract.addressing.pursuing}"`,
+          `  pursuing: ${p.handle(contract.addressing.question)} "${contract.addressing.asks}"`,
+        ]
+      : []),
     "",
     p.heading("May read"),
     bullets(contract.mayRead, p.untested("nothing named")),
