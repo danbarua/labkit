@@ -69,6 +69,7 @@ export type {
   CheckStatus,
   EnquiryStatus,
   EnquiryInContext,
+  QuestionBucket,
   EvaluationRecord,
   CriterionRef,
   GateRef,

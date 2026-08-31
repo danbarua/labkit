@@ -388,10 +388,18 @@ export const enquiryStatusSchema = z.strictObject({
   question: questionClosureSchema.nullable(),
 });
 
-/** `enquiry_in_context` — `enquiryStatusSchema` alongside the current knowledge survey (#128). */
+/**
+ * `enquiry_in_context` — `enquiryStatusSchema` alongside where this enquiry's
+ * own question currently sits in the overall survey (#128) -- one bucket, not
+ * the whole survey; see `EnquiryInContext`'s own doc comment.
+ */
 export const enquiryInContextSchema = z.strictObject({
   enquiry: enquiryStatusSchema,
-  knownNow: knowledgeSurveySchema,
+  standing: questionStanding
+    .extend({
+      bucket: z.enum(["established", "unresolved", "untested", "provisional", "accepted"]),
+    })
+    .nullable(),
 });
 
 export const designHistorySchema = z.strictObject({

@@ -195,11 +195,11 @@ export function registerReads(program: Command, run: Run): void {
     .description(
       "Whether a line of enquiry is still open, and if not how it closed — answered, abandoned, " +
         "or deliberately left open — with the answer and the evidence behind it. `--in-context` " +
-        "adds what the record currently knows overall, for checking a closure decision against " +
-        "the programme's present standing rather than in isolation.",
+        "adds which of `known`'s five buckets this enquiry's own question currently sits in — " +
+        "did closing it move the bucket?",
     )
     .argument("<enquiry-id>", "e.g. LOE_7", handle("enquiry"))
-    .option("--in-context", "also show what the record currently knows overall")
+    .option("--in-context", "also show which bucket this enquiry's question currently sits in")
     .action(async (enquiry, opts: { inContext?: boolean }) =>
       run(async ({ read }) =>
         opts.inContext

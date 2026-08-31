@@ -277,12 +277,13 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   }),
   tool({
     name: "enquiry_in_context",
-    title: "Whether a line of enquiry is open, alongside the current knowledge survey",
+    title: "Whether a line of enquiry is open, and where its question now stands",
     description:
-      "`enquiry_status`, alongside what the record currently knows overall (#128). Earned by " +
-      "the real record: 'is this reopening/closure decision warranted?' recurred three times " +
-      "in one transcript, always chaining `enquiry_status` with `known` by hand to check one " +
-      "closure against the programme's present standing.",
+      "`enquiry_status`, alongside which of `known`'s five buckets this enquiry's own question " +
+      "currently sits in -- did closing it move the bucket? (#128). Earned by the real record: " +
+      "'is this reopening/closure decision warranted?' recurred three times in one transcript, " +
+      "always chaining `enquiry_status` with `known` by hand and scrolling the whole survey to " +
+      "find one question. This is that lookup, narrowed to the one question this call is about.",
     inputSchema: {
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
     },

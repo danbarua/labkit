@@ -40,6 +40,7 @@ import type {
   CheckStatus,
   EnquiryStatus,
   EnquiryInContext,
+  QuestionBucket,
   CriterionRef,
   BlockedWork,
   ListedGate,
@@ -590,11 +591,37 @@ export class ReadSurface extends SessionCore {
     };
   }
 
-  /** `enquiryStatus`, alongside what the record currently knows overall (#128). */
+  /**
+   * `enquiryStatus`, alongside where this enquiry's own question currently
+   * sits in the overall survey (#128, narrowed on review -- see
+   * `EnquiryInContext`'s own doc comment for why it is one bucket, not the
+   * whole survey).
+   */
   async enquiryInContext(enquiry: EnquiryRef): Promise<EnquiryInContext> {
     const status = await this.enquiryStatus(enquiry);
-    const knownNow = await this.whatIsKnown();
-    return { enquiry: status, knownNow };
+    if (!status.question) return { enquiry: status, standing: null };
+
+    const survey = await this.whatIsKnown();
+    const buckets: [QuestionBucket, QuestionStanding[]][] = [
+      ["established", survey.established],
+      ["unresolved", survey.unresolved],
+      ["untested", survey.untested],
+      ["provisional", survey.provisional],
+      ["accepted", survey.accepted],
+    ];
+    // Every question that exists lands in exactly one bucket, by construction
+    // of the partition `whatIsKnown()` computes -- but this reads that back
+    // from what the survey actually returned rather than assuming it, the
+    // same discipline `contractFor()`'s `q`/`loe` pairing follows.
+    let standing: EnquiryInContext["standing"] = null;
+    for (const [bucket, questions] of buckets) {
+      const found = questions.find((q) => q.question === status.question!.question);
+      if (found) {
+        standing = { question: found.question, asks: found.asks, bucket };
+        break;
+      }
+    }
+    return { enquiry: status, standing };
   }
 
   /**

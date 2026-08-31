@@ -356,12 +356,14 @@ describe("every tool answers when an agent actually calls it", () => {
       const closed = await call(c, "enquiry_status", { enquiry: id(enquiry) });
       expect((closed.question as Json).closure).toBe("answered");
 
-      // #128: the same closure, alongside what the record currently knows
-      // overall -- checking one enquiry's decision against the programme's
-      // present standing, the way the real Bonsai transcript did by hand.
+      // #128: the same closure, alongside where this enquiry's own question
+      // now sits in the overall survey -- narrowed on review to one bucket
+      // rather than the whole survey (PJ-030, PJ-034 §5). Answered on
+      // `narrowedClaim`, which nothing here ever promoted, so it lands in
+      // `provisional` -- "answered, but not something to build on yet".
       const inContext = await call(c, "enquiry_in_context", { enquiry: id(enquiry) });
       expect(inContext.enquiry).toEqual(closed);
-      expect(inContext.knownNow).toBeTruthy();
+      expect((inContext.standing as Json).bucket).toBe("provisional");
       await c.close();
     } finally {
       await scenario.end();

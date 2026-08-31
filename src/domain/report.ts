@@ -481,23 +481,30 @@ export interface EnquiryStatus {
   question: QuestionClosure | null;
 }
 
+/** Which of `KnowledgeSurvey`'s five buckets a question currently sits in. */
+export type QuestionBucket = "established" | "unresolved" | "untested" | "provisional" | "accepted";
+
 /**
- * `EnquiryStatus`, alongside what the record currently knows overall.
+ * `EnquiryStatus`, alongside where this enquiry's own question currently sits
+ * in the overall survey.
  *
- * Earned by #128: "is this reopening/closure decision warranted?" recurred
- * three times, verbatim, across the real Bonsai transcript, and every
- * instance chained `enquiry` with `known` by hand to check one enquiry's
- * closure against the programme's current standing. `knownNow` is the
- * *current* survey (`whatIsKnown()`), not a point-in-time one: two of the
- * three transcript instances checked the present-day survey right after
- * closing, and the one that needed a specific historical instant supplied it
- * from Bonsai's own git history (#166) -- not something this record can
- * derive on its own, so it stays a separate `known --at` call rather than
- * something this report guesses at.
+ * Earned by #128, narrowed on review (PJ-030, PJ-034 §5): "is this
+ * reopening/closure decision warranted?" recurred three times, verbatim,
+ * across the real Bonsai transcript, and every instance chained `enquiry`
+ * with `known` by hand -- but what the transcript was actually doing was
+ * scrolling the whole survey to find where **this** question had landed, not
+ * reading every other question in the programme. An earlier version of this
+ * report appended the entire `KnowledgeSurvey`; that answers about every
+ * question in the record, not the one this report is about (PJ-030), and is
+ * exactly the `everything` dump PJ-034 §5 says a detail tool exists not to
+ * become. `standing` is `null` only when no question stands behind the
+ * enquiry, matching `EnquiryStatus.question` -- every question that exists
+ * lands in exactly one bucket of `whatIsKnown()`'s partition, so a non-null
+ * question always has one.
  */
 export interface EnquiryInContext {
   enquiry: EnquiryStatus;
-  knownNow: KnowledgeSurvey;
+  standing: { question: QuestionRef; asks: string; bucket: QuestionBucket } | null;
 }
 
 /**
