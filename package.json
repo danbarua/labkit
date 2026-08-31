@@ -47,7 +47,6 @@
 		"probe:dogfood": "bash scripts/probe-dogfood.sh",
 		"db:generate": "drizzle-kit generate",
 		"db:generate:custom": "drizzle-kit generate --custom",
-		"board:status": "bash scripts/apply-board-status.sh",
 		"ports": "bash scripts/worktree-ports.sh"
 	},
 	"private": true,
