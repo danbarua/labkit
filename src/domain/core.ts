@@ -340,7 +340,10 @@ export class SessionCore {
       if (rows[0]) name = rows[0].c.name;
       enquiry ??= rows.find((r) => r.loe)?.loe?.natural_id;
     }
-    if (name === undefined) throw new Error(`no claim ${claim}`);
+    if (name === undefined)
+      throw new Error(
+        `no claim ${claim}; a claim exists once an analysis concludes it, and its handle comes back from the act that recorded it`,
+      );
     return {
       proposition: name,
       ...(enquiry ? { enquiry: ref("enquiry", enquiry) } : {}),
