@@ -75,13 +75,13 @@ NUM=3
 #       total; P2 is the honest value for a thing nobody should be looking at.
 TODO="81 50 55 104 52 49 56 76 124 132 137"
 BLOCKED="94 60 127 128 129"   # 94, 60 behind #49; 127-129 behind #125
-PARKED="63 64 65 98 51 54 123 133 134"   # 123 waits on a scope go/no-go from Dan; 133 open question; 134 an absence, unparks on a wrong answer
+PARKED="63 64 65 98 51 54 123 133 134 139"   # 123 waits on a scope go/no-go from Dan; 133, 139 open questions; 134 an absence, unparks on a wrong answer
 IN_PROGRESS="119 125 126"   # 119 shipped in #121/#122 and 126 in #131, open under review; 125 is PR #135
 DONE="57 95"
 
 P0="132 137"      # TWO demonstrated wrong answers at once (PJ-008 rows AM, AN), found the same day by the same probe; CLAUDE.md says one at a time, and Dan has not yet said which clears first. Reviewer recommends #137 (one branch in one function). #81 was here until 2026-08-31, when Dan called it a special case
 P1="81 50 55 104 52 124 125 126"   # 124-126: the Bonsai record, the first real consumer
-P2="49 56 76 94 60 63 64 65 98 51 54 57 95 119 123 127 128 129 133 134"
+P2="49 56 76 94 60 63 64 65 98 51 54 57 95 119 123 127 128 129 133 134 139"
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ID=$(gh project view "$NUM" --owner "$OWNER" --format json -q .id)
