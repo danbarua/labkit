@@ -103,15 +103,31 @@ async function loadTraces() {
   for (const [i, trace] of state.traces.entries()) {
     const opt = document.createElement("option");
     opt.value = String(i);
-    opt.textContent = `${trace.name}  (${trace.steps.length} steps)`;
+    const badge = trace.origin === "labkit-rust" ? "[rust] " : "";
+    opt.textContent = `${badge}${trace.name}  (${trace.steps.length} steps)`;
     scenarioSelect.appendChild(opt);
   }
   selectTrace(0);
 }
 
+// Two independent models of the same domain can be in this list -- the TS
+// domain and the Rust/Grafeo spike (labkit#119) -- and they don't always
+// agree on things like edge direction. originBadge keeps that visible
+// throughout the run, not just in the picker, so nobody mistakes one for a
+// correction of the other mid-playback.
+function originBadge() {
+  return document.getElementById("origin-badge");
+}
+
 function selectTrace(index) {
   state.current = state.traces[index];
   scenarioSelect.value = String(index);
+  const badge = originBadge();
+  if (badge) {
+    const isRust = state.current?.origin === "labkit-rust";
+    badge.textContent = isRust ? "rust/grafeo model" : "TS domain model";
+    badge.classList.toggle("rust", isRust);
+  }
   resetRun();
 }
 

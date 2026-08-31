@@ -64,6 +64,16 @@ export interface TraceStep {
 
 export interface Trace {
   name: string;
+  /**
+   * Which implementation produced this trace. Two independent models of the
+   * same domain exist now — this TS/Postgres one and the Rust/Grafeo spike
+   * (#114) — and they diverge on real questions (edge direction, which node
+   * kinds an edge connects) that neither side has settled as "correct". The
+   * Explorer renders both; this field is what stops a viewer mistaking one
+   * model's trace for the other's, which matters exactly because they
+   * disagree sometimes.
+   */
+  origin: "labkit-ts" | "labkit-rust";
   steps: TraceStep[];
 }
 
@@ -104,6 +114,7 @@ export async function traceOf(
   let previous: DerivedSnapshot = { enquiries: [], gates: [] };
   return {
     name,
+    origin: "labkit-ts",
     steps: stream.map((e) => {
       const seq = e.seq ?? 0;
       const snapshot = provenance?.get(seq)?.derived;

@@ -55,6 +55,23 @@ body {
 }
 .field span { text-transform: uppercase; letter-spacing: 0.05em; }
 
+.origin-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  background: var(--accent-dim);
+  white-space: nowrap;
+}
+.origin-badge.rust {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 35%, transparent);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+}
+
 select, button, input[type="range"] {
   font-family: inherit;
   font-size: 12px;
