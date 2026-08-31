@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Transcribes Bonsai's real Stage 1B.2 -> 1C -> 1D chain into LabKit, by
-# hand, through the CLI. Continuation of #131's #125 (scripts/probe-
+# hand, through the CLI. Continuation of #135's #125 (scripts/probe-
 # bonsai-1a.sh) -- same real record, same rules: no verb pre-picked, every
 # invented fact / hesitation / wrong answer is checked against #132/#133/
 # #134/#139 before being filed as new.
@@ -17,26 +17,21 @@
 #
 # ## What transcribing this found
 #
-# **No verb reopens an accepted-as-unresolved enquiry -- and `accept`'s own
-# reasoning silently vanishes from view once a sibling enquiry answers the
-# same question, rather than persisting wrongly.** Checked both ways, not
-# assumed either way: `accept`'s report is correct in isolation (verified
-# separately -- `enquiry` on a freshly accepted line correctly shows
-# "accepted as unresolved... accepted because... reopens if..."). What
-# actually happens here: Stage 1C settles item 1 by `pursue`-ing Q_4
-# (1B.2's "does this generalize?" question) a SECOND time, minting a new,
-# independent LineOfEnquiry that gets closed normally. `known` correctly
-# moves the question out of "accepted as unresolved" once it is genuinely
-# answered -- that bucketing is right. But `enquiry` on the FIRST,
-# accepted line no longer shows anything about having been accepted, why,
-# or what was supposed to reopen it -- it silently reports the question's
-# new overall status instead, as if the earlier deferral had never
-# happened. Nothing formally links the two enquiries or records that one
-# reopened the other; the record does not become wrong, it becomes silent
-# about something that genuinely happened (recoverable only from
-# `happened`, never from durable state). Same shape recurs for item 2
-# (topology specificity) via Stage 1D -- two independent instances in one
-# transcript, filed once, not twice.
+# **A deferred-then-answered question drops its deferral condition.**
+# Filed as #143, then reframed after `labkit-review` measured against
+# source: closure belongs to the QUESTION, not the pursuit
+# (src/domain/report.ts:244, S-14's own decision), so `enquiry LOE_4`
+# printing "has produced nothing yet" and then "Q_4 closed -- answered" is
+# the model working as designed -- every sibling enquiry reports the
+# question's closure correctly. `accept` writes Decision -DEFERS->
+# Question (src/domain/write.ts:920), never touching the enquiry either,
+# so nothing "vanishes" from LOE_4 -- nothing was ever there. The real
+# gap: Q_4 was deferred with a named reopening condition ("run the
+# identical design on independent trajectories"), Stage 1C satisfied it
+# exactly, and no report says so -- the DEFERS edge and the answer both
+# exist in the graph, unread together by anything. Two independent
+# instances in this transcript (item 1 via LOE_4/LOE_7, item 2 via
+# LOE_3/LOE_5); a third predicted for Stage 2A, which establishes Q_6.
 #
 # **The same criterion-scoped verdict gap as #133, a second time.**
 # Stage 1D's own reporting groups T-vs-lattice (Part 1) with T-vs-three-
@@ -54,8 +49,8 @@
 # `close`'s `--answered-by` takes exactly one claim, so the enquiry closes
 # on the single cleanest comparison (lattice, Part 1's own dedicated
 # result) rather than a synthesized headline that has nowhere to live.
-# Named, not filed on its own -- same shape as #134's "no verb corrects a
-# mis-entered claim", an absence rather than a wrong answer.
+# Filed as #146 -- same shape as #134's "no verb corrects a mis-entered
+# claim", an absence rather than a wrong answer.
 #
 # **1B.2's promoted claim needed no narrowing.** Checked, not assumed:
 # `why` on 1B.2's "Level 2 established, locally" claim after Stage 1D
@@ -144,7 +139,7 @@ ask known
 
 say "Stage 1D Part 1: T vs. lattice"
 
-crit_lattice=$(lab criterion "T vs lattice: two-sided paired t-test on d_k=Delta_map(T,k)-Delta_map(lattice,k) across the 10 matched trajectory seeds, locked before running")
+crit_lattice=$(lab criterion "T vs lattice: agreement standard -- the primary paired t-test, exact sign-flip, and Wilcoxon signed-rank on the 10 matched d_k=Delta_map(T,k)-Delta_map(lattice,k) values must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
 art_lattice=$(lab observe "$loe5" --name stage1d_lattice_trajectories \
   --finding "lattice's own 10-trajectory run on Stage 1C's matched seeds (3000-3090); T's own values read read-only from Stage 1C, not recomputed" \
   --hash sha256:2df1d2c3)
@@ -154,7 +149,11 @@ out=$(lab analyse "$loe5" \
   --concludes '{"proposition": "T shows a Delta_map advantage over the matched lattice control", "finding": "mean d_k=-0.0085 (lattice nominally higher), paired t-test p=0.2815, sign-flip p=0.2871, Wilcoxon p=0.4316 -- all three agree, no detectable difference", "bearing": "challenges"}')
 comp_lattice=$(printf '%s\n' "$out" | sed -n 1p)
 clm_lattice=$(printf '%s\n' "$out" | sed -n 2p)
-lab evaluate "$crit_lattice" --value "paired t p=0.2815, sign-flip p=0.2871, Wilcoxon p=0.4316" --outcome pass --citing "$clm_lattice" >/dev/null
+# The criterion is a QUALITY BAR (do the methods agree?), not the
+# hypothesis (does T beat lattice?) -- direction lives in the
+# conclusion's own bearing, above. All three methods agree on
+# non-rejection at 0.0125, so the criterion is satisfied: pass.
+lab evaluate "$crit_lattice" --value "paired t p=0.2815, sign-flip p=0.2871, Wilcoxon p=0.4316 -- all three agree: no rejection at 0.0125" --outcome pass --citing "$clm_lattice" >/dev/null
 
 say "Stage 1D Part 2: the pilot (non-confirmatory), a fresh-input reverify, and the confirmatory run"
 
@@ -190,9 +189,9 @@ out=$(lab reverify "$comp_pilot" --enquiry "$loe5" \
 comp_followup=$(printf '%s\n' "$out" | sed -n 1p)
 clm_followup=$(printf '%s\n' "$out" | sed -n 2p)
 
-crit_rewired=$(lab criterion "T vs rewired: two-sided one-sample t-test on realization-level mean differences, Holm-corrected across the 4-way fixed-coordinate family, locked before running")
-crit_hist=$(lab criterion "T vs historical-random: two-sided one-sample t-test on realization-level mean differences (conditional on fixed-coordinate evaluability), Holm-corrected across the 4-way fixed-coordinate family, locked before running")
-crit_curr=$(lab criterion "T vs current-random: two-sided one-sample t-test on realization-level mean differences, Holm-corrected across the 4-way fixed-coordinate family, locked before running")
+crit_rewired=$(lab criterion "T vs rewired: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
+crit_hist=$(lab criterion "T vs historical-random: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences (conditional on fixed-coordinate evaluability) must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
+crit_curr=$(lab criterion "T vs current-random: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
 
 art_confirm=$(lab observe "$loe5" --name stage1d_confirmatory_gpu \
   --finding "225 trajectories (25 realizations x 3 matched seeds x 3 families), locked (R=25,K=3) allocation, GPU/JAX; hist_random pre-screened, 7 of 32 candidates rejected for fixed-coordinate isolation before 25 evaluable realizations were reached" \
@@ -201,16 +200,20 @@ out=$(lab analyse "$loe5" \
   --method "two-sided one-sample t-test on realization-level mean differences (primary), studentized bootstrap / Wilcoxon / exact sign-flip (robustness), Holm-corrected across rewired/hist_random/curr_random/lattice" \
   --from "$art_confirm" --held-to "$crit_rewired" --held-to "$crit_hist" --held-to "$crit_curr" \
   --concludes '{"proposition": "T shows a Delta_map advantage over rewired", "finding": "mean d_bar_gr=-0.0020, SD=0.0125, t(24)=-0.812, p=0.4246; sign-flip p=0.4215, Wilcoxon p=0.4418, bootstrap CI [-0.0103,0.0061]", "bearing": "challenges"}' \
-  --concludes '{"proposition": "T shows a Delta_map advantage over historical-random", "finding": "conditional on evaluability: mean d_bar_gr=-0.0025, SD=0.0154, t(24)=-0.824, p=0.4179; 21.9% of candidate realizations were unevaluable (95% CI 9.3-40.0%), disclosed separately, not folded into this estimate", "bearing": "challenges"}' \
-  --concludes '{"proposition": "T shows a Delta_map advantage over current-random", "finding": "mean d_bar_gr=-0.0004, SD=0.0158, t(24)=-0.132, p=0.8958; sign-flip p=0.8950, Wilcoxon p=0.8119", "bearing": "challenges"}')
+  --concludes '{"proposition": "T shows a Delta_map advantage over historical-random", "finding": "conditional on evaluability: mean d_bar_gr=-0.0025, SD=0.0154, t(24)=-0.824, p=0.4179; sign-flip p=0.4217, Wilcoxon p=0.2521, bootstrap 95% CI [-0.0109,0.0060]; 21.9% of candidate realizations were unevaluable (95% CI 9.3-40.0%), disclosed separately, not folded into this estimate", "bearing": "challenges"}' \
+  --concludes '{"proposition": "T shows a Delta_map advantage over current-random", "finding": "mean d_bar_gr=-0.0004, SD=0.0158, t(24)=-0.132, p=0.8958; sign-flip p=0.8950, Wilcoxon p=0.8119, bootstrap 95% CI [-0.0096,0.0084]", "bearing": "challenges"}')
 comp_confirm=$(printf '%s\n' "$out" | sed -n 1p)
 clm_confirm_rewired=$(printf '%s\n' "$out" | sed -n 2p)
 clm_confirm_hist=$(printf '%s\n' "$out" | sed -n 3p)
 clm_confirm_curr=$(printf '%s\n' "$out" | sed -n 4p)
 
-lab evaluate "$crit_rewired" --value "t(24)=-0.812, p=0.4246, Holm-adjusted 1.0000" --outcome pass --citing "$clm_confirm_rewired" >/dev/null
-lab evaluate "$crit_hist"    --value "t(24)=-0.824, p=0.4179, Holm-adjusted 1.0000" --outcome pass --citing "$clm_confirm_hist" >/dev/null
-lab evaluate "$crit_curr"    --value "t(24)=-0.132, p=0.8958, Holm-adjusted 1.0000" --outcome pass --citing "$clm_confirm_curr" >/dev/null
+# Same reasoning as crit_lattice: these criteria ask whether the four
+# methods agree, not which way the science came out. All four methods
+# agree on non-rejection at 0.0125 for each control (Holm-adjusted
+# p saturates at 1.0000 for all three), so each criterion is satisfied.
+lab evaluate "$crit_rewired" --value "t(24)=-0.812 p=0.4246, sign-flip p=0.4215, Wilcoxon p=0.4418, bootstrap CI [-0.0103,0.0061], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$clm_confirm_rewired" >/dev/null
+lab evaluate "$crit_hist"    --value "t(24)=-0.824 p=0.4179, sign-flip p=0.4217, Wilcoxon p=0.2521, bootstrap CI [-0.0109,0.0060], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$clm_confirm_hist" >/dev/null
+lab evaluate "$crit_curr"    --value "t(24)=-0.132 p=0.8958, sign-flip p=0.8950, Wilcoxon p=0.8119, bootstrap CI [-0.0096,0.0084], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$clm_confirm_curr" >/dev/null
 # crit_lattice already evaluated in Part 1 -- the 4-way Holm family DESIGN.md
 # and FINDINGS.md report together spans both parts, but no new structural
 # criterion is minted for that grouping (see the module note on #133,
@@ -218,17 +221,30 @@ lab evaluate "$crit_curr"    --value "t(24)=-0.132, p=0.8958, Holm-adjusted 1.00
 
 say "the GPU bug: a clean, total-supersession replace"
 
+# art_c alone can't support "GPU reported 0.2842" -- that number came out
+# of the buggy pilot run itself, never observed as its own artefact. No
+# raw file survives locally (only the later, corrected run's results are
+# on disk), so this is observed honestly without a hash, the same way
+# art_pilot is above.
+art_gpu_pilot=$(lab observe "$loe5" --name stage1d_gpu_pilot_buggy \
+  --finding "JAX/GPU pilot benchmark on an A100, as-shipped build_432_batch(), Delta_map=0.2842 for T seed=3000 -- no raw output file preserved locally")
 out=$(lab analyse "$loe5" \
   --method "JAX/GPU port of the per-trial simulator (run_one_trial_jax_faithful), pilot benchmark on an A100" \
-  --from "$art_c" \
+  --from "$art_c" --from "$art_gpu_pilot" \
   --concludes '{"proposition": "the GPU port reproduces Stage 1C'\''s cached Delta_map for T, seed=3000", "finding": "GPU reported 0.2842 vs. Stage 1C'\''s cached 0.3505 -- a real, non-trivial discrepancy", "bearing": "challenges"}')
 comp_gpu_bug=$(printf '%s\n' "$out" | sed -n 1p)
 clm_gpu_bug=$(printf '%s\n' "$out" | sed -n 2p)
 
 rev_gpu=$(lab review "$comp_gpu_bug" --verdict "wrong replica-direction distribution -- uniform(-1,1) instead of normal-then-rotation-projected-then-normalized -- fully reproduces the discrepancy on its own (confirmed by a 4-way factorial: correct/buggy directions x correct/buggy E_min gating); a dropped E_min validity gate was also found but confirmed inert for this specific trajectory")
+# Same reasoning: the corrected run's own 0.3505 is its own observation,
+# distinct from art_c's cached Stage 1C value it is being checked against.
+# No raw file for this specific smoke-test run survives locally either --
+# only the later confirmatory run (art_confirm) is on disk.
+art_gpu_fix=$(lab observe "$loe5" --name stage1d_gpu_fix_smoketest \
+  --finding "corrected build_432_batch() re-run on a fresh A100 session, Delta_map=0.3505 for T seed=3000, verify_on_gpu.py's field-by-field precision check passed -- no raw output file preserved locally beyond the later confirmatory run")
 lab replace "$comp_gpu_bug" --because "$rev_gpu" --enquiry "$loe5" \
   --method "corrected build_432_batch(), calling the real generate_fixed_replica_directions() instead of a hand-rolled uniform draw; smoke-tested against an independently computed replica state before touching a GPU, then re-verified end-to-end on a fresh A100 session" \
-  --from "$art_c" \
+  --from "$art_c" --from "$art_gpu_fix" \
   --concludes '{"proposition": "the GPU port reproduces Stage 1C'\''s cached Delta_map for T, seed=3000", "finding": "0.3505 vs. 0.3505 -- exact match, on a fresh GPU session, with verify_on_gpu.py'\''s own field-by-field precision check re-confirmed first"}' >/dev/null
 
 say "closing item 2, and checking whether item 1's promoted claim needed narrowing"
