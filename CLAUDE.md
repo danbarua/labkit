@@ -205,8 +205,11 @@ They are dated records: read them for reasoning, never for current state.
   identity, 031 on the execution-context seam — read it before changing how a
   surface is constructed, not only before touching events — 032 on the
   durable event log, which is where the atomicity of every write verb is
-  argued, and 033 on retiring the CLI's read-only constraint, whose §4 is a
-  negative control that found an assertion asserting nothing.
+  argued, 033 on retiring the CLI's read-only constraint, whose §4 is a
+  negative control that found an assertion asserting nothing, and 034 the
+  digest design — retired from `docs/` on 2026-09-01 with what it still owed
+  filed as issues, kept for its argument that a list view earns nothing
+  until the wrong answer underneath it is fixed.
 - **025-029 are about the method, not the model**, and are the ones worth
   reading if you are about to write a document. Their rules, which is all you
   need from them:
