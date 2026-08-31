@@ -749,9 +749,23 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "gate's state is computed from its criteria's evaluations, never stored — there is no " +
       "value anyone can set to `satisfied`.",
     inputSchema: {
-      governed_by: z.array(z.string()).describe(`criterion ids, e.g. ${CRITERION_PREFIX}1`),
+      // **`.min(1)` because this refusal is agent-reachable only.** The CLI
+      // declares both as `requiredOption`, so a person cannot send an empty
+      // list; an agent can, and the domain then refuses. Saying it at the
+      // boundary names the field the caller got wrong, which is what
+      // `isoInstant` already does for `--date`. The domain check stays: it is
+      // reachable from the CLI, from tests and from any later surface, and
+      // deleting it because one adapter now validates would move a domain
+      // invariant into an adapter.
+      governed_by: z
+        .array(z.string())
+        .min(1, "a gate needs at least one criterion to govern it: a gate enforces a condition")
+        .describe(`criterion ids, e.g. ${CRITERION_PREFIX}1`),
       consequence: z.string().describe("what this gate decides"),
-      protecting: z.array(z.string()).describe(`work ids, e.g. ${WORK_PREFIX}1`),
+      protecting: z
+        .array(z.string())
+        .min(1, "a gate needs at least one piece of work to protect")
+        .describe(`work ids, e.g. ${WORK_PREFIX}1`),
     },
     outputSchema: declaredGateSchema,
     handler: (write, { governed_by, consequence, protecting }) =>

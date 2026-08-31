@@ -148,6 +148,12 @@ interface RecordedConclusion {
 /**
  * The refusal a caller meets when they cite a claim nothing has concluded.
  *
+ * **What a refusal may point a caller at** — the rule, with its evidence, is on
+ * `ReadSurface` in `./read.ts`. In short: name the act, never a command (the two
+ * surfaces disagree on four of five names), and name a verb only when both
+ * surfaces spell it identically *and* its promise has been checked against the
+ * code implementing it.
+ *
  * **One spelling, because four is this repository's oldest defect shape.** The
  * text was hand-written at four call sites, which is written-once and forgotten
  * the second time — the same shape as the `SUPPORTS`/`CHALLENGES` traversal that
