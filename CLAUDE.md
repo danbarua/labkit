@@ -185,6 +185,12 @@ If a reader wants its status they grep one table.
 
 ## What this is
 
+**In the user's words (2026-09-01): *what am I blocked on right now, and what
+are my priorities?* The graph is a dependency tree that becomes a map once a
+gate has been advanced through, sidestepped, redefined or retired.** Every
+verb, report and rule is judged by whether it serves that — see the bar under
+"Changing the graph model".
+
 LabKit is a research control plane: it tracks provenance, justification, and
 dependency propagation for a research process (why a computation was run,
 what evidence resulted, what claims/decisions depend on it, what remains
@@ -1235,7 +1241,11 @@ did not:
    PJ-008b, a *capability* change — a new verb, or an edge that exists so a
    question can be asked at all — is instead earned by a **demonstrated
    consumer need**: a real user or agent asked, and the record could not
-   answer. `search` (#155) is the precedent. Only a confidently incorrect
+   answer. `search` (#155) is the precedent. The test to put to every
+   speculative modelling question, in Dan's words (2026-09-01): **would this
+   have saved the user weeks of frustration and cost building it in Markdown
+   + Git, when he never asked for JIRA in Markdown + Git?** A read that saves
+   one command and zero reading fails it. Only a confidently incorrect
    answer shows the model claiming something it cannot support. The same rule read
    from the other side: **a refusal needs something real to refuse.** S-5's
    decline-rather-than-guess pattern applies to a verb a caller would
