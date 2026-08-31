@@ -1,0 +1,407 @@
+$ labkit criterion the effect holds at n>=20
+CRIT_1
+
+$ labkit open does the pruning schedule move convergence?
+LOE_1
+
+$ labkit plan --objective sweep depth 4 through 20 --acceptance a curve with n>=20 at each depth --may-read raw
+TASK_1
+
+$ labkit declare --governed-by CRIT_1 --consequence may not be built on until this holds --protecting TASK_1
+GATE_1
+
+$ labkit observe LOE_1 --name depth-sweep-raw --finding convergence step counts at depths 4, 8, 12, 16, 20 --hash sha256:9f2b
+ART_1
+
+$ labkit analyse LOE_1 --method paired comparison against the unpruned baseline --from ART_1 --implementing TASK_1 --held-to CRIT_1 --concludes {"proposition": "the pruning schedule moves convergence", "finding": "converges ~3 steps earlier at every depth"}
+COMP_1
+CLM_1
+
+$ labkit known
+Established
+  nothing
+
+Provisional (answered, but not something to build on yet)
+  nothing
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  - does the pruning schedule move convergence?  (Q_1)
+
+Untested (nothing has been run against these)
+  nothing
+
+$ labkit why CLM_1
+"the pruning schedule moves convergence"
+  NOT supported, exploratory
+Resting on
+  - converges ~3 steps earlier at every depth  (via paired comparison against the unpruned baseline, COMP_1)
+
+Held to
+  - the effect holds at n>=20 — never-run
+
+Not currently met
+  - the effect holds at n>=20  (CRIT_1)
+      blocks GATE_1 — may not be built on until this holds
+        holding up sweep depth 4 through 20  (TASK_1)
+
+Ultimately resting on
+  - depth-sweep-raw  [ART_1]
+
+$ labkit promote CLM_1 --because we are relying on this to ship
+CLM_1
+
+$ labkit close LOE_1 --answered-by CLM_1
+LOE_1
+
+$ labkit known
+Established
+  nothing
+
+Provisional (answered, but not something to build on yet)
+  - does the pruning schedule move convergence?  (Q_1)
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  nothing
+
+$ labkit evaluate CRIT_1 --gate GATE_1 --value n=24 at every depth --outcome pass
+CRIT_1
+
+$ labkit gate GATE_1
+GATE_1 — satisfied
+  consequence: may not be built on until this holds
+Conditions
+  - passed              the effect holds at n>=20  (CRIT_1)  decided passed on "n=24 at every depth"
+
+Gating
+  - sweep depth 4 through 20  (TASK_1)
+
+Evaluations
+  - <timestamp>  passed  "n=24 at every depth"  (CEVAL_1)
+Computed, never stored. There is no value anyone can set to `satisfied`.
+
+$ labkit known
+Established
+  - does the pruning schedule move convergence?  (Q_1)
+
+Provisional (answered, but not something to build on yet)
+  nothing
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  nothing
+
+$ labkit claims the pruning schedule moves convergence
+Claims asserting "the pruning schedule moves convergence"
+  - the pruning schedule moves convergence  (CLM_1)
+
+$ labkit pursuits Q_1
+Lines of enquiry pursuing Q_1
+  - LOE_1
+
+`labkit enquiry <id>` says whether one is still open and what it has produced.
+
+$ labkit enquiry LOE_1
+does the pruning schedule move convergence?  (LOE_1)
+  produced 2 findings
+Pursuing "does the pruning schedule move convergence?"  (Q_1)
+  closed — answered
+  answer: yes
+  resting on confirmatory work
+
+This enquiry's findings
+  - convergence step counts at depths 4, 8, 12, 16, 20  (EV_1)
+  - converges ~3 steps earlier at every depth  (EV_2)
+
+The question's answer rests on
+  - converges ~3 steps earlier at every depth  (EV_2)
+
+$ labkit criteria GATE_1
+Conditions governing GATE_1
+  - CRIT_1
+
+Handles only. `labkit gate` gives the same conditions with their wording and
+their current standing.
+
+$ labkit contract TASK_1
+sweep depth 4 through 20  (TASK_1)
+  meeting it means: a curve with n>=20 at each depth
+
+May read
+  - raw
+
+Not enforced. The record states what this work may look at; nothing stops
+a computation reading elsewhere.
+
+$ labkit gates
+satisfied  GATE_1  may not be built on until this holds
+
+$ labkit work
+carried-out  TASK_1  sweep depth 4 through 20
+
+$ labkit origin Q_1
+Q_1 was posed directly.
+
+That is an answer, not a gap: only a question sharpened from an earlier
+one has an origin on the record.
+
+$ labkit interpretation CLM_1
+Now claims "the pruning schedule moves convergence"  (CLM_1)
+
+Originally
+  - the pruning schedule moves convergence  (CLM_1)
+
+Revisions
+  none — this reading has not been narrowed
+
+$ labkit affects depth-sweep-raw
+Claims that would be affected
+  - the pruning schedule moves convergence  (CLM_1)
+
+Lines of enquiry
+  - does the pruning schedule move convergence?  (LOE_1)
+
+Routes walked
+  - evidence recorded in this artefact, and the claims it bears on
+  - computations that consumed this artefact, and the claims their findings bear on
+  - the same, for every artefact downstream of this one through CONSUMES/PRODUCES
+
+This is a lower bound, not a finding of independence: anything
+connected by a route not listed above is absent from these lists
+and is not thereby unaffected.
+
+$ labkit pose does batch size interact?
+Q_2
+
+$ labkit pursue Q_2 --approach vary batch size at fixed depth
+LOE_2
+
+$ labkit gates --state satisfied
+satisfied  GATE_1  may not be built on until this holds
+
+$ labkit work --state carried-out
+carried-out  TASK_1  sweep depth 4 through 20
+
+$ labkit review COMP_1 --verdict the baseline was mismatched at depth 4
+REV_1
+
+$ labkit sharpen Q_2 --into does batch size interact below depth 8? --because the sweep only disagreed at low depth
+Q_3
+
+$ labkit origin Q_3
+Q_3 narrowed "does batch size interact?"  (Q_2)
+  because: the sweep only disagreed at low depth
+
+Known at that moment
+  - convergence step counts at depths 4, 8, 12, 16, 20  (EV_1)
+  - converges ~3 steps earlier at every depth  (EV_2)
+
+Frozen when the sharpening was recorded, not recomputed now. Evidence that
+arrived later is deliberately absent from this list.
+
+$ labkit amend CRIT_1 --now-requires the effect holds at n>=20 and at depth<8 --because the low-depth disagreement --citing CLM_1
+DEC_4
+
+$ labkit design GATE_1
+GATE_1, on CRIT_2
+  originally: the effect holds at n>=20
+  now requires: the effect holds at n>=20 and at depth<8
+
+Amendments
+scientific  (DEC_4)
+  was: the effect holds at n>=20
+  now: the effect holds at n>=20 and at depth<8
+  because: the low-depth disagreement
+  citing: converges ~3 steps earlier at every depth
+  needs re-running: sweep depth 4 through 20 (TASK_1)
+
+Ordered from the record itself, not from timestamps.
+
+$ labkit reinterpret CLM_1 --as the pruning schedule moves convergence below depth 8 --because the amended condition
+CLM_2
+
+$ labkit interpretation CLM_1
+Now claims "the pruning schedule moves convergence"  (CLM_1)
+
+Originally
+  - the pruning schedule moves convergence  (CLM_1)
+
+Revisions
+  none — this reading has not been narrowed
+
+$ labkit accept LOE_2 --because the equipment is unavailable --until the new sampler lands --in-light-of CLM_1
+LOE_2
+
+$ labkit known
+Established
+  - does the pruning schedule move convergence?  (Q_1)
+
+Provisional (answered, but not something to build on yet)
+  nothing
+
+Accepted as unresolved
+  - does batch size interact?  (Q_2)
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  - does batch size interact below depth 8?  (Q_3)
+
+$ labkit conflict CLM_1 CLM_2
+Corroboration — these agree.
+
+"the pruning schedule moves convergence"  (CLM_1)
+  asking "does the pruning schedule move convergence?"  (Q_1)
+  supported by: converges ~3 steps earlier at every depth
+
+"the pruning schedule moves convergence below depth 8"  (CLM_2)
+  asking "does the pruning schedule move convergence?"  (Q_1)
+  supported by: converges ~3 steps earlier at every depth
+
+$ labkit amend CRIT_2 --now-requires the effect holds at n>=20 and at depth<4 --because a second refinement, below the first --citing CLM_1
+DEC_7
+
+$ labkit design GATE_1
+GATE_1, on CRIT_3
+  originally: the effect holds at n>=20
+  now requires: the effect holds at n>=20 and at depth<4
+
+Amendments
+scientific  (DEC_4)
+  was: the effect holds at n>=20
+  now: the effect holds at n>=20 and at depth<8
+  because: the low-depth disagreement
+  citing: converges ~3 steps earlier at every depth
+  needs re-running: sweep depth 4 through 20 (TASK_1)
+
+scientific  (DEC_7)
+  was: the effect holds at n>=20 and at depth<8
+  now: the effect holds at n>=20 and at depth<4
+  because: a second refinement, below the first
+  citing: converges ~3 steps earlier at every depth
+  needs re-running: sweep depth 4 through 20 (TASK_1)
+
+Ordered from the record itself, not from timestamps.
+
+$ labkit pose does the correction change the sign of the effect?
+Q_4
+
+$ labkit pursue Q_4 --approach redo the analysis on a held-out set
+LOE_3
+
+$ labkit observe LOE_3 --name held-out-raw --finding held-out convergence counts --hash sha256:aa11
+ART_3
+
+$ labkit observe LOE_3 --name held-out-raw-nohash --finding a second, unhashed observation
+ART_4
+
+$ labkit analyse LOE_3 --method held-out comparison --from ART_3 --concludes {"proposition": "the effect holds on the held-out set", "finding": "it does, by a smaller margin"}
+COMP_2
+CLM_3
+
+$ labkit analyse LOE_3 --method a second read of the same data --from ART_4 --concludes {"proposition": "the held-out margin depends on the split", "finding": "no dependence found"}
+COMP_3
+CLM_4
+
+$ labkit reverify COMP_2 --enquiry LOE_3 --method re-run under fresh sampling --under ART_3 --concludes {"proposition": "the effect holds on the held-out set", "finding": "still holds, similar margin"}
+COMP_4
+CLM_5
+
+$ labkit reproduction COMP_4
+re-run under fresh sampling  (COMP_4)
+  re-checking held-out comparison  (COMP_2)
+  the two runs' findings agrees — this raises confidence
+
+The re-run read
+  - held-out-raw  (ART_3)
+
+The original read
+  - held-out-raw  (ART_3)
+
+Nothing differs in what the two runs read.
+
+This does not say the original was reproduced. Whether reading the same
+records is the same execution depends on what the method does, and the
+record does not know that.
+
+$ labkit review COMP_2 --verdict the held-out comparison mismatched sampling seeds
+REV_3
+
+$ labkit replace COMP_2 --because REV_3 --enquiry LOE_3 --method corrected held-out comparison --from ART_3 --concludes {"proposition": "the effect holds on the held-out set", "finding": "holds, corrected margin"}
+COMP_5
+CLM_6
+
+$ labkit reproducibility COMP_2 ART_3=sha256:aa11
+COMP_2 — accounted for
+
+Rebuilt and identical
+  - held-out-raw  (ART_3)
+
+Rebuilt and different
+  nothing
+
+Unverifiable (the record kept no hash, so nothing can be said either way)
+  nothing
+
+Not rebuilt
+  nothing
+
+$ labkit reproducibility COMP_2 ART_3=sha256:wrong
+COMP_2 — not accounted for
+
+Rebuilt and identical
+  nothing
+
+Rebuilt and different
+  - held-out-raw  (ART_3)
+
+Unverifiable (the record kept no hash, so nothing can be said either way)
+  nothing
+
+Not rebuilt
+  nothing
+
+$ labkit reproducibility COMP_2
+COMP_2 — not accounted for
+
+Rebuilt and identical
+  nothing
+
+Rebuilt and different
+  nothing
+
+Unverifiable (the record kept no hash, so nothing can be said either way)
+  nothing
+
+Not rebuilt
+  - held-out-raw  (ART_3)
+
+$ labkit reproducibility COMP_3 ART_4=sha256:anything
+COMP_3 — not accounted for
+
+Rebuilt and identical
+  nothing
+
+Rebuilt and different
+  nothing
+
+Unverifiable (the record kept no hash, so nothing can be said either way)
+  - held-out-raw-nohash  (ART_4)
+
+Not rebuilt
+  nothing
+

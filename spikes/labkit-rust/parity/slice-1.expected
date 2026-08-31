@@ -1,0 +1,41 @@
+$ labkit criterion the effect holds at n>=20
+CRIT_1
+
+$ labkit open does the pruning schedule move convergence?
+LOE_1
+
+$ labkit plan --objective sweep depth 4 through 20 --acceptance a curve with n>=20 at each depth --may-read raw
+TASK_1
+
+$ labkit declare --governed-by CRIT_1 --consequence may not be built on until this holds --protecting TASK_1
+GATE_1
+
+$ labkit known
+Established
+  nothing
+
+Provisional (answered, but not something to build on yet)
+  nothing
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  - does the pruning schedule move convergence?  (Q_1)
+
+$ labkit gate GATE_1
+GATE_1 — never-evaluated
+  consequence: may not be built on until this holds
+Conditions
+  - never-run           the effect holds at n>=20  (CRIT_1)
+
+Not currently met
+  - the effect holds at n>=20  (CRIT_1)
+
+Gating
+  - sweep depth 4 through 20  (TASK_1)
+Computed, never stored. There is no value anyone can set to `satisfied`.
+

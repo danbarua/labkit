@@ -1,0 +1,106 @@
+$ labkit criterion the effect holds at n>=20
+CRIT_1
+
+$ labkit open does the pruning schedule move convergence?
+LOE_1
+
+$ labkit plan --objective sweep depth 4 through 20 --acceptance a curve with n>=20 at each depth --may-read raw
+TASK_1
+
+$ labkit declare --governed-by CRIT_1 --consequence may not be built on until this holds --protecting TASK_1
+GATE_1
+
+$ labkit observe LOE_1 --name depth-sweep-raw --finding convergence step counts at depths 4, 8, 12, 16, 20 --hash sha256:9f2b
+ART_1
+
+$ labkit analyse LOE_1 --method paired comparison against the unpruned baseline --from ART_1 --implementing TASK_1 --held-to CRIT_1 --concludes {"proposition": "the pruning schedule moves convergence", "finding": "converges ~3 steps earlier at every depth"}
+COMP_1
+CLM_1
+
+$ labkit known
+Established
+  nothing
+
+Provisional (answered, but not something to build on yet)
+  nothing
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  - does the pruning schedule move convergence?  (Q_1)
+
+Untested (nothing has been run against these)
+  nothing
+
+$ labkit why CLM_1
+"the pruning schedule moves convergence"
+  NOT supported, exploratory
+Resting on
+  - converges ~3 steps earlier at every depth  (via paired comparison against the unpruned baseline, COMP_1)
+
+Held to
+  - the effect holds at n>=20 — never-run
+
+Not currently met
+  - the effect holds at n>=20  (CRIT_1)
+      blocks GATE_1 — may not be built on until this holds
+        holding up sweep depth 4 through 20  (TASK_1)
+
+Ultimately resting on
+  - depth-sweep-raw  [ART_1]
+
+$ labkit promote CLM_1 --because we are relying on this to ship
+CLM_1
+
+$ labkit close LOE_1 --answered-by CLM_1
+LOE_1
+
+$ labkit known
+Established
+  nothing
+
+Provisional (answered, but not something to build on yet)
+  - does the pruning schedule move convergence?  (Q_1)
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  nothing
+
+$ labkit evaluate CRIT_1 --gate GATE_1 --value n=24 at every depth --outcome pass
+CRIT_1
+
+$ labkit gate GATE_1
+GATE_1 — satisfied
+  consequence: may not be built on until this holds
+Conditions
+  - passed              the effect holds at n>=20  (CRIT_1)  decided passed on "n=24 at every depth"
+
+Gating
+  - sweep depth 4 through 20  (TASK_1)
+
+Evaluations
+  - <timestamp>  passed  "n=24 at every depth"  (CEVAL_1)
+Computed, never stored. There is no value anyone can set to `satisfied`.
+
+$ labkit known
+Established
+  - does the pruning schedule move convergence?  (Q_1)
+
+Provisional (answered, but not something to build on yet)
+  nothing
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  nothing
+
