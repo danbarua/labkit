@@ -36,15 +36,16 @@
 # worth noting as a *different* shape of the same underlying gap, not a
 # third identical repro).
 #
-# **#98, reproduced live, not reasoned about.** `plan --objective
-# --acceptance` mints a Task with no question and no enquiry parameter.
-# Declared one anyway (the feasibility ladder's go/no-go gate genuinely is
-# real, gated work), then asked `labkit contract` for it -- confirmed
-# directly: it answers "what is this work for" with the objective/
-# acceptance text alone, nothing connecting it to Q_6, exactly as #98's own
-# `TaskContract = {work, objective, acceptance, mayRead, enforced}` says.
+# **#98, reproduced live, then closed by the same task.** `plan --objective
+# --acceptance` used to mint a Task with no question and no enquiry
+# parameter; the feasibility ladder's go/no-go gate is real, gated work that
+# genuinely exists to serve $loe6, and `labkit contract` answered "what is
+# this work for" with the objective/acceptance text alone -- nothing
+# connecting it to Q_6, exactly as #98's own
+# `TaskContract = {work, objective, acceptance, mayRead, enforced}` said.
 # Commented on #98 with this concrete instance rather than filing a
-# duplicate.
+# duplicate; `plan` now takes `--enquiry`, written below, and `contract`
+# reports `addressing`/`pursuing` back.
 #
 # **A second instance of #146, not a `reinterpret`.** Stage 2A's own
 # FINDINGS.md originally claimed "the four [evolved] graphs are not
@@ -109,7 +110,8 @@ STAGE2A_DESIGN_LOCK=2026-08-02T22:23:11.000Z
 
 task_ladder=$(lab --date "$STAGE2A_DESIGN_LOCK" plan \
   --objective "advance Stage 2A's feasibility ladder (stages 1-3, up to the full 60,000-image official KMNIST training set) to the locked stage-4 confirmatory evaluation against the untouched official test set" \
-  --acceptance "zero solver failures, zero non-finite feature vectors, every required fold/C classifier fit converges")
+  --acceptance "zero solver failures, zero non-finite feature vectors, every required fold/C classifier fit converges" \
+  --enquiry "$loe6")
 crit_gono=$(lab --date "$STAGE2A_DESIGN_LOCK" criterion "Stage 2A go/no-go gate: zero solver failures, zero non-finite feature vectors, and every required fold/C classifier fit converges, across the full feasibility ladder -- a pipeline-health quality bar, not a scientific result, locked before running")
 gate_gono=$(lab --date "$STAGE2A_DESIGN_LOCK" declare --governed-by "$crit_gono" --consequence "stage 4 does not run against the official test set, pending investigation" --protecting "$task_ladder")
 

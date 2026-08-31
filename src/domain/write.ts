@@ -761,6 +761,8 @@ export class WriteSurface extends SessionCore {
         outputs: "",
         acceptance: input.acceptance,
       });
+      if (input.addressing)
+        await this.graph.createEdge(task.natural_id, "ADDRESSES", input.addressing);
       const events = await this.emit("planWork", ref("work", task.natural_id), {
         objective: input.objective,
       });

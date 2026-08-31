@@ -637,13 +637,18 @@ export class ReadSurface extends SessionCore {
   /** What a planned task is permitted to touch, and whether anyone is enforcing it. */
   async contractFor(work: WorkRef): Promise<TaskContract> {
     const rows = await this.graph.query(
-      `MATCH (t:Task {natural_id: $id}) RETURN t`,
+      `MATCH (t:Task {natural_id: $id})
+       OPTIONAL MATCH (t)-[:ADDRESSES]->(loe:LineOfEnquiry)
+       OPTIONAL MATCH (q:Question)-[:MOTIVATES]->(loe)
+       RETURN t, loe, q`,
       {
         t: vertexProps<{
           objective: string;
           acceptance: string;
           mayRead: string[];
         }>(),
+        loe: optional(vertexProps<{ natural_id: string; name: string }>()),
+        q: optional(vertexProps<{ natural_id: string; name: string }>()),
       },
       { id: work },
     );
@@ -660,12 +665,27 @@ export class ReadSurface extends SessionCore {
     // in a try/catch and two runtime type guards used to stand here, all of
     // them guarding a shape the writer cannot produce. Adding a fresh guard in
     // their place would have been the same defect wearing shorter code.
+    const loe = rows[0]?.loe;
+    const q = rows[0]?.q;
     return {
       work,
       objective: task.objective,
       acceptance: task.acceptance,
       mayRead: task.mayRead,
       enforced: false,
+      // `q` is never absent when `loe` is present -- see TaskContract.addressing
+      // -- but the report shape still has to be built from what the query
+      // returned rather than assumed.
+      ...(loe && q
+        ? {
+            addressing: {
+              enquiry: ref("enquiry", loe.natural_id),
+              pursuing: loe.name,
+              question: ref("question", q.natural_id),
+              asks: q.name,
+            },
+          }
+        : {}),
     };
   }
 

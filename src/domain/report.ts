@@ -1459,6 +1459,25 @@ export interface TaskContract {
   acceptance: string;
   mayRead: string[];
   enforced: false;
+  /**
+   * The line of enquiry this work exists to advance, and the question behind
+   * it, if `planWork` was told one (#98). Absent, not `null`, when it wasn't
+   * -- ungated work (#91) is a genuine case, not a gap in this report.
+   *
+   * Carries wording alongside each handle, matching `EnquiryStatus.pursuing`
+   * and `QuestionClosure.asks` -- the demonstrated need was "why does this
+   * task exist" answering nothing, and a bare handle answers that only for a
+   * caller willing to chain a second read. `question` is never absent when
+   * `enquiry` is present: `pursue()` requires a question to open a line of
+   * enquiry, so every `LineOfEnquiry` has exactly one `MOTIVATES` edge behind
+   * it by construction.
+   */
+  addressing?: {
+    enquiry: EnquiryRef;
+    pursuing: string;
+    question: QuestionRef;
+    asks: string;
+  };
 }
 
 /**

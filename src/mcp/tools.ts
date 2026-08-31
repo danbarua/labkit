@@ -717,13 +717,20 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .array(z.string())
         .optional()
         .describe("what this work may look at — recorded, not enforced"),
+      enquiry: z
+        .string()
+        .optional()
+        .describe(
+          `the line of enquiry this work exists to advance, e.g. ${ENQUIRY_PREFIX}7 — omit for ungated work`,
+        ),
     },
     outputSchema: plannedWorkSchema,
-    handler: (write, { objective, acceptance, may_read }) =>
+    handler: (write, { objective, acceptance, may_read, enquiry }) =>
       write.planWork({
         objective,
         acceptance,
         ...(may_read === undefined ? {} : { mayRead: may_read as string[] }),
+        ...(enquiry === undefined ? {} : { addressing: ref("enquiry", enquiry) }),
       }),
   }),
 
