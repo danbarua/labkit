@@ -248,6 +248,37 @@ five slices say whether it's still deterministic. It is.
   `ecb648b2`, evidence for the antithesis (a typed API removes one silent
   class of defect, not silence as such).
 
+## Explorer traces (labkit#119)
+
+`LABKIT_TRACE_OUT=<path>` (optionally with `LABKIT_TRACE_FRAGMENT=<name>`)
+appends one NDJSON line per graph-changing command — loosely a
+`fragments/trace.ts` `TraceStep`, for `main`'s LabKit Explorer (#118, #120)
+to render this port's own runs the same way it renders a real domain
+composition. Off by default; every one of the 35 byte-parity fixtures is
+unaffected, checked above.
+
+**Range, not traversal.** What a command created is `[node/edge count
+before, count after)`, looked up by id directly — not a diff of
+`iter_nodes()`/`iter_edges()` output. That distinction is the point: this
+session measured `iter_nodes()`'s order as neither creation order nor
+stable across process runs (`examples/graph_history_probe.rs`, written for
+`happened` two sections up), and a trace built by reading that order would
+have inherited the same flakiness. `NodeId`/`EdgeId` are plain sequential
+`u64`s, so a count-based range is a set of direct point lookups, not a
+traversal with an order to get wrong.
+
+**Approximated fields, on purpose and named as such**, agreed with
+`labkit-dev-web` before building: `subject` is the first created handle,
+not a real what-the-act-was-about distinction (this port doesn't model
+one); `detail` is raw `argv`; `fragment` is whatever the caller passes,
+there being no `fragments/compositions.ts` equivalent here; per-step
+enquiry/gate state (`derived` in the TS shape) isn't computed at all yet,
+deferred until a plain trace proves worth building on. One field *this*
+version gets more honestly than the TS one: `command` is the literal argv
+this process actually ran (`--db` stripped as harness noise, kept in
+`detail.argv`) — genuinely re-runnable, where `commandOf()` on the TS side
+is explicit that its rendering is not a claim the string would run.
+
 ## What is left
 
 **Byte-parity command coverage is done, for the 35 commands byte-parity is a
