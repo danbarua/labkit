@@ -73,15 +73,15 @@ NUM=3
 #   P2  everything else, Blocked and Parked included — not competing for
 #       attention. Every item carries one so the completeness check below stays
 #       total; P2 is the honest value for a thing nobody should be looking at.
-TODO="81 50 55 104 52 49 56 76 124 125 126"
+TODO="81 50 55 104 52 49 56 76 124 132"
 BLOCKED="94 60 127 128 129"   # 94, 60 behind #49; 127-129 behind #125
-PARKED="63 64 65 98 51 54 123"   # 123 waits on a scope go/no-go from Dan
-IN_PROGRESS="119"   # shipped in #121/#122, open under review
+PARKED="63 64 65 98 51 54 123 133 134"   # 123 waits on a scope go/no-go from Dan; 133 open question; 134 an absence, unparks on a wrong answer
+IN_PROGRESS="119 125 126"   # 119 shipped in #121/#122 and 126 in #131, open under review; 125 is PR #135
 DONE="57 95"
 
-P0="81"           # attribution: two writes, byte-identical, one of them a claim nobody checked
-P1="50 55 104 52 124 125 126"   # 124-126: the Bonsai record, the first real consumer
-P2="49 56 76 94 60 63 64 65 98 51 54 57 95 119 123 127 128 129"
+P0="132"          # partial supersession: the nominated demonstrated wrong answer (PJ-008 row AM). #81 was here until 2026-08-31, when Dan called it a special case
+P1="81 50 55 104 52 124 125 126"   # 124-126: the Bonsai record, the first real consumer
+P2="49 56 76 94 60 63 64 65 98 51 54 57 95 119 123 127 128 129 133 134"
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ID=$(gh project view "$NUM" --owner "$OWNER" --format json -q .id)
@@ -168,9 +168,11 @@ if stale:
     )
 
 for n, s in sorted(wanted.items(), key=lambda kv: (ranked[kv[0]], list(plan).index(kv[1]), int(kv[0]))):
-    # The label is printed with its space replaced: `read` below splits on
-    # whitespace, and "In progress" is the one status with a space in it --
-    # which nothing noticed while IN_PROGRESS was empty.
+    # The label is printed with its space replaced: the shell read below splits on
+    # whitespace, and In-progress is the one status with a space in it --
+    # which nothing noticed while IN_PROGRESS was empty. No quotes or backticks
+    # in this comment: it sits inside a double-quoted bash string, and a backtick
+    # here ran a command that consumed the JSON on stdin (2026-08-31).
     print(by_number[n], status['id'], status['options'][s],
           priority['id'], priority['options'][ranked[n]], n, s.replace(' ', '-'), ranked[n])
 " |
