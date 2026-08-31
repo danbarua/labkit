@@ -241,7 +241,7 @@ function renderQueue() {
 
     const li = document.createElement("li");
     li.className = i < state.step ? "done" : i === state.step ? "current" : "";
-    li.innerHTML = `<span class="n">${i + 1}</span> ${formatCommand(step.command)}`;
+    li.innerHTML = `<span class="n">${i + 1}</span>${formatCommand(step.command)}`;
     li.title = step.command;
     queueList.appendChild(li);
   }
@@ -268,19 +268,30 @@ const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt
 const HANDLE = /^[A-Z]+_\d+$/;
 const isHandle = (s) => HANDLE.test(s);
 
-// Splits `labkit <verb> --flag "value" --flag2 [...]` into one line per flag,
-// colouring the verb, every handle-shaped value, and (in the delta/queue
-// columns only) leaving prose as the reader's own colour -- the same
-// three-way split record-delta already draws between a `+`, an edge label,
-// and the plain node/handle text either side of it. Untouched by a formatter
-// change if the flag ever adds a value shape this hasn't seen: unrecognised
-// tokens render as plain text rather than throwing.
+// Splits `labkit <verb> --flag "value" --flag2 [...]` into a predictable,
+// hand-drawable shape rather than one line per flag with no further
+// structure -- Dan's own sketch, reproduced exactly because the alignment is
+// the point:
 //
-// Prose values (the common case: --because, --method, --proposition, most of
-// what a research act actually says) get their own line, word-wrapped by the
-// browser's own line-wrapping rather than measured here -- CSS white-space
-// handles that, and there is no case where re-implementing it would be more
-// correct than what the renderer already does for free.
+//   labkit stateCriterion
+//   --proposition
+//     "no grade 3 events at the target dose"
+//
+//   labkit declareGate
+//   --governed-by ["CRIT_1"]
+//   --protecting ["TASK_1"]
+//
+// No indent before `labkit <verb>` (the queue's own numbering column, .n,
+// carries that weight), two spaces before every `--flag`. A handle-shaped
+// value (a bare handle or an array of them) stays on the flag's own line --
+// it's short and it's an id, the same reason record-delta never wraps
+// `Q_1 -[MOTIVATES]-> LOE_1` onto two lines. A prose value drops to its own
+// line, indented by .cmd-prose (a block, not manual spaces in the string --
+// see that rule for why), because prose is what varies in length and wants
+// the browser's own word-wrap rather than being forced to share a line with
+// the flag that names it. Untouched by a formatter change if a flag ever
+// adds a value shape this hasn't seen: unrecognised tokens render as plain
+// text rather than throwing.
 function formatCommand(command) {
   const parts = command.split(/(?=--[a-z-]+ )/);
   const head = parts.shift() ?? command;
@@ -289,11 +300,19 @@ function formatCommand(command) {
     ? `${esc(verbMatch[1])} <span class="cmd-verb">${esc(verbMatch[2])}</span>`
     : esc(head);
 
+  // Each segment opens its own line and is responsible for nothing after
+  // it -- no trailing newline. .cmd-prose is `display: block`, which already
+  // starts a new line for whatever follows; a flag that also opened with
+  // "\n" stacked an extra blank line under every prose value that was
+  // followed by another flag.
   const flagHtml = (part) => {
     const m = part.match(/^(--[a-z-]+) (.*)$/s);
-    if (!m) return `  ${esc(part.trim())}`;
+    if (!m) return `\n  ${esc(part.trim())}`;
     const [, flag, rawValue] = m;
-    return `\n  ${esc(flag)} ${formatValue(rawValue.trim())}`;
+    const value = formatValue(rawValue.trim());
+    return value.isProse
+      ? `\n  ${esc(flag)}<span class="cmd-prose">${value.html}</span>`
+      : `\n  ${esc(flag)} ${value.html}`;
   };
 
   return [headHtml, ...parts.map(flagHtml)].join("");
@@ -301,12 +320,17 @@ function formatCommand(command) {
 
 // A flag's value is one of: a bare handle in quotes ("CRIT_1"), a prose
 // string in quotes, or a JSON array of either -- commandOf() never emits
-// anything else. Handles are coloured; prose passes through escaped.
+// anything else. Handles are coloured and treated as short (stay on the
+// flag's line); prose is escaped and treated as long (drops to its own
+// line) even when it happens to be short, because a step's flags should not
+// jump between the two layouts from one act to the next.
 function formatValue(value) {
   const quoted = value.match(/^"(.*)"$/s);
   if (quoted) {
     const inner = quoted[1];
-    return isHandle(inner) ? `"${handleSpan(inner)}"` : `"${esc(inner)}"`;
+    return isHandle(inner)
+      ? { isProse: false, html: `"${handleSpan(inner)}"` }
+      : { isProse: true, html: `"${esc(inner)}"` };
   }
   const array = value.match(/^\[(.*)\]$/s);
   if (array) {
@@ -315,13 +339,20 @@ function formatValue(value) {
     // and splitting on "," would cut it apart.
     try {
       const items = JSON.parse(value);
-      const rendered = items.map((v) => `"${isHandle(v) ? handleSpan(v) : esc(v)}"`);
-      return `[${rendered.join(", ")}]`;
+      // An array of handles ("--governed-by") stays on the flag's line, the
+      // same as one; an array with any prose item ("--changed", "--affected")
+      // is treated as prose, dropping the whole array to its own line rather
+      // than splitting one array across two layouts by item.
+      const allHandles = items.every(isHandle);
+      const rendered = items.map((v) => `"${allHandles ? handleSpan(v) : esc(v)}"`);
+      return { isProse: !allHandles, html: `[${rendered.join(", ")}]` };
     } catch {
-      return esc(value);
+      return { isProse: true, html: esc(value) };
     }
   }
-  return isHandle(value) ? handleSpan(value) : esc(value);
+  return isHandle(value)
+    ? { isProse: false, html: handleSpan(value) }
+    : { isProse: true, html: esc(value) };
 }
 
 const handleSpan = (h) => `<span class="cmd-handle">${esc(h)}</span>`;

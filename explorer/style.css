@@ -200,11 +200,33 @@ main {
   white-space: pre-wrap;
 }
 
-/* Shared by .act-command and #queue-list li -- formatCommand() emits the same
-   markup in both places, so one rule set keeps the two views reading as one
-   visual language rather than two things that happen to be near each other. */
-.cmd-verb { color: var(--accent); font-weight: 600; }
-.cmd-handle { color: var(--danger); }
+/* formatCommand() emits the same .cmd-verb/.cmd-handle markup in both
+   .act-command and #queue-list li, but the two read differently: the act
+   panel is always about the one act that just ran, so it's always coloured.
+   The queue is a schedule, and colour there means "this already happened or
+   is happening" -- an upcoming row keeps the bold weight (still useful
+   structure) but not the colour, so a glance at the queue shows how far
+   the run has actually got, not just what every command will eventually
+   look like. */
+.act-command .cmd-verb,
+#queue-list li.done .cmd-verb,
+#queue-list li.current .cmd-verb {
+  color: var(--accent);
+}
+.cmd-verb { font-weight: 600; }
+
+.act-command .cmd-handle,
+#queue-list li.done .cmd-handle,
+#queue-list li.current .cmd-handle {
+  color: var(--danger);
+}
+/* A prose value drops to its own line, indented -- and a block with its own
+   padding, not manual leading spaces in the string, is what keeps a wrapped
+   second line at the same indent as the first. Manual spaces only pad the
+   line the browser started wrapping from; the rest of the paragraph would
+   snap back to column zero, which is the one thing Dan's own sketch draws
+   as staying aligned. */
+.cmd-prose { display: block; padding-left: 4ch; }
 
 .derived-col .delta-line { margin: 2px 0; }
 .derived-col .delta-line .plus { color: var(--accent); }
@@ -242,7 +264,7 @@ main {
 .popover dd { margin: 0; word-break: break-word; }
 
 #queue {
-  flex: 0 0 368px;
+  flex: 0 0 320px;
   border-left: 1px solid var(--panel-border);
   background: var(--panel);
   overflow-y: auto;
@@ -273,8 +295,7 @@ main {
 }
 
 #queue-list li .n {
-  display: inline-block;
-  width: 24px;
+  display: block;
   color: var(--text-dim);
 }
 
