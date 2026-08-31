@@ -159,17 +159,33 @@ function resetRun() {
   renderDerivedPanel();
 }
 
-// One step: mint nodes at a random position near the graph's current
-// centroid (so new nodes drift toward the mass rather than spawning at a
-// fixed corner), record edges, and fade any node a closing act named.
+// One step: mint nodes, record edges, and fade any node a closing act named.
+//
+// A new node spawns near whichever *existing* node this step's edges connect
+// it to, not the graph's overall centroid -- an analysis minted this step
+// that consumes an artefact from ten steps ago should land beside that
+// artefact, not wherever the mass of everything happens to sit right now.
+// Falls back to the centroid only when nothing this step connects to already
+// exists (the very first node in a trace, or a step whose edges all run
+// between nodes created in the same step). This is deliberately about
+// spawn position only: tickPhysics()'s own spring/repulsion forces still
+// decide where a node actually settles once it's live, so a bad initial
+// guess here costs a few frames of drift, not a wrong final layout.
 function applyStep(step) {
   const [cx, cy] = centroid();
+  const newHandles = new Set(step.created.map((c) => c.handle));
   for (const created of step.created) {
+    const parent = step.edges
+      .map((e) => (e.from === created.handle ? e.to : e.to === created.handle ? e.from : null))
+      .filter((h) => h && !newHandles.has(h))
+      .map((h) => state.nodes.get(h))
+      .find(Boolean);
+    const [px, py] = parent ? [parent.x, parent.y] : [cx, cy];
     state.nodes.set(created.handle, {
       handle: created.handle,
       label: created.label,
-      x: cx + (Math.random() - 0.5) * 40,
-      y: cy + (Math.random() - 0.5) * 40,
+      x: px + (Math.random() - 0.5) * 40,
+      y: py + (Math.random() - 0.5) * 40,
       vx: 0,
       vy: 0,
       createdStep: step.seq,
@@ -432,8 +448,24 @@ const SPRING_K = 0.02;
 const DAMPING = 0.86;
 const CENTER_K = 0.002;
 
+// Repulsion scaled by 1/log(n): at REPEL's original strength, a large record
+// (bonsai-2026's 221 nodes, against the 3-64 node range every composition
+// covers) shoves a freshly-spawned node away from the parent applyStep() just
+// placed it beside before the spring connecting them gets a chance to hold
+// it there -- the "stack near the node it connects to" placement only reads
+// as a stack in 3D if repulsion doesn't immediately undo it. log(n) rather
+// than n or sqrt(n): repulsion is pairwise (the inner loop below is already
+// O(n^2)), so the *total* outward force on one node already grows with n on
+// its own; log(n) damps that growth without cancelling it outright the way
+// dividing by n would. Floored at 3 nodes (ln(3) ~ 1.1) rather than letting
+// a 1- or 2-node graph divide by something near zero and blow up.
+function springiness(n) {
+  return 1 / Math.log(Math.max(n, 3));
+}
+
 function tickPhysics() {
   const nodes = [...state.nodes.values()];
+  const repel = REPEL * springiness(nodes.length);
   for (let i = 0; i < nodes.length; i++) {
     const a = nodes[i];
     for (let j = i + 1; j < nodes.length; j++) {
@@ -442,7 +474,7 @@ function tickPhysics() {
       let dy = a.y - b.y;
       let d2 = dx * dx + dy * dy;
       if (d2 < 1) d2 = 1;
-      const f = REPEL / d2;
+      const f = repel / d2;
       const d = Math.sqrt(d2);
       dx /= d;
       dy /= d;
@@ -762,4 +794,13 @@ window.__labkitExplorer = {
   setOverlay,
   /** The full state object, for anything the methods above don't cover. */
   state,
+  /** Advances the physics simulation by n frames without waiting on
+   * requestAnimationFrame, which browser-automation sessions don't get:
+   * a hidden/backgrounded tab (document.hidden) never fires it, so a
+   * layout change would otherwise be unverifiable from outside a real,
+   * focused browser window. */
+  tick: (n = 1) => {
+    for (let i = 0; i < n; i++) tickPhysics();
+    render();
+  },
 };
