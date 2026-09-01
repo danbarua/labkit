@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves the real Bonsai record is script-derived: replays the four
+# Proves the real Bonsai record is script-derived: replays the
 # probe-bonsai-*.sh scripts into a fresh database and diffs the result
 # against the live one. Zero lines out is the point.
 #
@@ -14,7 +14,7 @@
 # `probe:dogfood`, this is NOT a "no exit code expresses the outcome"
 # probe -- it can and does properly pass or fail, and its exit code is
 # the thing to trust. It keeps the `probe-bonsai-` prefix rather than
-# `check-` because it is Bonsai-transcription tooling, sibling to the four
+# `check-` because it is Bonsai-transcription tooling, sibling to the
 # scripts it replays, not a general LabKit repo check -- CLAUDE.md's own
 # lesson about `check-all.ts`'s first exclusion list applies in reverse
 # here: a script's name should say what it is, and this one is not what
