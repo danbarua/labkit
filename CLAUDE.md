@@ -215,7 +215,10 @@ They are dated records: read them for reasoning, never for current state.
   negative control that found an assertion asserting nothing, and 034 the
   digest design — retired from `docs/` on 2026-09-01 with what it still owed
   filed as issues, kept for its argument that a list view earns nothing
-  until the wrong answer underneath it is fixed.
+  until the wrong answer underneath it is fixed. 036 is the reviewer's account
+  of the usage era's first two days — what the real record found, which rules
+  fell, and what the vocabulary became; 035, the `conclude` primitive's build
+  record, is written by the session that built it.
 - **025-029 are about the method, not the model**, and are the ones worth
   reading if you are about to write a document. Their rules, which is all you
   need from them:
