@@ -242,6 +242,99 @@ describe("an event records the edges the act created", () => {
    * single-edge case passes under a collector that only ever remembers the
    * last write.
    */
+  /**
+   * The log names the act the caller performed.
+   *
+   * `keep` and `replace` share one private implementation, and the shared half
+   * emitted a fixed name — so a `keep` read back as a replacement, which is a
+   * different act: one carries conclusions forward and the other supersedes
+   * every one of them. `happened` and `now --since` are the readers that
+   * cannot tell them apart.
+   */
+  test("a verb emits its own name", async () => {
+    const { ctx, write } = await surfaceFor("labkit");
+    const log = pgEventLog(db, ctx.tenantId);
+    const { enquiry } = await write.openEnquiry("does the coating hold?");
+    const { observations } = await write.recordObservations({
+      enquiry,
+      name: "panel-a",
+      finding: "120 panels, 90 days",
+    });
+    const { analysis } = await write.recordAnalysis({
+      enquiry,
+      method: "regression",
+      from: [observations],
+    });
+    const kept = await write.conclude({
+      analysis,
+      proposition: "the coating holds",
+      finding: "no failures at 90 days",
+    });
+    await write.conclude({
+      analysis,
+      proposition: "the primer holds",
+      finding: "no failures at 60 days",
+    });
+    const { review } = await write.recordReview({ of: analysis, verdict: "wrong scale" });
+
+    await write.keep({
+      keeping: [kept.claims[0]!.claim],
+      because: review,
+      method: "corrected scale",
+    });
+
+    expect(await log.select({ operation: "keep" })).toHaveLength(1);
+    expect(await log.select({ operation: "replaceAnalysis" })).toHaveLength(0);
+  });
+
+  /**
+   * The log says what standing a conclusion was recorded with, and what a
+   * promotion moved.
+   *
+   * `promote` mutates `Claim.kind` in place, so after it runs nothing on the
+   * record holds the value it replaced. Without both halves a reader cannot
+   * tell a claim recorded `confirmatory` from one promoted later, and has to
+   * infer it from whether a `promote` happens to follow.
+   */
+  test("standing is on the conclusion, and a promotion says what it moved", async () => {
+    const { ctx, write } = await surfaceFor("labkit");
+    const log = pgEventLog(db, ctx.tenantId);
+    const { enquiry } = await write.openEnquiry("does the coating hold?");
+    const { observations } = await write.recordObservations({
+      enquiry,
+      name: "panel-a",
+      finding: "120 panels",
+    });
+    const { analysis } = await write.recordAnalysis({
+      enquiry,
+      method: "regression",
+      from: [observations],
+    });
+
+    const exploratory = await write.conclude({
+      analysis,
+      proposition: "the coating holds",
+      finding: "no failures at 90 days",
+    });
+    await write.conclude({
+      analysis,
+      proposition: "the primer holds",
+      finding: "no failures at 60 days",
+      standing: "confirmatory",
+    });
+
+    const [first, second] = await log.select({ operation: "conclude" });
+    expect(first!.detail).toMatchObject({ standing: "exploratory" });
+    expect(second!.detail).toMatchObject({ standing: "confirmatory" });
+
+    await write.promote({
+      claim: exploratory.claims[0]!.claim,
+      because: "the prespecified check passed",
+    });
+    const [promoted] = await log.select({ operation: "promote" });
+    expect(promoted!.detail).toMatchObject({ from: "exploratory", to: "confirmatory" });
+  });
+
   test("recordAnalysis reports every edge, not only its nodes", async () => {
     const { ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);

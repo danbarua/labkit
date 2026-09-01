@@ -4,7 +4,7 @@ export type { ResearchSessionOptions } from "./session";
 // never constructs a WriteSurface cannot write -- worth more than a comment
 // saying it must not. See docs/session-log for the split's measurements.
 export { ReadSurface, type ResearchReads } from "./read";
-export { WriteSurface, type ResearchWrites } from "./write";
+export { WriteSurface, type ResearchWrites, type Operation } from "./write";
 export { SessionCore } from "./core";
 export { systemClock, inMemoryEventLog, domainEvent, UNATTRIBUTED } from "./events";
 export type {
@@ -18,7 +18,6 @@ export type {
   // Re-exported from `src/db/domain` through `./events`, so a consumer of the
   // domain barrel can name an edge without importing the persistence layer.
   MintedEdge,
-  Operation,
 } from "./events";
 export type {
   Ref,

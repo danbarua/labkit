@@ -178,41 +178,6 @@ export const UNATTRIBUTED: AttributionContext = {
 };
 
 /**
- * The verb an event records — one name per public write verb, and the same name.
- *
- * **Not a hand-kept copy of the verb list.** Checked when this was written: the
- * eighteen `emit` operations and the eighteen public verbs on `WriteSurface` are
- * the same eighteen strings, because CLAUDE.md requires it — *"a verb that
- * composes others records **one** event, not one per step"*, and that one event
- * is named for the act the researcher took. `openEnquiry` is `pose` + `pursue`
- * and emits only `openEnquiry`.
- *
- * Written as a union rather than `string` so a typo is a compile error.
- * `this.emit("recordAnalyis", …)` used to compile and would have written an
- * event nobody could ever filter for.
- */
-export type Operation =
-  | "pose"
-  | "pursue"
-  | "openEnquiry"
-  | "sharpen"
-  | "recordObservations"
-  | "recordAnalysis"
-  | "conclude"
-  | "recordReview"
-  | "closeEnquiry"
-  | "planWork"
-  | "stateCriterion"
-  | "declareGate"
-  | "evaluateCriterion"
-  | "reverify"
-  | "acceptAsUnresolved"
-  | "promote"
-  | "amendDesign"
-  | "replaceAnalysis"
-  | "reinterpret";
-
-/**
  * One recorded domain operation. `subject` is the natural id of whatever the
  * operation was primarily about; `detail` carries the operation-specific
  * payload a later query would need to reconstruct what happened.
@@ -253,7 +218,16 @@ export interface DomainEvent {
    * that and nothing else — see the column comment in `src/db/schema.ts`.
    */
   attribution: RecordedAttribution;
-  operation: Operation;
+  /**
+   * The verb this event records.
+   *
+   * **A string, because that is what the record holds** — it comes back out of
+   * Postgres as one, and nothing on the read side narrows on it. The set of
+   * valid names is `Operation` in `./write.ts`, derived from the surface, and
+   * it does its work at the point of emission where a typo would otherwise
+   * write an event nobody can filter for.
+   */
+  operation: string;
   subject: string;
   /**
    * Every handle this act minted. Always an array, empty if the act minted

@@ -30,7 +30,7 @@ import { and, arrayContains, asc, eq, gt, or } from "drizzle-orm";
 import type { LabKitDB } from "../db/backend";
 import { ormOver, unwrapped } from "../db/orm";
 import { labkitEvents } from "../db/schema";
-import type { RecordedAttribution, DomainEvent, EventFilter, EventSink, Operation } from "./events";
+import type { RecordedAttribution, DomainEvent, EventFilter, EventSink } from "./events";
 
 /** The row shape, as drizzle hands it back — derived from the table, not restated. */
 type EventRow = typeof labkitEvents.$inferSelect;
@@ -55,10 +55,7 @@ const toEvent = (r: EventRow): DomainEvent => {
     seq: r.seq,
     at: r.at,
     attribution,
-    // `text` in the schema, an `Operation` in the domain. The narrowing is
-    // here because this is where a stored string re-enters the type system;
-    // nothing else in the round trip can check it.
-    operation: r.operation as Operation,
+    operation: r.operation,
     subject: r.subject,
     created: r.created,
     // `null` only ever meant "written before this column existed" (2026-08-28),
