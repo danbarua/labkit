@@ -197,29 +197,25 @@ function releaseLock(lockPath: string): void {
  * An embedded, single-writer PGlite file, held for exactly as long as the work
  * takes: lock, open, work, close.
  *
- * **This replaced a leader election.** The first process to win the lockfile
- * used to open PGlite, start a `PGLiteSocketServer`, and then connect *to
- * itself* over loopback TCP so that everyone -- including the owner -- talked
- * to it as a plain `pg.Client`. It was coherent, and it bought nothing the use
- * case needs. Multiple agents against one project cannot each hold a connection
- * under it either: the first one in owns the file and the rest connect through
- * it only while it lives, so releasing between units of work was already
- * forced rather than chosen. And the process that most often wants the file is
- * not another agent at all — it is a person running `labkit` in a terminal
- * while an agent session is open. What the socket added on top of that was a second
- * failure mode -- when the primary died, a secondary's next query raised an
- * uncaught `'error'` event from `pg` and killed the process before any `catch`
- * ran.
+ * **Not a leader election.** Winning the lockfile and then serving the file
+ * over loopback TCP buys nothing the use case needs: multiple agents cannot
+ * each hold a connection under it either, since the first one in owns the file
+ * and the rest connect through it only while it lives — so releasing between
+ * units of work is forced rather than chosen. And the process that most often
+ * wants the file is a person running `labkit` in a terminal while an agent
+ * session is open, not another agent. What a socket adds is a second failure
+ * mode: when the primary dies, a secondary's next query raises an uncaught
+ * `'error'` event from `pg` and kills the process before any `catch` runs.
  *
  * The whole cycle is 80-96ms warm (measured 2026-08-26; see {@link acquireLock}
- * for the breakdown), against which a CLI invocation used to pay a speculative
- * TCP connect, possibly a lockfile race, possibly a 25ms poll, and then talk
- * over loopback anyway.
+ * for the breakdown), against which the alternative pays a speculative TCP
+ * connect, possibly a lockfile race, possibly a 25ms poll, and then talks over
+ * loopback anyway.
  *
- * **Migrations run on every open**, which is a change and a cheap one: the
- * no-op case is 2ms, and the alternative is a version gate of the kind PJ-005
- * reverted. There is no concurrent-writer race to reason about because the lock
- * is held across it.
+ * **Migrations run on every open**, and it is cheap: the no-op case is 2ms, and
+ * the alternative is a stored version gate that stops repairing drift the
+ * moment the number agrees. There is no concurrent-writer race to reason about,
+ * because the lock is held across it.
  */
 export function pgliteBackend(opts: {
   dataDir: string;

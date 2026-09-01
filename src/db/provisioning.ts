@@ -26,8 +26,8 @@ import { APP_ROLE } from "./schema";
  * current code, but that meant `resolveTenantContext()` — the actual
  * production path — would stop self-healing the moment the version
  * matched, even though the whole point of moving to per-resource
- * reconciliation (PJ-005) was to make drift repairable through normal
- * tenant resolution. Removed rather than kept as an unmeasured
+ * reconciliation is to make drift repairable through normal tenant
+ * resolution. Removed rather than kept as an unmeasured
  * optimization: each `ensure*` call is already a cheap existence check,
  * there's no evidence the full pass is a material cost, and the version
  * field created real correctness questions of its own (what happens when
@@ -60,11 +60,10 @@ export async function provisionTenantGraph(
 /**
  * Drops a tenant's graph and everything in it.
  *
- * **No production caller, and as of 2026-08-22 no test-teardown caller either.**
- * `tests/helpers/db.ts` used to call it between every test; it now truncates the
- * label tables instead, because dropping destroyed thirty-eight labels and
- * thirty-eight indexes that the next `resolveTenantContext()` had to rebuild —
- * about half the suite's wall time, measured.
+ * **No caller in production or in test teardown.** `tests/helpers/db.ts`
+ * truncates the label tables instead: dropping destroys every label and index,
+ * which the next `resolveTenantContext()` then rebuilds — about half the
+ * suite's wall time, measured.
  *
  * Kept rather than deleted, and given its own test rather than left dark. It is
  * the only way to remove a tenant, which is a real operation a deploy will need;
@@ -115,17 +114,15 @@ class TenantGraphProvisioner {
    * which is every call after the first, for the life of a tenant — that is
    * three round trips instead of about eighty.
    *
-   * Measured before it was changed, as PJ-005 asked: query tracing
-   * (`LABKIT_TRACE=all`, see src/db/trace.ts) over a single scenario file
-   * counted **2,448 queries, of which 1,086 — 44% — were this bookkeeping**,
-   * repeated across fourteen reconciliations that each found nothing to do.
-   * It is also the cost behind the suite's intermittent 5-second timeouts: a
-   * test doing 311 sequential queries is mostly doing these.
+   * Measured before it was changed: query tracing (`LABKIT_TRACE=all`, see
+   * src/db/trace.ts) over a single scenario file counted **2,448 queries, of
+   * which 1,086 — 44% — were this bookkeeping**, repeated across fourteen
+   * reconciliations that each found nothing to do.
    *
-   * **This is not the `schema_version` gate PJ-005 reverted, and the
-   * difference is the whole point.** That gate skipped reconciliation when a
-   * stored version matched, so drift stopped being repaired the moment the
-   * number agreed. This reads the *actual* catalog every single time and
+   * **This is not a `schema_version` gate, and the difference is the whole
+   * point.** Such a gate skips reconciliation when a stored version matches, so
+   * drift stops being repaired the moment the number agrees. This reads the
+   * *actual* catalog every single time and
    * reconciles against what is really there — it just asks in one question
    * rather than seventy-eight. Self-healing is preserved exactly; nothing is
    * remembered between calls.
@@ -178,8 +175,8 @@ class TenantGraphProvisioner {
    */
   private async ensureGrants(): Promise<void> {
     // Validated before interpolation even though `graph_name` is a generated
-    // column the server derives from a trusted id (PJ-003 §5) — an identifier
-    // cannot be a bind parameter, so the check is the only thing standing where
+    // column the server derives from a trusted id — an identifier cannot be a
+    // bind parameter, so the check is the only thing standing where
     // a parameter would be. The rest of this file interpolates the same value
     // unvalidated; this is the one that grants privileges.
     validateGraphName(this.graphName);
@@ -257,8 +254,8 @@ class TenantGraphProvisioner {
    *
    * **Not unique.** The natural-id index above is; this one must not be. Two
    * claims asserting the same sentence in different lines of enquiry are two
-   * claims (S-5), and a unique index on `Claim.name` would turn that from
-   * something the domain models into a `23505`.
+   * claims, and a unique index on `Claim.name` would turn that from something
+   * the domain models into a `23505`.
    *
    * Before this existed, every `MATCH (c:Claim {name: $name})` — twelve sites —
    * was a sequential scan over the label's table.

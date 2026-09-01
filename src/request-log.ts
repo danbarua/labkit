@@ -104,7 +104,7 @@ export function truncated(value: unknown, depth = 0, seen = new WeakSet<object>(
  * **Named `adapter` because it was `surface`, and `surface` is taken.**
  * `ReadSurface` and `WriteSurface` are the read and write halves of the domain,
  * 78 references' worth, so `surface: "mcp"` was a field whose value came from a
- * different axis than its name. CLAUDE.md's architecture section already calls
+ * different axis than its name. The architecture section already calls
  * these *"two adapters over one domain"*, so this is the repository's own word
  * rather than a borrowed one.
  *

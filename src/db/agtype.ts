@@ -363,11 +363,8 @@ export function parseAgtype<T = Record<string, AgtypeJSON>>(raw: string): Agtype
 // LabKit: property KEYS, not just graph/label names — LabKit's primary use
 // case is a per-project MCP server where an external agent supplies props.
 //
-// The two things this paragraph used to name are gone: `propPattern` in
-// graph.ts, and `createNode<T extends Record<string, unknown>>()` accepting
-// arbitrary keys at runtime. `createNode` is `<L extends NodeLabel>(label: L,
-// props: NodePropsByLabel[L])` now, and the key validation happens in
-// `buildPropertyClause()` below.
+// `createNode` is `<L extends NodeLabel>(label: L, props: NodePropsByLabel[L])`,
+// and the key validation happens in `buildPropertyClause()` below.
 // ---------------------------------------------------------------------------
 
 /** AGE graph names: dots/hyphens allowed in the middle, not at the ends. */
@@ -404,9 +401,8 @@ export function validateIdentifier(name: string, context: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Cypher clause construction — typed replacements for the raw-string property
-// patterns and hand-written AS clauses that used to interpolate unvalidated
-// strings into query text. Those are gone; this is what replaced them.
+// Cypher clause construction — typed, so no raw-string property pattern or
+// hand-written AS clause interpolates an unvalidated string into query text.
 // ---------------------------------------------------------------------------
 
 interface CypherColumn {
@@ -426,8 +422,9 @@ export function buildAsClause(columns: CypherColumn[]): string {
       // to `basisout`, while AGE keys the returned row by the name the Cypher
       // RETURN used. The column comes back present and NULL for every row --
       // no error, no warning, and a decoder reads it as "nothing matched".
-      // That cost a wrong diagnosis once (S-3c); a name that cannot be written
-      // costs nothing. Labels and property keys are unaffected: they are
+      // A name that cannot be written costs nothing, where the silent NULL
+      // costs a debugging session. Labels and property keys are unaffected:
+      // they are
       // quoted, and `Criterion` / `natural_id` stay exactly as they are.
       if (col.name !== col.name.toLowerCase()) {
         throw new Error(
@@ -448,7 +445,7 @@ export function buildAsClause(columns: CypherColumn[]): string {
  * **`createNode()` uses this; `createEdge()` deliberately does not**, and says
  * why at its call site: it binds its parameters under a `p_` prefix, because an
  * edge property called `from` would otherwise rebind the source node's natural
- * id. This docstring used to name both as callers.
+ * id.
  */
 export function buildPropertyClause(props: Record<string, unknown>): string {
   return Object.keys(props)

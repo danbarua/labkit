@@ -27,17 +27,16 @@ import { bullets } from "./format";
  * a boolean would report both as "not passed". And `everFailed` prints beside
  * the state rather than being implied by it: a gate that failed and was
  * re-checked is satisfied *now* and has failed, which is why the field
- * survives a later pass at all (S-3c).
+ * survives a later pass at all.
  *
  * Withdrawn evaluations are listed rather than dropped, marked as withdrawn.
  * A check that was decided and then withdrawn is not a check nobody ran.
  *
- * An evaluation's `basis` (S-8) is the same shape of omission (#151): empty
- * means the verdict was asserted, not measured, and the type has carried that
- * since S-8 with no view printing it — `labkit gate` read an asserted verdict
- * and a four-times-cited one identically. Prints `asserted` for the former,
- * what it rests on for the latter, the same way `enquiry` prints "The
- * question's answer rests on".
+ * An evaluation's `basis` is the same shape of omission: empty means the
+ * verdict was asserted rather than measured, and a view that does not print it
+ * reads an asserted verdict and a four-times-cited one identically. Prints
+ * `asserted` for the former and what it rests on for the latter, the same way
+ * `enquiry` prints "The question's answer rests on".
  */
 export function renderGate(status: GateStatus, p: Palette): string {
   // The four states are the whole point of this page, so each gets its own
@@ -118,16 +117,13 @@ export function renderCriteria(criteria: CriterionRef[], gate: GateRef, p: Palet
 /**
  * How a gate's conditions reached their current wording.
  *
- * `nature` prints on every amendment, first. `mechanical` and `scientific` are
- * what S-7 built `IMPLEMENTS` to tell apart — an amendment that moves a
- * prespecified comparison is not a tidy-up — and it is the field a reader
- * skims for.
+ * `nature` prints on every amendment, first: an amendment that moves a
+ * prespecified comparison is not a tidy-up, and it is the field a reader skims
+ * for.
  */
 export function renderDesign(history: DesignHistory, p: Palette): string {
   const amendment = (a: AmendmentRecord): string =>
     [
-      // `mechanical` versus `scientific` is what S-7 built IMPLEMENTS to tell
-      // apart, and the field a reader skims for.
       `${a.nature === "scientific" ? p.contested(a.nature) : p.provisional(a.nature)}  ${p.handle(`(${a.amendment})`)}`,
       `  was: ${a.replaced.requires}`,
       `  now: ${a.nowRequires.requires}`,

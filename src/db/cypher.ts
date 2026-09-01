@@ -3,16 +3,16 @@
  *
  * The seam this closes: AGE returns every column as agtype *text*, and
  * `cypher()` needs its result columns declared at the SQL level because it
- * can't infer them. Callers used to carry both halves by hand — a literal
- * `"(e agtype, comp agtype)"` string that had to match the RETURN arity, and
- * a `parseAgtype()` + kind-narrowing dance at each call site. Here a column
- * is declared once, as a decoder, and both halves fall out of it.
+ * cannot infer them. Carried by hand that is two halves per call site — a
+ * literal `"(e agtype, comp agtype)"` matching the RETURN arity, and a
+ * `parseAgtype()` plus kind-narrowing dance. Here a column is declared once, as
+ * a decoder, and both halves fall out of it.
  *
  * Decoding happens here, at the query boundary — deliberately not via `pg`'s
  * `types.setTypeParser()` global registry, which is what the Apache AGE
  * driver's `setAGETypes()` does. That registry is process-global and invisible
  * to any code path holding a raw PGlite instance, so it takes effect in
- * production and not in tests; see PJ-006 §5 for the incident that reverted it.
+ * production and not in tests.
  */
 
 import {

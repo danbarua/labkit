@@ -42,8 +42,7 @@
  * back to superuser, because it never was one.
  *
  * So the ingredients are a preloading server and a `bootstrapSession` that
- * does not issue `LOAD` — not the `session_preload_libraries` per-role setting
- * this comment used to name. **Not built, and the reason is that it is
+ * does not issue `LOAD`. **Not built, and the reason is that it is
  * per-backend**: PGlite has no preload and exactly one superuser session, so it
  * keeps the step-down. Deciding what the seam looks like when one backend can
  * offer a boundary the other cannot is the work, not the SQL.

@@ -48,9 +48,8 @@ export const LABKIT_SCHEMA = "public";
  */
 export const tenants = p.pgTable("tenants", {
   id: p.serial().primaryKey(),
-  // User-facing short name (e.g. "labkit"). NEVER used to derive
-  // graph_name directly — a user-controlled string must not become an AGE
-  // graph identifier (PJ-003 §5).
+  // User-facing short name (e.g. "labkit"). NEVER derives `graph_name`
+  // directly: a user-controlled string must not become an AGE graph identifier.
   slug: p.text().notNull().unique(),
   display_name: p.text().notNull(),
   // Single source of truth: derived from the trusted internal `id`, not a
@@ -71,8 +70,8 @@ export type Tenant = typeof tenants.$inferSelect;
  * and stops nothing at all from a caller who means harm. Say that plainly
  * rather than let a reader infer more from the word "policy" than is there.
  *
- * **It has to be `SET ROLE` and cannot be a login role**, and that was measured
- * rather than chosen (2026-08-26). `LOAD 'age'` is refused to a non-superuser —
+ * **It has to be `SET ROLE` and cannot be a login role**, measured rather than
+ * chosen: `LOAD 'age'` is refused to a non-superuser —
  * `access to library "age" is not allowed`, SQLSTATE 42501 — and without the
  * library loaded the `agtype` type does not resolve, so *every Cypher query
  * fails*, reads included. Connecting as a superuser and stepping down after
@@ -122,9 +121,9 @@ export const labkitApp = p.pgRole(APP_ROLE).existing();
  * first that is per-tenant data rather than the tenancy boundary itself.
  *
  * `src/domain/events.ts` explains what an event is and why the seam exists.
- * What this table adds is durability, and the consumer that earned it:
- * attribution has ridden on every event since PJ-031 and nothing could read it,
- * because the sink died with the process.
+ * What this table adds is durability, and the consumer that earns it:
+ * attribution rides on every event, and an in-memory sink dies with the process
+ * before anything can read it.
  *
  * **`tenant_id` is here because `tenants` is shared.** A tenant's *graph* is its
  * own Postgres schema, so nothing in the graph needs to say which tenant it

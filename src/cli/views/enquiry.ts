@@ -14,7 +14,7 @@ import { bullets } from "./format";
  *
  * `accepted-as-unresolved` deliberately carries `open: true` — it *is* still
  * open, on purpose — so rendering the boolean alone reported the one closure
- * the domain built S-14 for as though nobody had got round to it. The
+ * a deliberately-parked question as though nobody had got round to it. The
  * rationale and the reopening condition are what distinguish deciding to stop
  * from not having started, and they now print.
  *
@@ -34,7 +34,7 @@ export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
         : p.settled(`closed — ${q.closure}`);
   return [
     // The enquiry first, because that is what was asked about. The question's
-    // state is printed as the question's, not as this pursuit's -- PJ-030 §6:
+    // state is printed as the question's, not as this pursuit's:
     // flattened, every pursuit of an answered question read as answered itself.
     `${p.heading(status.pursuing)}  ${p.handle(`(${status.enquiry})`)}`,
     status.contributed.length
@@ -86,7 +86,7 @@ export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef, p
  * common case as an absence would read as a gap in the record.
  *
  * `knownAtTheTime` was frozen when the sharpening was recorded, not recomputed
- * now — that is the whole of S-1, and the line says so, because a reader who
+ * now, and the line says so, because a reader who
  * assumes it is current will read later evidence into an earlier decision.
  */
 export function renderOrigin(

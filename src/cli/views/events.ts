@@ -13,7 +13,7 @@ import type { Palette } from "../palette";
  *
  * **The only renderer here reading the event log rather than the graph**, and
  * the attribution is why it exists: who ran a command is not reconstructable
- * from the record at all (PJ-031), so this line is the only place it can be
+ * from the record at all, so this line is the only place it can be
  * read back. `seq` prints first because it is both the order and the cursor —
  * a reader paging through hands the last one back as `--since`.
  */
@@ -30,7 +30,7 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
       const who = e.attribution.attribution_label || "unattributed";
       // **How the name was come by, printed beside it.** `labkit happened` is
       // the command the grade exists for: it is where `--author dan` and a bare
-      // `labkit` on dan's machine used to be indistinguishable. `observed` is
+      // an OS-supplied name are otherwise indistinguishable. `observed` is
       // left silent because it is the ordinary case and a mark on every line
       // marks nothing; what a reader needs to see is the line that was merely
       // asserted. `null` is a row written before the grade existed and says so

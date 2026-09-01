@@ -5,7 +5,7 @@
  * and not an unfinished edge, and it was right for as long as nothing needed to
  * read the stream: every historical question the scenarios ask is answered from
  * the graph, asserted with a provably empty log. What changed is attribution
- * (PJ-031) — every event carries who ran the command and against which commit,
+ * — every event carries who ran the command and against which commit,
  * and until now that reached the end of the process and stopped.
  *
  * **The rule this does not break.** *Events explain how state changed; the graph
@@ -18,12 +18,10 @@
  * and because `src/db` may not import `src/domain` — dependency-cruiser enforces
  * that direction. Taking a `LabKitDB` is the allowed way round.
  *
- * **It used to build its `WHERE` clause by hand**, with an array of fragments
- * and a `bind()` closure doing `$${params.push(value)}` — the only place in the
- * codebase that assembled SQL rather than Cypher, on a table whose filters come
- * from an MCP caller. The graph side has had a typed surface since
- * `CypherRunner`; this is the relational half finally getting one. See
- * `src/db/orm.ts`.
+ * **The `WHERE` clause is built by the ORM, not by hand.** Assembling SQL from
+ * fragments is what this file would otherwise be doing on a table whose filters
+ * come from an MCP caller — the graph side has `CypherRunner`, and this is the
+ * relational half of the same seam. See `src/db/orm.ts`.
  */
 
 import { and, arrayContains, asc, eq, gt, or } from "drizzle-orm";
@@ -47,11 +45,9 @@ const toEvent = (r: EventRow): DomainEvent => {
   };
   return {
     // `seq` is a `bigserial`, which `pg` hands back as a **string** and a raw
-    // PGlite as a **number** (measured 2026-08-26). This used to be
-    // `Number(r.seq)`, narrowing at the seam so no caller had to know. It is
-    // gone because the column is declared `mode: "number"` and drizzle applies
-    // that mapper on both backends -- which is one of the things moving to the
-    // ORM buys, rather than an incidental tidy-up.
+    // PGlite as a **number** (measured 2026-08-26). No narrowing is needed
+    // here: the column is declared `mode: "number"` and drizzle applies that
+    // mapper on both backends.
     seq: r.seq,
     at: r.at,
     attribution,
