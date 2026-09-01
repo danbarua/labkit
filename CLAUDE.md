@@ -851,6 +851,25 @@ session id is worth taking on the caller's word because it is checkable in
 principle against a bus that knows its sessions, and a commit is not checkable
 against anything. Asking for one would buy a value nothing could contradict.
 
+#### Three tenses
+
+**`labkit --help` is the command list**, as this file says above; what a
+reader needs before the list is the shape, and the shape is three verbs in
+three tenses. **`now`** — what stands: what am I blocked on, what are my
+priorities, the five knowledge buckets with each answer's polarity; `now
+--since <seq>` is what *moved* since the cursor, derived from the acts since
+and the handles they touched, never from a snapshot (a historical `now` is
+refused on purpose — nothing freezes attention). **`why <handle>`** — the
+causes behind one thing, dispatched on the handle's kind: a gate is blocked
+*because* these checks failed on these dates; a task exists *to advance* this
+enquiry, pursuing this question. **`is <handle> … --because`** — assert a new
+present; the six revision verbs (`replace`, `reverify`, `reinterpret`,
+`amend`, `promote`, `sharpen`) are one act, *same thing, understood
+differently now*, and collapse into it — still to come, #184. Around them:
+`search` turns wording into handles, and `conclude` records one conclusion
+per call (#173). Dan, 2026-09-01: *"`labkit now`, `labkit why`, `labkit is
+--because`. That's intuitive."*
+
 #### The vocabulary is the user's
 
 **`labkit why <handle>` is one verb whatever the handle names** — a claim, a
