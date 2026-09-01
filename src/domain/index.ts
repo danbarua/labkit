@@ -3,8 +3,8 @@ export type { ResearchSessionOptions } from "./session";
 // The two halves, exported so a caller can take one. A read-only adapter that
 // never constructs a WriteSurface cannot write -- worth more than a comment
 // saying it must not. See docs/session-log for the split's measurements.
-export { ReadSurface, RESEARCH_READ_VERBS, type ResearchReads } from "./read";
-export { WriteSurface, RESEARCH_WRITE_VERBS, type ResearchWrites } from "./write";
+export { ReadSurface, type ResearchReads } from "./read";
+export { WriteSurface, type ResearchWrites } from "./write";
 export { SessionCore } from "./core";
 export { systemClock, inMemoryEventLog, domainEvent, UNATTRIBUTED } from "./events";
 export type {

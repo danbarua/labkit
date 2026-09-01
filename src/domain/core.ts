@@ -73,6 +73,22 @@ export interface ResearchSessionOptions extends Partial<CommandContext> {
   events?: EventSink;
 }
 
+/**
+ * The callable, public method names of a class.
+ *
+ * `keyof` on a class type already excludes `private`/`protected` members —
+ * TypeScript drops them from the type's key set, not merely from what an
+ * outside caller may write — so this needs only the function-type filter:
+ * `SessionCore`'s one public member, `events`, is a property rather than a
+ * method and is excluded by that filter, not by anything about visibility.
+ * `ResearchWrites`/`ResearchReads` (`./write`, `./read`) both key off this
+ * rather than a hand-written list, so a verb neither surface has excluded by
+ * name is in the Pick automatically.
+ */
+export type Methods<T> = {
+  [K in keyof T]-?: T[K] extends (...args: never[]) => unknown ? K : never;
+}[keyof T];
+
 export class SessionCore {
   protected readonly clock: Clock;
   /**
