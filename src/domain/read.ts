@@ -2003,8 +2003,9 @@ export class ReadSurface extends SessionCore {
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
     bearing: "SUPPORTS" | "CHALLENGES",
   ): Promise<{ a: ArtefactProps & Identified; e: Identified }[]> {
-    return this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+    return this.graph
+      .query(
+        `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
        MATCH (u)-[:USES]->(comp:Computation)
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
@@ -2021,16 +2022,17 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
        RETURN a, e, narrowed, replaced`,
-      {
-        // `natural_id` because `restingOn` deduplicates by identity, not by
-        // name — see S-9d.
-        a: vertexProps<ArtefactProps & { natural_id: string }>(),
-        e: vertexProps<{ natural_id: string }>(),
-        narrowed: optional(vertexProps<{ natural_id: string }>()),
-        replaced: optional(vertexProps<{ natural_id: string }>()),
-      },
-      { name: scope.proposition, ...this.scopeParams(scope) },
-    ).then((rows) => rows.filter((r) => !r.narrowed && !r.replaced));
+        {
+          // `natural_id` because `restingOn` deduplicates by identity, not by
+          // name — see S-9d.
+          a: vertexProps<ArtefactProps & { natural_id: string }>(),
+          e: vertexProps<{ natural_id: string }>(),
+          narrowed: optional(vertexProps<{ natural_id: string }>()),
+          replaced: optional(vertexProps<{ natural_id: string }>()),
+        },
+        { name: scope.proposition, ...this.scopeParams(scope) },
+      )
+      .then((rows) => rows.filter((r) => !r.narrowed && !r.replaced));
   }
 
   /**
