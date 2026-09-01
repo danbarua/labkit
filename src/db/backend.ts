@@ -81,6 +81,16 @@ export interface LabKitDBConnection {
    * `./transactor.ts`.
    */
   tx: Transactor;
+  /**
+   * The raw PGlite instance behind this connection, when there is one.
+   *
+   * Absent over `directPostgresBackend` — Postgres has no equivalent of
+   * `dumpDataDir()`, and `pg_dump` already covers that backend. Present so a
+   * caller needing PGlite-only capability reaches it *through* the lock this
+   * connection already holds, rather than opening the same data directory a
+   * second, unlocked way.
+   */
+  pglite?: PGlite;
   close(): Promise<void>;
 }
 
@@ -238,6 +248,7 @@ export function pgliteBackend(opts: {
         return {
           db,
           tx: transactor(db),
+          pglite,
           close: async () => {
             await pglite.close();
             releaseLock(lockPath);

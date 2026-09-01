@@ -427,6 +427,8 @@ bun install                    # install dependencies
 bun test                       # run all tests (embedded PGlite)
 bun run test:pg                # the same suite against a real Postgres + AGE container (docker/postgres)
 bun run test:in-docker         # what Cloud Build runs, in the CI image, on a worker-sized machine
+bun run test:migration-safety --snapshot <path>  # restore a snapshot, migrate forward, assert counts unchanged
+bun run snapshot:record --db <dir> --name <slug>  # dump a real record's PGlite data dir to a dated gzip tarball
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 bunx depcruise src tests --output-type err   # layering rules (errors) + cycles
