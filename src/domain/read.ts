@@ -39,6 +39,8 @@ import type {
   AnalysisRef,
   CheckStatus,
   EnquiryStatus,
+  EnquiryInContext,
+  QuestionBucket,
   CriterionRef,
   BlockedWork,
   ListedGate,
@@ -65,8 +67,15 @@ import type {
   DependencyReport,
   IdentifiedArtefact,
   SupportExplanation,
+  Kind,
+  AnyRef,
+  Cause,
+  Explanation,
+  ClaimExplanation,
+  WorkExplanation,
+  EnquiryExplanation,
 } from "./report";
-import { ref, isRefOfKind, KIND_BY_LABEL } from "./report";
+import { ref, isRefOfKind, KIND_BY_LABEL, kindOf } from "./report";
 import { compose, per, type Row } from "./facts";
 import {
   BEARINGS,
@@ -585,6 +594,46 @@ export class ReadSurface extends SessionCore {
           : "exploratory",
       },
     };
+  }
+
+  /**
+   * `enquiryStatus`, alongside where this enquiry's own question currently
+   * sits in the overall survey (#128, narrowed on review -- see
+   * `EnquiryInContext`'s own doc comment for why it is one bucket, not the
+   * whole survey).
+   *
+   * **No adapter reaches this directly since the redesign** (#128 round 2):
+   * the `enquiry --in-context` flag and `enquiry_in_context` tool it served
+   * are gone, folded into `why <enquiry>`'s `LineOfEnquiry` case
+   * (`explainEnquiry`, below `ReadSurface`) — see `NOT_EXPOSED`. Kept public
+   * rather than made `private`: `explainEnquiry` is a module-level function,
+   * not a class member, for the reason given on `Explainer`.
+   */
+  async enquiryInContext(enquiry: EnquiryRef): Promise<EnquiryInContext> {
+    const status = await this.enquiryStatus(enquiry);
+    if (!status.question) return { enquiry: status, standing: null };
+
+    const survey = await this.whatIsKnown();
+    const buckets: [QuestionBucket, QuestionStanding[]][] = [
+      ["established", survey.established],
+      ["unresolved", survey.unresolved],
+      ["untested", survey.untested],
+      ["provisional", survey.provisional],
+      ["accepted", survey.accepted],
+    ];
+    // Every question that exists lands in exactly one bucket, by construction
+    // of the partition `whatIsKnown()` computes -- but this reads that back
+    // from what the survey actually returned rather than assuming it, the
+    // same discipline `contractFor()`'s `q`/`loe` pairing follows.
+    let standing: EnquiryInContext["standing"] = null;
+    for (const [bucket, questions] of buckets) {
+      const found = questions.find((q) => q.question === status.question!.question);
+      if (found) {
+        standing = { question: found.question, asks: found.asks, bucket };
+        break;
+      }
+    }
+    return { enquiry: status, standing };
   }
 
   /**
@@ -2164,7 +2213,227 @@ export class ReadSurface extends SessionCore {
 
     return state ? listed.filter((w) => w.state === state) : listed;
   }
+
+  /**
+   * `why <handle>` — dispatches on the handle's own kind, over the report that
+   * already exists for it, and renders it as `{subject, is, because}` (#128,
+   * redesigned on review). Also takes a proposition, exactly as this verb did
+   * before the redesign: text resolves through `claimsAsserting` and refuses
+   * an ambiguous match rather than picking (S-5).
+   *
+   * **The dispatch table lives at module scope, not as a switch here.** `Kind`
+   * is closed (see `LABEL_BY_KIND`), so `EXPLAINERS satisfies
+   * Record<Kind, …>` makes a kind nobody explains a compile error rather than
+   * a runtime branch — the whole reason #128's rework asked for a table
+   * instead of the flag-per-composite-read shape this verb shipped with
+   * first.
+   */
+  async why(subject: AnyRef | IndexedString): Promise<Explanation> {
+    const kind = kindOf(subject);
+    if (kind) return EXPLAINERS[kind](this, subject);
+
+    const found = await this.claimsAsserting(subject);
+    if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);
+    if (found.length > 1)
+      throw new Error(
+        `"${subject}" is claimed ${found.length} times; name one: ${found
+          .map((c) => c.claim)
+          .join(", ")}`,
+      );
+    return EXPLAINERS.claim(this, found[0]!.claim);
+  }
 }
+
+/**
+ * One record's `why`, over the report that already exists for its kind — the
+ * table `ReadSurface.why` dispatches through.
+ *
+ * **Module-level functions, not private methods.** `check:no-stringly-typed`
+ * scans class members only (its own doc comment says so), so a class method
+ * taking `subject: string` before it is known which kind's `Ref` that string
+ * names would need an allowlist entry there; a free function does not. It also
+ * keeps the table itself a plain value — `satisfies Record<Kind, Explainer>`
+ * checks totality once, here, rather than at every call site.
+ */
+type Explainer = (self: ReadSurface, subject: string) => Promise<Explanation>;
+
+/** The `Claim` case: `whySupported`, plus the derived `{is, because}` envelope. */
+async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimExplanation> {
+  const report = await self.whySupported(ref("claim", subject));
+  // Exhaustive over the same three-way split `renderWhy` prints, in the same
+  // priority order (supported first, since `supported` and `withdrawn`/
+  // `challenged` are not mutually exclusive fields on the type -- S-12, S-3b).
+  const state: "supported" | "withdrawn" | "challenged" | "unsupported" = report.supported
+    ? "supported"
+    : report.withdrawn
+      ? "withdrawn"
+      : report.challenged
+        ? "challenged"
+        : "unsupported";
+  let is: string;
+  let because: Cause[];
+  switch (state) {
+    case "supported":
+      is = "supported";
+      because = report.support.map((s) => ({ handle: s.evidence, wording: s.finding }));
+      break;
+    case "withdrawn":
+      is = "withdrawn";
+      because = report.replacedBy
+        ? [{ handle: report.replacedBy.claim, wording: report.replacedBy.asserts }]
+        : [];
+      break;
+    case "challenged":
+      is = "challenged";
+      because = report.against.map((a) => ({ handle: a.evidence, wording: a.finding }));
+      break;
+    case "unsupported":
+      is = "unsupported — nothing has examined it";
+      because = [];
+      break;
+    default: {
+      const check: never = state;
+      throw new Error(`unreached claim state: ${check}`);
+    }
+  }
+  return { kind: "claim", subject: report.claim, is, because, report };
+}
+
+/** The `Work` case: `contractFor`'s `addressing`, with an honest sentence when there is none (#98). */
+async function explainWork(self: ReadSurface, subject: string): Promise<WorkExplanation> {
+  const work = ref("work", subject);
+  const report = await self.contractFor(work);
+  if (!report.addressing) {
+    return {
+      kind: "work",
+      subject: work,
+      is: "planned with no question named -- plan --enquiry records one",
+      because: [],
+      report,
+    };
+  }
+  const a = report.addressing;
+  return {
+    kind: "work",
+    subject: work,
+    is: "planned to advance",
+    because: [
+      { handle: a.enquiry, wording: a.pursuing },
+      { handle: a.question, wording: a.asks },
+    ],
+    report,
+  };
+}
+
+/** The `LineOfEnquiry` case: `enquiryInContext` -- what `--in-context` computed, before the redesign folded it in here. */
+async function explainEnquiry(self: ReadSurface, subject: string): Promise<EnquiryExplanation> {
+  const enquiry = ref("enquiry", subject);
+  const report = await self.enquiryInContext(enquiry);
+  const q = report.enquiry.question;
+  // Exhaustive over `QuestionClosure.closure`'s four values (three literals
+  // plus `null`), the same union `renderEnquiry` branches on.
+  let is: string;
+  if (!q) {
+    is = "pursuing nothing on the record";
+  } else {
+    switch (q.closure) {
+      case "answered":
+        is = `closed — answered${q.answer ? ` ${q.answer}` : ""}`;
+        break;
+      case "abandoned":
+        is = "closed — abandoned";
+        break;
+      case "accepted-as-unresolved":
+        is = "open — accepted as unresolved, deliberately";
+        break;
+      case null:
+        is = "open";
+        break;
+      default: {
+        const check: never = q.closure;
+        throw new Error(`unreached enquiry closure: ${check}`);
+      }
+    }
+  }
+  const because: Cause[] = report.standing
+    ? [
+        {
+          handle: report.standing.question,
+          wording: `${report.standing.asks} — currently ${report.standing.bucket}`,
+        },
+      ]
+    : [];
+  return { kind: "enquiry", subject: enquiry, is, because, report };
+}
+
+/**
+ * The kinds `why` actually explains, and their cases — #128's three. Every
+ * other kind gets a refusal built from **this** object, below, so a kind
+ * added here (#182) is a kind the refusal stops claiming for itself: naming
+ * the explained kinds twice, once in a hand-written list and once in the
+ * table, is exactly the drift `KIND_BY_LABEL`'s own comment warns about —
+ * "built rather than hand-duplicated ... in the direction that fails
+ * silently".
+ */
+const EXPLAINED = {
+  claim: explainClaim,
+  work: explainWork,
+  enquiry: explainEnquiry,
+} satisfies Partial<Record<Kind, Explainer>>;
+
+const EXPLAINED_KINDS = Object.keys(EXPLAINED) as Kind[];
+
+/** Every kind `EXPLAINED` does not already have a case for. */
+type UnexplainedKind = Exclude<Kind, keyof typeof EXPLAINED>;
+
+/**
+ * The refusal every kind outside {@link EXPLAINED} gets — two parts, per the
+ * discipline this file states above `ReadSurface`: **what was asked** (the
+ * kind) and **what `why` explains instead**. There is deliberately no third
+ * part naming where else to look: the domain does not know which surface is
+ * calling, so it cannot name a command (that comment's own rule) — and a
+ * blanket "this record has no other verb for it yet either" was simply
+ * false for most of these (`gate`/`criteria`/`design` all read a gate,
+ * `origin`/`pursuits` a question, `reproducibility` an analysis). Naming a
+ * false absence is the #170 mistake this file's refusal discipline exists to
+ * prevent, so this says only what is true.
+ */
+function refuseToExplain(kind: UnexplainedKind): Explainer {
+  return async () => {
+    throw new Error(
+      `why does not yet explain a ${kind}; it explains ${EXPLAINED_KINDS.join(", ")}`,
+    );
+  };
+}
+
+/**
+ * One refusal per {@link UnexplainedKind} — still a literal object, so
+ * `satisfies` checks it totally over exactly the kinds `EXPLAINED` has not
+ * claimed. That cuts both ways: when #182 moves `gate` into `EXPLAINED`,
+ * `UnexplainedKind` drops it and this object's `gate` entry becomes an
+ * *excess* property `satisfies` refuses — the compiler forces its removal
+ * rather than leaving a dead refusal nobody's dispatch can reach.
+ */
+const REFUSED = {
+  question: refuseToExplain("question"),
+  unit: refuseToExplain("unit"),
+  evidence: refuseToExplain("evidence"),
+  decision: refuseToExplain("decision"),
+  criterion: refuseToExplain("criterion"),
+  evaluation: refuseToExplain("evaluation"),
+  gate: refuseToExplain("gate"),
+  review: refuseToExplain("review"),
+  observations: refuseToExplain("observations"),
+  analysis: refuseToExplain("analysis"),
+} satisfies Record<UnexplainedKind, Explainer>;
+
+/**
+ * The total table `why` dispatches through — one entry per {@link Kind}, so
+ * a fourteenth kind added to `LABEL_BY_KIND` without a matching entry in
+ * `EXPLAINED` or `REFUSED` is a `tsc` failure, not a runtime "unknown kind".
+ * `EXPLAINED`'s three cases are #128's; `REFUSED` is everything else, #182.
+ */
+const EXPLAINERS = { ...EXPLAINED, ...REFUSED } satisfies Record<Kind, Explainer>;
 
 /**
  * A gate's state, from the checks governing it.

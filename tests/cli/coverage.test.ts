@@ -48,12 +48,18 @@ const commandSource = commandFiles
 /**
  * Verbs deliberately without a command, and why.
  *
- * Empty, and that is the current state rather than a claim it must stay empty.
  * The same shape as `NOT_EXPOSED` in `tests/helpers/surface-coverage.ts`: a
  * bare list of names would decay into whatever happens to be unimplemented
  * today, so an exclusion has to carry a reason.
  */
-const NO_COMMAND_FOR: Readonly<Record<string, string>> = {};
+const NO_COMMAND_FOR: Readonly<Record<string, string>> = {
+  // Both reached only through `why`'s dispatch table in src/domain/read.ts
+  // (#128 round 2), not called directly from any command module -- the `why`
+  // command itself calls `read.why(subject)`. `whySupported` is still called
+  // directly from src/mcp/tools.ts, so it keeps an MCP tool of its own.
+  whySupported: "reached only through `why`, as the Claim case's body",
+  enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",
+};
 
 test("the command modules were found at all", () => {
   // Guards the derivation rather than the thing derived. A moved directory

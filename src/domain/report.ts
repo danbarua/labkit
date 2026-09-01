@@ -53,7 +53,7 @@ export type Ref<K extends string> = string & { readonly [KIND]: K };
  * `Artefact`, *work* and means a `Task`. Five of the thirteen differ, so the
  * mapping has to be written down rather than derived from the name.
  */
-export const LABEL_BY_KIND: Record<string, NodeLabel> = {
+export const LABEL_BY_KIND = {
   question: "Question",
   enquiry: "LineOfEnquiry",
   unit: "EvidenceUnit",
@@ -67,7 +67,27 @@ export const LABEL_BY_KIND: Record<string, NodeLabel> = {
   observations: "Artefact",
   analysis: "Computation",
   work: "Task",
-};
+} satisfies Record<string, NodeLabel>;
+
+/**
+ * Every kind a handle can name — the closed union `why` (#128, redesigned on
+ * review) dispatches on. `satisfies` rather than a `: Record<string, NodeLabel>`
+ * annotation is what keeps this closed: the annotation used to erase the
+ * literal keys, so `keyof typeof LABEL_BY_KIND` was `string` and there was
+ * nowhere for a total `Record<Kind, …>` table to be checked against.
+ */
+export type Kind = keyof typeof LABEL_BY_KIND;
+
+/**
+ * A handle of any kind — every {@link Ref} this record can mint, in one type.
+ *
+ * Earned by `why` (#128, redesigned on review): its subject is a handle whose
+ * kind is not yet known, or a proposition, and `check:no-stringly-typed`
+ * reads the written type node rather than resolving it — so this, unlike a
+ * bare `string`, is never flagged, without needing an allowlist entry for a
+ * parameter that genuinely does name a record.
+ */
+export type AnyRef = Ref<Kind>;
 
 /**
  * Builds a handle, and **refuses one whose id does not match its kind**.
@@ -84,7 +104,13 @@ export const LABEL_BY_KIND: Record<string, NodeLabel> = {
  * label it was matched on says it cannot be.
  */
 export function isRefOfKind(kind: string, id: string): boolean {
-  const expected = LABEL_BY_KIND[kind];
+  // Widened, not narrowed: `LABEL_BY_KIND`'s literal keys (needed so `Kind` is
+  // closed, see above) would otherwise refuse to be indexed by the caller's
+  // plain `string`. This assignment is sound in a way a cast to `Kind` would
+  // not be -- it is not claiming `kind` IS one of the closed keys, only asking
+  // an object typed for arbitrary string keys, same runtime lookup either way.
+  const table: Record<string, NodeLabel> = LABEL_BY_KIND;
+  const expected = table[kind];
   if (!expected) return true;
   try {
     return labelForNaturalId(id) === expected;
@@ -97,10 +123,12 @@ export function isRefOfKind(kind: string, id: string): boolean {
 }
 
 export const ref = <K extends string>(kind: K, id: string): Ref<K> => {
-  if (!isRefOfKind(kind, id))
+  if (!isRefOfKind(kind, id)) {
+    const table: Record<string, NodeLabel> = LABEL_BY_KIND;
     throw new Error(
-      `${kind} handle expected a ${LABEL_BY_KIND[kind]} id, got "${id}" — pass the handle the act that minted it returned`,
+      `${kind} handle expected a ${table[kind]} id, got "${id}" — pass the handle the act that minted it returned`,
     );
+  }
   return id as Ref<K>;
 };
 
@@ -322,9 +350,27 @@ export interface Promoted {
  * with no matching entry there would mint a `Ref` `isRefOfKind` could never
  * agree with.
  */
-export const KIND_BY_LABEL: { readonly [L in NodeLabel]?: string } = Object.fromEntries(
+export const KIND_BY_LABEL: { readonly [L in NodeLabel]?: Kind } = Object.fromEntries(
   Object.entries(LABEL_BY_KIND).map(([kind, label]) => [label, kind]),
 );
+
+/**
+ * The kind a handle's own prefix names, or `null` for text that is not
+ * shaped like one of this record's ~97 mintable ids at all.
+ *
+ * Earned by `why` (#128, redesigned on review): dispatching a single verb on
+ * a handle's kind needs to tell "a handle of a kind I don't explain yet"
+ * apart from "ordinary prose, go look it up by wording" -- `isRefOfKind`
+ * answers only "is this ONE kind", which cannot make that distinction without
+ * calling it once per kind and hoping none throw.
+ */
+export function kindOf(id: string): Kind | null {
+  try {
+    return KIND_BY_LABEL[labelForNaturalId(id)] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * One record `search()` found containing the wording, and the text it
@@ -479,6 +525,32 @@ export interface EnquiryStatus {
    * question stands behind the enquiry.
    */
   question: QuestionClosure | null;
+}
+
+/** Which of `KnowledgeSurvey`'s five buckets a question currently sits in. */
+export type QuestionBucket = "established" | "unresolved" | "untested" | "provisional" | "accepted";
+
+/**
+ * `EnquiryStatus`, alongside where this enquiry's own question currently sits
+ * in the overall survey.
+ *
+ * Earned by #128, narrowed on review (PJ-030, PJ-034 §5): "is this
+ * reopening/closure decision warranted?" recurred three times, verbatim,
+ * across the real Bonsai transcript, and every instance chained `enquiry`
+ * with `known` by hand -- but what the transcript was actually doing was
+ * scrolling the whole survey to find where **this** question had landed, not
+ * reading every other question in the programme. An earlier version of this
+ * report appended the entire `KnowledgeSurvey`; that answers about every
+ * question in the record, not the one this report is about (PJ-030), and is
+ * exactly the `everything` dump PJ-034 §5 says a detail tool exists not to
+ * become. `standing` is `null` only when no question stands behind the
+ * enquiry, matching `EnquiryStatus.question` -- every question that exists
+ * lands in exactly one bucket of `whatIsKnown()`'s partition, so a non-null
+ * question always has one.
+ */
+export interface EnquiryInContext {
+  enquiry: EnquiryStatus;
+  standing: { question: QuestionRef; asks: string; bucket: QuestionBucket } | null;
 }
 
 /**
@@ -1440,6 +1512,27 @@ export interface ConflictVerdict {
 }
 
 /**
+ * The line of enquiry (and the question behind it) a task exists to advance
+ * (#98). Carries wording alongside each handle, matching `EnquiryStatus.pursuing`
+ * and `QuestionClosure.asks` -- the demonstrated need was "why does this task
+ * exist" answering nothing, and a bare handle answers that only for a caller
+ * willing to chain a second read. `question` is never absent when `enquiry`
+ * is present: `pursue()` requires a question to open a line of enquiry, so
+ * every `LineOfEnquiry` has exactly one `MOTIVATES` edge behind it by
+ * construction.
+ *
+ * Named and shared (not inlined per report) because #128 gave it a second
+ * reader: `WorkExplanation`'s `report` is the same `TaskContract` this shape
+ * already sat on.
+ */
+export interface Addressing {
+  enquiry: EnquiryRef;
+  pursuing: string;
+  question: QuestionRef;
+  asks: string;
+}
+
+/**
  * What a planned task is permitted to touch.
  *
  * Closed-world: `mayRead` is the whole contract, and anything absent is
@@ -1459,25 +1552,8 @@ export interface TaskContract {
   acceptance: string;
   mayRead: string[];
   enforced: false;
-  /**
-   * The line of enquiry this work exists to advance, and the question behind
-   * it, if `planWork` was told one (#98). Absent, not `null`, when it wasn't
-   * -- ungated work (#91) is a genuine case, not a gap in this report.
-   *
-   * Carries wording alongside each handle, matching `EnquiryStatus.pursuing`
-   * and `QuestionClosure.asks` -- the demonstrated need was "why does this
-   * task exist" answering nothing, and a bare handle answers that only for a
-   * caller willing to chain a second read. `question` is never absent when
-   * `enquiry` is present: `pursue()` requires a question to open a line of
-   * enquiry, so every `LineOfEnquiry` has exactly one `MOTIVATES` edge behind
-   * it by construction.
-   */
-  addressing?: {
-    enquiry: EnquiryRef;
-    pursuing: string;
-    question: QuestionRef;
-    asks: string;
-  };
+  /** Absent, not `null`, when `planWork` wasn't told one -- ungated work (#91) is a genuine case. */
+  addressing?: Addressing;
 }
 
 /**
@@ -1539,3 +1615,61 @@ export interface ListedWork {
   objective: string;
   state: WorkState;
 }
+
+/**
+ * One record a `why` explanation cites, and what it says — the shape
+ * `because` is built from (#128, redesigned on review).
+ *
+ * The same `{handle, wording}` convention every other report in this file
+ * uses (PJ-030 §4); `when` is present only where the cited record carries an
+ * instant of its own (an evaluation, a decision), which is why it is optional
+ * rather than always asked for.
+ */
+export interface Cause {
+  handle: Ref<Kind>;
+  wording: string;
+  when?: string;
+}
+
+/**
+ * `why <handle>` — a mini-app dispatching on the handle's own kind, over
+ * reports that already exist. Not new queries: a report is the plan, `why`
+ * renders it as causes (Postgres `EXPLAIN`, for *why*).
+ *
+ * One shape for every kind it explains, so `--json` and MCP get structure and
+ * the tty gets a sentence — `GATE_1 is blocked because CRIT_2 "…" failed on
+ * 2026-08-04 and CRIT_3 "…" has never been run` is the target once Gate joins
+ * (#182). `report` carries the kind's own existing report **unflattened**: an
+ * envelope that dictated the embedded shape would have cost `why CLM_1` the
+ * *Resting on / Held to / Ultimately resting on* view it has today, for a
+ * one-line sentence — a regression wearing a redesign.
+ *
+ * A discriminated union, not one interface with optional fields: `report`'s
+ * type differs by `kind`, and a caller narrowing on `kind` gets the right one
+ * without a cast. Only the three kinds this PR builds are members — Gate,
+ * Question, Criterion and the rest are #182, and a kind `why` does not yet
+ * explain never constructs one of these; it throws instead (see `read.ts`'s
+ * `EXPLAINERS` table).
+ */
+export interface ClaimExplanation {
+  kind: "claim";
+  subject: ClaimRef;
+  is: string;
+  because: Cause[];
+  report: SupportExplanation;
+}
+export interface WorkExplanation {
+  kind: "work";
+  subject: WorkRef;
+  is: string;
+  because: Cause[];
+  report: TaskContract;
+}
+export interface EnquiryExplanation {
+  kind: "enquiry";
+  subject: EnquiryRef;
+  is: string;
+  because: Cause[];
+  report: EnquiryInContext;
+}
+export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation;

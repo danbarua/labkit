@@ -79,6 +79,7 @@ import type {
   DependencyReport,
   DesignHistory,
   EnquiryStatus,
+  EnquiryInContext,
   EvaluationRecord,
   HistoricalSurvey,
   IdentifiedArtefact,
@@ -88,6 +89,9 @@ import type {
   ReproductionReport,
   Revision,
   SupportExplanation,
+  Kind,
+  Cause,
+  Explanation,
 } from "../domain/report";
 import type { Ref } from "../domain/report";
 import type { DomainEvent, MintedEdge, Operation } from "../domain/events";
@@ -386,6 +390,20 @@ export const enquiryStatusSchema = z.strictObject({
   question: questionClosureSchema.nullable(),
 });
 
+/**
+ * `enquiry_in_context` — `enquiryStatusSchema` alongside where this enquiry's
+ * own question currently sits in the overall survey (#128) -- one bucket, not
+ * the whole survey; see `EnquiryInContext`'s own doc comment.
+ */
+export const enquiryInContextSchema = z.strictObject({
+  enquiry: enquiryStatusSchema,
+  standing: questionStanding
+    .extend({
+      bucket: z.enum(["established", "unresolved", "untested", "provisional", "accepted"]),
+    })
+    .nullable(),
+});
+
 export const designHistorySchema = z.strictObject({
   gate: ref("gate"),
   originally: condition,
@@ -435,6 +453,18 @@ export const originOfSchema = z.strictObject({
   origin: questionOriginSchema.nullable(),
 });
 
+/**
+ * The line of enquiry (and question) a task exists to advance -- see
+ * `Addressing` in `src/domain/report.ts`. Shared, not inlined per schema:
+ * `taskContractSchema` and `workListWithWhySchema` (#128) both carry it.
+ */
+const addressingSchema = z.strictObject({
+  enquiry: ref("enquiry"),
+  pursuing: z.string(),
+  question: ref("question"),
+  asks: z.string(),
+});
+
 export const taskContractSchema = z.strictObject({
   work: ref("work"),
   objective: z.string(),
@@ -445,16 +475,54 @@ export const taskContractSchema = z.strictObject({
   // `enforced: true` from this.
   enforced: z.literal(false),
   // Absent, not null, for ungated work (#91) -- see PlanWorkCommand.addressing.
-  // Wording alongside each handle, matching EnquiryStatus/QuestionClosure.
-  addressing: z
-    .strictObject({
-      enquiry: ref("enquiry"),
-      pursuing: z.string(),
-      question: ref("question"),
-      asks: z.string(),
-    })
-    .optional(),
+  addressing: addressingSchema.optional(),
 });
+
+/**
+ * `why` — one record's `{handle, wording}` citation, the shape `because`
+ * arrays are built from. `handle` spans every {@link Kind}, exactly like
+ * `SearchMatch.handle` above -- the same `ref()` cast, since it is an output
+ * schema and there is nothing here to validate.
+ */
+const explanationCause: z.ZodType<Cause> = z.strictObject({
+  handle: z.string() as unknown as z.ZodType<Ref<Kind>>,
+  wording: z.string(),
+  when: z.string().optional(),
+});
+
+/**
+ * `why` — a discriminated union on `kind`, not one shape with optional
+ * fields: `report` differs by kind (`SupportExplanation` for a claim,
+ * `TaskContract` for work, `EnquiryInContext` for a line of enquiry), and a
+ * caller narrowing on `kind` gets the right one without a cast. Only the
+ * three kinds #128 builds are members here -- see `Explanation`'s own doc
+ * comment in `src/domain/report.ts` for why a kind `why` does not yet explain
+ * has no member and no schema: it never reaches `structuredContent` at all,
+ * because the domain throws before returning one.
+ */
+export const explanationSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("claim"),
+    subject: ref("claim"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: supportExplanationSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("work"),
+    subject: ref("work"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: taskContractSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("enquiry"),
+    subject: ref("enquiry"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: enquiryInContextSchema,
+  }),
+]);
 
 /** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */
 export const criteriaGoverningSchema = z.strictObject({
@@ -711,6 +779,9 @@ export type _QuestionClosure = Assert<
   Exact<z.infer<typeof questionClosureSchema>, QuestionClosure>
 >;
 export type _EnquiryStatus = Assert<Exact<z.infer<typeof enquiryStatusSchema>, EnquiryStatus>>;
+export type _EnquiryInContext = Assert<
+  Exact<z.infer<typeof enquiryInContextSchema>, EnquiryInContext>
+>;
 export type _DesignHistory = Assert<Exact<z.infer<typeof designHistorySchema>, DesignHistory>>;
 export type _InterpretationHistory = Assert<
   Exact<z.infer<typeof interpretationHistorySchema>, InterpretationHistory>
@@ -732,6 +803,7 @@ export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, Analy
 export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;
 export type _QuestionOrigin = Assert<Exact<z.infer<typeof questionOriginSchema>, QuestionOrigin>>;
 export type _TaskContract = Assert<Exact<z.infer<typeof taskContractSchema>, TaskContract>>;
+export type _Explanation = Assert<Exact<z.infer<typeof explanationSchema>, Explanation>>;
 export type _CriteriaGoverning = Assert<
   Exact<z.infer<typeof criteriaGoverningSchema>["criteria"], CriterionRef[]>
 >;
