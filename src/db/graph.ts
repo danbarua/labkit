@@ -36,12 +36,10 @@ import type { Transactor } from "./transactor";
 import type { TenantContext } from "./tenant";
 
 /**
- * Bundles `ctx`/`db` once instead of threading them through every call —
- * every call site was going to gain a `ctx: TenantContext` first parameter
- * regardless (PJ-003 §5), so this centralizes it, and gives `EDGE_SCHEMA`
- * validation, natural-id -> label resolution, and the `Decision` lifecycle
- * invariant one non-arbitrary home instead of scattering them across free
- * functions.
+ * Bundles `ctx`/`db` once instead of threading a `TenantContext` through every
+ * call, and gives `EDGE_SCHEMA` validation, natural-id -> label resolution and
+ * the `Decision` lifecycle invariant one home rather than scattering them
+ * across free functions.
  */
 export class TenantGraph {
   private readonly runner: CypherRunner;
@@ -62,11 +60,9 @@ export class TenantGraph {
   /**
    * Edges created since the last {@link drainMintedEdges}.
    *
-   * The same argument as {@link minted}, made for the other half of a write.
-   * That comment says a caller that mints three nodes and remembers two is a
-   * state nobody could see; until 2026-08-28 an act's edges were a state nobody
-   * could see *at all* — `createEdge` recorded nowhere, so `recordAnalysis`
-   * wrote eight edges and the event log reported none of them.
+   * The same argument as {@link minted}, made for the other half of a write:
+   * without it an act's edges are a state nobody can see, so a verb writing
+   * eight of them has an event log reporting none.
    *
    * **Pushed only where a row came back**, which is one of `createEdge`'s three
    * exits and the only one that created anything. The duplicate check and the
@@ -91,8 +87,8 @@ export class TenantGraph {
   ) {
     // CypherRunner validates ctx.graphName once, in its own constructor —
     // graphName is immutable for this instance's lifetime, and always
-    // server-derived (tenants.graph_name is a generated column, PJ-003 §5),
-    // so it should never fail in practice. Still worth checking before it's
+    // server-derived (`tenants.graph_name` is a generated column), so it should
+    // never fail in practice. Still worth checking before it is
     // interpolated into every query this instance issues.
     this.runner = new CypherRunner(db, ctx.graphName);
   }
@@ -101,16 +97,13 @@ export class TenantGraph {
    * Runs `work` inside one database transaction: everything it writes commits
    * together, or none of it does.
    *
-   * Earned by external review of S-3c, as a negative test rather than as
-   * infrastructure hygiene. A compound research action was not atomic and had
-   * become *consequential*: `replaceAnalysis()` invalidates the superseded
-   * output first, and since S-3c invalidating an output withdraws the criterion
-   * evaluations that cited it. So a failure between the two halves left a
-   * record where the earlier failure had stopped deciding its check and no
-   * corrected check existed — a partially committed scientific state, which is
-   * the thing this system exists to prevent. `reverify()` had the same shape
-   * with a worse landing: without its second write, the durable state is
-   * exactly S-10's demonstrated wrong answer.
+   * **Not infrastructure hygiene: a partial research act is a wrong answer.**
+   * Revising an analysis withdraws the criterion evaluations that cited its
+   * findings, so a failure between the halves leaves a record where the earlier
+   * failure has stopped deciding its check and no corrected check exists.
+   * `reverify()` has the same shape with a worse landing: without its second
+   * write the durable state is a second independent support where a
+   * re-verification was meant.
    *
    * **The boundary itself is not this class's any more** — see
    * `./transactor.ts` for why it moved and what it would cost to move back.
@@ -260,7 +253,7 @@ export class TenantGraph {
   /**
    * Creates a directed edge identified by natural IDs — never AGE's
    * internal graphid, never an arbitrary property-map match that could
-   * silently address more than one node (PJ-003 §7). The label of each
+   * silently address more than one node. The label of each
    * endpoint is inferred from its natural-id prefix (`labelForNaturalId`),
    * then validated as a legal `(fromLabel, edge, toLabel)` combination
    * against `EDGE_SCHEMA` before anything is matched in the database. A
@@ -320,7 +313,7 @@ export class TenantGraph {
     // `number[]` because one CONSUMES edge has to carry every position at which
     // its artefact was read: `(from, label, to)` is this method's identity and
     // a repeat is a no-op, so a run that read one record twice cannot be two
-    // edges. See `recorded()` and S-10e.
+    // edges. See `recorded()`.
     props?: Record<string, string | number | boolean | number[]>,
     /**
      * Skip the duplicate check because at least one endpoint was created by
@@ -349,12 +342,11 @@ export class TenantGraph {
       );
     }
 
-    // **The endpoints are not checked up front.** They used to be, one query
-    // each, and that made every edge cost three round trips before a single
-    // byte was written. The `CREATE` below matches both endpoints itself: if
-    // either is missing the pattern binds nothing, the statement creates
-    // nothing and returns **no rows**, which is the same information those two
-    // queries were buying -- so they are issued only when that happens, purely
+    // **The endpoints are not checked up front**, which would cost three round
+    // trips per edge before a single byte is written. The `CREATE` below
+    // matches both endpoints itself: if either is missing the pattern binds
+    // nothing, the statement creates nothing and returns **no rows** — the same
+    // information a check would buy. The lookups are issued only then, purely
     // to say *which* endpoint was missing. Measured on
     // `tests/scenarios/s11b_which_review_retracted_it.test.ts`: 240 of that
     // file's 812 queries were these two, 30% of everything it ran.

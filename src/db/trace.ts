@@ -1,13 +1,11 @@
 /**
  * Optional query tracing, off unless asked for.
  *
- * **Why this exists.** Two separate investigations into the same intermittent
- * test failure each began by hand-instrumenting `tests/helpers/db.ts`, and
- * three documents — `CLAUDE.md`, the work queue and that helper's own header —
- * asserted a wrong cause in the meantime. What finally settled it was
- * measurable in one run once the instrumentation existed: every query tracked
- * from start to completion, so "it hangs" could be answered with *59,086
- * queries, zero unfinished* rather than argued.
+ * **Why this exists.** An intermittent test failure is argued about until
+ * somebody measures it, and hand-instrumenting the test helper is where each
+ * investigation starts. With every query tracked from start to completion,
+ * "it hangs" is answerable with *59,086 queries, zero unfinished* rather than
+ * argued.
  *
  * The two numbers that did the work are the two this module records. **In-flight
  * queries outstanding past a threshold** is what turns "it hung" into "nothing
@@ -111,12 +109,11 @@ function ensureWatchdog(stuckMs: number): void {
  * What is in flight right now, as a snapshot.
  *
  * The watchdog above is the production consumer; this exists so the claim can
- * be **asserted** rather than described. `tests/trace.test.ts` used to say in a
- * comment that a thrown query must not leave a phantom entry — the one failure
- * mode that would make this module lie — and then assert `expect(true)`, which
- * is a second copy of the claim rather than a check on it (PJ-028). Moving
- * `inFlight.delete(id)` out of the `finally` left the whole suite green; with
- * the snapshot exported it fails, which is the difference.
+ * be **asserted** rather than described. A thrown query must not leave a
+ * phantom entry — the one failure mode that would make this module lie — and a
+ * comment saying so beside `expect(true)` is a second copy of the claim rather
+ * than a check on it. Moving `inFlight.delete(id)` out of the `finally` leaves
+ * the whole suite green; with the snapshot exported it fails.
  *
  * A copy, not the map: a caller holding the live map could clear it.
  */

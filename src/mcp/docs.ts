@@ -9,16 +9,11 @@
  * **Rendered on every read, and stored nowhere.** There is no second copy to go
  * stale, so nothing has to hold two things equal.
  *
- * There was one until 2026-08-26 — `docs/mcp-tools.md`, checked in so its diff
- * would show an API change, kept honest by an assertion in `tests/mcp.test.ts`
- * and refreshed by a `docs:tools` script. All three are gone. The assertion's
- * only failure mode was "someone regenerated late"; catching that cost a build
- * that had to run on documentation, and a generated file checked in beside the
- * code it describes invites a whole genre of ceremony — parity docs for the
- * other surface, tests asserting the two agree, a gate on all of it.
- *
- * The dependency graph went the same way on 2026-08-21, for the narrower
- * version of the same reason.
+ * **Do not check a rendered copy in.** Its only failure mode is "someone
+ * regenerated late", catching that costs a build that has to run on
+ * documentation, and a generated file beside the code it describes invites a
+ * genre of ceremony: parity docs for the other surface, tests asserting the two
+ * agree, a gate over all of it.
  *
  * The types are rendered from **JSON Schema**, not from the Zod objects, for
  * the same reason `server.ts` ships the whole report rather than a chosen

@@ -44,10 +44,10 @@ export const byEvaluation: (row: Row) => string | null = (row) => id(row, "ev");
  * The claim a closing decision rests on, **for one bearing**.
  *
  * AGE has no edge alternation — `[:SUPPORTS|CHALLENGES]` is a syntax error — so
- * a claim is reached one edge at a time. The two ways used to be two clauses in
- * one query binding two column names, and that is exactly how the last defect
- * survived: `checksOf` collected both names and the **grain** read one, so a
- * criterion arriving down the challenged path was dropped. Two places knew
+ * a claim is reached one edge at a time. Writing them as two clauses in one
+ * query binding two column names is how the defect survives: a fold can collect
+ * both names while the **grain** reads one, so a criterion arriving down the
+ * challenged path is dropped. Two places knew
  * there were two paths and only one was updated.
  *
  * So the bearing is a parameter and the caller runs both, merging the results.
@@ -57,8 +57,8 @@ export const byEvaluation: (row: Row) => string | null = (row) => id(row, "ev");
  * clause would have to be projected forward by hand, which a composable
  * system cannot ask of its callers.
  *
- * A promoted **negative** result is a first-class case (S-18b): this is not an
- * edge condition, it is half the domain.
+ * A promoted **negative** result is a first-class case: this is not an edge
+ * condition, it is half the domain.
  */
 export function answeringClaimBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<ClaimNode | null> {
   return {
@@ -86,10 +86,8 @@ export function answeringClaimBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<
  * sharing a name — and the two verbs gave contradictory answers about one
  * claim's standing.
  *
- * Handle wins, which is S-5's argument: a claim has its own identity and
- * wording is not it. **Findings are the opposite and deliberately so** — see
- * `findingsBearing` in `read.ts`, where selecting by handle was tried and
- * refuted by 13 scenarios.
+ * Handle wins: a claim has its own identity and wording is not it. **Findings
+ * are the opposite and deliberately so** — see `findingsBearing` in `read.ts`.
  */
 export function checksOfBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<Set<string>> {
   return {
@@ -115,22 +113,22 @@ export function checksOfBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<Set<st
  * One evaluation, folded: its verdict, and how much of its basis still stands.
  *
  * **Parameterised by which evaluations count**, because two scopes are
- * deliberately different and the difference is load-bearing (S-17 with S-3):
+ * deliberately different and the difference is load-bearing:
  *
  * - **gate-scoped** — has this condition been checked *for this gate*?
  * - **criterion-scoped** — has this check ever been shown able to fail?
  *
  * One criterion can govern several gates and be evaluated separately against
  * each — the same hash check run against staging and against release.
- * Collapsing the two made a gate nobody had evaluated report as blocked
- * because its criterion had failed somewhere else. That distinction used to
- * live in a paragraph above one of the two queries; here it is an argument, so
- * a caller has to choose rather than inherit whichever query they copied.
+ * Collapsing the two makes a gate nobody has evaluated report as blocked
+ * because its criterion failed somewhere else. It is a parameter rather than a
+ * paragraph above one of two queries, so a caller has to choose rather than
+ * inherit whichever query they copied.
  *
  * A verdict is **retracted** when everything it cited has been invalidated,
- * which is not failing — that difference is `no-standing-verdict` (S-3c). A
- * verdict citing nothing cannot be retracted at all, which stops S-8's
- * asserted-versus-measured distinction becoming a loophole.
+ * which is not failing — that difference is `no-standing-verdict`. A verdict
+ * citing nothing cannot be retracted at all, which stops an asserted verdict
+ * being indistinguishable from a measured one.
  */
 export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verdict> {
   return {
@@ -208,10 +206,10 @@ const retracted = (v: Verdict): boolean => v.cited > 0 && v.standing === 0;
  * A criterion's state, over whichever verdicts the caller chose.
  *
  * A failure **sticks** among verdicts that still stand, so re-running until
- * green is not evidence (S-3). A wholly-retracted verdict is a retraction and
- * not a failure (S-3c). And `never-run` is a first-class value rather than the
- * absence of one, because a check nobody performed must be distinguishable
- * from one that failed (S-17).
+ * green is not evidence. A wholly-retracted verdict is a retraction and not a
+ * failure. And `never-run` is a first-class value rather than the absence of
+ * one, because a check nobody performed must be distinguishable from one that
+ * failed.
  */
 export function checkStateOver(verdicts: Leaf<Verdict>): Derived<CheckState> {
   return {
@@ -278,10 +276,9 @@ export const BEARINGS = ["SUPPORTS", "CHALLENGES"] as const;
 /**
  * A check, itemised — the shape a reader is shown, not just its state.
  *
- * Replaces `checksFrom`, and with it the last place the four-state rule was
- * written out. Three reports need this — a gate's conditions, the standard a
- * finding was held to, and the survey's own bucketing — and each used to fold
- * it separately from a query it also wrote separately.
+ * Three reports need it — a gate's conditions, the standard a finding was held
+ * to, and the survey's own bucketing — so the four-state rule is written out
+ * here and nowhere else.
  *
  * Evaluations are ordered by time then identity because **Cypher imposes no
  * ordering**, and without it *which* verdict is reported as "the" value of a

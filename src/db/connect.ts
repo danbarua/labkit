@@ -25,12 +25,12 @@ export type { LabKitDBConnection };
  *
  * ## Two rules, and they point in opposite directions on purpose
  *
- * **`LABKIT_HOME` must exist.** It used to be enough that it *could* — the lock
- * directory was created with `{ recursive: true }`, so a typo built the whole
- * path and yielded a fresh empty database. An empty record and a mistyped one
- * are indistinguishable to a reader, and "this project has no history" is a
- * confident wrong answer rather than an error. Naming a directory is a claim
- * that it is there; it is not a request to create one.
+ * **`LABKIT_HOME` must exist**, and is not created. Creating the lock
+ * directory with `{ recursive: true }` lets a typo build the whole path and
+ * yield a fresh empty database — indistinguishable from a real one, so "this
+ * project has no history" comes back as a confident wrong answer rather than an
+ * error. Naming a directory is a claim that it is there, not a request to
+ * create one.
  *
  * **With `LABKIT_HOME` unset, an existing record above the working directory is
  * found.** A client launched from `packages/foo` of a project whose `.labkit/`
@@ -240,16 +240,15 @@ function discoverProjectRoot(from: string): string {
  * file, and silently building one beside it would be worse than ignoring the
  * flag.
  *
- * **The order is load-bearing and was wrong until 2026-08-28.** This was a
- * default parameter — `connectDb(projectRoot = resolveProjectRoot())` — which
- * JavaScript evaluates on entry, *before* the body reads the environment. So
- * the sentence above was true of the outcome and false of the sequence: the
- * URL path still resolved a root it then discarded. Two costs, both on the
- * hosted path this repo is heading for. `resolveProjectRoot` shells out to
- * `git rev-parse`, and `src/mcp/server.ts` calls `connectDb()` **per tool
- * call** — so a server backed by Postgres spawned a subprocess per call for an
- * answer nobody read. Worse, a `LABKIT_HOME` naming a directory that does not
- * exist *throws*, deliberately, so a stray value in a container's environment
+ * **The order is load-bearing, and a default parameter breaks it.**
+ * `connectDb(projectRoot = resolveProjectRoot())` evaluates on entry, *before*
+ * the body reads the environment — true of the outcome and false of the
+ * sequence, since the URL path still resolves a root it then discards. Two
+ * costs, both on the hosted path. `resolveProjectRoot` shells out to `git
+ * rev-parse`, and `src/mcp/server.ts` calls `connectDb()` **per tool call**, so
+ * a server backed by Postgres spawns a subprocess per call for an answer nobody
+ * reads. Worse, a `LABKIT_HOME` naming a directory that does not exist
+ * *throws*, deliberately, so a stray value in a container's environment
  * killed a server that was never going to open a file. Measured before the
  * fix: `LABKIT_DB_URL` set and `LABKIT_HOME` missing raised
  * `LABKIT_HOME names a directory that does not exist` without reaching the

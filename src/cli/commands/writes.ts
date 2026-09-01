@@ -11,12 +11,10 @@
  *
  * **The handles printed are `events[0].created`** — every verb's return value
  * carries `events: DomainEvent[]`, and `created` is the drained list of
- * everything the act minted. Before #161, a verb that minted more than one
- * thing (an enquiry and its question; a decision alongside a claim) withheld
- * every handle but the one its return type happened to name, and `close`,
- * `evaluate`, `accept` and `promote` withheld all of theirs — they returned
- * nothing, so the CLI answered with an acknowledgement that named what was
- * *acted on* and nothing that was *created*. `mintedHandles()` below reads
+ * everything the act minted. A per-verb field instead withholds every handle
+ * but the one a return type happens to name — an enquiry without its question,
+ * a claim without the decision beside it — and answers some acts with nothing
+ * created at all. `mintedHandles()` below reads
  * every event's `created` uniformly, so a verb minting several things and one
  * minting nothing both fall out of the same line rather than a per-command
  * special case.
@@ -36,8 +34,7 @@ import type { ClaimRef, DomainEvent, EnquiryRef, GateRef } from "../../domain";
 
 /**
  * Every handle an act minted, across however many events it recorded — in
- * practice one, per CLAUDE.md's "a verb that composes others records one
- * event, not one per step". Reading `events` rather than a per-verb field is
+ * practice one per act. Reading `events` rather than a per-verb field is
  * what makes this the same line for every command: a verb minting nothing
  * prints nothing, one minting several prints all of them, with no command
  * having to know which case it is.

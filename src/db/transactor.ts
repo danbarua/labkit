@@ -1,11 +1,9 @@
 /**
  * The transaction boundary, and who owns it.
  *
- * **`TenantGraph` used to.** It was the only citizen of `src/db/` when
- * `inTransaction` was written, so owning the boundary was not a decision — it
- * was the only place to put one. Since then the event store writes down the
- * same connection, drizzle mounts on the same seam, and both are inside
- * transactions a graph opened. A transaction is a property of the *connection*:
+ * **Not `TenantGraph`.** The event store writes down the same connection,
+ * drizzle mounts on the same seam, and both run inside transactions a graph
+ * opened. A transaction is a property of the *connection*:
  * two objects issuing `BEGIN` down one connection are in one transaction
  * whether they know it or not, and a second depth counter is exactly how they
  * stop knowing.
@@ -89,11 +87,11 @@ export function transactor(db: Statements): Transactor {
         }
         throw err;
       } finally {
-        // In `finally`, so it happens exactly once on every path. It used to be
-        // decremented before COMMIT *and* again in the catch, so a throwing
-        // COMMIT left `depth` at -1 -- and since re-entrancy is keyed on
-        // `depth > 0`, the next compound verb would run at an apparent depth of
-        // 0 and a verb nested inside it would issue a second BEGIN instead of
+        // In `finally`, so it happens exactly once on every path. Decrementing
+        // before COMMIT *and* again in a catch leaves `depth` at -1 when COMMIT
+        // throws -- and since re-entrancy is keyed on `depth > 0`, the next
+        // compound verb runs at an apparent depth of 0 and a verb nested inside
+        // it issues a second BEGIN instead of
         // joining. The re-entrancy contract silently inverted, for the life of
         // the object holding it. Never observed firing; found while
         // investigating the suite flake and demonstrated in

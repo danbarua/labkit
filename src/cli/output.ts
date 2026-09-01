@@ -61,7 +61,7 @@ export type View<T> = (value: T, palette: Palette) => string;
  * position, so `Answer<KnowledgeSurvey>` is not assignable to `Answer<unknown>`
  * and the runner cannot accept two commands answering with different reports.
  * `known` is exactly that command — it returns one of two genuinely different
- * surveys (S-1). Binding at construction keeps the pairing checked where it is
+ * surveys. Binding at construction keeps the pairing checked where it is
  * made and erases the type where nothing needs it.
  */
 export interface Answer<T = unknown> {

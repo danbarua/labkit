@@ -49,7 +49,7 @@ export function renderAffects(report: DependencyReport, p: Palette): string {
  * It says `agrees`/`disagrees` and never `reproduced`, which is the word a
  * reader most wants and the one the record cannot support: whether reading the
  * same inputs constitutes the same execution depends on what the method does,
- * and the record does not know that (PJ-019). The closing paragraph says so
+ * and the record does not know that. The closing paragraph says so
  * rather than leaving the reader to supply the stronger claim themselves.
  */
 export function renderReproduction(report: ReproductionReport, p: Palette): string {
@@ -127,7 +127,7 @@ export function renderReproducibility(report: ReproducibilityReport, p: Palette)
  *
  * Every step names records rather than a sentence, because one narrowing can
  * withdraw several claims at once — two analyses reaching one reading are
- * withdrawn together (S-12). A rendering keyed on wording would show one
+ * withdrawn together. A rendering keyed on wording would show one
  * withdrawal where there were two.
  */
 export function renderInterpretation(history: InterpretationHistory, p: Palette): string {

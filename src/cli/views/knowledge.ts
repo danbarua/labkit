@@ -99,7 +99,7 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
  * keep them apart: nothing has examined it, evidence bears against it, or
  * nobody asserts the sentence any more. The first version of this renderer
  * collapsed all three into `NOT supported` above a list of perfectly good
- * findings — which is the S-12 distinction being lost at the transport
+ * findings — the distinction being lost at the transport
  * boundary, after the read surface had got it right.
  */
 export function renderWhy(why: SupportExplanation, p: Palette): string {
@@ -190,7 +190,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
 
 /**
  * The `Work`/`LineOfEnquiry` cases of `why` — one sentence, then the causes
- * behind it (#128, redesigned on review). `Claim` gets the richer view above
+ * behind it. `Claim` gets the richer view above
  * instead (`renderWhyDispatch`, below); this is deliberately the smaller of
  * the two, since a task or an enquiry's own detail command already prints the
  * embedded `report` in full.
@@ -243,7 +243,7 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
  *
  * Several matches is not a duplicate to be tidied away. Two lines of enquiry
  * can assert the same sentence about different endpoints, and they are two
- * claims (S-5); collapsing them reports one record that is simultaneously
+ * claims; collapsing them reports one record that is simultaneously
  * supported and challenged when each separately has a clean answer. So the
  * multiple case gets a sentence saying so, rather than a list a reader might
  * take for redundancy.
@@ -294,7 +294,7 @@ export function renderSearch(groups: SearchGroup[], text: string, p: Palette): s
  * exists for: two analyses reaching opposite-sounding results are not in
  * conflict if they asked about different endpoints. Rendering that as a
  * contradiction is precisely the defect the domain went to trouble to prevent
- * (S-5), so the word never appears for it.
+ * so the word never appears for it.
  */
 export function renderConflict(verdict: ConflictVerdict, p: Palette): string {
   const side = (s: ConflictSide): string =>

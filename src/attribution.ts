@@ -22,7 +22,7 @@
  * caller with a genuine answer to either question: a person at a terminal has a
  * name, and the tree they are standing in has a HEAD.
  *
- * **The MCP server used to keep both mocks for the same reason — the protocol
+ * **The MCP server keeps one mock for the same reason — the protocol
  * carries neither fact — and as of 2026-08-28 it keeps only one.** The protocol
  * still cannot say which agent is calling, and this file still cannot invent
  * it; what changed is that the *agent* can now say, through the
@@ -33,7 +33,6 @@
  * checkable against a bus that knows its sessions, an agent naming a commit is
  * checkable against nothing.
  *
- * See PJ-031 for why attribution is recorded at all.
  */
 
 import { spawnSync } from "node:child_process";

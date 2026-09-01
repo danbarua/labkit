@@ -22,8 +22,7 @@
  * **Every public verb on either surface is exposed**, or listed in
  * `NOT_EXPOSED` with a reason — `tests/mcp.test.ts` derives the list from the
  * source and fails otherwise, and `tests/mcp-smoke.test.ts` fails if any tool
- * goes uncalled. This comment used to say nine commands were "a later pass";
- * they landed, and the sentence outlived them.
+ * goes uncalled.
  *
  * `labkit://docs/tools` is the tool list. This file deliberately does not count
  * them.
@@ -125,7 +124,7 @@ function writeTool<Shape extends z.ZodRawShape>(
 /**
  * The natural-id prefix an artefact carries. `whatDependsOn` takes a name or an
  * explicit reference and **refuses** an ambiguous name rather than answering
- * about the union (S-9), so the caller needs a way to hand in the reference —
+ * about the union, so the caller needs a way to hand in the reference —
  * and over a wire the only handle there is is the id itself.
  */
 const ARTEFACT_PREFIX = "ART_";
@@ -213,7 +212,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     // **No `outputSchema`, and this is the one tool without one.** It returns
     // `KnowledgeSurvey | HistoricalSurvey` — genuinely two reports, not one
     // with an extra field: the as-of answer has `open` where the present-day
-    // one has `unresolved` and `untested`, and cannot split them (S-1). The SDK
+    // one has `unresolved` and `untested`, and cannot split them. The SDK
     // cannot carry that: `normalizeObjectSchema` returns **undefined** for a
     // union rather than throwing, so declaring one makes every call to this
     // tool fail validation. Measured against the installed

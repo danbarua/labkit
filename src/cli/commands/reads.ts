@@ -81,7 +81,7 @@ export function registerReads(program: Command, run: Run): void {
       run(async ({ read }) =>
         // Two reports, not one with an extra field: the as-of answer has `open`
         // where the present-day one has `unresolved` and `untested`, and cannot
-        // split them (S-1). Two views, chosen here rather than inside one that
+        // split them. Two views, chosen here rather than inside one that
         // has to ask which it was given.
         at
           ? answer(await read.whatWasKnown(at), renderHistorical)

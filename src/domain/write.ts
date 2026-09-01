@@ -2,20 +2,17 @@
  * The verbs that change the record.
  *
  * Every one of these emits, and `emit` lives here rather than in `SessionCore`
- * so that a read cannot reach it. That is the temporal seam PJ-009 §3 describes,
- * made structural: one event per research action, stamped from the injected
- * clock, at the single choke point below.
+ * so that a read cannot reach it: one event per research action, stamped from
+ * the injected clock, at the single choke point below.
  *
  * Some verbs here run inside `graph.inTransaction()` — everything they write
  * commits together or none of it does. The `TenantGraph` is shared with the read
  * surface, so its re-entrancy depth is shared too, which is what a facade
  * composing both halves requires.
  *
- * **Which ones, and why it is not "the compound ones".** This header used to say
- * a *compound* verb is transactional, and that word already means something else
- * two paragraphs away in CLAUDE.md, where `openEnquiry` is the archetypal
- * composed verb — and `openEnquiry` is not transactional. Writing more than once
- * is not the test either. The rule (`039`, corrected in `041`):
+ * **Which ones, and it is not "the compound ones".** `openEnquiry` composes two
+ * verbs and is not transactional; writing more than once is not the test
+ * either. The rule is:
  *
  *   **A partial state is acceptable exactly when every answer a reader can
  *   derive from it is true.**
@@ -27,11 +24,10 @@
  * academic; it is the whole of `evaluateCriterion` below, where a shape that
  * another call produces legitimately is false when reached by interruption.
  *
- * Each verb is decided on its own by negative test, which is how the rule was
- * earned in the first place (PJ-020, S-3c) — not by a category anyone can read
- * off a signature. **Where the reachability edge sits in the write order is the
- * useful tell**: everything written after it is a claim about a record readers
- * can already see.
+ * Each verb is decided on its own by negative test, not by a category anyone
+ * can read off a signature. **Where the reachability edge sits in the write
+ * order is the useful tell**: everything written after it is a claim about a
+ * record readers can already see.
  *
  * Worked three ways, so the distinction is demonstrated rather than asserted:
  * `recordObservations` is transactional because a failure between the evidence
@@ -168,8 +164,8 @@ interface RecordedConclusion {
  * It is the highest-frequency refusal in the domain — every verb that cites a
  * claim reaches it — so it is the one most worth having exactly once.
  *
- * Ordered fact, rule, implication, which is the order every rewritten refusal
- * under #164 uses: what the domain got, what it expected, what would satisfy it.
+ * Ordered fact, rule, implication — what the domain got, what it expected, what
+ * would satisfy it. Every refusal here follows that order.
  */
 const noFindingBearsOn = (claim: ClaimRef): string =>
   `no finding bears on claim ${claim}; a claim can be cited only once an analysis ` +
@@ -216,11 +212,10 @@ export class WriteSurface extends SessionCore {
   /**
    * Puts a question on the record without pursuing it.
    *
-   * This is what makes "untested" a state of the record rather than something
-   * a reader invents: S-1 must answer *what has not been tested*, and a
-   * question nobody has written down cannot be reported as untested without
-   * manufacturing it. Posing is deliberately cheap — a hunch is allowed on the
-   * books before anyone knows what the experiment is.
+   * This is what makes "untested" a state of the record rather than something a
+   * reader invents: a question nobody has written down cannot be reported as
+   * untested without manufacturing it. Posing is deliberately cheap — a hunch
+   * is allowed on the books before anyone knows what the experiment is.
    *
    * Identity is the returned handle, never the wording. Posing the same words
    * twice gives two questions, because two people can ask the same thing for
@@ -252,11 +247,9 @@ export class WriteSurface extends SessionCore {
    * Opens a line of enquiry pursuing a question already on the record.
    *
    * One question may be pursued many ways — that is what a `LineOfEnquiry`
-   * *is*, and until S-1 nothing exercised it: every enquiry had exactly one
-   * question and every question exactly one enquiry, so the two were
-   * distinguishable only by S-4's closure argument. `approach` names the
-   * pursuit, not the question, and carrying similar words to another pursuit
-   * of the same question has no effect on identity either way.
+   * *is*. `approach` names the pursuit, not the question, and carrying similar
+   * words to another pursuit of the same question has no effect on identity
+   * either way.
    */
   async pursue(input: PursueCommand): Promise<Pursued> {
     return this.graph.inTransaction(async () => {
@@ -279,15 +272,12 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * Poses a question and immediately pursues it — the common case, and the
-   * only shape that existed before S-1.
+   * Poses a question and immediately pursues it — the common case.
    *
-   * Both nodes are created, because they are different things: the question is
-   * what is unknown, the enquiry is how it is being pursued. Until S-4 this
-   * created only the enquiry — and closure attaches to the question, so a
-   * closed enquiry went on reporting itself open. That was a service-layer
-   * collapse, not a gap in the model: `MOTIVATES` and `RESOLVES` both already
-   * existed. See PJ-008 row Q.
+   * **Both nodes are created**, because they are different things: the question
+   * is what is unknown, the enquiry is how it is being pursued. Creating only
+   * the enquiry leaves closure with nothing to attach to, since closure is on
+   * the question, and a closed enquiry goes on reporting itself open.
    */
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
     return this.graph.inTransaction(async () => {
@@ -308,8 +298,7 @@ export class WriteSurface extends SessionCore {
    * The original keeps its words. A vague hunch that later turns out to have
    * been the right instinct is worth being able to read back in the form it
    * was actually held, and rewriting it in place would make every programme
-   * look as though it had known its final question from the start — which is
-   * S-1's whole complaint.
+   * look as though it had known its final question from the start.
    *
    * Sharpening is not answering and not closing: the original stays open
    * unless something later resolves it on evidence.
@@ -317,8 +306,8 @@ export class WriteSurface extends SessionCore {
    * `knowing` freezes what the act was taken in light of. It is captured here,
    * at the moment of sharpening, because the alternative — reconstructing it
    * later from what stands *now* — back-dates every subsequent result onto the
-   * decision. S-1 asks this question after more evidence has arrived, for
-   * exactly that reason.
+   * decision. The question it answers is asked after more evidence arrives,
+   * which is what makes the freezing load-bearing.
    */
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
     return this.graph.inTransaction(async () => {
@@ -370,18 +359,15 @@ export class WriteSurface extends SessionCore {
 
   /**
    * Records raw observations — the durable measurements an analysis later
-   * interprets. Kept distinct from the conclusions drawn from them, which is
-   * the entire premise of S-11: an inference can be wrong while the
-   * observations it consumed remain fine.
+   * interprets. Kept distinct from the conclusions drawn from them: an
+   * inference can be wrong while the observations it consumed remain fine.
    *
-   * **Taking measurements is work, and this records it as such (row AD).** For
-   * eighteen scenarios it created `Evidence` with no producing `EvidenceUnit`,
-   * which PJ-001 defines as impossible. Three cold reviewers flagged it and
-   * three scenarios were pointed at it without finding harm; S-9b found the
-   * harm. `whatIsKnown()` decides whether anyone has looked at a question from
-   * `EvidenceUnit -ADDRESSES-> LineOfEnquiry`, so a question pursued only
-   * through observations reported itself `untested` — *"one nothing has ever
-   * been run against"*. Populated, confident, and false.
+   * **Taking measurements is work, and this records it as such.** Without a
+   * producing `EvidenceUnit` the `Evidence` has no producer at all, and
+   * `whatIsKnown()` decides whether anyone has looked at a question from
+   * `EvidenceUnit -ADDRESSES-> LineOfEnquiry` — so a question pursued only
+   * through observations would report itself `untested`, meaning *nothing has
+   * ever been run against it*. Populated, confident, and false.
    *
    * The unit `PRODUCES` the evidence and **not** the artefact, which is where
    * this differs from `recorded()`. There the artefact is an analysis *output*
@@ -399,10 +385,8 @@ export class WriteSurface extends SessionCore {
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
     return this.graph.inTransaction(async () => {
-      // Atomic, and this is the sharper half of row AD's fix. Before the unit
-      // existed there was nothing an interrupted call could leave behind that the
-      // model called impossible; now a failure between the evidence and the unit
-      // would write *precisely* the invariant this verb was changed to stop --
+      // Atomic. A failure between the evidence and its unit writes *precisely*
+      // the invariant this verb exists to prevent --
       // durably, and looking exactly like the eighteen scenarios of records that
       // predate the fix. See TenantGraph.inTransaction.
       const { artefact } = await this.graph.inTransaction(async () => {
@@ -415,13 +399,11 @@ export class WriteSurface extends SessionCore {
           statement: input.finding,
         });
         // `role` is recorded because the property is not optional, not because
-        // anything reads it: `EvidenceUnitRole` has nine values, and until this
-        // call one writer and no readers anywhere in `src/`. An "observation"
-        // value was the obvious move and was declined -- adding vocabulary to a
-        // union nothing consumes is the dead shape PJ-007 found in
-        // `buildAsClause`, and the no-cull policy does not cover it: that policy
-        // protects labels and edges, which are claims about the domain, and the
-        // CQRS views were removed on exactly this distinction. `experiment` is
+        // anything reads it: `EvidenceUnitRole` has one writer and no readers
+        // anywhere in `src/`. An "observation" value was declined -- adding
+        // vocabulary to a union nothing consumes is dead shape, and the no-cull
+        // policy covers labels and edges, which are claims about the domain,
+        // not property values. `experiment` is
         // the nearest existing value for a measurement taken rather than
         // inferred, and it is a placeholder until something reads the field.
         const unit = await this.graph.createNode("EvidenceUnit", {
@@ -457,22 +439,17 @@ export class WriteSurface extends SessionCore {
    * conclusions. Creates the computation, the unit of work that ran it, the
    * artefact holding its output, and one finding + proposition per conclusion.
    *
-   * `from` names the observations consumed, recorded as real execution
-   * lineage (`CONSUMES`). Until S-11 forced the question there was no such
-   * edge, and the only route back to inputs went out to the enquiry and
-   * back — which answered a different question and produced a genuine false
-   * inference in `whySupported()`. See EDGE_SCHEMA.CONSUMES.
+   * `from` names the observations consumed, recorded as real execution lineage
+   * (`CONSUMES`). A route back to inputs through the enquiry instead answers a
+   * different question and produces a false inference in `whySupported()`. See
+   * EDGE_SCHEMA.CONSUMES.
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
       const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
-      // The analysis is its own act, and each conclusion is another. **N+1
-      // events, and that is the truthful count**: concluding four things is
-      // four things a researcher did, and this must record them the same way
-      // the CLI does when a person makes the same four calls. An analysis with
-      // no conclusions yet emits exactly one and is a real, honest state --
-      // `enquiry` prints "has produced nothing yet" and `known` buckets it as
-      // worked-on-no-answer.
+      // An analysis with no conclusions yet emits exactly one event and is a
+      // real state: `enquiry` prints "has produced nothing yet" and `known`
+      // buckets it as worked-on-no-answer.
       const events = await this.emit("recordAnalysis", analysis, {
         enquiry: input.enquiry,
         method: input.method,
@@ -486,9 +463,7 @@ export class WriteSurface extends SessionCore {
    *
    * Composed verbs call this. A researcher who re-verified a result did one
    * thing, and a log that also records the analysis underneath it describes the
-   * implementation — the rule `openEnquiry` established (PJ-014), applied where
-   * external review found it had lapsed: `reverify()` and `replaceAnalysis()`
-   * were each emitting two events while their journals claimed one.
+   * implementation instead of the act.
    */
   private async recorded(
     input: Omit<RecordAnalysisCommand, "concludes">,
@@ -533,22 +508,19 @@ export class WriteSurface extends SessionCore {
     // than one per occurrence: `createEdge` treats `(from, label, to)` as
     // identity and a repeat as a no-op, backed by a real
     // `UNIQUE (start_id, end_id)` index -- so `from: [A, B, A]` cannot be three
-    // edges, and writing it as two silently dropped the second A (S-10e).
+    // edges, and writing it as two silently drops the second A.
     //
     // The caller said the run read three things. Storing two is losing what the
     // caller said, in the store whose job is not to. Refusing `[A, A]` was the
     // other available answer and is worse: a null test compares a series against
     // itself, which is an ordinary thing to record, and declining it would be
-    // LabKit deciding a legitimate run is not recordable -- exactly what S-10d
-    // took out.
+    // LabKit deciding a legitimate run is not recordable.
     const positionsFor = new Map<ObservationsRef, number[]>();
     for (const [position, source] of input.from.entries()) {
       // An analysis is named by its computation; what it *read* is that
       // computation's output artefact, which is what CONSUMES points at.
-      // Which kind of input this is, from the id's own prefix. It was
-      // `source.kind === "analysis"` while a handle was an object; the prefix
-      // was already the authority even then -- `createEdge` has never consulted
-      // `kind` -- so this reads the same fact from the one place carrying it.
+      // Which kind of input this is, from the id's own prefix -- the one place
+      // carrying that fact, and what `createEdge` consults too.
       const artefact =
         labelForNaturalId(source) === "Computation"
           ? await this.outputArtefactOf(source as AnalysisRef)
@@ -559,7 +531,7 @@ export class WriteSurface extends SessionCore {
     }
     for (const [artefact, positions] of positionsFor) {
       // No verdict rests on any of this: `reproductionOf` reports both runs'
-      // lists in order and adjudicates nothing (S-10d).
+      // lists in order and adjudicates nothing.
       await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact, {
         positions,
       });
@@ -575,25 +547,17 @@ export class WriteSurface extends SessionCore {
    * A conclusion is a research act of its own: a run draws its findings one at a
    * time, and each is recorded when it is reached.
    *
-   * ## `replacing` supersedes exactly one finding, and needs no new edge
+   * ## `replacing` names which finding this one stands in place of
    *
-   * `Decision -[:CHANGES]-> Claim` already means *this decision changed which
-   * claim stands*, and `MOTIVATES` already names what replaced it —
-   * `withdrawalOf()` reads precisely that pair. So a partial replacement is
-   * expressible with the edges the model has.
+   * It does not supersede: by the time a successor's conclusions are recorded,
+   * `keep` has already superseded everything it did not carry forward. This
+   * says *which* superseded finding a new one replaces, so a reader does not
+   * have to match on wording.
    *
-   * **That is one reading, not two**, and the distinction matters because
-   * `PROMOTES` was split out of `CHANGES` for being a second one. `reinterpret`
-   * writes `CHANGES` for *this reading was narrowed* and this writes it for
-   * *this finding was superseded*; both are a decision withdrawing a claim and
-   * naming its successor, and every reader — `withdrawalOf`, `whySupported` —
-   * wants the same answer from both: that claim no longer stands, this one does.
-   * `PROMOTES` was different in kind: it asserts a claim *more strongly*, so
-   * reading it as `CHANGES` made promotion retract what it promoted.
-   *
-   * `REVERIFIES` is the edge that looks right here and is not. It means
-   * *re-verified* — the same proposition checked again — where this means
-   * *superseded*. Using it would be the one-edge-two-readings shape above.
+   * The decision it mints writes `SUPERSEDES` to the old claim and `MOTIVATES`
+   * to the new — not `CHANGES`, which means *the same evidence read
+   * differently*. `REVERIFIES` is the other edge that looks right and is not:
+   * it means the same proposition checked again.
    *
    * ## What is not written
    *
@@ -606,14 +570,7 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * `conclude`, plus the review a composition can supply. **The compounds call
-   * this one.**
-   *
-   * `because` is not on {@link ConcludeCommand} and this is not plumbing: a
-   * researcher concluding one thing at a terminal is not holding a review
-   * handle, and `replaceAnalysis` is the act that says a review caused the
-   * supersession. Keeping it off the command is what stops the CLI and MCP
-   * asking for a value neither of their callers has.
+   * `conclude`'s work in its own mint scope. **The compounds call this one.**
    */
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () =>
@@ -895,9 +852,9 @@ export class WriteSurface extends SessionCore {
   /**
    * Records a reviewer's finding about an analysis.
    *
-   * The review attaches to the inferential activity (the evidence unit), not
-   * to the execution that ran it — what gets criticized in S-11 is the
-   * method, and nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
+   * The review attaches to the inferential activity (the evidence unit), not to
+   * the execution that ran it: what a reviewer criticises is the method, and
+   * nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
     return this.graph.inTransaction(async () => {
@@ -945,23 +902,20 @@ export class WriteSurface extends SessionCore {
       // reader sees is arbitrary. Demonstrated through the public API with no
       // interruption at all: abandon an enquiry, later find a result and close it
       // citing the evidence, and the record still reports `abandoned`,
-      // `answer: null`, `evidence: []`. The answer is erased, and `abandoned` is a
-      // positive classification, so PJ-011 §5 does not excuse it.
-      //
-      // This is a *different route* to the wrong answer `043` found by
-      // interruption, and it survives that fix untouched, because nothing here
-      // fails halfway. Two clean calls are enough.
+      // `answer: null`, `evidence: []`. The answer is erased, and `abandoned` is
+      // a positive classification rather than an empty result. Two clean calls
+      // are enough; nothing has to fail halfway.
       //
       // **Refused rather than resolved in the reader**, and the choice is not
       // arbitrary: `closeEnquiry` is the only writer of `RESOLVES`, so with this
       // guard two resolving decisions cannot exist, and a reader-side tie-break
-      // would be a branch nothing can reach — the `DEFERS` shape PJ-011 §6
-      // describes, where an unreachable branch was not merely dead but wrong.
+      // would be a branch nothing can reach, and an unreachable branch is not
+      // merely dead but usually wrong.
       //
-      // The refusal has something real to refuse (S-5, S-10): a caller closing a
-      // question that is already closed. Re-opening a settled question on new
-      // evidence is a *different research act* and has no verb; when a scenario
-      // needs one it gets built, rather than being smuggled in as a second close.
+      // The refusal has something real to refuse: a caller closing a question
+      // that is already closed. Re-opening a settled question on new evidence is
+      // a *different research act* and has no verb; it gets built when something
+      // needs it, rather than being smuggled in as a second close.
       const alreadyResolved = await this.graph.query(
         `MATCH (d:Decision)-[:RESOLVES]->(:Question {natural_id: $id}) RETURN d`,
         { d: vertexProps<{ natural_id: string; reason: string }>() },
@@ -982,8 +936,8 @@ export class WriteSurface extends SessionCore {
         // belongs to THIS enquiry. One hop from the claim rather than a search
         // for a proposition.
         // BOTH bearings. A question answered "no" is answered on a finding that
-        // CHALLENGES its proposition -- S-4's whole case -- and checking only
-        // SUPPORTS rejected exactly the closure the scenario exists for.
+        // CHALLENGES its proposition, so checking only SUPPORTS rejects exactly
+        // that closure.
         const addresses: unknown[] = [];
         for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
           addresses.push(
@@ -1018,8 +972,8 @@ export class WriteSurface extends SessionCore {
       // between them with `.find()` over unordered rows, and the orphan can win.
       // The question then reports `closure: "abandoned"`, `answer: null` for a
       // question that was answered "no" on cited evidence. The answer is not
-      // inverted — it is erased, and PJ-011 §5 does not cover it, because
-      // "abandoned" is a positive classification and not an empty result.
+      // inverted, it is erased -- and "abandoned" is a positive classification
+      // rather than an empty result.
       const decision = await this.graph.inTransaction(async () => {
         const decision = await this.graph.createNode("Decision", {
           decided_at: this.clock.now(),
@@ -1089,8 +1043,7 @@ export class WriteSurface extends SessionCore {
 
   /**
    * Declares a gate: a consequence attached to a criterion, protecting some
-   * work. Declaring a gate must not make it satisfied — that is the entire
-   * subject of S-17.
+   * work. **Declaring a gate must not make it satisfied.**
    */
   async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
     return this.graph.inTransaction(async () => {
@@ -1099,11 +1052,10 @@ export class WriteSurface extends SessionCore {
           "a gate needs at least one criterion to govern it: a gate enforces a condition, and one " +
             "governed by nothing could never be satisfied or blocked — name them in governedBy",
         );
-      // And a gate protecting nothing is not a gate either. Before S-3b there
-      // was no way to record a check that qualifies a finding without minting
-      // one: `gateStatus()` then answered "what is blocked?" with `blocked` and
-      // an empty `gating` list -- a control-plane object asserting a consequence
-      // for work that does not exist. `recordAnalysis({ heldTo })` is how a
+      // And a gate protecting nothing is not a gate either: `gateStatus()`
+      // would answer "what is blocked?" with `blocked` and an empty `gating`
+      // list -- a control-plane object asserting a consequence for work that
+      // does not exist. `recordAnalysis({ heldTo })` is how a
       // standard with nothing downstream is recorded now.
       if (input.protecting.length === 0)
         throw new Error(
@@ -1167,15 +1119,14 @@ export class WriteSurface extends SessionCore {
       // from that point the evaluation is reachable and the edges after it are
       // the ones that say what it means.
       //
-      // The window that earned this is `BASED_ON`. A verdict that lost it reads
-      // as reached against nothing — `basis: []`, an empty result, which PJ-011
-      // §5 says is not a wrong answer. But `isWithdrawn` is
+      // The window that earns this is `BASED_ON`. A verdict that lost it reads
+      // as reached against nothing — `basis: []`, which on its own is an
+      // absence rather than a wrong answer. But withdrawal is
       // `cited > 0 && standing === 0`, so a verdict that cited nothing can never
-      // be withdrawn. Retract the evidence it was actually reached against and
+      // be withdrawn: retract the evidence it was actually reached against and
       // the gate stays **blocked** by a `fail` the record insists still stands.
-      // That is a positively false answer, not an absence, and it is what
-      // separates this verb from `sharpen` (`039`), whose partial states no
-      // reader can reach.
+      // That is positively false, which is what separates this verb from
+      // `sharpen`, whose partial states no reader can reach.
       const evaluation = await this.graph.inTransaction(async () => {
         const ev = await this.graph.createNode("CriterionEvaluation", {
           value: input.value,
@@ -1184,10 +1135,9 @@ export class WriteSurface extends SessionCore {
         });
         await this.graph.createEdge(input.criterion, "EVALUATED_AS", ev.natural_id);
         if (input.gate) await this.graph.createEdge(ev.natural_id, "TRIGGERS", input.gate);
-        // What the verdict was reached against. `BASED_ON: CriterionEvaluation ->
-        // Evidence` was declared in PJ-004 and never written until S-8; without
-        // it, a condition established by measurement and one asserted by an agent
-        // returned identical records. See PJ-008 row W.
+        // What the verdict was reached against. Without it, a condition
+        // established by measurement and one asserted by an agent return
+        // identical records.
         if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
         return ev;
       });
@@ -1206,7 +1156,7 @@ export class WriteSurface extends SessionCore {
 
   /**
    * Records that a historical result was re-checked, without claiming its run
-   * was reproduced (S-10).
+   * was reproduced.
    *
    * `recordAnalysis` plus one edge, and the edge is the whole point: recorded
    * as an ordinary analysis the re-run becomes a second finding behind the same
@@ -1223,9 +1173,9 @@ export class WriteSurface extends SessionCore {
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
-      // Atomic: without the second write the durable state is precisely S-10's
-      // demonstrated wrong answer -- a second independent support standing where
-      // a re-verification was meant. See TenantGraph.inTransaction.
+      // Atomic: without the second write the durable state is a second
+      // independent support standing where a re-verification was meant. See
+      // TenantGraph.inTransaction.
       const verification = await this.graph.inTransaction(async () => {
         const original = await this.findingFor(input.historical, input.concludes.proposition);
         if (!original) {
@@ -1275,27 +1225,21 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * Records that a question is being left open on purpose (S-14).
+   * Records that a question is being left open on purpose.
    *
    * Not closing it. `closeEnquiry()` with nothing cited reports the question
-   * **abandoned** — nobody worked on it, no result behind it — which is a
-   * confident misreading of a deliberate decision as neglect, and was the only
-   * thing a researcher could do here before this verb existed.
+   * **abandoned** — nobody worked on it, no result behind it — which reads a
+   * deliberate decision as neglect.
    *
-   * `until` is the condition that would reopen it, and it lands on the
-   * decision's `invalidation_check`, which already meant exactly that: what
-   * would make this decision wrong. The bullet it answers insists the condition
-   * be about the world — new design, new data — rather than "run the analysis
-   * again", and nothing here can enforce that; what the model guarantees is
-   * that a condition was named at all, which is the difference between deciding
-   * to stop and drifting to a halt.
+   * `until` is the condition that would reopen it, landing on the decision's
+   * `invalidation_check`: what would make this decision wrong. The condition
+   * should be about the world — new design, new data — rather than "run the
+   * analysis again", and nothing here can enforce that. What the model
+   * guarantees is that a condition was named at all, which is the difference
+   * between deciding to stop and drifting to a halt.
    *
-   * **No `Task` is created**, and none may be needed to make any of this
-   * answerable. A to-do item nobody intends to action, minted so a survey can
-   * report it, is the ceremony PJ-001 forbids and the failure mode §2 names.
-   *
-   * Writes `DEFERS`, which is its first writer since PJ-004 declared it —
-   * CLAUDE.md's standing example of a reader with no writer, now walked.
+   * **No `Task` is created.** A to-do item nobody intends to action, minted so
+   * a survey can report it, is ceremony.
    */
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
     return this.graph.inTransaction(async () => {
@@ -1317,8 +1261,8 @@ export class WriteSurface extends SessionCore {
           invalidation_check: input.until,
         });
         await this.graph.createEdge(decision.natural_id, "DEFERS", question);
-        // What was known when the call was made -- S-1's requirement, and the
-        // reason `evidence` is answerable afterwards rather than only now.
+        // What was known when the call was made, which is what makes
+        // `evidence` answerable afterwards rather than only now.
         await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
         return decision;
       });
@@ -1333,31 +1277,27 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * Promotes an exploratory finding to confirmatory standing (S-18).
+   * Promotes an exploratory finding to confirmatory standing.
    *
-   * Standing can be **conferred by an act** — the successor question rows G, K
-   * and R left open — because story 18's premise requires it: scratch is
-   * captured before anyone knows it matters, so the researcher recording it
-   * does not yet have the information a birth declaration would encode.
+   * Standing can be **conferred by an act**, because scratch is captured before
+   * anyone knows it matters and the researcher recording it does not yet have
+   * what a declaration at birth would encode.
    *
    * It does **not** replace declaring standing at creation
-   * (`Conclusion.standing`, S-7), and the prediction that it would was half
-   * refuted. Both paths are legitimate and the discriminator is whether the
-   * standing was knowable in advance: a prespecified comparison declares it
-   * *before* running, which is what prespecification is, and declaring it
-   * afterwards would be the p-hacking the design lock exists to prevent. Work
-   * that could not have declared it gets promoted instead, and pays for the
-   * lateness with a recorded reason. A reader can tell the two apart:
+   * (`Conclusion.standing`). Both paths are legitimate, and the discriminator
+   * is whether the standing was knowable in advance: a prespecified comparison
+   * declares it *before* running, which is what prespecification is, and
+   * declaring it afterwards would be the p-hacking a design lock exists to
+   * prevent. Work that could not have declared it is promoted instead and pays
+   * for the lateness with a recorded reason, which a reader can see —
    * `whySupported().promotedBecause` is present only for the second.
    *
-   * Writes `PROMOTES`, not `CHANGES`. The prediction for this build said
-   * `CHANGES` would serve, and it was refuted by demonstration — see
-   * `EDGE_SCHEMA.PROMOTES`.
+   * Writes `PROMOTES`, not `CHANGES` — see `EDGE_SCHEMA.PROMOTES`.
    *
-   * Deliberately not a gate. S-17 established that declaring a gate does not
-   * satisfy it, so a gate-conferred model would leave a claim behind an
-   * unevaluated confirmatory gate reading exploratory, and S-7's amendment
-   * check would miss a scientific change. Promotion is an act with a reason.
+   * **Deliberately not a gate.** Declaring a gate does not satisfy it, so a
+   * gate-conferred model would leave a claim behind an unevaluated confirmatory
+   * gate reading exploratory, and an amendment check would miss a scientific
+   * change. Promotion is an act with a reason.
    */
   async promote(input: PromoteCommand): Promise<Promoted> {
     return this.graph.inTransaction(async () => {
@@ -1365,9 +1305,9 @@ export class WriteSurface extends SessionCore {
         const claim = input.claim;
         // `invalidation_check` is the verb's own sentence about what would make a
         // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
-        // `amendDesign` and `reinterpret`. S-14 is the one place the researcher
-        // supplies it, because there naming the condition *is* the act. Taking an
-        // `until:` here that no scenario reads would be the ceremony S-14 forbids.
+        // `amendDesign` and `reinterpret`. `acceptAsUnresolved` is the one place
+        // the researcher supplies it, because there naming the condition *is*
+        // the act.
         const decision = await this.graph.createNode("Decision", {
           decided_at: this.clock.now(),
           reason: input.because,
@@ -1403,18 +1343,16 @@ export class WriteSurface extends SessionCore {
    * Amends a locked design: replaces one condition with another, recording the
    * act rather than editing the setting.
    *
-   * This is the `Decision` S-11 declined to mint. There, "we replaced X
-   * because of review Y" pointed causality backwards and no assertion used it.
-   * Here the decision is the whole point: the original setting has to stay
-   * readable, the reason and its evidence have to survive, and one amendment
-   * has to be orderable against another.
+   * The decision is the whole point: the original setting has to stay readable,
+   * the reason and its evidence have to survive, and one amendment has to be
+   * orderable against another.
    *
    * The diagnosis is cited **specifically**, not snapshotted. `sharpen()`
    * freezes everything standing because a sharpening genuinely is taken in
    * light of everything known; an amendment is taken on one diagnosis, and
    * recording every finding on the record as its basis would manufacture a
-   * rationale the researcher never had. See PJ-008 row AA — the same edge now
-   * carries both senses, deliberately and with the boundary written down.
+   * rationale the researcher never had. `BASED_ON` carries both senses, and
+   * this is the boundary between them.
    *
    * `SUPERSEDES` chains this amendment to the previous one on the same design,
    * found rather than supplied: an ordering that depends on the caller
@@ -1556,9 +1494,9 @@ export class WriteSurface extends SessionCore {
    * here — it invalidates the old analysis's output, records the replacement
    * against the same observations, and returns what moved.
    *
-   * The observations are deliberately untouched: only the artefact holding
-   * the old analysis's OUTPUT is invalidated. That separation is the whole
-   * point of S-11.
+   * The observations are deliberately untouched: only the artefact holding the
+   * old analysis's OUTPUT is invalidated. An inference can be wrong while the
+   * measurements it read remain fine.
    */
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
     return this.revise({ ...input, keeping: [] }, "replaceAnalysis");
@@ -1702,12 +1640,11 @@ export class WriteSurface extends SessionCore {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
 
-      // A reinterpretation narrows a READING, not one node. Two analyses in one
-      // line of enquiry concluding the same sentence share a reading, and S-12
-      // requires both to stop standing -- so the scope is still (proposition,
-      // enquiry). What changed is that both now come FROM THE NAMED CLAIM
-      // instead of being searched for, so nothing is guessed and the caller
-      // cannot be surprised about which reading was narrowed.
+      // A reinterpretation narrows a READING, not one node: two analyses in one
+      // line of enquiry concluding the same sentence share a reading, and both
+      // stop standing. So the scope is (proposition, enquiry) -- but reached
+      // from the named claim rather than searched for, so nothing is guessed
+      // about which reading was narrowed.
       const scope = await this.scopeOf(input.of);
       const previously = scope.proposition;
       const claims = await this.graph.query(
@@ -1793,10 +1730,8 @@ export class WriteSurface extends SessionCore {
       return {
         at,
         previously: withdrawn,
-        // The narrower claim was minted here and its handle discarded -- the
-        // eighth thing CLAUDE.md's "does the act record what it produced, or
-        // only what it acted on?" has caught. A caller had to go back through
-        // `claimsAsserting` to name what this very call had just created.
+        // The act records what it produced: without this a caller has to go
+        // back through `claimsAsserting` to name what this very call created.
         nowClaims: {
           claim: ref("claim", narrower.natural_id),
           asserts: input.as,
@@ -1822,11 +1757,9 @@ export class WriteSurface extends SessionCore {
    * and that command's attribution.
    *
    * Returns an array, always -- one entry per event `emit` recorded, which
-   * today is always exactly one (CLAUDE.md: "a verb that composes others
-   * records one event, not one per step"). The uniform shape is for the
-   * caller: every write verb hands its own return value's `events` field
-   * straight through from here, so a `--json` renderer or a future verb that
-   * genuinely needs more than one event needs no new plumbing.
+   * today is always exactly one. The uniform shape is for the caller: every
+   * write verb hands its own `events` field straight through from here, so a
+   * `--json` renderer needs no new plumbing if a verb ever records more.
    */
   private async emit(
     operation: Operation,
@@ -1982,9 +1915,8 @@ export class WriteSurface extends SessionCore {
    * An `AnalysisRef` currently carries the computation's id, so reaching the
    * unit is a hop. Worth watching: "analysis" keeps behaving like the
    * EvidenceUnit (the bounded inferential activity) rather than the
-   * Computation (its execution) -- the review endpoint went that way too. Not
-   * changed now, because S-11 passes and renaming nouns is not a reason to
-   * refactor; flagged so a later scenario can settle it.
+   * Computation (its execution) -- the review endpoint goes that way too.
+   * Flagged rather than renamed: renaming nouns is not a reason to refactor.
    */
   private async unitOf(analysis: AnalysisRef): Promise<UnitRef> {
     const rows = await this.graph.query(

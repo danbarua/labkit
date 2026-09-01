@@ -57,7 +57,7 @@ export async function runMigrations(db: PGlite): Promise<void> {
  * **Deliberately not called by `directPostgresBackend`.** With no lock and N
  * processes connecting concurrently, migrating on connect would be a race;
  * against that backend migrations are an out-of-band deploy step run once
- * before any LabKit process starts (PJ-004). This exists for the callers that
+ * before any LabKit process starts. This exists for the callers that
  * *are* that step: `tests/helpers/db.ts` when `LABKIT_DB_URL` points it at a
  * container, and anyone migrating a database by hand.
  *

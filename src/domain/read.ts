@@ -1,13 +1,6 @@
 /**
  * The verbs that answer questions about the record, and change nothing.
  *
- * The larger half, and the half the consumer contract is about.
- * `docs/consumer-contract/024_vertical_slice_results.md` demonstrated three gaps
- * here at bar 4 — rows Z, F and S. **All three have since landed**: Z resolved
- * with `Decision.decided_at` and `Question.posed_at`, F closed `boundary`, S
- * refuted. The sentence used to say "this is where the next three builds land"
- * and pointed a new reader at finished work.
- *
  * Nothing in this file may emit. `emit` is not reachable from `SessionCore`, so
  * that is enforced by construction rather than by review.
  */
@@ -102,10 +95,8 @@ type Identified = { natural_id: string };
 /**
  * Deduplicate by identity, never by wording.
  *
- * The reason this helper exists rather than a `Set` of strings: two records can
- * say the same sentence and be different records (S-5), so collapsing on text
- * reports one where there are two. `whatDependsOn` was doing exactly that until
- * PJ-030 §5.
+ * A `Set` of strings will not do: two records can say the same sentence and be
+ * different records, so collapsing on text reports one where there are two.
  */
 function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
   return [...new Map(items.map((item) => [id(item), item])).values()];
@@ -136,32 +127,26 @@ export type ResearchReads = Pick<ReadSurface, Methods<ReadSurface>>;
  * question* — which is true wherever the caller is.
  *
  * **A verb may be named only if both surfaces spell it identically AND its
- * promise has been checked against the code that implements it.** `search` is
- * spelled the same on both, which is why the first version of this file pointed
- * six refusals at it — and three of those promised something it cannot do.
- * `search` scans {@link SEARCHABLE_PROSE}, and `Computation`, `Claim` and
- * `Artefact` are absent from that table: one is the `ReadOnlyString` bug #159
- * excluded, two are deliberate `IndexedString` exclusions. *"'search' finds its
- * handle by the method"* sent a caller to a search that returns nothing.
+ * promise has been checked against the code that implements it.** Spelling is
+ * not enough: `search` is spelled the same on both surfaces but scans only
+ * {@link SEARCHABLE_PROSE}, and `Computation`, `Claim` and `Artefact` are
+ * absent from that table — so *"'search' finds its handle by the method"* sends
+ * a caller to a search that returns nothing.
  *
  * **A taught remedy that fails is worse than the opacity it replaced**, because
- * the caller believes it and spends the trust before finding out. That is the
- * whole reason this comment sits here rather than in CLAUDE.md: the reader who
- * needs it is the one adding the next refusal, and they are looking at this
- * file.
+ * the caller believes it and spends the trust before finding out.
  */
 export class ReadSurface extends SessionCore {
   /**
    * What was done, in order — the one read that answers from the event log
    * rather than the graph.
    *
-   * **This is not the exception to CLAUDE.md's rule, it is the rule's other
-   * half.** *Events explain how state changed; the graph explains what the
-   * current research state is.* Every other read here answers "what is true
-   * now" and must never consult the log. This one asks "what happened", which
-   * the graph cannot answer at all: the graph holds the result of every act and
-   * no record of the acts themselves, and after PJ-031 the log is the only
-   * place that says **who** did any of it.
+   * **Events explain how state changed; the graph explains what the current
+   * research state is.** Every other read here answers "what is true now" and
+   * must never consult the log. This one asks "what happened", which the graph
+   * cannot answer at all: it holds the result of every act and no record of the
+   * acts themselves, and the log is the only place that says **who** did any of
+   * it.
    *
    * So: do not reach for this to establish current state, and do not add a
    * caller that does. If an answer can be derived from the graph, derive it
@@ -425,10 +410,9 @@ export class ReadSurface extends SessionCore {
       //
       // `established` is the strongest word this survey has and means the
       // answer rests on promoted work **that met the standard it was held to**.
-      // Promotion alone is not enough — a claim held to a check that failed, or
-      // that nobody ran, is S-3b's case: a prespecified check nobody performed
-      // counts against the finding it qualifies (issue #62, S-19). A claim held
-      // to nothing is vacuously met, which keeps S-18's promoted scratch in
+      // Promotion alone is not enough: a prespecified check that failed, or
+      // that nobody ran, counts against the finding it qualifies. A claim held
+      // to nothing is vacuously met, so promoted work under no standard stays
       // `established`.
       const answer: "yes" | "no" = answeringBearing.get(question) === "CHALLENGES" ? "no" : "yes";
       if (claim && claim.kind === "confirmatory" && met.get(claim.natural_id) !== false)
@@ -529,10 +513,9 @@ export class ReadSurface extends SessionCore {
         },
       };
     }
-    // Accepted, not closed. `open` stays TRUE, which is the correction S-14
-    // forced: the previous branch reported `open: false`, so a question left
-    // open on purpose read as shut. The question has not been answered and
-    // nobody claims it has; what changed is that leaving it open is now a
+    // Accepted, not closed. `open` stays TRUE: a question left open on purpose
+    // is not shut. It has not been answered and nobody claims it has; what
+    // changed is that leaving it open is now a
     // recorded decision rather than an absence of one.
     const accepting = rows.find((r) => r.deferring)?.deferring ?? null;
     if (accepting && !resolving) {
@@ -567,12 +550,11 @@ export class ReadSurface extends SessionCore {
     // What the closing decision rests on. Nothing cited means the question was
     // abandoned, not answered -- absence of evidence is not a negative result.
     const cited = await this.graph.query(
-      // Only the challenging bearing is fetched. An earlier version also
-      // returned the supporting claim as `forClaim` and never read it: polarity
-      // is "no" when something challenges and "yes" otherwise, so the
-      // supporting side is the default rather than an input. Dead the same way
-      // PJ-007's `buildAsClause` branch was -- and silently broken besides,
-      // since a camelCase column decodes as null (see `buildAsClause`, which
+      // Only the challenging bearing is fetched: polarity is "no" when
+      // something challenges and "yes" otherwise, so the supporting side is the
+      // default rather than an input. Returning it as `forClaim` would also be
+      // silently broken, since a camelCase column decodes as null (see
+      // `buildAsClause`, which
       // now refuses the name that hid this).
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(against:Claim)
@@ -608,14 +590,11 @@ export class ReadSurface extends SessionCore {
     // What the closure rests on: promoted work, or scratch nobody promoted.
     // Answered either way -- the question is settled as far as anyone has taken
     // it -- but a reader deciding whether to build on it should not have to go
-    // and look (S-18).
+    // and look.
     // **Both bearings.** A question answered *no* is settled by evidence that
-    // CHALLENGES the claim, and walking only SUPPORTS found no claim at all --
-    // so a negative result somebody had vouched for reported itself as resting
-    // on scratch, which tells a reader not to build on it (S-18b). Third time
-    // this assumption has been found in a query path: `scopeOf` and
-    // `closeEnquiry`'s ownership check were the first two. No edge alternation
-    // in AGE, so it is two OPTIONAL MATCHes, exactly as `conclusionsOf` does.
+    // CHALLENGES the claim, so walking only SUPPORTS finds no claim at all and
+    // a promoted negative result reports itself as resting on scratch. No edge
+    // alternation in AGE, so it is two OPTIONAL MATCHes.
     const promoted = await this.graph.query(
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
@@ -652,17 +631,14 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * `enquiryStatus`, alongside where this enquiry's own question currently
-   * sits in the overall survey (#128, narrowed on review -- see
-   * `EnquiryInContext`'s own doc comment for why it is one bucket, not the
-   * whole survey).
+   * `enquiryStatus`, alongside where this enquiry's own question sits in the
+   * overall survey — one bucket, not the whole survey. See
+   * `EnquiryInContext`'s own doc comment.
    *
-   * **No adapter reaches this directly since the redesign** (#128 round 2):
-   * the `enquiry --in-context` flag and `enquiry_in_context` tool it served
-   * are gone, folded into `why <enquiry>`'s `LineOfEnquiry` case
-   * (`explainEnquiry`, below `ReadSurface`) — see `NOT_EXPOSED`. Kept public
-   * rather than made `private`: `explainEnquiry` is a module-level function,
-   * not a class member, for the reason given on `Explainer`.
+   * **No adapter reaches this directly.** It is the body of `why <enquiry>`'s
+   * `LineOfEnquiry` case (`explainEnquiry`, below `ReadSurface`) — see
+   * `NOT_EXPOSED`. Public rather than `private` because `explainEnquiry` is a
+   * module-level function, not a class member; see `Explainer`.
    */
   async enquiryInContext(enquiry: EnquiryRef): Promise<EnquiryInContext> {
     const status = await this.enquiryStatus(enquiry);
@@ -703,15 +679,10 @@ export class ReadSurface extends SessionCore {
    * Everything else in `whySupported` now selects by handle, because two
    * analyses in one enquiry concluding the same sentence are two claims and a
    * check held by one is not the other's standard. **Findings are the
-   * exception, and the corpus is what says so**: selecting them by handle
-   * turned 13 scenarios red, S-10's *"the re-run reads as independent
-   * confirmation"* among them.
-   *
-   * That is the distinction, and it is a domain fact rather than an oversight.
-   * A re-run producing the same conclusion **corroborates** — the findings
-   * aggregate over the proposition. A prespecified check **belongs to** the
-   * analysis that was held to it. Same two nodes, two different questions, and
-   * the answer differs.
+   * exception**, and the distinction is a domain fact: a re-run producing the
+   * same conclusion **corroborates**, so findings aggregate over the
+   * proposition, while a prespecified check **belongs to** the analysis held to
+   * it. Same two nodes, two different questions, two answers.
    */
   private async findingsBearing(
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
@@ -772,13 +743,10 @@ export class ReadSurface extends SessionCore {
         `no planned work ${work}; work is planned before it can be read back, and 'search' finds its handle by the objective`,
       );
 
-    // No fallback, and that is checked rather than assumed. `planWork` writes
+    // No fallback, and that is checked rather than assumed: `planWork` writes
     // `mayRead: input.mayRead ?? []`, so the property is always present and an
-    // empty contract round-trips as a real empty array -- confirmed by putting
-    // a sentinel in a `?? []` here and watching it never appear. A `JSON.parse`
-    // in a try/catch and two runtime type guards used to stand here, all of
-    // them guarding a shape the writer cannot produce. Adding a fresh guard in
-    // their place would have been the same defect wearing shorter code.
+    // empty contract round-trips as a real empty array. A guard here would be
+    // guarding a shape the writer cannot produce.
     const loe = rows[0]?.loe;
     const q = rows[0]?.q;
     return {
@@ -806,14 +774,10 @@ export class ReadSurface extends SessionCore {
   /**
    * Which criterion governs this gate?
    *
-   * The reviewer in S-17 asks for evidence that the guard fails when the
-   * protected artefact is wrong. That is a question about the criterion, and
-   * answering it requires knowing which criterion a gate enforces.
-   *
-   * Answered via `GOVERNS`, which exists from the moment the gate is
-   * declared. Before that edge, the only route ran through a
-   * CriterionEvaluation and so returned null for exactly the gates S-17 is
-   * about — see EDGE_SCHEMA.GOVERNS.
+   * Answered via `GOVERNS`, which exists from the moment the gate is declared.
+   * A route through `CriterionEvaluation` instead returns nothing for a gate
+   * nobody has evaluated — which is exactly the gate the question is usually
+   * asked about. See EDGE_SCHEMA.GOVERNS.
    */
   async criteriaGoverning(gate: GateRef): Promise<CriterionRef[]> {
     const rows = await this.graph.query(
@@ -825,7 +789,7 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * What a re-run did and did not establish (S-10).
+   * What a re-run did and did not establish.
    *
    * The execution verdict is derived from what each run recorded consuming, not
    * from a stored flag: two runs are a reproduction when they read the same
@@ -858,9 +822,7 @@ export class ReadSurface extends SessionCore {
 
     // Keyed by natural id, never by `logical_name`. Two runs can each record
     // something called "initial conditions" and mean different data; comparing
-    // the names made those the same execution input. That is the identity-
-    // versus-wording mistake this project has now found in four unrelated
-    // places (S-5, S-12, S-3b, and here, by external review).
+    // the names would make those the same execution input.
     // What a run read, **in order and with repeats**, plus the same as a set
     // for the difference calculation below.
     //
@@ -937,7 +899,7 @@ export class ReadSurface extends SessionCore {
             })),
         ];
     // Sorted by name then identity: the name is what a reader scans, and the
-    // identity is what breaks the tie when two inputs share one (S-10c).
+    // identity breaks the tie when two inputs share one.
     differs.sort(
       (a, b) => a.what.name.localeCompare(b.what.name) || a.what.part.localeCompare(b.what.part),
     );
@@ -959,9 +921,8 @@ export class ReadSurface extends SessionCore {
     const agrees = newChallenges === oldChallenges;
 
     return {
-      // Identity and wording both. These were the computations' METHOD text
-      // only, so two runs of one method were indistinguishable -- the same
-      // `via` defect PJ-030 §4 caught one function away.
+      // Identity and wording both. Method text alone leaves two runs of one
+      // method indistinguishable.
       verification,
       verificationMethod: method[0]!.c.kind,
       of: ref("analysis", found.oldcomp.natural_id),
@@ -986,8 +947,8 @@ export class ReadSurface extends SessionCore {
    *
    * The order comes from the supersession chain alone — no decision carries a
    * timestamp, nothing is read from the event log, and natural-id allocation
-   * order is never consulted. What that does *not* order is two amendments to
-   * different designs; see PJ-008 row Z.
+   * order is never consulted. It does **not** order two amendments to different
+   * designs relative to each other.
    */
   async designHistory(gate: GateRef): Promise<DesignHistory> {
     const conditions = await this.graph.query(
@@ -1005,9 +966,6 @@ export class ReadSurface extends SessionCore {
         `gate ${gate} is governed by no condition; a design history is the record of its conditions being amended, and this gate has none to amend`,
       );
 
-    // The two maps used to say `Map<string, string>` with `// decision ->
-    // criterion it replaced` beside one of them. The comment was a type written
-    // as prose; it is a type now.
     const changedBy = new Map<DecisionRef, CriterionRef>();
     const propositionOf = new Map<CriterionRef, Prose>();
     const current: CriterionRef[] = [];
@@ -1019,8 +977,8 @@ export class ReadSurface extends SessionCore {
     }
 
     // A design history needs one condition in force. A gate governed by
-    // several unamended conditions is a different shape -- see S-3 -- and
-    // guessing which one is "the design" would be a confidently wrong answer.
+    // several unamended conditions is a different shape, and guessing which one
+    // is "the design" would be a confidently wrong answer.
     const inForce = [...new Set(current)];
     if (inForce.length !== 1) {
       throw new Error(
@@ -1150,12 +1108,11 @@ export class ReadSurface extends SessionCore {
     return ordered;
   }
   /**
-   * S-17/S-3: may this gate be relied on, and on what evidence?
+   * May this gate be relied on, and on what evidence?
    *
    * Every governing condition is itemised, including the ones nobody has
-   * evaluated. That is the point: S-3 requires a failed check to be
-   * distinguishable from a check never run, and an absent list entry cannot
-   * carry that difference.
+   * evaluated. That is the point: a failed check must be distinguishable from
+   * one never run, and an absent list entry cannot carry that difference.
    */
   async gateStatus(gate: GateRef): Promise<GateStatus> {
     const declared = await this.graph.query(
@@ -1170,8 +1127,7 @@ export class ReadSurface extends SessionCore {
       );
 
     // Every governing criterion with the evaluations that pertain to THIS
-    // gate. Two scopes are deliberately kept apart, and S-17 plus S-3
-    // together are what force the distinction:
+    // gate. Two scopes are deliberately kept apart:
     //
     //   gate-scoped  (here) -- has this condition been checked FOR this gate?
     //   criterion-scoped    -- has this check ever been shown able to fail?
@@ -1235,9 +1191,6 @@ export class ReadSurface extends SessionCore {
       checks,
       unmet,
       evaluations,
-      // `?? g.w.kind ?? "unknown"` used to sit here. Dead now: `work` carries
-      // the handle, so a caller with an odd objective can go and look rather
-      // than being handed a placeholder.
       gating: gating.map((g) => ({
         work: ref("work", g.w.natural_id),
         objective: g.w.objective ?? "",
@@ -1307,15 +1260,14 @@ export class ReadSurface extends SessionCore {
    * be a writer with no reader.
    */
   async interpretationHistory(claim: ClaimRef): Promise<InterpretationHistory> {
-    // **Walked by id.** Every step of a revision chain is already reachable by
-    // identity -- `reinterpret` writes `Decision -MOTIVATES-> narrower` and
-    // `Decision -CHANGES-> each withdrawn claim`, both carrying natural ids --
-    // so this needed a different query and no new structure. It used to find
-    // each step by the NAME of the one after it, which S-12b breaks: two
-    // independent chains passing through one sentence made a legitimate
-    // history throw `is not a single line`, because the by-name match found
-    // the other chain's claim and its decision. Same text is not same claim,
-    // which is this repo's oldest lesson arriving from an external review.
+    // **Walked by id.** `reinterpret` writes `Decision -MOTIVATES-> narrower`
+    // and `Decision -CHANGES-> each withdrawn claim`, both carrying natural
+    // ids, so every step is reachable by identity.
+    //
+    // Matching by NAME instead breaks on two independent chains passing through
+    // one sentence: the match finds the other chain's claim and its decision,
+    // and a legitimate history throws `is not a single line`. Same text is not
+    // same claim.
     const proposition = await this.assertedBy(claim);
     if (proposition === undefined)
       throw new Error(
@@ -1324,15 +1276,14 @@ export class ReadSurface extends SessionCore {
     const steps: Revision[] = [];
     let current: ConcludedClaim[] = [{ claim, asserts: proposition }];
 
-    // Seeded with the entry claim now that it holds ids. It could not be while
-    // it held wording -- a set of names cannot be primed with a claim -- so a
-    // self-loop was caught one step late.
+    // Seeded with the entry claim, which is what catches a self-loop on the
+    // first step rather than the second.
     const seen = new Set<ClaimRef>([claim]);
 
     for (;;) {
       const rows = await this.graph.query(
-        // `nxt` bound and matched by id. Lower-case names throughout: a
-        // camelCase RETURN name decodes as null (CLAUDE.md).
+        // `nxt` bound and matched by id. Lower-case RETURN names throughout: a
+        // camelCase one decodes as null. See `buildAsClause`.
         `MATCH (d:Decision)-[:MOTIVATES]->(nxt:Claim)
          WHERE nxt.natural_id IN $ids
          MATCH (d)-[:CHANGES]->(was:Claim)
@@ -1358,8 +1309,8 @@ export class ReadSurface extends SessionCore {
 
       // Every record the decision withdrew, not the one that came back first.
       // One decision withdraws every claim asserting the reading it replaced,
-      // so this is plural by construction -- S-12's two analyses reaching one
-      // reading are withdrawn together.
+      // so this is plural by construction: two analyses reaching one reading are
+      // withdrawn together.
       const withdrew: ConcludedClaim[] = [
         ...new Map(rows.map((r) => [r.was.natural_id, r.was] as const)).values(),
       ].map((was) => ({
@@ -1383,9 +1334,9 @@ export class ReadSurface extends SessionCore {
           asserts: step.nxt.name,
         },
         reason: step.d.reason,
-        // Scoped to the withdrawn claim's own line of enquiry. Passing the
-        // bare proposition asked "what was decided on the strength of this
-        // SENTENCE", which in S-12b reaches the other chain's decisions.
+        // Scoped to the withdrawn claim's own line of enquiry. The bare
+        // proposition would ask "what was decided on the strength of this
+        // SENTENCE", which reaches another chain's decisions.
         restingOnTheOldReading: await this.decidedOnTheStrengthOf(
           await this.scopeOf(withdrew[0]!.claim),
         ),
@@ -1405,19 +1356,16 @@ export class ReadSurface extends SessionCore {
    * Whether two findings actually conflict.
    *
    * Answered from what each claim is attached to — the question it answers and
-   * the way its evidence bears — never from comparing the two sentences. In
-   * S-5 the sentences are identical and the answer is "no".
+   * the way its evidence bears — never from comparing the two sentences. Two
+   * claims can be worded identically and not conflict at all.
    */
   async doTheseConflict(a: ClaimRef, b: ClaimRef): Promise<ConflictVerdict> {
     const sides = [await this.sideOf(a), await this.sideOf(b)];
     const [left, right] = sides;
 
-    // `.id`, not the handles. `EnquiryRef` is an object, so `===` between two
-    // of them is reference equality and is false even for the same enquiry --
-    // which read as "different lines of enquiry" and turned a contradiction
-    // into a dissociation, silently. The compiler accepts it: both sides have
-    // the same type. Caught by S-5, which exists to catch exactly the class of
-    // error where two records are wrongly told apart or run together.
+    // Value equality, which a handle gives: two records wrongly told apart here
+    // turn a contradiction into a dissociation, silently and with the compiler's
+    // blessing, since both sides have the same type.
     const sameScope = left!.enquiry === right!.enquiry;
     if (!sameScope) {
       // Support for equivalence on one endpoint says nothing about another.
@@ -1485,7 +1433,7 @@ export class ReadSurface extends SessionCore {
    * between the two, and it is a verb of its own rather than a guess buried in
    * each read: it returns *all* matches and lets the caller refuse, instead of
    * picking one and being wrong when a sentence is asserted in two lines of
-   * enquiry (S-5).
+   * enquiry.
    */
   async claimsAsserting(proposition: IndexedString): Promise<ConcludedClaim[]> {
     const rows = await this.graph.query(
@@ -1500,10 +1448,8 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * Every record containing the text, as `{handle, wording}` pairs grouped
-   * by label — the read the Bonsai transcription scripts needed and could
-   * not have (a question's wording had to be hardcoded to its handle
-   * because nothing turned one into the other).
+   * Every record containing the text, as `{handle, wording}` pairs grouped by
+   * label — how a caller holding only wording finds the handle for it.
    *
    * **Returns every match and refuses to pick, exactly as {@link
    * claimsAsserting} does** — this is a second seam where wording is
@@ -1651,9 +1597,9 @@ export class ReadSurface extends SessionCore {
                   : "it was superseded"),
             });
         } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
-          // A re-verification is not a second independent finding. Counting it
-          // as one reported a proposition established once as corroborated
-          // twice -- S-10, and the reason `REVERIFIES` exists.
+          // A re-verification is not a second independent finding: counting it
+          // as one reports a proposition established once as corroborated
+          // twice. See `EDGE_SCHEMA.REVERIFIES`.
           if (!reverifiedBy.some((r) => r.analysis === row.comp.natural_id))
             reverifiedBy.push({
               analysis: ref("analysis", row.comp.natural_id),
@@ -1669,9 +1615,9 @@ export class ReadSurface extends SessionCore {
     // computation, not a detour through the enquiry. Only currently-standing
     // findings count: a superseded analysis's inputs are not what the claim
     // rests on now.
-    // Both bearings and by handle, for the reasons on `checksAnchor` — a claim
-    // its evidence bears *against* rests on inputs exactly as one it supports
-    // does, and the one-sided walk reported `restingOn: []` for it.
+    // Both bearings, and by handle: a claim its evidence bears *against* rests
+    // on inputs exactly as one it supports does, and a one-sided walk reports
+    // `restingOn: []` for it.
     const resting = (
       await Promise.all(
         (["SUPPORTS", "CHALLENGES"] as const).map((bearing) =>
@@ -1680,31 +1626,29 @@ export class ReadSurface extends SessionCore {
       )
     ).flat();
 
-    // The standard the finding was held to, if it was held to one. S-3b: the
-    // criteria a researcher agreed before the run are what "does this stand?"
-    // is answered against, and before `QUALIFIES` there was no path from a
-    // claim to them at all -- so a finding whose own prespecified checks had
-    // failed reported `supported: true`. See ledger row V.
+    // The standard the finding was held to, if it was held to one. The criteria
+    // a researcher agreed before the run are what "does this stand?" is
+    // answered against; without them a finding whose own prespecified checks
+    // failed reads as `supported: true`.
     //
     // Same invalidation filter as `restingOn` above: a replaced analysis's
-    // checks are as historical as its findings, and applying one filter and
-    // not the other would make two fields of one answer disagree. Load-bearing,
-    // not tidy -- see the superseded-analysis test in S-3b.
+    // checks are as historical as its findings, and applying one filter and not
+    // the other makes two fields of one answer disagree.
     //
-    // Boundary: only the SUPPORTING analyses' standards are read. An analysis
-    // recorded with `heldTo` whose findings CHALLENGE the proposition still
+    // **Boundary: only the SUPPORTING analyses' standards are read.** An
+    // analysis recorded with `heldTo` whose findings CHALLENGE the proposition
     // reads as a live challenge even if its own checks failed, so `challenged`
-    // is not qualified the way `supported` now is. Nothing in the corpus holds
-    // a challenging analysis to a prespecified standard; the scenario that
-    // would settle it is a null result whose robustness checks disagree.
+    // is not qualified the way `supported` is. What would settle it is a null
+    // result whose robustness checks disagree, which nothing records yet.
     // The same fact the survey and a gate read, so "which checks does this
     // claim answer to" is one definition. Selected by handle: two analyses in
     // one enquiry concluding the same sentence are two claims, and matching by
-    // wording made this verb and `whatIsKnown` contradict each other.
-    // Both bearings, merged — the idiom `findingsBearing` uses, and the reason
-    // it is a loop rather than two hand-written anchors is that the one-sided
-    // version is silent: a promoted negative result reported "held to no
-    // prespecified standard" while the record held the check.
+    // wording makes this verb and `whatIsKnown` contradict each other.
+    //
+    // Both bearings, merged, and a loop rather than two hand-written anchors
+    // because the one-sided version is silent: a promoted negative result
+    // reports "held to no prespecified standard" while the record holds the
+    // check.
     // Which of the inputs this claim rests on have been retracted outright --
     // every finding they record superseded. One query for all of them.
     const retractedInputs = await this.retractedArtefacts([
@@ -1724,7 +1668,7 @@ export class ReadSurface extends SessionCore {
     const standard = [...byCriterion.values()];
     // Never-run counts against, exactly as it does for a gate: a check nobody
     // performed has not been met. `gateStatus()` computes `unmet` the same way
-    // and the two must agree, since in S-3 they are the same checks.
+    // and the two must agree, since they are the same checks.
     const unmetChecks = standard.filter((c) => c.state !== "passed");
     // One query for every unmet check rather than one per check: the number of
     // prespecified conditions on a claim is small, but a round trip each is the
@@ -1738,21 +1682,16 @@ export class ReadSurface extends SessionCore {
 
     // A withdrawn interpretation is not supported, however much evidence once
     // carried it. `support` stays populated deliberately: the findings are
-    // fine and always were, and blanking them would say the numbers had gone
-    // wrong -- which is the one thing S-12 exists to deny.
+    // fine, and blanking them would say the numbers had gone wrong when only
+    // the reading moved.
     const { withdrawn, replacedBy } = await this.withdrawalOf(scope);
 
     // Standing, and why it was conferred. Read from the claim rather than the
     // conclusion so a promotion taken later is visible here at all.
-    // By handle, and with no traversal at all. This used to reach the claim
-    // through `<-[:SUPPORTS]-`, which meant a **promoted negative result read
-    // as exploratory** — the promotion is on the claim, and the walk that found
-    // it could not reach a claim its evidence bears against. Selecting by name
-    // within an enquiry also let it return a *different* claim's promotion,
-    // since two analyses in one enquiry can conclude the same sentence.
-    //
-    // The traversal was never load-bearing: a promotion is an edge on the claim.
-    // Removing it deletes the footgun rather than handling it.
+    // By handle, and with no traversal at all. A promotion is an edge on the
+    // claim, so reaching it through `<-[:SUPPORTS]-` cannot see a promoted
+    // negative result, and selecting by name within an enquiry can return a
+    // different claim's promotion.
     const promotion = await this.graph.query(
       `MATCH (c:Claim {natural_id: $claim})
        OPTIONAL MATCH (d:Decision)-[:PROMOTES]->(c)
@@ -1772,8 +1711,8 @@ export class ReadSurface extends SessionCore {
       claim,
       proposition,
       // Three ways to not be supported, and they are different states: no
-      // evidence at all, the interpretation withdrawn, and -- since S-3b --
-      // evidence that exists and fails the standard set for it. `support`
+      // evidence at all, the interpretation withdrawn, and evidence that exists
+      // and fails the standard set for it. `support`
       // stays populated in the third case for the same reason it does in the
       // second: the numbers are fine, and blanking them would say otherwise.
       supported: support.length > 0 && !withdrawn && unmet.length === 0,
@@ -1786,15 +1725,14 @@ export class ReadSurface extends SessionCore {
       // Re-verifying findings are excluded here for the same reason they are
       // kept out of `support`: the claim does not rest on inputs belonging to
       // something this very report says is not an independent supporting
-      // finding (external review of S-10). Filtered in TypeScript rather than
-      // in the query because AGE rejects a `NOT (pattern)` predicate outright
-      // -- `cypher_yyerror`, not a decode problem.
+      // finding. Filtered in TypeScript rather than in the query, because AGE
+      // rejects a `NOT (pattern)` predicate outright -- `cypher_yyerror`, not a
+      // decode problem.
       // Deduplicated by **identity**, never by name. Two artefacts may share a
-      // `logical_name` -- a regeneration carries the name of the part it
-      // replaces (S-9) -- and collapsing on the name reported a conclusion
-      // resting on one input when it rested on two, with the vanished one
-      // indistinguishable from the survivor (S-9d). Same defect S-9c fixed in
-      // `reproducibilityOf()`, in the read researchers actually use.
+      // `logical_name`, since a regeneration carries the name of the part it
+      // replaces, so collapsing on the name reports a conclusion resting on one
+      // input when it rests on two, with the vanished one indistinguishable
+      // from the survivor.
       restingOn: [
         ...new Map(
           resting
@@ -1821,13 +1759,11 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * How much of a past construction can be rebuilt (S-9).
+   * How much of a past construction can be rebuilt.
    *
    * The caller re-runs whatever it can and offers the hashes it got back; this
    * says which parts match, which disagree, and which nobody can check because
-   * the original never recorded a hash. `content_hash` had been written and
-   * never read since PJ-004 — declared, carried through every tenant, and
-   * consulted by nothing. This is its first reader.
+   * the original never recorded a hash. The one reader of `content_hash`.
    *
    * Offered per part rather than by name, deliberately. A regenerated part
    * carries the name of the part it regenerates, so a name-keyed map would
@@ -1839,11 +1775,10 @@ export class ReadSurface extends SessionCore {
   ): Promise<ReproducibilityReport> {
     const offered = new Map<ObservationsRef, IdentityString>(rebuilt.map((r) => [r.part, r.hash]));
 
-    // An absent subject and an empty one are different states, and answering
-    // them alike is what let this report say `reproducible: true` about nothing
-    // (S-9e). The existence check is separate from the parts query because both
-    // return zero rows and only one of them is a caller error -- there is a real
-    // analysis to refuse a report about, so this is not a manufactured refusal.
+    // An absent subject and an empty one are different states: answering them
+    // alike lets this report say `reproducible: true` about nothing. The
+    // existence check is separate from the parts query because both return zero
+    // rows and only one of them is a caller error.
     const subject = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
@@ -1877,11 +1812,11 @@ export class ReadSurface extends SessionCore {
       // attempt did not rebuild the part (about the attempt). `differing` is a
       // comparison that ran and came out unequal, which is a different kind of
       // statement. Folding either absence into it claims evidence the record
-      // does not have -- external review found exactly that, in the function
-      // written to respect the distinction.
-      // Keyed by natural id, never by name. An original and its regeneration
-      // legitimately share a `logical_name` (S-9), and reporting bare names put
-      // that one string in `exact` and `differing` at once -- see S-9c.
+      // does not have.
+      //
+      // Keyed by natural id, never by name: an original and its regeneration
+      // legitimately share a `logical_name`, so bare names put one string in
+      // `exact` and `differing` at once.
       const entry = {
         part: ref("observations", a.natural_id),
         name: a.logical_name,
@@ -1900,17 +1835,12 @@ export class ReadSurface extends SessionCore {
       differing: differing.sort(byName),
       unverifiable: unverifiable.sort(byName),
       notRebuilt: notRebuilt.sort(byName),
-      // Anything not shown to match leaves the construction unshown. Saying
-      // otherwise is the quiet inheritance S-9 forbids.
+      // Anything not shown to match leaves the construction unshown.
       //
       // `exact.length > 0` is the conjunct three empty lists cannot supply: an
       // analysis that consumed nothing satisfies "nothing differed, nothing was
-      // unverifiable, nothing went unrebuilt" vacuously, and reported that a
-      // construction with no parts reproduces (S-9e). The rule was already
-      // written out one function away -- `reproductionOf()`'s "absence on BOTH
-      // sides is still absence: two runs that each recorded nothing have not
-      // reproduced anything" -- and never travelled to the function whose own
-      // docstring says that rule was learned here.
+      // unverifiable, nothing went unrebuilt" vacuously, and would report that
+      // a construction with no parts reproduces. Absence is still absence.
       reproducible:
         exact.length > 0 &&
         differing.length === 0 &&
@@ -2048,33 +1978,29 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * "What is affected if this record is invalidated?" -- PJ-001's MVP
-   * propagation query. Deliberately the affected side only; what is *not*
-   * affected is reported by replaceAnalysis, because it depends on what the
-   * replacement rests on rather than on the invalidated record alone.
-   *
-   * Unrelated to whySupported()'s `restingOn`, which moved to CONSUMES: this
-   * asks which enquiries REQUIRE the evidence held here, not what any
-   * computation read.
-   *
    * What is affected if this artefact turns out to be wrong?
    *
-   * Two routes in, and S-9 is what forced the second. An artefact reached by
-   * `Evidence -RECORDED_IN->` is an analysis *output*, and the evidence
-   * recorded in it bears on claims directly — that is the path S-11 walks. An
-   * artefact a computation `CONSUMES` is an *input*, and nothing recorded in it
+   * Deliberately the affected side only. What is *not* affected depends on what
+   * a replacement rests on rather than on the invalidated record alone.
+   *
+   * Distinct from `whySupported()`'s `restingOn`: this asks which enquiries
+   * REQUIRE the evidence held here, not what any computation read.
+   *
+   * **Two routes in.** An artefact reached by `Evidence -RECORDED_IN->` is an
+   * analysis *output*, and the evidence recorded in it bears on claims
+   * directly. An artefact a computation `CONSUMES` is an *input*, and nothing
+   * recorded in it
    * bears on anything; what rests on it are the claims of every analysis that
    * read it. Walking only the first returned `claims: []` for an input a claim
    * demonstrably rested on, while still naming the enquiry — a confident,
    * populated, wrong answer, and the same verb answering one question two
    * incompatible ways depending on which end of a computation it was aimed at.
-   * That is ledger row P surfacing: `Evidence` carries two senses, and this
-   * query knew only one of them.
+   * `Evidence` carries both senses, and a query that walks one of them answers
+   * about half the record.
    *
    * `subject` is a name while a name identifies one artefact, and an explicit
-   * reference when it does not — S-5's rule, and S-9 is where artefacts needed
-   * it: a regenerated part naturally carries the name of the part it
-   * regenerates. Given an ambiguous name this **refuses** rather than answering
+   * reference when it does not: a regenerated part carries the name of the part
+   * it regenerates. Given an ambiguous name this **refuses** rather than answering
    * about the union, because the union is exactly the "inferred provenance
    * silently inheriting the original's standing" the scenario exists to prevent.
    */
@@ -2093,12 +2019,11 @@ export class ReadSurface extends SessionCore {
     // Walk the pipeline downstream before asking what rests on it. An analysis
     // can read another analysis's output (row AE), so invalidating a raw input
     // reaches every stage built on top of it -- and asking only about the
-    // artefact handed in stopped at the first stage, which is the other half of
-    // S-11c's omission.
+    // artefact handed in stops at the first stage.
     //
     // Iterative rather than a variable-length pattern: the chain alternates
-    // CONSUMES and PRODUCES, and AGE has no edge-type alternation at all
-    // (see CLAUDE.md's gotchas). Visited-set rather than a depth cap, so a
+    // CONSUMES and PRODUCES, and AGE has no edge-type alternation at all.
+    // Visited-set rather than a depth cap, so a
     // cycle terminates without silently truncating a legitimate long pipeline.
     const reached = new Set<ObservationsRef>([start]);
     for (let frontier = [start]; frontier.length > 0; ) {
@@ -2120,10 +2045,8 @@ export class ReadSurface extends SessionCore {
     }
 
     // Deduplicated **by id**, not by wording. Two claims asserting the same
-    // sentence in different lines of enquiry are two claims (S-5), and the
-    // previous version -- a `Set<string>` of names -- silently merged them, so
-    // invalidating a record under one reported one affected claim where there
-    // were two.
+    // sentence in different lines of enquiry are two claims, and a `Set<string>`
+    // of names merges them silently.
     const claims = new Map<ClaimRef, AffectedClaim>();
     const enquiries = new Map<EnquiryRef, AffectedEnquiry>();
     for (const artefact of reached) {
@@ -2160,11 +2083,11 @@ export class ReadSurface extends SessionCore {
    * currently-standing findings count: a superseded analysis's inputs are not
    * what the claim rests on now — and the `invalidated` filter is on the
    * evidence's **own** output, never on what the computation read, because a
-   * retracted input must still be reported and marked (S-11e).
+   * retracted input must still be reported and marked.
    *
-   * Called once per bearing: the single-bearing version reported an empty list
-   * for a claim its evidence bears *against* (S-18b's shape), the same silent
-   * hole `checksAnchor` exists to close.
+   * Called once per bearing: a single-bearing version reports an empty list for
+   * a claim its evidence bears *against*, the same silent hole `checksAnchor`
+   * exists to close.
    *
    * **Selected by proposition within the enquiry, not by handle** — the same
    * exception `findingsBearing` documents, and refuted the same way: selecting
@@ -2325,10 +2248,10 @@ export class ReadSurface extends SessionCore {
   /**
    * Resolves an artefact name to one artefact, or refuses.
    *
-   * Two artefacts can carry one name — a regenerated part is the case S-9 is
-   * about — and answering about both would merge a historical record with an
-   * inferred one. Declining beats guessing, exactly as it does for a claim
-   * asserted in two lines of enquiry (S-5).
+   * Two artefacts can carry one name — a regenerated part carries the name of
+   * the part it regenerates — and answering about both merges a historical
+   * record with an inferred one. Declining beats guessing, exactly as it does
+   * for a claim asserted in two lines of enquiry.
    */
   private async artefactNamed(name: IndexedString): Promise<ObservationsRef> {
     const rows = await this.graph.query(
@@ -2363,9 +2286,7 @@ export class ReadSurface extends SessionCore {
    * gate as over one. What does not carry is the **grain**: `checkStatusForGate`
    * is grained `byCriterion`, and a criterion may govern several gates — the
    * same hash check against staging and against release — so folding the whole
-   * result by criterion would merge two gates' verdicts into one answer. That
-   * is precisely the collapse S-17 and S-3 exist to prevent, arriving from a new
-   * direction.
+   * result by criterion would merge two gates' verdicts into one answer.
    *
    * So the rows are bucketed by gate first and `per()` is applied within each
    * bucket. The alternative — a composite grain — would have to change
@@ -2435,10 +2356,8 @@ export class ReadSurface extends SessionCore {
    * `closed` were candidates and neither survived — see {@link WorkState},
    * which carries the argument and the two that died.
    *
-   * Nothing is stored. `Task.is_open` existed until 2026-08-28 and was written
-   * by `planWork` and read by nobody, exactly as `DecisionProps.is_open` had
-   * been; it was deleted rather than consumed, because a stored flag is the
-   * first place a work queue rots.
+   * **Nothing is stored.** There is no `is_open` flag to set, because a stored
+   * flag is the first place a work queue rots.
    *
    * **`OPTIONAL MATCH` twice, and both are load-bearing.** A task with no gate
    * and no analysis is the *most* interesting row here — it is the ready work —
@@ -2580,17 +2499,13 @@ export class ReadSurface extends SessionCore {
 
   /**
    * `why <handle>` — dispatches on the handle's own kind, over the report that
-   * already exists for it, and renders it as `{subject, is, because}` (#128,
-   * redesigned on review). Also takes a proposition, exactly as this verb did
-   * before the redesign: text resolves through `claimsAsserting` and refuses
-   * an ambiguous match rather than picking (S-5).
+   * already exists for it, and renders it as `{subject, is, because}`. Also
+   * takes a proposition: text resolves through `claimsAsserting` and refuses an
+   * ambiguous match rather than picking.
    *
    * **The dispatch table lives at module scope, not as a switch here.** `Kind`
-   * is closed (see `LABEL_BY_KIND`), so `EXPLAINERS satisfies
-   * Record<Kind, …>` makes a kind nobody explains a compile error rather than
-   * a runtime branch — the whole reason #128's rework asked for a table
-   * instead of the flag-per-composite-read shape this verb shipped with
-   * first.
+   * is closed (see `LABEL_BY_KIND`), so `EXPLAINERS satisfies Record<Kind, …>`
+   * makes a kind nobody explains a compile error rather than a runtime branch.
    */
   async why(subject: AnyRef | IndexedString): Promise<Explanation> {
     const kind = kindOf(subject);
@@ -2643,8 +2558,8 @@ type Explainer = (self: ReadSurface, subject: string) => Promise<Explanation>;
 async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimExplanation> {
   const report = await self.whySupported(ref("claim", subject));
   // Exhaustive over the same three-way split `renderWhy` prints, in the same
-  // priority order (supported first, since `supported` and `withdrawn`/
-  // `challenged` are not mutually exclusive fields on the type -- S-12, S-3b).
+  // priority order: supported first, since `supported` and
+  // `withdrawn`/`challenged` are not mutually exclusive fields on the type.
   const state: "supported" | "withdrawn" | "challenged" | "unsupported" = report.supported
     ? "supported"
     : report.withdrawn
@@ -2764,9 +2679,9 @@ function causeForCheck(c: CheckStatus): Cause {
     case "never-run":
       return { handle: c.criterion, wording: `${c.proposition} — has never been run` };
     case "no-standing-verdict":
-      // S-3c: evaluated, and every evaluation has since been withdrawn -- not
-      // the same fact as never-run, and `renderGate` already keeps the two
-      // apart under this exact name.
+      // Evaluated, and every evaluation has since been withdrawn -- not the
+      // same fact as never-run, and `renderGate` keeps the two apart under this
+      // exact name.
       return { handle: c.criterion, wording: `${c.proposition} — no standing verdict` };
     default: {
       const check: never = c.state;
@@ -2816,13 +2731,12 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
 }
 
 /**
- * The `Gate` case (#182): `gateStatus`, exhaustive over `GateStatus.state` —
- * the same four-way split `gateStateFrom` computes, worded rather than
- * coloured. `blocked` and `incomplete` both cite every condition not
- * currently passing (a blocked gate can carry a never-run condition beside
- * its failed one, and the dictated sentence on #182 shows both together);
- * `satisfied` and `never-evaluated` cite every condition, since all of them
- * share one state there.
+ * The `Gate` case: `gateStatus`, exhaustive over `GateStatus.state` — the same
+ * four-way split `gateStateFrom` computes, worded rather than coloured.
+ * `blocked` and `incomplete` both cite every condition not currently passing,
+ * since a blocked gate can carry a never-run condition beside its failed one;
+ * `satisfied` and `never-evaluated` cite every condition, all of them sharing
+ * one state there.
  */
 async function explainGate(self: ReadSurface, subject: string): Promise<GateExplanation> {
   const gate = ref("gate", subject);
@@ -2855,13 +2769,12 @@ async function explainGate(self: ReadSurface, subject: string): Promise<GateExpl
 }
 
 /**
- * The kinds `why` actually explains, and their cases — #128's three plus
- * Gate (#182). Every other kind gets a refusal built from **this** object,
- * below, so a kind added here is a kind the refusal stops claiming for
- * itself: naming the explained kinds twice, once in a hand-written list and
- * once in the table, is exactly the drift `KIND_BY_LABEL`'s own comment
- * warns about — "built rather than hand-duplicated ... in the direction
- * that fails silently".
+ * The kinds `why` actually explains, and their cases.
+ *
+ * Every other kind gets a refusal built from **this** object, below, so a kind
+ * added here is one the refusal stops claiming for itself. Naming the explained
+ * kinds twice — once in a hand-written list, once in the table — is drift in
+ * the direction that fails silently.
  */
 const EXPLAINED = {
   claim: explainClaim,
@@ -2882,11 +2795,10 @@ type UnexplainedKind = Exclude<Kind, keyof typeof EXPLAINED>;
  * kind) and **what `why` explains instead**. There is deliberately no third
  * part naming where else to look: the domain does not know which surface is
  * calling, so it cannot name a command (that comment's own rule) — and a
- * blanket "this record has no other verb for it yet either" was simply
- * false for most of these (`gate`/`criteria`/`design` all read a gate,
- * `origin`/`pursuits` a question, `reproducibility` an analysis). Naming a
- * false absence is the #170 mistake this file's refusal discipline exists to
- * prevent, so this says only what is true.
+ * blanket "this record has no other verb for it yet either" is false for most
+ * of these: `gate`/`criteria`/`design` all read a gate, `origin`/`pursuits` a
+ * question, `reproducibility` an analysis. Naming a false absence is what the
+ * refusal discipline above exists to prevent, so this says only what is true.
  */
 function refuseToExplain(kind: UnexplainedKind): Explainer {
   return async () => {
@@ -2899,10 +2811,10 @@ function refuseToExplain(kind: UnexplainedKind): Explainer {
 /**
  * One refusal per {@link UnexplainedKind} — still a literal object, so
  * `satisfies` checks it totally over exactly the kinds `EXPLAINED` has not
- * claimed. That cuts both ways: when #182 moves `gate` into `EXPLAINED`,
- * `UnexplainedKind` drops it and this object's `gate` entry becomes an
- * *excess* property `satisfies` refuses — the compiler forces its removal
- * rather than leaving a dead refusal nobody's dispatch can reach.
+ * claimed. That cuts both ways: moving a kind into `EXPLAINED` drops it from
+ * `UnexplainedKind`, and this object's entry for it becomes an *excess*
+ * property `satisfies` refuses — the compiler forces its removal rather than
+ * leaving a dead refusal nobody's dispatch can reach.
  */
 const REFUSED = {
   question: refuseToExplain("question"),
@@ -2917,9 +2829,8 @@ const REFUSED = {
 
 /**
  * The total table `why` dispatches through — one entry per {@link Kind}, so
- * a fourteenth kind added to `LABEL_BY_KIND` without a matching entry in
- * `EXPLAINED` or `REFUSED` is a `tsc` failure, not a runtime "unknown kind".
- * `EXPLAINED`'s three cases are #128's; `REFUSED` is everything else, #182.
+ * a kind added to `LABEL_BY_KIND` without a matching entry in `EXPLAINED` or
+ * `REFUSED` is a `tsc` failure, not a runtime "unknown kind".
  */
 const EXPLAINERS = { ...EXPLAINED, ...REFUSED } satisfies Record<Kind, Explainer>;
 
@@ -2936,28 +2847,22 @@ const EXPLAINERS = { ...EXPLAINED, ...REFUSED } satisfies Record<Kind, Explainer
  *
  * Order matters and neither branch is cosmetic. Absence is checked before
  * satisfaction so a gate nobody evaluated can never fall through to
- * `satisfied` (S-17); failure is checked before incompleteness because a
- * failure is decisive (S-3).
+ * `satisfied`; failure is checked before incompleteness because a failure is
+ * decisive.
  *
  * **`satisfied` requires positive proof — every check passed — rather than
- * being the branch left over once the others are ruled out.** Until
- * 2026-08-31 it was `else`, on the same "absence is checked before
- * satisfaction" argument above — and that argument covered `never-run` but
- * not the `no-standing-verdict` state S-3c added afterward: a criterion whose
- * only evaluation(s) were retracted by a later `replace` matched neither
- * `failed` nor `never-run`, so it fell through to `satisfied` — the itemised
- * per-check report already listed it correctly under "not met"
- * (`CheckStatus.state`'s own doc comment), only this aggregate disagreed with
- * it. Found transcribing Bonsai's real research record by hand (labkit#137).
- * Requiring every check to have positively `passed` closes the general case:
- * a sixth `CheckState` added later lands in `incomplete` by construction,
- * not by whoever edits this function next remembering to add a branch for it.
+ * being the branch left over once the others are ruled out.** As an `else` it
+ * catches any state the branches above do not name: a criterion whose only
+ * evaluations were retracted matches neither `failed` nor `never-run` and
+ * would fall through to `satisfied`, disagreeing with the itemised per-check
+ * report in the same object. Requiring a positive `passed` means a new
+ * `CheckState` lands in `incomplete` by construction, rather than by whoever
+ * edits this function next remembering to add a branch for it.
  *
  * **A gate with no criteria at all reports `never-evaluated`.** `every` over an
  * empty list is `true`, which is the right answer for the wrong-looking reason:
- * a gate governing nothing has certainly not been shown to hold, and
- * `declareGate` refuses to mint one anyway (S-3b), so this is a defence rather
- * than a case.
+ * a gate governing nothing has certainly not been shown to hold. `declareGate`
+ * refuses to mint one anyway, so this is a defence rather than a case.
  */
 function gateStateFrom(checks: readonly { state: CheckState }[]): GateStatus["state"] {
   return checks.every((c) => c.state === "never-run")
@@ -2987,8 +2892,7 @@ function gateStateFrom(checks: readonly { state: CheckState }[]): GateStatus["st
  * `never-evaluated` and `incomplete` mean nobody has finished checking, which is
  * a fact about the gate rather than an obstruction to the work. Treating them as
  * blocking would report every freshly gated task as blocked on the day it was
- * planned, which is exactly the "queue that can never be emptied and is
- * therefore never read" PJ-001 warns against.
+ * planned — a queue that can never be emptied, and is therefore never read.
  */
 function workStateFrom(
   task: { gates: Set<string>; implemented: boolean },
