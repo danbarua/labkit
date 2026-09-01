@@ -120,6 +120,7 @@ import type {
   PlanWorkCommand,
   PromoteCommand,
   PursueCommand,
+  ConcludeCommand,
   RecordAnalysisCommand,
   RecordObservationsCommand,
   RecordReviewCommand,
@@ -143,6 +144,8 @@ interface RecordedConclusion {
   claim: ClaimRef;
   proposition: string;
   finding: string;
+  evidence: EvidenceRef;
+  bearing: "supports" | "challenges";
 }
 
 /**
@@ -170,6 +173,57 @@ interface RecordedConclusion {
 const noFindingBearsOn = (claim: ClaimRef): string =>
   `no finding bears on claim ${claim}; a claim can be cited only once an analysis ` +
   `has concluded it and produced the evidence bearing on it`;
+
+/**
+ * The write verbs a research *move* needs — what a fragment depends on.
+ *
+ * **Structural, and that is the point.** A fragment in `fragments/` composes a
+ * few of these into one thing a researcher did. It has no business depending on
+ * `WriteSurface` the class, which carries 28 members it never calls — protected
+ * helpers, the event sink, `SessionCore`'s internals — and that dependency was
+ * not merely untidy, it was **load-bearing in the wrong direction**.
+ *
+ * Measured 2026-09-01: `ResearchSession` *composes* a `WriteSurface` rather
+ * than extending one, so it is not assignable to it —
+ * `TS2740: missing … posed, pursued, standingFindings, recorded, and 24 more`
+ * — and `writes` is private, so there is no accessor either. A scenario holds a
+ * `ResearchSession`. It therefore **could not call a fragment at all**, and
+ * `tests/fragments.test.ts` builds a bare `WriteSurface` to get past it, saying
+ * so in a comment.
+ *
+ * That matters beyond the inconvenience. `fragments/index.ts`'s header explained
+ * its absence from `tests/` as a *choice* — "someone would import it into a
+ * scenario" — while this barrier made the import impossible regardless. A true
+ * sentence naming the wrong reason, which is the defect class CLAUDE.md's
+ * document rule is about, found in a type rather than in prose.
+ *
+ * Naming the dependency here rather than inside `fragments/` is what lets
+ * `ResearchSession` be checked against it (see `./session.ts`): a delegating
+ * property whose signature drifts then fails to compile **where the drift is**,
+ * rather than three files away in whichever fragment happened to call it.
+ */
+export type ResearchWrites = Pick<
+  WriteSurface,
+  | "pose"
+  | "pursue"
+  | "openEnquiry"
+  | "sharpen"
+  | "recordObservations"
+  | "recordAnalysis"
+  | "conclude"
+  | "recordReview"
+  | "replaceAnalysis"
+  | "reverify"
+  | "reinterpret"
+  | "closeEnquiry"
+  | "acceptAsUnresolved"
+  | "promote"
+  | "planWork"
+  | "stateCriterion"
+  | "declareGate"
+  | "evaluateCriterion"
+  | "amendDesign"
+>;
 
 export class WriteSurface extends SessionCore {
   /**
@@ -581,6 +635,173 @@ export class WriteSurface extends SessionCore {
       analysis: ref("analysis", computation.natural_id),
       claims: minted,
     };
+  }
+
+  /**
+   * Assert one thing an analysis found. **The primitive the compound verbs are
+   * built from.**
+   *
+   * `recordAnalysis` used to take an array of these and mint them in one call,
+   * and that array was a transaction boundary drawn around the graph's
+   * convenience rather than around what a person does. Bonsai's researchers
+   * wrote `FINDINGS.md` over days, one conclusion at a time; the compound form
+   * made them serialise a tree through flat flags, which is why exactly three of
+   * eighteen CLI commands took JSON and they were exactly the three that mint
+   * conclusions (#173).
+   *
+   * **One conclusion, one call, one event.** That is not a relaxation of
+   * one-act-one-event — it is that rule read as written. The log must not record
+   * *implementation steps*, and concluding four things is four things a
+   * researcher did.
+   *
+   * ## `replacing` supersedes exactly one finding, and needs no new edge
+   *
+   * `Decision -[:CHANGES]-> Claim` already means *this decision changed which
+   * claim stands*, and `MOTIVATES` already names what replaced it —
+   * `withdrawalOf()` reads precisely that pair. So a partial replacement is
+   * expressible with the edges the model has.
+   *
+   * **That is one reading, not two**, and the distinction matters because
+   * `PROMOTES` was split out of `CHANGES` for being a second one. `reinterpret`
+   * writes `CHANGES` for *this reading was narrowed* and this writes it for
+   * *this finding was superseded*; both are a decision withdrawing a claim and
+   * naming its successor, and every reader — `withdrawalOf`, `whySupported` —
+   * wants the same answer from both: that claim no longer stands, this one does.
+   * `PROMOTES` was different in kind: it asserts a claim *more strongly*, so
+   * reading it as `CHANGES` made promotion retract what it promoted.
+   *
+   * `REVERIFIES` is the edge that looks right here and is not. It means
+   * *re-verified* — the same proposition checked again — where this means
+   * *superseded*. Using it would be the one-edge-two-readings shape above.
+   *
+   * ## What is not written
+   *
+   * **The output artefact's `invalidated` flag is untouched.** A flag over the
+   * whole artefact summarises the standing of every finding it carries, which is
+   * what made `replaceAnalysis` retract untouched conclusions (#132). Standing
+   * lives per finding and `whySupported` computes it. That is the same verdict
+   * `Task.is_open` and `DecisionProps.is_open` got — stored state a computed
+   * answer already covers.
+   */
+  async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
+    return this.graph.inTransaction(async () => {
+      const at = this.clock.now();
+      const concluded = await this.graph.inTransaction(async () => {
+        const unit = await this.unitOf(input.analysis);
+        const output = await this.outputArtefactOf(input.analysis);
+
+        // Superseded analyses take no new conclusions. Adding one would put a
+        // fresh finding on a record the caller has already declared spent, and
+        // nothing downstream distinguishes it from a live one.
+        const [artefact] = await this.graph.query(
+          `MATCH (a:Artefact {natural_id: $id}) RETURN a`,
+          { a: vertexProps<ArtefactProps>() },
+          { id: output },
+        );
+        if (artefact?.a.invalidated)
+          throw new Error(
+            `analysis ${input.analysis} has been superseded and takes no further conclusions; ` +
+              `record this on the analysis that replaced it`,
+          );
+
+        // What is being superseded, if anything — matched on whichever handle
+        // the caller held, since #162 hands back both.
+        let superseded: RecordedConclusion | undefined;
+        if (input.replacing !== undefined) {
+          const already = await this.conclusionsOf(input.analysis);
+          superseded = already.find(
+            (c) => c.claim === input.replacing || c.evidence === input.replacing,
+          );
+          if (!superseded) {
+            const named = already.length
+              ? already.map((c) => `${c.claim} "${c.proposition}"`).join(", ")
+              : "nothing yet";
+            throw new Error(
+              `analysis ${input.analysis} did not conclude ${input.replacing}, so there is ` +
+                `nothing here to supersede; it concluded: ${named}`,
+            );
+          }
+        }
+
+        // Inherited from what is being superseded, overridden when given. A
+        // replacement restates the same proposition by default -- that is what
+        // makes it a replacement rather than a new finding.
+        const proposition = input.proposition ?? superseded?.proposition;
+        if (proposition === undefined)
+          throw new Error(
+            `conclude needs the proposition this finding bears on and none was given; ` +
+              `pass it, or pass the claim or finding being superseded so it can be inherited`,
+          );
+        const bearing = input.bearing ?? superseded?.bearing ?? "supports";
+
+        // The same guard `recordAnalysis` applied per conclusion, now applied
+        // where a conclusion is actually made. A withdrawn proposition cannot
+        // be re-asserted as a side effect -- except by the act that supersedes
+        // it, which is what `replacing` says.
+        if (superseded === undefined) {
+          const enquiry = await this.enquiryOf(input.analysis);
+          const { withdrawn, replacedBy } = await this.withdrawalOf({
+            proposition,
+            ...(enquiry === undefined ? {} : { enquiry }),
+          });
+          if (withdrawn)
+            throw new Error(
+              `"${proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy}"` : ""}; ` +
+                `it cannot be re-asserted by recording another analysis`,
+            );
+        }
+
+        const evidence = await this.graph.createNode("Evidence", { statement: input.finding });
+        const claim = await this.graph.createNode("Claim", {
+          name: proposition,
+          kind: input.standing ?? "exploratory",
+        });
+        await this.graph.createEdge(unit, "PRODUCES", evidence.natural_id, undefined, true);
+        await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", output, undefined, true);
+        await this.graph.createEdge(
+          evidence.natural_id,
+          bearing === "challenges" ? "CHALLENGES" : "SUPPORTS",
+          claim.natural_id,
+          undefined,
+          true,
+        );
+
+        // Per-finding supersession, on the edges the model already has.
+        if (superseded) {
+          const decision = await this.graph.createNode("Decision", {
+            decided_at: at,
+            reason: `superseded by "${input.finding}"`,
+            invalidation_check: "evidence that the superseded finding was right after all",
+          });
+          await this.graph.createEdge(decision.natural_id, "CHANGES", superseded.claim);
+          await this.graph.createEdge(decision.natural_id, "MOTIVATES", claim.natural_id);
+        }
+
+        return {
+          claim: ref("claim", claim.natural_id),
+          asserts: proposition,
+          finding: ref("evidence", evidence.natural_id),
+        };
+      });
+
+      const events = await this.emit("conclude", input.analysis, {
+        conclusions: this.conclusionEvents([concluded]),
+        ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
+      });
+      return { at, analysis: input.analysis, claims: [concluded], events };
+    });
+  }
+
+  /** The enquiry an analysis was recorded under, for the withdrawal guard's scope. */
+  private async enquiryOf(analysis: AnalysisRef): Promise<EnquiryRef | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(l:LineOfEnquiry)
+       RETURN l`,
+      { l: vertexProps<{ natural_id: string }>() },
+      { id: analysis },
+    );
+    const found = rows[0];
+    return found ? ref("enquiry", found.l.natural_id) : undefined;
   }
 
   /** `{claim, finding, proposition}` per conclusion — the event's own record of the pairing, independent of the typed report. */
@@ -1570,7 +1791,7 @@ export class WriteSurface extends SessionCore {
        OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
        RETURN e, sc, cc`,
       {
-        e: vertexProps<EvidenceProps>(),
+        e: vertexProps<EvidenceProps & { natural_id: string }>(),
         sc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
         cc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
       },
@@ -1584,6 +1805,11 @@ export class WriteSurface extends SessionCore {
               claim: ref("claim", claim.natural_id),
               proposition: claim.name,
               finding: r.e.statement,
+              // The handle, beside the text. `conclude --replacing` takes
+              // either a CLM_ or an EV_ and has to match on whichever it was
+              // given; without this the evidence half was unaddressable.
+              evidence: ref("evidence", r.e.natural_id),
+              bearing: r.sc ? ("supports" as const) : ("challenges" as const),
             },
           ]
         : [];

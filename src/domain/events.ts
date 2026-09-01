@@ -198,6 +198,7 @@ export type Operation =
   | "sharpen"
   | "recordObservations"
   | "recordAnalysis"
+  | "conclude"
   | "recordReview"
   | "closeEnquiry"
   | "planWork"

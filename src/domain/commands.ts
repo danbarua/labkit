@@ -29,6 +29,7 @@ import type {
   ReviewRef,
   WorkRef,
   ClaimRef,
+  EvidenceRef,
 } from "./report";
 
 /** `pursue` — open a line of enquiry against a question already on the record. */
@@ -182,6 +183,48 @@ export interface AmendDesignCommand {
   nowRequires: string;
   because: string;
   citing: ClaimRef;
+}
+
+/**
+ * `conclude` — assert one thing an analysis found. **The primitive.**
+ *
+ * One conclusion, one call, one event. `recordAnalysis`, `replaceAnalysis` and
+ * `reverify` are compositions over this, and the CLI and MCP expose only this,
+ * because the compound form was a transaction boundary drawn around the graph's
+ * convenience rather than around what a person does — Bonsai's researchers
+ * wrote `FINDINGS.md` over days, one conclusion at a time (#173).
+ *
+ * `proposition` is required **unless** `replacing` is given, in which case it
+ * and `bearing` are inherited from the finding being superseded. Passing both is
+ * an override, not a conflict.
+ */
+export interface ConcludeCommand {
+  /** The analysis this conclusion belongs to. */
+  analysis: AnalysisRef;
+  /** What was found, in this analysis's own words. */
+  finding: string;
+  /**
+   * The proposition the finding bears on.
+   *
+   * Optional only in the `replacing` case. Absent with nothing to inherit from
+   * is a refusal, not a default: a conclusion is *about* something, and there is
+   * no sensible thing to assume.
+   */
+  proposition?: string;
+  /** Which way the finding cuts. Inherited when replacing; otherwise `supports`. */
+  bearing?: "supports" | "challenges";
+  /** Confirmatory standing. Defaults to `exploratory` — see {@link Conclusion}. */
+  standing?: "exploratory" | "confirmatory";
+  /**
+   * The single finding this supersedes — a claim or an evidence handle.
+   *
+   * **Evidence grain, which is what #132 turned on.** `replaceAnalysis` used to
+   * invalidate the superseded *output artefact*, one flag over every conclusion
+   * the analysis produced, so replacing one finding retracted the others. Naming
+   * them one at a time makes coverage exactly the calls the caller made: a
+   * conclusion nobody names stands, and so does everything citing it.
+   */
+  replacing?: ClaimRef | EvidenceRef;
 }
 
 /** `replaceAnalysis` — supersede a defective analysis, invalidating its output and withdrawing what cited it. */
