@@ -1638,18 +1638,19 @@ export interface Cause {
  *
  * One shape for every kind it explains, so `--json` and MCP get structure and
  * the tty gets a sentence — `GATE_1 is blocked because CRIT_2 "…" failed on
- * 2026-08-04 and CRIT_3 "…" has never been run` is the target once Gate joins
- * (#182). `report` carries the kind's own existing report **unflattened**: an
+ * 2026-08-04 and CRIT_3 "…" has never been run` is Gate's, dictated on #182.
+ * `report` carries the kind's own existing report **unflattened**: an
  * envelope that dictated the embedded shape would have cost `why CLM_1` the
  * *Resting on / Held to / Ultimately resting on* view it has today, for a
  * one-line sentence — a regression wearing a redesign.
  *
  * A discriminated union, not one interface with optional fields: `report`'s
  * type differs by `kind`, and a caller narrowing on `kind` gets the right one
- * without a cast. Only the three kinds this PR builds are members — Gate,
- * Question, Criterion and the rest are #182, and a kind `why` does not yet
- * explain never constructs one of these; it throws instead (see `read.ts`'s
- * `EXPLAINERS` table).
+ * without a cast. Only the kinds `read.ts`'s `EXPLAINED` table has a case for
+ * are members — the rest are #182's remaining kinds, added one at a time as
+ * someone asks and gets the refusal (the usage-era bar, per #182's own
+ * text) — and a kind `why` does not yet explain never constructs one of
+ * these; it throws instead.
  */
 export interface ClaimExplanation {
   kind: "claim";
@@ -1672,4 +1673,11 @@ export interface EnquiryExplanation {
   because: Cause[];
   report: EnquiryInContext;
 }
-export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation;
+export interface GateExplanation {
+  kind: "gate";
+  subject: GateRef;
+  is: string;
+  because: Cause[];
+  report: GateStatus;
+}
+export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation | GateExplanation;

@@ -74,6 +74,7 @@ import type {
   ClaimExplanation,
   WorkExplanation,
   EnquiryExplanation,
+  GateExplanation,
 } from "./report";
 import { ref, isRefOfKind, KIND_BY_LABEL, kindOf } from "./report";
 import { compose, per, type Row } from "./facts";
@@ -2367,18 +2368,85 @@ async function explainEnquiry(self: ReadSurface, subject: string): Promise<Enqui
 }
 
 /**
- * The kinds `why` actually explains, and their cases — #128's three. Every
- * other kind gets a refusal built from **this** object, below, so a kind
- * added here (#182) is a kind the refusal stops claiming for itself: naming
- * the explained kinds twice, once in a hand-written list and once in the
- * table, is exactly the drift `KIND_BY_LABEL`'s own comment warns about —
- * "built rather than hand-duplicated ... in the direction that fails
- * silently".
+ * One governing condition's cause, worded by its own state — the same
+ * `CheckStatus.state` four-way split `renderGate` colours, turned into prose
+ * instead: `blocked` and `incomplete` both cite whichever of these are not
+ * `passed`, so the wording (not just `when`) is what tells a failed check
+ * apart from one nobody has run.
+ */
+function causeForCheck(c: CheckStatus): Cause {
+  switch (c.state) {
+    case "passed":
+      return { handle: c.criterion, wording: `${c.proposition} — passed`, when: c.decidedBy?.at };
+    case "failed":
+      return { handle: c.criterion, wording: `${c.proposition} — failed`, when: c.decidedBy?.at };
+    case "never-run":
+      return { handle: c.criterion, wording: `${c.proposition} — has never been run` };
+    case "no-standing-verdict":
+      // S-3c: evaluated, and every evaluation has since been withdrawn -- not
+      // the same fact as never-run, and `renderGate` already keeps the two
+      // apart under this exact name.
+      return { handle: c.criterion, wording: `${c.proposition} — no standing verdict` };
+    default: {
+      const check: never = c.state;
+      throw new Error(`unreached check state: ${check}`);
+    }
+  }
+}
+
+/**
+ * The `Gate` case (#182): `gateStatus`, exhaustive over `GateStatus.state` —
+ * the same four-way split `gateStateFrom` computes, worded rather than
+ * coloured. `blocked` and `incomplete` both cite every condition not
+ * currently passing (a blocked gate can carry a never-run condition beside
+ * its failed one, and the dictated sentence on #182 shows both together);
+ * `satisfied` and `never-evaluated` cite every condition, since all of them
+ * share one state there.
+ */
+async function explainGate(self: ReadSurface, subject: string): Promise<GateExplanation> {
+  const gate = ref("gate", subject);
+  const report = await self.gateStatus(gate);
+  let is: string;
+  let because: Cause[];
+  switch (report.state) {
+    case "blocked":
+      is = "blocked";
+      because = report.checks.filter((c) => c.state !== "passed").map(causeForCheck);
+      break;
+    case "incomplete":
+      is = "incomplete";
+      because = report.checks.filter((c) => c.state !== "passed").map(causeForCheck);
+      break;
+    case "satisfied":
+      is = "satisfied";
+      because = report.checks.map(causeForCheck);
+      break;
+    case "never-evaluated":
+      is = "never evaluated";
+      because = report.checks.map(causeForCheck);
+      break;
+    default: {
+      const check: never = report.state;
+      throw new Error(`unreached gate state: ${check}`);
+    }
+  }
+  return { kind: "gate", subject: gate, is, because, report };
+}
+
+/**
+ * The kinds `why` actually explains, and their cases — #128's three plus
+ * Gate (#182). Every other kind gets a refusal built from **this** object,
+ * below, so a kind added here is a kind the refusal stops claiming for
+ * itself: naming the explained kinds twice, once in a hand-written list and
+ * once in the table, is exactly the drift `KIND_BY_LABEL`'s own comment
+ * warns about — "built rather than hand-duplicated ... in the direction
+ * that fails silently".
  */
 const EXPLAINED = {
   claim: explainClaim,
   work: explainWork,
   enquiry: explainEnquiry,
+  gate: explainGate,
 } satisfies Partial<Record<Kind, Explainer>>;
 
 const EXPLAINED_KINDS = Object.keys(EXPLAINED) as Kind[];
@@ -2421,7 +2489,6 @@ const REFUSED = {
   decision: refuseToExplain("decision"),
   criterion: refuseToExplain("criterion"),
   evaluation: refuseToExplain("evaluation"),
-  gate: refuseToExplain("gate"),
   review: refuseToExplain("review"),
   observations: refuseToExplain("observations"),
   analysis: refuseToExplain("analysis"),

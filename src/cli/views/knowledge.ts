@@ -191,11 +191,11 @@ function renderExplanation(explanation: Explanation, p: Palette): string {
  *
  * `Claim` renders through the existing rich view over its embedded
  * `SupportExplanation` (the *Resting on / Held to / Ultimately resting on*
- * page); `Work` and `LineOfEnquiry` render the sentence-plus-causes shape
- * instead, since their own detail commands (`contract`, `enquiry`) already
- * show the fuller report. `--json` gets the same `{kind, subject, is,
- * because, report}` envelope regardless of which branch prints for a
- * terminal.
+ * page); every other kind (`Work`, `LineOfEnquiry`, `Gate`) renders the
+ * sentence-plus-causes shape instead, since their own detail commands
+ * (`contract`, `enquiry`, `gate`) already show the fuller report. `--json`
+ * gets the same `{kind, subject, is, because, report}` envelope regardless of
+ * which branch prints for a terminal.
  */
 export function renderWhyDispatch(explanation: Explanation, p: Palette): string {
   switch (explanation.kind) {
@@ -203,6 +203,7 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
       return renderWhy(explanation.report, p);
     case "work":
     case "enquiry":
+    case "gate":
       return renderExplanation(explanation, p);
     default: {
       const check: never = explanation;
