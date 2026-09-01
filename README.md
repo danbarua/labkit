@@ -2,9 +2,8 @@
 
 <!--
   Real output, pasted from a run against a live research record (a coupled-
-  oscillator dynamics research programme called Bonsai) at commit 3fec73e,
-  2026-09-01. Re-paste after the record rebuild tracked in #190 step 5 —
-  TASK_2 and GATE_1 will read differently once it lands.
+  oscillator dynamics research programme called Bonsai) at commit 43a4cae,
+  2026-09-01, after the record rebuild tracked in #190 step 5.
 -->
 
 ```sh
@@ -17,11 +16,11 @@ blocked  GATE_3  Stage 2B's readiness signal stays red; the independent package-
 Blocked work
 blocked  TASK_3  produce and maintain the reviewer-required gate inventory (requirement 4, ruling of 2026-08-08) verifying Stage 2B's binding guarantees are enforced in code, not just documented
 
-Unevaluated gates
+Incomplete gates
 incomplete  GATE_1  the affected comparison's robustness cannot be confirmed either way; a further design iteration or an honest 'inconclusive' verdict is required
 
 Untouched work — ready to start
-planned  TASK_2  advance Stage 2A's feasibility ladder (stages 1-3, up to the full 60,000-image official KMNIST training set) to the locked stage-4 confirmatory evaluation against the untouched official test set
+  nothing
 
 Established
   - does a structured internal transformation exist in response to local perturbations along a baseline trajectory?  (Q_3)  — yes
@@ -44,7 +43,7 @@ Unresolved (worked on, no answer yet)
 Untested (nothing has been run against these)
   nothing
 
-seq: 104  —  `now --since 104` asks what moves next
+seq: 133  —  `now --since 133` asks what moves next
 
 $ labkit why GATE_3
 GATE_3 is blocked because
@@ -57,7 +56,7 @@ Question:
   - does this structured transformation generalize across independent baseline trajectories, or is it specific to seed=3000?  (Q_4)
 LineOfEnquiry:
   - 10-class re-verification: 25 seeds per stochastic control, mean-aggregated paired Wilcoxon primary, median-aggregation + exact sign-flip + within-class MCSE robustness cascade, Holm correction across 4 comparisons  (LOE_2)
-  ⋮ (12 more matches, across Evidence, Decision, Criterion, CriterionEvaluation, Review and Task — every field the record considers prose, not just questions)
+  ⋮ (22 more matches, across Evidence, Decision, Criterion, CriterionEvaluation, Review and Task — every field the record considers prose, not just questions)
 ```
 
 **`now` is the standing** — what's blocked, what's ready, where every question
@@ -67,8 +66,8 @@ about one handle. **`search` finds a handle from a word**, across every field
 the record considers prose. Together they are two tenses of one vocabulary:
 `now` is what stands, `why` is why. A third, `is`, will assert a new present
 deliberately (#184, not yet built); until then the write verbs (`pose`,
-`pursue`, `record_analysis`, `close_enquiry`, …) do that work directly, each
-under its own name.
+`pursue`, `record_analysis`, `conclude`, `close_enquiry`, …) do that work
+directly, each under its own name.
 
 LabKit is a research control plane: it tracks **why** a computation was run,
 what evidence resulted, what claims and decisions depend on it, and what is
@@ -193,12 +192,10 @@ It reads **and writes** — every verb the MCP server exposes has a command — 
 record; `--author` names who is acting, since a script driving LabKit is not the
 account it runs under.
 
-<!--
-  TODO(#186): once `conclude` lands, document it here as the write primitive
-  it replaces record_analysis's superseding-analysis JSON flags with. Neither
-  form is documented yet on purpose — the flags it replaces are still live on
-  main, and writing either down now would describe a shape still in motion.
--->
+Writing is one conclusion per call: `labkit conclude <analysis-id> --proposition
+"..." --finding "..."` records a finding and what it bears on; `--replacing
+<CLM_…|EV_…>` supersedes an earlier one instead, inheriting its proposition and
+bearing.
 
 Running `labkit now` in a terminal while an agent session is open is the
 ordinary case, not an edge one: the server holds the database only for the
