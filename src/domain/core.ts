@@ -1,24 +1,18 @@
 /**
  * What every research verb needs, and the few helpers both halves share.
  *
- * `src/domain/session.ts` reached 2,920 lines across 62 members. The seam it
- * was split on is one the domain already asserts — CLAUDE.md's *"events explain
- * how state changed; the graph explains what the current research state is"* —
- * and the measurement bore it out: 18 write verbs and 14 read verbs partitioned
- * with **no member doing both**, and `emit` had 18 callers, every one a write.
+ * The seam between the two surfaces is one the domain already asserts: events
+ * explain how state changed, the graph explains what the current research state
+ * is. Read and write verbs partition cleanly along it, with no member doing
+ * both.
  *
  * This class holds the graph, the clock, the attribution and the event sink,
  * plus the helpers both halves genuinely need.
  *
- * **Membership is by use, and it has to be re-checked rather than assumed.**
- * The first pass took what each half calls directly; transitive closure through
- * those pulled in more, including `withdrawalOf`, which a regex pass had
- * wrongly called read-only. It also pulled in two that were already dead —
- * `enquiriesClaiming` and `enquiryAddressedBy` had no caller anywhere — and
- * `claimFor` lost its last one later with nothing to notice. All three were
- * removed on 2026-08-24. The count that used to open this paragraph went with
- * them: a numeral in prose must earn its assertion (PJ-028), and that one
- * asserted a membership nobody re-derived.
+ * **Membership is by use, and by transitive closure rather than by name.** A
+ * helper that reads like a query can still be reached only from the write side
+ * — `withdrawalOf` is one — so what belongs here is what both halves actually
+ * call, which has to be re-derived rather than assumed.
  *
  * It deliberately holds **no verbs and no `emit`**. `emit` lives on the write
  * side so that a read *cannot* stamp an event: the invariant that reads are
@@ -179,7 +173,7 @@ export class SessionCore {
   /**
    * Restricts a claim traversal to one line of enquiry, when the caller named
    * one. Empty when they did not — a sentence asserted in a single scope needs
-   * no qualifier, and every scenario before S-5 relies on that.
+   * no qualifier.
    */
 
   protected withinScope(scope: { enquiry?: EnquiryRef }): string {
@@ -204,7 +198,7 @@ export class SessionCore {
     // Keyed by id, not by objective. Two tasks can share an objective and be
     // two tasks; deduping on the text reported one piece of work to re-run
     // where there were two. Same traversal `gateStatus` reports as
-    // `{work, objective}` -- one was converted and this was not (PJ-030 §7).
+    // `{work, objective}`.
     const found = new Map<WorkRef, GatedWork>();
     for (const gate of gates) {
       const rows = await this.graph.query(
@@ -226,14 +220,13 @@ export class SessionCore {
    * Reaches the *results*, not just the work: gate -> work -> the unit that
    * carried it out -> what that unit concluded. Without the last two hops this
    * could only report "no confirmatory result affected" by virtue of seeing no
-   * results at all, which is the same answer a genuinely clean amendment
-   * gives — see S-4 on absence of evidence reading as a negative.
+   * results at all — the same answer a genuinely clean amendment gives, and
+   * absence of evidence must not read as a negative result.
    */
 
   protected async confirmatoryResultsBehind(gates: GateRef[]): Promise<ConfirmatoryResult[]> {
-    // Keyed by id. S-5's literal case: one sentence asserted in two lines of
-    // enquiry is two claims, and merging them understated the blast radius of
-    // a scientific amendment.
+    // Keyed by id: one sentence asserted in two lines of enquiry is two claims,
+    // and merging them understates the blast radius of a scientific amendment.
     const affected = new Map<ClaimRef, ConfirmatoryResult>();
     for (const gate of gates) {
       for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
@@ -295,8 +288,7 @@ export class SessionCore {
     if (rows.length === 0) return { withdrawn: false };
 
     // Every node asserting this proposition must have been withdrawn. One left
-    // standing means the record still claims it -- which is exactly the
-    // duplicate-claim case S-12 was built to catch.
+    // standing means the record still claims it.
     // Either predicate counts. Reading one and not the other is the silent
     // half of the two-clause trap above: a claim superseded but not narrowed
     // would have read as standing.
@@ -305,9 +297,9 @@ export class SessionCore {
     );
     if (standing.size > 0) return { withdrawn: false };
 
-    // Identity as well as wording. This was the claim's NAME, picked from
-    // whichever row happened to carry one -- arbitrary row and arbitrary text,
-    // in the field that says what the record asserts instead (PJ-030 §7).
+    // Identity as well as wording. A name alone is picked from whichever row
+    // happens to carry one -- an arbitrary row and arbitrary text, in the field
+    // that says what the record asserts.
     const now =
       rows.find((r) => r.insteadof)?.insteadof ?? rows.find((r) => r.successor)?.successor;
     // **Which decision withdrew it**, so a caller can tell its own act's
@@ -339,9 +331,8 @@ export class SessionCore {
     proposition: IndexedString;
     enquiry?: EnquiryRef;
   }): Promise<DecidedQuestion[]> {
-    // Keyed by id. Two identically-worded questions are two questions -- S-1
-    // poses exactly that pair, and `report.ts` says neither may be resolved by
-    // comparing text. This helper was doing it anyway.
+    // Keyed by id. Two identically-worded questions are two questions, and
+    // neither is resolvable by comparing text.
     const asked = new Map<QuestionRef, DecidedQuestion>();
     // Both bearings: a question can be settled "no" on a finding that
     // challenges the proposition, and that closure rests on this reading just
@@ -369,8 +360,7 @@ export class SessionCore {
   ): Promise<{ proposition: IndexedString; enquiry?: EnquiryRef }> {
     // BOTH bearings. A conclusion that challenges its proposition reaches its
     // line of enquiry the same way one that supports it does, and walking only
-    // SUPPORTS lost the enquiry for every challenging claim -- which S-5's
-    // second stage is, and which is how this was caught.
+    // SUPPORTS loses the enquiry for every challenging claim.
     let name: string | undefined;
     let enquiry: string | undefined;
     for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {

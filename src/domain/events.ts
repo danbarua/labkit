@@ -2,48 +2,20 @@
  * The temporal seam.
  *
  * Every state-changing domain operation flows through one choke point that
- * stamps it with a time and records what it did. This exists now, before any
- * scenario forces it, because the hard part to retrofit is the API discipline
- * — once callers can mutate research state without leaving a temporal trace,
- * questions like "what evidence existed when this decision was amended?"
- * (S-7) or "what was the state of knowledge when this question was
- * sharpened?" (S-1) become unanswerable for everything already recorded.
+ * stamps it with a time and records what it did. The hard part to retrofit is
+ * the API discipline rather than the field: once callers can mutate research
+ * state without leaving a temporal trace, *what evidence existed when this
+ * decision was amended?* is unanswerable for everything already recorded.
  *
- * Where these events durably live is still not decided, and the trigger that
- * was supposed to decide it has now been tested and did not fire.
+ * **The graph, not this log, answers what is true now.** Both of the hardest
+ * historical questions the corpus asks — what was known when a question was
+ * sharpened, which amendment happened first — are answered from durable graph
+ * state, each asserted with a second reader whose event log is provably empty.
+ * `sharpen()` freezes the findings an act was taken in light of; `SUPERSEDES`
+ * orders one design's amendments structurally.
  *
- * PJ-009 named S-1 and S-7 as the first real consumers of durable chronology.
- * Both were built. Both answer their hardest historical question — "what was
- * known when this question was sharpened?", "which amendment happened first?"
- * — from durable graph state, each asserted with a second reader whose event
- * log is provably empty. `sharpen()` freezes the findings an act was taken in
- * light of; `SUPERSEDES` orders one design's amendments structurally. Neither
- * needed a log.
- *
- * The successor trigger, stated so the next reader can check it rather than
- * assume it: a store is earned when a scenario needs an ordering between two
- * decisions that share no supersession chain — row Z's residue — and cannot
- * get it from graph state. Natural-id allocation order is not an answer; ids
- * happen to be issued in sequence, which is an accident of the sequence and
- * not a modelled fact.
- *
- * When that does happen, the answer is still **in memory**. The only consumer
- * of this layer is the test suite, so persistence and dispatch are decided
- * after the scenario corpus is complete, not before. An earned store gets an
- * implementation behind `EventSink` and its own test file, separate from the
- * scenarios — that suite becomes the specification a later PGlite-backed
- * implementation has to satisfy, and its shape is whatever the domain turns
- * out to require. `inMemoryEventLog()` below is therefore a decision, not an
- * unfinished edge.
- *
- * **A second trigger now stands beside that one, and it is nearer.** Time was
- * one aspect of a command's execution context; who ran it is another, and
- * `AttributionContext` below records it. Attribution is *written* here and read
- * by nothing — the shape CLAUDE.md calls dead code after PJ-007's
- * `buildAsClause`. It ships that way deliberately, and the trigger is a
- * consumer asking who did something: an audit read, a "what has this session
- * been doing" report, an MCP notification. Until one exists, attribution
- * reaches the end of this process and stops. See PJ-031.
+ * Attribution is the other aspect of a command's execution context, recorded by
+ * `AttributionContext` below.
  */
 
 import type { MintedEdge } from "../db/domain";
@@ -99,9 +71,8 @@ export interface AttributionContext {
  * populated and uniform while the underlying facts differed, so a reader
  * trusting both equally was misled about exactly one and could not tell which.
  *
- * That is not an *empty* answer, which is the distinction PJ-011 §5 turns on: a
- * missing feature manufactures an empty result, and only a confidently wrong
- * one shows the model claiming something it cannot support.
+ * That is not an *empty* answer: a missing field manufactures an empty result,
+ * where this is the record claiming something it cannot support.
  *
  * | | means | producers |
  * | --- | --- | --- |
@@ -140,12 +111,11 @@ export type RecordedAttribution = Omit<AttributionContext, "attribution_how"> & 
 /**
  * What a command executes in.
  *
- * `Clock` was here first and alone, because PJ-009 §3 built the temporal seam
- * before a scenario forced it: the part that is hard to retrofit is the API
- * discipline, not the field. That argument was never specific to time. Once
- * callers can mutate research state without leaving a trace of *who*, "which
- * agent recorded this analysis?" is unanswerable for everything already
- * written, exactly as "what evidence existed when this was amended?" would have
+ * Time and attribution both, for the same reason: the part that is hard to
+ * retrofit is the API discipline, not the field. Once callers can mutate
+ * research state without leaving a trace of *who*, "which agent recorded this
+ * analysis?" is unanswerable for everything already written, exactly as "what
+ * evidence existed when this was amended?" would have
  * been.
  *
  * So this is the temporal seam generalised one level, and the clock keeps its
@@ -191,11 +161,9 @@ export interface DomainEvent {
    * `EventSink.record` takes one without a `seq` and the store assigns it.
    * Anything read back out of either sink has one.
    *
-   * `inMemoryEventLog()` did not assign one until 2026-08-28, on the reasoning
-   * that a process-lifetime array has nothing to number. That was wrong twice:
-   * an array index is a number, and the filter below reads `(e.seq ?? 0)`, so
-   * `select({since})` returned nothing for every value while `pgEventLog`
-   * answered correctly.
+   * **Both sinks must assign it.** The filter below reads `(e.seq ?? 0)`, so a
+   * sink that leaves it undefined scores every event 0 and `select({since})`
+   * returns nothing for every value, while the other answers correctly.
    *
    * It is the stream's order, not `at`. A frozen clock — which most of the
    * suite runs — stamps every event in a scenario with one instant, and this
@@ -246,19 +214,12 @@ export interface DomainEvent {
    * Every edge this act created. Always an array, for the same reason as
    * {@link created} — see {@link domainEvent}.
    *
-   * The other half of {@link created}, and it did not exist until 2026-08-28.
-   * `createNode` had pushed to a buffer since the collector was written;
-   * `createEdge` pushed to nothing, so `recordAnalysis` wrote eight edges and
-   * the log reported none — the act's nodes were visible and what connected
-   * them was not.
+   * The other half of {@link created}. Without it an act's nodes are visible
+   * and what connected them is not.
    *
-   * **Not earned by a wrong answer, and the commit says so.** An event missing
-   * its edges was *incomplete*, and PJ-011 §5 is explicit that an empty result
-   * is not a wrong one. What earned it is a consumer, exactly as attribution
-   * earned the durable log in PJ-032: which edges an act created is
-   * unreconstructable from the graph, because the graph holds the edge and not
-   * the act that made it — and unlike a node there is no `created` to fall back
-   * on.
+   * **Unreconstructable from the graph**, which is why it is recorded rather
+   * than derived: the graph holds the edge and not the act that made it, and
+   * unlike a node there is no `created` to fall back on.
    */
   edges: readonly MintedEdge[];
   detail?: Record<string, unknown>;
@@ -268,16 +229,13 @@ export interface DomainEvent {
  * Builds a `DomainEvent`, defaulting `created`/`edges` to `[]` so a caller
  * building one by hand never states "this minted nothing" twice.
  *
- * This used to be the type's own job: both fields were optional, and a
- * consumer three call-sites away had to know that "absent" meant "empty" —
- * `?? []` at every read, and a `null` sentinel in the store to tell "empty"
- * apart from "nobody was collecting yet" (`event-store.ts`). That distinction
- * had a real use once, for rows written before `edges` existed — but this
- * repo's one durable record (`bonsai-2026`) postdates every column it has,
- * and is itself script-derived: `probe-bonsai-replay.sh` regenerates it byte
- * for byte, so there is no data anywhere a schema change could strand.
- * Nothing here is preserved rather than regenerated, so the case the `null`
- * sentinel was protecting never occurs and never will.
+ * **Not the type's own job.** Optional fields make a consumer three call-sites
+ * away know that "absent" means "empty" — a `?? []` at every read, and a `null`
+ * sentinel in the store to tell "empty" apart from "nobody was collecting yet".
+ * That distinction only earns its keep for rows written before the column
+ * existed, and the one durable record this repo has is script-derived:
+ * `probe-bonsai-replay.sh` regenerates it byte for byte, so no data anywhere
+ * could be stranded by a schema change.
  *
  * `WriteSurface.emit` already supplies both fields unconditionally, from
  * `TenantGraph`'s drain calls — this constructor is for the other caller, a
@@ -329,24 +287,16 @@ export interface EventSink {
  * exercises the seam and none has needed the log to answer anything; every
  * historical question so far is answered from the graph.
  *
- * Stronger than it sounds, and asserted rather than asserted-about: the
- * scenarios that touch the log at all check that it is **empty** at the moment
- * a historical answer is read (S-1, S-7, S-11, S-12), which is what makes the
- * answer durable rather than replayed.
- *
- * No count here on purpose. It said "eight scenarios" through sixteen more —
- * a number in a comment is a maintenance claim nobody checks, and the argument
- * never needed one (PJ-028).
+ * Asserted rather than asserted-about: the scenarios that touch the log check
+ * it is **empty** at the moment a historical answer is read, which is what
+ * makes the answer durable rather than replayed.
  */
 export function inMemoryEventLog(): EventSink {
   const events: DomainEvent[] = [];
-  // **Numbered here, and it took a defect to earn the counter.** This sink
-  // used to leave `seq` undefined on the reasoning that a process-lifetime
-  // array has nothing to number. An array index is a number, and the omission
-  // was not free: `matches` below reads `(e.seq ?? 0) > f.since`, so every
-  // event scored 0 and `select({since})` returned **nothing, for every value
-  // of `since`**, while `pgEventLog` answered the same filter correctly. Two
-  // sinks behind one interface, disagreeing — measured 2026-08-28.
+  // **Numbered, because `matches` below reads `(e.seq ?? 0) > f.since`.**
+  // Leaving it undefined scores every event 0, so `select({since})` returns
+  // nothing for every value of `since` while `pgEventLog` answers the same
+  // filter correctly: two sinks behind one interface, disagreeing.
   //
   // Per-sink and gapless, where Postgres's is a `bigserial` shared across
   // tenants and therefore gappy within one. Neither property matters to the
