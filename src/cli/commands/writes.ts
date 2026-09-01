@@ -29,7 +29,7 @@
  */
 
 import type { Command } from "commander";
-import { collect, conclusion, handle, inputRef } from "../args";
+import { bearing, collect, handle, inputRef, standing, supersededRef } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
 import type { ClaimRef, DomainEvent, EnquiryRef, GateRef } from "../../domain";
@@ -125,10 +125,11 @@ export function registerWrites(program: Command, run: Run): void {
 
   program
     .command("analyse")
-    .summary("record a computation, what it read, and what it concluded")
+    .summary("record a computation and what it read")
     .description(
-      "The compound verb: a computation, its evidence unit, an output artefact, and one claim " +
-        "per conclusion. Answers with every handle the act minted.",
+      "The run itself: a computation, its evidence unit, and an output artefact. Findings are " +
+        "added with `labkit conclude`, one at a time, as they are reached. Answers with the " +
+        "analysis handle, which is what `conclude` takes.",
     )
     .argument("<enquiry-id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what was done")
@@ -137,15 +138,10 @@ export function registerWrites(program: Command, run: Run): void {
       "an input: ART_… observations or an earlier COMP_… analysis (repeatable)",
       collect(inputRef),
     )
-    .requiredOption(
-      "--concludes <json>",
-      `'{"proposition": "…", "finding": "…"}' (repeatable; bearing and standing optional)`,
-      collect(conclusion),
-    )
     .option("--implementing <work-id>", "the planned work this carries out", handle("work"))
     .option(
       "--held-to <criterion-id>",
-      "a prespecified condition these conclusions answer to (repeatable)",
+      "a prespecified condition its conclusions answer to (repeatable)",
       collect(handle("criterion")),
     )
     .action(async (enquiry, opts) =>
@@ -155,9 +151,40 @@ export function registerWrites(program: Command, run: Run): void {
             enquiry,
             method: opts.method,
             from: opts.from,
-            concludes: opts.concludes,
+            concludes: [],
             ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
             ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
+          }),
+          mintedView(),
+        ),
+      ),
+    );
+
+  program
+    .command("conclude")
+    .summary("assert one thing an analysis found")
+    .description(
+      "The primitive. One conclusion, one call — findings arrive over days, one at a time, and " +
+        "the compound form made a caller serialise a tree through flat flags. Give " +
+        "--replacing to supersede exactly one earlier finding: the proposition and bearing are " +
+        "then inherited, and a finding nobody names stands.",
+    )
+    .argument("<analysis-id>", "the analysis this conclusion belongs to", handle("analysis"))
+    .requiredOption("--finding <text>", "what was found, in this analysis's own words")
+    .option("--proposition <text>", "what the finding bears on (required unless --replacing)")
+    .option("--replacing <id>", "the CLM_… claim or EV_… finding this supersedes", supersededRef)
+    .option("--bearing <supports|challenges>", "which way it cuts (default supports)", bearing)
+    .option("--standing <exploratory|confirmatory>", "confirmatory standing", standing)
+    .action(async (analysis, opts) =>
+      run(async ({ write }) =>
+        answer(
+          await write.conclude({
+            analysis,
+            finding: opts.finding,
+            ...(opts.proposition === undefined ? {} : { proposition: opts.proposition }),
+            ...(opts.replacing === undefined ? {} : { replacing: opts.replacing }),
+            ...(opts.bearing === undefined ? {} : { bearing: opts.bearing }),
+            ...(opts.standing === undefined ? {} : { standing: opts.standing }),
           }),
           mintedView(),
         ),
@@ -321,7 +348,10 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--enquiry <id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what the re-check did")
     .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(inputRef))
-    .requiredOption("--concludes <json>", `'{"proposition": "…", "finding": "…"}'`, conclusion)
+    .requiredOption("--proposition <text>", "what the re-check reached a verdict about")
+    .requiredOption("--finding <text>", "what it found this time")
+    .option("--bearing <supports|challenges>", "which way it cuts (default supports)", bearing)
+    .option("--standing <exploratory|confirmatory>", "confirmatory standing", standing)
     .action(async (historical, opts) =>
       run(async ({ write }) =>
         answer(
@@ -330,7 +360,15 @@ export function registerWrites(program: Command, run: Run): void {
             enquiry: opts.enquiry,
             method: opts.method,
             under: opts.under,
-            concludes: opts.concludes,
+            // Flat flags rather than JSON, and this one stays on the verb: a
+            // re-check reaches exactly one verdict about the thing it
+            // re-checked, so there is no list to serialise.
+            concludes: {
+              proposition: opts.proposition,
+              finding: opts.finding,
+              ...(opts.bearing === undefined ? {} : { bearing: opts.bearing }),
+              ...(opts.standing === undefined ? {} : { standing: opts.standing }),
+            },
           }),
           mintedView(),
         ),
@@ -410,16 +448,16 @@ export function registerWrites(program: Command, run: Run): void {
     .command("replace")
     .summary("supersede a defective analysis with a corrected one")
     .description(
-      "Invalidates the superseded output and records the replacement in one transaction, so a " +
-        "failure between the halves cannot leave an earlier failure no longer deciding its " +
-        "check with no corrected check in existence. Answers with every handle it minted.",
+      "Records the replacement and the lineage to what it supersedes. Its findings are added " +
+        "with `labkit conclude --replacing <claim>`, one per finding actually revisited — a " +
+        "re-analysis that addresses three of four conclusions leaves the fourth standing, " +
+        "which is what a whole-analysis retraction could not express (#132).",
     )
     .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
     .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))
     .requiredOption("--enquiry <id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what the replacement did")
     .requiredOption("--from <id>", "an input it read (repeatable)", collect(inputRef))
-    .requiredOption("--concludes <json>", "a conclusion (repeatable)", collect(conclusion))
     .action(async (supersedes, opts) =>
       run(async ({ write }) =>
         answer(
@@ -429,7 +467,7 @@ export function registerWrites(program: Command, run: Run): void {
             enquiry: opts.enquiry,
             method: opts.method,
             from: opts.from,
-            concludes: opts.concludes,
+            concludes: [],
           }),
           mintedView(),
         ),

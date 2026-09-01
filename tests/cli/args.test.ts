@@ -103,8 +103,6 @@ test("a repeated option keeps every value, in order", async () => {
     "ART_1",
     "--from",
     "COMP_2",
-    "--concludes",
-    JSON.stringify({ proposition: "p", finding: "f" }),
   ]);
   expect(analyse.opts().from).toEqual(["ART_1", "COMP_2"]);
 });

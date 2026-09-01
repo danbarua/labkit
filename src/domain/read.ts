@@ -1662,7 +1662,7 @@ export class ReadSurface extends SessionCore {
     // Which of the inputs this claim rests on have been retracted outright --
     // every finding they record superseded. One query for all of them.
     const retractedInputs = await this.retractedArtefacts([
-      ...new Set(resting.map((r) => r.a.natural_id)),
+      ...new Set(resting.map((r) => ref("observations", r.a.natural_id))),
     ]);
 
     const byCriterion = new Map<CriterionRef, CheckStatus>();
@@ -1762,7 +1762,9 @@ export class ReadSurface extends SessionCore {
                 // 2026-09-01, and a partial replacement no longer sets it --
                 // so a reader resting on a record whose findings had all been
                 // superseded was told nothing. See `retractedArtefacts`.
-                ...(retractedInputs.has(r.a.natural_id) ? { invalidated: true as const } : {}),
+                ...(retractedInputs.has(ref("observations", r.a.natural_id))
+                  ? { invalidated: true as const }
+                  : {}),
               },
             ]),
         ).values(),
@@ -2049,7 +2051,7 @@ export class ReadSurface extends SessionCore {
    * holding no findings at all is not retracted — there is nothing to have
    * fallen, which is PJ-011 §5's distinction between empty and wrong.
    */
-  private async retractedArtefacts(ids: string[]): Promise<Set<string>> {
+  private async retractedArtefacts(ids: ObservationsRef[]): Promise<Set<ObservationsRef>> {
     if (ids.length === 0) return new Set();
     const rows = await this.graph.query(
       `MATCH (a:Artefact) WHERE a.natural_id IN $ids
@@ -2070,17 +2072,18 @@ export class ReadSurface extends SessionCore {
     // Both bearings. A finding that CHALLENGES a claim is a finding, and
     // reading only the supporting side is the silent half of this repo's
     // six-occurrence defect.
-    const standing = new Map<string, boolean>();
+    const standing = new Map<ObservationsRef, boolean>();
     for (const row of rows) {
-      const gone = await this.supersededClaim(row.sup?.natural_id ?? row.chal?.natural_id);
-      standing.set(row.a.natural_id, (standing.get(row.a.natural_id) ?? false) || !gone);
+      const bears = row.sup?.natural_id ?? row.chal?.natural_id;
+      const gone = bears === undefined ? false : await this.supersededClaim(ref("claim", bears));
+      const artefact = ref("observations", row.a.natural_id);
+      standing.set(artefact, (standing.get(artefact) ?? false) || !gone);
     }
     return new Set([...standing].filter(([, anyStanding]) => !anyStanding).map(([id]) => id));
   }
 
   /** Whether a decision stands instead of this claim. Both predicates; see `withdrawalOf`. */
-  private async supersededClaim(claim: string | undefined): Promise<boolean> {
-    if (claim === undefined) return false;
+  private async supersededClaim(claim: ClaimRef): Promise<boolean> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id})
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)

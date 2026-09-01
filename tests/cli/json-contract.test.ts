@@ -186,14 +186,19 @@ beforeAll(async () => {
     work,
     "--held-to",
     criterion,
-    "--concludes",
-    JSON.stringify({
-      proposition: "the schedule moves convergence",
-      finding: "~3 steps earlier at every depth",
-    }),
   ]);
   const analysis = recorded.analysis as string;
-  const claim = (recorded.claims as Array<{ claim: string }>)[0]!.claim;
+  // A second call, because `analyse` records the run and `conclude` records a
+  // finding. Findings arrive over days, one at a time (#173).
+  const concluded = await out([
+    "conclude",
+    analysis,
+    "--proposition",
+    "the schedule moves convergence",
+    "--finding",
+    "~3 steps earlier at every depth",
+  ]);
+  const claim = (concluded.claims as Array<{ claim: string }>)[0]!.claim;
 
   await out(["evaluate", criterion, "--gate", gate, "--value", "n=24", "--outcome", "pass"]);
   await out(["promote", claim, "--because", "the prespecified check passed"]);
@@ -207,11 +212,10 @@ beforeAll(async () => {
     "replication at n=24",
     "--under",
     observations,
-    "--concludes",
-    JSON.stringify({
-      proposition: "the schedule moves convergence",
-      finding: "holds at n=24",
-    }),
+    "--proposition",
+    "the schedule moves convergence",
+    "--finding",
+    "holds at n=24",
   ]);
   const question = (await surfaces.read.enquiryStatus(enquiry as never)).question!.question;
   await out(["close", enquiry, "--answered-by", claim]);

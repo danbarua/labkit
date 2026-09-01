@@ -478,7 +478,6 @@ export class WriteSurface extends SessionCore {
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
-      const at = this.clock.now();
       const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
       const claims: ConcludedClaim[] = [];
       for (const conclusion of input.concludes) {
@@ -1934,7 +1933,7 @@ export class WriteSurface extends SessionCore {
    * asserting a sentence, and whether this particular finding has already
    * fallen.
    */
-  private async supersessionOf(claim: ClaimRef): Promise<string | undefined> {
+  private async supersessionOf(claim: ClaimRef): Promise<Prose | undefined> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id})
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)

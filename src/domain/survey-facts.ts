@@ -31,9 +31,6 @@ interface CriterionNode extends Node {
 interface BasisNode extends Node {
   statement: string;
 }
-interface ArtefactNode extends Node {
-  invalidated?: boolean;
-}
 
 const id = (row: Row, key: string): string | null => (row[key] as Node | null)?.natural_id ?? null;
 
