@@ -210,6 +210,9 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Question", "LineOfEnquiry"],
     ["Decision", "Question"],
     ["Decision", "Claim"],
+    // The revision an act produced, at analysis grain. See the `Computation`
+    // pair on `CHANGES` for what this link does and does not mean.
+    ["Decision", "Computation"],
   ],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
   // A Task earns this pair by #98: `labkit contract` had no way to say why a
@@ -375,6 +378,37 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   CHANGES: [
     ["Decision", "Criterion"],
     ["Decision", "Claim"],
+    /**
+     * **The `Computation` pair is LINEAGE, not retraction**, and confusing the
+     * two would undo the defect it was added for.
+     *
+     * `Decision -CHANGES-> Computation(old)` with
+     * `Decision -MOTIVATES-> Computation(new)` says *this analysis is a
+     * revision of that one*. It says nothing whatever about the standing of
+     * the old analysis's conclusions. **No reader may infer that the old
+     * analysis's other findings fell** from the existence of this edge —
+     * `affects`, `why` and `known` must all go on reporting an untouched
+     * conclusion as standing, and as resting on the old output artefact.
+     *
+     * Retraction stays exactly one grain lower: `conclude --replacing` writes
+     * `Decision -CHANGES-> Claim` per finding, which is what `withdrawalOf`
+     * reads. That separation *is* #132's fix. The old code carried retraction
+     * on `Artefact.invalidated`, one flag over every finding, so replacing one
+     * conclusion withdrew the rest.
+     *
+     * `replaceAnalysis` declined a link of any kind until 2026-09-01, on two
+     * grounds stated together: nothing read one, and invalidation already
+     * carried the meaning. #173 removed the second — the flag is no longer
+     * written — and supplied the first: `conclude --replacing X` walks
+     * `new <-MOTIVATES- Decision -CHANGES-> old` to check that `old` actually
+     * concluded `X`, and names what it did conclude when it did not.
+     *
+     * The alternative was to leave `--replacing` unscoped, and that produces a
+     * confidently wrong answer rather than an empty one: a finding recorded as
+     * superseded by an analysis that never addressed its question, with the
+     * record pointing at the wrong act as the reason it no longer stands.
+     */
+    ["Decision", "Computation"],
   ],
   BASED_ON: [
     ["Decision", "Evidence"],
