@@ -121,11 +121,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       : "",
     "",
     // **One word, one meaning.** This list is the supporting *findings*; the
-    // inputs they rest on are `restingOn`, below. It was headed "Resting on"
-    // with "nothing" as its empty text, so a challenged claim -- which has no
-    // supporting findings by definition -- printed that it rested on nothing
-    // and then, two sections down, named what it rested on. A correct record
-    // reading as the wrong answer, and negative results are the common case.
+    // inputs they rest on are `restingOn`, below.
     p.heading("Supported by"),
     bullets(
       why.support.map(
