@@ -149,6 +149,16 @@ function selectTrace(index) {
     badge.classList.toggle("rust", origin === "labkit-rust");
     badge.classList.toggle("db", origin === "labkit-db");
   }
+  // A `--db` trace whose replay diverged (fragments/replay.ts) still renders
+  // -- every step's own created/edges are real either way -- but `derived`
+  // and `fragment` go missing from the divergence onward, silently unless
+  // this says so. See scripts/read-db-trace.ts's `derivedUnavailable`.
+  const warning = document.getElementById("derived-warning");
+  if (warning) {
+    const reason = state.current?.derivedUnavailable;
+    warning.hidden = !reason;
+    if (reason) warning.title = reason;
+  }
   resetRun();
 }
 

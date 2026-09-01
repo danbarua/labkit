@@ -77,6 +77,19 @@ body {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
+.derived-warning {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  white-space: nowrap;
+  cursor: help;
+}
+
 select, button, input[type="range"] {
   font-family: inherit;
   font-size: 12px;
