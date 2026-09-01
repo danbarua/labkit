@@ -136,6 +136,7 @@ const CRITERION_PREFIX = "CRIT_";
 const GATE_PREFIX = "GATE_";
 const WORK_PREFIX = "TASK_";
 const REVIEW_PREFIX = "REV_";
+const EVIDENCE_PREFIX = "EV_";
 
 export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   tool({
@@ -629,21 +630,22 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
 
   writeTool({
     name: "record_analysis",
-    title: "Record a computation and what it concluded",
+    title: "Record a computation and what it read",
     description:
-      "The compound act: a computation, what it read, and one claim per conclusion. `from` " +
-      "takes observation ids or the ids of earlier analyses whose output this one read — a " +
-      "two-stage pipeline records the second stage as consuming the first, never by " +
-      "re-entering the intermediate as if it were fresh measurement. `held_to` names " +
-      "prespecified checks the conclusions must answer to; a check nobody runs still counts " +
-      "against the finding, so it is named here and not at evaluation time.",
+      "The run itself: a computation, what it read, and an artefact to hold its output. Call " +
+      "`conclude` for each finding it reached — findings arrive one at a time, and an " +
+      "analysis with none yet is an honest state. `from` takes observation ids or the ids of " +
+      "earlier analyses whose output this one read — a two-stage pipeline records the second " +
+      "stage as consuming the first, never by re-entering the intermediate as if it were " +
+      "fresh measurement. `held_to` names prespecified checks the conclusions must answer to; " +
+      "a check nobody runs still counts against the finding, so it is named here and not at " +
+      "evaluation time.",
     inputSchema: {
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
       method: z.string().describe("what was done"),
       from: z
         .array(z.string())
         .describe(`ids this run read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`),
-      concludes: z.array(conclusionShape).describe("one entry per conclusion"),
       implementing: z.string().optional().describe("id of the planned work this carries out"),
       held_to: z
         .array(z.string())
@@ -651,17 +653,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .describe("ids of prespecified criteria the conclusions are held to"),
     },
     outputSchema: recordedAnalysisSchema,
-    handler: (write, { enquiry, method, from, concludes, implementing, held_to }) =>
+    handler: (write, { enquiry, method, from, implementing, held_to }) =>
       write.recordAnalysis({
         enquiry: ref("enquiry", enquiry),
         method,
         from: (from as string[]).map(inputRef),
-        concludes: concludes as Array<{
-          proposition: string;
-          finding: string;
-          bearing?: "supports" | "challenges";
-          standing?: "exploratory" | "confirmatory";
-        }>,
+        concludes: [],
         ...(implementing === undefined ? {} : { implementing: ref("work", implementing) }),
         ...(held_to === undefined
           ? {}
@@ -710,6 +707,61 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     outputSchema: sharpenedQuestionSchema,
     handler: (write, { from, into, because }) =>
       write.sharpen({ from: ref("question", from), into, because }),
+  }),
+
+  writeTool({
+    name: "conclude",
+    title: "Assert one thing an analysis found",
+    description:
+      "The primitive. One conclusion, one call — a researcher reaches findings one at a time, " +
+      "over days, and the compound form made a caller serialise a tree in order to record " +
+      "them. `replacing` supersedes exactly one earlier finding, naming its claim or evidence " +
+      "id: `proposition` and `bearing` are then inherited, and a finding nobody names stands. " +
+      "That is what lets a re-analysis address three of four conclusions and leave the fourth " +
+      "alone. `replacing` is only accepted on an analysis that `replace_analysis` recorded as " +
+      "superseding the one that concluded it.",
+    inputSchema: {
+      analysis: z
+        .string()
+        .describe(`id of the analysis this conclusion belongs to, e.g. ${ANALYSIS_PREFIX}3`),
+      finding: z.string().describe("what was found, in this analysis's own words"),
+      proposition: z
+        .string()
+        .optional()
+        .describe("the claim, as a sentence; required unless `replacing` is given"),
+      replacing: z
+        .string()
+        .optional()
+        .describe(
+          `id of the single finding this supersedes — ${CLAIM_PREFIX}\u2026 or ${EVIDENCE_PREFIX}\u2026`,
+        ),
+      bearing: z
+        .enum(["supports", "challenges"])
+        .optional()
+        .describe("whether the finding supports or challenges the proposition (default: supports)"),
+      standing: z
+        .enum(["exploratory", "confirmatory"])
+        .optional()
+        .describe("confirmatory means it was prespecified; exploratory is the default"),
+    },
+    outputSchema: recordedAnalysisSchema,
+    handler: (write, { analysis, finding, proposition, replacing, bearing, standing }) =>
+      write.conclude({
+        analysis: ref("analysis", analysis),
+        finding,
+        ...(proposition === undefined ? {} : { proposition }),
+        // Prefix, never `typeof`: both arms of the union are "string" at
+        // runtime, which is the defect `isRefOfKind` exists for.
+        ...(replacing === undefined
+          ? {}
+          : {
+              replacing: (replacing as string).startsWith(CLAIM_PREFIX)
+                ? ref("claim", replacing)
+                : ref("evidence", replacing),
+            }),
+        ...(bearing === undefined ? {} : { bearing: bearing as "supports" | "challenges" }),
+        ...(standing === undefined ? {} : { standing: standing as "exploratory" | "confirmatory" }),
+      }),
   }),
 
   writeTool({
@@ -854,20 +906,37 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       under: z
         .array(z.string())
         .describe(`ids read this time — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`),
-      concludes: conclusionShape.describe("the single conclusion this re-verification reached"),
+      // Flat fields, and this conclusion stays on the verb: a re-check reaches
+      // exactly one verdict about the thing it re-checked, so there is no list
+      // to serialise and nothing for `conclude` to add.
+      proposition: z.string().describe("what the re-check reached a verdict about"),
+      finding: z.string().describe("what it found this time"),
+      bearing: z
+        .enum(["supports", "challenges"])
+        .optional()
+        .describe("whether the finding supports or challenges the proposition (default: supports)"),
+      standing: z
+        .enum(["exploratory", "confirmatory"])
+        .optional()
+        .describe("confirmatory means it was prespecified; exploratory is the default"),
     },
     outputSchema: verificationReportSchema,
-    handler: (write, { historical, enquiry, method, under, concludes }) =>
+    handler: (
+      write,
+      { historical, enquiry, method, under, proposition, finding, bearing, standing },
+    ) =>
       write.reverify({
         historical: ref("analysis", historical),
         enquiry: ref("enquiry", enquiry),
         method,
         under: (under as string[]).map(inputRef),
-        concludes: concludes as {
-          proposition: string;
-          finding: string;
-          bearing?: "supports" | "challenges";
-          standing?: "exploratory" | "confirmatory";
+        concludes: {
+          proposition: proposition as string,
+          finding: finding as string,
+          ...(bearing === undefined ? {} : { bearing: bearing as "supports" | "challenges" }),
+          ...(standing === undefined
+            ? {}
+            : { standing: standing as "exploratory" | "confirmatory" }),
         },
       }),
   }),
@@ -942,12 +1011,11 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Supersede a defective analysis",
     description:
       "Record a corrected analysis in place of a defective one, citing the review that " +
-      "justified the retraction. The superseded output is invalidated and the checks that " +
-      "cited it are withdrawn, in one transaction with the replacement — a failure between " +
-      "the halves would leave an earlier failure no longer deciding its check and no " +
-      "corrected check in existence. The answer says what changed and what did not. `from` " +
-      "takes observation ids or the ids of earlier analyses whose output the replacement " +
-      "read, exactly as `record_analysis` does.",
+      "justified the retraction, and the lineage between them. Its findings are recorded " +
+      "with `conclude`, passing `replacing` for each finding actually revisited — so a " +
+      "re-analysis that addresses three of four conclusions leaves the fourth standing, and " +
+      "so do the checks resting on it. `from` takes observation ids or the ids of earlier " +
+      "analyses whose output the replacement read, exactly as `record_analysis` does.",
     inputSchema: {
       supersedes: z
         .string()
@@ -960,22 +1028,16 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .describe(
           `ids the replacement read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
         ),
-      concludes: z.array(conclusionShape).describe("one entry per conclusion"),
     },
     outputSchema: replacementReportSchema,
-    handler: (write, { supersedes, because, enquiry, method, from, concludes }) =>
+    handler: (write, { supersedes, because, enquiry, method, from }) =>
       write.replaceAnalysis({
         supersedes: ref("analysis", supersedes),
         because: ref("review", because),
         enquiry: ref("enquiry", enquiry),
         method,
         from: (from as string[]).map(inputRef),
-        concludes: concludes as Array<{
-          proposition: string;
-          finding: string;
-          bearing?: "supports" | "challenges";
-          standing?: "exploratory" | "confirmatory";
-        }>,
+        concludes: [],
       }),
   }),
 

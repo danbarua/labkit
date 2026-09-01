@@ -96,14 +96,7 @@ test("a repeated option keeps every value, in order", async () => {
   const program = buildProgram(async () => {});
   program.exitOverride();
   const analyse = program.commands.find((c) => c.name() === "analyse")!;
-  analyse.parseOptions([
-    "--method",
-    "m",
-    "--from",
-    "ART_1",
-    "--from",
-    "COMP_2",
-  ]);
+  analyse.parseOptions(["--method", "m", "--from", "ART_1", "--from", "COMP_2"]);
   expect(analyse.opts().from).toEqual(["ART_1", "COMP_2"]);
 });
 

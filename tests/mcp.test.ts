@@ -239,10 +239,16 @@ describe("an agent can track work through the tools alone", () => {
         enquiry: id(enquiry),
         method: "paired comparison",
         from: [id(observations)],
-        concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
+      });
+      // Two calls, because the run and the finding are two acts. An agent
+      // records the analysis, then concludes as it reaches each finding.
+      const concluded = await call(c, "conclude", {
+        analysis: id(analysis),
+        proposition: PROP,
+        finding: "moves by ~3 steps",
       });
 
-      const claimId = (analysis.claims as Array<{ claim: string; asserts: string }>).find(
+      const claimId = (concluded.claims as Array<{ claim: string; asserts: string }>).find(
         (x) => x.asserts === PROP,
       )!.claim;
       await call(c, "close_enquiry", {
@@ -335,19 +341,18 @@ describe("an agent can track work through the tools alone", () => {
         name: "seed sweep",
         finding: "five seeds, consistent",
       });
-      await call(c, "record_analysis", {
+      const sweep = await call(c, "record_analysis", {
         enquiry: id(enquiry),
         method: "seed sweep",
         from: [id(observations)],
-        concludes: [
-          {
-            proposition: HOLDS,
-            finding: "holds at all five",
-            standing: "confirmatory",
-          },
-        ],
         implementing: id(work),
         held_to: [id(criterion)],
+      });
+      await call(c, "conclude", {
+        analysis: id(sweep),
+        proposition: HOLDS,
+        finding: "holds at all five",
+        standing: "confirmatory",
       });
 
       // Unmet before the check is run -- an unrun check counts against the
@@ -389,7 +394,11 @@ describe("an agent can track work through the tools alone", () => {
         enquiry: id(enquiry),
         method: "benchmark",
         from: [id(observations)],
-        concludes: [{ proposition: GENERAL, finding: "12% faster overall" }],
+      });
+      await call(c, "conclude", {
+        analysis: id(analysis),
+        proposition: GENERAL,
+        finding: "12% faster overall",
       });
       expect(analysis.analysis as string).toMatch(/^COMP_/);
 
@@ -450,18 +459,21 @@ describe("an agent can track work through the tools alone", () => {
         enquiry: id(enquiry),
         method: "calibrate",
         from: [id(raw)],
-        concludes: [
-          {
-            proposition: "the series is calibrated",
-            finding: "offset removed",
-          },
-        ],
+      });
+      await call(c, "conclude", {
+        analysis: id(calibration),
+        proposition: "the series is calibrated",
+        finding: "offset removed",
       });
       const trend = await call(c, "record_analysis", {
         enquiry: id(enquiry),
         method: "trend",
         from: [calibration.analysis as string],
-        concludes: [{ proposition: TRENDS, finding: "slope 0.4" }],
+      });
+      await call(c, "conclude", {
+        analysis: id(trend),
+        proposition: TRENDS,
+        finding: "slope 0.4",
       });
       const review = await call(c, "record_review", {
         of: trend.analysis as string,
@@ -475,7 +487,14 @@ describe("an agent can track work through the tools alone", () => {
         enquiry: id(enquiry),
         method: "trend, two-sided",
         from: [stageOne],
-        concludes: [{ proposition: TRENDS, finding: "slope 0.4, two-sided" }],
+      });
+      // `replacing` names the one finding this supersedes. The replacement is
+      // the analysis to conclude on; the claim it supersedes belongs to the
+      // analysis it replaced, which the lineage edge makes reachable.
+      await call(c, "conclude", {
+        analysis: report.replacement as string,
+        replacing: await claimIdFor(c, TRENDS),
+        finding: "slope 0.4, two-sided",
       });
 
       // The handle comes back as the caller named it -- an analysis, not an
@@ -503,12 +522,11 @@ describe("an agent can track work through the tools alone", () => {
         enquiry: id(enquiry),
         method: "calibrate, current offsets",
         from: [id(raw)],
-        concludes: [
-          {
-            proposition: "the series is calibrated",
-            finding: "offset removed, current table",
-          },
-        ],
+      });
+      await call(c, "conclude", {
+        analysis: other.replacement as string,
+        replacing: await claimIdFor(c, "the series is calibrated"),
+        finding: "offset removed, current table",
       });
       expect((other.unaffected as Array<{ named: string }>)[0]!.named).toBe("raw series");
 
@@ -519,10 +537,8 @@ describe("an agent can track work through the tools alone", () => {
         enquiry: id(enquiry),
         method: "trend, held-out split",
         under: [stageOne],
-        concludes: {
-          proposition: TRENDS,
-          finding: "slope 0.38 on the held-out split",
-        },
+        proposition: TRENDS,
+        finding: "slope 0.38 on the held-out split",
       });
       expect(String(verified.verification as string).startsWith("COMP_")).toBe(true);
       await c.close();

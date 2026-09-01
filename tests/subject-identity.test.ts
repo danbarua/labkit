@@ -567,19 +567,29 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
           enquiry: id(enquiry),
           method: "stage one",
           from: [id(raw)],
-          concludes: [{ proposition: "p1", finding: "f1" }],
         })
       ).body.analysis as string;
+      await call(client, "conclude", {
+        analysis: stageOne,
+        proposition: "p1",
+        finding: "f1",
+      });
       const stageTwoResult = (
         await call(client, "record_analysis", {
           enquiry: id(enquiry),
           method: "stage two",
           from: [stageOne],
-          concludes: [{ proposition: "p2", finding: "f2" }],
         })
       ).body;
       const stageTwo = stageTwoResult.analysis as string;
-      const p2 = (stageTwoResult.claims as Array<{ claim: string; asserts: string }>).find(
+      const concludedTwo = (
+        await call(client, "conclude", {
+          analysis: stageTwo,
+          proposition: "p2",
+          finding: "f2",
+        })
+      ).body;
+      const p2 = (concludedTwo.claims as Array<{ claim: string; asserts: string }>).find(
         (c) => c.asserts === "p2",
       )!.claim;
       const review = (
@@ -599,9 +609,13 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
         enquiry: id(enquiry),
         method: "stage two, corrected",
         from: [stageOne],
-        concludes: [{ proposition: "p2", finding: "f2 corrected" }],
       });
       expect(repair.failed).toBe(false);
+      await call(client, "conclude", {
+        analysis: repair.body.replacement as string,
+        replacing: p2,
+        finding: "f2 corrected",
+      });
       // And the report names the input as the caller named it, rather than as
       // an artefact relabelled "observations".
       expect((repair.body.unaffected as Array<{ what: string }>)[0]!.what).toEqual(stageOne);
