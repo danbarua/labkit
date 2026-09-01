@@ -53,22 +53,15 @@ import { renderStanding } from "../views/standing";
 export function registerReads(program: Command, run: Run): void {
   program
     .command("now")
-    .summary("what am I blocked on right now, what are my priorities")
+    .summary("show me what the programme says matters")
     .description(
       "Blocked gates and the work each protects, gates nobody " +
         "has finished checking, planned work nothing has touched, and where every question " +
-        "stands. Literally `gates`, `work` and `known` in one read -- nothing here is stored, " +
-        "and there is deliberately no `--at`: gate and work state are computed from today's " +
-        "graph, so a historical answer would compute 'blocked last Tuesday' from today's " +
-        "evaluations and present it as history. `--since <seq>` narrows every section to " +
-        "what moved: acts since that cursor, and the handles they touched, reported at " +
-        "current standing. Always prints the current `seq`, to pass back next time.",
+        "stands. There is deliberately no `--at`: this answers only about now, never about a " +
+        "moment in the past. `--since <seq>` narrows every section to what moved since that " +
+        "seq, and always prints the current `seq`, to pass back next time.",
     )
-    .option(
-      "--since <seq>",
-      "only what moved after this seq — the cursor `now` last returned",
-      whole,
-    )
+    .option("--since <seq>", "only what moved since this seq -- the one `now` last returned", whole)
     .action(async ({ since }: { since?: number }) =>
       run(async ({ read }) => answer(await read.now(since), renderStanding)),
     );

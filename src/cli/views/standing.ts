@@ -3,8 +3,11 @@
  *
  * Composes the same renderers `gates`, `work` and `known` already use: this
  * file adds no rendering logic of its own for a gate or a task, only the
- * section headings that order them — blocked first, then where the map
- * hasn't been walked, then the standing of what the gates were for.
+ * section order. The top half (blocked gates, blocked work, incomplete
+ * gates, untouched work) answers what is in the way; the bottom half (the
+ * five buckets from `known`) answers what the record currently holds. No
+ * heading marks the split — keep the two halves from interleaving rather
+ * than labelling them.
  */
 
 import type { Standing } from "../../domain";
@@ -24,7 +27,7 @@ export function renderStanding(standing: Standing, p: Palette): string {
     p.contested("Blocked work"),
     renderWorkList(standing.blocked.work, p),
     "",
-    p.untested("Unevaluated gates"),
+    p.untested("Incomplete gates"),
     renderGateList(standing.unevaluated, p),
     "",
     p.untested("Untouched work — ready to start"),

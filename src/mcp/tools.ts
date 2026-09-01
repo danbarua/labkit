@@ -187,13 +187,13 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "protects, gates nobody has finished checking, planned work nothing has touched yet, " +
       "and where every question stands. Literally the composition of `gate_list`, " +
       "`work_list` and `known` -- no new query, and nothing here is stored. Give `since` (a " +
-      "`seq` this tool previously returned) to narrow every section to what changed: acts " +
-      "since that cursor, and the handles they created, touched or connected, reported at " +
-      "current standing and marked moved by their presence in the answer -- never a snapshot " +
-      "of what things *were*, which is also why there is no `at`. Always returns the current " +
+      "`seq` `now` returned before) to narrow every section to what changed: acts since " +
+      "that `seq`, and the handles they created, touched or connected, reported at current " +
+      "standing and marked moved by their presence in the answer -- never a snapshot of " +
+      "what things *were*, which is also why there is no `at`. Always returns the current " +
       "`seq`, to hand back next time.",
     inputSchema: {
-      since: z.number().optional().describe("a `seq` this tool previously returned"),
+      since: z.number().optional().describe("a `seq` `now` returned before"),
     },
     outputSchema: standingSchema,
     handler: (read, { since }) => read.now(since),
