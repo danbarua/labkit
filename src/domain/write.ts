@@ -621,10 +621,7 @@ export class WriteSurface extends SessionCore {
    * supersession. Keeping it off the command is what stops the CLI and MCP
    * asking for a value neither of their callers has.
    */
-  private async concludeOne(
-    input: ConcludeCommand,
-    because?: ReviewRef,
-  ): Promise<RecordedAnalysis> {
+  private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () =>
       // **Its own mint scope, so a composition calling this keeps its own.**
       // `emit` drains what has been minted since the last event, and without a
@@ -633,7 +630,7 @@ export class WriteSurface extends SessionCore {
       // `TenantGraph.inMintScope`, which also records why suppressing the inner
       // event was the wrong fix.
       this.graph.inMintScope(async () => {
-        const concluded = await this.concluding(input, because);
+        const concluded = await this.concluding(input);
         const events = await this.emit("conclude", input.analysis, {
           conclusions: this.conclusionEvents([concluded]),
           ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
@@ -664,19 +661,7 @@ export class WriteSurface extends SessionCore {
    * One who calls a compound made one call and gets one, with every conclusion
    * in its payload — the same distinction `pose` and `openEnquiry` already make.
    */
-  private async concluding(
-    input: ConcludeCommand,
-    /**
-     * The review this supersession rested on, when a compound had one.
-     *
-     * Not on `ConcludeCommand`, and that is a claim about the domain rather
-     * than about plumbing: a researcher concluding one thing at a terminal is
-     * not holding a review handle, and `replaceAnalysis` is the act that says
-     * a review caused this. Row O's question is asked of a finding, so the
-     * edge lands on the per-finding decision — see EDGE_SCHEMA.INVALIDATED_BY.
-     */
-    because?: ReviewRef,
-  ): Promise<Required<ConcludedClaim>> {
+  private async concluding(input: ConcludeCommand): Promise<Required<ConcludedClaim>> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
       {
@@ -700,13 +685,15 @@ export class WriteSurface extends SessionCore {
         // What is being superseded, if anything — matched on whichever handle
         // the caller held; both come back from the act that recorded it.
         let superseded: RecordedConclusion | undefined;
+        let revision: { old: AnalysisRef; because?: ReviewRef } | undefined;
         if (input.replacing !== undefined) {
           // **Scoped to the analysis this one revises, not to this one.** A
           // replacement supersedes findings of the analysis it replaced, so the
           // handle the caller holds belongs to the OLD analysis. The lineage
           // decision is what makes that reachable:
           // `new <-MOTIVATES- Decision -CHANGES-> old`.
-          const revised = await this.revisedBy(input.analysis);
+          revision = await this.revisedBy(input.analysis);
+          const revised = revision?.old;
           if (revised === undefined)
             throw new Error(
               `analysis ${input.analysis} replaces nothing, so ${input.replacing} is not its ` +
@@ -796,8 +783,11 @@ export class WriteSurface extends SessionCore {
           });
           await this.graph.createEdge(decision.natural_id, "SUPERSEDES", superseded.claim);
           await this.graph.createEdge(decision.natural_id, "MOTIVATES", claim.natural_id);
-          if (because !== undefined)
-            await this.graph.createEdge(decision.natural_id, "INVALIDATED_BY", because);
+          // The review the revision rested on, carried down from the lineage
+          // decision so a reader asking why THIS finding fell gets the verdict
+          // that caused it rather than any review of the same unit.
+          if (revision?.because !== undefined)
+            await this.graph.createEdge(decision.natural_id, "INVALIDATED_BY", revision.because);
         }
 
         return {
@@ -816,15 +806,25 @@ export class WriteSurface extends SessionCore {
    * analysis revises that one, never that the old one's findings fell. See the
    * `Computation` pair on `EDGE_SCHEMA.CHANGES`.
    */
-  private async revisedBy(analysis: AnalysisRef): Promise<AnalysisRef | undefined> {
+  private async revisedBy(
+    analysis: AnalysisRef,
+  ): Promise<{ old: AnalysisRef; because?: ReviewRef } | undefined> {
     const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(:Decision)-[:SUPERSEDES]->(old:Computation)
-       RETURN old`,
-      { old: vertexProps<{ natural_id: string }>() },
+      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
+       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
+       RETURN old, rev`,
+      {
+        old: vertexProps<{ natural_id: string }>(),
+        rev: optional(vertexProps<{ natural_id: string }>()),
+      },
       { id: analysis },
     );
     const found = rows[0];
-    return found ? ref("analysis", found.old.natural_id) : undefined;
+    if (!found) return undefined;
+    return {
+      old: ref("analysis", found.old.natural_id),
+      ...(found.rev ? { because: ref("review", found.rev.natural_id) } : {}),
+    };
   }
 
   /** The enquiry an analysis was recorded under, for the withdrawal guard's scope. */
@@ -1573,6 +1573,11 @@ export class WriteSurface extends SessionCore {
         });
         await this.graph.createEdge(lineage.natural_id, "SUPERSEDES", input.supersedes);
         await this.graph.createEdge(lineage.natural_id, "MOTIVATES", analysis);
+        // The review this revision rested on, on the decision that records the
+        // revision. Every finding superseded afterwards reads it from here, so
+        // the answer to "which review retracted this?" comes from the act that
+        // named one rather than from any review of the same unit.
+        await this.graph.createEdge(lineage.natural_id, "INVALIDATED_BY", input.because);
 
         return { before, analysis, output };
       });
@@ -1626,17 +1631,14 @@ export class WriteSurface extends SessionCore {
           was = before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
         }
         paired.push(was);
-        const concluded = await this.concludeOne(
-          {
-            analysis: replacement,
-            proposition: now.proposition,
-            finding: now.finding,
-            ...(was === undefined ? {} : { replacing: was.claim }),
-            ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
-            ...(now.standing === undefined ? {} : { standing: now.standing }),
-          },
-          input.because,
-        );
+        const concluded = await this.concludeOne({
+          analysis: replacement,
+          proposition: now.proposition,
+          finding: now.finding,
+          ...(was === undefined ? {} : { replacing: was.claim }),
+          ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
+          ...(now.standing === undefined ? {} : { standing: now.standing }),
+        });
         claims.push(...concluded.claims);
         replacementEvents.push(...concluded.events);
       }
