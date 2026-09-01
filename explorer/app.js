@@ -70,7 +70,14 @@ const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
 const TEMPORAL_HISTORICAL = "hsl(220deg 10% 34%)";
 
-const ZSPACING = 46; // px of depth per step, in 3D
+// A trace's full 3D depth, fixed regardless of how many steps it has -- a
+// 15-step composition and the real Bonsai record (335 steps and growing)
+// span the same tunnel; what changes is how finely packed a trace's nodes
+// are along it, not how far back the camera has to pull to see the whole
+// thing. 14 steps' worth at the old fixed per-step spacing (46px) is what a
+// typical composition already looked like, so this keeps that case visually
+// unchanged and only compresses larger traces down to match.
+const TOTAL_DEPTH = 46 * 14;
 const FOCAL = 640;
 
 function colorFor(kind) {
@@ -591,17 +598,23 @@ function project(node) {
 // moment its own timestamps actually name. `state.timeRange` is fixed once
 // per trace (see `selectTrace`), so this is a stable function of the node,
 // not of how far playback has progressed.
+//
+// Every trace maps onto the same `TOTAL_DEPTH`, whatever its step count --
+// a real record only ever grows, and depth scaling with size would mean
+// re-deriving how far back the camera needs to sit every time more of it
+// gets imported. What changes with size is density along the tunnel, not
+// the tunnel's length.
 function zOf(node) {
   const range = state.timeRange;
-  const totalDepth = Math.max(0, (state.current?.steps.length ?? 1) - 1) * ZSPACING;
+  const totalSteps = Math.max(1, (state.current?.steps.length ?? 1) - 1);
   // Same fallback for a degenerate range (every `at` identical or absent) and
   // for one node whose own `at` didn't parse -- `state.timeRange` already
   // excludes non-finite values from min/max, but a single bad one here would
   // still NaN this node's own z without this check.
   if (!range || range.max === range.min || !Number.isFinite(node.createdAt)) {
-    return node.createdStep * ZSPACING;
+    return (node.createdStep / totalSteps) * TOTAL_DEPTH;
   }
-  return ((node.createdAt - range.min) / (range.max - range.min)) * totalDepth;
+  return ((node.createdAt - range.min) / (range.max - range.min)) * TOTAL_DEPTH;
 }
 
 function maxCreatedZ() {
