@@ -2,7 +2,7 @@
 	"name": "labkit",
 	"description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
 	"license": "MIT",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"main": "src/index.ts",
 	"type": "module",
 	"bin": {
