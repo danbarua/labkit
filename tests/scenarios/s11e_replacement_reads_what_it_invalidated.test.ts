@@ -141,9 +141,9 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     const why = await later.whySupported(report.claims[0]!.claim);
 
     // `supported: true` stays, and that is the design rather than an oversight:
-    // invalidating a record deliberately does not withdraw what rests on it,
-    // because S-11 makes the consequence *enumerable* instead of automatic.
-    // What was missing is the half that makes the doctrine honest — the reader
+    // invalidating a record deliberately does not withdraw what rests on it --
+    // the consequence is *enumerable* rather than automatic. What was missing
+    // is the half that makes the doctrine honest — the reader
     // could not see, from this answer, that the sole input had been retracted.
     expect(why.supported).toBe(true);
     expect(why.restingOn).toHaveLength(2);

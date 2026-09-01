@@ -6,10 +6,10 @@
  *
  * A real, freshly provisioned database, not the suite's shared one
  * (`tests/helpers/db.ts`): natural ids are a global sequence across that
- * shared instance (CLAUDE.md, "Resetting between tests"), so a second test's
- * fixture would not start at `Q_1` the way `replayIntoScratch`'s own scratch
- * database always does, and every step would diverge for a reason that has
- * nothing to do with the mechanism under test.
+ * shared instance, so a second test's fixture would not start at `Q_1` the
+ * way `replayIntoScratch`'s own scratch database always does, and every
+ * step would diverge for a reason that has nothing to do with the
+ * mechanism under test.
  */
 
 import { afterAll, beforeAll, expect, test } from "bun:test";

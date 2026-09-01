@@ -121,17 +121,6 @@ const clock: Clock = (() => {
 })();
 
 describe("structure", () => {
-  /**
-   * **This block used to forbid writing.** Three tests asserted that no write
-   * verb name appeared under `src/mcp/` and that every tool declared
-   * `readOnlyHint`. They were right for the batch of work they were written
-   * for, and wrong as a design position: a record nothing can write to has
-   * nothing in it. They were deleted with the commit that added write tools,
-   * not worked around.
-   *
-   * `tests/cli.test.ts` keeps the same checks, because the CLI *is* read-only
-   * by design — it builds a `ReadSurface` and never a `WriteSurface`.
-   */
   test("every public domain verb is exposed, or excluded with a reason", () => {
     // The check that would have caught six reads shipping unreachable. Both
     // lists are derived: the verbs from the surface declarations, the reached
@@ -434,15 +423,10 @@ describe("an agent can track work through the tools alone", () => {
   });
 
   /**
-   * The demonstrated consumer failure, from the other side.
-   *
-   * `replace_analysis(supersedes=A2, from=[A1])` used to come back
-   * `CONSUMES does not allow Computation -> Computation`. `record_analysis`
-   * accepted an analysis id and the other two recording verbs did not, so an
-   * agent that had recorded stage two held its `COMP_` id and never the `ART_`
-   * id underneath it. The reachable workaround was to call `why_supported` in
-   * order to learn what a computation had read, which is a database search to
-   * use a command.
+   * `replace_analysis(supersedes=A2, from=[A1])` accepts an earlier
+   * analysis's own id as an input, not only the artefact id underneath it --
+   * so a caller holding a `COMP_` id from an earlier recording step can pass
+   * it straight through, rather than looking up what that analysis read.
    */
   test("a replacement can read an earlier analysis's output, by that analysis's id", async () => {
     const c = await client();
@@ -859,10 +843,10 @@ describe("behaviour — the same answers, over the wire", () => {
 /**
  * **Who signed this?**
  *
- * The server used to stamp every write `mock-session-0` — one value for every
- * agent, every session and every machine, in the identity column of a record
- * whose whole purpose is provenance. That is worse than an empty field: empty
- * reads as unknown, a uniform placeholder reads as known.
+ * A write's identity column is the whole purpose of a record built for
+ * provenance, and a uniform placeholder for every agent, session, and
+ * machine would be worse than an empty field: empty reads as unknown, a
+ * placeholder reads as known.
  *
  * These build the server the way `main()` does — `commandContext` over
  * `registeredSession` — because the composition is the thing under test. The

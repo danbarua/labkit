@@ -28,7 +28,7 @@
  *   - `reproducibilityOf` puts a computed input in **`unverifiable`**, which is
  *     the record declining to answer. It could have been positive here: had it
  *     landed in `differing`, that would be claiming inequality from absence,
- *     which is a wrong answer and the exact defect S-9c was fixed for.
+ *     which is a wrong answer.
  *
  * So the row closes as **refuted at the wrong-answer bar**: this is reference-
  * model debt, not missing domain state. The one real consequence is named in

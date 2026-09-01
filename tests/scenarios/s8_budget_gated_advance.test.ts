@@ -3,10 +3,9 @@
  * docs/project-journal/008_user_story_mining.md
  *
  * The reverse of row V: criteria that **gate work and qualify no finding**.
- * S-3's criteria do both jobs at once, which is exactly why S-3 cannot
- * discriminate between row V's two models. This scenario is the other half of
- * that probe, and it is predicted to *narrow* row V rather than settle it —
- * see the prediction table in PJ-008 §3.
+ * Criteria that do both jobs at once cannot discriminate between row V's two
+ * models. This scenario is the other half of that probe, and it narrows row
+ * V rather than settling it.
  *
  * One Afterward bullet is deliberately not probed. "Who approved the
  * scale-up?" has no home, because LabKit has no concept of user identity —
@@ -269,7 +268,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
   });
 
   /**
-   * Row V, from the side S-3 could not reach.
+   * The other half of row V.
    *
    * These criteria gate expensive work and qualify no finding. The throughput
    * claim's standing is unaffected by the gate that its evaluation triggered —

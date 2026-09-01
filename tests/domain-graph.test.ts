@@ -26,7 +26,7 @@ import { transactor } from "../src/db/transactor";
  * queried through the same `LabKitDB` seam production uses (see
  * tests/helpers/db.ts).
  * Each test corresponds to one of the journal's MVP acceptance-criteria
- * questions, or one of PJ-003 §15 / PJ-004's acceptance tests.
+ * questions, or one of its acceptance tests.
  */
 
 let testDb: TestDb;
@@ -43,11 +43,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // One labelled client per test. Several tests in this file deliberately
-  // provoke DB-level errors, which used to be load-bearing: a pglite-socket
-  // defect could permanently corrupt a connection that saw enough of them, and
-  // a connection per test bounded that. The socket is gone and so is the
-  // defect — see tests/helpers/db.ts.
+  // One labelled client per test — see tests/helpers/db.ts.
   db = await testDb.openClient();
   ctx = await resolveTenantContext(db, db.tx, "labkit");
   graph = new TenantGraph(ctx, db, db.tx);
@@ -153,9 +149,9 @@ describe("invalidation propagation", () => {
     // RECORDED_IN/SUPPORTS/BASED_ON/REQUIRES — not PRODUCES/USES/ADDRESSES,
     // which are provenance of how the evidence came to exist and aren't
     // invalidated retroactively just because its durable record was.
-    // "Affected" is not the same as "unsupported" (PJ-003 §11) — this
-    // traversal answers "what needs reconsideration", not "what is now
-    // false"; nothing here marks the claim unsupported.
+    // "Affected" is not the same as "unsupported" — this traversal answers
+    // "what needs reconsideration", not "what is now false"; nothing here
+    // marks the claim unsupported.
     const rows = await graph.query(
       `MATCH (a:Artefact {natural_id: $artefactId})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
@@ -525,10 +521,8 @@ describe("provisioning reconciliation", () => {
     // provisioned" without actually changing NODE_LABELS: drop one label's
     // vertex table entirely (as if it never existed for this tenant), then
     // confirm the next ordinary resolveTenantContext() call notices and
-    // recreates it — this is exactly the schema-evolution gap PJ-004's
-    // original all-or-nothing "provision only if the graph itself is
-    // absent" check couldn't close, now proven closed through the real
-    // path rather than a test-only shortcut.
+    // recreates it — proven through the real reconciliation path rather than
+    // a test-only shortcut.
     await db.query(`SELECT ag_catalog.drop_label($1, 'Task', false)`, [ctx.graphName]);
     const before = await db.query(
       `SELECT 1 FROM ag_catalog.ag_label WHERE name = 'Task' AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,

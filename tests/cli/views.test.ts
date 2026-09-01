@@ -256,9 +256,9 @@ test("a gate that failed and was re-checked does not read as though it never fai
 });
 
 test("an evaluation with no basis reads as asserted, not as measured", () => {
-  // S-8's distinction (report.ts's EvaluationRecord.basis doc comment): empty
-  // means asserted, not measured. #151 -- the type carries it, nothing in the
-  // view read it, so an asserted verdict and a cited one printed identically.
+  // Empty `basis` means the verdict was asserted, not measured (report.ts's
+  // EvaluationRecord.basis doc comment) -- the view renders that distinction
+  // rather than printing an asserted verdict the same as a cited one.
   const status: GateStatus = {
     gate: ref("gate", "GATE_2"),
     consequence: "the release is blocked",

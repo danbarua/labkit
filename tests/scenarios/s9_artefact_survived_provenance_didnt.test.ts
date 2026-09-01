@@ -233,10 +233,8 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
    * The refusal, stated on its own. Asking by name is fine while a name
    * identifies one thing; once a part has been regenerated it does not, and
    * answering about the union is how inferred provenance would inherit the
-   * original's standing.
-   *
-   * S-5's rule, reaching artefacts for the first time: a command that declines
-   * beats an answer about something the caller did not mean.
+   * original's standing. A command that declines beats an answer about
+   * something the caller did not mean.
    */
   test("asking by name is refused once two artefacts share it", async () => {
     const { enquiry } = await aCachedConstructionWithOneUnrecordedPart();
@@ -309,33 +307,20 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
   });
 
   /**
-   * External review, and the correction to this build's own conclusion.
-   *
-   * PJ-021 first claimed that a regeneration needs no artefact lineage because
-   * "direction is in the act". It is not. The regenerated part is created with
-   * an ordinary `recordObservations()` that names nothing historical, and
-   * `reproducibilityOf()` is a read that takes the historical parts as
-   * arguments and persists nothing. So the direction lives in the caller's
-   * variables and in prose, not in durable state.
+   * A regeneration needs no artefact lineage to record its direction, because
+   * the direction is not durable in the first place: the regenerated part is
+   * created with an ordinary `recordObservations()` that names nothing
+   * historical, and `reproducibilityOf()` is a read that takes the historical
+   * parts as arguments and persists nothing. The direction lives in the
+   * caller's variables and in prose, not in durable state.
    *
    * What this test pins is the half that IS demonstrable: the two artefacts
-   * have distinct identity and distinct dependants.
-   *
-   * What it deliberately does **not** try to pin is the absence itself. An
-   * earlier version ended with `expect(Object.keys(regenerated)).toEqual([...])`
-   * and claimed that assertion was "what changes when lineage is earned". It
-   * was not — an `Artefact -> Artefact` edge could be added tomorrow and an
-   * opaque `ObservationsRef` should still be `{ kind, id }`. The assertion
-   * pinned the public handle shape and nothing about lineage, so it was a
-   * confident claim about coverage that the test did not have. Removed.
-   *
-   * The honest position, and the reason row F is `open` rather than refuted:
-   * "no existing domain answer reconstructs their relationship" is an
-   * **absence of capability**. Under PJ-011 §5 that earns nothing, and trying
-   * to assert it strongly would mean inventing the very query the rule says
-   * not to invent. The limitation lives in PJ-021 and the ledger, where a
-   * limitation belongs; the executable part of this scenario asserts only what
-   * it can actually observe.
+   * have distinct identity and distinct dependants. What it deliberately does
+   * **not** try to pin is the absence itself -- "no existing domain answer
+   * reconstructs their relationship" is an absence of capability, and
+   * asserting it strongly would mean inventing the very query that is
+   * missing. The executable part of this scenario asserts only what it can
+   * actually observe.
    */
   test("BOUNDARY: nothing durable says what a regeneration was reconstructing", async () => {
     const { enquiry, parts } = await aCachedConstructionWithOneUnrecordedPart();

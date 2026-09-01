@@ -3,15 +3,12 @@
  * docs/project-journal/008_user_story_mining.md
  *
  * The first scenario where sequence genuinely matters, and the first to put
- * an explicit researcher decision in the middle of the record — S-11's
- * `replaceAnalysis` deliberately declined to mint one, and said this scenario
- * was where a `Decision` should be earned.
+ * an explicit researcher decision in the middle of the record.
  *
  * Nothing is pre-decided about: what "locked" means, whether decision
  * chronology needs stored timestamps, whether `SUPERSEDES` is enough to
  * reconstruct before/after, whether edges need properties, or whether
- * mechanical-vs-scientific is a property or derivable. Predictions for all of
- * these were recorded in PJ-008 §3 before this file existed.
+ * mechanical-vs-scientific is a property or derivable.
  *
  * Imports only src/domain — never src/db (enforced).
  */

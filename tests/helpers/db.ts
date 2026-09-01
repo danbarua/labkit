@@ -30,22 +30,12 @@ import { type Transactor, transactor } from "../../src/db/transactor";
  *
  * Nothing runs it for you. There is no CI, and `bun run check` uses the default.
  *
- * ## What changed, and why the old rule inverted
- *
- * This file used to wrap PGlite in a `PGLiteSocketServer` and hand every test a
- * fresh `pg.Client`. The stated reason was fidelity: production talked to
- * PGlite over a socket, so tests should too. Production does not any more —
- * `src/db/backend.ts` takes an exclusive lock and opens the file directly — so
- * sharing the instance is now the *more* faithful arrangement, not a shortcut.
- *
- * The fresh-connection-per-test rule went with it. It existed to contain a
- * confirmed upstream concurrency bug in `@electric-sql/pglite-socket`
- * ([electric-sql/pglite#1046](https://github.com/electric-sql/pglite/issues/1046)),
- * where two connections racing could permanently desync one of them. **The bug
- * is the socket.** With no socket there is nothing to contain, and on the PGlite
- * path `openClient()` is a labelled view onto the one session rather than a real
- * connection. On the Postgres path it is a real connection again, for the
- * plainer reason that there is a server to connect to.
+ * `src/db/backend.ts` takes an exclusive lock and opens the PGlite file
+ * directly, with no socket in between, which is what sharing one instance
+ * across the suite mirrors: on the PGlite path `openClient()` is a labelled
+ * view onto that one shared session rather than a real connection. On the
+ * Postgres path it is a real connection, for the plainer reason that there
+ * is a server to connect to.
  *
  * Two consequences worth knowing before writing a test against the default:
  *
@@ -146,8 +136,8 @@ async function bootPglite(): Promise<Booted> {
 }
 
 async function bootPostgres(connectionString: string): Promise<Booted> {
-  // Migrations are the out-of-band deploy step this backend expects (PJ-004),
-  // and a test run is a legitimate instance of one: nothing else is going to
+  // Migrations are the out-of-band deploy step this backend expects, and a
+  // test run is a legitimate instance of one: nothing else is going to
   // have migrated the container. Idempotent, so re-running the suite is free.
   const migrator = new Client({ connectionString });
   await migrator.connect();
@@ -254,8 +244,8 @@ export async function setupTestDb(): Promise<TestDb> {
         // `pg`'s simple query protocol and **throws** against a raw PGlite
         // instance — `cannot insert multiple commands into a prepared
         // statement` — which is the same restriction the custom migrations work
-        // around with `--> statement-breakpoint` (see CLAUDE.md). Three calls
-        // work on both, so there is one code path rather than a branch.
+        // around with `--> statement-breakpoint`. Three calls work on both, so
+        // there is one code path rather than a branch.
         await admin.query(`set session_replication_role = replica;`);
         await admin.query(`truncate ${tableNames.join(", ")} restart identity cascade;`);
         await admin.query(`set session_replication_role = DEFAULT;`);

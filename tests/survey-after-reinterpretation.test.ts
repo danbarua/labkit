@@ -1,11 +1,11 @@
 /**
  * Reinterpreting a closed question's claim does not move the question.
  *
- * **A port got this wrong, which is why it is asserted here.** The Rust/Grafeo
- * spike (#114) hit it: `reinterpret` adds a second `SUPPORTS` from the same
- * evidence to the narrowed claim, so the closing decision's cited evidence
- * reaches *two* claims — and code that took whichever the store handed back
- * first reported the question `provisional` or `established` by luck.
+ * **A port could get this wrong, which is why it is asserted here.**
+ * `reinterpret` adds a second `SUPPORTS` from the same evidence to the
+ * narrowed claim, so the closing decision's cited evidence reaches *two*
+ * claims — and code that took whichever the store handed back first would
+ * report the question `provisional` or `established` by luck.
  *
  * **LabKit has the same order-dependence and does not have the bug.**
  * `answeringClaimBearing`'s fold is `found ?? row.answering`, which is a
@@ -20,7 +20,7 @@
  * proposed — that `checksOf`'s per-claim grain isolates it — and the second
  * mutation refutes that story without replacing it. So this file asserts the
  * observable property and deliberately does not explain it: a comment naming
- * the wrong reason is the defect PJ-029 is about, and it passes either way.
+ * the wrong reason is a defect no test catches, and this passes either way.
  *
  * What the test is for: if a future consumer of `answeringClaim` ever depends
  * on *which* claim came back, it goes red here rather than intermittently in
@@ -70,8 +70,8 @@ test("a reinterpretation does not move the question between buckets", async () =
   });
   const claim = rec.claims[0]!.claim;
   // **Failed**, which is what makes the two candidate answering claims give
-  // different answers. Promoted-over-an-unmet-check is S-19: the original claim
-  // is promoted and its check failed -> `provisional`. The narrowed claim has
+  // different answers. Promoted over an unmet check: the original claim is
+  // promoted and its check failed -> `provisional`. The narrowed claim has
   // no criteria at all -> vacuously met -> `established`. With a passing check
   // both readings agree and the probe cannot fail.
   await s.evaluateCriterion({ criterion: crit, value: "0.071", outcome: "fail", citing: claim });
@@ -93,7 +93,7 @@ test("a reinterpretation does not move the question between buckets", async () =
   const after = await s.whatIsKnown();
   const bucketAfter = BUCKETS.find((b) => after[b].some((q) => q.asks === "does the drug work?"));
 
-  // Promoted over a check that failed is S-19's case: `provisional`, not
+  // Promoted over a check that failed reads `provisional`, not
   // `established`. Both before and after, and the "after" is the claim.
   expect(bucketBefore).toBe("provisional");
   expect(bucketAfter).toBe("provisional");

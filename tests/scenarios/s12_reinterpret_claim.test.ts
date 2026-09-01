@@ -9,8 +9,7 @@
  *
  * Deliberately not pre-decided: whether claims supersede claims, whether a
  * claim is a proposition or an occurrence of asserting one, and whether the
- * review that caused a narrowing needs a relationship of its own. Predictions
- * for each were recorded in PJ-008 §3 before this file existed.
+ * review that caused a narrowing needs a relationship of its own.
  *
  * Imports only src/domain — never src/db (enforced).
  */
@@ -125,7 +124,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // Both records that asserted the old reading, by handle. The report said
     // the sentence and nothing else, so a caller could not name either claim
     // this withdrew -- and a single handle here would have picked between two
-    // records arbitrarily, which is the whole of PJ-030.
+    // records arbitrarily.
     expect(report.previously.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
     expect(report.previously.map((c) => c.claim).sort()).toEqual(
       [
@@ -218,8 +217,8 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     ]);
 
     // The observations underneath are untouched -- this is what separates a
-    // reinterpretation from S-11's replacement, where the output was
-    // invalidated and the findings became historical.
+    // reinterpretation from a replacement, where the output is invalidated
+    // and the findings become historical.
     expect(now.restingOn.map((a) => a.name).sort()).toEqual([
       "attenuation readings, cohort A",
       "attenuation readings, cohort B",
@@ -237,9 +236,10 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    * Afterward 3 — does anything downstream of the original claim need
    * revisiting?
    *
-   * Enumerable, and a different answer from S-11's: there the inputs became
-   * invalid, here they did not. What is at risk is anything that was decided
-   * on the strength of the sentence, not anything computed from the numbers.
+   * Enumerable, and a different answer from a replacement's: there the inputs
+   * become invalid, here they do not. What is at risk is anything that was
+   * decided on the strength of the sentence, not anything computed from the
+   * numbers.
    */
   test("a question closed on the old interpretation is surfaced as resting on it", async () => {
     const programme = await assertedTwice();
@@ -269,10 +269,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   });
 
   /**
-   * Afterward 4 — a second narrowing, ordered against the first.
-   *
-   * Same probe as S-7's: asked after both happened, from a session with an
-   * empty event log, with no timestamp on anything.
+   * Afterward 4 — a second narrowing, ordered against the first, asked after
+   * both happened, from a session with an empty event log and no timestamp
+   * on anything.
    */
   test("successive reinterpretations are ordered without timestamps or an event log", async () => {
     const programme = await assertedTwice();
@@ -312,8 +311,8 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    * A claim can be challenged without its source evidence becoming invalid.
    *
    * This is the third thing S-12 has to keep apart: challenged is about the
-   * proposition, invalidated is about the analysis output. S-4 made challenge
-   * real; here it has to coexist with evidence that is entirely fine.
+   * proposition, invalidated is about the analysis output, and here challenge
+   * has to coexist with evidence that is entirely fine.
    */
   test("challenging a claim leaves its evidence standing", async () => {
     const programme = await assertedTwice();

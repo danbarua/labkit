@@ -3,13 +3,8 @@
  * docs/project-journal/008_user_story_mining.md, §3
  *
  * S-3's criteria do two jobs at once: they gate the tertiary analysis, and
- * they decide whether the primary finding can be relied on. Only the first was
- * modelled, and ledger row V recorded the resulting wrong answer —
- * `whySupported()` reporting `supported: true` for a finding two of whose own
- * prespecified checks had failed. S-8 supplied the reverse case (criteria that
- * gate work and qualify nothing) and could only narrow the row.
- *
- * This is S-3's conversation with the tertiary model taken away. Same checks,
+ * they decide whether the primary finding can be relied on. This scenario is
+ * S-3's conversation with the tertiary model taken away. Same checks,
  * same significant result, nothing downstream at all — so the qualification
  * job is the only one left, and whatever the model needs here it needs for
  * that job alone.
@@ -97,11 +92,9 @@ describe("S-3b: the same design with nothing downstream", () => {
    * Afterward 1. "Does the finding stand?" — no, and not because evidence is
    * missing.
    *
-   * This is the assertion row V has been open on since S-3. Before
-   * `QUALIFIES`, criteria reached only a `Gate`, so there was no path from a
-   * claim to the conditions it was supposed to satisfy and this returned
-   * `supported: true` — "some evidence exists" rather than "the evidence holds
-   * up by the standard set for it".
+   * `QUALIFIES` gives a claim a path to the conditions it must satisfy, so
+   * `supported: true` means more than "some evidence exists" — it means the
+   * evidence holds up by the standard set for it.
    */
   test("Afterward 1: the finding does not stand, and the numbers are still good", async () => {
     const { primary, median, analysisClaims } = await aFindingHeldToAgreedChecks();
@@ -124,7 +117,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     expect(why.supported).toBe(false);
     // Not for want of evidence, and not because anything was withdrawn. The
     // finding is still there, still says what it said, and still supports the
-    // proposition — S-12's distinction, reached from the other direction.
+    // proposition.
     expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
       { finding: "p = 0.002, Holm-corrected", method: "holm-pairwise" },
     ]);
@@ -134,9 +127,9 @@ describe("S-3b: the same design with nothing downstream", () => {
   });
 
   /**
-   * Afterward 2. "By what standard?" — S-3's third bullet, asked of the
-   * finding instead of the work. A check that disagreed and a check nobody ran
-   * are different answers to "why doesn't this stand", and both are unmet.
+   * Afterward 2. "By what standard?" asked of the finding instead of the
+   * work. A check that disagreed and a check nobody ran are different answers
+   * to "why doesn't this stand", and both are unmet.
    */
   test("Afterward 2: the agreed checks are itemised, disagreement apart from never-run", async () => {
     const { primary, median, analysisClaims } = await aFindingHeldToAgreedChecks();
@@ -268,8 +261,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * `restingOn`; the standard is read through the same filter, and this is
    * what makes that filter load-bearing rather than tidy. Without it the dead
    * analysis's failed check would disqualify the claim the *replacement*
-   * supports — S-11's separation of the observations from the inference,
-   * undone from a direction S-11 could not see.
+   * supports.
    */
   test("a superseded analysis's failed checks do not disqualify its replacement", async () => {
     const { median, analysis, enquiry, observations } = await aFindingHeldToAgreedChecks();
@@ -304,8 +296,8 @@ describe("S-3b: the same design with nothing downstream", () => {
   });
 
   /**
-   * Scope, as S-5 left it: two lines of enquiry can assert the same sentence,
-   * and a standard agreed in one must not disqualify the other's finding.
+   * Scope: two lines of enquiry can assert the same sentence, and a standard
+   * agreed in one must not disqualify the other's finding.
    */
   test("a standard belongs to the analysis it was agreed for, not to the wording", async () => {
     const { primary, median, analysisClaims } = await aFindingHeldToAgreedChecks();

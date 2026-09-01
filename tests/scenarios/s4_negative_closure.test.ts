@@ -241,10 +241,9 @@ describe("S-4: a negative result that closes the question", () => {
   });
 
   /**
-   * Row I, outside the gate machinery for the first time. A claim refuted by
-   * a null result and a claim nobody has ever examined are scientifically
-   * very different. PJ-001's doctrine is that absence of evidence must not be
-   * confused with failure.
+   * A claim refuted by a null result and a claim nobody has ever examined are
+   * scientifically very different — absence of evidence must not be confused
+   * with failure.
    */
   test("a refuted claim is distinguishable from one nobody has examined", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
@@ -264,11 +263,11 @@ describe("S-4: a negative result that closes the question", () => {
     const refuted = await session.whySupported(await claimNamed(session, SPECIFICITY));
 
     // **A sentence nobody claimed has no claim to ask about.** `whySupported`
-    // used to take text and answer `supported: false, challenged: false` for
-    // one; it takes a handle now, and there is no handle to hand it. The
-    // distinction the scenario exists for survives, one step earlier: a
-    // refuted claim EXISTS and is challenged, an unexamined sentence does not
-    // exist at all -- which is a stronger statement than a false flag.
+    // takes a handle, and there is no handle to hand it for an unclaimed
+    // sentence. The distinction the scenario exists for survives, one step
+    // earlier: a refuted claim EXISTS and is challenged, an unexamined
+    // sentence does not exist at all -- which is a stronger statement than a
+    // false flag.
     expect(await session.claimsAsserting("nobody has ever asked this")).toEqual([]);
 
     expect(refuted.supported).toBe(false);

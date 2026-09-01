@@ -78,11 +78,11 @@ test("a global flag may precede or follow the command", () => {
 });
 
 test("an unknown flag is refused, not ignored", async () => {
-  // It used to be dropped on the floor, on the reasoning that a missing
-  // positional would surface the mistake. That held while every command was a
-  // read: the worst case was an answer to a slightly different question. A
-  // mistyped `--becuase` on a write puts a record on the permanent register
-  // with a field the caller believes they set.
+  // Dropping it on the floor and trusting a missing positional to surface
+  // the mistake would hold for a read, where the worst case is an answer to
+  // a slightly different question. A mistyped `--becuase` on a write puts a
+  // record on the permanent register with a field the caller believes they
+  // set.
   // On a command with no required options, so the message is about the unknown
   // flag rather than a missing one -- `promote --becuase …` reports the absent
   // `--because` first, which would let this pass for the wrong reason.

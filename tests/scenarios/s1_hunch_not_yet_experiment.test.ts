@@ -3,9 +3,9 @@
  * docs/project-journal/008_user_story_mining.md
  *
  * The first scenario to ask what `Question` and `LineOfEnquiry` mean beyond
- * closure. S-4 proved they are distinct because closure attaches to the
- * question; it never made one question carry two pursuits, and never created
- * a question from anything other than a researcher typing one.
+ * closure -- closure attaches to the question, not the pursuit -- including
+ * one question carrying two pursuits, and a question created from something
+ * other than a researcher typing one.
  *
  * Three things are deliberately NOT pre-decided:
  *   - whether question-to-question lineage needs an edge of its own;
@@ -84,16 +84,12 @@ async function priorState() {
     enquiry: nlEnquiry,
     method: "curvature-fit",
     from: [nlObs],
-    // `standing` was added here by S-18, and it is not a notation change.
-    // Until then "established" was free: any question closed on any cited
-    // result landed there, so a lunchtime notebook sweep and a confirmatory
-    // comparison were indistinguishable — which is story 18's own sentence
-    // about scratch entering the record by accident. This fixture is the one
-    // place in the corpus that asserted `established` positively, and it did so
-    // on the default. It now has to say which it is, and it says so at
-    // creation, as prespecified work does — the alternative act,
-    // `promote()`, is for findings whose standing was not knowable when they
-    // were recorded, which is not this one.
+    // `standing` here is not a notation change: without it, "established" is
+    // ambiguous between a lunchtime notebook sweep and a confirmatory
+    // comparison. This fixture asserts `established` positively, so it has to
+    // say which one it is at creation, as prespecified work does — the
+    // alternative act, `promote()`, is for findings whose standing was not
+    // knowable when they were recorded, which is not this one.
     concludes: [
       {
         proposition: NONLINEAR,
@@ -344,8 +340,8 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
    *
    * The act writes a decision, two edges per standing finding, and a question.
    * A rejection partway through would leave a decision recording a narrowing
-   * that produced nothing — which is precisely the unreadable state row D was
-   * about. Same shape as S-4's closure guards.
+   * that produced nothing — an unreadable state, the same shape as S-4's
+   * closure guards.
    */
   test("sharpening a question that is not on the record writes nothing", async () => {
     await priorState();

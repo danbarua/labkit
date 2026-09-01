@@ -3,12 +3,11 @@
  * robustness checks."
  * docs/project-journal/008_user_story_mining.md
  *
- * PJ-008 calls this its strongest single prediction: that
- * `CriterionEvaluation.outcome` being binary (`pass`/`fail`) cannot carry
- * this scenario's honest state. It also names the alternative worth testing
- * — that the individual checks really did pass and fail, and it is the
- * conclusion drawn from them that is inconclusive. This scenario is built to
- * discriminate between those, not to confirm either.
+ * The prediction under test: that `CriterionEvaluation.outcome` being binary
+ * (`pass`/`fail`) cannot carry this scenario's honest state. The alternative
+ * worth testing is that the individual checks really did pass and fail, and
+ * it is the conclusion drawn from them that is inconclusive. This scenario is
+ * built to discriminate between those, not to confirm either.
  *
  * Imports only src/domain — never src/db (enforced).
  */
@@ -138,9 +137,9 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
   });
 
   /**
-   * The assertion PJ-008 predicted would need a third outcome value. It does
-   * not: each check is genuinely binary, and what the three of them jointly
-   * fail to establish is carried one layer up.
+   * This does not need a third outcome value: each check is genuinely
+   * binary, and what the three of them jointly fail to establish is carried
+   * one layer up.
    */
   test("Afterward 3: checks are itemised, and a failure is distinguishable from a check never run", async () => {
     const { primary, median, gate } = await aPrespecifiedRobustnessDesign();
@@ -239,8 +238,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
   test("is the primary finding trustworthy? — the criteria that qualify it", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
     // Both jobs, named explicitly: the same three checks gate the tertiary
-    // model and are the standard this analysis is held to. Before S-3b only
-    // the first was expressible.
+    // model and are the standard this analysis is held to.
     const { enquiry } = await session.openEnquiry("does T differ from rewired?");
     const { observations } = await session.recordObservations({
       enquiry,
@@ -284,13 +282,10 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
     expect(status.state).toBe("blocked");
 
-    // And so does the finding. This assertion read `true` from the day it was
-    // written until S-3b: nothing connected the prespecified criteria to the
-    // analysis they qualified, so "supported" meant "some evidence exists"
-    // rather than "the evidence holds up by its own prespecified standard".
-    // It was left asserting the wrong answer on purpose, as ledger row V, to
-    // be updated by whoever fixed it rather than drifting silently. Fixed by
-    // `QUALIFIES`; see tests/scenarios/s3b_criteria_qualify_only.test.ts.
+    // And so does the finding: `QUALIFIES` connects the prespecified criteria
+    // to the analysis they qualify, so "supported" means "the evidence holds
+    // up by its own prespecified standard", not just "some evidence exists".
+    // See tests/scenarios/s3b_criteria_qualify_only.test.ts.
     const why = await session.whySupported(await claimNamed(session, "T differs from rewired"));
     expect(await whyOf(await afterwards(), "T differs from rewired")).toEqual(why);
     expect(why.supported).toBe(false);
@@ -304,9 +299,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
   /**
    * Two criteria worded identically are two criteria. Aggregating by
-   * proposition text collapsed them into one check — which is the "two things
-   * treated as one" shape that has caused every expensive mistake in this
-   * project so far (PJ-012 §1).
+   * proposition text would collapse them into one check.
    */
   test("two criteria worded identically are two separate checks", async () => {
     const { work } = await session.planWork({

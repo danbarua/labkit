@@ -1,15 +1,13 @@
 /**
  * The historical survey, put under a wound clock.
  *
- * Prompted by an external review of the consumer branch (2026-08-21), which
- * read `whatWasKnown()` and predicted two wrong answers without running
- * anything. This file runs them. A candidate is not a finding until someone
- * does — PJ-027 — so the tests below are written to *demonstrate*, and each
- * one names what it expects the current code to do.
+ * This file runs two predicted wrong answers against the real code rather
+ * than arguing from reading `whatWasKnown()` alone: a candidate is not a
+ * finding until someone runs it, so the tests below are written to
+ * *demonstrate*, and each one names what it expects the current code to do.
  *
- * Both probes clear PJ-011 §5 rather than `023`'s bar 4: the survey does not
- * return an empty or absent answer, it returns a **confidently incorrect** one.
- * A question is placed in a bucket it could not have been in.
+ * Both probes return a **confidently incorrect** answer, not an empty or
+ * absent one: a question is placed in a bucket it could not have been in.
  *
  * Imports only src/domain, never src/db (enforced — see .dependency-cruiser.cjs).
  */

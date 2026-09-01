@@ -1,13 +1,13 @@
 /**
- * Additive reconciliation of a tenant graph (PJ-005).
+ * Additive reconciliation of a tenant graph.
  *
  * `provisionTenantGraph()` re-runs on every `resolveTenantContext()` call
  * specifically so a label or index added to the codebase reaches
  * tenants whose graphs were provisioned before that change shipped. This test
- * exercises that for the case it was built for — the S-11 edge additions
- * (`CONSUMES`, `EVALUATES: Review->EvidenceUnit`) were the first new edge
- * labels since the machinery landed, so "additive by design" had never
- * actually been demonstrated on the deployment path.
+ * exercises that for the case it was built for — new edge labels added to an
+ * existing tenant (`CONSUMES`, `EVALUATES: Review->EvidenceUnit`), so
+ * "additive by design" is demonstrated on the deployment path, not just
+ * asserted.
  *
  * Reconciliation is exercised through `resolveTenantContext()`, the same path
  * production uses, never by calling provisioning internals.
@@ -71,26 +71,17 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
 });
 
 /**
- * `dropTenantGraph()`'s only reader.
- *
- * It had none until this test. `tests/helpers/db.ts` called it between every
- * test until 2026-08-22, when teardown switched to truncating the label tables
- * — dropping was rebuilding thirty-eight labels and thirty-eight indexes per
- * test, about half the suite's wall time. That left the repo's only way to
- * remove a tenant with a writer and no reader, which is the dead-code shape
- * PJ-007 found in `buildAsClause`.
- *
- * Tested rather than deleted, because unlike a query convenience this is a real
- * operation a deploy will need, and an untested drop gets discovered to be
- * broken at the moment someone needs it most.
+ * `dropTenantGraph()`'s only reader, kept as a real operation a deploy will
+ * need rather than deleted as unused — an untested drop gets discovered to
+ * be broken at the moment someone needs it most.
  *
  * **It drops `labkit_t1`, not some safely-named other graph.** `"drop-me"` is
  * the first tenant resolved in this file, `tenants.id` is truncated with
  * `RESTART IDENTITY`, so it gets id 1 and the graph every other file also calls
- * `labkit_t1` — verified, after a reading that assumed the name kept it apart.
- * What keeps it apart is that `setupTestDb()` builds a **separate PGlite
- * instance per test file**, so this file's `labkit_t1` is not any other file's.
- * That, and not the tenant slug, is why dropping here is safe.
+ * `labkit_t1`. What keeps it apart is that `setupTestDb()` builds a
+ * **separate PGlite instance per test file**, so this file's `labkit_t1` is
+ * not any other file's. That, and not the tenant slug, is why dropping here
+ * is safe.
  */
 test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", async () => {
   const db = await testDb.openClient();
@@ -125,15 +116,13 @@ test("dropTenantGraph removes the graph, and resolving the tenant rebuilds it", 
  * Property indexes, and the two things worth asserting separately: that
  * provisioning **built** one, and that reconciliation **restores** it.
  *
- * `Claim.name` is matched in twelve Cypher sites and was a sequential scan
- * over the label's table until `INDEXED_PROPS` existed. Nothing about that is
+ * `Claim.name` is matched in twelve Cypher sites. Nothing about an index is
  * observable from a query result — the same rows come back either way — so the
  * index has to be asserted against `pg_indexes` directly or not at all.
  *
- * The drop-and-re-resolve half is the point PJ-005 exists for: an index added
- * to the codebase must reach a tenant whose graph was provisioned before it
- * shipped. Exercised through `resolveTenantContext()`, never provisioning
- * internals.
+ * The drop-and-re-resolve half proves an index added to the codebase reaches
+ * a tenant whose graph was provisioned before it shipped. Exercised through
+ * `resolveTenantContext()`, never provisioning internals.
  */
 test("a property index is built, and a tenant missing one picks it up on re-resolve", async () => {
   const db = await testDb.openClient();
@@ -150,7 +139,7 @@ test("a property index is built, and a tenant missing one picks it up on re-reso
   expect(await indexNames()).toContain("claim_name_idx");
 
   // Not unique, and that is load-bearing rather than incidental: two claims may
-  // assert the same sentence in different lines of enquiry (S-5), so a unique
+  // assert the same sentence in different lines of enquiry, so a unique
   // index here would make a modelled situation a 23505.
   const unique = await db.query<{ indisunique: boolean }>(
     `SELECT i.indisunique FROM pg_class c

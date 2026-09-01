@@ -3,10 +3,10 @@
  * docs/project-journal/008_user_story_mining.md §3 row F.
  *
  * Row F says an artefact has no identity apart from its content: `logical_name`
- * is wording, which S-9 refused to treat as identity, and `content_hash` is the
- * bytes. S-9 guarded the *input* side — `reproducibilityOf()` takes parts by
- * reference, and its comment says a name-keyed map "would merge exactly the two
- * things this scenario exists to keep apart".
+ * is wording, not identity, and `content_hash` is the bytes. The input side
+ * is already guarded — `reproducibilityOf()` takes parts by reference, and
+ * its comment says a name-keyed map "would merge exactly the two things this
+ * scenario exists to keep apart".
  *
  * The **output** side was never given the same treatment.
  *
@@ -51,8 +51,8 @@ const NAME = "control series";
  * Researcher: "We regenerated the control, and this analysis compares it
  *  against the original."
  *
- * Both are called what the thing is called. S-9 established that is legitimate:
- * a regenerated part naturally carries the name of the part it replaces.
+ * Both are called what the thing is called: a regenerated part naturally
+ * carries the name of the part it replaces.
  */
 async function anAnalysisComparingBothControls(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("do the two controls agree?");

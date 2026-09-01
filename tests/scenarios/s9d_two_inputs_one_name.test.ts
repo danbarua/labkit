@@ -3,11 +3,7 @@
  * docs/project-journal/008_user_story_mining.md §3 row F
  * docs/consumer-contract/033_row_f_third_bite_predictions.md
  *
- * Fourth attempt at row F. S-9 answered with a refusal, S-9b left an absence,
- * S-9c bit the report and was fixed in the query. Each time the row stayed open.
- *
- * This one starts from the shape S-9c exposed rather than from the row's title:
- * a rule enforced on the way **in** and dropped on the way **out**.
+ * A rule enforced on the way **in** and dropped on the way **out**.
  * `reproducibilityOf()` took parts by reference, argued for it in a comment, and
  * reported bare names. `whySupported().restingOn` is the same construction, in
  * the most-used read on the surface.
@@ -56,8 +52,8 @@ const DIVERGE = "the treated and control arms diverge";
  *  remainder. This analysis reads both — the surviving fragment and the
  *  regeneration — because the comparison needs the whole series."
  *
- * Two artefacts, one name. S-9 established that is legitimate: a regenerated
- * part naturally carries the name of the part it replaces. One of the two has
+ * Two artefacts, one name: a regenerated part naturally carries the name of
+ * the part it replaces. One of the two has
  * provenance nobody can vouch for, which is the situation that matters.
  */
 async function anAnalysisRestingOnBothControls(s: ResearchSession) {
@@ -89,9 +85,9 @@ describe("S-9d: resting on one thing, or two?", () => {
    * genuinely distinct in the record, so the collapse below is a fact about the
    * read rather than about the fixture.
    *
-   * Asserted through `reproducibilityOf()`, which was taught identity in S-9c
-   * and therefore reports both. Same graph, different read, different answer —
-   * which is what makes this a reporting defect and not a recording one.
+   * Asserted through `reproducibilityOf()`, which reports both. Same graph,
+   * different read, different answer -- which is what makes this a reporting
+   * defect and not a recording one.
    */
   test("the record holds two distinct inputs under the one name", async () => {
     const { surviving, regenerated, analysis } = await anAnalysisRestingOnBothControls(session);
@@ -137,9 +133,7 @@ describe("S-9d: resting on one thing, or two?", () => {
    *
    * The graph holds two artefacts, each carrying the claim independently, and
    * the surface already knows the name is ambiguous — `whatDependsOn()` refuses
-   * it, which is S-9 working. Three reads, three consistent answers; before the
-   * fix the third one disagreed with the other two about how many things were
-   * there.
+   * it. Three reads, three consistent answers about how many things are there.
    */
   test("the collapse is in the read, not in what was recorded", async () => {
     const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);

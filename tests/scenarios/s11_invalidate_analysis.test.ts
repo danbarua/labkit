@@ -2,9 +2,9 @@
  * S-11 — "The analysis was wrong; the observations were fine."
  * docs/project-journal/008_user_story_mining.md
  *
- * PJ-008 promotes this as the CONTROL scenario: the one the current model was
- * designed for and the one most likely to pass unchanged. Its value is
- * diagnostic — if S-11 strains, the problem is deeper than PJ-008's §3 gaps.
+ * This is the CONTROL scenario: the one the current model was designed for
+ * and the one most likely to pass unchanged. Its value is diagnostic — if
+ * S-11 strains, the problem runs deeper than a surface gap.
  *
  * Two rules this file exists to enforce, not just to describe:
  *
@@ -286,11 +286,11 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   /**
    * The regression test for the relationship S-11 earned.
    *
-   * Before `Computation -[:CONSUMES]-> Artefact` existed, "what does this
-   * claim rest on?" was answered by going out to the enquiry and back, which
-   * returns every observation the ENQUIRY is associated with. One enquiry
-   * carrying two analyses over different inputs is where that stops being the
-   * same question -- and it returned both observation sets for both claims.
+   * Without `Computation -[:CONSUMES]-> Artefact`, "what does this claim rest
+   * on?" would answer by going out to the enquiry and back, returning every
+   * observation the ENQUIRY is associated with -- so one enquiry carrying two
+   * analyses over different inputs would return both observation sets for
+   * both claims, not just each analysis's own input.
    */
   test("a claim rests only on what its own analysis consumed, not on everything in the enquiry", async () => {
     const { enquiry } = await session.openEnquiry("which construction classifies best?");

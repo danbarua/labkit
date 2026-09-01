@@ -9,8 +9,8 @@
  *
  * The trap this scenario exists to catch is named in §2: a model that can only
  * express this as an open task has failed. So no `Task` is created anywhere
- * below, and none may be needed to make a query answer correctly — PJ-001's
- * "should not accumulate ceremony" bullet, made executable.
+ * below, and none may be needed to make a query answer correctly — the record
+ * should not accumulate ceremony.
  *
  * Imports only src/domain — never src/db (enforced).
  */
@@ -163,8 +163,8 @@ describe("S-14: deliberately leaving something unresolved", () => {
    * Afterward 4. "Why was it accepted rather than pursued?" — the exhausted
    * dataset, recorded, and the finding it was accepted in light of.
    *
-   * Asserted from durable state with the event log empty, as S-1 established:
-   * a reason that survives only in the event stream has not been recorded.
+   * Asserted from durable state with the event log empty: a reason that
+   * survives only in the event stream has not been recorded.
    */
   test("Afterward 4: the reasoning survives, and so does what was known at the time", async () => {
     const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();

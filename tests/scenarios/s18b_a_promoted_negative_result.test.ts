@@ -1,11 +1,10 @@
 /**
  * S-18b — "The answer is no, and somebody vouched for it."
- * External peer review of PR #2, merge blocker 2. An S-4 × S-18 overlap.
  *
- * S-4 established that a question can be substantively answered **no**, by
- * evidence that `CHALLENGES` the claim answering it. S-18 established that
- * `promote()` moves a finding from scratch to citable. Each has a scenario;
- * neither crosses the other, and the reviewer predicted the crossing is broken:
+ * A question can be substantively answered **no**, by evidence that
+ * `CHALLENGES` the claim answering it, and `promote()` moves a finding from
+ * scratch to citable. Each has a scenario; neither crosses the other, and
+ * this scenario is where the crossing turns out broken:
  *
  * > three read paths still discover the promoted closing claim using only
  * > `Evidence -SUPPORTS-> Claim`, not `CHALLENGES`.

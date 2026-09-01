@@ -48,19 +48,15 @@ const CONVERGES = "the pruning schedule shifts the convergence point";
 
 describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
   /**
-   * `024` claimed a pinned clock meant this harness "structurally cannot
-   * evaluate whether row Z's ordering can be derived from `closed_at` or event
-   * stamps". **Withdrawn.** The limitation was the fixture's: a constant
-   * function is a frozen value, not a clock, and winding one is all it took.
+   * A frozen clock cannot distinguish ordering from argument, so this probe
+   * winds one. Of the six places a write verb reads the clock, **one**
+   * reaches the graph — `evaluateCriterion`, stamping
+   * `CriterionEvaluation.evaluated_at`. The other five reach only the event
+   * stream, which the record excludes from "what is true now".
    *
-   * Wound, the answer is observable rather than argued. Of the six places a
-   * write verb reads the clock, **one** reaches the graph — `evaluateCriterion`,
-   * stamping `CriterionEvaluation.evaluated_at`. The other five reach only the
-   * event stream, which CLAUDE.md excludes from "what is true now".
-   *
-   * So row Z is narrower than "the record has no time in it", and the narrower
-   * statement is the useful one: **evaluations are ordered, decisions are not**.
-   * A frozen clock could not have shown this, because every stamp was identical.
+   * So the record's own claim about time is narrower than "the record has no
+   * time in it": **evaluations are ordered, decisions are not**. A frozen
+   * clock could not show this, because every stamp would be identical.
    */
   test("an evaluation carries the time it was reached; a decision carries none", async () => {
     const graph = await scenario.begin();
@@ -306,16 +302,15 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
 
 describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", () => {
   /**
-   * Row Z, closed as far as the contract requires. Rung 1 was built first and
-   * shown to fail (probe 6); rung 2 was declined by argument rather than
-   * demonstration — sequence is a property of each act, not a relation between
-   * two, and an `AFTER` edge would leave a reader reconstructing a total order
-   * from pairs. Then, and only then, one property: `Decision.decided_at`.
+   * Rung 1 was built first and shown to fail (probe 6); rung 2 was declined by
+   * argument rather than demonstration — sequence is a property of each act,
+   * not a relation between two, and an `AFTER` edge would leave a reader
+   * reconstructing a total order from pairs. Then, and only then, one
+   * property: `Decision.decided_at`.
    *
-   * The success condition was stated in `025` before any of it was written: two
-   * programmes settling the same questions in **opposite orders** return
-   * *different* as-of answers, each correct, from durable state — with the event
-   * log empty beside it, as S-1 established.
+   * The success condition: two programmes settling the same questions in
+   * **opposite orders** return *different* as-of answers, each correct, from
+   * durable state — with the event log empty beside it.
    */
   const FIRST = {
     asks: "does pruning move convergence?",
@@ -470,22 +465,10 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
   });
 
   /**
-   * **Rewritten on 2026-08-21. It used to assert the bug.**
-   *
-   * The old form posed a question in March, asked what was known in *February*,
-   * and asserted the question came back `open` — "before anything was decided,
-   * everything is open". That reads like a boundary case and is a wrong answer:
-   * in February the question had not been asked. Nothing was open because
-   * nothing existed. The test passed because `whatWasKnown()` began
-   * `MATCH (q:Question)` and dropped every unclassified row into `open`, so the
-   * assertion and the defect agreed with each other.
-   *
-   * Worth leaving the note rather than quietly editing the file. A test that
-   * encodes the behaviour it was written to pin is the same shape as PJ-027's
-   * comments — a second copy of the code's opinion, mistaken for a check on it.
-   *
-   * The two moments are now separated: before the question exists, and after it
-   * exists but before anything settles it. Only the second is `open`.
+   * A question is open only between being asked and being settled. Before it
+   * exists, and after it exists but before anything settles it, are two
+   * different moments — asking "what was known" in the first must not read
+   * back as `open`; only the second moment is.
    */
   test("a question is open only between being asked and being settled", async () => {
     const graph = await scenario.begin();

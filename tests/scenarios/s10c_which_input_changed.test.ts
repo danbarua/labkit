@@ -3,9 +3,9 @@
  * docs/project-journal/008_user_story_mining.md §3 row F
  * docs/consumer-contract/035_row_f_verdict_predictions.md
  *
- * Fourth instance of one defect. S-9c found it in `reproducibilityOf()`, S-9d in
- * `whySupported().restingOn`, and this is `reproductionOf().differs` — keyed by
- * `natural_id` internally, reported as a bare `logical_name`.
+ * The same defect recurs across API surfaces: `reproducibilityOf()`,
+ * `whySupported().restingOn`, and here in `reproductionOf().differs` — keyed
+ * by `natural_id` internally, reported as a bare `logical_name`.
  *
  * The shape every time: identity is used to decide, and dropped to report.
  *
@@ -95,9 +95,9 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
 
 describe("S-10c: which input changed?", () => {
   /**
-   * The re-run read a different artefact and the record says so. That much has
-   * worked since S-10; what changed is that the record no longer *concludes*
-   * anything from it — `execution: "not-reproduced"` was a verdict and is gone.
+   * The re-run reads a different artefact and the record says so, without
+   * concluding anything from it — there is no verdict field like
+   * `execution: "not-reproduced"`.
    */
   test("swapping an input for a same-named one is reported as two differences", async () => {
     const { verification } = await aReVerificationAgainstTheRegeneratedControl(session);
@@ -117,8 +117,9 @@ describe("S-10c: which input changed?", () => {
    * re-run do differently?* — is told that a thing called "control series" was
    * both introduced and dropped.
    *
-   * Fixed by carrying identity, as S-9c and S-9d were. The name stays ambiguous;
-   * that is the point, and it is why the name was never identity.
+   * Identity is carried through rather than the ambiguous name. The name
+   * stays ambiguous; that is the point, and it is why the name was never
+   * identity.
    */
   test("the two entries name the same thing and mean different artefacts", async () => {
     const { original, regenerated, verification } =
