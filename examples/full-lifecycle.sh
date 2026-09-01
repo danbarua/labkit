@@ -217,17 +217,24 @@ lab observe "$enquiry" \
   --hash 'sha256:9f2b'
 observations=$(pick ART "$LAST")
 
-say "One act, many records: a computation, an evidence unit, an output" \
-    "artefact, and one claim per conclusion. It answers with the analysis" \
-    "first, then a claim per conclusion in the order they were given."
+say "Recording the run: a computation, an evidence unit, and an artefact to" \
+    "hold its output. No findings yet, and that is a real state rather than" \
+    "an empty one -- the analysis is still being done."
 
 lab analyse "$enquiry" \
   --method 'paired comparison against the unpruned baseline' \
   --from "$observations" \
   --implementing "$work" \
-  --held-to "$criterion" \
-  --concludes '{"proposition": "the pruning schedule moves convergence", "finding": "converges ~3 steps earlier at every depth"}'
+  --held-to "$criterion"
 analysis=$(handle COMP "$(printf '%s' "$LAST" | head -1)")
+
+say "Then the finding, as its own act. Findings arrive one at a time, over" \
+    "days -- so concluding is its own verb, and the record says when each" \
+    "one was reached and by whom."
+
+lab conclude "$analysis" \
+  --proposition 'the pruning schedule moves convergence' \
+  --finding 'converges ~3 steps earlier at every depth'
 claim=$(handle CLM "$(printf '%s' "$LAST" | tail -1)")
 
 chapter "Promoting and closing, before the check has run" \
@@ -285,8 +292,11 @@ lab observe "$holdout" --name 'holdout-raw' --finding 'convergence on the held-o
 holdout_obs=$(pick ART "$LAST")
 lab analyse "$holdout" \
   --method 'paired comparison on the held-out split' \
-  --from "$holdout_obs" \
-  --concludes '{"proposition": "the effect holds on the held-out split", "finding": "converges ~2 steps earlier"}'
+  --from "$holdout_obs"
+holdout_analysis=$(handle COMP "$(printf '%s' "$LAST" | head -1)")
+lab conclude "$holdout_analysis" \
+  --proposition 'the effect holds on the held-out split' \
+  --finding 'converges ~2 steps earlier'
 holdout_claim=$(handle CLM "$(printf '%s' "$LAST" | tail -1)")
 lab close "$holdout" --answered-by "$holdout_claim"
 

@@ -42,10 +42,15 @@ q=$(lab pose 'what may the record honestly say about who did something?')
 e=$(lab pursue "$q" --approach 'grade the attribution at the provider')
 
 # The review finding that started the work -- a real measurement, kept verbatim.
+# The ART_ line specifically. `observe` mints three things and prints a handle
+# for each (#161), and this captured all three into one variable -- so `--from`
+# was handed a three-line string, which parses as a handle and then matches no
+# record. Found running this script, which is what "nothing runs it, so it can
+# rot" in CLAUDE.md predicted for it.
 obs=$(lab observe "$e" \
   --name 'author-vs-os-attribution' \
   --finding 'labkit pose and labkit --author dan pose wrote byte-identical attribution' \
-  --hash 'sha256:427fa7f')
+  --hash 'sha256:427fa7f' | grep '^ART_')
 
 # The work that finding created, the condition it was held to, the gate.
 w=$(lab plan \
@@ -59,9 +64,12 @@ g=$(lab declare --governed-by "$c" \
 
 out=$(lab analyse "$e" \
   --method 'grade on the provider, three values' \
-  --from "$obs" --implementing "$w" --held-to "$c" \
-  --concludes '{"proposition": "the grade belongs to the provider, not the field", "finding": "how() is a method because personContext is observed or claimed by construction"}')
-claim=$(printf '%s' "$out" | tail -1)
+  --from "$obs" --implementing "$w" --held-to "$c")
+analysis=$(printf '%s' "$out" | head -1)
+claim=$(lab conclude "$analysis" \
+  --proposition 'the grade belongs to the provider, not the field' \
+  --finding 'how() is a method because personContext is observed or claimed by construction' \
+  | tail -1)
 lab evaluate "$c" --gate "$g" --value 'observed, claimed, unattributed all written' \
   --outcome pass --citing "$claim" >/dev/null
 
