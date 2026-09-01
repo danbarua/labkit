@@ -312,7 +312,7 @@ STAGE1D_GPU_FIX=2026-08-02T19:10:59.000Z
 # run (confirmatory_observations) is on disk.
 gpu_fix_observations=$(lab --date "$STAGE1D_GPU_FIX" observe "$topology_specificity_enquiry" --name stage1d_gpu_fix_smoketest \
   --finding "corrected build_432_batch() re-run on a fresh A100 session, Delta_map=0.3505 for T seed=3000, verify_on_gpu.py's field-by-field precision check passed -- no raw output file preserved locally beyond the later confirmatory run" | grep '^ART_')
-gpu_fix_replacement=$(lab --date "$STAGE1D_GPU_FIX" replace "$gpu_pilot_analysis" --because "$gpu_bug_review" --enquiry "$topology_specificity_enquiry" \
+gpu_fix_replacement=$(lab --date "$STAGE1D_GPU_FIX" replace "$gpu_pilot_analysis" --because "$gpu_bug_review" \
   --method "corrected build_432_batch(), calling the real generate_fixed_replica_directions() instead of a hand-rolled uniform draw; smoke-tested against an independently computed replica state before touching a GPU, then re-verified end-to-end on a fresh A100 session" \
   --from "$trajectory_generalization_observations" --from "$gpu_fix_observations" | grep '^COMP_')
 lab --date "$STAGE1D_GPU_FIX" conclude "$gpu_fix_replacement" --replacing "$gpu_pilot_claim" \
