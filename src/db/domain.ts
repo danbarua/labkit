@@ -36,18 +36,13 @@ export type NodeLabel = (typeof NODE_LABELS)[number];
  * `Timestamp`, and every such property must appear here —
  * `bun run check:prop-classes` fails when the two disagree.
  *
- * That checker exists under protest. CLAUDE.md is right that a fact in one
- * place needs no checker, and this is a fact in two: the type is for the reader
- * and this is for the machine. The honest upgrade is to **generate** this from
- * the types, the way `labkit://docs/tools` is generated from the tool
- * declarations and its freshness asserted by a test that was running anyway. It
- * is written by hand first because a generator for a table nobody has read yet
- * is a step ahead of the evidence.
+ * **This is a fact in two places** — the type is for the reader, this is for
+ * the machine — which is what the checker is for. Generating it from the types
+ * would be the honest upgrade.
  *
- * Non-unique, unlike the natural-id indexes next to them in
- * `provisioning.ts` — two claims may assert the same sentence on purpose (S-5),
- * and a unique index here would make that a database error instead of a
- * research finding.
+ * Non-unique, unlike the natural-id indexes beside them in `provisioning.ts`:
+ * two claims may assert the same sentence on purpose, and a unique index here
+ * would make that a database error instead of a research finding.
  */
 export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = {
   Question: ["posed_at"],
@@ -163,49 +158,36 @@ export interface MintedEdge {
 }
 
 /**
- * Single authoritative source of truth for legal edge shapes (PJ-003 §8).
- * `createEdge` validates the resolved `(fromLabel, toLabel)` pair against
- * this table and throws before issuing any Cypher if the pair isn't listed.
+ * Single authoritative source of truth for legal edge shapes. `createEdge`
+ * validates the resolved `(fromLabel, toLabel)` pair against this table and
+ * throws before issuing any Cypher if the pair is not listed.
  *
- * `GATES`'s source is `Gate`, not `Criterion` (PJ-004 decision #9): the
- * shipped shape had `CriterionEvaluation -[:TRIGGERS]-> Gate` and
- * *separately* `Criterion -[:GATES]-> Task/Computation`, meaning nothing
- * ever flowed out of `Gate` — `Criterion` did the gating, contradicting
- * PJ-001's own definition of `Gate` as "the policy consequence attached to
- * an evaluation." The chain now actually chains:
- * `Criterion -[:EVALUATED_AS]-> CriterionEvaluation -[:TRIGGERS]-> Gate -[:GATES]-> Task/Computation`.
+ * **`GATES`'s source is `Gate`, not `Criterion`**, so that the control chain
+ * actually chains: `Criterion -[:EVALUATED_AS]-> CriterionEvaluation
+ * -[:TRIGGERS]-> Gate -[:GATES]-> Task/Computation`. With `Criterion` as the
+ * source nothing flows out of `Gate` at all, and the criterion does the
+ * gating — which is not what a gate is.
  */
 export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, NodeLabel]>> = {
   /**
    * "Gave rise to." A question gives rise to a line of enquiry; a decision
    * gives rise to a question.
    *
-   * The second pair is earned by S-1. Sharpening a vague hunch into a testable
-   * question records a `Decision` that `NARROWS` the original — but nothing
-   * attached the *product* of that act to the act, so a question created by
-   * sharpening had no path back to it. Demonstrated rather than argued: with
-   * one hunch sharpened twice and a result landing in between,
-   * `originOf(secondQuestion)` reported the knowledge that existed before the
-   * *first* sharpening, back-dating an act onto evidence that had not yet
-   * arrived. That is a confidently wrong answer, not an empty one — the reply
-   * was populated and plausible, and belonged to a different event.
+   * **`Decision -> Question`**: sharpening records a `Decision` that `NARROWS`
+   * the original, and this attaches the *product* of that act to the act.
+   * Without it a question created by sharpening has no path back, and
+   * `originOf` reports the knowledge that existed before an *earlier*
+   * sharpening — populated, plausible, and about a different event.
    *
-   * The `Decision -> Claim` pair is S-12, and it is the third instance of the
-   * same shape (PJ-008 row AB): `CHANGES` records which interpretation was
-   * withdrawn, and nothing recorded which one replaced it. S-7 got away
-   * without such an edge because a gate contains its design conditions and the
-   * current one is derivable as the unchanged member. An interpretation has no
-   * container, so from a narrowed claim there was no route back to the act
-   * that narrowed it — the prediction that S-7's remedy would transfer was
-   * wrong. Note what this makes redundant: with `CHANGES` and `MOTIVATES` both
-   * present the revision chain walks claim-to-claim through its decisions, so
-   * no `SUPERSEDES` edge is written between them. An edge needs a reader.
+   * A direct `Question -> Question` lineage edge answers "where did this come
+   * from" but not "what did we know when we asked it", since the reason and the
+   * frozen evidence set live on the decision.
    *
-   * A direct `Question -> Question` lineage edge was the other candidate and
-   * was not chosen: it answers "where did this come from" but not "what did we
-   * know when we asked it", because the reason and the frozen evidence set
-   * live on the decision. The two models are not equally capable here, so
-   * PJ-011's record-both-pick-neither rule does not apply — see PJ-008 row D.
+   * **`Decision -> Claim`**: `CHANGES` records which interpretation was
+   * withdrawn; this records which one replaced it. A gate contains its design
+   * conditions, so the current one is derivable as the unchanged member — an
+   * interpretation has no container, and without this there is no route from a
+   * narrowed claim back to the act that narrowed it.
    */
   MOTIVATES: [
     ["Question", "LineOfEnquiry"],
@@ -217,27 +199,18 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Computation"],
   ],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
-  // A Task earns this pair by #98: `labkit contract` had no way to say why a
-  // piece of planned work exists. Reusing ADDRESSES rather than minting a new
-  // label -- an EvidenceUnit already ADDRESSES the enquiry it was recorded
-  // towards, and a Task addressing the same enquiry before any evidence
-  // exists is the same claim, one step earlier.
+  // The `Task` pair says why a piece of planned work exists. It reuses
+  // ADDRESSES rather than minting a label because it is the *same* reading one
+  // step earlier in time: an EvidenceUnit ADDRESSES the enquiry it was recorded
+  // towards, and a Task addresses the same enquiry before any evidence exists.
   //
-  // Checked against the precedent that went the other way (PJ-016 §4, row V):
-  // reusing GATES for qualification was rejected because GATES was "fully
-  // occupied with control semantics", and one edge with two readings is
-  // PJ-012 §1's shape -- the one that "has caused every expensive mistake in
-  // this project". The difference here is not surface similarity, it's
-  // whether the two readings can ever meet in a query. GATES governs which
-  // work may proceed; folding qualification into it would have made a
-  // control-flow edge also carry a content judgement, indistinguishable at
-  // read time. ADDRESSES already has one reading -- "this work was done
-  // towards this enquiry" -- and a planned Task's edge is the *same* reading
-  // one step earlier in time, not a second one. Every existing reader
+  // **The test for reusing an edge is whether the two readings can ever meet in
+  // a query**, not whether they look alike. Folding qualification into GATES
+  // was rejected on exactly that: a control-flow edge would also carry a
+  // content judgement, indistinguishable at read time. Here every reader
   // (`whatIsKnown`, `withinScope`, `enquiryStatus`'s `mine` query) binds its
-  // source variable to `:EvidenceUnit` explicitly before matching the edge,
-  // so the two node types never collide in a traversal even though they
-  // share a label.
+  // source variable to `:EvidenceUnit` explicitly before matching the edge, so
+  // the two node types never collide in a traversal despite sharing a label.
   ADDRESSES: [
     ["EvidenceUnit", "LineOfEnquiry"],
     ["Task", "LineOfEnquiry"],
@@ -246,15 +219,14 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   CHALLENGES: [["Evidence", "Claim"]],
   USES: [["EvidenceUnit", "Computation"]],
   /**
-   * Execution lineage: what a computation read. Earned by S-11
-   * (docs/project-journal/008_user_story_mining.md), which asks what an
-   * analysis rests on and could previously only answer it by going out to the
-   * enquiry and back — `ADDRESSES` to a LineOfEnquiry, then `REQUIRES` to
-   * whatever observations that enquiry needs. That answers "what observations
+   * Execution lineage: what a computation read.
+   *
+   * The alternative route — `ADDRESSES` out to a LineOfEnquiry, then `REQUIRES`
+   * to whatever observations that enquiry needs — answers "what observations
    * is this enquiry associated with", not "what did this computation
    * consume", and the two stop being the same answer the moment one enquiry
-   * carries two analyses over different inputs. It produced a real false
-   * inference in the service layer's `whySupported()`, not a hypothetical one.
+   * carries two analyses over different inputs — which makes `whySupported()`
+   * report a conclusion resting on data it never read.
    *
    * Paired with `PRODUCES: Computation -> Artefact`, execution lineage reads
    * directly in both directions, and it is the seam an external run tracker
@@ -272,32 +244,28 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   RECORDED_IN: [["Evidence", "Artefact"]],
   /**
    * Which condition a gate enforces, independent of whether it has ever been
-   * evaluated. Earned by S-17.
+   * evaluated.
    *
-   * PJ-004 #9 made the control chain flow
-   * `Criterion -EVALUATED_AS-> CriterionEvaluation -TRIGGERS-> Gate -GATES-> work`,
-   * which correctly means nothing flows out of a gate that no evaluation
-   * triggered. But it also made the criterion reachable from the gate ONLY
-   * through an evaluation — so for a gate nobody has evaluated, which is
-   * precisely S-17's subject, the governing criterion is unreachable and the
-   * gate is an orphan that gates work while recording no condition at all.
+   * The control chain — `Criterion -EVALUATED_AS-> CriterionEvaluation
+   * -TRIGGERS-> Gate -GATES-> work` — correctly means nothing flows out of a
+   * gate no evaluation triggered. But it also leaves the criterion reachable
+   * from the gate **only** through an evaluation, so a gate nobody has
+   * evaluated is an orphan that gates work while recording no condition at all,
+   * and "show me evidence this fails when the artefact is wrong" cannot even be
+   * aimed at a criterion.
    *
-   * Demonstrated rather than argued: `criterionGoverning()` returned null for
-   * a declared-but-unevaluated gate, so the reviewer's actual question —
-   * "show me evidence this fails when the artefact is wrong" — could not even
-   * be aimed at a criterion. Direction matches the rest of the chain so the
-   * whole control path reads left to right.
+   * Direction matches the rest of the chain, so the control path reads left to
+   * right.
    */
   GOVERNS: [["Criterion", "Gate"]],
   /**
    * The standard a finding is held to, as distinct from the work a condition
-   * gates. Earned by S-3b (PJ-016), which is S-3's conversation with the
-   * downstream work removed.
+   * gates.
    *
-   * Demonstrated rather than argued: with prespecified robustness checks
-   * failing against the very analysis they were agreed about, `whySupported()`
-   * reported `supported: true` — "some evidence exists" rather than "the
-   * evidence holds up by the standard set for it". Criteria reached only
+   * Without it, prespecified robustness checks can fail against the very
+   * analysis they were agreed about and `whySupported()` still reports
+   * `supported: true` — "some evidence exists" rather than "the evidence holds
+   * up by the standard set for it". Criteria reached only
    * `Gate`, so there was no path from a claim to the conditions it was
    * supposed to satisfy, and the answer was confidently wrong rather than
    * empty. Ledger row V.
@@ -320,12 +288,11 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Gate", "Computation"],
   ],
   /**
-   * "Re-checked that finding, without reproducing the run behind it." Earned
-   * by S-10.
+   * "Re-checked that finding, without reproducing the run behind it."
    *
-   * Demonstrated rather than argued: the only way to record a re-run was as
-   * another analysis concluding the same proposition, which S-5's scope rules
-   * then resolve to the same claim — so `whySupported()` reported the
+   * Without it the only way to record a re-run is as another analysis
+   * concluding the same proposition, which resolves to the same claim — so
+   * `whySupported()` reports the
    * proposition resting on *two independent findings*. It rests on one, checked
    * twice, and the second check specified initial conditions the first never
    * recorded. A historical claim reporting itself independently corroborated by
@@ -344,20 +311,14 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    */
   REVERIFIES: [["Evidence", "Evidence"]],
   /**
-   * The act that confers confirmatory standing on a finding. Earned by S-18.
+   * The act that confers confirmatory standing on a finding.
    *
-   * The prediction for that build was that `CHANGES` would carry it — a
-   * decision acting on a claim, which is what `CHANGES` already means. It was
-   * refuted by demonstration: `withdrawalOf()` reads *any* `Decision -CHANGES->
-   * Claim` as a retraction (S-12, where that is exactly right), so promoting a
-   * finding made `whySupported()` report it as withdrawn and no longer
-   * supported. Promotion would have retracted the thing it promoted.
+   * **Not `CHANGES`**, though a promotion is a decision acting on a claim.
+   * `withdrawalOf()` reads *any* `Decision -CHANGES-> Claim` as a retraction,
+   * so promotion written that way retracts the thing it promotes.
    *
-   * That is the same lesson `GATES` taught in row V, from the other side: one
-   * edge with two readings is the failure shape behind every expensive mistake
-   * in this project. Two acts that both "change a claim" are not the same
-   * relationship when one means *stop asserting this* and the other means
-   * *assert it more strongly*.
+   * Two acts that both "change a claim" are not the same relationship when one
+   * means *stop asserting this* and the other means *assert it more strongly*.
    *
    * Direction and endpoint match `CHANGES`: the decision is the act, the claim
    * is what it acts on. Why it was promoted lives on the decision's `reason`,
@@ -384,16 +345,13 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    */
   KEEPS: [["Decision", "Claim"]],
   /**
-   * What a decision withdrew or replaced. A design condition (S-7), an
-   * interpretation (S-12).
+   * What a decision withdrew or replaced: a design condition, an
+   * interpretation.
    *
-   * The `Claim` pair is earned by S-12. With only a `Review` recording that an
-   * interpretation had been criticised, `whySupported()` went on reporting the
-   * retracted sentence as supported — the record confidently asserting
-   * something the reviewer had just withdrawn, which is the worst thing a
-   * provenance system can do. A review is not a retraction: reviews also
-   * confirm, and telling the two apart from a free-text verdict would be
-   * text-matching.
+   * **A review is not a retraction.** With only a `Review` recording that an
+   * interpretation was criticised, `whySupported()` goes on reporting the
+   * retracted sentence as supported — reviews also confirm, and telling the two
+   * apart from a free-text verdict would be text-matching.
    */
   CHANGES: [
     ["Decision", "Criterion"],
@@ -450,18 +408,16 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Computation"],
   ],
   /**
-   * `Review -> EvidenceUnit` is the second relationship S-11 earned: a review
-   * of an *analysis* previously had nowhere to point, so its subject survived
-   * only in the ephemeral event stream and "why was this replaced?" was
-   * unanswerable from the graph.
+   * `Review -> EvidenceUnit` is how a review of an *analysis* has somewhere to
+   * point; without it the subject survives only in the event stream and "why
+   * was this replaced?" is unanswerable from the graph.
    *
-   * The endpoint is the EvidenceUnit rather than the Computation
-   * deliberately. What the S-11 reviewer criticized — "your bootstrap is
-   * centred on the observed effect; it isn't a null test" — is the
-   * inferential procedure, not the execution: nothing ran incorrectly. The
-   * EvidenceUnit is the bounded inferential activity; the Computation is how
-   * it was executed. `Review -> Computation` may well be earned later by a
-   * scenario reviewing an execution, but S-11 did not earn it.
+   * **The endpoint is the EvidenceUnit rather than the Computation.** What a
+   * reviewer criticises — *your bootstrap is centred on the observed effect; it
+   * is not a null test* — is the inferential procedure, not the execution:
+   * nothing ran incorrectly. The EvidenceUnit is the bounded inferential
+   * activity; the Computation is how it was executed. `Review -> Computation`
+   * would be a different claim and nothing makes it yet.
    */
   EVALUATES: [
     ["Review", "Claim"],
@@ -470,7 +426,7 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Review", "EvidenceUnit"],
   ],
   /**
-   * Which review a retraction actually rested on. Earned by S-11b, row O.
+   * Which review a retraction actually rested on.
    *
    * `replaceAnalysis()` took a `because: ReviewRef`, checked it reviewed the
    * analysis being replaced, and then wrote it nowhere — the reference reached
@@ -510,16 +466,16 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
 //
 // Every property below is a `string` at runtime; these say nothing about the
 // value's shape and everything about the *code's relationship to it*. That is
-// the question a reader of `*Props` actually has, and answering it used to
-// require reading every Cypher query in `src/domain/` — an audit that took
-// three hundred seconds of machine time and could go stale the next afternoon.
+// the question a reader of `*Props` actually has, and the alternative is
+// auditing every Cypher query in `src/domain/` and redoing it the next
+// afternoon.
 //
 // They are plain aliases, so none of them constrains anything at a call site.
 // The enforcement is elsewhere and deliberately narrow: `INDEXED_PROPS` below
 // is what `provisionTenantGraph()` actually reads, and `bun run
 // check:prop-classes` fails when it disagrees with these annotations. A
-// classification nobody re-reads is not a mechanism (PJ-025), so exactly one
-// of them has a machine consequence and the rest are for the reader.
+// classification nobody re-reads is not a mechanism, so exactly one of them has
+// a machine consequence and the rest are for the reader.
 //
 // The axis is *does LabKit inspect this, and where* — not *what does it look
 // like*. `posed_at` is a timestamp and `content_hash` is a digest, but what
@@ -542,10 +498,9 @@ export type IndexedString = string;
  * **Most of these are written by nothing today, and that is not a reason to
  * delete them.** LabKit does not decide on their contents, but the wider
  * toolset may show them to a researcher who does, and an integration may fill
- * them: PJ-009 names `CONSUMES`/`PRODUCES` as *"where an external run tracker
- * would eventually attach"*, and these are its attachment points. The type is
- * where that reason lives, so the next audit finds an answer rather than an
- * unexplained empty field.
+ * them — `CONSUMES`/`PRODUCES` are where an external run tracker would attach,
+ * and these are its attachment points. The type is where that reason lives, so
+ * the next audit finds an answer rather than an unexplained empty field.
  */
 export type IdentityString = string;
 
@@ -594,8 +549,8 @@ export type EvidenceUnitRole =
   | "infrastructure"
   | "confirmatory";
 
-// `project_id` removed from every *Props interface below (PJ-003 §4): the
-// graph itself is the tenant partition now, not a repeated node property.
+// No `project_id` on any *Props interface below: the graph itself is the tenant
+// partition, not a repeated node property.
 
 export interface QuestionProps {
   name: Prose;
@@ -638,10 +593,8 @@ export interface EvidenceUnitProps {
    * `ReadOnlyString<EvidenceUnitRole>` rather than a bare `ReadOnlyString`: the
    * union is what stops a third writer inventing a tenth value, and widening it
    * to `string` in the name of classifying it would trade real safety for a
-   * label. CLAUDE.md uses this property as the contrast that bounds the
-   * no-cull policy — an unwalked *edge* is a claim about the domain and is
-   * protected; a property value is not — so the type is now where that fact
-   * lives, rather than a paragraph a reader has to find.
+   * label. It is also where the no-cull policy stops: an unwalked *edge* is a
+   * claim about the domain and is protected, and a property value is not.
    */
   role: ReadOnlyString<EvidenceUnitRole>;
 }
@@ -659,22 +612,19 @@ export interface ClaimProps {
    * taxonomy: this reads like free text and behaves like a key. It is still
    * **not** identity — `claimsAsserting()` is the one seam where wording
    * becomes a handle, and it returns every match and refuses to pick, because
-   * two claims can assert the same sentence (S-5).
+   * two claims can assert the same sentence.
    */
   name: IndexedString;
   /**
    * Whether the finding was prespecified, and whether anyone has promoted it —
    * **two facts under one value**, which is issue #63.
    *
-   * `ReadOnlyString` until 2026-08-27, and that was **false**. The taxonomy
-   * defines that class as *stored, handed back to callers, never decided on*;
-   * the annotation exists to say nothing reads it. Three sites decide on it,
-   * and the first is `whatIsKnown`'s bucketing, where it selects the survey's
-   * strongest word. Found by reading the declaration beside its readers rather
-   * than by any check — the shape issue #50 is a sweep for.
+   * **Not `ReadOnlyString`.** That class means *stored, handed back to callers,
+   * never decided on*, and three sites decide on this — the first being
+   * `whatIsKnown`'s bucketing, where it selects the survey's strongest word.
    *
-   * It is a plain union now, which claims nothing beyond the values. That is
-   * weaker than the taxonomy would like and it is what is true: a taxonomy
+   * A plain union, then, claiming nothing beyond the values. That is weaker
+   * than the taxonomy would like and it is what is true: a taxonomy
    * member asserting something false about the field it annotates is worse
    * than one absent, because the annotation is what a reader trusts instead of
    * grepping.
@@ -686,15 +636,12 @@ export interface ClaimProps {
 }
 
 /**
- * `evidence` (a string shadow of `Decision -[:BASED_ON]-> Evidence`) is removed
- * (PJ-003 §10).
+ * **No `evidence` string shadow**, and no `is_open`/`closed_at`.
  *
- * So are `is_open`/`closed_at`, PJ-004 decision #2's explicit operational
- * state, removed on 2026-08-24 with `TenantGraph.closeDecision()` and the
- * biconditional validator that guarded them. **Nothing was ever stored in
- * them.** All six verbs that mint a Decision pass exactly the three properties
- * below, so the only branch of that validator production ever reached was the
- * one defaulting `is_open` to `true`; nothing anywhere read whether a decision
+ * The first duplicates `Decision -[:BASED_ON]-> Evidence`. The second is
+ * operational state nothing reads: every verb that mints a Decision passes
+ * exactly the three properties below, so a stored open-flag would be written by
+ * every writer and consulted by no
  * was closed. A decision's standing is expressed by supersession and review,
  * which is where the doc comment said it belonged all along.
  */
@@ -734,8 +681,8 @@ export interface CriterionProps {
   proposition: Prose;
 }
 
-// `evidence_ref` removed (PJ-004 decision #5) — represented in-graph now as
-// `CriterionEvaluation -[:BASED_ON]-> Evidence` instead of a string shadow.
+// No `evidence_ref`: what a verdict was reached against is
+// `CriterionEvaluation -[:BASED_ON]-> Evidence`, not a string shadow of it.
 export interface CriterionEvaluationProps {
   value: Prose;
   outcome: ReadOnlyString<"pass" | "fail">;
@@ -798,15 +745,11 @@ export interface ComputationProps {
 }
 
 /**
- * **`is_open` was here until 2026-08-28, and it went for the reason
- * {@link DecisionProps}'s did — the same defect, in the neighbouring type.**
+ * **No `is_open`**, for the reason {@link DecisionProps} gives: a flag every
+ * writer sets and no reader consults.
  *
- * `planWork` passed `is_open: true` and nothing anywhere read it. That is
- * `DecisionProps.is_open` exactly: written by every writer, consulted by no
- * reader, removed on 2026-08-24 with the note above.
- *
- * Found while deriving the states for `workList` (#66), which is the moment it
- * mattered: a stored flag is the obvious thing for a work-queue filter to read,
+ * It matters most where it looks most useful — a stored flag is the obvious
+ * thing for a work-queue filter to read,
  * and it would have been the first place the queue rotted. Whether a task is
  * still open is computed from what the graph holds — a gate that protects it,
  * an analysis that implements it — the same way `gateStatus` computes four
@@ -860,18 +803,17 @@ export interface NodePropsByLabel {
 /** Everything the persistence layer needs to know about one node label, in one place. */
 interface NodeType<L extends NodeLabel> {
   /**
-   * Short display prefix for natural IDs (e.g. `Computation` -> `"COMP_123"`,
-   * underscore per PJ-004 decision #4). Scoped globally per entity-type, not
-   * per-tenant. Must stay in sync with the per-label `CREATE SEQUENCE`
+   * Short display prefix for natural IDs — `Computation` -> `"COMP_123"`.
+   * Scoped globally per entity-type, not per-tenant. Must stay in sync with the
+   * per-label `CREATE SEQUENCE`
    * statements in drizzle/0002_natural_ids.sql — nothing here enforces that,
    * it's a cross-file obligation to a migration.
    */
   readonly prefix: string;
 
   /**
-   * Creation-time enforcement of per-label property invariants (PJ-004
-   * decision #8). Returns the props to actually write, so a validator can
-   * normalize as well as reject.
+   * Creation-time enforcement of per-label property invariants. Returns the
+   * props to actually write, so a validator can normalise as well as reject.
    *
    * **No label declares one today.** `Decision` was the only user and went with
    * `closeDecision()` on 2026-08-24. The hook is kept rather than culled with
@@ -883,9 +825,9 @@ interface NodeType<L extends NodeLabel> {
 }
 
 /**
- * One entry per node label, replacing what used to be four parallel records
- * (`NODE_LABELS` / `NATURAL_ID_PREFIX` / `NODE_VIEW_COLUMNS` /
- * `NODE_VALIDATORS`) indexed by the same key and kept aligned by comment.
+ * One entry per node label — everything the persistence layer knows about a
+ * label in one record, rather than parallel tables indexed by the same key and
+ * kept aligned by hand.
  */
 export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
   Question: { prefix: "Q" },
