@@ -156,6 +156,23 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     expect(minted.has(report.changed[0]!.claim)).toBe(true);
     expect(superseded.has(report.changed[0]!.was)).toBe(true);
     expect([...minted].some((id) => superseded.has(id))).toBe(false);
+
+    // Afterward: the same answer, asked of the record rather than taken from
+    // the value the act returned. Six conclusions arrive as six acts, so what
+    // a replacement changed is spread across them and is a question about the
+    // record — read from the lineage decision and the per-finding ones.
+    const explained = await (await afterwards()).why(report.replacement);
+    if (explained.kind !== "analysis")
+      throw new Error(`asked about an analysis, got ${explained.kind}`);
+    expect(explained.report.supersedes).toEqual(analysis);
+    expect(explained.report.because?.review).toEqual(review);
+    expect(explained.report.changed).toHaveLength(1);
+    expect(explained.report.changed[0]).toMatchObject({
+      proposition: "T beats rewired",
+      before: "p = 0.002 (bootstrap)",
+      after: "p = 0.049 (sign-flip permutation)",
+    });
+    expect(explained.report.stillStanding).toEqual([]);
   });
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {

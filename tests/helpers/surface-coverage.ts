@@ -115,4 +115,8 @@ export const NOT_EXPOSED: Readonly<Record<string, string>> = {
   // module-level function rather than a class member (see `Explainer`), so
   // this stays public rather than `private`.
   enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",
+  // Same shape, for the Computation case. It answers what an analysis revised
+  // and which findings moved, which is what `why <analysis>` renders; a second
+  // reader would make it worth a tool of its own.
+  analysisRevision: "reached only through `why`, as the Computation case's body",
 };

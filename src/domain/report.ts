@@ -1729,7 +1729,69 @@ export interface GateExplanation {
   because: Cause[];
   report: GateStatus;
 }
-export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation | GateExplanation;
+export interface AnalysisExplanation {
+  kind: "analysis";
+  subject: AnalysisRef;
+  is: string;
+  because: Cause[];
+  report: AnalysisRevision;
+}
+export type Explanation =
+  | ClaimExplanation
+  | WorkExplanation
+  | EnquiryExplanation
+  | GateExplanation
+  | AnalysisExplanation;
+
+/**
+ * What an analysis revised, and which of the earlier findings actually moved.
+ *
+ * **Read, not returned.** Conclusions arrive one act at a time, so what a
+ * replacement changed is spread across N calls and no single act holds it. It
+ * is answered from the record: the lineage decision says which analysis this
+ * one revises and on which review, and the per-finding decisions say which
+ * findings were superseded and by what.
+ *
+ * `supersedes` and `because` are absent for an analysis that revises nothing,
+ * which is the ordinary case and an honest answer rather than a refusal.
+ */
+export interface AnalysisRevision {
+  analysis: AnalysisRef;
+  supersedes?: AnalysisRef;
+  because?: { review: ReviewRef; verdict: string };
+  /**
+   * Superseded findings whose wording actually moved — the re-analysis reached
+   * a different answer.
+   */
+  changed: RevisedFinding[];
+  /**
+   * Superseded findings the re-analysis reached again unchanged.
+   *
+   * Separate from {@link changed} because they answer different questions. A
+   * re-run that confirms five of six results and moves one has done something
+   * quite unlike one that moved all six, and a single "superseded" count
+   * cannot tell a reader which happened. These are the **replacement's**
+   * claims: the ones they supersede are withdrawn.
+   */
+  restated: ConcludedClaim[];
+  /**
+   * Conclusions of the superseded analysis that nothing here named.
+   *
+   * Empty when this analysis revises nothing. A partial re-analysis is what
+   * fills it, and every claim in it is still current: the act that superseded
+   * its siblings did not touch it.
+   */
+  stillStanding: ConcludedClaim[];
+}
+
+/** One superseded finding and the one standing in its place. */
+export interface RevisedFinding {
+  proposition: string;
+  was: ClaimRef;
+  before: string;
+  claim: ClaimRef;
+  after: string;
+}
 
 /**
  * "What am I blocked on right now, what are my priorities?" Literally the

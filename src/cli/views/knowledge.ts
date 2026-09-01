@@ -227,6 +227,7 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
     case "work":
     case "enquiry":
     case "gate":
+    case "analysis":
       return renderExplanation(explanation, p);
     default: {
       const check: never = explanation;

@@ -76,6 +76,9 @@ import type {
   EnquiryExplanation,
   GateExplanation,
   Standing,
+  AnalysisRevision,
+  RevisedFinding,
+  AnalysisExplanation,
 } from "./report";
 import { ref, isRefOfKind, KIND_BY_LABEL, kindOf } from "./report";
 import { compose, per, type Row } from "./facts";
@@ -106,6 +109,41 @@ type Identified = { natural_id: string };
 function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
   return [...new Map(items.map((item) => [id(item), item])).values()];
 }
+
+/**
+ * The read verbs a research session answers — the read half of
+ * {@link ResearchWrites}.
+ *
+ * Its whole job is the assertion in `./session.ts`: a `ResearchSession`
+ * composes a `ReadSurface` and delegates each verb by hand, so a verb added
+ * here without a delegate there is reachable from the CLI and MCP and from
+ * nowhere a scenario can call.
+ */
+export type ResearchReads = Pick<
+  ReadSurface,
+  | "claimsAsserting"
+  | "contractFor"
+  | "criteriaGoverning"
+  | "designHistory"
+  | "doTheseConflict"
+  | "enquiryInContext"
+  | "enquiryStatus"
+  | "gateList"
+  | "gateStatus"
+  | "interpretationHistory"
+  | "originOf"
+  | "pursuitsOf"
+  | "reproducibilityOf"
+  | "reproductionOf"
+  | "search"
+  | "whatDependsOn"
+  | "whatHappened"
+  | "whatIsKnown"
+  | "whatWasKnown"
+  | "why"
+  | "whySupported"
+  | "workList"
+>;
 
 /**
  * **What a refusal may point a caller at, and what it may not.**
@@ -1905,6 +1943,112 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
+   * What an analysis revised, and which findings moved — {@link AnalysisRevision}.
+   *
+   * Three reads, because they are three different questions about one act: the
+   * lineage decision (which analysis this revises, on which review), the
+   * per-finding decisions (old claim to new), and the superseded analysis's
+   * own conclusions (so the ones nothing named can be reported standing).
+   */
+  async analysisRevision(analysis: AnalysisRef): Promise<AnalysisRevision> {
+    const lineage = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
+       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
+       RETURN old, rev`,
+      {
+        old: vertexProps<{ natural_id: string }>(),
+        rev: optional(vertexProps<{ natural_id: string; verdict: string }>()),
+      },
+      { id: analysis },
+    );
+    const revises = lineage[0];
+    if (!revises) return { analysis, changed: [], restated: [], stillStanding: [] };
+
+    // Both bearings: a finding that challenges a claim is superseded exactly as
+    // one that supports it, and reading one is silent.
+    const changed: RevisedFinding[] = [];
+    const restated: ConcludedClaim[] = [];
+    const supersededClaims = new Set<string>();
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
+         MATCH (e)-[:${bearing}]->(now:Claim)
+         MATCH (now)<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(was:Claim)
+         MATCH (before:Evidence)-[:${bearing}]->(was)
+         RETURN now, was, e, before`,
+        {
+          now: vertexProps<{ natural_id: string; name: string }>(),
+          was: vertexProps<{ natural_id: string }>(),
+          e: vertexProps<{ statement: string }>(),
+          before: vertexProps<{ statement: string }>(),
+        },
+        { id: analysis },
+      );
+      for (const row of rows) {
+        supersededClaims.add(row.was.natural_id);
+        // Same wording means the re-run reached the earlier answer again. It
+        // still supersedes -- the old claim is withdrawn -- but a reader asking
+        // what this revision changed wants the ones that moved.
+        if (row.before.statement === row.e.statement) {
+          restated.push({
+            claim: ref("claim", row.now.natural_id),
+            asserts: row.now.name,
+          });
+          continue;
+        }
+        changed.push({
+          proposition: row.now.name,
+          was: ref("claim", row.was.natural_id),
+          before: row.before.statement,
+          claim: ref("claim", row.now.natural_id),
+          after: row.e.statement,
+        });
+      }
+    }
+
+    // The superseded analysis's own conclusions. One this act did not name is
+    // still current -- the whole of a partial re-analysis.
+    const stillStanding: ConcludedClaim[] = [];
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
+         MATCH (e)-[:${bearing}]->(c:Claim)
+         RETURN c, e`,
+        {
+          c: vertexProps<{ natural_id: string; name: string }>(),
+          e: vertexProps<{ natural_id: string }>(),
+        },
+        { id: revises.old.natural_id },
+      );
+      for (const row of rows) {
+        if (supersededClaims.has(row.c.natural_id)) continue;
+        if (stillStanding.some((s) => s.claim === row.c.natural_id)) continue;
+        stillStanding.push({
+          claim: ref("claim", row.c.natural_id),
+          asserts: row.c.name,
+          finding: ref("evidence", row.e.natural_id),
+        });
+      }
+    }
+
+    return {
+      analysis,
+      supersedes: ref("analysis", revises.old.natural_id),
+      ...(revises.rev
+        ? {
+            because: {
+              review: ref("review", revises.rev.natural_id),
+              verdict: revises.rev.verdict,
+            },
+          }
+        : {}),
+      changed: changed.sort((a, b) => a.was.localeCompare(b.was)),
+      restated: restated.sort((a, b) => a.claim.localeCompare(b.claim)),
+      stillStanding: stillStanding.sort((a, b) => a.claim.localeCompare(b.claim)),
+    };
+  }
+
+  /**
    * "What is affected if this record is invalidated?" -- PJ-001's MVP
    * propagation query. Deliberately the affected side only; what is *not*
    * affected is reported by replaceAnalysis, because it depends on what the
@@ -2633,6 +2777,41 @@ function causeForCheck(c: CheckStatus): Cause {
 }
 
 /**
+ * The `Computation` case: what this analysis revised, and which findings moved.
+ *
+ * An analysis that revises nothing answers so. That is the ordinary case — most
+ * analyses are a first run — and reporting it as "revises nothing" is an
+ * answer, where a refusal would say the question does not apply.
+ */
+async function explainAnalysis(self: ReadSurface, subject: string): Promise<AnalysisExplanation> {
+  const analysis = ref("analysis", subject);
+  const report = await self.analysisRevision(analysis);
+  if (report.supersedes === undefined)
+    return { kind: "analysis", subject: analysis, is: "a first run", because: [], report };
+
+  const because: Cause[] = [];
+  if (report.because)
+    because.push({ handle: report.because.review, wording: report.because.verdict });
+  for (const c of report.changed)
+    because.push({ handle: c.was, wording: `${c.proposition}: ${c.before} → ${c.after}` });
+  for (const s of report.stillStanding)
+    because.push({ handle: s.claim, wording: `${s.asserts} — not revisited, still standing` });
+
+  const moved = report.changed.length;
+  const stood = report.stillStanding.length;
+  return {
+    kind: "analysis",
+    subject: analysis,
+    is:
+      stood === 0
+        ? `a revision of ${report.supersedes}`
+        : `a partial revision of ${report.supersedes}, ${moved} of ${moved + stood} findings`,
+    because,
+    report,
+  };
+}
+
+/**
  * The `Gate` case (#182): `gateStatus`, exhaustive over `GateStatus.state` —
  * the same four-way split `gateStateFrom` computes, worded rather than
  * coloured. `blocked` and `incomplete` both cite every condition not
@@ -2685,6 +2864,7 @@ const EXPLAINED = {
   work: explainWork,
   enquiry: explainEnquiry,
   gate: explainGate,
+  analysis: explainAnalysis,
 } satisfies Partial<Record<Kind, Explainer>>;
 
 const EXPLAINED_KINDS = Object.keys(EXPLAINED) as Kind[];
@@ -2729,7 +2909,6 @@ const REFUSED = {
   evaluation: refuseToExplain("evaluation"),
   review: refuseToExplain("review"),
   observations: refuseToExplain("observations"),
-  analysis: refuseToExplain("analysis"),
 } satisfies Record<UnexplainedKind, Explainer>;
 
 /**

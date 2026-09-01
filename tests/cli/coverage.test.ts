@@ -59,6 +59,7 @@ const NO_COMMAND_FOR: Readonly<Record<string, string>> = {
   // directly from src/mcp/tools.ts, so it keeps an MCP tool of its own.
   whySupported: "reached only through `why`, as the Claim case's body",
   enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",
+  analysisRevision: "reached only through `why`, as the Computation case's body",
 };
 
 test("the command modules were found at all", () => {
