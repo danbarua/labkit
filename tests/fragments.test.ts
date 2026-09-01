@@ -177,6 +177,7 @@ describe("a composition writes the record its moves describe", () => {
         ...trace.steps,
         {
           seq: 99,
+          at: "2026-08-28T09:00:00.000Z",
           operation: "pose",
           subject: "Q_9",
           created: [],

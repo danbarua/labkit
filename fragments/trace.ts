@@ -41,6 +41,8 @@ export interface DerivedItem {
 /** One act, and what it did to the graph. */
 export interface TraceStep {
   seq: number;
+  /** When the act was recorded — not necessarily when `seq` places it in the stream; see `--date` backfill. */
+  at: string;
   operation: string;
   /** What the act was *about* — often not what it created. */
   subject: string;
@@ -136,6 +138,7 @@ export async function traceOf(
       if (snapshot) previous = snapshot;
       return {
         seq,
+        at: e.at,
         operation: e.operation,
         subject: e.subject,
         created: e.created.map((handle) => ({

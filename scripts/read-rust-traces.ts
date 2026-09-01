@@ -40,6 +40,11 @@ function parseNdjson(name: string, text: string): Trace {
     const parsed = JSON.parse(line) as RustTraceLine;
     return {
       seq: i + 1,
+      // No analogue on this side either: NDJSON has no timestamp per line.
+      // Synthesised strictly increasing with line position, one second apart,
+      // so the Explorer's time-based z-axis renders this exactly as its
+      // seq-based one did — there is no real elapsed time to place it by.
+      at: new Date(i * 1000).toISOString(),
       operation: parsed.operation,
       subject: parsed.subject,
       created: parsed.created,
