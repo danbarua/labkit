@@ -31,6 +31,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -71,7 +72,7 @@ async function aDifference() {
     finding: "twelve points",
     contentHash: "sha256:control",
   });
-  const { analysis } = await session.recordAnalysis({
+  const { analysis } = await recordAnalysis(session, {
     enquiry,
     method: METHOD,
     from: [treated, control],

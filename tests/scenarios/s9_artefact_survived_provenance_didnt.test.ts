@@ -21,6 +21,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -100,7 +101,7 @@ async function aCachedConstructionWithOneUnrecordedPart() {
       })
     ).observations,
   ];
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "stage2-construction",
     from: parts,
@@ -172,7 +173,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       finding: "randomised control series, regenerated from an inferred algorithm",
       contentHash: "sha256:regenerated",
     });
-    const { analysis: downstream } = await session.recordAnalysis({
+    const { analysis: downstream } = await recordAnalysis(session, {
       enquiry,
       method: "stage2-construction, rebuilt",
       from: [regenerated],

@@ -14,20 +14,20 @@
  * rerunCheck → promoteFinding → closeOnEvidence`, and the LabKit Explorer
  * mockup hand-wrote that sequence eight times over.
  *
- * ## Why this is not in `tests/`
+ * ## Why this is not in `tests/`, and why a scenario may import it
  *
- * Because someone would import it into a scenario, and the paragraph above is
- * the reason not to. A fragment is for *building a record* — for a trace, a
- * demo, a seeded database. A scenario is a probe, and a probe that shares its
- * setup with another probe has stopped being independent.
+ * The fixture argument above is about shared **state**: two probes drawing on
+ * one graph stop being independent, which is why `openScenario().begin()` hands
+ * back an empty graph per `beforeEach`.
  *
- * ## Why it is not in `src/` either
+ * Importing a fragment is shared **code**, and that is the opposite case — a
+ * move used by twenty scenarios is the same shape as a fact used by two
+ * readers, so mutating it once turns twenty red together. That is wanted.
  *
- * Nothing here is domain code. Every fragment is a few calls on a
- * `WriteSurface` and returns the handles a later fragment needs — plain
- * TypeScript over the public API, adding no verbs and no ontology. If a
- * fragment ever needs something the surface cannot do, that is a finding about
- * the surface, not a reason to reach past it.
+ * So a fragment lives outside `tests/` because it is for **building a
+ * record**: a trace, a demo, a seeded database, and the acts a scenario
+ * performs before it asserts anything. What a scenario must not share is its
+ * graph.
  *
  * ## The shape, and why it is this dull
  *
@@ -48,17 +48,21 @@ import type {
   AnalysisRef,
   ClaimRef,
   ConcludedClaim,
+  Conclusion,
   CriterionRef,
   EnquiryRef,
   GateRef,
+  InputRef,
   ObservationsRef,
   QuestionRef,
   WorkRef,
+  ReviewRef,
+  ReplacementReport,
 } from "../src/domain/report";
-import type { WriteSurface } from "../src/domain";
+import type { ResearchWrites, ReplacementConclusion } from "../src/domain";
 
 /** Every fragment writes through the public surface and nothing else. */
-type W = WriteSurface;
+type W = ResearchWrites;
 
 /**
  * A question on the record, and a line of enquiry against it.
@@ -135,6 +139,47 @@ export async function gatedWork(
 }
 
 /**
+ * A run and every conclusion drawn from it, in one call.
+ *
+ * **This is where the array lives.** `recordAnalysis` on the surface records
+ * the run and takes no conclusions, because a conclusion is its own act. A
+ * caller that wants a run with its findings already on it wants a move rather
+ * than a primitive, which is what a fragment is.
+ *
+ * Named for the verb and taking the surface first, so a call site reads
+ * `recordAnalysis(session, x)`.
+ *
+ * The event stream is the same either way: one `recordAnalysis` and one
+ * `conclude` per conclusion, exactly what a person typing the two commands
+ * produces. See `TenantGraph.inMintScope`.
+ */
+export async function recordAnalysis(
+  w: W,
+  input: {
+    enquiry: EnquiryRef;
+    method: string;
+    from: InputRef[];
+    concludes: readonly Conclusion[];
+    heldTo?: CriterionRef[];
+    implementing?: WorkRef;
+  },
+): Promise<{ analysis: AnalysisRef; claims: ConcludedClaim[] }> {
+  const { analysis } = await w.recordAnalysis({
+    enquiry: input.enquiry,
+    method: input.method,
+    from: input.from,
+    ...(input.heldTo === undefined ? {} : { heldTo: input.heldTo }),
+    ...(input.implementing === undefined ? {} : { implementing: input.implementing }),
+  });
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) {
+    const drawn = await w.conclude({ analysis, ...c });
+    claims.push(...drawn.claims);
+  }
+  return { analysis, claims };
+}
+
+/**
  * Measurement, then a computation over it and what it concluded.
  *
  * The two together because that is one move for a researcher, and because an
@@ -158,15 +203,20 @@ export async function observeAndAnalyse(
     name: input.name,
     finding: input.finding,
   });
-  const recorded = await w.recordAnalysis({
+  const { analysis } = await w.recordAnalysis({
     enquiry: input.enquiry,
     method: input.method,
     from: [observations],
-    concludes: [...input.concludes],
     ...(input.heldTo === undefined ? {} : { heldTo: input.heldTo }),
     ...(input.implementing === undefined ? {} : { implementing: input.implementing }),
   });
-  return { observations, analysis: recorded.analysis, claims: recorded.claims };
+  // Looped here rather than delegating to the `recordAnalysis` fragment:
+  // **nothing in `fragments/` calls another fragment**, which is what lets
+  // `fragments/provenance.ts` keep the running fragment in a single global
+  // rather than a stack. See its header.
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) claims.push(...(await w.conclude({ analysis, ...c })).claims);
+  return { observations, analysis, claims };
 }
 
 /**
@@ -192,13 +242,18 @@ export async function negativeResult(
     name: input.name,
     finding: input.finding,
   });
-  const recorded = await w.recordAnalysis({
+  const { analysis } = await w.recordAnalysis({
     enquiry: input.enquiry,
     method: input.method,
     from: [observations],
-    concludes: [{ proposition: input.proposition, finding: input.finding, bearing: "challenges" }],
   });
-  return { observations, analysis: recorded.analysis, claims: recorded.claims };
+  const { claims } = await w.conclude({
+    analysis,
+    proposition: input.proposition,
+    finding: input.finding,
+    bearing: "challenges",
+  });
+  return { observations, analysis, claims };
 }
 
 /** A prespecified check, run and not held. */
@@ -277,7 +332,7 @@ export async function acceptUnresolved(
 }
 
 /** A review finds the method wrong, and a corrected analysis supersedes it. */
-export async function replaceAnalysis(
+export async function reviewAndReplace(
   w: W,
   input: {
     supersedes: AnalysisRef;
@@ -295,12 +350,59 @@ export async function replaceAnalysis(
   const report = await w.replaceAnalysis({
     supersedes: input.supersedes,
     because: review,
-    enquiry: input.enquiry,
     method: input.method,
     from: input.from,
-    concludes: [...input.concludes],
   });
-  return { replacement: report.replacement, claims: report.claims };
+  // **The array lives here, not on the verb.** `replaceAnalysis` records the
+  // replacement and the lineage; each finding it supersedes is its own act.
+  // `replacing` names the one it stands in for, so a conclusion the caller
+  // does not restate is not superseded.
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) {
+    const drawn = await w.conclude({ analysis: report.replacement, ...c });
+    claims.push(...drawn.claims);
+  }
+  return { replacement: report.replacement, claims };
+}
+
+/**
+ * A replacement and the findings it supersedes — the signature
+ * `WriteSurface.replaceAnalysis` had before its conclusions became acts of
+ * their own.
+ *
+ * `replacing` on each conclusion names the finding it stands in for; one the
+ * caller does not name is not superseded. Omitting it falls back to matching by
+ * proposition, which refuses an ambiguous match rather than picking.
+ *
+ * Distinct from {@link reviewAndReplace}, which mints the review as well — this
+ * takes one already on the record, as the verb does.
+ */
+export async function replaceAnalysis(
+  w: W,
+  input: {
+    supersedes: AnalysisRef;
+    because: ReviewRef;
+    enquiry: EnquiryRef;
+    method: string;
+    from: InputRef[];
+    concludes: readonly ReplacementConclusion[];
+  },
+): Promise<ReplacementReport & { claims: ConcludedClaim[] }> {
+  const report = await w.replaceAnalysis({
+    supersedes: input.supersedes,
+    because: input.because,
+    method: input.method,
+    from: input.from,
+  });
+  // Each conclusion names the finding it supersedes. One the caller does not
+  // name is not superseded, which is what lets a re-analysis address some of a
+  // run's conclusions and leave the rest standing.
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) {
+    const drawn = await w.conclude({ analysis: report.replacement, ...c });
+    claims.push(...drawn.claims);
+  }
+  return { ...report, claims };
 }
 
 /**

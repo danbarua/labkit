@@ -585,51 +585,30 @@ export interface ChangedConclusion {
  */
 export interface ReplacementReport {
   at: string;
-  /**
-   * The analysis this act brought into existence.
-   *
-   * The act recorded what it replaced and what that cost, and not what it
-   * produced — so the replacement was unreachable to the caller that had just
-   * created it. Row AB's shape for the fourth time, and the first where the
-   * omission blocks a scenario outright rather than degrading an answer: S-3c
-   * has to cite the corrected check to evaluate a criterion against it, and
-   * could not name it. The remedy is the smallest of the four, which is the
-   * point of the heuristic — it says look, not what to do.
-   */
+  /** The analysis this act brought into existence — what `conclude` is called on next. */
   replacement: AnalysisRef;
+  /** The lineage decision recording that `replacement` revises `supersedes`. */
+  decision: Ref<"decision">;
+  /** The analysis being revised, echoed so a caller holds both ends of the lineage. */
+  supersedes: AnalysisRef;
+  /** The conclusions carried forward, exactly as the caller named them. */
+  kept: ClaimRef[];
   /**
-   * The claims the replacement minted.
+   * The conclusions this act superseded — everything the revised analysis
+   * concluded that was not kept.
    *
-   * Same reason `recordAnalysis` returns its own (PJ-030): a replacement
-   * asserts its predecessor's propositions afresh, so after one there are two
-   * claims saying each sentence and a caller holding only the analysis has no
-   * way to name either. The sixth time CLAUDE.md's *"does the act record what
-   * it produced?"* has caught something.
+   * Returned because it is what the caller most needs to check and cannot have
+   * predicted: it is the complement of what they typed, over a set they may not
+   * have had in front of them.
    */
-  claims: ConcludedClaim[];
+  superseded: ConcludedClaim[];
   /**
-   * The claims whose support ran through the replaced analysis — enumerable,
-   * not "everything downstream". These are the **superseded** records: each is
-   * withdrawn by this act, and the replacement's claim asserting the same
-   * sentence is in `claims`.
-   */
-  affected: ConcludedClaim[];
-  /** Still valid, and still cited by the replacement. */
-  unaffected: UnaffectedRecord[];
-  changed: ChangedConclusion[];
-  /**
-   * The **replacement's** claims whose supporting finding is the same as
-   * before. Deliberately the new records and not the superseded ones: every
-   * claim in `affected` is withdrawn by this act, so naming those here would
-   * report a withdrawn record as unchanged.
-   */
-  unchanged: ConcludedClaim[];
-  /**
-   * The event this act recorded — `events[0].created` names the replacement's
-   * own output artefact, which is the handle #161 first added a dedicated
-   * `artefact` field for and then withdrew once this existed.
-   * `outputArtefactOf()` still earns its keep here: it resolves the
-   * *superseded* analysis's artefact, which no event of this act can name.
+   * The event this act recorded.
+   *
+   * **What it does not carry is the point.** This act mints an analysis and a
+   * lineage decision; the successor's own findings arrive afterwards, one
+   * `conclude` at a time. What the revision changed is therefore spread across
+   * those calls and is read back with `why <analysis>`.
    */
   events: DomainEvent[];
 }
@@ -1729,7 +1708,78 @@ export interface GateExplanation {
   because: Cause[];
   report: GateStatus;
 }
-export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation | GateExplanation;
+export interface AnalysisExplanation {
+  kind: "analysis";
+  subject: AnalysisRef;
+  is: string;
+  because: Cause[];
+  report: AnalysisRevision;
+}
+export type Explanation =
+  | ClaimExplanation
+  | WorkExplanation
+  | EnquiryExplanation
+  | GateExplanation
+  | AnalysisExplanation;
+
+/**
+ * What an analysis revised, and which of the earlier findings actually moved.
+ *
+ * **Read, not returned.** Conclusions arrive one act at a time, so what a
+ * replacement changed is spread across N calls and no single act holds it. It
+ * is answered from the record: the lineage decision says which analysis this
+ * one revises and on which review, and the per-finding decisions say which
+ * findings were superseded and by what.
+ *
+ * `supersedes` and `because` are absent for an analysis that revises nothing,
+ * which is the ordinary case and an honest answer rather than a refusal.
+ */
+export interface AnalysisRevision {
+  analysis: AnalysisRef;
+  supersedes?: AnalysisRef;
+  because?: { review: ReviewRef; verdict: string };
+  /**
+   * Superseded findings whose wording actually moved — the re-analysis reached
+   * a different answer.
+   */
+  changed: RevisedFinding[];
+  /**
+   * Superseded findings the re-analysis reached again unchanged.
+   *
+   * Separate from {@link changed} because they answer different questions. A
+   * re-run that confirms five of six results and moves one has done something
+   * quite unlike one that moved all six, and a single "superseded" count
+   * cannot tell a reader which happened. These are the **replacement's**
+   * claims: the ones they supersede are withdrawn.
+   */
+  restated: ConcludedClaim[];
+  /**
+   * Conclusions the revision carried forward, and which still stand.
+   *
+   * They keep their original evidence, so asking why one holds answers with the
+   * superseded analysis's own output — that is where the number came from.
+   */
+  kept: ConcludedClaim[];
+  /**
+   * Superseded findings with no successor this read could identify.
+   *
+   * **It never guesses.** New conclusions are paired to superseded ones by
+   * proposition, and an analysis may assert the same sentence twice about
+   * different endpoints — so where the match is ambiguous, or where nothing
+   * new asserts the sentence at all, the finding is reported here rather than
+   * paired with an arbitrary one.
+   */
+  unpaired: ConcludedClaim[];
+}
+
+/** One superseded finding and the one standing in its place. */
+export interface RevisedFinding {
+  proposition: string;
+  was: ClaimRef;
+  before: string;
+  claim: ClaimRef;
+  after: string;
+}
 
 /**
  * "What am I blocked on right now, what are my priorities?" Literally the

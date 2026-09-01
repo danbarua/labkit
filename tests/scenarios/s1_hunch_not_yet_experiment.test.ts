@@ -29,6 +29,7 @@ import {
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -79,7 +80,7 @@ async function priorState() {
     name: "curvature sweep readings",
     finding: "response departs from the linear fit across the sweep",
   });
-  const { claims: nlAnalysisClaims } = await session.recordAnalysis({
+  const { claims: nlAnalysisClaims } = await recordAnalysis(session, {
     enquiry: nlEnquiry,
     method: "curvature-fit",
     from: [nlObs],
@@ -118,7 +119,7 @@ async function priorState() {
     name: "response-map readings",
     finding: "response map recorded for eight input families",
   });
-  await session.recordAnalysis({
+  await recordAnalysis(session, {
     enquiry: smearEnquiry,
     method: "response-map-inspection",
     from: [smearObs],
@@ -296,7 +297,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
       name: "seed-controlled response maps",
       finding: "response maps recorded with initial conditions held fixed",
     });
-    await session.recordAnalysis({
+    await recordAnalysis(session, {
       enquiry: prior.smearEnquiry,
       method: "seed-controlled-inspection",
       from: [lateObs],

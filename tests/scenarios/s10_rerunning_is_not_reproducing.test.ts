@@ -21,6 +21,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -68,7 +69,7 @@ async function aHistoricalResultWithNoRecordedInputs() {
   const { enquiry } = await session.openEnquiry(
     "does the annealed protocol converge below tolerance?",
   );
-  const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
+  const { analysis: historical, claims: historicalClaims } = await recordAnalysis(session, {
     enquiry,
     method: "annealing-v1",
     from: [],
@@ -104,7 +105,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    await session.recordAnalysis({
+    await recordAnalysis(session, {
       enquiry,
       method: "annealing-v1, re-run",
       from: [conditions],
@@ -282,7 +283,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const { analysis: first } = await session.recordAnalysis({
+    const { analysis: first } = await recordAnalysis(session, {
       enquiry,
       method: "annealing-v1",
       from: [conditions],
@@ -329,7 +330,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "initial conditions",
       finding: "seed 91, tolerance 1e-3, 64 steps",
     });
-    const { analysis: historical } = await session.recordAnalysis({
+    const { analysis: historical } = await recordAnalysis(session, {
       enquiry,
       method: "annealing-v1",
       from: [theirs],
@@ -414,7 +415,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "conditions B",
       finding: "warm start",
     });
-    const { analysis: historical } = await session.recordAnalysis({
+    const { analysis: historical } = await recordAnalysis(session, {
       enquiry,
       method: "annealing-v1",
       from: [a, b],
@@ -446,7 +447,7 @@ describe("S-10: rerunning is not reproducing", () => {
     const { enquiry } = await session.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const { analysis: historical } = await session.recordAnalysis({
+    const { analysis: historical } = await recordAnalysis(session, {
       enquiry,
       method: "annealing-v1",
       from: [],
@@ -497,7 +498,7 @@ describe("S-10: rerunning is not reproducing", () => {
       name: "original conditions",
       finding: "seed 1",
     });
-    const { analysis: historical, claims: historicalClaims } = await session.recordAnalysis({
+    const { analysis: historical, claims: historicalClaims } = await recordAnalysis(session, {
       enquiry,
       method: "annealing-v1",
       from: [original],

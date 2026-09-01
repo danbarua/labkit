@@ -31,6 +31,7 @@ import {
 } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -89,7 +90,7 @@ async function aResultHeldToARobustnessCheck() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -110,7 +111,7 @@ async function theCheckIsRun(
   method: string,
   concludes: { proposition: string; finding: string },
 ) {
-  return await session.recordAnalysis({
+  return await recordAnalysis(session, {
     enquiry,
     method,
     from: [observations],
@@ -220,7 +221,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    const _corrected = await session.replaceAnalysis({
+    const _corrected = await replaceAnalysis(session, {
       supersedes: defective,
       because: review,
       enquiry,
@@ -300,7 +301,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    const _corrected = await session.replaceAnalysis({
+    const _corrected = await replaceAnalysis(session, {
       supersedes: defective,
       because: review,
       enquiry,
@@ -382,7 +383,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: failed,
       verdict: "the aggregation dropped the last fold",
     });
-    await session.replaceAnalysis({
+    await replaceAnalysis(session, {
       supersedes: failed,
       because: review,
       enquiry,
@@ -432,7 +433,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: unrelated,
       verdict: "the aggregation dropped the last fold",
     });
-    await session.replaceAnalysis({
+    await replaceAnalysis(session, {
       supersedes: unrelated,
       because: review,
       enquiry,
@@ -480,7 +481,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    await session.replaceAnalysis({
+    await replaceAnalysis(session, {
       supersedes: defective,
       because: review,
       enquiry,
@@ -556,7 +557,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       verdict: "the aggregation dropped the last fold",
     });
     await expect(
-      session.replaceAnalysis({
+      replaceAnalysis(session, {
         supersedes: defective,
         because: review,
         enquiry,
@@ -623,7 +624,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       of: passing,
       verdict: "the aggregation dropped the last fold",
     });
-    await session.replaceAnalysis({
+    await replaceAnalysis(session, {
       supersedes: passing,
       because: review,
       enquiry,

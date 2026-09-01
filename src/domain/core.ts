@@ -49,6 +49,7 @@ import type {
   ReplacementClaim,
   DecidedQuestion,
   GatedWork,
+  Ref,
 } from "./report";
 import { ref } from "./report";
 
@@ -247,7 +248,7 @@ export class SessionCore {
   protected async withdrawalOf(scope: {
     proposition: IndexedString;
     enquiry?: EnquiryRef;
-  }): Promise<{ withdrawn: boolean; replacedBy?: ReplacementClaim }> {
+  }): Promise<{ withdrawn: boolean; by?: Ref<"decision">; replacedBy?: ReplacementClaim }> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
@@ -293,8 +294,18 @@ export class SessionCore {
     // in the field that says what the record asserts instead (PJ-030 §7).
     const now =
       rows.find((r) => r.insteadof)?.insteadof ?? rows.find((r) => r.successor)?.successor;
+    // **Which decision withdrew it**, so a caller can tell its own act's
+    // withdrawal from somebody else's. Only meaningful when exactly one
+    // decision is responsible; with several the answer is that more than one
+    // was, which no single id can say, so it is absent.
+    const deciding = [
+      ...new Set(
+        rows.flatMap((r) => [r.narrowed?.natural_id, r.replaced?.natural_id]).filter(Boolean),
+      ),
+    ];
     return {
       withdrawn: true,
+      ...(deciding.length === 1 ? { by: ref("decision", deciding[0] as string) } : {}),
       ...(now
         ? {
             replacedBy: {

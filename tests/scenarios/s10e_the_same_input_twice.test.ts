@@ -27,6 +27,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -62,7 +63,7 @@ describe("S-10e — the same record, read twice by one run", () => {
     });
 
     // The null test: the same series on both sides of a difference.
-    const { analysis } = await session.recordAnalysis({
+    const { analysis } = await recordAnalysis(session, {
       enquiry,
       method: "difference of the two series",
       from: [series, series],
@@ -100,7 +101,7 @@ describe("S-10e — the same record, read twice by one run", () => {
       finding: "twelve points",
     });
 
-    const { analysis } = await session.recordAnalysis({
+    const { analysis } = await recordAnalysis(session, {
       enquiry,
       method: "a minus b plus a",
       from: [a, b, a],

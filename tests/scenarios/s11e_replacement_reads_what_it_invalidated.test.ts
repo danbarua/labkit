@@ -25,6 +25,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -49,6 +50,11 @@ afterEach(async () => {
 
 const PROP = "the treatment shortens recovery";
 
+/** A second reader over the same graph, for the afterward half of each answer. */
+async function afterwards(): Promise<ResearchSession> {
+  return new ResearchSession(await scenario.current(), { clock, events: inMemoryEventLog() });
+}
+
 /** An analysis, reviewed as defective — everything a replacement needs. */
 async function aDefectiveAnalysis() {
   const { enquiry } = await session.openEnquiry("does the treatment shorten recovery?");
@@ -57,7 +63,7 @@ async function aDefectiveAnalysis() {
     name: "recovery times",
     finding: "sixty patients, two arms",
   });
-  const { analysis, claims } = await session.recordAnalysis({
+  const { analysis, claims } = await recordAnalysis(session, {
     enquiry,
     method: "unadjusted comparison",
     from: [observations],
@@ -80,7 +86,7 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
   test("the report says what the input actually is, rather than asserting it survived", async () => {
     const { enquiry, analysis, review } = await aDefectiveAnalysis();
 
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -90,19 +96,21 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
       concludes: [{ proposition: PROP, finding: "one day shorter, adjusted" }],
     });
 
-    // `why` was the fixed sentence "not produced by the replaced analysis",
-    // which is the opposite of true here: this artefact was produced by it and
-    // retracted by this very call. The entry stays in the list — the
-    // replacement really does rest on it — and says so.
-    expect(report.unaffected).toHaveLength(1);
-    expect(report.unaffected[0]!.what).toEqual(analysis);
-    expect(report.unaffected[0]!.invalidated).toBe(true);
-    expect(report.unaffected[0]!.why).not.toContain("not produced by the replaced analysis");
+    // The replacement really does rest on it, and the record says the record it
+    // rests on has been retracted — every finding in it superseded by this very
+    // act. Read from the claim, because that is where a reader arrives.
+    const resting = (await (await afterwards()).whySupported(report.claims[0]!.claim)).restingOn;
+    // **Two inputs, and that is the add-only rule.** The successor inherits
+    // what its predecessor read, and consumes the predecessor's own output
+    // besides, because this call named it. Only the second is retracted:
+    // every finding in it fell when the revision was recorded.
+    expect(resting).toHaveLength(2);
+    expect(resting.filter((r) => r.invalidated)).toHaveLength(1);
 
     // An ordinary input is unchanged, so the flag is a discriminator and not a
     // relabelling of every row.
     const clean = await aDefectiveAnalysis();
-    const ordinary = await session.replaceAnalysis({
+    const ordinary = await replaceAnalysis(session, {
       supersedes: clean.analysis,
       because: clean.review,
       enquiry: clean.enquiry,
@@ -110,13 +118,14 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
       from: [clean.observations],
       concludes: [{ proposition: PROP, finding: "one day shorter, adjusted" }],
     });
-    expect(ordinary.unaffected[0]!.invalidated).toBeUndefined();
-    expect(ordinary.unaffected[0]!.why).toContain("not produced by the replaced analysis");
+    const ordinaryResting = (await (await afterwards()).whySupported(ordinary.claims[0]!.claim))
+      .restingOn;
+    expect(ordinaryResting[0]!.invalidated).toBeUndefined();
   });
 
   test("the replacement's conclusion does not stand on a retracted record", async () => {
     const { enquiry, analysis, review } = await aDefectiveAnalysis();
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -137,13 +146,14 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // What was missing is the half that makes the doctrine honest — the reader
     // could not see, from this answer, that the sole input had been retracted.
     expect(why.supported).toBe(true);
-    expect(why.restingOn).toHaveLength(1);
-    expect(why.restingOn[0]!.invalidated).toBe(true);
+    expect(why.restingOn).toHaveLength(2);
+    expect(why.restingOn.filter((r) => r.invalidated)).toHaveLength(1);
 
     // And the enumerable route actually reaches this claim, which is what
     // "not automatic" is relying on. If it did not, `supported: true` would be
     // a wrong answer with no way to find out.
-    const affected = await later.whatDependsOn(why.restingOn[0]!.part);
+    const retracted = why.restingOn.find((r) => r.invalidated)!;
+    const affected = await later.whatDependsOn(retracted.part);
     expect(affected.claims.map((c) => c.claim)).toContain(report.claims[0]!.claim);
   });
 });

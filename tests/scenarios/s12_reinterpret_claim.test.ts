@@ -21,6 +21,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { claimNamed } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -64,7 +65,7 @@ async function assertedTwice() {
     name: "attenuation readings, cohort A",
     finding: "signal amplitude before and after encoding, both signal types, cohort A",
   });
-  const { analysis: first, claims: firstClaims } = await session.recordAnalysis({
+  const { analysis: first, claims: firstClaims } = await recordAnalysis(session, {
     enquiry,
     method: "attenuation-ratio",
     from: [firstReadings],
@@ -81,7 +82,7 @@ async function assertedTwice() {
     name: "attenuation readings, cohort B",
     finding: "signal amplitude before and after encoding, both signal types, cohort B",
   });
-  const { analysis: second, claims: secondClaims } = await session.recordAnalysis({
+  const { analysis: second, claims: secondClaims } = await recordAnalysis(session, {
     enquiry,
     method: "attenuation-ratio",
     from: [secondReadings],
@@ -322,7 +323,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       name: "attenuation readings, cohort C",
       finding: "signal amplitude before and after encoding, cohort C",
     });
-    await session.recordAnalysis({
+    await recordAnalysis(session, {
       enquiry: programme.enquiry,
       method: "attenuation-ratio",
       from: [contrary],
@@ -375,7 +376,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       finding: "signal amplitude before and after encoding, cohort D",
     });
     await expect(
-      session.recordAnalysis({
+      recordAnalysis(session, {
         enquiry: programme.enquiry,
         method: "attenuation-ratio",
         from: [moreReadings],

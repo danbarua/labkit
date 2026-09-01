@@ -21,6 +21,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -93,7 +94,7 @@ async function lockedProgramme() {
     name: "held-out comparison readings",
     finding: "evolved and rewired conditions measured on the held-out split",
   });
-  const { analysis: confirmatory } = await session.recordAnalysis({
+  const { analysis: confirmatory } = await recordAnalysis(session, {
     enquiry,
     method: "prespecified-comparison",
     implementing: confirmatoryWork,
@@ -129,7 +130,7 @@ async function diagnose(
     name: "non-convergence traces",
     finding: "solver hits the iteration cap on 9 of 10 sweeps",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "convergence-diagnosis",
     implementing: work,

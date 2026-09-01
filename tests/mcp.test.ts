@@ -51,6 +51,7 @@ import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { NOT_EXPOSED, publicVerbsOf, verbsCalledOn } from "./helpers/surface-coverage";
 import { claimNamed, claimOf } from "./helpers/claims";
+import { recordAnalysis } from "../fragments";
 
 /**
  * A handle out of a tool's reply.
@@ -497,16 +498,8 @@ describe("an agent can track work through the tools alone", () => {
       });
 
       // The handle comes back as the caller named it -- an analysis, not an
-      // artefact relabelled "observations" -- and `named` is the output's own
-      // name, which needed the same dereference the CONSUMES edge needs.
-      const unaffected = report.unaffected as Array<{
-        what: string;
-        named: string;
-        why: string;
-      }>;
-      expect(unaffected).toHaveLength(1);
-      expect(unaffected[0]!.what).toEqual(stageOne);
-      expect(unaffected[0]!.named).toBe("calibrate output");
+      // artefact relabelled "observations".
+      expect(report.supersedes).toEqual(trend.analysis as string);
 
       // The observations branch of the same field, which had never been
       // asserted either and was returning its id too.
@@ -527,7 +520,7 @@ describe("an agent can track work through the tools alone", () => {
         replacing: await claimIdFor(c, "the series is calibrated"),
         finding: "offset removed, current table",
       });
-      expect((other.unaffected as Array<{ named: string }>)[0]!.named).toBe("raw series");
+      expect(other.supersedes).toEqual(calibration.analysis as string);
 
       // And the same id is accepted by the third verb, which also took
       // observations alone.
@@ -689,7 +682,7 @@ describe("behaviour — the same answers, over the wire", () => {
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     });
-    const { analysis, claims: analysisClaims } = await s.recordAnalysis({
+    const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
       enquiry,
       method: "paired comparison",
       from: [observations],

@@ -16,6 +16,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -67,7 +68,7 @@ async function anAnalysisComparingBothControls(s: ResearchSession) {
     finding: "regenerated from an inferred algorithm",
     contentHash: "sha256:regen",
   });
-  const { analysis: comparison } = await s.recordAnalysis({
+  const { analysis: comparison } = await recordAnalysis(s, {
     enquiry,
     method: "compare-controls",
     from: [original, regenerated],
@@ -114,7 +115,7 @@ describe("S-9c: two parts, one name", () => {
       name: NAME,
       finding: "a third copy, no hash recorded",
     });
-    const { analysis } = await session.recordAnalysis({
+    const { analysis } = await recordAnalysis(session, {
       enquiry,
       method: "second-look",
       from: [noHash],

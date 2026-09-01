@@ -20,6 +20,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -71,7 +72,7 @@ async function twoStages() {
     name: "mapping-strength readings across constructions",
     finding: "mapping strength measured for five graph constructions",
   });
-  const { analysis: earlier, claims: earlierClaims } = await session.recordAnalysis({
+  const { analysis: earlier, claims: earlierClaims } = await recordAnalysis(session, {
     enquiry: internalWork,
     method: "mapping-strength-comparison",
     from: [internalReadings],
@@ -93,7 +94,7 @@ async function twoStages() {
     name: "downstream classification readings",
     finding: "held-out classification accuracy measured for the same five constructions",
   });
-  const { analysis: later, claims: laterClaims } = await session.recordAnalysis({
+  const { analysis: later, claims: laterClaims } = await recordAnalysis(session, {
     enquiry: externalWork,
     method: "downstream-classification",
     from: [externalReadings],
@@ -190,7 +191,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "mapping-strength readings, wider construction set",
       finding: "mapping strength measured for twelve graph constructions",
     });
-    const { claims: dissentingClaims } = await session.recordAnalysis({
+    const { claims: dissentingClaims } = await recordAnalysis(session, {
       enquiry: programme.internalWork,
       method: "mapping-strength-comparison",
       from: [rerun],
@@ -281,7 +282,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured for the same five constructions",
     });
-    const { claims: settledClaims } = await session.recordAnalysis({
+    const { claims: settledClaims } = await recordAnalysis(session, {
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
@@ -344,7 +345,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "reconstruction-error readings",
       finding: "reconstruction error measured across constructions",
     });
-    const { claims: freshClaims } = await session.recordAnalysis({
+    const { claims: freshClaims } = await recordAnalysis(session, {
       enquiry: work,
       method: "reconstruction-error-comparison",
       from: [readings],
@@ -434,7 +435,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       name: "curvature readings",
       finding: "response measured across the sweep",
     });
-    await session.recordAnalysis({
+    await recordAnalysis(session, {
       enquiry: work,
       method: "curvature-fit",
       from: [readings],

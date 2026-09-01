@@ -21,6 +21,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf, whyOf } from "../helpers/claims";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -73,7 +74,7 @@ async function aFindingHeldToAgreedChecks() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -228,7 +229,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
     });
-    await session.recordAnalysis({
+    await recordAnalysis(session, {
       enquiry,
       method: "holm-pairwise",
       from: [observations],
@@ -285,7 +286,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       of: analysis,
       verdict: "the aggregation was the wrong one",
     });
-    const replacement = await session.replaceAnalysis({
+    const replacement = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -328,7 +329,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       name: "held-out results",
       finding: "per-image accuracy, held-out split",
     });
-    const { claims: otherAnalysisClaims } = await session.recordAnalysis({
+    const { claims: otherAnalysisClaims } = await recordAnalysis(session, {
       enquiry: other,
       method: "holm-pairwise",
       from: [otherObservations],

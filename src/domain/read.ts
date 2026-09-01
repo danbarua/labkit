@@ -76,6 +76,10 @@ import type {
   EnquiryExplanation,
   GateExplanation,
   Standing,
+  AnalysisRevision,
+  RevisedFinding,
+  AnalysisExplanation,
+  Ref,
 } from "./report";
 import { ref, isRefOfKind, KIND_BY_LABEL, kindOf } from "./report";
 import { compose, per, type Row } from "./facts";
@@ -106,6 +110,42 @@ type Identified = { natural_id: string };
 function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
   return [...new Map(items.map((item) => [id(item), item])).values()];
 }
+
+/**
+ * The read verbs a research session answers — the read half of
+ * {@link ResearchWrites}.
+ *
+ * Its whole job is the assertion in `./session.ts`: a `ResearchSession`
+ * composes a `ReadSurface` and delegates each verb by hand, so a verb added
+ * here without a delegate there is reachable from the CLI and MCP and from
+ * nowhere a scenario can call.
+ */
+export type ResearchReads = Pick<
+  ReadSurface,
+  | "analysisRevision"
+  | "claimsAsserting"
+  | "contractFor"
+  | "criteriaGoverning"
+  | "designHistory"
+  | "doTheseConflict"
+  | "enquiryInContext"
+  | "enquiryStatus"
+  | "gateList"
+  | "gateStatus"
+  | "interpretationHistory"
+  | "originOf"
+  | "pursuitsOf"
+  | "reproducibilityOf"
+  | "reproductionOf"
+  | "search"
+  | "whatDependsOn"
+  | "whatHappened"
+  | "whatIsKnown"
+  | "whatWasKnown"
+  | "why"
+  | "whySupported"
+  | "workList"
+>;
 
 /**
  * **What a refusal may point a caller at, and what it may not.**
@@ -1905,6 +1945,134 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
+   * What an analysis revised, and which findings moved — {@link AnalysisRevision}.
+   *
+   * Three reads, because they are three different questions about one act: the
+   * lineage decision (which analysis this revises, on which review), the
+   * per-finding decisions (old claim to new), and the superseded analysis's
+   * own conclusions (so the ones nothing named can be reported standing).
+   */
+  async analysisRevision(analysis: AnalysisRef): Promise<AnalysisRevision> {
+    const lineage = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
+       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
+       RETURN old, rev, d`,
+      {
+        old: vertexProps<{ natural_id: string }>(),
+        rev: optional(vertexProps<{ natural_id: string; verdict: string }>()),
+        d: vertexProps<{ natural_id: string }>(),
+      },
+      { id: analysis },
+    );
+    const revises = lineage[0];
+    if (!revises) return { analysis, changed: [], restated: [], kept: [], unpaired: [] };
+
+    // What the successor concluded, and what the revision superseded and kept.
+    // Both bearings throughout: a finding that challenges a claim is superseded
+    // and carried forward exactly as a supporting one is, and reading one side
+    // is silent.
+    const now = await this.conclusionsIn(analysis);
+    const decision = ref("decision", revises.d.natural_id);
+    const fell = await this.claimsFrom(decision, "SUPERSEDES");
+    const kept = await this.claimsFrom(decision, "KEEPS");
+
+    // **Paired by proposition, and only where the proposition is unique on both
+    // sides.** An analysis may assert the same sentence twice about different
+    // endpoints, so a wording match can name two; this is a description rather
+    // than an act and cannot refuse, so an ambiguous or absent match is
+    // reported unpaired instead of guessed.
+    const countBy = (cs: ConcludedClaim[], p: string) => cs.filter((c) => c.asserts === p).length;
+    const changed: RevisedFinding[] = [];
+    const restated: ConcludedClaim[] = [];
+    const unpaired: ConcludedClaim[] = [];
+    for (const was of fell) {
+      const successor =
+        countBy(fell, was.asserts) === 1 && countBy(now, was.asserts) === 1
+          ? now.find((c) => c.asserts === was.asserts)
+          : undefined;
+      if (!successor) {
+        unpaired.push({ claim: was.claim, asserts: was.asserts });
+        continue;
+      }
+      const before = await this.findingText(was.claim);
+      const after = await this.findingText(successor.claim);
+      if (before === after) restated.push({ claim: successor.claim, asserts: successor.asserts });
+      else
+        changed.push({
+          proposition: was.asserts,
+          was: was.claim,
+          before,
+          claim: successor.claim,
+          after,
+        });
+    }
+
+    const byClaim = (a: { claim: string }, b: { claim: string }) => a.claim.localeCompare(b.claim);
+    return {
+      analysis,
+      supersedes: ref("analysis", revises.old.natural_id),
+      ...(revises.rev
+        ? {
+            because: {
+              review: ref("review", revises.rev.natural_id),
+              verdict: revises.rev.verdict,
+            },
+          }
+        : {}),
+      changed: changed.sort((a, b) => a.was.localeCompare(b.was)),
+      restated: restated.sort(byClaim),
+      kept: kept.sort(byClaim),
+      unpaired: unpaired.sort(byClaim),
+    };
+  }
+
+  /** The claims an analysis concluded, both bearings. */
+  private async conclusionsIn(analysis: AnalysisRef): Promise<ConcludedClaim[]> {
+    const out: ConcludedClaim[] = [];
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
+         MATCH (e)-[:${bearing}]->(c:Claim)
+         RETURN c`,
+        { c: vertexProps<{ natural_id: string; name: string }>() },
+        { id: analysis },
+      );
+      for (const row of rows)
+        if (!out.some((o) => o.claim === row.c.natural_id))
+          out.push({ claim: ref("claim", row.c.natural_id), asserts: row.c.name });
+    }
+    return out;
+  }
+
+  /** The claims one decision points at over one edge. */
+  private async claimsFrom(
+    decision: Ref<"decision">,
+    edge: "SUPERSEDES" | "KEEPS",
+  ): Promise<ConcludedClaim[]> {
+    const rows = await this.graph.query(
+      `MATCH (:Decision {natural_id: $id})-[:${edge}]->(c:Claim)
+       RETURN c`,
+      { c: vertexProps<{ natural_id: string; name: string }>() },
+      { id: decision },
+    );
+    return rows.map((r) => ({ claim: ref("claim", r.c.natural_id), asserts: r.c.name }));
+  }
+
+  /** The wording of the finding bearing on a claim. */
+  private async findingText(claim: ClaimRef): Promise<Prose> {
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (e:Evidence)-[:${bearing}]->(:Claim {natural_id: $id})
+         RETURN e`,
+        { e: vertexProps<{ statement: string }>() },
+        { id: claim },
+      );
+      if (rows[0]) return rows[0].e.statement;
+    }
+    return "";
+  }
+
+  /**
    * "What is affected if this record is invalidated?" -- PJ-001's MVP
    * propagation query. Deliberately the affected side only; what is *not*
    * affected is reported by replaceAnalysis, because it depends on what the
@@ -2633,6 +2801,46 @@ function causeForCheck(c: CheckStatus): Cause {
 }
 
 /**
+ * The `Computation` case: what this analysis revised, and which findings moved.
+ *
+ * An analysis that revises nothing answers so. That is the ordinary case — most
+ * analyses are a first run — and reporting it as "revises nothing" is an
+ * answer, where a refusal would say the question does not apply.
+ */
+async function explainAnalysis(self: ReadSurface, subject: string): Promise<AnalysisExplanation> {
+  const analysis = ref("analysis", subject);
+  const report = await self.analysisRevision(analysis);
+  if (report.supersedes === undefined)
+    return { kind: "analysis", subject: analysis, is: "a first run", because: [], report };
+
+  const because: Cause[] = [];
+  if (report.because)
+    because.push({ handle: report.because.review, wording: report.because.verdict });
+  for (const c of report.changed)
+    because.push({ handle: c.was, wording: `${c.proposition}: ${c.before} → ${c.after}` });
+  for (const s of report.kept)
+    because.push({ handle: s.claim, wording: `${s.asserts} — kept, on its original evidence` });
+  for (const u of report.unpaired)
+    because.push({ handle: u.claim, wording: `${u.asserts} — superseded, no successor named` });
+
+  // **Every finding that fell, not just the reworded ones.** Counting only
+  // `changed` loses the restated and the unpaired, so a revision that moved one
+  // of two could report "0 of 1" while `because` listed both.
+  const fell = report.changed.length + report.restated.length + report.unpaired.length;
+  const stood = report.kept.length;
+  return {
+    kind: "analysis",
+    subject: analysis,
+    is:
+      stood === 0
+        ? `a revision of ${report.supersedes}`
+        : `a partial revision of ${report.supersedes}, ${fell} of ${fell + stood} findings`,
+    because,
+    report,
+  };
+}
+
+/**
  * The `Gate` case (#182): `gateStatus`, exhaustive over `GateStatus.state` —
  * the same four-way split `gateStateFrom` computes, worded rather than
  * coloured. `blocked` and `incomplete` both cite every condition not
@@ -2685,6 +2893,7 @@ const EXPLAINED = {
   work: explainWork,
   enquiry: explainEnquiry,
   gate: explainGate,
+  analysis: explainAnalysis,
 } satisfies Partial<Record<Kind, Explainer>>;
 
 const EXPLAINED_KINDS = Object.keys(EXPLAINED) as Kind[];
@@ -2729,7 +2938,6 @@ const REFUSED = {
   evaluation: refuseToExplain("evaluation"),
   review: refuseToExplain("review"),
   observations: refuseToExplain("observations"),
-  analysis: refuseToExplain("analysis"),
 } satisfies Record<UnexplainedKind, Explainer>;
 
 /**

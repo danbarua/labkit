@@ -55,6 +55,7 @@ import { sessionRegistry } from "../src/attribution";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
 import { ref } from "../src/domain/report";
+import { recordAnalysis } from "../fragments";
 
 /**
  * A handle out of a tool's reply.
@@ -139,7 +140,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
         name: "seed sweep readings",
         finding: "five seeds, consistent",
       });
-      const { claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await recordAnalysis(s, {
         enquiry: anasSweep,
         method: "paired comparison",
         from: [readings],
@@ -202,7 +203,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
         name: "width readings",
         finding: "it does",
       });
-      const { claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await recordAnalysis(s, {
         enquiry: worked,
         method: "sweep",
         from: [readings],
@@ -244,7 +245,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
         name: "raw readings",
         finding: "twelve runs",
       });
-      const { analysis } = await s.recordAnalysis({
+      const { analysis } = await recordAnalysis(s, {
         enquiry,
         method: "stage one",
         from: [observations],
@@ -290,13 +291,13 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
         name: "raw",
         finding: "f",
       });
-      const { analysis: stageOne } = await s.recordAnalysis({
+      const { analysis: stageOne } = await recordAnalysis(s, {
         enquiry,
         method: "stage one",
         from: [raw],
         concludes: [{ proposition: "p1", finding: "f1" }],
       });
-      const { analysis: viaAnalysis } = await s.recordAnalysis({
+      const { analysis: viaAnalysis } = await recordAnalysis(s, {
         enquiry,
         method: "stage two, by analysis ref",
         from: [stageOne],
@@ -308,7 +309,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
       expect(outputOfStageOne?.startsWith("ART_")).toBe(true);
 
-      const { analysis: viaArtefact } = await s.recordAnalysis({
+      const { analysis: viaArtefact } = await recordAnalysis(s, {
         enquiry,
         method: "stage two, by artefact id",
         from: [outputOfStageOne!],
@@ -360,7 +361,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       name: "sweep readings",
       finding: "five seeds, consistent",
     });
-    const { analysis, claims: analysisClaims } = await s.recordAnalysis({
+    const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -602,23 +603,22 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
       // Recording stage two on stage one was accepted all along.
       expect(String(stageOne).startsWith("COMP_")).toBe(true);
 
-      // Repairing it, on the same input, is now accepted too.
+      // Repairing it is now accepted too, and needs no `from` at all: the
+      // successor inherits what its predecessor read, which here is stage one
+      // by its COMP_ id.
       const repair = await call(client, "replace_analysis", {
         supersedes: stageTwo,
         because: id(review),
-        enquiry: id(enquiry),
         method: "stage two, corrected",
-        from: [stageOne],
       });
       expect(repair.failed).toBe(false);
-      await call(client, "conclude", {
+      expect(repair.body.supersedes).toEqual(stageTwo);
+      const corrected = await call(client, "conclude", {
         analysis: repair.body.replacement as string,
         replacing: p2,
         finding: "f2 corrected",
       });
-      // And the report names the input as the caller named it, rather than as
-      // an artefact relabelled "observations".
-      expect((repair.body.unaffected as Array<{ what: string }>)[0]!.what).toEqual(stageOne);
+      expect(corrected.failed).toBe(false);
 
       // The detour still works and is no longer the only route. It is what a
       // consumer had to do: ask why a claim was supported in order to learn

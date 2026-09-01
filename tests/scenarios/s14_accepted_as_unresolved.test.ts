@@ -19,6 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -70,7 +71,7 @@ async function aMarginalComparisonWithNothingLeftToRunIt() {
     name: "marginal split results",
     finding: "per-image accuracy on the marginal split",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "paired-comparison",
     from: [observations],
@@ -222,7 +223,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
       name: "external replication cohort",
       finding: "per-image accuracy, independent cohort",
     });
-    const { claims: settledClaims } = await session.recordAnalysis({
+    const { claims: settledClaims } = await recordAnalysis(session, {
       enquiry,
       method: "paired-comparison, external cohort",
       from: [fresh],

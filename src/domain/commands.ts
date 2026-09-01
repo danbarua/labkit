@@ -53,7 +53,13 @@ export interface RecordObservationsCommand {
   contentHash?: string;
 }
 
-/** `recordAnalysis` — the compound verb: a computation, its evidence unit, its output artefact, and one claim per conclusion. */
+/**
+ * `recordAnalysis` — a computation, its evidence unit, and its output artefact.
+ *
+ * **It takes no conclusions.** A conclusion is its own act, recorded by
+ * `conclude`. A run with its findings already on it, in one call, is
+ * `fragments/index.ts`'s `recordAnalysis` — same name, surface first.
+ */
 export interface RecordAnalysisCommand {
   enquiry: EnquiryRef;
   method: string;
@@ -71,7 +77,6 @@ export interface RecordAnalysisCommand {
    * same type.
    */
   from: InputRef[];
-  concludes: Conclusion[];
   /**
    * The planned work this analysis carries out, if it carries out any.
    *
@@ -231,36 +236,70 @@ export interface ConcludeCommand {
  */
 export interface ReplacementConclusion extends Conclusion {
   /**
-   * The earlier finding this one stands in for.
+   * The earlier finding this one stands in for, when the caller wants to say.
    *
-   * **Inferred by proposition when absent**, which covers the ordinary re-run —
-   * the same claim, re-derived — so most callers never write this. Name it when
-   * the correction *reverses* its predecessor: the two then assert different
-   * propositions and there is no wording to match on.
-   *
-   * Two things the inference will not do:
-   *
-   * - **It is composition-only.** `conclude` never matches on wording, because
-   *   there the proposition is the caller's own sentence and matching it would
-   *   guess at another caller's words. Only `replaceAnalysis`, handed a whole
-   *   list to pair against another whole list, infers.
-   * - **An ambiguous match is refused, not picked.** Two conclusions of one
-   *   analysis may assert the same sentence about different endpoints, so a
-   *   wording match can name two; `replaceAnalysis` then refuses and asks for
-   *   this field rather than taking the first.
+   * **Optional, and never inferred at write time.** After `keep`, supersession
+   * has already happened — every conclusion not kept fell when the revision was
+   * recorded — so a new conclusion needs no pairing to be correct. Naming one
+   * is how a caller states which finding this stands in place of, for a reader
+   * that would otherwise have to match on wording.
    */
   replacing?: ClaimRef | EvidenceRef;
 }
 
-/** `replaceAnalysis` — supersede a defective analysis, invalidating its output and withdrawing what cited it. */
+/**
+ * `keep` — revise an analysis by naming the conclusions that survive.
+ *
+ * The inverse of naming each finding superseded, and the safer default: a
+ * caller who forgets an entry supersedes something that is still true, which a
+ * reader sees, rather than leaving something stale standing, which reads as
+ * current.
+ *
+ * Every other conclusion of the analysis those claims came from is superseded
+ * at this moment. The successor's own findings are recorded afterwards with
+ * `conclude`.
+ */
+export interface KeepCommand {
+  /**
+   * The conclusions that survive the revision.
+   *
+   * They must come from **one** analysis — that is what identifies the analysis
+   * being revised, so claims spanning two are refused rather than resolved to
+   * whichever came first. May be empty only through `replaceAnalysis`, which is
+   * the nothing-kept case said out loud.
+   */
+  keeping: ClaimRef[];
+  /** The review that found the analysis wanting. */
+  because: ReviewRef;
+  /** What the revision did differently. */
+  method: string;
+  /**
+   * Inputs the successor read **in addition to** the superseded analysis's own.
+   *
+   * Add-only: a revision reads what its predecessor read unless it says
+   * otherwise, so re-listing them is work a caller should not have to do.
+   */
+  from?: InputRef[];
+}
+
+/**
+ * `replaceAnalysis` — record a corrected analysis in place of a defective one,
+ * and the lineage between them.
+ *
+ * **It takes no conclusions.** The replacement's findings are recorded with
+ * `conclude`, one at a time, each naming the finding it supersedes; one the
+ * caller does not name goes on standing. A run with its findings already on it
+ * is a fragment — see `fragments/index.ts`.
+ */
 export interface ReplaceAnalysisCommand {
   supersedes: AnalysisRef;
   because: ReviewRef;
-  enquiry: EnquiryRef;
   method: string;
-  /** What the replacement read. {@link InputRef} — an earlier analysis's output counts. */
-  from: InputRef[];
-  concludes: ReplacementConclusion[];
+  /**
+   * Inputs the replacement read **in addition to** the superseded analysis's
+   * own. Add-only, as {@link KeepCommand.from} is.
+   */
+  from?: InputRef[];
 }
 
 /** `reinterpret` — narrow what a claim is taken to mean, without re-running anything. */

@@ -521,6 +521,26 @@ const explanationCause: z.ZodType<Cause> = z.strictObject({
   when: z.string().optional(),
 });
 
+/** One superseded finding and the one standing in its place. */
+const revisedFinding = z.strictObject({
+  proposition: z.string(),
+  was: ref("claim"),
+  before: z.string(),
+  claim: ref("claim"),
+  after: z.string(),
+});
+
+/** What an analysis revised — `supersedes` absent when it revises nothing. */
+const analysisRevisionSchema = z.strictObject({
+  analysis: ref("analysis"),
+  supersedes: ref("analysis").optional(),
+  because: z.strictObject({ review: ref("review"), verdict: z.string() }).optional(),
+  changed: z.array(revisedFinding),
+  restated: z.array(concludedClaim),
+  kept: z.array(concludedClaim),
+  unpaired: z.array(concludedClaim),
+});
+
 /**
  * `why` — a discriminated union on `kind`, not one shape with optional
  * fields: `report` differs by kind (`SupportExplanation` for a claim,
@@ -560,6 +580,13 @@ export const explanationSchema = z.discriminatedUnion("kind", [
     is: z.string(),
     because: z.array(explanationCause),
     report: gateStatusSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("analysis"),
+    subject: ref("analysis"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: analysisRevisionSchema,
   }),
 ]);
 
@@ -740,11 +767,10 @@ export const amendmentReportSchema = z.strictObject({
 export const replacementReportSchema = z.strictObject({
   at: z.string(),
   replacement: ref("analysis"),
-  claims: z.array(concludedClaim),
-  affected: z.array(concludedClaim),
-  unaffected: z.array(unaffectedRecord),
-  changed: z.array(changedConclusion),
-  unchanged: z.array(concludedClaim),
+  decision: ref("decision"),
+  supersedes: ref("analysis"),
+  kept: z.array(ref("claim")),
+  superseded: z.array(concludedClaim),
   events: z.array(domainEventSchema),
 });
 

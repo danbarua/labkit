@@ -33,6 +33,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -77,7 +78,7 @@ async function aPromotedAnswerNobodyChecked() {
     name: "8k-step run logs",
     finding: "loss plateaus at 4.1 by step 6k",
   });
-  const { claims } = await session.recordAnalysis({
+  const { claims } = await recordAnalysis(session, {
     enquiry,
     method: "8k-step ablation",
     from: [observations],
@@ -188,7 +189,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
       name: "8k-step run logs",
       finding: "loss plateaus at 4.1 by step 6k",
     });
-    const { claims } = await session.recordAnalysis({
+    const { claims } = await recordAnalysis(session, {
       enquiry,
       method: "8k-step ablation",
       from: [observations],

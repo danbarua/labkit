@@ -17,6 +17,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, whyOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -246,7 +247,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
     });
-    const { analysis } = await session.recordAnalysis({
+    const { analysis } = await recordAnalysis(session, {
       enquiry,
       method: "holm-pairwise",
       from: [observations],

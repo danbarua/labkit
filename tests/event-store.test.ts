@@ -17,6 +17,7 @@ import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, UNATTRIBUTED, inMemoryEventLog, type Clock } from "../src/domain";
 import { pgEventLog } from "../src/domain/event-store";
+import { recordAnalysis } from "../fragments";
 
 let testDb: TestDb;
 let db: TestClient;
@@ -176,7 +177,7 @@ describe("an event commits with the writes it describes, or not at all", () => {
       return realCreateEdge(from as never, edge as never, to as never);
     }) as typeof graph.createEdge;
     await expect(
-      write.recordAnalysis({
+      recordAnalysis(write, {
         enquiry,
         method: "regression",
         from: [raw],
@@ -250,7 +251,7 @@ describe("an event records the edges the act created", () => {
       name: "panel-a",
       finding: "120 panels, 90 days",
     });
-    await write.recordAnalysis({
+    await recordAnalysis(write, {
       enquiry,
       method: "regression",
       from: [raw],

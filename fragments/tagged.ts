@@ -38,6 +38,7 @@ export const promoteFinding = tag("promoteFinding", fragments.promoteFinding);
 export const closeOnEvidence = tag("closeOnEvidence", fragments.closeOnEvidence);
 export const acceptUnresolved = tag("acceptUnresolved", fragments.acceptUnresolved);
 export const replaceAnalysis = tag("replaceAnalysis", fragments.replaceAnalysis);
+export const reviewAndReplace = tag("reviewAndReplace", fragments.reviewAndReplace);
 export const reinterpretClaim = tag("reinterpretClaim", fragments.reinterpretClaim);
 export const reverifyEarlier = tag("reverifyEarlier", fragments.reverifyEarlier);
 export const sharpenQuestion = tag("sharpenQuestion", fragments.sharpenQuestion);

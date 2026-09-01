@@ -150,7 +150,6 @@ export function registerWrites(program: Command, run: Run): void {
             enquiry,
             method: opts.method,
             from: opts.from,
-            concludes: [],
             ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
             ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
           }),
@@ -442,28 +441,62 @@ export function registerWrites(program: Command, run: Run): void {
     );
 
   program
+    .command("keep")
+    .summary("revise an analysis, naming the conclusions that survive")
+    .description(
+      "Records a successor to the analysis those claims came from, supersedes every other " +
+        "conclusion of it, and carries the named ones forward on their original evidence — " +
+        "`labkit why` on a kept claim still rests on the run that produced the number. Add the " +
+        "successor's own findings with `labkit conclude`. The successor reads what its " +
+        "predecessor read; --from adds to that.",
+    )
+    .argument("<claim-id...>", "the conclusions that survive", (v, prev: string[] = []) => [
+      ...prev,
+      handle("claim")(v),
+    ])
+    .requiredOption("--because <review-id>", "the review that found it wanting", handle("review"))
+    .requiredOption("--method <text>", "what the revision did differently")
+    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
+    .action(async (keeping, opts) =>
+      run(async ({ write }) => {
+        const report = await write.keep({
+          keeping,
+          because: opts.because,
+          method: opts.method,
+          ...(opts.from === undefined ? {} : { from: opts.from }),
+        });
+        // **What was superseded is the complement of what the caller typed**,
+        // over a set they may not have had in front of them, so the act says
+        // out loud what it did. stderr, because stdout is the handles.
+        const total = report.superseded.length + report.kept.length;
+        process.stderr.write(
+          `labkit: superseding ${report.supersedes} — ${report.superseded.length} of ${total} ` +
+            `conclusions; keeping ${report.kept.join(", ")}\n`,
+        );
+        return answer(report, mintedView());
+      }),
+    );
+
+  program
     .command("replace")
     .summary("supersede a defective analysis with a corrected one")
     .description(
-      "Records the replacement and the lineage to what it supersedes. Add its findings with " +
-        "`labkit conclude --replacing <claim>`, one per finding actually revisited; a " +
-        "conclusion of the superseded analysis that nothing names goes on standing.",
+      "Every conclusion of the superseded analysis falls here — use `labkit keep` instead to " +
+        "carry some of them forward. Add the successor's own findings with `labkit conclude`. " +
+        "It reads what its predecessor read; --from adds to that.",
     )
     .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
     .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))
-    .requiredOption("--enquiry <id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what the replacement did")
-    .requiredOption("--from <id>", "an input it read (repeatable)", collect(inputRef))
+    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
     .action(async (supersedes, opts) =>
       run(async ({ write }) =>
         answer(
           await write.replaceAnalysis({
             supersedes,
             because: opts.because,
-            enquiry: opts.enquiry,
             method: opts.method,
-            from: opts.from,
-            concludes: [],
+            ...(opts.from === undefined ? {} : { from: opts.from }),
           }),
           mintedView(),
         ),

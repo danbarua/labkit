@@ -43,6 +43,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -76,13 +77,13 @@ async function twoStages() {
     finding: "uncalibrated instrument output",
     contentHash: "sha256:raw",
   });
-  const calibration = await session.recordAnalysis({
+  const calibration = await recordAnalysis(session, {
     enquiry,
     method: "calibrate",
     from: [raw],
     concludes: [{ proposition: "the series is calibrated", finding: "offset removed" }],
   });
-  const trend = await session.recordAnalysis({
+  const trend = await recordAnalysis(session, {
     enquiry,
     method: "trend",
     from: [calibration.analysis],

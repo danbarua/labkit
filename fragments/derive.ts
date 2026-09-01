@@ -52,7 +52,7 @@ export interface StepProvenance {
  * Wraps an event sink so every `record` also captures which fragment was
  * running and a derived-state snapshot, keyed by the event's `seq`.
  *
- * The wrapper is the whole mechanism: neither `WriteSurface` nor a fragment
+ * The wrapper is the whole mechanism: neither the surface nor a fragment
  * needs to know this exists, so nothing here can go stale from a fragment
  * forgetting to report itself.
  */
