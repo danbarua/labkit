@@ -23,7 +23,7 @@
 import type { TenantGraph } from "../db/graph";
 import type { EventSink } from "./events";
 import { ReadSurface } from "./read";
-import { WriteSurface } from "./write";
+import { WriteSurface, type ResearchWrites } from "./write";
 import type { ResearchSessionOptions } from "./core";
 
 export type { ResearchSessionOptions } from "./core";
@@ -60,6 +60,7 @@ export class ResearchSession {
     this.writes.recordObservations(...args);
   readonly recordAnalysis: WriteSurface["recordAnalysis"] = (...args) =>
     this.writes.recordAnalysis(...args);
+  readonly conclude: WriteSurface["conclude"] = (...args) => this.writes.conclude(...args);
   readonly recordReview: WriteSurface["recordReview"] = (...args) =>
     this.writes.recordReview(...args);
   readonly closeEnquiry: WriteSurface["closeEnquiry"] = (...args) =>
@@ -103,3 +104,26 @@ export class ResearchSession {
   readonly whatDependsOn: ReadSurface["whatDependsOn"] = (...args) =>
     this.reads.whatDependsOn(...args);
 }
+
+/**
+ * **`ResearchSession` delegates every research verb, checked at compile time.**
+ *
+ * `ResearchWrites` names the write verbs a research move calls;
+ * `fragments/` depends on that type rather than on `WriteSurface`, and this is
+ * what keeps a session able to satisfy it. A delegate whose signature drifts,
+ * or one nobody added, fails to compile **here** rather than three files away
+ * in whichever fragment happened to call it.
+ *
+ * **It found something the day it was written**, which is the case for having
+ * it: `conclude` — the primitive #173 is about — had no delegate at all. Every
+ * scenario writes through a `ResearchSession`, none had called the new verb
+ * directly yet, and a green suite is entirely compatible with a verb being
+ * unreachable from the class that is supposed to expose it. Nothing else in
+ * the repository would have said so.
+ *
+ * A type, not a test, because the claim is about signatures: a runtime check
+ * could only see that the properties exist, and the drift worth catching is a
+ * delegate that still exists and no longer matches.
+ */
+const _sessionDelegatesEveryResearchVerb: ResearchWrites = null as unknown as ResearchSession;
+void _sessionDelegatesEveryResearchVerb;
