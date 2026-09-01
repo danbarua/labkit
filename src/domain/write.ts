@@ -750,21 +750,27 @@ export class WriteSurface extends SessionCore {
         // A withdrawn proposition cannot be re-asserted as a side effect of
         // recording some other analysis.
         //
-        // **The successor of the revision that withdrew it is exempt**, and
-        // that is not a loophole: `keep` supersedes every conclusion it does
-        // not carry forward at the moment it records the successor, so the
-        // successor's own findings are asserted against propositions this very
-        // act has just withdrawn. Restating them is what it exists to do, and
-        // without the exemption `keep` could never be followed by `conclude`.
-        if (superseded === undefined && revision === undefined)
-          revision = await this.revisedBy(input.analysis);
-        if (superseded === undefined && revision === undefined) {
+        // **The exemption is one decision wide.** `keep` supersedes every
+        // conclusion it does not carry forward at the moment it records the
+        // successor, so the successor's own findings are asserted against
+        // propositions this very act has just withdrawn; restating those is
+        // what it exists to do, and without the exemption `keep` could never
+        // be followed by `conclude`.
+        //
+        // It reaches no further than that. A proposition withdrawn by some
+        // OTHER act -- a reinterpretation that narrowed it, an earlier
+        // revision -- is still refused here, even to a successor, because
+        // nothing about revising one analysis licenses re-asserting what
+        // somebody else's decision retired. Compared by decision, not by
+        // whether this analysis happens to be a successor at all.
+        if (superseded === undefined) {
+          if (revision === undefined) revision = await this.revisedBy(input.analysis);
           const enquiry = await this.enquiryOf(input.analysis);
-          const { withdrawn, replacedBy } = await this.withdrawalOf({
+          const { withdrawn, by, replacedBy } = await this.withdrawalOf({
             proposition,
             ...(enquiry === undefined ? {} : { enquiry }),
           });
-          if (withdrawn)
+          if (withdrawn && by !== revision?.decision)
             throw new Error(
               `"${proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy}"` : ""}; ` +
                 `it cannot be re-asserted by recording another analysis`,
@@ -850,7 +856,6 @@ export class WriteSurface extends SessionCore {
       const rows = await this.graph.query(
         `MATCH (c:Claim) WHERE c.natural_id IN $ids
          MATCH (e:Evidence)-[:${bearing}]->(c)
-         MATCH (:EvidenceUnit)-[:PRODUCES]->(e)
          MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
          MATCH (u)-[:USES]->(comp:Computation)
          RETURN comp`,

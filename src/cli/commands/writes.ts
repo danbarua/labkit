@@ -481,15 +481,14 @@ export function registerWrites(program: Command, run: Run): void {
     .command("replace")
     .summary("supersede a defective analysis with a corrected one")
     .description(
-      "Records the replacement and the lineage to what it supersedes. Add its findings with " +
-        "`labkit conclude --replacing <claim>`, one per finding actually revisited; a " +
-        "conclusion of the superseded analysis that nothing names goes on standing.",
+      "Every conclusion of the superseded analysis falls here — use `labkit keep` instead to " +
+        "carry some of them forward. Add the successor's own findings with `labkit conclude`. " +
+        "It reads what its predecessor read; --from adds to that.",
     )
     .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
     .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))
-    .requiredOption("--enquiry <id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what the replacement did")
-    .requiredOption("--from <id>", "an input it read (repeatable)", collect(inputRef))
+    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
     .action(async (supersedes, opts) =>
       run(async ({ write }) =>
         answer(
@@ -497,7 +496,7 @@ export function registerWrites(program: Command, run: Run): void {
             supersedes,
             because: opts.because,
             method: opts.method,
-            from: opts.from,
+            ...(opts.from === undefined ? {} : { from: opts.from }),
           }),
           mintedView(),
         ),

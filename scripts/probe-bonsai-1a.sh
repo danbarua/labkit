@@ -205,15 +205,19 @@ STAGE1A_V2_RESULTS=2026-08-01T11:46:49.000Z
 # of the three: a review found the prior analysis's significant results
 # untrustworthy, and a corrected analysis supersedes it.
 #
-# `replace` itself only records the new analysis and the lineage decision
-# (this run revises that one, per #173) -- it touches no claim. Standing is
-# per finding: `conclude --replacing` below names exactly the three v1
-# conclusions v2 actually revisits (historical random, current random,
-# rewiring); lattice is simply never named, so its original claim and
-# evaluation stand untouched -- no re-entry needed, unlike before #173.
-log_scale_replacement=$(lab --date "$STAGE1A_V2_RESULTS" replace "$reverification_v1_analysis" --because "$raw_scale_review" --enquiry "$reverification_enquiry" \
+# `keep` names what SURVIVES: the lattice comparison, which v2 does not
+# revisit. Everything else v1 concluded is superseded at this moment, and the
+# lattice claim keeps its original evidence -- asking why it holds still
+# answers with the v1 run that produced the number. `conclude --replacing`
+# below then names which superseded finding each new one stands in place of.
+#
+# Naming the survivor rather than each casualty is the safer direction: a
+# forgotten entry here supersedes something still true, which the answer
+# shows; forgetting to supersede would leave something stale reading as
+# current.
+log_scale_replacement=$(lab --date "$STAGE1A_V2_RESULTS" keep "$lattice_claim" --because "$raw_scale_review" \
   --method "log-scale (geometric mean) re-aggregation of the same 770 raw AUC values from ART_4 -- no new simulation, no new seeds, only the aggregation function changes; pre-committed before running, decision rule not revised after seeing results" \
-  --from "$reverification_observations" | grep '^COMP_')
+  | grep '^COMP_')
 historical_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$historical_random_claim" \
   --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322); 95% CI on multiplicative scale x[0.280, 1.541] brackets 1.0" \
   | grep '^CLM_')

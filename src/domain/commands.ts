@@ -56,16 +56,9 @@ export interface RecordObservationsCommand {
 /**
  * `recordAnalysis` — a computation, its evidence unit, and its output artefact.
  *
- * **It takes no conclusions, and that is #173.** A conclusion is its own act:
- * findings arrive one at a time, over days, and `conclude` records one. The
- * array this used to carry is why exactly three of eighteen CLI commands took
- * JSON, and they were exactly the three that mint conclusions.
- *
- * A run with its findings already on it, in one call, is what a test usually
- * wants — and that is a **fragment**, `fragments/index.ts`'s `recordAnalysis`,
- * same name with the surface first. Dan's own definition of one: *"one
- * 'Afterward' question, one complete call."* The domain layer holds the
- * primitives; a move over them is a fragment.
+ * **It takes no conclusions.** A conclusion is its own act, recorded by
+ * `conclude`. A run with its findings already on it, in one call, is
+ * `fragments/index.ts`'s `recordAnalysis` — same name, surface first.
  */
 export interface RecordAnalysisCommand {
   enquiry: EnquiryRef;

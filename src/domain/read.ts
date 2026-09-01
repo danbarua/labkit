@@ -122,6 +122,7 @@ function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
  */
 export type ResearchReads = Pick<
   ReadSurface,
+  | "analysisRevision"
   | "claimsAsserting"
   | "contractFor"
   | "criteriaGoverning"
@@ -2822,7 +2823,10 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
   for (const u of report.unpaired)
     because.push({ handle: u.claim, wording: `${u.asserts} — superseded, no successor named` });
 
-  const moved = report.changed.length;
+  // **Every finding that fell, not just the reworded ones.** Counting only
+  // `changed` loses the restated and the unpaired, so a revision that moved one
+  // of two could report "0 of 1" while `because` listed both.
+  const fell = report.changed.length + report.restated.length + report.unpaired.length;
   const stood = report.kept.length;
   return {
     kind: "analysis",
@@ -2830,7 +2834,7 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
     is:
       stood === 0
         ? `a revision of ${report.supersedes}`
-        : `a partial revision of ${report.supersedes}, ${moved} of ${moved + stood} findings`,
+        : `a partial revision of ${report.supersedes}, ${fell} of ${fell + stood} findings`,
     because,
     report,
   };

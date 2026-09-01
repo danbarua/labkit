@@ -16,49 +16,18 @@
  *
  * ## Why this is not in `tests/`, and why a scenario may import it
  *
- * This header used to say the library is not in `tests/` *because someone
- * would import it into a scenario*. **That was the wrong reason, and it was
- * wrong in a way worth keeping written down.**
+ * The fixture argument above is about shared **state**: two probes drawing on
+ * one graph stop being independent, which is why `openScenario().begin()` hands
+ * back an empty graph per `beforeEach`.
  *
- * The fixture argument above is about shared **state** — two probes drawing on
- * one graph stop being independent, which is why `openScenario().begin()`
- * hands back an empty graph per `beforeEach`. Importing a fragment is shared
- * **code**, and that is the opposite case: a move used by twenty scenarios is
- * the same shape as a fact used by two readers, so mutating it once turns
- * twenty red together. That is the property this repository wants, not the
- * coupling it fears (Dan, 2026-09-01).
+ * Importing a fragment is shared **code**, and that is the opposite case — a
+ * move used by twenty scenarios is the same shape as a fact used by two
+ * readers, so mutating it once turns twenty red together. That is wanted.
  *
- * **A second thing was holding the old rule up, and it was not an argument at
- * all.** Every fragment took a `WriteSurface`, and `ResearchSession` — the
- * class every scenario writes through — *composes* one rather than extending
- * it, with `writes` private:
- *
- * ```
- * TS2740: Type 'ResearchSession' is missing the following properties from
- * type 'WriteSurface': posed, pursued, standingFindings, recorded, and 24 more.
- * ```
- *
- * So a scenario could not call a fragment whatever this header said, and the
- * header described that impossibility as a *choice*. A true sentence naming
- * the wrong reason, holding up the prose's own conclusion; nobody could have
- * told which of the two was load-bearing without removing one.
- *
- * It is removed on purpose. Fragments depend on `ResearchWrites` — the verbs a
- * research move actually calls — which a `ResearchSession` satisfies, asserted
- * in `src/domain/session.ts`.
- *
- * So the reason this lives outside `tests/` is what it always should have
- * been: **a fragment is for building a record** — a trace, a demo, a seeded
- * database, and the acts a scenario performs before it asserts anything. What
- * a scenario must not share is its graph.
- *
- * ## Why it is not in `src/` either
- *
- * Nothing here is domain code. Every fragment is a few calls on the write
- * surface and returns the handles a later fragment needs — plain TypeScript
- * over the public API, adding no verbs and no ontology. If a fragment ever
- * needs something the surface cannot do, that is a finding about the surface,
- * not a reason to reach past it.
+ * So a fragment lives outside `tests/` because it is for **building a
+ * record**: a trace, a demo, a seeded database, and the acts a scenario
+ * performs before it asserts anything. What a scenario must not share is its
+ * graph.
  *
  * ## The shape, and why it is this dull
  *

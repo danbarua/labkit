@@ -105,6 +105,8 @@ export class ResearchSession {
   readonly whatDependsOn: ReadSurface["whatDependsOn"] = (...args) =>
     this.reads.whatDependsOn(...args);
   readonly why: ReadSurface["why"] = (...args) => this.reads.why(...args);
+  readonly analysisRevision: ReadSurface["analysisRevision"] = (...args) =>
+    this.reads.analysisRevision(...args);
   readonly search: ReadSurface["search"] = (...args) => this.reads.search(...args);
   readonly whatHappened: ReadSurface["whatHappened"] = (...args) =>
     this.reads.whatHappened(...args);
@@ -135,9 +137,7 @@ void _sessionDelegatesEveryResearchVerb;
  *
  * A read verb with no delegate is invisible in exactly the way a write one is:
  * every scenario reads through this class, and one nobody has called yet is
- * simply never reached. Four were missing when this was added — `why`,
- * `search`, `whatHappened` and `enquiryInContext` — so a scenario could not ask
- * the questions the CLI and MCP had been answering for weeks.
+ * simply never reached.
  */
 const _sessionDelegatesEveryRead: ResearchReads = null as unknown as ResearchSession;
 void _sessionDelegatesEveryRead;

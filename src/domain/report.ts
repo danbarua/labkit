@@ -605,11 +605,10 @@ export interface ReplacementReport {
   /**
    * The event this act recorded.
    *
-   * **What it does not carry is the point.** Recording a replacement mints an
-   * analysis and a lineage decision, and nothing else: its findings arrive
-   * afterwards, one `conclude --replacing` at a time. What the revision changed
-   * is therefore spread across those calls and is not a fact this act holds —
-   * it is read back with `why <analysis>`.
+   * **What it does not carry is the point.** This act mints an analysis and a
+   * lineage decision; the successor's own findings arrive afterwards, one
+   * `conclude` at a time. What the revision changed is therefore spread across
+   * those calls and is read back with `why <analysis>`.
    */
   events: DomainEvent[];
 }

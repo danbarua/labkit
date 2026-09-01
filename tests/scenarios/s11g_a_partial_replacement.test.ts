@@ -196,6 +196,69 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
+   * **The boundary of the successor's exemption**, in a pair.
+   *
+   * A revision withdraws every conclusion it does not keep, so its successor
+   * has to be allowed to re-assert those propositions — that is what recording
+   * the successor's findings *is*. The exemption must reach no further: a
+   * proposition some **other** act retired is still refused, because nothing
+   * about revising one analysis licenses re-asserting what somebody else's
+   * decision withdrew.
+   *
+   * Both halves against one record, since an exemption that covered everything
+   * and one that covered nothing would each satisfy a single assertion.
+   */
+  test("a successor may re-assert what its own revision withdrew, and nothing else", async () => {
+    const { enquiry } = await session.openEnquiry("does T differ from its controls?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "per-image results",
+      finding: "T and two controls",
+    });
+    const { analysis: v1, claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "raw-scale aggregation",
+      from: [observations],
+      concludes: [
+        { proposition: REVISITED, finding: "p = 0.03 raw" },
+        { proposition: EXCLUDED, finding: "p = 0.41 raw" },
+      ],
+    });
+    const narrowed = claimOf(claims, EXCLUDED);
+
+    // Somebody else's act retires one of them first.
+    await session.reinterpret({
+      of: narrowed,
+      as: "T differs from the lattice control on this instance set only",
+      because: "the lattice set was not matched for density",
+    });
+
+    const { review } = await session.recordReview({ of: v1, verdict: "wrong scale" });
+    const report = await session.keep({
+      keeping: [narrowed],
+      because: review,
+      method: "log-scale re-aggregation",
+    });
+
+    // The successor may restate what THIS revision withdrew.
+    const restated = await session.conclude({
+      analysis: report.replacement,
+      proposition: REVISITED,
+      finding: "p = 0.007 log",
+    });
+    expect(restated.claims).toHaveLength(1);
+
+    // It may not restate what the reinterpretation withdrew, successor or not.
+    await expect(
+      session.conclude({
+        analysis: report.replacement,
+        proposition: EXCLUDED,
+        finding: "p = 0.39 log",
+      }),
+    ).rejects.toThrow(/withdrawn/);
+  });
+
+  /**
    * **The pair, on the evaluations.** A verdict falls or stands according to
    * which finding it cited. Both halves are asserted, because a record that
    * withdrew all of them or none would satisfy either alone.
