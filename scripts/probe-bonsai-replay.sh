@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves the real Bonsai record is script-derived: replays the four
+# Proves the real Bonsai record is script-derived: replays the
 # probe-bonsai-*.sh scripts into a fresh database and diffs the result
 # against the live one. Zero lines out is the point.
 #
@@ -14,15 +14,15 @@
 # `probe:dogfood`, this is NOT a "no exit code expresses the outcome"
 # probe -- it can and does properly pass or fail, and its exit code is
 # the thing to trust. It keeps the `probe-bonsai-` prefix rather than
-# `check-` because it is Bonsai-transcription tooling, sibling to the four
+# `check-` because it is Bonsai-transcription tooling, sibling to the
 # scripts it replays, not a general LabKit repo check -- CLAUDE.md's own
 # lesson about `check-all.ts`'s first exclusion list applies in reverse
 # here: a script's name should say what it is, and this one is not what
 # `check:` means even though it can go red.
 #
 # The live record is opened READ-ONLY -- only `happened` is ever run
-# against it. Everything the four scripts write goes into a fresh,
-# disposable directory.
+# against it. Everything the scripts write goes into a fresh, disposable
+# directory.
 #
 # What gets stripped before the diff, and why each survives or doesn't:
 #   - `@<git-hash>` in each event's attribution line: differs whenever the
@@ -37,7 +37,7 @@
 # **ISO timestamps used to be stripped here too, and no longer are (#166).**
 # They differed because every write ran against `date -u` at the moment the
 # script executed, so a replay run today could never match a live record
-# built on an earlier day. Once the four scripts backfill real, verified
+# built on an earlier day. Once the scripts backfill real, verified
 # dates via `--date` instead, `at` is deterministic content like any other
 # field -- checked directly, 2026-08-31: a replay with the stripping simply
 # deleted matched the live record byte for byte, with nothing left for the
@@ -66,7 +66,7 @@ live="${1:-${LABKIT_HOME:-}}"
 fresh="$(mktemp -d)"
 trap 'rm -rf "$fresh"' EXIT
 
-echo "replaying the five scripts into $fresh" >&2
+echo "replaying the scripts into $fresh" >&2
 for script in probe-bonsai-1a.sh probe-bonsai-1b2-1d.sh probe-bonsai-2a.sh probe-bonsai-2b.sh probe-bonsai-3-gates.sh; do
   echo "  $script" >&2
   # probe-bonsai-3-gates.sh reads gates.toml from a real Bonsai checkout,
@@ -124,11 +124,11 @@ happened_diff=$(diff <(printf '%s\n' "$live_happened") <(printf '%s\n' "$fresh_h
 known_diff=$(diff <(printf '%s\n' "$live_known") <(printf '%s\n' "$fresh_known")) && known_ok=1 || known_ok=0
 
 if [ "$happened_ok" = 1 ] && [ "$known_ok" = 1 ]; then
-  echo "OK: the live event stream and graph state are exactly what the four scripts produce, commit hashes aside."
+  echo "OK: the live event stream and graph state are exactly what the scripts produce, commit hashes aside."
   exit 0
 fi
 
-echo "FAILED: the live record has drifted from what the four scripts produce." >&2
+echo "FAILED: the live record has drifted from what the scripts produce." >&2
 [ "$happened_ok" = 0 ] && { echo "-- event stream (happened) --"; echo "$happened_diff"; }
 [ "$known_ok" = 0 ] && { echo "-- graph state (known) --"; echo "$known_diff"; }
 echo >&2
