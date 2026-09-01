@@ -242,6 +242,22 @@ describe("every tool answers when an agent actually calls it", () => {
         "is the solver faster on sparse instances?",
       );
 
+      // #55: the morning briefing. No cursor -- the full standing, and
+      // `known` agrees with the call above since it's the same report.
+      const standing = await call(c, "now", {});
+      expect((standing.known as Json).established as unknown[]).toEqual(
+        survey.established as unknown[],
+      );
+      const seq = standing.seq as number;
+
+      // Asked again from the seq it just returned, with nothing having
+      // happened since: every section is empty and the cursor is unchanged
+      // -- there is nothing to move it, not an error.
+      const sinceNothing = await call(c, "now", { since: seq });
+      expect(sinceNothing.seq).toBe(seq);
+      expect((sinceNothing.blocked as Json).gates).toEqual([]);
+      expect((sinceNothing.known as Json).established).toEqual([]);
+
       const why = await call(c, "why_supported", { claim });
       expect(why.supported).toBe(true);
       const depends = await call(c, "what_depends_on", {

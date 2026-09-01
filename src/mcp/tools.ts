@@ -72,6 +72,7 @@ import {
   registeredSessionSchema,
   gateListSchema,
   workListSchema,
+  standingSchema,
 } from "./schemas";
 
 /**
@@ -177,6 +178,25 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: workListSchema,
     handler: async (read, { state }) => ({ work: await read.workList(state) }),
+  }),
+  tool({
+    name: "now",
+    title: "What am I blocked on right now, what are my priorities",
+    description:
+      "Gates currently blocking work and the work each " +
+      "protects, gates nobody has finished checking, planned work nothing has touched yet, " +
+      "and where every question stands. Literally the composition of `gate_list`, " +
+      "`work_list` and `known` -- no new query, and nothing here is stored. Give `since` (a " +
+      "`seq` `now` returned before) to narrow every section to what changed: acts since " +
+      "that `seq`, and the handles they created, touched or connected, reported at current " +
+      "standing and marked moved by their presence in the answer -- never a snapshot of " +
+      "what things *were*, which is also why there is no `at`. Always returns the current " +
+      "`seq`, to hand back next time.",
+    inputSchema: {
+      since: z.number().optional().describe("a `seq` `now` returned before"),
+    },
+    outputSchema: standingSchema,
+    handler: (read, { since }) => read.now(since),
   }),
   tool({
     name: "known",

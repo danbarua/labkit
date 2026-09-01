@@ -10,6 +10,8 @@
  */
 
 import type {
+  AcceptedQuestion,
+  AnsweredQuestion,
   ConcludedClaim,
   ConflictSide,
   ConflictVerdict,
@@ -23,19 +25,40 @@ import type {
 import type { Palette } from "../palette";
 import { bullets, questionLines } from "./format";
 
+/**
+ * `AcceptedQuestion`'s own line — `asks` and the handle, plus why it was
+ * accepted and what would reopen it. Without the second half, "accepted"
+ * says only that a decision was taken, not what it would take to revisit it.
+ */
+function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
+  return qs.map(
+    (q) =>
+      `${q.asks}  ${p.handle(`(${q.question})`)}  — accepted because: ${q.acceptedBecause}; reopens if: ${q.reopensIf}`,
+  );
+}
+
+/**
+ * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was
+ * answered. Without the polarity, reading only `asks` for an established
+ * question cannot tell a promoted, confirmed "no" apart from a "yes".
+ */
+function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
+  return qs.map((q) => `${q.asks}  ${p.handle(`(${q.question})`)}  — ${q.answer}`);
+}
+
 export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
   const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, p), "nothing");
   return [
     // The five headings carry the distinction the buckets exist for, so they
     // are coloured by what the bucket means rather than uniformly.
     p.settled("Established"),
-    list(survey.established),
+    bullets(answeredLines(survey.established, p), "nothing"),
     "",
     p.provisional("Provisional (answered, but not something to build on yet)"),
-    list(survey.provisional),
+    bullets(answeredLines(survey.provisional, p), "nothing"),
     "",
     p.provisional("Accepted as unresolved"),
-    list(survey.accepted),
+    bullets(acceptedLines(survey.accepted, p), "nothing"),
     "",
     p.untested("Unresolved (worked on, no answer yet)"),
     list(survey.unresolved),
