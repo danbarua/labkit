@@ -139,21 +139,17 @@ export async function gatedWork(
 }
 
 /**
- * A run and every conclusion drawn from it — the compound `WriteSurface` used
- * to be, with the same signature and one argument more.
+ * A run and every conclusion drawn from it, in one call.
  *
- * **This is where the array lives now.** `recordAnalysis` on the surface
- * records the run and takes no conclusions, because a conclusion is its own
- * act: findings arrive one at a time, over days, and #173 is about the domain
- * saying so. But a *test* usually wants a run with its findings already on it,
- * in one line, and that want is real — it is Dan's own definition of a
- * fragment: *"one 'Afterward' question, one complete call."*
+ * **This is where the array lives.** `recordAnalysis` on the surface records
+ * the run and takes no conclusions, because a conclusion is its own act. A
+ * caller that wants a run with its findings already on it wants a move rather
+ * than a primitive, which is what a fragment is.
  *
- * Named for the verb and taking the surface first, so the edit at every call
- * site is `session.recordAnalysis(x)` → `recordAnalysis(session, x)` and the
- * compiler enumerates the rest.
+ * Named for the verb and taking the surface first, so a call site reads
+ * `recordAnalysis(session, x)`.
  *
- * The event stream is the honest one either way: one `recordAnalysis` and one
+ * The event stream is the same either way: one `recordAnalysis` and one
  * `conclude` per conclusion, exactly what a person typing the two commands
  * produces. See `TenantGraph.inMintScope`.
  */
