@@ -75,6 +75,7 @@ import type {
   WorkExplanation,
   EnquiryExplanation,
   GateExplanation,
+  Standing,
 } from "./report";
 import { ref, isRefOfKind, KIND_BY_LABEL, kindOf } from "./report";
 import { compose, per, type Row } from "./facts";
@@ -339,14 +340,25 @@ export class ReadSurface extends SessionCore {
 
     const answering = new Map<string, { natural_id: string; kind?: string }>();
     const met = new Map<string, boolean>();
-    const seen = new Map<string, { asks: string; accepted: boolean; worked: boolean }>();
+    const seen = new Map<
+      string,
+      {
+        asks: string;
+        accepted: boolean;
+        worked: boolean;
+        reopensIf?: string;
+        acceptedBecause?: string;
+      }
+    >();
 
     for (const bearing of BEARINGS) {
       const claimFact = answeringClaimBearing(bearing);
       const metFact = checksMetBearing(bearing);
       const { cypher, decoders } = compose(anchor, metFact, {
         q: vertexProps<{ natural_id: string; name: string }>(),
-        accepting: optional(vertexProps<{ natural_id: string }>()),
+        accepting: optional(
+          vertexProps<{ natural_id: string; reason: string; invalidation_check: string }>(),
+        ),
         work: optional(vertexProps<{ natural_id: string }>()),
       });
       const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
@@ -358,9 +370,17 @@ export class ReadSurface extends SessionCore {
 
       for (const row of rows) {
         const q = row.q as { natural_id: string; name: string };
+        const accepting = row.accepting as { reason: string; invalidation_check: string } | null;
         const entry = seen.get(q.natural_id) ?? { asks: q.name, accepted: false, worked: false };
-        entry.accepted ||= row.accepting !== null;
+        entry.accepted ||= accepting !== null;
         entry.worked ||= row.work !== null;
+        // Same `accepting` node every time it appears, regardless of which
+        // bearing's query found this row -- one `DEFERS` decision per
+        // question, not one per bearing.
+        if (accepting) {
+          entry.acceptedBecause = accepting.reason;
+          entry.reopensIf = accepting.invalidation_check;
+        }
         seen.set(q.natural_id, entry);
       }
     }
@@ -387,9 +407,18 @@ export class ReadSurface extends SessionCore {
       // to nothing is vacuously met, which keeps S-18's promoted scratch in
       // `established`.
       if (claim && claim.kind === "confirmatory" && met.get(claim.natural_id) !== false)
-        survey.established.push(standing);
-      else if (claim) survey.provisional.push(standing);
-      else if (entry.accepted) survey.accepted.push(standing);
+        survey.established.push({ ...standing, claim: ref("claim", claim.natural_id) });
+      else if (claim)
+        survey.provisional.push({ ...standing, claim: ref("claim", claim.natural_id) });
+      else if (entry.accepted)
+        survey.accepted.push({
+          ...standing,
+          // Never absent when `entry.accepted` is true -- both are set in the
+          // same branch above, the one time `accepting` is seen for this
+          // question.
+          reopensIf: entry.reopensIf!,
+          acceptedBecause: entry.acceptedBecause!,
+        });
       else if (entry.worked) survey.unresolved.push(standing);
       else survey.untested.push(standing);
     }
@@ -2315,6 +2344,79 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
+   * "What am I blocked on right now, what are my priorities?" (#55) — see
+   * `Standing`'s own doc comment for the shape and why there is no `at=`.
+   *
+   * With no `since`, the full standing. With one, every section narrowed to
+   * what a touched handle appears in since that cursor — `whatHappened`'s
+   * `created`/`edges`/`subject` on every act since it, per #161/PJ-032's
+   * edge recording, never a snapshot of what things *were*.
+   *
+   * **A question is moved if its own id was touched, or the claim answering
+   * it was.** `closeEnquiry`/`acceptAsUnresolved` both write an edge landing
+   * on the question itself (`RESOLVES`/`DEFERS`), so those show up from the
+   * question id alone — but `promote`/`reinterpret`/`reverify` touch only the
+   * claim, never the question they move into `established` or out of
+   * `provisional`. The join costs nothing new: `whatIsKnown()` already
+   * resolves which claim answers each `established`/`provisional` question
+   * (`AnsweredQuestion.claim`), so checking the claim id against the same
+   * touched set the other sections use is one more membership test, not a
+   * new query. What this still cannot catch: a question moving `unresolved`
+   * → `untested` or the reverse has no claim to check and no edge landing on
+   * the question either -- `unresolved`/`untested`/`accepted` can only be
+   * marked moved by their own id. Not fixed with more traversal; named so
+   * the gap is a documented one rather than a discovered one.
+   */
+  async now(since?: number): Promise<Standing> {
+    const [events, gates, work, known] = await Promise.all([
+      this.whatHappened(since === undefined ? {} : { since }),
+      this.gateList(),
+      this.workList(),
+      this.whatIsKnown(),
+    ]);
+    const last = events.at(-1);
+    const seq = last?.seq ?? since ?? 0;
+
+    if (since === undefined) {
+      return {
+        blocked: {
+          gates: gates.filter((g) => g.state === "blocked"),
+          work: work.filter((w) => w.state === "blocked"),
+        },
+        unevaluated: gates.filter((g) => g.state === "never-evaluated" || g.state === "incomplete"),
+        untouched: work.filter((w) => w.state === "planned"),
+        known,
+        seq,
+      };
+    }
+
+    const touched = touchedHandles(events);
+    const movedById = (h: { question: string }) => touched.has(h.question);
+    const movedByIdOrClaim = (h: { question: string; claim: string }) =>
+      touched.has(h.question) || touched.has(h.claim);
+
+    return {
+      blocked: {
+        gates: gates.filter((g) => g.state === "blocked" && touched.has(g.gate)),
+        work: work.filter((w) => w.state === "blocked" && touched.has(w.work)),
+      },
+      unevaluated: gates.filter(
+        (g) => (g.state === "never-evaluated" || g.state === "incomplete") && touched.has(g.gate),
+      ),
+      untouched: work.filter((w) => w.state === "planned" && touched.has(w.work)),
+      known: {
+        established: known.established.filter(movedByIdOrClaim),
+        provisional: known.provisional.filter(movedByIdOrClaim),
+        unresolved: known.unresolved.filter(movedById),
+        untested: known.untested.filter(movedById),
+        accepted: known.accepted.filter(movedById),
+      },
+      seq,
+      since,
+    };
+  }
+
+  /**
    * `why <handle>` — dispatches on the handle's own kind, over the report that
    * already exists for it, and renders it as `{subject, is, because}` (#128,
    * redesigned on review). Also takes a proposition, exactly as this verb did
@@ -2342,6 +2444,24 @@ export class ReadSurface extends SessionCore {
       );
     return EXPLAINERS.claim(this, found[0]!.claim);
   }
+}
+
+/**
+ * Every handle a batch of events created or touched — `now({since})`'s only
+ * new machinery, and it reads three fields `DomainEvent` already carries
+ * (`subject`, `created`, `edges`), adding no query of its own.
+ */
+function touchedHandles(events: readonly DomainEvent[]): Set<string> {
+  const touched = new Set<string>();
+  for (const e of events) {
+    touched.add(e.subject);
+    for (const id of e.created) touched.add(id);
+    for (const edge of e.edges) {
+      touched.add(edge.from);
+      touched.add(edge.to);
+    }
+  }
+  return touched;
 }
 
 /**

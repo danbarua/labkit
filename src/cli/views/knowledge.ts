@@ -10,6 +10,7 @@
  */
 
 import type {
+  AcceptedQuestion,
   ConcludedClaim,
   ConflictSide,
   ConflictVerdict,
@@ -23,6 +24,19 @@ import type {
 import type { Palette } from "../palette";
 import { bullets, questionLines } from "./format";
 
+/**
+ * `AcceptedQuestion`'s own line — `asks` and the handle, plus why it was
+ * accepted and what would reopen it. Without the second half this is the
+ * list nobody reads (S-14): "accepted" says a decision was taken, not what it
+ * would take to revisit it.
+ */
+function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
+  return qs.map(
+    (q) =>
+      `${q.asks}  ${p.handle(`(${q.question})`)}  — accepted because: ${q.acceptedBecause}; reopens if: ${q.reopensIf}`,
+  );
+}
+
 export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
   const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, p), "nothing");
   return [
@@ -35,7 +49,7 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
     list(survey.provisional),
     "",
     p.provisional("Accepted as unresolved"),
-    list(survey.accepted),
+    bullets(acceptedLines(survey.accepted, p), "nothing"),
     "",
     p.untested("Unresolved (worked on, no answer yet)"),
     list(survey.unresolved),

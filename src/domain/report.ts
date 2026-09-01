@@ -1282,6 +1282,36 @@ export interface QuestionStanding {
 }
 
 /**
+ * `QuestionStanding`, plus what would reopen it — carried on `KnowledgeSurvey
+ * .accepted` (#55): a deliberately-open list without the condition that would
+ * reopen each item is the list nobody reads (S-14's own argument, applied to
+ * `whatIsKnown` rather than to `enquiryStatus`, which already carries both on
+ * `QuestionClosure`). Sourced from the same `DEFERS` decision `enquiryStatus`
+ * reads `reopensIf`/`acceptedBecause` from, and read the same way here: one
+ * more projection on `whatIsKnown`'s already-joined `accepting` node, not a
+ * second query per question.
+ */
+export interface AcceptedQuestion extends QuestionStanding {
+  reopensIf: string;
+  acceptedBecause: string;
+}
+
+/**
+ * `QuestionStanding`, plus the claim that answers it — carried on
+ * `KnowledgeSurvey.established`/`.provisional` (#55): both buckets are
+ * "answered", differing only in whether the answer met the standard it was
+ * held to and was promoted, and the claim is what `whatIsKnown` already
+ * resolved to decide which bucket to place the question in. Exposing it
+ * lets a reader go straight to `why <claim>` without a text search, and lets
+ * `now`'s delta recognise a question as moved when the claim answering it
+ * was touched (by `promote`, `reinterpret`, `reverify`) even though the
+ * question's own id was not.
+ */
+export interface AnsweredQuestion extends QuestionStanding {
+  claim: ClaimRef;
+}
+
+/**
  * What the programme knows, in more states than settled-or-not. The buckets are
  * the fields below; they have been added one scenario at a time and the count
  * is deliberately not written here, because it was wrong for every scenario
@@ -1299,8 +1329,12 @@ export interface QuestionStanding {
  * appears under `untested` if nothing did.
  */
 export interface KnowledgeSurvey {
-  /** Settled on cited evidence. Polarity is not here — an answered "no" is still settled; see `EnquiryStatus.answer`. */
-  established: QuestionStanding[];
+  /**
+   * Settled on cited evidence. Polarity is not here — an answered "no" is
+   * still settled; see `EnquiryStatus.answer`. `AnsweredQuestion`, not
+   * `QuestionStanding` — see its own doc comment.
+   */
+  established: AnsweredQuestion[];
   /** Worked on, not settled. */
   unresolved: QuestionStanding[];
   /** On the books, never pursued. Not a failure and not an inconclusive result. */
@@ -1332,8 +1366,10 @@ export interface KnowledgeSurvey {
    * The heading this renders under said "resting on work nobody promoted"
    * until 2026-08-27, which was true of the first reason and false of the
    * second the moment it existed.
+   *
+   * `AnsweredQuestion`, not `QuestionStanding` — see its own doc comment.
    */
-  provisional: QuestionStanding[];
+  provisional: AnsweredQuestion[];
   /**
    * Open on purpose (S-14). Worked on, not settled, and deliberately left —
    * with the condition that would reopen it recorded on the deciding act.
@@ -1342,8 +1378,10 @@ export interface KnowledgeSurvey {
    * scanning for what still needs doing must not find it there. That is the
    * whole of PJ-001's "should not accumulate ceremony" bullet: the alternative
    * is a to-do list that can never be emptied and is therefore never read.
+   *
+   * `AcceptedQuestion`, not `QuestionStanding` — see its own doc comment.
    */
-  accepted: QuestionStanding[];
+  accepted: AcceptedQuestion[];
 }
 
 /**
@@ -1681,3 +1719,46 @@ export interface GateExplanation {
   report: GateStatus;
 }
 export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation | GateExplanation;
+
+/**
+ * "What am I blocked on right now, what are my priorities?" (#55, Dan's own
+ * spec). Literally the composition of reads that already exist — `gateList`,
+ * `workList`, `whatIsKnown` — never a private helper, so a section that
+ * needs a query nothing else has yet shows up as a signature change the
+ * coverage tests already police.
+ *
+ * `blocked`/`unevaluated`/`untouched` are `gateList()`/`workList()`
+ * partitioned client-side by the state each already carries, not three
+ * separate filtered queries: one traversal per read, not one per section.
+ * `known` is `whatIsKnown()` unmodified, all five buckets present and
+ * unmerged — PJ-001's `untested` is not a weak `unresolved` applies here
+ * exactly as it does there, and collapsing them into a shorter, prettier
+ * section list was tried and is exactly the defect class this repo keeps
+ * finding.
+ *
+ * **Deliberately no `at=`.** Gate and work state are computed from
+ * evaluations and edges as they currently stand; a historical standing would
+ * compute "blocked last Tuesday" from today's graph and present it as
+ * history — the confidently-wrong shape PJ-011 §5 warns against, not an
+ * honest empty result. `whatHappened` already refuses the same thing a
+ * different way (it answers "what happened", never "what was true").
+ */
+export interface Standing {
+  /** Gates currently blocking work, and the work each protects — two reads, not a join. */
+  blocked: { gates: ListedGate[]; work: ListedWork[] };
+  /** Gates nobody has finished checking: `never-evaluated` or `incomplete`. */
+  unevaluated: ListedGate[];
+  /** Planned work with nothing recorded against it yet — what is ready to start. */
+  untouched: ListedWork[];
+  /** Where every question currently stands. */
+  known: KnowledgeSurvey;
+  /** This read's position in the event stream — what `now({since})` takes next. */
+  seq: number;
+  /**
+   * The cursor this answer was asked from. Absent means this is the full
+   * standing; present means every section above has already been narrowed
+   * to what a touched handle appears in since that cursor — presence *is*
+   * the "moved" marker, not a per-item flag repeating it.
+   */
+  since?: number;
+}

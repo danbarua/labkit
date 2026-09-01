@@ -159,7 +159,9 @@ test("withdrawn, challenged and never-examined render apart", () => {
 
 test("every question in the survey carries its handle", () => {
   const survey: KnowledgeSurvey = {
-    established: [{ question: ref("question", "Q_1"), asks: "does it converge?" }],
+    established: [
+      { question: ref("question", "Q_1"), asks: "does it converge?", claim: ref("claim", "CLM_1") },
+    ],
     provisional: [],
     accepted: [],
     unresolved: [{ question: ref("question", "Q_2"), asks: "does it converge?" }],
@@ -548,7 +550,9 @@ test("colouring changes nothing a reader would read", () => {
   expect(stripped(renderGate(gateFixture, COLOUR))).toBe(renderGate(gateFixture, PLAIN));
 
   const survey: KnowledgeSurvey = {
-    established: [{ question: ref("question", "Q_1"), asks: "does it converge?" }],
+    established: [
+      { question: ref("question", "Q_1"), asks: "does it converge?", claim: ref("claim", "CLM_1") },
+    ],
     provisional: [],
     accepted: [],
     unresolved: [],

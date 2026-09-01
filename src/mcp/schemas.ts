@@ -85,6 +85,9 @@ import type {
   IdentifiedArtefact,
   InterpretationHistory,
   KnowledgeSurvey,
+  AcceptedQuestion,
+  AnsweredQuestion,
+  Standing,
   QuestionStanding,
   ReproductionReport,
   Revision,
@@ -239,6 +242,17 @@ const questionStanding = z.strictObject({
   asks: z.string(),
 });
 
+/** `KnowledgeSurvey.accepted` — `questionStanding` plus what would reopen it (#55). */
+const acceptedQuestion = questionStanding.extend({
+  reopensIf: z.string(),
+  acceptedBecause: z.string(),
+});
+
+/** `KnowledgeSurvey.established`/`.provisional` — plus the claim that answers it (#55). */
+const answeredQuestion = questionStanding.extend({
+  claim: ref("claim"),
+});
+
 const identifiedArtefact = z.strictObject({
   part: ref("observations"),
   name: z.string(),
@@ -323,11 +337,11 @@ const revision = z.strictObject({
 /* -- the seven tools' return shapes -------------------------------------- */
 
 export const knowledgeSurveySchema = z.strictObject({
-  established: z.array(questionStanding),
+  established: z.array(answeredQuestion),
   unresolved: z.array(questionStanding),
   untested: z.array(questionStanding),
-  provisional: z.array(questionStanding),
-  accepted: z.array(questionStanding),
+  provisional: z.array(answeredQuestion),
+  accepted: z.array(acceptedQuestion),
 });
 
 export const historicalSurveySchema = z.strictObject({
@@ -764,6 +778,8 @@ type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 type Assert<T extends true> = T;
 
 export type _QuestionStanding = Assert<Exact<z.infer<typeof questionStanding>, QuestionStanding>>;
+export type _AcceptedQuestion = Assert<Exact<z.infer<typeof acceptedQuestion>, AcceptedQuestion>>;
+export type _AnsweredQuestion = Assert<Exact<z.infer<typeof answeredQuestion>, AnsweredQuestion>>;
 export type _IdentifiedArtefact = Assert<
   Exact<z.infer<typeof identifiedArtefact>, IdentifiedArtefact>
 >;
@@ -924,3 +940,21 @@ export const workListSchema = z.strictObject({
 
 export type _ListedGate = Assert<Exact<z.infer<typeof listedGate>, ListedGate>>;
 export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;
+
+/**
+ * `now` — "what am I blocked on right now, what are my priorities?" (#55).
+ * `blocked`/`unevaluated`/`untouched` reuse `listedGate`/`listedWork`;
+ * `known` reuses `knowledgeSurveySchema` whole, all five buckets. `since` is
+ * absent for the full-standing form and present once a cursor narrowed
+ * every section -- see `Standing`'s own doc comment in
+ * `src/domain/report.ts`.
+ */
+export const standingSchema = z.strictObject({
+  blocked: z.strictObject({ gates: z.array(listedGate), work: z.array(listedWork) }),
+  unevaluated: z.array(listedGate),
+  untouched: z.array(listedWork),
+  known: knowledgeSurveySchema,
+  seq: z.number(),
+  since: z.number().optional(),
+});
+export type _Standing = Assert<Exact<z.infer<typeof standingSchema>, Standing>>;
