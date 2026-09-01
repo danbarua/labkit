@@ -210,8 +210,9 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Question", "LineOfEnquiry"],
     ["Decision", "Question"],
     ["Decision", "Claim"],
-    // The revision an act produced, at analysis grain. See the `Computation`
-    // pair on `CHANGES` for what this link does and does not mean.
+    // The revision an act produced, at analysis grain — the half that pairs
+    // with `SUPERSEDES -> Computation`. `MOTIVATES` names what an act put in
+    // place; `SUPERSEDES` names what it stands instead of.
     ["Decision", "Computation"],
   ],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
@@ -378,37 +379,6 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   CHANGES: [
     ["Decision", "Criterion"],
     ["Decision", "Claim"],
-    /**
-     * **The `Computation` pair is LINEAGE, not retraction**, and confusing the
-     * two would undo the defect it was added for.
-     *
-     * `Decision -CHANGES-> Computation(old)` with
-     * `Decision -MOTIVATES-> Computation(new)` says *this analysis is a
-     * revision of that one*. It says nothing whatever about the standing of
-     * the old analysis's conclusions. **No reader may infer that the old
-     * analysis's other findings fell** from the existence of this edge —
-     * `affects`, `why` and `known` must all go on reporting an untouched
-     * conclusion as standing, and as resting on the old output artefact.
-     *
-     * Retraction stays exactly one grain lower: `conclude --replacing` writes
-     * `Decision -CHANGES-> Claim` per finding, which is what `withdrawalOf`
-     * reads. That separation *is* #132's fix. The old code carried retraction
-     * on `Artefact.invalidated`, one flag over every finding, so replacing one
-     * conclusion withdrew the rest.
-     *
-     * `replaceAnalysis` declined a link of any kind until 2026-09-01, on two
-     * grounds stated together: nothing read one, and invalidation already
-     * carried the meaning. #173 removed the second — the flag is no longer
-     * written — and supplied the first: `conclude --replacing X` walks
-     * `new <-MOTIVATES- Decision -CHANGES-> old` to check that `old` actually
-     * concluded `X`, and names what it did conclude when it did not.
-     *
-     * The alternative was to leave `--replacing` unscoped, and that produces a
-     * confidently wrong answer rather than an empty one: a finding recorded as
-     * superseded by an analysis that never addressed its question, with the
-     * record pointing at the wrong act as the reason it no longer stands.
-     */
-    ["Decision", "Computation"],
   ],
   BASED_ON: [
     ["Decision", "Evidence"],
@@ -417,7 +387,59 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   RESOLVES: [["Decision", "Question"]],
   NARROWS: [["Decision", "Question"]],
   DEFERS: [["Decision", "Question"]],
-  SUPERSEDES: [["Decision", "Decision"]],
+  /**
+   * **A later record stands instead of an earlier one.**
+   *
+   * The line between this and {@link CHANGES} is what keeps either honest, and
+   * it was drawn by a reader that broke without it:
+   *
+   * - `CHANGES` — the *same evidence read differently*. A reading narrowed
+   *   (S-12), a condition amended (S-7). Nothing is replaced; the record still
+   *   stands and its meaning moved.
+   * - `SUPERSEDES` — *this stands instead of that*. An amendment over an
+   *   amendment, a corrected finding over a defective one, a re-analysis over
+   *   the analysis it replaced.
+   *
+   * **`reinterpret` does not supersede**, which is the case that makes the
+   * distinction load-bearing rather than tidy: the evidence is untouched and
+   * only the reading moved.
+   *
+   * ## The measurement that earned the two `Decision` pairs below
+   *
+   * #173 first wrote per-finding supersession as `CHANGES -> Claim`, argued as
+   * one reading — *this decision changed which claim stands*. Building it
+   * refuted the argument. `interpretationHistory` walks
+   * `Decision -MOTIVATES-> Claim` with `-CHANGES-> Claim` to build a narrowing
+   * chain, so a replacement entered the interpretation history and looped it:
+   *
+   *     interpretation history for "…" loops at "…"
+   *
+   * There is no structural discriminator — both decisions change exactly one
+   * claim and motivate exactly one. So the edge did carry two readings and a
+   * reader that wanted one got both. **That is the third instance of this
+   * project's most expensive shape**, after `PROMOTES` (split out of `CHANGES`
+   * because promotion read as retraction) and row V's `GATES`.
+   *
+   * ## Who reads which
+   *
+   * - `interpretationHistory` reads `CHANGES` only — a supersession is not a
+   *   step in a narrowing chain.
+   * - `withdrawalOf` reads both: a claim no longer stands whether its reading
+   *   was narrowed or its finding was superseded.
+   * - `whySupported` reads `SUPERSEDES` for *instead of*.
+   *
+   * The `Computation` pair is analysis-grain **lineage**: this analysis is a
+   * revision of that one. It says nothing about the standing of the old
+   * analysis's conclusions — no reader may infer that they fell from this
+   * edge's existence. Retraction is one grain lower, per finding, which is
+   * exactly #132's fix: the old code carried it on `Artefact.invalidated`, one
+   * flag over every finding, so replacing one conclusion withdrew the rest.
+   */
+  SUPERSEDES: [
+    ["Decision", "Decision"],
+    ["Decision", "Claim"],
+    ["Decision", "Computation"],
+  ],
   /**
    * `Review -> EvidenceUnit` is the second relationship S-11 earned: a review
    * of an *analysis* previously had nowhere to point, so its subject survived

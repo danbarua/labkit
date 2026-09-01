@@ -740,7 +740,7 @@ export class WriteSurface extends SessionCore {
             reason: `superseded by "${input.finding}"`,
             invalidation_check: "evidence that the superseded finding was right after all",
           });
-          await this.graph.createEdge(decision.natural_id, "CHANGES", superseded.claim);
+          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", superseded.claim);
           await this.graph.createEdge(decision.natural_id, "MOTIVATES", claim.natural_id);
         }
 
@@ -768,7 +768,7 @@ export class WriteSurface extends SessionCore {
    */
   private async revisedBy(analysis: AnalysisRef): Promise<AnalysisRef | undefined> {
     const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(:Decision)-[:CHANGES]->(old:Computation)
+      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(:Decision)-[:SUPERSEDES]->(old:Computation)
        RETURN old`,
       { old: vertexProps<{ natural_id: string }>() },
       { id: analysis },
@@ -1523,7 +1523,7 @@ export class WriteSurface extends SessionCore {
           reason: `superseded by a re-run: ${input.method}`,
           invalidation_check: "evidence that the superseded analysis was sound after all",
         });
-        await this.graph.createEdge(lineage.natural_id, "CHANGES", input.supersedes);
+        await this.graph.createEdge(lineage.natural_id, "SUPERSEDES", input.supersedes);
         await this.graph.createEdge(lineage.natural_id, "MOTIVATES", analysis);
 
         return { before, analysis };

@@ -674,7 +674,7 @@ export class ReadSurface extends SessionCore {
        // one flag over every finding an analysis produced, so replacing one
        // conclusion reported the rest superseded too (#132). Same pair
        // withdrawalOf reads: a decision that changed which claim stands.
-       OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (d:Decision)-[:SUPERSEDES]->(c)
        RETURN e, comp, a, r, d`,
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
