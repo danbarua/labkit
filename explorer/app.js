@@ -150,7 +150,7 @@ function selectTrace(index) {
   // within the same second or so) and renders indistinguishably from the old
   // seq-based depth; a `--db` trace with a backfilled `--date` import is
   // exactly the case this exists for -- see the header on `zOf()`.
-  const ats = (state.current?.steps ?? []).map((s) => Date.parse(s.at));
+  const ats = (state.current?.steps ?? []).map((s) => Date.parse(s.at)).filter(Number.isFinite);
   state.timeRange = ats.length
     ? { min: Math.min(...ats), max: Math.max(...ats) }
     : null;
@@ -594,7 +594,13 @@ function project(node) {
 function zOf(node) {
   const range = state.timeRange;
   const totalDepth = Math.max(0, (state.current?.steps.length ?? 1) - 1) * ZSPACING;
-  if (!range || range.max === range.min) return node.createdStep * ZSPACING;
+  // Same fallback for a degenerate range (every `at` identical or absent) and
+  // for one node whose own `at` didn't parse -- `state.timeRange` already
+  // excludes non-finite values from min/max, but a single bad one here would
+  // still NaN this node's own z without this check.
+  if (!range || range.max === range.min || !Number.isFinite(node.createdAt)) {
+    return node.createdStep * ZSPACING;
+  }
   return ((node.createdAt - range.min) / (range.max - range.min)) * totalDepth;
 }
 
