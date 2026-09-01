@@ -251,6 +251,20 @@ export interface ReplacementConclusion extends Conclusion {
    * a partial re-analysis, which is what Bonsai actually does, retracted
    * findings the act never mentioned. Coverage is which conclusions the caller
    * paired; one nobody pairs stands.
+   *
+   * Two guards on that inference, both about not guessing:
+   *
+   * - **It is composition-only.** `conclude` itself never matches on wording —
+   *   a caller at the CLI or over MCP names the finding it supersedes or
+   *   supersedes nothing. There the proposition is the agent's own sentence and
+   *   matching it would be a guess about someone else's words; here the caller
+   *   handed in a whole list to be paired against another whole list.
+   * - **An ambiguous match is refused, not picked.** Two conclusions of one
+   *   analysis may assert the same sentence about different endpoints — S-5's
+   *   case, and the reason a claim has a handle of its own — so
+   *   `replaceAnalysis` refuses when the wording matches more than one and asks
+   *   for this field. Taking the first would be a coin toss recorded as a fact,
+   *   which is what `claimsAsserting` already refuses to do.
    */
   replacing?: ClaimRef | EvidenceRef;
 }

@@ -107,9 +107,10 @@ describe("a composition writes the record its moves describe", () => {
     });
     await closeOnEvidence(w, { enquiry, answeredBy: second.claims[0]!.claim });
 
-    // The arc, as the record has it. Eight fragments, ten events: `gatedWork`
-    // and `observeAndAnalyse` are each two acts, which is the honest count —
-    // a fragment is a move for a researcher, not a promise about event count.
+    // The arc, as the record has it. A fragment is a move for a researcher,
+    // not a promise about event count — `gatedWork` and `observeAndAnalyse`
+    // are each more than one act, and the honest count says so. Each analysis
+    // draws one conclusion here, so each contributes a `conclude` (#173).
     expect(operations(await events.all())).toEqual([
       "openEnquiry",
       "stateCriterion",
@@ -117,19 +118,25 @@ describe("a composition writes the record its moves describe", () => {
       "declareGate",
       "recordObservations",
       "recordAnalysis",
+      "conclude",
       "evaluateCriterion",
       "recordObservations",
       "recordAnalysis",
+      "conclude",
       "evaluateCriterion",
       "promote",
       "closeEnquiry",
     ]);
 
     // And the edges are there, which is what the hand-written mockup had to
-    // invent. Asserted on the compound verb, where getting it wrong is easiest.
+    // invent. **Both events**, because the split is where getting this wrong
+    // is easiest: what the run read is on the run, and what the finding bears
+    // on is on the conclusion. A nested emit used to take the first with the
+    // second — see `TenantGraph.inMintScope`.
     const analysis = (await events.select({ operation: "recordAnalysis" }))[0]!;
     expect((analysis.edges ?? []).map((e) => e.label)).toContain("CONSUMES");
-    expect((analysis.edges ?? []).map((e) => e.label)).toContain("SUPPORTS");
+    const drawn = (await events.select({ operation: "conclude" }))[0]!;
+    expect((drawn.edges ?? []).map((e) => e.label)).toContain("SUPPORTS");
   });
 
   /**
@@ -200,8 +207,11 @@ describe("a composition writes the record its moves describe", () => {
     });
     await closeOnEvidence(w, { enquiry, answeredBy: claims[0]!.claim });
 
-    const analysis = (await events.select({ operation: "recordAnalysis" }))[0]!;
-    const labels = (analysis.edges ?? []).map((e) => e.label);
+    // On the `conclude` event, since #173: the bearing belongs to the finding,
+    // and the finding is its own act. The run beneath it has no bearing to
+    // lose.
+    const drawn = (await events.select({ operation: "conclude" }))[0]!;
+    const labels = (drawn.edges ?? []).map((e) => e.label);
     // CHALLENGES, not SUPPORTS. A fragment that lost the bearing would still
     // produce a claim and a closed question, and only this distinguishes them.
     expect(labels).toContain("CHALLENGES");

@@ -479,33 +479,29 @@ export class WriteSurface extends SessionCore {
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
       const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
-      const claims: ConcludedClaim[] = [];
-      for (const conclusion of input.concludes) {
-        // `concluding`, not `conclude` -- one act, one event, and the caller
-        // made one call. See its header for the half that is not style: a
-        // nested emit DRAINS this act's edges into an event of its own.
-        claims.push(
-          await this.concluding({
-            analysis,
-            proposition: conclusion.proposition,
-            finding: conclusion.finding,
-            ...(conclusion.bearing === undefined ? {} : { bearing: conclusion.bearing }),
-            ...(conclusion.standing === undefined ? {} : { standing: conclusion.standing }),
-          }),
-        );
-      }
-      // **Last, not first**, for the same reason. `emit` drains what has been
-      // minted since the previous event, so emitting before the conclusions
-      // exist reports a computation with no findings hanging off it --
-      // `PRODUCES`, `RECORDED_IN` and `SUPPORTS` all missing, which is most of
-      // what an analysis is. An analysis with no conclusions still emits
-      // exactly one event and is a real, honest state: `enquiry` prints "has
-      // produced nothing yet" and `known` buckets it as worked-on-no-answer.
+      // The analysis is its own act, and each conclusion is another. **N+1
+      // events, and that is the truthful count**: concluding four things is
+      // four things a researcher did, and this must record them the same way
+      // the CLI does when a person makes the same four calls. An analysis with
+      // no conclusions yet emits exactly one and is a real, honest state --
+      // `enquiry` prints "has produced nothing yet" and `known` buckets it as
+      // worked-on-no-answer.
       const events = await this.emit("recordAnalysis", analysis, {
         enquiry: input.enquiry,
         method: input.method,
-        conclusions: this.conclusionEvents(claims),
       });
+      const claims: ConcludedClaim[] = [];
+      for (const conclusion of input.concludes) {
+        const concluded = await this.conclude({
+          analysis,
+          proposition: conclusion.proposition,
+          finding: conclusion.finding,
+          ...(conclusion.bearing === undefined ? {} : { bearing: conclusion.bearing }),
+          ...(conclusion.standing === undefined ? {} : { standing: conclusion.standing }),
+        });
+        claims.push(...concluded.claims);
+        events.push(...concluded.events);
+      }
       return { analysis, claims, events };
     });
   }
@@ -644,14 +640,39 @@ export class WriteSurface extends SessionCore {
    * answer already covers.
    */
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.graph.inTransaction(async () => {
-      const concluded = await this.concluding(input);
-      const events = await this.emit("conclude", input.analysis, {
-        conclusions: this.conclusionEvents([concluded]),
-        ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
-      });
-      return { analysis: input.analysis, claims: [concluded], events };
-    });
+    return this.concludeOne(input);
+  }
+
+  /**
+   * `conclude`, plus the review a composition can supply. **The compounds call
+   * this one.**
+   *
+   * `because` is not on {@link ConcludeCommand} and this is not plumbing: a
+   * researcher concluding one thing at a terminal is not holding a review
+   * handle, and `replaceAnalysis` is the act that says a review caused the
+   * supersession. Keeping it off the command is what stops the CLI and MCP
+   * asking for a value neither of their callers has.
+   */
+  private async concludeOne(
+    input: ConcludeCommand,
+    because?: ReviewRef,
+  ): Promise<RecordedAnalysis> {
+    return this.graph.inTransaction(async () =>
+      // **Its own mint scope, so a composition calling this keeps its own.**
+      // `emit` drains what has been minted since the last event, and without a
+      // scope that meant everything the enclosing verb had minted too — the
+      // parent's edges carried off into the child's event. See
+      // `TenantGraph.inMintScope`, which also records why suppressing the inner
+      // event was the wrong fix.
+      this.graph.inMintScope(async () => {
+        const concluded = await this.concluding(input, because);
+        const events = await this.emit("conclude", input.analysis, {
+          conclusions: this.conclusionEvents([concluded]),
+          ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
+        });
+        return { analysis: input.analysis, claims: [concluded], events };
+      }),
+    );
   }
 
   /**
@@ -1625,27 +1646,48 @@ export class WriteSurface extends SessionCore {
       // it would have disagreed about which finding fell.
       const claims: ConcludedClaim[] = [];
       const paired: (RecordedConclusion | undefined)[] = [];
+      const replacementEvents: DomainEvent[] = [];
       for (const now of input.concludes) {
         // Explicit wins; the proposition match is the fallback the ordinary
         // re-run relies on. See `ReplacementConclusion.replacing`.
-        const was =
-          now.replacing === undefined
-            ? before.find((b) => b.proposition === now.proposition)
-            : before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
+        //
+        // **The fallback lives here and nowhere else.** `conclude` itself never
+        // matches on text: a caller at the CLI or over MCP names the finding it
+        // supersedes or supersedes nothing, because there the wording is the
+        // agent's own and matching it would guess. This is a composition, where
+        // the caller handed in a whole list to be paired.
+        let was: RecordedConclusion | undefined;
+        if (now.replacing === undefined) {
+          // **Refuses rather than picks.** Two conclusions of one analysis may
+          // assert the same sentence about different endpoints -- S-5's case,
+          // and the reason a claim has its own handle -- so a wording match can
+          // be ambiguous, and taking the first is a coin toss recorded as a
+          // fact. That is the shape `claimsAsserting` already refuses.
+          const candidates = before.filter((b) => b.proposition === now.proposition);
+          if (candidates.length > 1)
+            throw new Error(
+              `analysis ${input.supersedes} concluded "${now.proposition}" more than once ` +
+                `(${candidates.map((b) => b.claim).join(", ")}), so which one this replaces ` +
+                `cannot be inferred from the wording; name it with 'replacing'`,
+            );
+          was = candidates[0];
+        } else {
+          was = before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
+        }
         paired.push(was);
-        claims.push(
-          await this.concluding(
-            {
-              analysis: replacement,
-              proposition: now.proposition,
-              finding: now.finding,
-              ...(was === undefined ? {} : { replacing: was.claim }),
-              ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
-              ...(now.standing === undefined ? {} : { standing: now.standing }),
-            },
-            input.because,
-          ),
+        const concluded = await this.concludeOne(
+          {
+            analysis: replacement,
+            proposition: now.proposition,
+            finding: now.finding,
+            ...(was === undefined ? {} : { replacing: was.claim }),
+            ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
+            ...(now.standing === undefined ? {} : { standing: now.standing }),
+          },
+          input.because,
         );
+        claims.push(...concluded.claims);
+        replacementEvents.push(...concluded.events);
       }
 
       const changed: ChangedConclusion[] = [];
@@ -1745,6 +1787,7 @@ export class WriteSurface extends SessionCore {
           after: c.after,
         })),
       });
+      events.push(...replacementEvents);
       return {
         at,
         replacement,

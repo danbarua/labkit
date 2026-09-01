@@ -148,11 +148,52 @@ export class TenantGraph {
   }
 
   /**
+   * Runs `work` with its own mint list, so an `emit` inside it claims only what
+   * `work` minted — and the enclosing act keeps its own.
+   *
+   * **Nesting-safe draining, and without it a nested event is not merely an
+   * extra one — it steals.** `drainMinted` splices the whole list, so a
+   * composition that calls a verb which emits had its own already-minted ids
+   * and edges carried off into the child's event. `recordAnalysis` wrote a
+   * computation, an evidence unit and an output artefact, then called
+   * `conclude` once per conclusion, and its event came out reporting a
+   * computation with no `PRODUCES`, no `RECORDED_IN` and no `SUPPORTS` — most
+   * of what an analysis is. `tests/event-store.test.ts` is what noticed.
+   *
+   * **Suppressing the inner event was the other available fix and is the wrong
+   * one.** It makes the grain depend on the client: a composition would record
+   * one event for an analysis with four conclusions while the CLI, doing the
+   * same four acts, records five. The same research action must not leave a
+   * different log for having been written through a different tool — the
+   * Explorer's traces and the live record would then disagree about identical
+   * arcs. Scope the drain; leave the grain alone.
+   *
+   * What a scope does not claim is **handed back up**, not dropped: a verb that
+   * mints something and emits nothing has still brought it into existence, and
+   * the enclosing act is what recorded that.
+   */
+  async inMintScope<T>(work: () => Promise<T>): Promise<T> {
+    const outer = this.minted;
+    const outerEdges = this.mintedEdges;
+    this.minted = [];
+    this.mintedEdges = [];
+    try {
+      return await work();
+    } finally {
+      outer.push(...this.minted);
+      outerEdges.push(...this.mintedEdges);
+      this.minted = outer;
+      this.mintedEdges = outerEdges;
+    }
+  }
+
+  /**
    * The natural ids minted since the last call, and clears them.
    *
    * Read once per event, by `WriteSurface.emit`. Draining rather than reading
    * is deliberate: two events in one transaction must not both claim the same
-   * new records.
+   * new records. See {@link inMintScope} for what "since the last call" means
+   * when one emitting verb is called by another.
    */
   drainMinted(): string[] {
     return this.minted.splice(0);

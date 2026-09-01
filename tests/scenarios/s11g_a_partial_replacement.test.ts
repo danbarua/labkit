@@ -155,6 +155,46 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
+   * The inference has to be able to say "I cannot tell", or it is guessing.
+   *
+   * Two conclusions of one analysis may assert the same sentence about
+   * different endpoints — S-5's case, and the reason a claim has a handle of
+   * its own. Pairing a replacement's conclusions by wording is then ambiguous,
+   * and taking the first is a coin toss recorded as a fact.
+   */
+  test("a replacement whose wording matches two earlier findings is refused, not guessed", async () => {
+    const { enquiry } = await session.openEnquiry("does T differ from its controls?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "per-image results",
+      finding: "two independent batches",
+    });
+    // One sentence, two findings: the same claim about two batches.
+    const { analysis: v1 } = await session.recordAnalysis({
+      enquiry,
+      method: "raw-scale aggregation",
+      from: [observations],
+      concludes: [
+        { proposition: REVISITED, finding: "p = 0.03 raw, batch one" },
+        { proposition: REVISITED, finding: "p = 0.04 raw, batch two" },
+      ],
+    });
+    const { review } = await session.recordReview({ of: v1, verdict: "wrong scale" });
+
+    await expect(
+      session.replaceAnalysis({
+        supersedes: v1,
+        because: review,
+        enquiry,
+        method: "log-scale re-aggregation",
+        from: [observations],
+        // No `replacing`, and the wording matches both.
+        concludes: [{ proposition: REVISITED, finding: "p = 0.007 log" }],
+      }),
+    ).rejects.toThrow(/more than once/);
+  });
+
+  /**
    * **The regression pair, on the evaluations.** #132's cost was not only the
    * claim: withdrawing an artefact withdrew every criterion evaluation that
    * cited any finding recorded in it. Both halves are asserted against one
