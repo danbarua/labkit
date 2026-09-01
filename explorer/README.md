@@ -76,14 +76,21 @@ Given a sequence of research-verb calls (`pose`, `pursue`, `recordAnalysis`,
   a Rust trace is rebuilt from the domain on every server start; a `--db`
   record is re-read on every request; either way the picture cannot drift out
   of sync with what actually happened, the way a checked-in mockup did.
-- **A `--db` record is read, never written.** The Explorer opens it and closes
-  the connection within one request, the same acquire-and-release shape the
-  MCP server uses per tool call — it never holds the PGlite lock for the
-  life of the process, which would block every real writer trying to touch
-  that record. It also never fills in `derived` for a `--db` trace:
-  `fragments/derive.ts`'s enquiry/gate snapshots are taken live, and there is
-  no way to ask a durable log what a query would have answered at a past
-  step after the fact.
+- **A `--db` record is read, never written.** The Explorer opens it, reads the
+  event history and every created node's properties, and closes the
+  connection within one request, the same acquire-and-release shape the MCP
+  server uses per tool call — it never holds the PGlite lock for the life of
+  the process, which would block every real writer trying to touch that
+  record. `derived` and `fragment` come afterward, from `fragments/replay.ts`
+  replaying that history — verb by verb, checked against itself — into a
+  disposable scratch database, because there is no way to ask a durable log
+  what a query would have answered at a past step after the fact; the live
+  connection to the real record is long closed by the time this runs.
+  Measured against the real, rebuilt Bonsai record (133 events, 2026-09-01):
+  about 4.1s per request, of which the scratch database's own boot and
+  provisioning is roughly 1.1-1.2s — the remainder is the 133 replayed verb
+  calls and their `withProvenance` snapshots, which is the cost that grows
+  with the record, worth knowing before pointing this at a much larger one.
 - **It does not reconstruct the CLI.** The command line shown per step
   (`labkit pose --question "..."`) is assembled for display from the event's
   `operation` and `detail` fields and is explicitly not a claim that string

@@ -7,10 +7,20 @@
  * `commandOf` already says why: it carries what a later query needs, not
  * what the CLI took). What it omits is recoverable two other ways: from the
  * act's own `edges` — a `QUALIFIES` edge is `heldTo`, a `BASED_ON` edge run
- * through `evidenceToClaim` is `citing` — or, for a value nothing edges to
- * (an evidence unit's `statement`, a claim's `kind`), from the node's own
+ * through `claimFor` is `citing` — or, for a value nothing edges to (an
+ * evidence unit's `statement`, a task's `acceptance`), from the node's own
  * property, read once from the live record before replay because prose does
  * not change after creation here.
+ *
+ * **One property is not prose and does change: `Claim.kind`.** `promote`
+ * mutates it in place, no new node or edge, so a claim promoted after it was
+ * concluded reads back from the live record as `confirmatory` no matter when
+ * `conclude` ran. Read that way, `conclude`/`reverify` would decode the claim
+ * as confirmatory from birth — wrong, and invisible to `replayIntoScratch`'s
+ * own check, which compares `created`/`edges` and cannot see a property.
+ * `wasPromoted` is the fix: a claim promoted anywhere in the history was
+ * exploratory when it was concluded, because promotion is defined as moving
+ * an exploratory finding to confirmatory standing, never the reverse.
  *
  * `DECODERS` is exhaustive over `Operation` at compile time
  * (`satisfies Record<Operation, Decoder>`), so a write verb with no decoder
@@ -29,6 +39,8 @@ export interface DecodeContext {
   claimFor(evidence: string): string | undefined;
   /** What an already-replayed analysis consumed, for `keep`/`replaceAnalysis`'s add-only `from`. */
   consumesOf(analysis: string): Promise<string[]>;
+  /** Whether a `promote` event names this claim anywhere in the history — see this file's header. */
+  wasPromoted(claim: string): boolean;
 }
 
 export type Decoder = (ctx: DecodeContext, event: DomainEvent) => Promise<void>;
@@ -43,6 +55,12 @@ function findEdges(event: DomainEvent, label: string) {
 
 function bearingOf(event: DomainEvent): "supports" | "challenges" {
   return findEdge(event, "CHALLENGES") ? "challenges" : "supports";
+}
+
+/** See this file's header: a claim promoted anywhere in the history was exploratory at conclude time. */
+function standingOf(ctx: DecodeContext, claim: string): "exploratory" | "confirmatory" | undefined {
+  if (ctx.wasPromoted(claim)) return "exploratory";
+  return ctx.nodeProp(claim, "kind") as "exploratory" | "confirmatory" | undefined;
 }
 
 export const DECODERS = {
@@ -101,7 +119,7 @@ export const DECODERS = {
   conclude: async (ctx, e) => {
     const c = (e.detail?.conclusions as { claim: string; finding: string; proposition: string }[])[0]!;
     const bearing = bearingOf(e);
-    const standing = ctx.nodeProp(c.claim, "kind") as "exploratory" | "confirmatory" | undefined;
+    const standing = standingOf(ctx, c.claim);
     const finding = ctx.nodeProp(c.finding, "statement") as string;
     const replacing = e.detail?.replacing as string | undefined;
     await ctx.writes.conclude({
@@ -181,7 +199,7 @@ export const DECODERS = {
     const method = ctx.nodeProp(e.subject, "kind") as string;
     const c = (e.detail?.conclusions as { claim: string; finding: string; proposition: string }[])[0]!;
     const bearing = bearingOf(e);
-    const standing = ctx.nodeProp(c.claim, "kind") as "exploratory" | "confirmatory" | undefined;
+    const standing = standingOf(ctx, c.claim);
     const finding = ctx.nodeProp(c.finding, "statement") as string;
     await ctx.writes.reverify({
       historical: ref("analysis", e.detail?.of as string),

@@ -120,6 +120,8 @@ Bun.serve({
       if (!dbDir) return Response.json(traces);
       try {
         const dbTrace = await readDbTrace(dbDir, basename(dbDir));
+        if (dbTrace.derivedUnavailable)
+          console.error(`labkit: --db ${dbDir}: ${dbTrace.derivedUnavailable}`);
         return Response.json([...traces, dbTrace]);
       } catch (err) {
         console.error(`labkit: failed to read --db ${dbDir}: ${(err as Error).message}`);
