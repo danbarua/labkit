@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Restores a snapshot, then proves a real migration run cannot lose rows off
- * a populated record. #129.
+ * a populated record.
  *
  * `check:migrations` lints `drizzle/*.sql` for destructive DDL, but nothing
  * runs a migration against a database that has real data in it -- a
