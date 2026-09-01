@@ -55,7 +55,7 @@ export function registerReads(program: Command, run: Run): void {
     .command("now")
     .summary("what am I blocked on right now, what are my priorities")
     .description(
-      "The morning briefing (#55): blocked gates and the work each protects, gates nobody " +
+      "Blocked gates and the work each protects, gates nobody " +
         "has finished checking, planned work nothing has touched, and where every question " +
         "stands. Literally `gates`, `work` and `known` in one read -- nothing here is stored, " +
         "and there is deliberately no `--at`: gate and work state are computed from today's " +

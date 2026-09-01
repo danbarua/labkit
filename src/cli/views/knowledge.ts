@@ -27,9 +27,8 @@ import { bullets, questionLines } from "./format";
 
 /**
  * `AcceptedQuestion`'s own line — `asks` and the handle, plus why it was
- * accepted and what would reopen it. Without the second half this is the
- * list nobody reads (S-14): "accepted" says a decision was taken, not what it
- * would take to revisit it.
+ * accepted and what would reopen it. Without the second half, "accepted"
+ * says only that a decision was taken, not what it would take to revisit it.
  */
 function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
   return qs.map(
@@ -40,12 +39,8 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
 
 /**
  * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was
- * answered. Without the polarity, an established **"no"** reads as though the
- * record had shown the opposite: an outside reader given only `asks` for a
- * promoted, confirmed negative result read it as a "yes" (`now`'s own
- * acceptance test, run cold, #189). The record has always carried this
- * (`QuestionClosure.answer`, S-4); this line is the same fact, on the report
- * that previously omitted it.
+ * answered. Without the polarity, reading only `asks` for an established
+ * question cannot tell a promoted, confirmed "no" apart from a "yes".
  */
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => `${q.asks}  ${p.handle(`(${q.question})`)}  — ${q.answer}`);

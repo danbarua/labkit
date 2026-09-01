@@ -1,12 +1,10 @@
 /**
- * "What am I blocked on right now, what are my priorities?" (#55).
+ * "What am I blocked on right now, what are my priorities?"
  *
- * Composes the same renderers `gates`, `work` and `known` already use —
- * `lists filter, detail tools explain` applies to the page as much as to the
- * data: this file adds no rendering logic of its own for a gate or a task,
- * only the section headings that order them the way Dan's own framing does
- * (blocked first, then where the map hasn't been walked, then the standing
- * of what the gates were for).
+ * Composes the same renderers `gates`, `work` and `known` already use: this
+ * file adds no rendering logic of its own for a gate or a task, only the
+ * section headings that order them — blocked first, then where the map
+ * hasn't been walked, then the standing of what the gates were for.
  */
 
 import type { Standing } from "../../domain";

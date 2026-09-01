@@ -242,13 +242,13 @@ const questionStanding = z.strictObject({
   asks: z.string(),
 });
 
-/** `KnowledgeSurvey.accepted` — `questionStanding` plus what would reopen it (#55). */
+/** `KnowledgeSurvey.accepted` — `questionStanding` plus what would reopen it. */
 const acceptedQuestion = questionStanding.extend({
   reopensIf: z.string(),
   acceptedBecause: z.string(),
 });
 
-/** `KnowledgeSurvey.established`/`.provisional` — the claim that answers it, and which way (#55). */
+/** `KnowledgeSurvey.established`/`.provisional` — the claim that answers it, and which way. */
 const answeredQuestion = questionStanding.extend({
   claim: ref("claim"),
   answer: z.enum(["yes", "no"]),
@@ -944,7 +944,7 @@ export type _ListedGate = Assert<Exact<z.infer<typeof listedGate>, ListedGate>>;
 export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;
 
 /**
- * `now` — "what am I blocked on right now, what are my priorities?" (#55).
+ * `now` — "what am I blocked on right now, what are my priorities?"
  * `blocked`/`unevaluated`/`untouched` reuse `listedGate`/`listedWork`;
  * `known` reuses `knowledgeSurveySchema` whole, all five buckets. `since` is
  * absent for the full-standing form and present once a cursor narrowed

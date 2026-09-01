@@ -183,7 +183,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     name: "now",
     title: "What am I blocked on right now, what are my priorities",
     description:
-      "The morning briefing (#55): gates currently blocking work and the work each " +
+      "Gates currently blocking work and the work each " +
       "protects, gates nobody has finished checking, planned work nothing has touched yet, " +
       "and where every question stands. Literally the composition of `gate_list`, " +
       "`work_list` and `known` -- no new query, and nothing here is stored. Give `since` (a " +

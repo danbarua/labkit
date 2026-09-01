@@ -1282,14 +1282,12 @@ export interface QuestionStanding {
 }
 
 /**
- * `QuestionStanding`, plus what would reopen it — carried on `KnowledgeSurvey
- * .accepted` (#55): a deliberately-open list without the condition that would
- * reopen each item is the list nobody reads (S-14's own argument, applied to
- * `whatIsKnown` rather than to `enquiryStatus`, which already carries both on
- * `QuestionClosure`). Sourced from the same `DEFERS` decision `enquiryStatus`
- * reads `reopensIf`/`acceptedBecause` from, and read the same way here: one
- * more projection on `whatIsKnown`'s already-joined `accepting` node, not a
- * second query per question.
+ * `QuestionStanding`, plus what would reopen it — carried on
+ * `KnowledgeSurvey.accepted`: a deliberately-open list without the condition
+ * that would reopen each item is a list nobody can act on. Sourced from the
+ * same `DEFERS` decision `enquiryStatus` reads `reopensIf`/`acceptedBecause`
+ * from, and read the same way here: one more projection on `whatIsKnown`'s
+ * already-joined `accepting` node, not a second query per question.
  */
 export interface AcceptedQuestion extends QuestionStanding {
   reopensIf: string;
@@ -1298,21 +1296,19 @@ export interface AcceptedQuestion extends QuestionStanding {
 
 /**
  * `QuestionStanding`, plus the claim that answers it and which way it cuts —
- * carried on `KnowledgeSurvey.established`/`.provisional` (#55): both
- * buckets are "answered", differing only in whether the answer met the
- * standard it was held to and was promoted, and both the claim and the
- * polarity are what `whatIsKnown` already resolved to decide which bucket to
- * place the question in and which bearing (`SUPPORTS`/`CHALLENGES`) answered
- * it. Exposing the claim lets a reader go straight to `why <claim>` without
- * a text search, and lets `now`'s delta recognise a question as moved when
- * the claim answering it was touched (by `promote`, `reinterpret`,
- * `reverify`) even though the question's own id was not.
+ * carried on `KnowledgeSurvey.established`/`.provisional`: both buckets are
+ * "answered", differing only in whether the answer met the standard it was
+ * held to and was promoted, and both the claim and the polarity are what
+ * `whatIsKnown` already resolved to decide which bucket to place the
+ * question in and which bearing (`SUPPORTS`/`CHALLENGES`) answered it.
+ * Exposing the claim lets a reader go straight to `why <claim>` without a
+ * text search, and lets a caller recognise a question as moved when the
+ * claim answering it changed even though the question's own id did not.
  *
- * **`answer` is not decoration.** An outside reader given only `asks` for an
- * established question read a promoted, confirmed **"no"** as though the
- * record had shown the opposite — `now`'s own acceptance test, run cold
- * (#189). The record has always carried polarity (`QuestionClosure.answer`,
- * S-4); this is that same fact, on the report that previously omitted it.
+ * **`answer` is not decoration.** Reading only `asks` for an established
+ * question cannot tell a promoted, confirmed "no" apart from a "yes" — the
+ * record has always carried this polarity (`QuestionClosure.answer`); this
+ * is that same fact, on a report that would otherwise omit it.
  */
 export interface AnsweredQuestion extends QuestionStanding {
   claim: ClaimRef;
@@ -1656,12 +1652,11 @@ export type WorkState = "planned" | "blocked" | "carried-out";
  * adds, and it is why the two types are not one: a `GatedWork` says what a gate
  * is holding up, and says nothing about whether that work has happened.
  *
- * `gates` joined #55: `workList()` already collects every gate governing a
- * task to compute `state` (`workStateFrom` reads exactly this set) — a
- * caller composing `now`'s `--since` delta needs it too, to catch a task
- * newly blocked by a criterion evaluation, which touches the gate
- * (`TRIGGERS`) and never the task itself. Exposing what the computation
- * already held, not a second query.
+ * `workList()` already collects every gate governing a task to compute
+ * `state` (`workStateFrom` reads exactly this set), and `gates` exposes it: a
+ * caller needs it to catch a task newly blocked by a criterion evaluation,
+ * which touches the gate (`TRIGGERS`) and never the task itself. Exposing
+ * what the computation already held, not a second query.
  */
 export interface ListedWork {
   work: WorkRef;
@@ -1737,27 +1732,26 @@ export interface GateExplanation {
 export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation | GateExplanation;
 
 /**
- * "What am I blocked on right now, what are my priorities?" (#55, Dan's own
- * spec). Literally the composition of reads that already exist — `gateList`,
- * `workList`, `whatIsKnown` — never a private helper, so a section that
- * needs a query nothing else has yet shows up as a signature change the
- * coverage tests already police.
+ * "What am I blocked on right now, what are my priorities?" Literally the
+ * composition of reads that already exist — `gateList`, `workList`,
+ * `whatIsKnown` — never a private helper, so a section that needs a query
+ * nothing else has yet shows up as a signature change the coverage tests
+ * already police.
  *
  * `blocked`/`unevaluated`/`untouched` are `gateList()`/`workList()`
  * partitioned client-side by the state each already carries, not three
  * separate filtered queries: one traversal per read, not one per section.
  * `known` is `whatIsKnown()` unmodified, all five buckets present and
- * unmerged — PJ-001's `untested` is not a weak `unresolved` applies here
- * exactly as it does there, and collapsing them into a shorter, prettier
- * section list was tried and is exactly the defect class this repo keeps
- * finding.
+ * unmerged: `untested` is not a weak form of `unresolved`, and collapsing
+ * them into a shorter section list reports a question nothing has been run
+ * against identically to one that was worked on and not settled.
  *
  * **Deliberately no `at=`.** Gate and work state are computed from
  * evaluations and edges as they currently stand; a historical standing would
  * compute "blocked last Tuesday" from today's graph and present it as
- * history — the confidently-wrong shape PJ-011 §5 warns against, not an
- * honest empty result. `whatHappened` already refuses the same thing a
- * different way (it answers "what happened", never "what was true").
+ * history, not an honest empty result. `whatHappened` already refuses the
+ * same thing a different way (it answers "what happened", never "what was
+ * true").
  */
 export interface Standing {
   /** Gates currently blocking work, and the work each protects — two reads, not a join. */

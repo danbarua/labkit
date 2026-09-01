@@ -340,10 +340,10 @@ export class ReadSurface extends SessionCore {
 
     const answering = new Map<string, { natural_id: string; kind?: string }>();
     // Which bearing supplied the answering claim -- CHALLENGES means the
-    // question was answered "no" (S-4), exactly as `enquiryStatus` derives
-    // polarity from the same shape of query. Never both for one question in
-    // practice (`closeEnquiry` forbids a second `RESOLVES`), so last-write
-    // is academic, not a real ambiguity to resolve.
+    // question was answered "no", exactly as `enquiryStatus` derives polarity
+    // from the same shape of query. Never both for one question in practice
+    // (`closeEnquiry` forbids a second `RESOLVES`), so last-write is
+    // academic, not a real ambiguity to resolve.
     const answeringBearing = new Map<string, "SUPPORTS" | "CHALLENGES">();
     const met = new Map<string, boolean>();
     const seen = new Map<
@@ -2355,22 +2355,21 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * "What am I blocked on right now, what are my priorities?" (#55) — see
+   * "What am I blocked on right now, what are my priorities?" — see
    * `Standing`'s own doc comment for the shape and why there is no `at=`.
    *
    * With no `since`, the full standing. With one, every section narrowed to
    * what a touched handle appears in since that cursor — `whatHappened`'s
-   * `created`/`edges`/`subject` on every act since it, per #161/PJ-032's
-   * edge recording, never a snapshot of what things *were*.
+   * `created`/`edges`/`subject` on every act since it, never a snapshot of
+   * what things *were*.
    *
    * **A task is moved if its own id was touched, or any gate governing it
    * was.** `evaluateCriterion` touches the criterion, the evaluation and the
    * gate (`TRIGGERS`) — never the task a gate protects — so a task newly
    * blocked (or newly unblocked) by an evaluation would otherwise be
-   * invisible in exactly the case #55 is for. `ListedWork.gates` is what
-   * `workStateFrom` already reads to compute `state`; checking those ids
-   * against the same touched set is one more membership test, not a new
-   * query (review on #189).
+   * invisible. `ListedWork.gates` is what `workStateFrom` already reads to
+   * compute `state`; checking those ids against the same touched set is one
+   * more membership test, not a new query.
    *
    * **A question is moved if its own id was touched, or the claim answering
    * it was.** `closeEnquiry`/`acceptAsUnresolved` both write an edge landing
