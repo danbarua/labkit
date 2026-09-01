@@ -1,7 +1,77 @@
 # LabKit
 
-A research control plane: it tracks **why** a computation was run, what evidence
-resulted, what claims and decisions depend on it, and what is still unresolved.
+<!--
+  Real output, pasted from a run against a live research record (a coupled-
+  oscillator dynamics research programme called Bonsai) at commit 43a4cae,
+  2026-09-01, after the record rebuild tracked in #190 step 5.
+-->
+
+```sh
+$ labkit now
+Right now
+
+Blocked gates
+blocked  GATE_3  Stage 2B's readiness signal stays red; the independent package-review gate for stage-4 release is separately and additionally blocked
+
+Blocked work
+blocked  TASK_3  produce and maintain the reviewer-required gate inventory (requirement 4, ruling of 2026-08-08) verifying Stage 2B's binding guarantees are enforced in code, not just documented
+
+Incomplete gates
+incomplete  GATE_1  the affected comparison's robustness cannot be confirmed either way; a further design iteration or an honest 'inconclusive' verdict is required
+
+Untouched work — ready to start
+  nothing
+
+Established
+  - does a structured internal transformation exist in response to local perturbations along a baseline trajectory?  (Q_3)  — yes
+  - can this structured mapping be linked to an externally defined task or information-processing objective (Level 3)?  (Q_6)  — yes
+  - does runtime graph evolution, on top of an already dynamically-encoded local phase state, improve single-step active-support reconstruction under a fixed, majority-censored clipped-Gaussian corruption -- the Stage-2A-shaped question for denoising instead of classification?  (Q_8)  — yes
+  - does learned topology (T) produce distinguishable finite-time infinitesimal perturbation dynamics from matched controls (rewired, random, lattice)?  (Q_1)  — no
+
+Provisional (answered, but not something to build on yet)
+  - does this structured transformation generalize across independent baseline trajectories, or is it specific to seed=3000?  (Q_4)  — yes
+  - does learned topology T produce this mapping more strongly, more stably, or differently structured than matched controls (rewired, random, lattice)?  (Q_5)  — no
+  - does the oscillator readout's runtime graph evolution ever become cheaper per image than an ordinary MLP baseline, at some deployment scale?  (Q_7)  — no
+  - does the T-vs-stochastic-control comparison hold up under proper seed accounting (multiple seeds per class, explicit within-class aggregation and robustness checks)?  (Q_2)  — no
+
+Accepted as unresolved
+  nothing
+
+Unresolved (worked on, no answer yet)
+  nothing
+
+Untested (nothing has been run against these)
+  nothing
+
+seq: 133  —  `now --since 133` asks what moves next
+
+$ labkit why GATE_3
+GATE_3 is blocked because
+  - binding_gate a375db47a337: the hierarchical identity gate (primary evolved_T-vs-pre_evolution; denoising gate against identity, evaluated only if primary succeeds, never rescuing a failed primary; pre_evolution-vs-identity always reported independently) is enforced in code, not only in DESIGN.md prose — failed  (CRIT_14)  on 2026-08-08T21:53:23.000Z
+
+$ labkit search "seed"
+Records containing "seed"
+Question:
+  - does the T-vs-stochastic-control comparison hold up under proper seed accounting (multiple seeds per class, explicit within-class aggregation and robustness checks)?  (Q_2)
+  - does this structured transformation generalize across independent baseline trajectories, or is it specific to seed=3000?  (Q_4)
+LineOfEnquiry:
+  - 10-class re-verification: 25 seeds per stochastic control, mean-aggregated paired Wilcoxon primary, median-aggregation + exact sign-flip + within-class MCSE robustness cascade, Holm correction across 4 comparisons  (LOE_2)
+  ⋮ (22 more matches, across Evidence, Decision, Criterion, CriterionEvaluation, Review and Task — every field the record considers prose, not just questions)
+```
+
+**`now` is the standing** — what's blocked, what's ready, where every question
+sits — computed fresh from the graph on every call, never stored. **`why`
+explains one record's causes**, the same computation `now` summarises, asked
+about one handle. **`search` finds a handle from a word**, across every field
+the record considers prose. Together they are two tenses of one vocabulary:
+`now` is what stands, `why` is why. A third, `is`, will assert a new present
+deliberately (#184, not yet built); until then the write verbs (`pose`,
+`pursue`, `record_analysis`, `conclude`, `close_enquiry`, …) do that work
+directly, each under its own name.
+
+LabKit is a research control plane: it tracks **why** a computation was run,
+what evidence resulted, what claims and decisions depend on it, and what is
+still unresolved.
 
 It is not experiment telemetry — W&B and MLflow own metrics, run logs and
 sweeps. LabKit owns provenance, justification and dependency propagation, and
@@ -9,7 +79,8 @@ answers questions like *why does this conclusion count as supported?*, *what
 breaks if this record turns out to be wrong?* and *is this gate actually
 satisfied, or has nobody checked?*
 
-The primary interface is an **MCP server**, so the caller is usually an agent.
+The primary interface is an **MCP server**, so the caller is usually an agent;
+the CLI above is the same record, for a person at a terminal.
 
 ## Running the MCP server
 
@@ -111,7 +182,7 @@ The same binary, without the `mcp` subcommand:
 
 ```sh
 labkit --help
-labkit known           # what does this programme know?
+labkit now             # what am I blocked on, what are my priorities?
 bun run dev --help     # the same thing, from source
 bun run example        # a narrated lifecycle, for reading
 ```
@@ -121,7 +192,12 @@ It reads **and writes** — every verb the MCP server exposes has a command — 
 record; `--author` names who is acting, since a script driving LabKit is not the
 account it runs under.
 
-Running `labkit known` in a terminal while an agent session is open is the
+Writing is one conclusion per call: `labkit conclude <analysis-id> --proposition
+"..." --finding "..."` records a finding and what it bears on; `--replacing
+<CLM_…|EV_…>` supersedes an earlier one instead, inheriting its proposition and
+bearing.
+
+Running `labkit now` in a terminal while an agent session is open is the
 ordinary case, not an edge one: the server holds the database only for the
 length of a tool call, so the two take turns rather than colliding.
 
