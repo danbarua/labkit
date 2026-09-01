@@ -226,16 +226,18 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{
-        proposition: AGREES,
-        finding: "median p = 0.04",
-        // The correction REVERSES its predecessor, so there is no shared
-        // proposition to pair them by and the caller has to say. Before #132
-        // it needed saying nowhere, because a replacement retracted the whole
-        // superseded analysis by construction -- which is that issue's root
-        // cause, not a convenience.
-        replacing: claimOf(defectiveClaims, DISAGREES),
-      }],
+      concludes: [
+        {
+          proposition: AGREES,
+          finding: "median p = 0.04",
+          // The correction REVERSES its predecessor, so there is no shared
+          // proposition to pair them by and the caller has to say. Before #132
+          // it needed saying nowhere, because a replacement retracted the whole
+          // superseded analysis by construction -- which is that issue's root
+          // cause, not a convenience.
+          replacing: claimOf(defectiveClaims, DISAGREES),
+        },
+      ],
     });
     await session.evaluateCriterion({
       criterion: robustness,
@@ -307,16 +309,18 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{
-        proposition: AGREES,
-        finding: "median p = 0.04",
-        // The correction REVERSES its predecessor, so there is no shared
-        // proposition to pair them by and the caller has to say. Before #132
-        // it needed saying nowhere, because a replacement retracted the whole
-        // superseded analysis by construction -- which is that issue's root
-        // cause, not a convenience.
-        replacing: claimOf(defectiveClaims, DISAGREES),
-      }],
+      concludes: [
+        {
+          proposition: AGREES,
+          finding: "median p = 0.04",
+          // The correction REVERSES its predecessor, so there is no shared
+          // proposition to pair them by and the caller has to say. Before #132
+          // it needed saying nowhere, because a replacement retracted the whole
+          // superseded analysis by construction -- which is that issue's root
+          // cause, not a convenience.
+          replacing: claimOf(defectiveClaims, DISAGREES),
+        },
+      ],
     });
     await session.evaluateCriterion({
       criterion: robustness,
@@ -390,16 +394,18 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{
-        proposition: AGREES,
-        finding: "median p = 0.04",
-        // The correction REVERSES its predecessor, so there is no shared
-        // proposition to pair them by and the caller has to say. Before #132
-        // it needed saying nowhere, because a replacement retracted the whole
-        // superseded analysis by construction -- which is that issue's root
-        // cause, not a convenience.
-        replacing: claimOf(failedClaims, DISAGREES),
-      }],
+      concludes: [
+        {
+          proposition: AGREES,
+          finding: "median p = 0.04",
+          // The correction REVERSES its predecessor, so there is no shared
+          // proposition to pair them by and the caller has to say. Before #132
+          // it needed saying nowhere, because a replacement retracted the whole
+          // superseded analysis by construction -- which is that issue's root
+          // cause, not a convenience.
+          replacing: claimOf(failedClaims, DISAGREES),
+        },
+      ],
     });
 
     expect(
@@ -489,16 +495,18 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{
-        proposition: AGREES,
-        finding: "median p = 0.04",
-        // The correction REVERSES its predecessor, so there is no shared
-        // proposition to pair them by and the caller has to say. Before #132
-        // it needed saying nowhere, because a replacement retracted the whole
-        // superseded analysis by construction -- which is that issue's root
-        // cause, not a convenience.
-        replacing: claimOf(defectiveClaims, DISAGREES),
-      }],
+      concludes: [
+        {
+          proposition: AGREES,
+          finding: "median p = 0.04",
+          // The correction REVERSES its predecessor, so there is no shared
+          // proposition to pair them by and the caller has to say. Before #132
+          // it needed saying nowhere, because a replacement retracted the whole
+          // superseded analysis by construction -- which is that issue's root
+          // cause, not a convenience.
+          replacing: claimOf(defectiveClaims, DISAGREES),
+        },
+      ],
     });
 
     const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));

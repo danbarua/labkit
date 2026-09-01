@@ -676,7 +676,19 @@ export class WriteSurface extends SessionCore {
    * One who calls a compound made one call and gets one, with every conclusion
    * in its payload — the same distinction `pose` and `openEnquiry` already make.
    */
-  private async concluding(input: ConcludeCommand): Promise<Required<ConcludedClaim>> {
+  private async concluding(
+    input: ConcludeCommand,
+    /**
+     * The review this supersession rested on, when a compound had one.
+     *
+     * Not on `ConcludeCommand`, and that is a claim about the domain rather
+     * than about plumbing: a researcher concluding one thing at a terminal is
+     * not holding a review handle, and `replaceAnalysis` is the act that says
+     * a review caused this. Row O's question is asked of a finding, so the
+     * edge lands on the per-finding decision — see EDGE_SCHEMA.INVALIDATED_BY.
+     */
+    because?: ReviewRef,
+  ): Promise<Required<ConcludedClaim>> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
       {
@@ -798,6 +810,8 @@ export class WriteSurface extends SessionCore {
           });
           await this.graph.createEdge(decision.natural_id, "SUPERSEDES", superseded.claim);
           await this.graph.createEdge(decision.natural_id, "MOTIVATES", claim.natural_id);
+          if (because !== undefined)
+            await this.graph.createEdge(decision.natural_id, "INVALIDATED_BY", because);
         }
 
         return {
@@ -1617,14 +1631,17 @@ export class WriteSurface extends SessionCore {
             : before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
         paired.push(was);
         claims.push(
-          await this.concluding({
-            analysis: replacement,
-            proposition: now.proposition,
-            finding: now.finding,
-            ...(was === undefined ? {} : { replacing: was.claim }),
-            ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
-            ...(now.standing === undefined ? {} : { standing: now.standing }),
-          }),
+          await this.concluding(
+            {
+              analysis: replacement,
+              proposition: now.proposition,
+              finding: now.finding,
+              ...(was === undefined ? {} : { replacing: was.claim }),
+              ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
+              ...(now.standing === undefined ? {} : { standing: now.standing }),
+            },
+            input.because,
+          ),
         );
       }
 

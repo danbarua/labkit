@@ -498,13 +498,32 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * closing this one. Its sources are also judgments (`Decision`,
    * `CriterionEvaluation`); an `Artefact` is not one.
    *
-   * The endpoint is the invalidated `Artefact` because that is the thing whose
-   * standing changed and the thing a reader is holding when the question
-   * arises: *why is this no longer valid?* The direction is passive, like
-   * `BASED_ON` and `RECORDED_IN`, because a review does not retract anything —
-   * a researcher does, on the strength of it.
+   * The direction is passive, like `BASED_ON` and `RECORDED_IN`, because a
+   * review does not retract anything — a researcher does, on the strength of it.
+   *
+   * ## Two sources, and the second is the one row O actually wanted
+   *
+   * `Artefact -> Review` was the original, on the reasoning that the artefact
+   * is the thing whose standing changed and the thing a reader is holding when
+   * the question arises. **That is artefact grain, and #132 is the bill for
+   * it**: one edge over every finding an analysis produced, so it could only
+   * ever answer *why was this analysis replaced?* — and a partial replacement
+   * has no single answer to that.
+   *
+   * `Decision -> Review` is the same fact one grain lower. `conclude
+   * --replacing` mints a decision per superseded finding, and this says which
+   * review that particular retraction rested on. Row O's question — *why is
+   * this finding no longer standing?* — is asked of a finding, and now
+   * answered at that grain.
+   *
+   * Both endpoints stay. The artefact edge is still written and still read as
+   * a fallback, and it remains the honest answer to the question it can
+   * actually answer.
    */
-  INVALIDATED_BY: [["Artefact", "Review"]],
+  INVALIDATED_BY: [
+    ["Artefact", "Review"],
+    ["Decision", "Review"],
+  ],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
 };
 

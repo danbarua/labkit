@@ -675,13 +675,19 @@ export class ReadSurface extends SessionCore {
        // conclusion reported the rest superseded too (#132). Same pair
        // withdrawalOf reads: a decision that changed which claim stands.
        OPTIONAL MATCH (d:Decision)-[:SUPERSEDES]->(c)
-       RETURN e, comp, a, r, d`,
+       // Which review THIS retraction rested on (row O), at the grain the
+       // question is asked. Distinct from the 'r' above, which is any review of
+       // the unit -- reading that as the cause is what reported a confirming
+       // review as a reason work was retracted.
+       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(caused:Review)
+       RETURN e, comp, a, r, d, caused`,
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
         comp: vertexProps<ComputationProps & Identified>(),
         a: optional(vertexProps<ArtefactProps & { natural_id: string }>()),
         r: optional(vertexProps<{ verdict: string }>()),
         d: optional(vertexProps<{ reason: string }>()),
+        caused: optional(vertexProps<{ verdict: string }>()),
       },
       {
         name: scope.proposition,
@@ -1586,7 +1592,13 @@ export class ReadSurface extends SessionCore {
             superseded.push({
               ...entry,
               bearing,
+              // **The review that caused THIS retraction first** (row O). The
+              // decision's own `reason` is generated text -- useful when a
+              // bare `conclude --replacing` superseded a finding with no
+              // review behind it, and not an answer to "which review
+              // retracted it?" when there is one.
               reason:
+                row.caused?.verdict ||
                 row.d.reason ||
                 (row.a
                   ? (retractedBy.get(row.a.natural_id) ?? "it was superseded")
