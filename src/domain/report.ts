@@ -4,10 +4,9 @@ import type { DomainEvent } from "./events";
 /**
  * What the domain layer hands back — research answers, not graph rows.
  *
- * Every type here is derived from one of S-11's "Afterward" bullets
- * (docs/project-journal/008_user_story_mining.md). That direction matters: if
- * a bullet has no natural home in these types, the API is wrong rather than
- * the bullet. Nothing here mentions a node or edge label.
+ * Every type here answers a question a researcher asked. That direction
+ * matters: a question with no natural home in these types means the API is
+ * wrong, not the question. Nothing here mentions a node or edge label.
  */
 
 declare const KIND: unique symbol;
@@ -17,21 +16,14 @@ declare const KIND: unique symbol;
  * else. Never AGE's internal graphid.
  *
  * **It *is* the id.** The brand exists only at compile time; at runtime a
- * `GateRef` is the string `"GATE_1"`. That was `{ kind, id }` until 2026-08-24,
- * and the change is not cosmetic — the object shape had two failure modes that
- * a string does not, both of which shipped in the one commit that introduced it
- * (PR #15):
+ * `GateRef` is the string `"GATE_1"`. Two things follow, and both are the
+ * reason it is a string rather than a `{ kind, id }` object:
  *
- * - **`===` was reference equality.** `left.enquiry === right.enquiry` compiled,
- *   type-checked, and was false for the same enquiry. It reported two claims in
- *   one line of enquiry as being in different ones, turning a contradiction into
- *   a dissociation, and only S-5 caught it. Here `===` is value equality, and
- *   comparing two *different* kinds is a compile error rather than a permanent
- *   `false`.
- * - **A handle bound as a Cypher parameter matched nothing.** Params are
- *   `Record<string, unknown>`, so `{ id: gate }` where `{ id: gate.id }` was
- *   meant type-checked and silently found no rows. Three of those shipped.
- *   Here `{ id: gate }` is simply correct.
+ * - **`===` is value equality.** Comparing two handles of the same kind
+ *   compares the ids; comparing two *different* kinds is a compile error
+ *   rather than a silent `false`.
+ * - **A handle binds directly as a Cypher parameter.** Params are
+ *   `Record<string, unknown>`, so an object would type-check and match no rows.
  *
  * The brand is **non-optional**, which is what makes this nominal: a plain
  * `string` is not assignable to a `Ref`, and a `GateRef` is not assignable to a
@@ -70,32 +62,31 @@ export const LABEL_BY_KIND = {
 } satisfies Record<string, NodeLabel>;
 
 /**
- * Every kind a handle can name — the closed union `why` (#128, redesigned on
- * review) dispatches on. `satisfies` rather than a `: Record<string, NodeLabel>`
- * annotation is what keeps this closed: the annotation used to erase the
- * literal keys, so `keyof typeof LABEL_BY_KIND` was `string` and there was
- * nowhere for a total `Record<Kind, …>` table to be checked against.
+ * Every kind a handle can name — the closed union `why` dispatches on.
+ *
+ * **`satisfies`, not a `: Record<string, NodeLabel>` annotation**, and that is
+ * what keeps it closed: the annotation erases the literal keys, leaving
+ * `keyof typeof LABEL_BY_KIND` as `string` with nowhere for a total
+ * `Record<Kind, …>` table to be checked against.
  */
 export type Kind = keyof typeof LABEL_BY_KIND;
 
 /**
  * A handle of any kind — every {@link Ref} this record can mint, in one type.
  *
- * Earned by `why` (#128, redesigned on review): its subject is a handle whose
- * kind is not yet known, or a proposition, and `check:no-stringly-typed`
- * reads the written type node rather than resolving it — so this, unlike a
- * bare `string`, is never flagged, without needing an allowlist entry for a
- * parameter that genuinely does name a record.
+ * For a parameter whose kind is not known until it is inspected, such as
+ * `why`'s subject. `check:no-stringly-typed` reads the written type node
+ * rather than resolving it, so this passes where a bare `string` would be
+ * flagged — without an allowlist entry for a parameter that does name a record.
  */
 export type AnyRef = Ref<Kind>;
 
 /**
  * Builds a handle, and **refuses one whose id does not match its kind**.
  *
- * The check is new with the branded form and is the point of keeping `kind` as
- * an argument at all. Under `{ kind, id }` the two halves could disagree and
- * nothing noticed; here they cannot disagree in the type, and this stops them
- * disagreeing at the moment of minting. It costs one prefix lookup at each of
+ * That refusal is the point of keeping `kind` as an argument at all: the two
+ * halves cannot disagree in the type, and this stops them disagreeing at the
+ * moment of minting. It costs one prefix lookup at each of
  * the ~97 sites that mint a handle.
  *
  * It throws rather than returning a result type: every caller is inside the
@@ -172,14 +163,12 @@ export type ReviewRef = Ref<"review">;
 export type EnquiryRef = Ref<"enquiry">;
 
 /**
- * A claim, by identity.
+ * A claim, by identity — never by its wording.
  *
- * Claims had no handle: they were addressed only as a {@link ConclusionRef},
- * which is an analysis id plus **wording**, and reported as bare propositions.
- * That is the collapse PJ-030 is about, at the one entity the model is most
- * about. `ConclusionRef` stays as an *input* convenience for a caller who has
- * just run an analysis and does not hold the claim id yet; every report hands
- * back one of these.
+ * Two claims can assert the same sentence about different endpoints, so the
+ * handle is the only thing that names one. {@link ConclusionRef} is an *input*
+ * convenience for a caller who has just run an analysis and does not hold the
+ * claim id yet; every report hands back one of these.
  */
 export type ClaimRef = Ref<"claim">;
 
@@ -189,16 +178,13 @@ export type EvidenceRef = Ref<"evidence">;
 /**
  * The inferential activity an analysis carried out — an `EvidenceUnit`.
  *
- * The last natural-id prefix without a handle. `EU_` had no `Ref` type because
- * nothing outside the write surface names one: a caller says *analysis* and
+ * Nothing outside the write surface names one: a caller says *analysis* and
  * means the `Computation`, while the unit is what `EVALUATES` and `IMPLEMENTS`
- * actually point at. It exists now because `unitOf()` was handing one back as a
- * bare string, which is the shape this refactor is removing, not because a new
- * caller wants it.
+ * point at.
  *
  * Kind `"unit"`, not `"evidenceUnit"` — the kinds name research concepts rather
  * than labels throughout (`observations` for `Artefact`, `analysis` for
- * `Computation`, `work` for `Task`), and this follows that.
+ * `Computation`, `work` for `Task`).
  */
 export type UnitRef = Ref<"unit">;
 
@@ -209,14 +195,12 @@ export type EvaluationRef = Ref<"evaluation">;
 export type DecisionRef = Ref<"decision">;
 
 /**
- * What `recordObservations` produced — #161's audit: withheld entirely, a
- * caller had no handle back at all.
+ * What `recordObservations` produced.
  *
- * `evidence` is not named here: it is exactly what `events[0].created` already
- * carries, and naming it a second time is the per-verb echo #161's mechanism
- * is meant to replace. `observations` stays because it is what the caller
- * asked to create and is the one thing every reader of this return wants
- * without going via the event.
+ * `evidence` is not named here — it is what `events[0].created` carries, and a
+ * second copy is a second thing to keep in step. `observations` stays because
+ * it is what the caller asked to create, and the one thing every reader of
+ * this return wants without going via the event.
  */
 export interface RecordedObservations {
   observations: ObservationsRef;
@@ -224,8 +208,8 @@ export interface RecordedObservations {
 }
 
 /**
- * What `openEnquiry` produced — #161's audit: the `Question` was withheld,
- * even though it is the half a caller needs to `sharpen` or `accept` later.
+ * What `openEnquiry` produced. The `Question` is the half a caller needs to
+ * `sharpen` or `accept` later.
  */
 export interface OpenedEnquiry {
   enquiry: EnquiryRef;
@@ -234,10 +218,9 @@ export interface OpenedEnquiry {
 }
 
 /**
- * What `sharpen` produced — #161's audit: the `Decision` holding the frozen
- * what-was-known snapshot was withheld, unlike every other verb that mints
- * one alongside its main effect (`closeEnquiry`, `promote`, `amendDesign`,
- * `reinterpret`).
+ * What `sharpen` produced. The `Decision` holds the frozen what-was-known
+ * snapshot, as it does for `closeEnquiry`, `promote`, `amendDesign` and
+ * `reinterpret`.
  */
 export interface SharpenedQuestion {
   question: QuestionRef;
@@ -248,17 +231,12 @@ export interface SharpenedQuestion {
 /**
  * What `recordAnalysis` produced — the analysis, and **the claims it minted**.
  *
- * The claims are here because CLAUDE.md asks of every minting verb: *does the
- * act record what it produced, or only what it acted on?* This one returned
- * only the analysis, so every later reference to one of its claims had to
- * re-identify it **by wording** — which is what {@link ConclusionRef} was, and
- * why it existed. A caller now holds a {@link ClaimRef} the moment the claim
- * exists and never has to describe it again.
+ * A caller holds a {@link ClaimRef} the moment the claim exists, so it never
+ * has to describe one by wording to refer to it again.
  *
- * The output artefact is not named here — #161 first added it directly, then
- * dropped it once `events` existed: it is exactly `events[0].created`'s other
- * member, and `outputArtefactOf()` still earns its keep resolving *other*
- * analyses' artefacts, which this act's own event cannot supply.
+ * The output artefact is not named here: it is `events[0].created`'s other
+ * member. `outputArtefactOf()` resolves *other* analyses' artefacts, which
+ * this act's own event cannot supply.
  */
 export interface RecordedAnalysis {
   analysis: AnalysisRef;
@@ -269,13 +247,11 @@ export interface RecordedAnalysis {
 /**
  * One claim an analysis minted: its handle, and the proposition it asserts.
  *
- * `finding` is optional, not always-populated the way `claim`/`asserts` are:
- * `recordAnalysis`/`reverify`/`replaceAnalysis` each mint exactly one
- * `Evidence` per conclusion and can name it directly (#132's own step one).
- * A claim reached by wording (`claimsAsserting`) or one that narrows several
- * prior findings into a single reading (`reinterpret`'s `nowClaims`) has no
- * single canonical finding to name here — `evidenceStanding` is where that
- * report lists them instead. Left absent rather than guessed at either way.
+ * `finding` is optional where `claim`/`asserts` are not. A verb that mints one
+ * `Evidence` per conclusion names it directly; a claim reached by wording
+ * (`claimsAsserting`) or one narrowing several prior findings into a single
+ * reading (`reinterpret`'s `nowClaims`) has no single canonical finding, and
+ * `evidenceStanding` lists them instead. Absent rather than guessed at.
  */
 export interface ConcludedClaim {
   claim: ClaimRef;
@@ -284,18 +260,13 @@ export interface ConcludedClaim {
 }
 
 /**
- * What each of the eight single-mint write verbs produced — a name for the one
- * thing the act minted, plus the event that recorded it.
+ * What each single-mint write verb produced — a name for the one thing the act
+ * minted, plus the event that recorded it.
  *
- * Before #161 these returned the bare ref alone (`pose`, `pursue`,
- * `recordReview`, `planWork`, `stateCriterion`, `declareGate`) or nothing at
- * all (`closeEnquiry`, `evaluateCriterion`, `acceptAsUnresolved`, `promote`
- * returned `void`, or later a bare ref once each got its own type-safe
- * widening). `events` is added uniformly rather than case-by-case: "did my
- * write land as event 103" is the same question for every verb, and a
- * surface where six verbs answer one shape and twelve another is the
- * exception-accretion CLAUDE.md's "delete the reason, not the exception"
- * warns about, built on purpose.
+ * `events` is on every one of them rather than case-by-case: *did my write land
+ * as event 103* is the same question whichever verb was called, and a surface
+ * where some verbs answer it and others do not is one a caller has to learn
+ * verb by verb.
  */
 export interface Posed {
   question: QuestionRef;
@@ -358,11 +329,10 @@ export const KIND_BY_LABEL: { readonly [L in NodeLabel]?: Kind } = Object.fromEn
  * The kind a handle's own prefix names, or `null` for text that is not
  * shaped like one of this record's ~97 mintable ids at all.
  *
- * Earned by `why` (#128, redesigned on review): dispatching a single verb on
- * a handle's kind needs to tell "a handle of a kind I don't explain yet"
- * apart from "ordinary prose, go look it up by wording" -- `isRefOfKind`
- * answers only "is this ONE kind", which cannot make that distinction without
- * calling it once per kind and hoping none throw.
+ * For dispatching on a handle's kind, which needs to tell "a handle of a kind
+ * I don't explain yet" apart from "ordinary prose, look it up by wording".
+ * `isRefOfKind` answers only "is this ONE kind", which cannot make that
+ * distinction without being called once per kind.
  */
 export function kindOf(id: string): Kind | null {
   try {
@@ -378,15 +348,10 @@ export function kindOf(id: string): Kind | null {
  * caller who wants to know *why* it matched needs this, not just the
  * handle.
  *
- * `handle` is a proper `Ref` — a union of every kind {@link
- * SEARCHABLE_PROSE} names a label for, all nine of which have an entry in
- * {@link KIND_BY_LABEL} — not the bare string `fragments/trace.ts`'s
- * `created` field uses. That precedent does not transfer: `trace.ts` is the
- * rendering pipeline, not a report, and PJ-030's rule ("every handle in a
- * report is a `Ref`") makes no exception for a report whose results happen
- * to span several kinds. {@link SearchGroup} already narrows to one label
- * per group, so the kind is never actually mixed within one `matches` array
- * — only across groups, which a union still expresses honestly.
+ * `handle` is a proper `Ref` — a union of every kind {@link SEARCHABLE_PROSE}
+ * names a label for — rather than a bare string, because every handle in a
+ * report is one. {@link SearchGroup} narrows to a single label per group, so
+ * the kind is never mixed within one `matches` array, only across groups.
  */
 export interface SearchMatch {
   handle:
@@ -423,20 +388,19 @@ export interface Conclusion {
   /**
    * Whether this proposition is being asserted as a confirmatory result.
    *
-   * Defaults to `exploratory`, and that default is the point. Until S-7 every
-   * claim was written `confirmatory` by the only writer, so a solver diagnosis
-   * and a prespecified comparison were indistinguishable — and an amendment
-   * that touched only feasibility work reported itself as compromising a
-   * confirmatory result, which is a false p-hacking alarm rather than an empty
-   * answer. Confirmatory standing is claimed deliberately or not at all.
+   * **Defaults to `exploratory`, and the default is the point.** If everything
+   * were confirmatory a solver diagnosis and a prespecified comparison would be
+   * indistinguishable, and an amendment touching only feasibility work would
+   * report itself as compromising a confirmatory result — a false p-hacking
+   * alarm rather than an empty answer. Confirmatory standing is claimed
+   * deliberately or not at all.
    *
-   * Whether standing should instead be *conferred* by an act was open until
-   * S-18 (PJ-008 rows G, K, R), and the answer is **both, for different work**.
-   * Declaring here is prespecification: saying before the run that this is the
-   * confirmatory comparison, which is the thing a locked design locks. Work
-   * that could not have said it — scratch, captured before anyone knew it
-   * mattered — is promoted afterwards by `ResearchSession.promote()` and pays
-   * for the lateness with a recorded reason. Declaring *after* the fact is the
+   * **Declared here, or conferred later, for different work.** Declaring is
+   * prespecification: saying before the run that this is the confirmatory
+   * comparison, which is what a locked design locks. Work that could not have
+   * said it — scratch, captured before anyone knew it mattered — is promoted
+   * afterwards by `ResearchSession.promote()` and pays for the lateness with a
+   * recorded reason. Declaring *after* the fact is the
    * move neither path allows.
    */
   standing?: "exploratory" | "confirmatory";
@@ -452,10 +416,9 @@ export interface Conclusion {
  *
  * Separate from {@link EnquiryStatus} because a question may be pursued more
  * than once and its closure belongs to the question, not to whichever pursuit
- * reached it. Nested rather than flattened for one measured reason: flattened,
- * every pursuit of an answered question reported *itself* answered and offered
- * the closing evidence as its own, so a caller summing findings across pursuits
- * counted one finding twice. PJ-030 §6.
+ * reached it. **Nested rather than flattened**: flattened, every pursuit of an
+ * answered question reports *itself* answered and offers the closing evidence
+ * as its own, so a caller summing findings across pursuits counts one twice.
  */
 export interface QuestionClosure {
   /** The question's identity, matching `QuestionStanding.question`. */
@@ -464,12 +427,9 @@ export interface QuestionClosure {
   asks: string;
   open: boolean;
   /**
-   * `accepted-as-unresolved` replaces the `deferred` token, which no verb ever
-   * wrote — `enquiryStatus()` could report it and nothing could produce it.
-   * S-14 gives the state its one meaning: left open on purpose, with the
+   * `accepted-as-unresolved` means one thing: left open on purpose, with the
    * condition that would reopen it named. "Parked pending work" is a different
-   * state and has not been needed by any scenario; it gets built when one needs
-   * it, not before.
+   * state and no verb writes it; it gets built when something needs it.
    */
   closure: "answered" | "abandoned" | "accepted-as-unresolved" | null;
   answer: "yes" | "no" | null;
@@ -487,8 +447,8 @@ export interface QuestionClosure {
   /** Why it was accepted rather than pursued. Present with `reopensIf`. */
   acceptedBecause?: string;
   /**
-   * The standing of the evidence a closure rests on (S-18). Present when the
-   * question is `answered`.
+   * The standing of the evidence a closure rests on. Present when the question
+   * is `answered`.
    *
    * `exploratory` does not mean the answer is wrong — it means nothing has
    * promoted what it rests on, and a reader deciding whether to build on it
@@ -503,9 +463,9 @@ export interface QuestionClosure {
  * Where one line of enquiry stands.
  *
  * Everything at this level is true **of the enquiry**. The question's state is
- * under `question`, where it cannot be mistaken for this pursuit's own — that
- * separation is the whole of PJ-030 §6, and the shape before it asserted four
- * things of a pursuit that had produced nothing.
+ * under `question`, where it cannot be mistaken for this pursuit's own. Without
+ * that separation the report asserts of a pursuit four things that belong to
+ * the question, including of one that has produced nothing.
  */
 export interface EnquiryStatus {
   /** This line of enquiry. */
@@ -516,8 +476,8 @@ export interface EnquiryStatus {
    * What **this** pursuit has produced, whether or not it closed anything.
    *
    * The answer to *"where is my ablation up to?"*. Empty means nothing has been
-   * recorded against it — which is a real answer and used to be unavailable,
-   * because the only findings this report carried were the question's.
+   * recorded against it, which is a real answer and distinct from the
+   * question's own findings under `question`.
    */
   contributed: CitedFinding[];
   /**
@@ -534,19 +494,15 @@ export type QuestionBucket = "established" | "unresolved" | "untested" | "provis
  * `EnquiryStatus`, alongside where this enquiry's own question currently sits
  * in the overall survey.
  *
- * Earned by #128, narrowed on review (PJ-030, PJ-034 §5): "is this
- * reopening/closure decision warranted?" recurred three times, verbatim,
- * across the real Bonsai transcript, and every instance chained `enquiry`
- * with `known` by hand -- but what the transcript was actually doing was
- * scrolling the whole survey to find where **this** question had landed, not
- * reading every other question in the programme. An earlier version of this
- * report appended the entire `KnowledgeSurvey`; that answers about every
- * question in the record, not the one this report is about (PJ-030), and is
- * exactly the `everything` dump PJ-034 §5 says a detail tool exists not to
- * become. `standing` is `null` only when no question stands behind the
- * enquiry, matching `EnquiryStatus.question` -- every question that exists
- * lands in exactly one bucket of `whatIsKnown()`'s partition, so a non-null
- * question always has one.
+ * **Where this question landed, not the whole survey.** Answering *is this
+ * closure warranted?* means finding one question's bucket; appending the entire
+ * `KnowledgeSurvey` answers about every question in the record instead of the
+ * one this report is about.
+ *
+ * `standing` is `null` only when no question stands behind the enquiry,
+ * matching `EnquiryStatus.question` — every question that exists lands in
+ * exactly one bucket of `whatIsKnown()`'s partition, so a non-null question
+ * always has one.
  */
 export interface EnquiryInContext {
   enquiry: EnquiryStatus;
@@ -578,10 +534,9 @@ export interface ChangedConclusion {
 /**
  * The answer to "replace this analysis and propagate whatever claims change."
  *
- * Field-by-field, this is S-11's Afterward list: `affected`/`unaffected` are
- * bullets 1 and 2, `changed`/`unchanged` are bullet 3. Bullets 4 and 5 are
- * queries on the session, because they must remain answerable long after this
- * report was returned.
+ * What the act minted, and what it superseded. What the revision *changed* is
+ * a question about the record rather than a fact this act holds — it is spread
+ * across the `conclude` calls that follow, and `why <analysis>` reads it back.
  */
 export interface ReplacementReport {
   at: string;
@@ -624,22 +579,21 @@ export interface UnaffectedRecord {
    * The entry stays in the list and says what it is, the way a superseded
    * `EvaluationRecord` stays readable and carries `withdrawn`. Dropping it
    * would hide an input the replacement genuinely rests on; a fixed `why`
-   * saying it was "not produced by the replaced analysis" said something
-   * false about it (S-11e).
+   * saying it was "not produced by the replaced analysis" would be false.
    */
   invalidated?: true;
-  /** What it is, in the researcher's words — the wording half this used to lack. */
+  /** What it is, in the researcher's words. */
   named: string;
   why: string;
 }
 
 /**
- * Whether a gate may be relied on — S-17's four Afterward questions.
+ * Whether a gate may be relied on.
  *
  * `state` deliberately has four values. "Never evaluated" is not a kind of
  * failure and must never read as a pass: a gate nobody has evaluated and a
- * gate that evaluated and failed are different situations, and PJ-001's
- * doctrine is that a missing evaluation must not be confused with a pass.
+ * gate that evaluated and failed are different situations, and a missing
+ * evaluation must never be confused with one.
  * `incomplete` covers the fourth case a multi-criterion gate creates — some
  * conditions checked, none failing, others never run.
  */
@@ -658,9 +612,9 @@ export interface GateStatus {
    */
   state: "never-evaluated" | "incomplete" | "blocked" | "satisfied";
   /**
-   * Every governing condition, itemised. `never-run` is a first-class value,
-   * not the absence of an entry — S-3 requires failing checks to be
-   * distinguishable from checks nobody performed.
+   * Every governing condition, itemised. `never-run` is a first-class value
+   * rather than the absence of an entry: a failing check and one nobody
+   * performed must be distinguishable.
    */
   checks: CheckStatus[];
   /** Conditions not currently passing — what would have to change. Named before anyone spends the compute. */
@@ -700,9 +654,9 @@ export interface CheckStatus {
   /**
    * `no-standing-verdict` is the state between a check being found defective
    * and its correction being run: evaluations exist, and none of them still
-   * stands. It is emphatically not `never-run` — the check ran, and reporting
-   * otherwise contradicted the `evaluations` list in the same object (external
-   * review of S-3c). It counts as unmet, exactly as `never-run` does.
+   * stands. It is emphatically not `never-run` — the check ran, and saying
+   * otherwise contradicts the `evaluations` list in the same object. It counts
+   * as unmet, exactly as `never-run` does.
    */
   state: "passed" | "failed" | "never-run" | "no-standing-verdict";
   /**
@@ -722,9 +676,9 @@ export interface EvaluationRecord {
   /**
    * This evaluation's handle.
    *
-   * It was computed and then discarded on the way out, so two evaluations of
-   * different criteria sharing a value, outcome and instant were
-   * indistinguishable once `GateStatus.evaluations` flattened them (PJ-030 §7).
+   * Without it, two evaluations of different criteria sharing a value, outcome
+   * and instant are indistinguishable once `GateStatus.evaluations` flattens
+   * them.
    */
   evaluation: EvaluationRef;
   /** The criterion this evaluated — the flattened list loses it otherwise. */
@@ -745,16 +699,14 @@ export interface EvaluationRecord {
   /**
    * The findings this evaluation was carried out against.
    *
-   * Empty means the verdict was asserted, not measured — a real and different
-   * thing from a verdict backed by a result, and S-8's reason for existing:
-   * work is promoted "by explicit evidence rather than agent enthusiasm", and
-   * the two must not read alike. See PJ-008 row W.
+   * Empty means the verdict was asserted, not measured — a different thing
+   * from one backed by a result, and the two must not read alike.
    */
   basis: CitedFinding[];
 }
 
 /**
- * What a re-run did and did not establish about a historical result (S-10).
+ * What a re-run did and did not establish about a historical result.
  *
  * Two verdicts, deliberately not one: a conclusion can be re-reached by an
  * execution that was never reproduced, and collapsing those into a single
@@ -780,11 +732,11 @@ export interface ReproductionReport {
    * execution depends on what the method does, which the record does not know
    * and should not guess.
    *
-   * An `execution: "reproduced" | "not-reproduced"` field used to sit here and
-   * was removed for exactly that. It called a reversed rerun of an
-   * order-sensitive method a reproduction, and the fix attempted first — a
-   * third value meaning "cannot say" — made the guess hedged rather than
-   * absent. Two lists and no adjudication is less machinery than either.
+   * There is deliberately no `execution: "reproduced" | "not-reproduced"`
+   * verdict. Adjudicating would call a reversed rerun of an order-sensitive
+   * method a reproduction, and a third value meaning "cannot say" hedges the
+   * guess rather than removing it. Two lists and no adjudication is less
+   * machinery than either.
    *
    * Order is recorded because the caller supplied it: `recordAnalysis({ from })`
    * takes an ordered array, and discarding it was the actual defect — losing
@@ -794,23 +746,17 @@ export interface ReproductionReport {
   /** The same, for the analysis being re-checked. Empty when it recorded nothing. */
   ofRead: IdentifiedArtefact[];
   /**
-   * What the two runs did not share. `unrecorded-in-the-original` is the case
-   * S-10 exists for and is **not** the same as `changed`: nobody wrote the
-   * original's conditions down, so the two are not known to differ and are not
-   * known to agree. Row I's distinction, asked of execution instead of evidence.
+   * What the two runs did not share. `unrecorded-in-the-original` is **not**
+   * the same as `changed`: nobody wrote the original's conditions down, so the
+   * two are not known to differ and not known to agree.
    */
   differs: Array<{
     /**
-     * The input, identified. Not a bare name: two artefacts legitimately share
-     * a `logical_name` — a regeneration carries the name of the part it
-     * replaces — and a re-run that swapped one for the other reported **two**
-     * entries reading "control series", one `changed` and one
-     * `not-used-by-the-re-run`, contradicting each other under one label with
-     * nothing to tell them apart (S-10c).
-     *
-     * Fourth read caught doing this, after `reproducibilityOf()` (S-9c) and
-     * `whySupported().restingOn` (S-9d). Each decided by `natural_id` and
-     * reported the name, which is the shape rather than the incident.
+     * The input, identified — not a bare name. Two artefacts legitimately share
+     * a `logical_name`, since a regeneration carries the name of the part it
+     * replaces, so a re-run that swapped one for the other would report two
+     * entries reading "control series" that contradict each other under one
+     * label. Decided by `natural_id`, reporting the name.
      */
     what: IdentifiedArtefact;
     standing: "unrecorded-in-the-original" | "changed" | "not-used-by-the-re-run";
@@ -822,28 +768,16 @@ export interface ReproductionReport {
 /**
  * An artefact in a report: what it is, and what it is called.
  *
- * `part` is identity; `name` is what a person reads. Keeping both is row F's
- * lesson applied to the **output** side of a read — S-9 already took parts by
- * *reference* on the way in, with a comment that a name-keyed map "would merge
- * exactly the two things this scenario exists to keep apart", and then reported
- * bare names on the way out.
+ * `part` is identity; `name` is what a person reads. Both, on the way out as
+ * well as in: a name-keyed map merges two artefacts that legitimately share a
+ * `logical_name`.
  *
- * Two reads have now been caught doing that, which is why this is a shared
- * shape rather than one report's private type. `reproducibilityOf()` put a
- * single name in `exact` and `differing` at once (S-9c), and
- * `whySupported().restingOn` deduplicated two distinct inputs into one entry
- * (S-9d) — hiding, in that case, that a regeneration with inferred provenance
- * was underneath a conclusion.
+ * A shared shape rather than one report's private type, because more than one
+ * read has to identify an artefact. Deduplicating on the name instead collapses
+ * two distinct inputs into one entry, which can hide a regeneration with
+ * inferred provenance underneath a conclusion.
  *
- * Named for what it is rather than for either caller: this was `ReproducedPart`
- * until a second read needed it, at which point the name described one caller's
- * use of it rather than the thing.
- *
- * The sentence above said `IdentifiedArtefact` — the **new** name — as though it
- * were the old one, directly over the declaration. Written in the same hunk as
- * the rename, in the commit that was itself fixing a comment that disagreed with
- * its code. That is PJ-028's headline: the fix went where the author was
- * looking, and the prose one line up did not.
+ * Named for what it is rather than for either caller.
  */
 export interface IdentifiedArtefact {
   /** The observations handle — identity, and the only thing that is. */
@@ -857,19 +791,17 @@ export interface IdentifiedArtefact {
    * `ReproducibilityReport` do not, because that report is about hashes and
    * says nothing about standing.
    *
-   * Invalidating a record deliberately does **not** withdraw what rests on it
-   * — S-11's whole design is that the consequence is *enumerable*, through
-   * `whatDependsOn`, rather than automatic. That only holds while the reader
-   * can see the retraction. Without this field a conclusion whose sole input
-   * had been retracted reported `supported: true` and named the artefact with
-   * no hint of its state (S-11e), which is the answer overstating itself
-   * rather than the doctrine working.
+   * Retracting a record deliberately does **not** withdraw what rests on it:
+   * the consequence is *enumerable*, through `whatDependsOn`, rather than
+   * automatic. That only holds while the reader can see the retraction —
+   * without this field a conclusion whose sole input had been retracted reads
+   * `supported: true` and names the artefact with no hint of its state.
    */
   invalidated?: true;
 }
 
 /**
- * How much of a past construction can be rebuilt (S-9).
+ * How much of a past construction can be rebuilt.
  *
  * Four outcomes per part, and only two of them are comparisons. `exact` and
  * `differing` are completed comparisons; `unverifiable` and `notRebuilt` are
@@ -906,11 +838,11 @@ export interface ReproducibilityReport {
    * leaves the construction unshown, and this is the field that must not
    * quietly say otherwise.
    *
-   * **And false when there were no parts at all** — the sentence above was
-   * satisfied vacuously by an analysis that consumed nothing, so this reported
-   * that a construction with nothing in it reproduces (S-9e). At least one part
-   * must be in `exact`. An analysis whose subject does not exist is refused
-   * rather than reported on; absent and empty are different states.
+   * **And false when there were no parts at all**, since the sentence above is
+   * otherwise satisfied vacuously and a construction with nothing in it would
+   * report as reproducing. At least one part must be in `exact`. An analysis
+   * whose subject does not exist is refused rather than reported on; absent and
+   * empty are different states.
    */
   reproducible: boolean;
 }
@@ -940,8 +872,8 @@ export interface VerificationReport {
  * `claim` is the handle; `asserts` is what it says. Both, because a report
  * telling you what would be affected is useless if you cannot then go and look
  * at any of it — every follow-up verb takes a reference — and unreadable if it
- * gives you only an id. This is the shape `QuestionStanding` and
- * `IdentifiedArtefact` already use (PJ-030 §4).
+ * gives you only an id. The shape `QuestionStanding` and `IdentifiedArtefact`
+ * also use.
  */
 export interface AffectedClaim {
   claim: ClaimRef;
@@ -952,7 +884,7 @@ export interface AffectedClaim {
  * A finding, identified as well as quoted.
  *
  * `evidence` is the handle, `states` what it says. Used wherever a report names
- * findings a conclusion or a decision rests on — PJ-030 §4.
+ * the findings a conclusion or a decision rests on.
  */
 export interface CitedFinding {
   evidence: EvidenceRef;
@@ -964,8 +896,8 @@ export interface CitedFinding {
  *
  * `finding` is what it says, `evidence` identifies it; `method` is what the
  * analysis did, `analysis` identifies that. Both halves of both, because two
- * runs of one method are two analyses and the old shape — a bare method name
- * under `via` — could not tell them apart (PJ-030 §4).
+ * runs of one method are two analyses, and a bare method name cannot tell them
+ * apart.
  */
 export interface BearingFinding {
   finding: string;
@@ -1061,15 +993,9 @@ export interface AffectedEnquiry {
  * What is affected if this record turns out to be wrong — and, deliberately, a
  * statement that the answer is a **lower bound**.
  *
- * Designer 2 required that *"no dependency found"* never read as
- * *"independent"*. `docs/consumer-contract/022` §4 classified it as query
- * semantics rather than missing structure and declined to act until someone
- * demonstrated a reader acting on the gap and being wrong. S-11c is that
- * demonstration, and this shape is the whole remedy: no new durable state, no
- * new edge, just an answer that stops overstating itself.
- *
- * The fourth catch on this one verb. PJ-021 found it returning `claims: []` for
- * an input while still naming the enquiry.
+ * **"No dependency found" must never read as "independent."** The remedy is
+ * this shape and nothing else: no new durable state, no new edge, just an
+ * answer that stops overstating itself.
  */
 export interface DependencyReport {
   /**
@@ -1077,11 +1003,10 @@ export interface DependencyReport {
    *
    * Echoed because the verb also accepts a logical **name**, and a caller who
    * passed one otherwise cannot tell which record the name resolved to — the
-   * report described a record it never identified. `kind` is `observations`
-   * for the same reason the argument's is: the `ART_` prefix does not
-   * distinguish a raw input from an analysis output — which PJ-008's row AG
-   * measured on 2026-08-24 and found to be reference-model debt rather than a
-   * missing distinction, so it is not a claim being made here either.
+   * report would describe a record it never identified. `kind` is
+   * `observations` for the same reason the argument's is: the `ART_` prefix
+   * does not distinguish a raw input from an analysis output, and this makes no
+   * claim that it does.
    */
   subject: ObservationsRef;
   /** Claims found to rest on the subject, supporting or challenging. */
@@ -1092,11 +1017,7 @@ export interface DependencyReport {
    * The routes actually walked, named so a reader knows what was considered.
    *
    * Anything connected by a route not listed here is absent from `claims` and
-   * `enquiries` and is **not thereby independent**. The known gap, demonstrated
-   * in S-11c: `recordAnalysis({ from })` accepts only observations handles, so
-   * an analysis cannot read another analysis's output, and a multi-stage
-   * pipeline is recorded as disconnected stages. Everything downstream of such
-   * a break is unreachable from here.
+   * `enquiries` and is **not thereby independent**.
    */
   routesWalked: string[];
   /**
@@ -1104,28 +1025,25 @@ export interface DependencyReport {
    *
    * Traversal here is **open-world**: this reports what was found, never that
    * nothing else exists. A caller cannot write `if (report.complete)` and have
-   * it mean anything, which is the point — the alternative is a reader
-   * inferring completeness from a populated-looking list, which is what S-11c
-   * shows going wrong.
+   * it mean anything, which is the point: the alternative is a reader
+   * inferring completeness from a populated-looking list.
    *
    * **Do not widen this to `boolean`.** Asserting completeness needs to know
    * the relevant dependency set *is* complete, which is durable coverage state
-   * this model does not have; `023` §4 preserves that as a discriminator for
-   * later and says explicitly not to build it. Widening the type here would
-   * ship the assertion without the state behind it.
+   * this model does not have. Widening the type would ship the assertion
+   * without the state behind it.
    */
   complete: false;
 }
 
-/** The answer to "why does this conclusion count as supported?" — bullet 4. */
+/** The answer to "why does this conclusion count as supported?" */
 export interface SupportExplanation {
   /**
    * The claim this answer is about.
    *
-   * The caller passes a handle in and the report gave back only a sentence, so
-   * the answer stopped identifying its own subject the moment it was stored or
-   * sent — and over MCP it is exactly a stored blob. Two claims can assert the
-   * same sentence (S-5), which is when the omission stops being cosmetic.
+   * Without it the answer stops identifying its own subject the moment it is
+   * stored or sent, and over MCP it is exactly a stored blob. Two claims can
+   * assert the same sentence, so the wording does not name one.
    */
   claim: ClaimRef;
   proposition: string;
@@ -1133,14 +1051,15 @@ export interface SupportExplanation {
    * Whether the record currently stands behind this proposition: evidence
    * supports it, nothing has withdrawn it, and it meets whatever standard it
    * was held to. `support`, `withdrawn` and `unmet` say which of the three is
-   * missing when it is false — reporting them identically is the confusion
-   * this field has been fixed for twice (S-12, S-3b).
+   * missing when it is false; reporting those identically is the confusion this
+   * field exists to prevent.
    */
   supported: boolean;
   /**
-   * Whether this finding has been promoted to confirmatory standing (S-18).
+   * Whether this finding has been promoted to confirmatory standing.
    * `exploratory` until an act says otherwise — scratch is captured before
-   * anyone knows it matters, so the standing cannot be declared at birth.
+   * anyone knows it matters, so the standing cannot always be declared at
+   * birth.
    */
   standing: "exploratory" | "confirmatory";
   /** Why it was promoted. Present only when `standing` is `confirmatory`. */
@@ -1149,7 +1068,7 @@ export interface SupportExplanation {
   support: BearingFinding[];
   /**
    * Analyses that re-checked a supporting finding without reproducing its
-   * execution, by method (S-10).
+   * execution, by method.
    *
    * Kept out of `support` deliberately. A re-verification is not a second
    * independent finding, and listing it as one made a claim established once
@@ -1161,9 +1080,9 @@ export interface SupportExplanation {
    * itemised the same way a gate's are — `recordAnalysis({ heldTo })`.
    *
    * Empty means the finding was held to no agreed standard, which is a
-   * different state from meeting one and from failing one. S-3b: without this,
-   * `supported` meant "some evidence exists" and a finding whose own
-   * robustness checks had failed read as plainly supported.
+   * different state from meeting one and from failing one. Without it,
+   * `supported` means only "some evidence exists", and a finding whose own
+   * robustness checks failed reads as plainly supported.
    */
   standard: CheckStatus[];
   /**
@@ -1176,19 +1095,13 @@ export interface SupportExplanation {
    * Observations the supporting findings ultimately rest on — **identified**,
    * not named.
    *
-   * `name` is `recordObservations({ name })` and never the `finding` text; two
-   * different strings describe an observation set and asserting on the wrong
-   * one is a mistake this project has already made. But the name is not the
-   * identity: `part` is, and `IdentifiedArtefact` says in its own docstring
-   * that *"two parts may legitimately share"* a name. Keying on the name
-   * collapsed two same-named inputs into one entry (S-9d).
-   *
-   * This field was `string[]` and this docstring told the reader to key on the
-   * name. The commit that widened the type left the instruction standing, so
-   * it went on recommending exactly the mistake it had just fixed.
+   * `name` is `recordObservations({ name })` and never the `finding` text: two
+   * different strings describe an observation set. But the name is not the
+   * identity — `part` is, and two parts may legitimately share a name, so
+   * keying on it collapses two distinct inputs into one entry.
    */
   restingOn: IdentifiedArtefact[];
-  /** Findings withdrawn because their analysis was replaced — bullet 5. Either bearing. */
+  /** Findings withdrawn because their analysis was revised. Either bearing. */
   superseded: Array<BearingFinding & { reason: string; bearing: "supports" | "challenges" }>;
   /**
    * Whether any finding bears *against* this proposition.
@@ -1196,7 +1109,7 @@ export interface SupportExplanation {
    * Distinct from `supported: false`, which is also true of a proposition
    * nobody has ever examined. A claim refuted by a null result and a claim
    * never investigated are different scientific states, and reporting them
-   * identically confuses absence of evidence with failure — see S-4.
+   * identically confuses absence of evidence with failure.
    */
   challenged: boolean;
   against: BearingFinding[];
@@ -1206,8 +1119,8 @@ export interface SupportExplanation {
    * A third state, and it is not `challenged`. Challenged means evidence bears
    * against the sentence; withdrawn means nobody is asserting the sentence any
    * more, usually because a narrower one replaced it. The findings underneath a
-   * withdrawn interpretation are untouched — that is the whole point of S-12 —
-   * so `support` stays populated while `supported` is false.
+   * withdrawn interpretation are untouched — only the reading moved — so
+   * `support` stays populated while `supported` is false.
    */
   withdrawn: boolean;
   /** The interpretation that replaced it, if one did. */
@@ -1251,9 +1164,9 @@ export interface HistoricalSurvey {
 
 /**
  * A question on the record. `question` is its identity; `asks` is what it
- * says. The two are kept apart deliberately: S-1 pursues one question two
- * ways and poses two identically-worded questions, and neither may be
- * resolved by comparing text.
+ * says. The two are kept apart deliberately: one question may be pursued two
+ * ways, and two questions may be worded identically. Neither is resolvable by
+ * comparing text.
  */
 export interface QuestionStanding {
   question: QuestionRef;
@@ -1296,20 +1209,16 @@ export interface AnsweredQuestion extends QuestionStanding {
 
 /**
  * What the programme knows, in more states than settled-or-not. The buckets are
- * the fields below; they have been added one scenario at a time and the count
- * is deliberately not written here, because it was wrong for every scenario
- * after the third (PJ-028).
+ * the fields below, and their count is deliberately not written here.
  *
  * `untested` is not a weak form of `unresolved`: one is a question nothing has
- * ever been run against, the other is a question something has been run
- * against without settling it. PJ-001's doctrine that absence of evidence must
- * not read as a negative result is why they are separate lists rather than a
- * flag on one.
+ * ever been run against, the other a question something has been run against
+ * without settling it. Absence of evidence must not read as a negative result,
+ * which is why they are separate lists rather than a flag on one.
  *
- * Boundaries S-1 does not test, and which are therefore classified by
- * structure alone: a question closed *without* cited evidence (abandoned)
- * appears under `unresolved` if anything ever addressed it, and a deferred one
- * appears under `untested` if nothing did.
+ * Two boundaries are classified by structure alone: a question closed *without*
+ * cited evidence appears under `unresolved` if anything ever addressed it, and
+ * a deferred one under `untested` if nothing did.
  */
 export interface KnowledgeSurvey {
   /**
@@ -1326,41 +1235,31 @@ export interface KnowledgeSurvey {
    * Answered, but not on something to build on — **for either of two
    * reasons**, and the bucket deliberately holds both.
    *
-   * The first is S-18's: the finding nobody promoted. A result is relied on and
-   * the question is settled *as far as anyone has taken it*, but what settles
-   * it is scratch. Kept out of `established` so that reading the survey for
-   * "what do we actually know" cannot silently include a lunchtime notebook
-   * sweep.
+   * The first is the finding nobody promoted: the question is settled *as far
+   * as anyone has taken it*, but what settles it is scratch. Kept out of
+   * `established` so that reading the survey for "what do we actually know"
+   * cannot silently include a lunchtime notebook sweep.
    *
-   * The second is S-19's, and it is the opposite shape: the finding somebody
-   * **did** promote, held to a prespecified check that failed or was never
-   * run. Promotion says a person vouched for it; the check says nobody
-   * confirmed it, and S-3b holds a check nobody performed to count against the
-   * finding it qualifies.
+   * The second is the opposite shape: the finding somebody **did** promote,
+   * held to a prespecified check that failed or was never run. Promotion says a
+   * person vouched for it; the check says nobody confirmed it.
    *
-   * **One bucket rather than a sixth**, which is the answer S-19 arrived at by
-   * landing here rather than by being designed. The two reasons differ and the
-   * consequence does not: *this is answered, and it is not something to build
-   * on*. A reader acts identically on both. Row Y is the standing warning
-   * against a bucket built for nobody, and splitting these would be one —
-   * `whySupported` already distinguishes them for anyone who needs to know
-   * which it is.
-   *
-   * The heading this renders under said "resting on work nobody promoted"
-   * until 2026-08-27, which was true of the first reason and false of the
-   * second the moment it existed.
+   * **One bucket rather than two.** The reasons differ and the consequence does
+   * not — *this is answered, and it is not something to build on* — and a
+   * reader acts identically on both. `whySupported` distinguishes them for
+   * anyone who needs to know which it is.
    *
    * `AnsweredQuestion`, not `QuestionStanding` — see its own doc comment.
    */
   provisional: AnsweredQuestion[];
   /**
-   * Open on purpose (S-14). Worked on, not settled, and deliberately left —
-   * with the condition that would reopen it recorded on the deciding act.
+   * Open on purpose. Worked on, not settled, and deliberately left — with the
+   * condition that would reopen it recorded on the deciding act.
    *
    * Its own bucket rather than a flag on `unresolved`, because a reader
-   * scanning for what still needs doing must not find it there. That is the
-   * whole of PJ-001's "should not accumulate ceremony" bullet: the alternative
-   * is a to-do list that can never be emptied and is therefore never read.
+   * scanning for what still needs doing must not find it there. The
+   * alternative is a to-do list that can never be emptied and is therefore
+   * never read.
    *
    * `AcceptedQuestion`, not `QuestionStanding` — see its own doc comment.
    */
@@ -1373,8 +1272,8 @@ export interface KnowledgeSurvey {
  * `knownAtTheTime` is the point of this type. It is the findings the
  * sharpening act was taken in light of, frozen when the act was recorded —
  * not "everything standing now", which would back-date later results onto an
- * earlier decision. S-1's hardest Afterward question is asked *after* more
- * evidence has arrived, precisely to catch that.
+ * earlier decision. The question this answers is asked *after* more evidence
+ * has arrived, which is what makes the freezing load-bearing.
  */
 export interface QuestionOrigin {
   /** Identity of the question this one was sharpened from. */
@@ -1390,10 +1289,10 @@ export interface QuestionOrigin {
  * What an amendment to a locked design did.
  *
  * `nature` is the field that matters. Mechanical and scientific amendments are
- * the difference between a legitimate repair and p-hacking, and the record has
- * to carry it — S-7's own words. It is derived, not declared: an amendment is
- * scientific exactly when something the confirmatory boundary rests on is in
- * its blast radius. Nobody can set it to "mechanical".
+ * the difference between a legitimate repair and p-hacking, so the record has
+ * to carry it. Derived, not declared: an amendment is scientific exactly when
+ * something the confirmatory boundary rests on is in its blast radius. Nobody
+ * can set it to "mechanical".
  */
 export interface AmendmentReport {
   at: string;
@@ -1424,10 +1323,10 @@ export interface AmendmentRecord {
 /**
  * A locked design and everything that has happened to it.
  *
- * `amendments` is ordered oldest-first, and that order is reconstructed from
- * the supersession chain alone — no timestamp on any decision, and nothing
- * read from the event log. See PJ-008 row Z for what this does and does not
- * settle about chronology.
+ * `amendments` is ordered oldest-first, reconstructed from the supersession
+ * chain alone — no timestamp on any decision, and nothing read from the event
+ * log. It orders the amendments relative to each other and says nothing about
+ * when any of them happened.
  */
 export interface DesignHistory {
   gate: GateRef;
@@ -1452,12 +1351,12 @@ export interface ReinterpretationReport {
   /**
    * The claims that stopped standing — **plural**, and that is the point.
    * A reinterpretation narrows a *reading*, and two analyses in one line of
-   * enquiry concluding the same sentence share one (S-12), so a single handle
-   * here would be an arbitrary pick between records this act withdrew
-   * together. They all assert the same `asserts`; the handles are what differ.
+   * enquiry concluding the same sentence share one, so a single handle here
+   * would be an arbitrary pick between records this act withdrew together.
+   * They all assert the same `asserts`; the handles are what differ.
    */
   previously: ConcludedClaim[];
-  /** The narrower claim this act minted. It had no handle until PJ-030. */
+  /** The narrower claim this act minted. */
   nowClaims: ConcludedClaim;
   /** Findings that carried the old reading and carry the new one. Unchanged, and demonstrably so. */
   evidenceStanding: CitedFinding[];
@@ -1465,11 +1364,8 @@ export interface ReinterpretationReport {
   restingOnTheOldReading: DecidedQuestion[];
   requiresRecomputation: boolean;
   /**
-   * The event this act recorded — `events[0].created` names the `Review` and
-   * the `Decision` this act minted, both withheld entirely before #161: every
-   * other act that mints a `Decision` and/or a `Review` alongside its main
-   * effect (`closeEnquiry`, `promote`, `replaceAnalysis`) hands the caller a
-   * dedicated field, and the event carries the same information without one.
+   * The event this act recorded. `events[0].created` names the `Review` and the
+   * `Decision` it minted, so neither needs a dedicated field here.
    */
   events: DomainEvent[];
 }
@@ -1501,7 +1397,7 @@ export interface InterpretationHistory {
 
 /** One side of a comparison between two findings. */
 export interface ConflictSide {
-  /** The claim's handle. Two sides can assert the same sentence about different endpoints (S-5). */
+  /** The claim's handle. Two sides can assert the same sentence about different endpoints. */
   claim: ClaimRef;
   /** The question this side's line of enquiry pursues. */
   question: QuestionRef;
@@ -1516,9 +1412,8 @@ export interface ConflictSide {
  * Whether two findings actually conflict.
  *
  * The verdict comes from scope and bearing, never from comparing the two
- * sentences — S-5's two claims are worded identically on purpose. Two claims
- * of the same scope with opposing support contradict each other; two claims of
- * different scope do not, however alike they read.
+ * sentences. Two claims of the same scope with opposing support contradict
+ * each other; two of different scope do not, however alike they read.
  */
 export interface ConflictVerdict {
   conflict: boolean;
@@ -1533,18 +1428,16 @@ export interface ConflictVerdict {
 }
 
 /**
- * The line of enquiry (and the question behind it) a task exists to advance
- * (#98). Carries wording alongside each handle, matching `EnquiryStatus.pursuing`
- * and `QuestionClosure.asks` -- the demonstrated need was "why does this task
- * exist" answering nothing, and a bare handle answers that only for a caller
- * willing to chain a second read. `question` is never absent when `enquiry`
- * is present: `pursue()` requires a question to open a line of enquiry, so
- * every `LineOfEnquiry` has exactly one `MOTIVATES` edge behind it by
- * construction.
+ * The line of enquiry, and the question behind it, that a task exists to
+ * advance.
  *
- * Named and shared (not inlined per report) because #128 gave it a second
- * reader: `WorkExplanation`'s `report` is the same `TaskContract` this shape
- * already sat on.
+ * Wording alongside each handle, matching `EnquiryStatus.pursuing` and
+ * `QuestionClosure.asks`: *why does this task exist* is answerable from a bare
+ * handle only by chaining a second read. `question` is never absent when
+ * `enquiry` is present — `pursue()` requires a question to open a line of
+ * enquiry, so every `LineOfEnquiry` has exactly one `MOTIVATES` edge behind it.
+ *
+ * Named and shared rather than inlined per report, since more than one reads it.
  */
 export interface Addressing {
   enquiry: EnquiryRef;
@@ -1564,7 +1457,7 @@ export interface Addressing {
  * `enforced` is `false` and says so out loud. LabKit records the contract; it
  * does not police it. Nothing here prevents a process reading whatever it
  * likes, and a scenario that implied otherwise would be describing a guarantee
- * the system cannot give — S-8's own expressibility note concedes this.
+ * the system cannot give.
  */
 export interface TaskContract {
   /** The work's handle. `GateStatus.gating` names the same entity as `{work, objective}`. */
@@ -1573,7 +1466,7 @@ export interface TaskContract {
   acceptance: string;
   mayRead: string[];
   enforced: false;
-  /** Absent, not `null`, when `planWork` wasn't told one -- ungated work (#91) is a genuine case. */
+  /** Absent, not `null`, when `planWork` was not told one. Ungated work is a genuine case. */
   addressing?: Addressing;
 }
 
@@ -1645,13 +1538,12 @@ export interface ListedWork {
 }
 
 /**
- * One record a `why` explanation cites, and what it says — the shape
- * `because` is built from (#128, redesigned on review).
+ * One record a `why` explanation cites, and what it says — the shape `because`
+ * is built from.
  *
- * The same `{handle, wording}` convention every other report in this file
- * uses (PJ-030 §4); `when` is present only where the cited record carries an
- * instant of its own (an evaluation, a decision), which is why it is optional
- * rather than always asked for.
+ * The same `{handle, wording}` convention every other report in this file uses.
+ * `when` is present only where the cited record carries an instant of its own,
+ * such as an evaluation or a decision.
  */
 export interface Cause {
   handle: Ref<Kind>;
@@ -1665,20 +1557,18 @@ export interface Cause {
  * renders it as causes (Postgres `EXPLAIN`, for *why*).
  *
  * One shape for every kind it explains, so `--json` and MCP get structure and
- * the tty gets a sentence — `GATE_1 is blocked because CRIT_2 "…" failed on
- * 2026-08-04 and CRIT_3 "…" has never been run` is Gate's, dictated on #182.
- * `report` carries the kind's own existing report **unflattened**: an
- * envelope that dictated the embedded shape would have cost `why CLM_1` the
- * *Supported by / Held to / Resting on* view it has today, for a
- * one-line sentence — a regression wearing a redesign.
+ * the tty gets a sentence: *GATE_1 is blocked because CRIT_2 "…" failed on
+ * 2026-08-04 and CRIT_3 "…" has never been run*.
+ *
+ * `report` carries the kind's own existing report **unflattened**. An envelope
+ * dictating the embedded shape would cost `why CLM_1` its *Supported by / Held
+ * to / Resting on* view for the sake of a one-line sentence.
  *
  * A discriminated union, not one interface with optional fields: `report`'s
  * type differs by `kind`, and a caller narrowing on `kind` gets the right one
  * without a cast. Only the kinds `read.ts`'s `EXPLAINED` table has a case for
- * are members — the rest are #182's remaining kinds, added one at a time as
- * someone asks and gets the refusal (the usage-era bar, per #182's own
- * text) — and a kind `why` does not yet explain never constructs one of
- * these; it throws instead.
+ * are members; a kind `why` does not explain never constructs one of these, it
+ * throws instead.
  */
 export interface ClaimExplanation {
   kind: "claim";
