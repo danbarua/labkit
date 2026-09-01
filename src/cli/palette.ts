@@ -43,7 +43,7 @@ import { createColors } from "picocolors";
  * function and colour is never a special case a view has to branch on.
  */
 export interface Palette {
-  /** A section heading — `Established`, `Conditions`, `Resting on`. */
+  /** A section heading — `Established`, `Conditions`, `Supported by`. */
   heading(text: string): string;
   /** A handle: `Q_1`, `CLM_4`, `GATE_2`. What the next command takes. */
   handle(text: string): string;

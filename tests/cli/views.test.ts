@@ -157,6 +157,55 @@ test("withdrawn, challenged and never-examined render apart", () => {
   expect(withdrawn).toContain("moves by ~3 steps");
 });
 
+/**
+ * The page that misled a reader into filing a defect against a correct record.
+ *
+ * A challenged claim has no supporting findings by definition, so whatever
+ * heading sits above that list is what the page says the claim has none of.
+ * The inputs it rests on are a different list and must not answer to the same
+ * words.
+ */
+test("a challenged claim says it has no supporting findings, not that it rests on nothing", () => {
+  const challenged: SupportExplanation = {
+    claim: ref("claim", "CLM_6"),
+    proposition: "T vs lattice is distinguishable",
+    supported: false,
+    standing: "exploratory",
+    // Empty by definition: every finding bears against it.
+    support: [],
+    reverifiedBy: [],
+    standard: [],
+    unmet: [],
+    // And yet it plainly rests on something.
+    restingOn: [{ part: ref("observations", "ART_4"), name: "stage1a results" }],
+    superseded: [],
+    challenged: true,
+    against: [
+      {
+        finding: "not significant (p_holm=0.13086)",
+        evidence: ref("evidence", "EV_6"),
+        method: "paired Wilcoxon",
+        analysis: ref("analysis", "COMP_3"),
+      },
+    ],
+    withdrawn: false,
+  };
+  const page = renderWhy(challenged, PLAIN);
+
+  // The input is named under a heading that means inputs, and the page never
+  // claims this claim rests on nothing while naming what it rests on.
+  expect(page).toContain("Resting on\n  - stage1a results  [ART_4]");
+  expect(page).not.toContain("Resting on\n  nothing");
+
+  // The empty list says what is actually empty.
+  expect(page).toContain("Supported by");
+  expect(page).toContain("no supporting findings");
+
+  // The finding that does exist is still shown, under its own heading.
+  expect(page).toContain("Bearing against");
+  expect(page).toContain("not significant (p_holm=0.13086)");
+});
+
 test("every question in the survey carries its handle", () => {
   const survey: KnowledgeSurvey = {
     established: [

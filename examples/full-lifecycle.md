@@ -151,13 +151,13 @@ $ labkit why CLM_1
 "the pruning schedule moves convergence"
   supported, confirmatory
   promoted because: the prespecified check passed at every depth
-Resting on
+Supported by
   - converges ~3 steps earlier at every depth  (via paired comparison against the unpruned baseline, COMP_1)
 
 Held to
   - the effect holds at n>=20 — passed
 
-Ultimately resting on
+Resting on
   - depth-sweep-raw  [ART_1]
 ```
 
