@@ -191,6 +191,13 @@ describe("every tool answers when an agent actually calls it", () => {
       const status = await call(c, "gate_status", { gate: id(gate) });
       expect(status.state).toBe("satisfied");
 
+      // #182: the `Gate` case of `why`. Every check passed, so the cause
+      // cites the one condition that did, not an absence.
+      const gateWhy = await call(c, "why", { subject: id(gate) });
+      expect(gateWhy.kind).toBe("gate");
+      expect(gateWhy.is).toBe("satisfied");
+      expect(gateWhy.because as unknown[]).toHaveLength(1);
+
       // The two enumeration tools, driven the way an agent without a handle
       // would: no arguments, then filtered. `gate_list` must agree with
       // `gate_status` above about this very gate -- they compute the state
@@ -368,9 +375,12 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(enquiryWhy.because as unknown[]).toHaveLength(1);
       expect((enquiryWhy.because as Json[])[0]!.wording as string).toContain("provisional");
 
-      // The refusal case: `why` does not yet explain a review (#182). Names
-      // what it explains instead rather than going quiet or guessing.
-      await expect(call(c, "why", { subject: id(review) })).rejects.toThrow(/claim, work, enquiry/);
+      // The refusal case: `why` does not yet explain a review (still #182 --
+      // Gate is done, Review is not). Names what it explains instead rather
+      // than going quiet or guessing.
+      await expect(call(c, "why", { subject: id(review) })).rejects.toThrow(
+        /claim, work, enquiry, gate/,
+      );
       await c.close();
     } finally {
       await scenario.end();

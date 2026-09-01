@@ -478,6 +478,22 @@ export const taskContractSchema = z.strictObject({
   addressing: addressingSchema.optional(),
 });
 
+/** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */
+export const criteriaGoverningSchema = z.strictObject({
+  criteria: z.array(ref("criterion")),
+});
+
+export const gateStatusSchema = z.strictObject({
+  gate: ref("gate"),
+  consequence: z.string(),
+  state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
+  checks: z.array(checkStatus),
+  unmet: z.array(unmetCheck),
+  evaluations: z.array(evaluationRecord),
+  gating: z.array(gatedWork),
+  everFailed: z.boolean(),
+});
+
 /**
  * `why` — one record's `{handle, wording}` citation, the shape `because`
  * arrays are built from. `handle` spans every {@link Kind}, exactly like
@@ -493,12 +509,13 @@ const explanationCause: z.ZodType<Cause> = z.strictObject({
 /**
  * `why` — a discriminated union on `kind`, not one shape with optional
  * fields: `report` differs by kind (`SupportExplanation` for a claim,
- * `TaskContract` for work, `EnquiryInContext` for a line of enquiry), and a
- * caller narrowing on `kind` gets the right one without a cast. Only the
- * three kinds #128 builds are members here -- see `Explanation`'s own doc
- * comment in `src/domain/report.ts` for why a kind `why` does not yet explain
- * has no member and no schema: it never reaches `structuredContent` at all,
- * because the domain throws before returning one.
+ * `TaskContract` for work, `EnquiryInContext` for a line of enquiry,
+ * `GateStatus` for a gate), and a caller narrowing on `kind` gets the right
+ * one without a cast. Only the kinds `src/domain/read.ts`'s `EXPLAINED` table
+ * has a case for are members here -- see `Explanation`'s own doc comment in
+ * `src/domain/report.ts` for why a kind `why` does not yet explain has no
+ * member and no schema: it never reaches `structuredContent` at all, because
+ * the domain throws before returning one.
  */
 export const explanationSchema = z.discriminatedUnion("kind", [
   z.strictObject({
@@ -522,23 +539,14 @@ export const explanationSchema = z.discriminatedUnion("kind", [
     because: z.array(explanationCause),
     report: enquiryInContextSchema,
   }),
+  z.strictObject({
+    kind: z.literal("gate"),
+    subject: ref("gate"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: gateStatusSchema,
+  }),
 ]);
-
-/** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */
-export const criteriaGoverningSchema = z.strictObject({
-  criteria: z.array(ref("criterion")),
-});
-
-export const gateStatusSchema = z.strictObject({
-  gate: ref("gate"),
-  consequence: z.string(),
-  state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
-  checks: z.array(checkStatus),
-  unmet: z.array(unmetCheck),
-  evaluations: z.array(evaluationRecord),
-  gating: z.array(gatedWork),
-  everFailed: z.boolean(),
-});
 
 const conflictSide = z.strictObject({
   claim: ref("claim"),

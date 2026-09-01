@@ -276,6 +276,7 @@ test("every read command's --json parses against the MCP schema for the same ver
     ["why", ["why", seeded.claim], explanationSchema],
     ["why", ["why", seeded.work], explanationSchema],
     ["why", ["why", seeded.enquiry], explanationSchema],
+    ["why", ["why", seeded.gate], explanationSchema],
     ["claims", ["claims", "the schedule moves convergence"], claimsAssertingSchema],
     ["conflict", ["conflict", seeded.claim, seeded.claim], conflictVerdictSchema],
     ["pursuits", ["pursuits", seeded.question], pursuitsSchema],
