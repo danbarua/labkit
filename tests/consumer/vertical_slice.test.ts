@@ -229,10 +229,10 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
       /as_?of|believ|assert(ed)?_?at|recorded_?at|effective|when|timestamp|version/i.test(k),
     );
     expect(temporalFields).toEqual([]);
-    // `claim` joined #55: which claim answers this question, not when. Still
-    // no time on the row -- the assertion above is the one that would catch
-    // that, and does.
-    expect(Object.keys(a[0]!).sort()).toEqual(["asks", "claim", "question"]);
+    // `claim` and `answer` joined #55: which claim answers this question and
+    // which way, not when. Still no time on the row -- the assertion above
+    // is the one that would catch that, and does.
+    expect(Object.keys(a[0]!).sort()).toEqual(["answer", "asks", "claim", "question"]);
 
     // And the other half, which is what the old detector was reaching for and
     // could not see: the capability exists, as a read of its own.

@@ -1297,18 +1297,26 @@ export interface AcceptedQuestion extends QuestionStanding {
 }
 
 /**
- * `QuestionStanding`, plus the claim that answers it — carried on
- * `KnowledgeSurvey.established`/`.provisional` (#55): both buckets are
- * "answered", differing only in whether the answer met the standard it was
- * held to and was promoted, and the claim is what `whatIsKnown` already
- * resolved to decide which bucket to place the question in. Exposing it
- * lets a reader go straight to `why <claim>` without a text search, and lets
- * `now`'s delta recognise a question as moved when the claim answering it
- * was touched (by `promote`, `reinterpret`, `reverify`) even though the
- * question's own id was not.
+ * `QuestionStanding`, plus the claim that answers it and which way it cuts —
+ * carried on `KnowledgeSurvey.established`/`.provisional` (#55): both
+ * buckets are "answered", differing only in whether the answer met the
+ * standard it was held to and was promoted, and both the claim and the
+ * polarity are what `whatIsKnown` already resolved to decide which bucket to
+ * place the question in and which bearing (`SUPPORTS`/`CHALLENGES`) answered
+ * it. Exposing the claim lets a reader go straight to `why <claim>` without
+ * a text search, and lets `now`'s delta recognise a question as moved when
+ * the claim answering it was touched (by `promote`, `reinterpret`,
+ * `reverify`) even though the question's own id was not.
+ *
+ * **`answer` is not decoration.** An outside reader given only `asks` for an
+ * established question read a promoted, confirmed **"no"** as though the
+ * record had shown the opposite — `now`'s own acceptance test, run cold
+ * (#189). The record has always carried polarity (`QuestionClosure.answer`,
+ * S-4); this is that same fact, on the report that previously omitted it.
  */
 export interface AnsweredQuestion extends QuestionStanding {
   claim: ClaimRef;
+  answer: "yes" | "no";
 }
 
 /**
@@ -1647,11 +1655,19 @@ export type WorkState = "planned" | "blocked" | "carried-out";
  * moving between the two reports meets one convention. `state` is what this
  * adds, and it is why the two types are not one: a `GatedWork` says what a gate
  * is holding up, and says nothing about whether that work has happened.
+ *
+ * `gates` joined #55: `workList()` already collects every gate governing a
+ * task to compute `state` (`workStateFrom` reads exactly this set) — a
+ * caller composing `now`'s `--since` delta needs it too, to catch a task
+ * newly blocked by a criterion evaluation, which touches the gate
+ * (`TRIGGERS`) and never the task itself. Exposing what the computation
+ * already held, not a second query.
  */
 export interface ListedWork {
   work: WorkRef;
   objective: string;
   state: WorkState;
+  gates: GateRef[];
 }
 
 /**

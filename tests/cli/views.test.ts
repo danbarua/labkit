@@ -160,7 +160,12 @@ test("withdrawn, challenged and never-examined render apart", () => {
 test("every question in the survey carries its handle", () => {
   const survey: KnowledgeSurvey = {
     established: [
-      { question: ref("question", "Q_1"), asks: "does it converge?", claim: ref("claim", "CLM_1") },
+      {
+        question: ref("question", "Q_1"),
+        asks: "does it converge?",
+        claim: ref("claim", "CLM_1"),
+        answer: "yes",
+      },
     ],
     provisional: [],
     accepted: [],
@@ -551,7 +556,12 @@ test("colouring changes nothing a reader would read", () => {
 
   const survey: KnowledgeSurvey = {
     established: [
-      { question: ref("question", "Q_1"), asks: "does it converge?", claim: ref("claim", "CLM_1") },
+      {
+        question: ref("question", "Q_1"),
+        asks: "does it converge?",
+        claim: ref("claim", "CLM_1"),
+        answer: "yes",
+      },
     ],
     provisional: [],
     accepted: [],

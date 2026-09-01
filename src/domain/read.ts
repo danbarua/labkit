@@ -339,6 +339,12 @@ export class ReadSurface extends SessionCore {
        OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)`;
 
     const answering = new Map<string, { natural_id: string; kind?: string }>();
+    // Which bearing supplied the answering claim -- CHALLENGES means the
+    // question was answered "no" (S-4), exactly as `enquiryStatus` derives
+    // polarity from the same shape of query. Never both for one question in
+    // practice (`closeEnquiry` forbids a second `RESOLVES`), so last-write
+    // is academic, not a real ambiguity to resolve.
+    const answeringBearing = new Map<string, "SUPPORTS" | "CHALLENGES">();
     const met = new Map<string, boolean>();
     const seen = new Map<
       string,
@@ -364,7 +370,10 @@ export class ReadSurface extends SessionCore {
       const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
 
       for (const [question, claim] of per(claimFact, rows)) {
-        if (claim !== null) answering.set(question, claim);
+        if (claim !== null) {
+          answering.set(question, claim);
+          answeringBearing.set(question, bearing);
+        }
       }
       for (const [claim, ok] of per(metFact, rows)) met.set(claim, ok);
 
@@ -406,10 +415,11 @@ export class ReadSurface extends SessionCore {
       // counts against the finding it qualifies (issue #62, S-19). A claim held
       // to nothing is vacuously met, which keeps S-18's promoted scratch in
       // `established`.
+      const answer: "yes" | "no" = answeringBearing.get(question) === "CHALLENGES" ? "no" : "yes";
       if (claim && claim.kind === "confirmatory" && met.get(claim.natural_id) !== false)
-        survey.established.push({ ...standing, claim: ref("claim", claim.natural_id) });
+        survey.established.push({ ...standing, claim: ref("claim", claim.natural_id), answer });
       else if (claim)
-        survey.provisional.push({ ...standing, claim: ref("claim", claim.natural_id) });
+        survey.provisional.push({ ...standing, claim: ref("claim", claim.natural_id), answer });
       else if (entry.accepted)
         survey.accepted.push({
           ...standing,
@@ -2337,6 +2347,7 @@ export class ReadSurface extends SessionCore {
         work: ref("work", id),
         objective: t.objective,
         state: workStateFrom(t, gateStates),
+        gates: [...t.gates].map((g) => ref("gate", g)),
       }))
       .sort((a, b) => a.work.localeCompare(b.work));
 
@@ -2352,18 +2363,26 @@ export class ReadSurface extends SessionCore {
    * `created`/`edges`/`subject` on every act since it, per #161/PJ-032's
    * edge recording, never a snapshot of what things *were*.
    *
+   * **A task is moved if its own id was touched, or any gate governing it
+   * was.** `evaluateCriterion` touches the criterion, the evaluation and the
+   * gate (`TRIGGERS`) — never the task a gate protects — so a task newly
+   * blocked (or newly unblocked) by an evaluation would otherwise be
+   * invisible in exactly the case #55 is for. `ListedWork.gates` is what
+   * `workStateFrom` already reads to compute `state`; checking those ids
+   * against the same touched set is one more membership test, not a new
+   * query (review on #189).
+   *
    * **A question is moved if its own id was touched, or the claim answering
    * it was.** `closeEnquiry`/`acceptAsUnresolved` both write an edge landing
    * on the question itself (`RESOLVES`/`DEFERS`), so those show up from the
    * question id alone — but `promote`/`reinterpret`/`reverify` touch only the
    * claim, never the question they move into `established` or out of
-   * `provisional`. The join costs nothing new: `whatIsKnown()` already
-   * resolves which claim answers each `established`/`provisional` question
-   * (`AnsweredQuestion.claim`), so checking the claim id against the same
-   * touched set the other sections use is one more membership test, not a
-   * new query. What this still cannot catch: a question moving `unresolved`
-   * → `untested` or the reverse has no claim to check and no edge landing on
-   * the question either -- `unresolved`/`untested`/`accepted` can only be
+   * `provisional`. `AnsweredQuestion.claim` is `whatIsKnown()`'s own
+   * resolution of the same fact, so the check is a membership test too.
+   *
+   * **What is still not caught, after both joins**: a question moving
+   * `unresolved` ↔ `untested` has no claim to check and no edge landing on
+   * the question either — `unresolved`/`untested`/`accepted` can only be
    * marked moved by their own id. Not fixed with more traversal; named so
    * the gap is a documented one rather than a discovered one.
    */
@@ -2391,6 +2410,7 @@ export class ReadSurface extends SessionCore {
     }
 
     const touched = touchedHandles(events);
+    const movedWork = (w: ListedWork) => touched.has(w.work) || w.gates.some((g) => touched.has(g));
     const movedById = (h: { question: string }) => touched.has(h.question);
     const movedByIdOrClaim = (h: { question: string; claim: string }) =>
       touched.has(h.question) || touched.has(h.claim);
@@ -2398,12 +2418,12 @@ export class ReadSurface extends SessionCore {
     return {
       blocked: {
         gates: gates.filter((g) => g.state === "blocked" && touched.has(g.gate)),
-        work: work.filter((w) => w.state === "blocked" && touched.has(w.work)),
+        work: work.filter((w) => w.state === "blocked" && movedWork(w)),
       },
       unevaluated: gates.filter(
         (g) => (g.state === "never-evaluated" || g.state === "incomplete") && touched.has(g.gate),
       ),
-      untouched: work.filter((w) => w.state === "planned" && touched.has(w.work)),
+      untouched: work.filter((w) => w.state === "planned" && movedWork(w)),
       known: {
         established: known.established.filter(movedByIdOrClaim),
         provisional: known.provisional.filter(movedByIdOrClaim),

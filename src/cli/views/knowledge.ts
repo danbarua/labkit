@@ -11,6 +11,7 @@
 
 import type {
   AcceptedQuestion,
+  AnsweredQuestion,
   ConcludedClaim,
   ConflictSide,
   ConflictVerdict,
@@ -37,16 +38,29 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
   );
 }
 
+/**
+ * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was
+ * answered. Without the polarity, an established **"no"** reads as though the
+ * record had shown the opposite: an outside reader given only `asks` for a
+ * promoted, confirmed negative result read it as a "yes" (`now`'s own
+ * acceptance test, run cold, #189). The record has always carried this
+ * (`QuestionClosure.answer`, S-4); this line is the same fact, on the report
+ * that previously omitted it.
+ */
+function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
+  return qs.map((q) => `${q.asks}  ${p.handle(`(${q.question})`)}  — ${q.answer}`);
+}
+
 export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
   const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, p), "nothing");
   return [
     // The five headings carry the distinction the buckets exist for, so they
     // are coloured by what the bucket means rather than uniformly.
     p.settled("Established"),
-    list(survey.established),
+    bullets(answeredLines(survey.established, p), "nothing"),
     "",
     p.provisional("Provisional (answered, but not something to build on yet)"),
-    list(survey.provisional),
+    bullets(answeredLines(survey.provisional, p), "nothing"),
     "",
     p.provisional("Accepted as unresolved"),
     bullets(acceptedLines(survey.accepted, p), "nothing"),

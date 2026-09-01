@@ -248,9 +248,10 @@ const acceptedQuestion = questionStanding.extend({
   acceptedBecause: z.string(),
 });
 
-/** `KnowledgeSurvey.established`/`.provisional` — plus the claim that answers it (#55). */
+/** `KnowledgeSurvey.established`/`.provisional` — the claim that answers it, and which way (#55). */
 const answeredQuestion = questionStanding.extend({
   claim: ref("claim"),
+  answer: z.enum(["yes", "no"]),
 });
 
 const identifiedArtefact = z.strictObject({
@@ -931,6 +932,7 @@ const listedWork = z.strictObject({
   work: ref("work"),
   objective: z.string(),
   state: z.enum(["planned", "blocked", "carried-out"]),
+  gates: z.array(ref("gate")),
 });
 
 /** `work_list` — the same wrapping, for the same reason. */
