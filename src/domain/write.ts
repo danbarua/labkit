@@ -198,6 +198,24 @@ const noFindingBearsOn = (claim: ClaimRef): string =>
  */
 export type ResearchWrites = Pick<WriteSurface, Methods<WriteSurface>>;
 
+/**
+ * **Every write verb has an `Operation`, and every `Operation` is a verb.**
+ *
+ * Assigning each way makes the two sets identical: a verb with no entry fails
+ * the first, an entry naming no verb fails the second, and the error names the
+ * member rather than saying the types differ. `keep` shipped without an entry
+ * and nothing said so, because emitting is the only thing that would have
+ * noticed and it emitted somebody else's name.
+ *
+ * A check rather than a derivation, and the direction is why: `./events.ts`
+ * cannot compute `Methods<WriteSurface>` without importing this module, which
+ * already imports it. The check lives where the class is instead.
+ */
+const _everyVerbIsAnOperation: Operation = null as unknown as Methods<WriteSurface>;
+const _everyOperationIsAVerb: Methods<WriteSurface> = null as unknown as Operation;
+void _everyVerbIsAnOperation;
+void _everyOperationIsAVerb;
+
 export class WriteSurface extends SessionCore {
   /**
    * Puts a question on the record without pursuing it.
@@ -613,6 +631,11 @@ export class WriteSurface extends SessionCore {
         const concluded = await this.concluding(input);
         const events = await this.emit("conclude", input.analysis, {
           conclusions: this.conclusionEvents([concluded]),
+          // The standing this conclusion was recorded with. Without it the log
+          // cannot say whether a claim now reading `confirmatory` was recorded
+          // that way or promoted later, and a reader has to infer it from
+          // whether a `promote` happens to follow.
+          standing: input.standing ?? "exploratory",
           ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
         });
         return { analysis: input.analysis, claims: [concluded], events };
@@ -1355,17 +1378,28 @@ export class WriteSurface extends SessionCore {
           invalidation_check: "evidence that the promoted result does not replicate",
         });
         await this.graph.createEdge(decision.natural_id, "PROMOTES", claim);
+        // **Read before the write, so the event can say what it changed from.**
+        // The act mutates `Claim.kind` in place, so afterwards nothing on the
+        // record holds the value it replaced and the log could only say that a
+        // promotion happened, never what it moved.
+        const [existing] = await this.graph.query(
+          `MATCH (c:Claim {natural_id: $id}) RETURN c`,
+          { c: vertexProps<ClaimProps>() },
+          { id: claim },
+        );
         await this.graph.query(
           `MATCH (c:Claim {natural_id: $id}) SET c.kind = 'confirmatory' RETURN c`,
           { c: vertexProps<ClaimProps>() },
           { id: claim },
         );
-        return decision;
+        return { decision, was: existing?.c.kind ?? "exploratory" };
       });
       const events = await this.emit("promote", input.claim, {
         proposition: await this.assertedBy(input.claim),
+        from: decision.was,
+        to: "confirmatory",
       });
-      return { decision: ref("decision", decision.natural_id), events };
+      return { decision: ref("decision", decision.decision.natural_id), events };
     });
   }
 
@@ -1531,7 +1565,7 @@ export class WriteSurface extends SessionCore {
    * point of S-11.
    */
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
-    return this.revise({ ...input, keeping: [] });
+    return this.revise({ ...input, keeping: [] }, "replaceAnalysis");
   }
 
   /**
@@ -1559,12 +1593,19 @@ export class WriteSurface extends SessionCore {
           : `${input.keeping.join(", ")} were concluded by ${spans.join(" and ")}, and a revision ` +
               `revises one analysis; keep the claims of one of them`,
       );
-    return this.revise({ ...input, supersedes: spans[0]! });
+    return this.revise({ ...input, supersedes: spans[0]! }, "keep");
   }
 
   /** `keep` and `replaceAnalysis`, which differ only in how much they carry forward. */
   private async revise(
     input: KeepCommand & { supersedes: AnalysisRef },
+    /**
+     * Which act the caller performed. **Taken from the caller, not fixed
+     * here**: `keep` and `replace` share this implementation and are different
+     * acts — one carries conclusions forward, the other supersedes every one
+     * of them — so a log that named them alike could not tell them apart.
+     */
+    operation: "keep" | "replaceAnalysis",
   ): Promise<ReplacementReport> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
@@ -1632,7 +1673,7 @@ export class WriteSurface extends SessionCore {
         return { analysis, decision: ref("decision", decision.natural_id), superseded };
       });
 
-      const events = await this.emit("replaceAnalysis", replacement, {
+      const events = await this.emit(operation, replacement, {
         supersedes: input.supersedes,
         because: input.because,
         keeping: input.keeping,

@@ -180,16 +180,14 @@ export const UNATTRIBUTED: AttributionContext = {
 /**
  * The verb an event records — one name per public write verb, and the same name.
  *
- * **Not a hand-kept copy of the verb list.** Checked when this was written: the
- * eighteen `emit` operations and the eighteen public verbs on `WriteSurface` are
- * the same eighteen strings, because CLAUDE.md requires it — *"a verb that
- * composes others records **one** event, not one per step"*, and that one event
- * is named for the act the researcher took. `openEnquiry` is `pose` + `pursue`
- * and emits only `openEnquiry`.
+ * **It must equal the set of methods on `WriteSurface`, and `write.ts` asserts
+ * that it does.** It cannot be *derived* from the class here: `write.ts`
+ * already imports this module, so reaching back for `WriteSurface` would make
+ * a cycle. The assertion is where the class is, and fails to compile naming
+ * the member that drifted — which is how `keep` was found missing.
  *
- * Written as a union rather than `string` so a typo is a compile error.
- * `this.emit("recordAnalyis", …)` used to compile and would have written an
- * event nobody could ever filter for.
+ * A union rather than `string`, so `emit("recordAnalyis", …)` is a compile
+ * error rather than an event nobody can filter for.
  */
 export type Operation =
   | "pose"
@@ -210,6 +208,7 @@ export type Operation =
   | "promote"
   | "amendDesign"
   | "replaceAnalysis"
+  | "keep"
   | "reinterpret";
 
 /**
