@@ -2,8 +2,8 @@
 # Imports Bonsai's real gates.toml (reviewer requirement 4's binding-clause
 # inventory) into LabKit, driving the CLI the same way the probe-bonsai-*
 # scripts do. #127. Thin wrapper: the row-by-row logic lives in
-# import-bonsai-gates.ts because parsing and iterating 106 TOML rows is not
-# something bash does honestly.
+# import-bonsai-gates.ts because parsing and iterating gates.toml's rows is
+# not something bash does honestly.
 #
 #   LABKIT_HOME=~/Code/pycharm/bonsai-2026 bash scripts/probe-bonsai-3-gates.sh
 #   bash scripts/probe-bonsai-3-gates.sh <db-dir> [<bonsai-source-dir>]

@@ -189,11 +189,6 @@ function collapse(text: unknown): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-function truncate(text: string, max = 220): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max).trimEnd()}…`;
-}
-
 function firstNonEmpty(fields: Record<string, string>, keys: string[]): string {
   for (const key of keys) {
     const v = collapse(fields[key]);
@@ -266,7 +261,7 @@ function dispositionOf(row: Row): Disposition {
     case "not_binding": {
       const reason = collapse(f.reason);
       return {
-        proposition: `not_binding ${row.id}: ${truncate(reason)}`,
+        proposition: `not_binding ${row.id}: ${reason}`,
         outcome: "pass",
         value: reason,
       };
