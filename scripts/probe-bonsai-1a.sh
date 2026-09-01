@@ -41,20 +41,14 @@
 # Filed as an `open question` (labkit#133), not a bug: the query does exactly
 # what it was designed to do, and the design has a real gap.
 #
-# **Two things that USED to be wrong answers here, now fixed by #173/#132.**
-# `replace` used to invalidate the WHOLE prior analysis's claims -- one flag
-# on the shared output artefact, so superseding one conclusion silently
-# retracted the other three (and every criterion evaluation citing them) even
-# though the replacement never named them. `conclude --replacing <old-claim>`
-# replaced that: standing lives per finding now, and coverage is exactly
-# which findings a `conclude --replacing` call actually names. Below, v2
-# replaces three of v1's four conclusions (historical random, current random,
-# rewiring) and simply never names the fourth (lattice) -- so lattice's
-# original evaluation and claim stand untouched, which is what Bonsai's own
-# record has always said and is no longer something this script has to work
-# around. `why "$lattice_claim"` demonstrates it reads correctly on every run.
-# Was filed as `domain model` (labkit#132, GATE_1 cascade labkit#137);
-# PJ-008 §3 rows AM/AN.
+# **Below, v2 replaces three of v1's four conclusions and simply never names
+# the fourth.** `conclude --replacing <old-claim>` names historical random,
+# current random and rewiring; lattice is never named, so its original
+# evaluation and claim stand untouched -- which is what Bonsai's own record
+# has always said. `why "$lattice_claim"` demonstrates it reads correctly on
+# every run. Was filed as `domain model` (labkit#132, GATE_1 cascade
+# labkit#137); PJ-008 §3 rows AM/AN, and PJ-035 for the mechanism this
+# replaced.
 #
 # A third thing worth knowing, filed on its own even though it is an
 # absence and PJ-011 §5 says an absence earns nothing alone: there is no
