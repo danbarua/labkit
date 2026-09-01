@@ -1527,7 +1527,11 @@ export class WriteSurface extends SessionCore {
       // and no corrected check in existence. External review named it the
       // blocking finding; S-3c carries the negative test. See
       // TenantGraph.inTransaction.
-      const { before, analysis: replacement } = await this.graph.inTransaction(async () => {
+      const {
+        before,
+        analysis: replacement,
+        output: supersededOutput,
+      } = await this.graph.inTransaction(async () => {
         await this.assertReviewOf(input.because, input.supersedes);
         const before = await this.conclusionsOf(input.supersedes);
 
@@ -1593,7 +1597,7 @@ export class WriteSurface extends SessionCore {
         await this.graph.createEdge(lineage.natural_id, "SUPERSEDES", input.supersedes);
         await this.graph.createEdge(lineage.natural_id, "MOTIVATES", analysis);
 
-        return { before, analysis };
+        return { before, analysis, output };
       });
 
       // Both sides carry a handle. After a replacement two records assert each
@@ -1670,7 +1674,19 @@ export class WriteSurface extends SessionCore {
       // and silently fell back to printing the id. Same one hop `recorded()`
       // makes to write the CONSUMES edge.
       const inputNames = new Map<InputRef, IndexedString>();
-      // Read after the transaction above, so it sees this act's own invalidation.
+      // **Which inputs this act retracted outright.** It read
+      // `Artefact.invalidated`, and this call no longer sets it (#132) -- so
+      // the answer was silently always "none", and a replacement resting on
+      // the record it had just emptied said it rested on something intact.
+      //
+      // Computed from what this call actually did, not queried: `before` is
+      // every conclusion the superseded analysis drew and `paired` is the ones
+      // this call superseded, so the superseded output is retracted exactly
+      // when those two agree. **Every, not any** -- a partial replacement
+      // leaves standing findings in that artefact and it remains a live
+      // record, which is the whole of #132.
+      const supersededWhole =
+        before.length > 0 && before.every((b) => paired.some((pr) => pr?.claim === b.claim));
       const retracted = new Set<InputRef>();
       // One query for every input, not one per input. `logical_name` is what an
       // Artefact carries; this read `.name` -- a property no Artefact has -- so it
@@ -1697,7 +1713,7 @@ export class WriteSurface extends SessionCore {
         const a = found.get(artefact);
         if (!a) continue;
         inputNames.set(handle, a.logical_name);
-        if (a.invalidated) retracted.add(handle);
+        if (supersededWhole && artefact === supersededOutput) retracted.add(handle);
       }
 
       // `why` is computed, not asserted. Two things had been wrong with the fixed

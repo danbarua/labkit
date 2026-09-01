@@ -1659,6 +1659,12 @@ export class ReadSurface extends SessionCore {
     // it is a loop rather than two hand-written anchors is that the one-sided
     // version is silent: a promoted negative result reported "held to no
     // prespecified standard" while the record held the check.
+    // Which of the inputs this claim rests on have been retracted outright --
+    // every finding they record superseded. One query for all of them.
+    const retractedInputs = await this.retractedArtefacts([
+      ...new Set(resting.map((r) => r.a.natural_id)),
+    ]);
+
     const byCriterion = new Map<CriterionRef, CheckStatus>();
     for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
       const { cypher, decoders } = compose(checksAnchor(bearing), checkStatus, {
@@ -1752,7 +1758,11 @@ export class ReadSurface extends SessionCore {
               {
                 part: ref("observations", r.a.natural_id),
                 name: r.a.logical_name,
-                ...(r.a.invalidated ? { invalidated: true as const } : {}),
+                // Computed, not stored. `r.a.invalidated` said this until
+                // 2026-09-01, and a partial replacement no longer sets it --
+                // so a reader resting on a record whose findings had all been
+                // superseded was told nothing. See `retractedArtefacts`.
+                ...(retractedInputs.has(r.a.natural_id) ? { invalidated: true as const } : {}),
               },
             ]),
         ).values(),
@@ -1998,17 +2008,89 @@ export class ReadSurface extends SessionCore {
        ${this.withinScope(scope)}
        MATCH (u)-[:USES]->(comp:Computation)
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
-       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL OR out.invalidated = false
-       RETURN a, e`,
+       // **Per claim, not per artefact.** This filtered on
+       // out.invalidated -- one flag over every finding an analysis produced,
+       // so a partial replacement dropped the inputs of conclusions it never
+       // touched (#132). A finding stops counting when a decision stands
+       // instead of the claim it bears on.
+       //
+       // Two clauses, because AGE has no edge alternation, and filtered in
+       // TypeScript because AGE has no NOT (pattern) predicate in WHERE either
+       // -- both traps are in CLAUDE.md and the second is a syntax error, not
+       // a silent wrong answer.
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       RETURN a, e, narrowed, replaced`,
       {
         // `natural_id` because `restingOn` deduplicates by identity, not by
         // name — see S-9d.
         a: vertexProps<ArtefactProps & { natural_id: string }>(),
         e: vertexProps<{ natural_id: string }>(),
+        narrowed: optional(vertexProps<{ natural_id: string }>()),
+        replaced: optional(vertexProps<{ natural_id: string }>()),
       },
       { name: scope.proposition, ...this.scopeParams(scope) },
+    ).then((rows) => rows.filter((r) => !r.narrowed && !r.replaced));
+  }
+
+  /**
+   * The artefacts among these whose every recorded finding has been superseded.
+   *
+   * **Every, not any**, and that is #132 in one word. An artefact holds one
+   * finding per conclusion its analysis drew; replacing one of them leaves the
+   * rest standing, and so leaves the artefact a live record that a reader may
+   * still rest on. Only when nothing in it stands has the record itself been
+   * retracted.
+   *
+   * It replaces `Artefact.invalidated`, which said the same thing for the
+   * all-or-nothing case and the wrong thing for every other. An artefact
+   * holding no findings at all is not retracted — there is nothing to have
+   * fallen, which is PJ-011 §5's distinction between empty and wrong.
+   */
+  private async retractedArtefacts(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await this.graph.query(
+      `MATCH (a:Artefact) WHERE a.natural_id IN $ids
+       MATCH (e:Evidence)-[:RECORDED_IN]->(a)
+       OPTIONAL MATCH (e)-[:SUPPORTS]->(sup:Claim)
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(chal:Claim)
+       OPTIONAL MATCH (:Decision)-[:SUPERSEDES]->(sup)
+       OPTIONAL MATCH (:Decision)-[:SUPERSEDES]->(chal)
+       RETURN a, e, sup, chal`,
+      {
+        a: vertexProps<{ natural_id: string }>(),
+        e: vertexProps<{ natural_id: string }>(),
+        sup: optional(vertexProps<{ natural_id: string }>()),
+        chal: optional(vertexProps<{ natural_id: string }>()),
+      },
+      { ids },
     );
+    // Both bearings. A finding that CHALLENGES a claim is a finding, and
+    // reading only the supporting side is the silent half of this repo's
+    // six-occurrence defect.
+    const standing = new Map<string, boolean>();
+    for (const row of rows) {
+      const gone = await this.supersededClaim(row.sup?.natural_id ?? row.chal?.natural_id);
+      standing.set(row.a.natural_id, (standing.get(row.a.natural_id) ?? false) || !gone);
+    }
+    return new Set([...standing].filter(([, anyStanding]) => !anyStanding).map(([id]) => id));
+  }
+
+  /** Whether a decision stands instead of this claim. Both predicates; see `withdrawalOf`. */
+  private async supersededClaim(claim: string | undefined): Promise<boolean> {
+    if (claim === undefined) return false;
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $id})
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       RETURN narrowed, replaced`,
+      {
+        narrowed: optional(vertexProps<{ natural_id: string }>()),
+        replaced: optional(vertexProps<{ natural_id: string }>()),
+      },
+      { id: claim },
+    );
+    return rows.some((r) => r.narrowed || r.replaced);
   }
 
   /** The claims and enquiries resting on one artefact, by the two direct routes. */
