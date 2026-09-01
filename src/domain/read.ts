@@ -120,32 +120,34 @@ function dedupeById<T>(items: T[], id: (item: T) => string): T[] {
  * here without a delegate there is reachable from the CLI and MCP and from
  * nowhere a scenario can call.
  */
-export type ResearchReads = Pick<
-  ReadSurface,
-  | "analysisRevision"
-  | "claimsAsserting"
-  | "contractFor"
-  | "criteriaGoverning"
-  | "designHistory"
-  | "doTheseConflict"
-  | "enquiryInContext"
-  | "enquiryStatus"
-  | "gateList"
-  | "gateStatus"
-  | "interpretationHistory"
-  | "originOf"
-  | "pursuitsOf"
-  | "reproducibilityOf"
-  | "reproductionOf"
-  | "search"
-  | "whatDependsOn"
-  | "whatHappened"
-  | "whatIsKnown"
-  | "whatWasKnown"
-  | "why"
-  | "whySupported"
-  | "workList"
->;
+export const RESEARCH_READ_VERBS = [
+  "analysisRevision",
+  "claimsAsserting",
+  "contractFor",
+  "criteriaGoverning",
+  "designHistory",
+  "doTheseConflict",
+  "enquiryInContext",
+  "enquiryStatus",
+  "gateList",
+  "gateStatus",
+  "interpretationHistory",
+  "now",
+  "originOf",
+  "pursuitsOf",
+  "reproducibilityOf",
+  "reproductionOf",
+  "search",
+  "whatDependsOn",
+  "whatHappened",
+  "whatIsKnown",
+  "whatWasKnown",
+  "why",
+  "whySupported",
+  "workList",
+] as const;
+
+export type ResearchReads = Pick<ReadSurface, (typeof RESEARCH_READ_VERBS)[number]>;
 
 /**
  * **What a refusal may point a caller at, and what it may not.**

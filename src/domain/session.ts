@@ -112,6 +112,7 @@ export class ResearchSession {
     this.reads.whatHappened(...args);
   readonly enquiryInContext: ReadSurface["enquiryInContext"] = (...args) =>
     this.reads.enquiryInContext(...args);
+  readonly now: ReadSurface["now"] = (...args) => this.reads.now(...args);
 }
 
 /**

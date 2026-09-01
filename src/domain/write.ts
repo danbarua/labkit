@@ -196,29 +196,30 @@ const noFindingBearsOn = (claim: ClaimRef): string =>
  * property whose signature drifts then fails to compile **where the drift is**,
  * rather than three files away in whichever fragment happened to call it.
  */
-export type ResearchWrites = Pick<
-  WriteSurface,
-  | "pose"
-  | "pursue"
-  | "openEnquiry"
-  | "sharpen"
-  | "recordObservations"
-  | "recordAnalysis"
-  | "conclude"
-  | "recordReview"
-  | "replaceAnalysis"
-  | "keep"
-  | "reverify"
-  | "reinterpret"
-  | "closeEnquiry"
-  | "acceptAsUnresolved"
-  | "promote"
-  | "planWork"
-  | "stateCriterion"
-  | "declareGate"
-  | "evaluateCriterion"
-  | "amendDesign"
->;
+export const RESEARCH_WRITE_VERBS = [
+  "pose",
+  "pursue",
+  "openEnquiry",
+  "sharpen",
+  "recordObservations",
+  "recordAnalysis",
+  "conclude",
+  "recordReview",
+  "replaceAnalysis",
+  "keep",
+  "reverify",
+  "reinterpret",
+  "closeEnquiry",
+  "acceptAsUnresolved",
+  "promote",
+  "planWork",
+  "stateCriterion",
+  "declareGate",
+  "evaluateCriterion",
+  "amendDesign",
+] as const;
+
+export type ResearchWrites = Pick<WriteSurface, (typeof RESEARCH_WRITE_VERBS)[number]>;
 
 export class WriteSurface extends SessionCore {
   /**
