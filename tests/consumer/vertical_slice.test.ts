@@ -34,6 +34,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ReadSurface, ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 
@@ -105,7 +106,7 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
         name: "sweep readings",
         finding: "twelve runs across the schedule",
       });
-      const { claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await recordAnalysis(s, {
         enquiry,
         method: "convergence-fit",
         from: [observations],
@@ -174,7 +175,7 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
       name: `${proposition} readings`,
       finding: `measurements for ${proposition}`,
     });
-    await s.recordAnalysis({
+    await recordAnalysis(s, {
       enquiry,
       method: "paired-comparison",
       from: [observations],
@@ -303,7 +304,7 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
         finding: "the 2024 control, as archived",
         contentHash: "sha256:1111",
       });
-      const { analysis } = await s.recordAnalysis({
+      const { analysis } = await recordAnalysis(s, {
         enquiry,
         method: "paired-comparison",
         from: [historical],
@@ -374,7 +375,7 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
         // The only place a name can go. It is evidence prose, not attribution.
         finding: `difference 2.1%, CI excludes zero (adjudicated by ${closer})`,
       });
-      const { claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await recordAnalysis(s, {
         enquiry,
         method: "paired-comparison",
         from: [observations],

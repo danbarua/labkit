@@ -79,9 +79,11 @@ import type {
   AnalysisRef,
   ClaimRef,
   ConcludedClaim,
+  Conclusion,
   CriterionRef,
   EnquiryRef,
   GateRef,
+  InputRef,
   ObservationsRef,
   QuestionRef,
   WorkRef,
@@ -166,6 +168,51 @@ export async function gatedWork(
 }
 
 /**
+ * A run and every conclusion drawn from it — the compound `WriteSurface` used
+ * to be, with the same signature and one argument more.
+ *
+ * **This is where the array lives now.** `recordAnalysis` on the surface
+ * records the run and takes no conclusions, because a conclusion is its own
+ * act: findings arrive one at a time, over days, and #173 is about the domain
+ * saying so. But a *test* usually wants a run with its findings already on it,
+ * in one line, and that want is real — it is Dan's own definition of a
+ * fragment: *"one 'Afterward' question, one complete call."*
+ *
+ * Named for the verb and taking the surface first, so the edit at every call
+ * site is `session.recordAnalysis(x)` → `recordAnalysis(session, x)` and the
+ * compiler enumerates the rest.
+ *
+ * The event stream is the honest one either way: one `recordAnalysis` and one
+ * `conclude` per conclusion, exactly what a person typing the two commands
+ * produces. See `TenantGraph.inMintScope`.
+ */
+export async function recordAnalysis(
+  w: W,
+  input: {
+    enquiry: EnquiryRef;
+    method: string;
+    from: InputRef[];
+    concludes: readonly Conclusion[];
+    heldTo?: CriterionRef[];
+    implementing?: WorkRef;
+  },
+): Promise<{ analysis: AnalysisRef; claims: ConcludedClaim[] }> {
+  const { analysis } = await w.recordAnalysis({
+    enquiry: input.enquiry,
+    method: input.method,
+    from: input.from,
+    ...(input.heldTo === undefined ? {} : { heldTo: input.heldTo }),
+    ...(input.implementing === undefined ? {} : { implementing: input.implementing }),
+  });
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) {
+    const drawn = await w.conclude({ analysis, ...c });
+    claims.push(...drawn.claims);
+  }
+  return { analysis, claims };
+}
+
+/**
  * Measurement, then a computation over it and what it concluded.
  *
  * The two together because that is one move for a researcher, and because an
@@ -189,15 +236,20 @@ export async function observeAndAnalyse(
     name: input.name,
     finding: input.finding,
   });
-  const recorded = await w.recordAnalysis({
+  const { analysis } = await w.recordAnalysis({
     enquiry: input.enquiry,
     method: input.method,
     from: [observations],
-    concludes: [...input.concludes],
     ...(input.heldTo === undefined ? {} : { heldTo: input.heldTo }),
     ...(input.implementing === undefined ? {} : { implementing: input.implementing }),
   });
-  return { observations, analysis: recorded.analysis, claims: recorded.claims };
+  // Looped here rather than delegating to the `recordAnalysis` fragment:
+  // **nothing in `fragments/` calls another fragment**, which is what lets
+  // `fragments/provenance.ts` keep the running fragment in a single global
+  // rather than a stack. See its header.
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) claims.push(...(await w.conclude({ analysis, ...c })).claims);
+  return { observations, analysis, claims };
 }
 
 /**
@@ -223,13 +275,18 @@ export async function negativeResult(
     name: input.name,
     finding: input.finding,
   });
-  const recorded = await w.recordAnalysis({
+  const { analysis } = await w.recordAnalysis({
     enquiry: input.enquiry,
     method: input.method,
     from: [observations],
-    concludes: [{ proposition: input.proposition, finding: input.finding, bearing: "challenges" }],
   });
-  return { observations, analysis: recorded.analysis, claims: recorded.claims };
+  const { claims } = await w.conclude({
+    analysis,
+    proposition: input.proposition,
+    finding: input.finding,
+    bearing: "challenges",
+  });
+  return { observations, analysis, claims };
 }
 
 /** A prespecified check, run and not held. */

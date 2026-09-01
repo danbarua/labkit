@@ -483,19 +483,7 @@ export class WriteSurface extends SessionCore {
         enquiry: input.enquiry,
         method: input.method,
       });
-      const claims: ConcludedClaim[] = [];
-      for (const conclusion of input.concludes) {
-        const concluded = await this.conclude({
-          analysis,
-          proposition: conclusion.proposition,
-          finding: conclusion.finding,
-          ...(conclusion.bearing === undefined ? {} : { bearing: conclusion.bearing }),
-          ...(conclusion.standing === undefined ? {} : { standing: conclusion.standing }),
-        });
-        claims.push(...concluded.claims);
-        events.push(...concluded.events);
-      }
-      return { analysis, claims, events };
+      return { analysis, claims: [], events };
     });
   }
 

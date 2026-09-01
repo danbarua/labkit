@@ -677,7 +677,6 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         enquiry: ref("enquiry", enquiry),
         method,
         from: (from as string[]).map(inputRef),
-        concludes: [],
         ...(implementing === undefined ? {} : { implementing: ref("work", implementing) }),
         ...(held_to === undefined
           ? {}

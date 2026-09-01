@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimOf } from "./helpers/claims";
+import { recordAnalysis } from "../fragments";
 
 let scenario: Scenario;
 beforeAll(async () => {
@@ -78,7 +79,7 @@ describe("enumerating gates and work", () => {
       name: "the readings",
       finding: "measured",
     });
-    const { claims } = await s.recordAnalysis({
+    const { claims } = await recordAnalysis(s, {
       enquiry,
       method: "comparison",
       from: [readings],
@@ -104,7 +105,7 @@ describe("enumerating gates and work", () => {
       consequence: "fine",
       protecting: [doneWork],
     });
-    const { claims: more } = await s.recordAnalysis({
+    const { claims: more } = await recordAnalysis(s, {
       enquiry,
       method: "second comparison",
       from: [readings],
@@ -132,7 +133,7 @@ describe("enumerating gates and work", () => {
       consequence: "partly checked",
       protecting: [partialWork],
     });
-    const { claims: third } = await s.recordAnalysis({
+    const { claims: third } = await recordAnalysis(s, {
       enquiry,
       method: "third comparison",
       from: [readings],
@@ -250,7 +251,7 @@ describe("enumerating gates and work", () => {
         name: "readings",
         finding: "measured",
       });
-      const { claims } = await s.recordAnalysis({
+      const { claims } = await recordAnalysis(s, {
         enquiry,
         method: "comparison",
         from: [readings],
@@ -316,7 +317,7 @@ describe("enumerating gates and work", () => {
         name: "readings",
         finding: "measured",
       });
-      const { claims } = await s.recordAnalysis({
+      const { claims } = await recordAnalysis(s, {
         enquiry,
         method: "comparison",
         from: [readings],

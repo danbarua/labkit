@@ -51,6 +51,7 @@ import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { NOT_EXPOSED, publicVerbsOf, verbsCalledOn } from "./helpers/surface-coverage";
 import { claimNamed, claimOf } from "./helpers/claims";
+import { recordAnalysis } from "../fragments";
 
 /**
  * A handle out of a tool's reply.
@@ -689,7 +690,7 @@ describe("behaviour — the same answers, over the wire", () => {
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     });
-    const { analysis, claims: analysisClaims } = await s.recordAnalysis({
+    const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
       enquiry,
       method: "paired comparison",
       from: [observations],

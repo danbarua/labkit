@@ -150,7 +150,6 @@ export function registerWrites(program: Command, run: Run): void {
             enquiry,
             method: opts.method,
             from: opts.from,
-            concludes: [],
             ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
             ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
           }),

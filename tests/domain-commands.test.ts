@@ -27,6 +27,7 @@ import {
 } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
+import { recordAnalysis } from "../fragments";
 
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;
@@ -69,7 +70,7 @@ describe("commands are values a caller can hold", () => {
     };
     const { observations } = await s.recordObservations(observing);
 
-    const { claims: analysisClaims } = await s.recordAnalysis({
+    const { claims: analysisClaims } = await recordAnalysis(s, {
       enquiry,
       method: "paired comparison",
       from: [observations],

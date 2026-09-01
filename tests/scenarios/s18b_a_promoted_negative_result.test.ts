@@ -23,6 +23,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -57,7 +58,7 @@ async function aVouchedForNo() {
     name: "cycle counts",
     finding: "forty coupons, coated and bare",
   });
-  const { claims } = await session.recordAnalysis({
+  const { claims } = await recordAnalysis(session, {
     enquiry,
     method: "survival comparison",
     from: [observations],
@@ -130,7 +131,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       name: "sealant counts",
       finding: "forty coupons",
     });
-    const { claims } = await session.recordAnalysis({
+    const { claims } = await recordAnalysis(session, {
       enquiry,
       method: "survival comparison",
       from: [observations],

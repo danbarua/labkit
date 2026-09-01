@@ -27,6 +27,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { ref } from "../../src/domain/report";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -67,7 +68,7 @@ const HOLDS = "the simulation converges";
  */
 async function anAnalysisThatConsumedNothing(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("does the simulation converge?");
-  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
     enquiry,
     method: "pure-sim",
     from: [],

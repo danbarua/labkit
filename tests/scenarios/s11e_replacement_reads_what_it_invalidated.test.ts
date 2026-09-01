@@ -25,6 +25,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -57,7 +58,7 @@ async function aDefectiveAnalysis() {
     name: "recovery times",
     finding: "sixty patients, two arms",
   });
-  const { analysis, claims } = await session.recordAnalysis({
+  const { analysis, claims } = await recordAnalysis(session, {
     enquiry,
     method: "unadjusted comparison",
     from: [observations],

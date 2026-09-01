@@ -22,6 +22,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -69,7 +70,7 @@ async function bootstrapAnalysisAsShipped() {
     finding: "per-image accuracy for all five constructions, 10,000 images",
     contentHash: "sha256:obs",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "bootstrap-pairwise",
     from: [observations],
@@ -293,13 +294,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       finding: "per-image accuracy on Fashion-MNIST",
     });
 
-    const { claims: mnistClaims } = await session.recordAnalysis({
+    const { claims: mnistClaims } = await recordAnalysis(session, {
       enquiry,
       method: "permutation-mnist",
       from: [mnist],
       concludes: [{ proposition: "T beats lattice on MNIST", finding: "p = 0.001" }],
     });
-    const { claims: fashionClaims } = await session.recordAnalysis({
+    const { claims: fashionClaims } = await recordAnalysis(session, {
       enquiry,
       method: "permutation-fashion",
       from: [fashion],
@@ -354,13 +355,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       finding: "raw",
     });
 
-    const { analysis: target, claims: targetClaims } = await session.recordAnalysis({
+    const { analysis: target, claims: targetClaims } = await recordAnalysis(session, {
       enquiry,
       method: "bootstrap-pairwise",
       from: [observations],
       concludes: [{ proposition: "T beats rewired", finding: "p = 0.002 (bootstrap)" }],
     });
-    const { analysis: unrelated } = await session.recordAnalysis({
+    const { analysis: unrelated } = await recordAnalysis(session, {
       enquiry,
       method: "unrelated-analysis",
       from: [observations],

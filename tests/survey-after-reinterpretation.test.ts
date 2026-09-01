@@ -31,6 +31,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:te
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { vertexProps } from "../src/db/cypher";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../src/domain";
+import { recordAnalysis } from "../fragments";
 
 const clock: Clock = { now: () => "2026-08-29T09:00:00.000Z" };
 let scenario: Scenario;
@@ -60,7 +61,7 @@ test("a reinterpretation does not move the question between buckets", async () =
     name: "cohort",
     finding: "+11%",
   });
-  const rec = await s.recordAnalysis({
+  const rec = await recordAnalysis(s, {
     enquiry,
     method: "fit",
     from: [obs],

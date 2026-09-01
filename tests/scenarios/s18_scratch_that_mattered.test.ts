@@ -19,6 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -69,7 +70,7 @@ async function scratchExploration() {
     name: "lunchtime sweep",
     finding: "twelve runs, no seed control",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "notebook-sweep",
     from: [observations],
@@ -209,7 +210,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       name: "small-model sweep",
       finding: "eight runs, small model",
     });
-    const { claims: otherAnalysisClaims } = await session.recordAnalysis({
+    const { claims: otherAnalysisClaims } = await recordAnalysis(session, {
       enquiry: other,
       method: "notebook-sweep",
       from: [otherObservations],

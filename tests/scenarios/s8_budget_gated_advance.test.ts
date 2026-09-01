@@ -24,6 +24,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -120,7 +121,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       name: "feasibility slice timings",
       finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
     });
-    const { claims: measuredClaims } = await session.recordAnalysis({
+    const { claims: measuredClaims } = await recordAnalysis(session, {
       enquiry: programme.enquiry,
       method: "throughput-and-convergence",
       implementing: programme.feasibility,
@@ -326,7 +327,7 @@ async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aSta
     name: "feasibility slice timings",
     finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
   });
-  return await session.recordAnalysis({
+  return await recordAnalysis(session, {
     enquiry: programme.enquiry,
     method: "throughput-and-convergence",
     implementing: programme.feasibility,

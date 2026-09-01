@@ -17,6 +17,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -62,7 +63,7 @@ async function aRunPartlyReAnalysed(holdTo = false) {
   // about supersession, and the first test would have been asserting the wrong
   // thing while passing for a reason it did not name.
   const criterion = holdTo ? (await session.stateCriterion(AGGREGATION)).criterion : undefined;
-  const { analysis: v1, claims: v1Claims } = await session.recordAnalysis({
+  const { analysis: v1, claims: v1Claims } = await recordAnalysis(session, {
     enquiry,
     method: "raw-scale aggregation",
     from: [observations],
@@ -157,7 +158,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       finding: "two independent batches",
     });
     // One sentence, two findings: the same claim about two batches.
-    const { analysis: v1 } = await session.recordAnalysis({
+    const { analysis: v1 } = await recordAnalysis(session, {
       enquiry,
       method: "raw-scale aggregation",
       from: [observations],

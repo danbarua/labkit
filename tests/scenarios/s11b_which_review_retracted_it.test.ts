@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 
@@ -75,7 +76,7 @@ async function anAnalysisWithTwoReviews(s: ResearchSession) {
     name: "onset sweep",
     finding: "onset across twelve coatings",
   });
-  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
     enquiry,
     method: "linear-onset-fit",
     from: [readings],

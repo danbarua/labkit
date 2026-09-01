@@ -31,6 +31,7 @@ import {
 } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -89,7 +90,7 @@ async function aResultHeldToARobustnessCheck() {
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -110,7 +111,7 @@ async function theCheckIsRun(
   method: string,
   concludes: { proposition: string; finding: string },
 ) {
-  return await session.recordAnalysis({
+  return await recordAnalysis(session, {
     enquiry,
     method,
     from: [observations],

@@ -30,6 +30,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf, whyOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;
@@ -95,7 +96,7 @@ describe("S-8b: there is no who, only what ran", () => {
         finding: "opus-5, temperature 0, prompt v3",
         contentHash: "sha256:cfg-v3",
       });
-      const { analysis: first } = await s.recordAnalysis({
+      const { analysis: first } = await recordAnalysis(s, {
         enquiry,
         method: "convergence-fit",
         from: [readings, older],
@@ -108,7 +109,7 @@ describe("S-8b: there is no who, only what ran", () => {
         finding: "opus-5, temperature 0.7, prompt v4",
         contentHash: "sha256:cfg-v4",
       });
-      await s.recordAnalysis({
+      await recordAnalysis(s, {
         enquiry,
         method: "convergence-fit",
         from: [readings, newer],
@@ -162,7 +163,7 @@ describe("S-8b: there is no who, only what ran", () => {
         name: "cost projection",
         finding: "projected 31 GPU-hours at target scale",
       });
-      const { claims: analysisClaims } = await s.recordAnalysis({
+      const { claims: analysisClaims } = await recordAnalysis(s, {
         enquiry,
         method: "cost-projection",
         from: [readings],

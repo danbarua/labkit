@@ -19,6 +19,7 @@ import { ResearchSession, inMemoryEventLog } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, days } from "../helpers/clock";
 import { claimOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;
@@ -104,7 +105,7 @@ describe("what was known, as of an instant", () => {
       name: "sweep readings",
       finding: "twelve runs",
     });
-    const { claims: analysisClaims } = await s.recordAnalysis({
+    const { claims: analysisClaims } = await recordAnalysis(s, {
       enquiry,
       from: [observations],
       method: "paired comparison",

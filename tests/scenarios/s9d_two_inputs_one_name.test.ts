@@ -19,6 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, whyOf } from "../helpers/claims";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -73,7 +74,7 @@ async function anAnalysisRestingOnBothControls(s: ResearchSession) {
     finding: "the remainder, regenerated from an inferred algorithm",
     contentHash: "sha256:regenerated",
   });
-  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
     enquiry,
     method: "arm-comparison",
     from: [surviving, regenerated],

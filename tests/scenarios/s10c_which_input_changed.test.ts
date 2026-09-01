@@ -15,6 +15,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -62,7 +63,7 @@ async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
     finding: "the original series",
     contentHash: "sha256:original",
   });
-  const { analysis, claims: analysisClaims } = await s.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
     enquiry,
     method: "effect-test",
     from: [original],

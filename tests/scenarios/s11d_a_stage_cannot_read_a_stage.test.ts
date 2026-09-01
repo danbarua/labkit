@@ -16,6 +16,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { recordAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -61,7 +62,7 @@ async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
     name: "raw sensor series",
     finding: "eleven dose levels, instrument settings not logged",
   });
-  const { analysis: calibration } = await s.recordAnalysis({
+  const { analysis: calibration } = await recordAnalysis(s, {
     enquiry,
     method: "calibrate",
     from: [raw],
@@ -77,7 +78,7 @@ async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
   // expressible: `from` took observations only, so the intermediate had to be
   // re-entered as if it were fresh measurement — severing the chain to the raw
   // series and making stage two look independently reproducible.
-  const { analysis: trend } = await s.recordAnalysis({
+  const { analysis: trend } = await recordAnalysis(s, {
     enquiry,
     method: "dose-response-fit",
     from: [calibration],

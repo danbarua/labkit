@@ -17,6 +17,7 @@ import { openScenario, type Scenario } from "./helpers/scenario";
 import { vertexProps } from "../src/db/cypher";
 import type { TenantGraph } from "../src/db/graph";
 import { claimNamed, claimOf } from "./helpers/claims";
+import { recordAnalysis } from "../fragments";
 
 let scenario: Scenario;
 let graph: TenantGraph;
@@ -51,7 +52,7 @@ test("whySupported treats an explicit invalidated:false the same as an absent on
     name: "obs",
     finding: "raw",
   });
-  await session.recordAnalysis({
+  await recordAnalysis(session, {
     enquiry,
     method: "m",
     from: [observations],
@@ -129,7 +130,7 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
     name: "per-image results",
     finding: "per-image accuracy",
   });
-  const { claims: analysisClaims } = await session.recordAnalysis({
+  const { claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -183,7 +184,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
     name: "solver traces",
     finding: "iteration counts",
   });
-  const { claims: analysisClaims } = await session.recordAnalysis({
+  const { claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "feasibility",
     from: [observations],
@@ -330,7 +331,7 @@ test("an interrupted sharpen leaves nothing at all", async () => {
     name: "run A",
     finding: "no delamination",
   });
-  await session.recordAnalysis({
+  await recordAnalysis(session, {
     enquiry,
     method: "cycling",
     from: [obs],
@@ -402,7 +403,7 @@ const aGatedCheck = async () => {
     name: "sweep",
     finding: "residuals recorded",
   });
-  const { analysis, claims: analysisClaims } = await session.recordAnalysis({
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "convergence",
     from: [obs],
@@ -487,7 +488,7 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
     name: "load runs",
     finding: "cracks at 40MPa",
   });
-  const { claims: analysisClaims } = await session.recordAnalysis({
+  const { claims: analysisClaims } = await recordAnalysis(session, {
     enquiry,
     method: "load-test",
     from: [obs],
@@ -595,7 +596,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
     name: "readings",
     finding: "twelve runs",
   });
-  const { claims: analysisClaims } = await s.recordAnalysis({
+  const { claims: analysisClaims } = await recordAnalysis(s, {
     enquiry,
     method: "paired comparison",
     from: [observations],
@@ -643,7 +644,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     name: "sweep",
     finding: "runs",
   });
-  const { claims: analysisClaims } = await s.recordAnalysis({
+  const { claims: analysisClaims } = await recordAnalysis(s, {
     enquiry,
     method: "paired comparison",
     from: [observations],
@@ -773,7 +774,7 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
     name: "run",
     finding: "data",
   });
-  const { analysis } = await session.recordAnalysis({
+  const { analysis } = await recordAnalysis(session, {
     enquiry,
     method: "m",
     from: [obs],
