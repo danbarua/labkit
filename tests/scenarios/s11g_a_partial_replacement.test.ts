@@ -83,22 +83,25 @@ async function aRunPartlyReAnalysed(holdTo = false) {
   };
 }
 
-/** The re-analysis, naming the one finding it supersedes and no other. */
+/** The re-analysis, naming the one finding that survives it and no other. */
 async function theLogScaleReAnalysis(w: Awaited<ReturnType<typeof aRunPartlyReAnalysed>>) {
   const { review } = await session.recordReview({
     of: w.v1,
     verdict: "raw-scale aggregation is untrustworthy for the stochastic-control comparisons",
   });
-  return replaceAnalysis(session, {
-    supersedes: w.v1,
+  // The lattice comparison is what survives, matching the re-analysis's own
+  // scope: everything else the run concluded is superseded here.
+  const report = await session.keep({
+    keeping: [w.stands],
     because: review,
-    enquiry: w.enquiry,
     method: "log-scale re-aggregation",
-    from: [w.observations],
-    // The lattice comparison is deliberately absent, matching Bonsai's own
-    // scope. Coverage is which conclusions the caller paired.
-    concludes: [{ proposition: REVISITED, finding: "p = 0.007 log" }],
   });
+  const { claims } = await session.conclude({
+    analysis: report.replacement,
+    proposition: REVISITED,
+    finding: "p = 0.007 log",
+  });
+  return { ...report, claims };
 }
 
 async function afterwards(): Promise<ResearchSession> {
@@ -143,14 +146,14 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
-   * The inference has to be able to say "I cannot tell", or it is guessing.
+   * The read has to be able to say "I cannot tell", or it is guessing.
    *
    * Two conclusions of one analysis may assert the same sentence about
    * different endpoints, which is why a claim has a handle of its own. Pairing
-   * a replacement's conclusions by wording is then ambiguous, and taking the
-   * first is a coin toss recorded as a fact.
+   * a successor's findings to the superseded ones by wording is then ambiguous,
+   * and a read cannot refuse — so it reports the finding unpaired.
    */
-  test("a replacement whose wording matches two earlier findings is refused, not guessed", async () => {
+  test("a superseded finding whose wording matches two is reported unpaired, not guessed", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from its controls?");
     const { observations } = await session.recordObservations({
       enquiry,
@@ -158,7 +161,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       finding: "two independent batches",
     });
     // One sentence, two findings: the same claim about two batches.
-    const { analysis: v1 } = await recordAnalysis(session, {
+    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session, {
       enquiry,
       method: "raw-scale aggregation",
       from: [observations],
@@ -169,17 +172,27 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     });
     const { review } = await session.recordReview({ of: v1, verdict: "wrong scale" });
 
-    await expect(
-      replaceAnalysis(session, {
-        supersedes: v1,
-        because: review,
-        enquiry,
-        method: "log-scale re-aggregation",
-        from: [observations],
-        // No `replacing`, and the wording matches both.
-        concludes: [{ proposition: REVISITED, finding: "p = 0.007 log" }],
-      }),
-    ).rejects.toThrow(/more than once/);
+    // Nothing kept — both fall — and one successor finding asserting the same
+    // sentence as each of them.
+    const report = await session.replaceAnalysis({
+      supersedes: v1,
+      because: review,
+      method: "log-scale re-aggregation",
+    });
+    await session.conclude({
+      analysis: report.replacement,
+      proposition: REVISITED,
+      finding: "p = 0.007 log",
+    });
+
+    const why = await (await afterwards()).why(report.replacement);
+    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
+    // The superseded one is reported, and not paired with the successor: the
+    // wording matched more than one finding of the revised analysis.
+    expect(why.report.unpaired.map((u) => u.claim).sort()).toEqual(
+      v1Claims.map((c) => c.claim).sort(),
+    );
+    expect(why.report.changed).toEqual([]);
   });
 
   /**

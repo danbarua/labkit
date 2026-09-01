@@ -207,6 +207,7 @@ export type ResearchWrites = Pick<
   | "conclude"
   | "recordReview"
   | "replaceAnalysis"
+  | "keep"
   | "reverify"
   | "reinterpret"
   | "closeEnquiry"
@@ -686,7 +687,7 @@ export class WriteSurface extends SessionCore {
         // What is being superseded, if anything — matched on whichever handle
         // the caller held; both come back from the act that recorded it.
         let superseded: RecordedConclusion | undefined;
-        let revision: { old: AnalysisRef; because?: ReviewRef } | undefined;
+        let revision: { old: AnalysisRef; decision: string; because?: ReviewRef } | undefined;
         if (input.replacing !== undefined) {
           // **Scoped to the analysis this one revises, not to this one.** A
           // replacement supersedes findings of the analysis it replaced, so the
@@ -714,21 +715,22 @@ export class WriteSurface extends SessionCore {
             );
           }
 
-          // **A finding falls once.** Naming `replacing` exempts this call from
-          // the withdrawn-proposition guard below -- the act that supersedes a
-          // finding is exactly the act allowed to restate it -- and without
-          // this that exemption reached a finding somebody else had already
-          // withdrawn. Two decisions would then stand instead of one claim,
-          // each naming a different successor, and no reader can say which
-          // holds: `withdrawalOf` picks whichever row it happens to see first.
+          // **A finding falls once, and it fell when the revision was
+          // recorded.** So `replacing` here is not the act of superseding; it
+          // names which superseded finding this one stands in place of, for a
+          // reader that would otherwise match on wording.
           //
-          // The refusal names the claim, not the wording.
+          // What is refused is naming a finding that some OTHER act withdrew.
+          // Two decisions would then stand instead of one claim, each naming a
+          // different successor, and no reader can say which holds --
+          // `withdrawalOf` takes whichever row it sees first. The refusal names
+          // the claim, not the wording.
           const gone = await this.supersessionOf(superseded.claim);
-          if (gone)
+          if (gone !== undefined && gone !== revision?.decision)
             throw new Error(
-              `${superseded.claim} has already been superseded (${gone}), and a finding is ` +
-                `superseded once; supersede the finding that stands in its place, or record ` +
-                `this conclusion without naming one`,
+              `${superseded.claim} was superseded by a different act; a finding falls once, ` +
+                `so this conclusion cannot stand in its place. Name a finding the revision ` +
+                `this analysis records superseded, or conclude without naming one`,
             );
         }
 
@@ -743,11 +745,18 @@ export class WriteSurface extends SessionCore {
           );
         const bearing = input.bearing ?? superseded?.bearing ?? "supports";
 
-        // The same guard `recordAnalysis` applied per conclusion, now applied
-        // where a conclusion is actually made. A withdrawn proposition cannot
-        // be re-asserted as a side effect -- except by the act that supersedes
-        // it, which is what `replacing` says.
-        if (superseded === undefined) {
+        // A withdrawn proposition cannot be re-asserted as a side effect of
+        // recording some other analysis.
+        //
+        // **The successor of the revision that withdrew it is exempt**, and
+        // that is not a loophole: `keep` supersedes every conclusion it does
+        // not carry forward at the moment it records the successor, so the
+        // successor's own findings are asserted against propositions this very
+        // act has just withdrawn. Restating them is what it exists to do, and
+        // without the exemption `keep` could never be followed by `conclude`.
+        if (superseded === undefined && revision === undefined)
+          revision = await this.revisedBy(input.analysis);
+        if (superseded === undefined && revision === undefined) {
           const enquiry = await this.enquiryOf(input.analysis);
           const { withdrawn, replacedBy } = await this.withdrawalOf({
             proposition,
@@ -809,14 +818,15 @@ export class WriteSurface extends SessionCore {
    */
   private async revisedBy(
     analysis: AnalysisRef,
-  ): Promise<{ old: AnalysisRef; because?: ReviewRef } | undefined> {
+  ): Promise<{ old: AnalysisRef; decision: string; because?: ReviewRef } | undefined> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
        OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
-       RETURN old, rev`,
+       RETURN old, rev, d`,
       {
         old: vertexProps<{ natural_id: string }>(),
         rev: optional(vertexProps<{ natural_id: string }>()),
+        d: vertexProps<{ natural_id: string }>(),
       },
       { id: analysis },
     );
@@ -824,6 +834,7 @@ export class WriteSurface extends SessionCore {
     if (!found) return undefined;
     return {
       old: ref("analysis", found.old.natural_id),
+      decision: found.d.natural_id,
       ...(found.rev ? { because: ref("review", found.rev.natural_id) } : {}),
     };
   }
@@ -1816,19 +1827,21 @@ export class WriteSurface extends SessionCore {
    * asserting a sentence, and whether this particular finding has already
    * fallen.
    */
-  private async supersessionOf(claim: ClaimRef): Promise<Prose | undefined> {
+  private async supersessionOf(claim: ClaimRef): Promise<string | undefined> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id})
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
        RETURN narrowed, replaced`,
       {
-        narrowed: optional(vertexProps<{ reason: string }>()),
-        replaced: optional(vertexProps<{ reason: string }>()),
+        narrowed: optional(vertexProps<{ natural_id: string }>()),
+        replaced: optional(vertexProps<{ natural_id: string }>()),
       },
       { id: claim },
     );
-    return rows.map((r) => r.narrowed?.reason ?? r.replaced?.reason).find((r) => r !== undefined);
+    return rows
+      .map((r) => r.narrowed?.natural_id ?? r.replaced?.natural_id)
+      .find((r) => r !== undefined);
   }
 
   private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {

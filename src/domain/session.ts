@@ -90,6 +90,7 @@ export class ResearchSession {
   readonly workList: ReadSurface["workList"] = (...args) => this.reads.workList(...args);
   readonly replaceAnalysis: WriteSurface["replaceAnalysis"] = (...args) =>
     this.writes.replaceAnalysis(...args);
+  readonly keep: WriteSurface["keep"] = (...args) => this.writes.keep(...args);
   readonly reinterpret: WriteSurface["reinterpret"] = (...args) => this.writes.reinterpret(...args);
   readonly interpretationHistory: ReadSurface["interpretationHistory"] = (...args) =>
     this.reads.interpretationHistory(...args);
