@@ -68,6 +68,7 @@ import type {
   IdentifiedArtefact,
   SupportExplanation,
   Kind,
+  AnyRef,
   Cause,
   Explanation,
   ClaimExplanation,
@@ -2227,11 +2228,11 @@ export class ReadSurface extends SessionCore {
    * instead of the flag-per-composite-read shape this verb shipped with
    * first.
    */
-  async why(subject: string): Promise<Explanation> {
+  async why(subject: AnyRef | IndexedString): Promise<Explanation> {
     const kind = kindOf(subject);
     if (kind) return EXPLAINERS[kind](this, subject);
 
-    const found = await this.claimsAsserting(subject as IndexedString);
+    const found = await this.claimsAsserting(subject);
     if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);
     if (found.length > 1)
       throw new Error(
@@ -2366,36 +2367,54 @@ async function explainEnquiry(self: ReadSurface, subject: string): Promise<Enqui
 }
 
 /**
- * The refusal every kind outside `EXPLAINED_KINDS` gets — three parts, per
- * the discipline this file states above `ReadSurface`: **what was asked** (the
- * kind), **what `why` explains instead**, and what would answer today. That
- * third part deliberately names no command: the domain does not know which
- * surface is calling, and CLI and MCP do not always spell one the same way
- * (`enquiry` vs `enquiry_status`) — naming one anyway is the exact mistake
- * that comment records two incidents of.
+ * The kinds `why` actually explains, and their cases — #128's three. Every
+ * other kind gets a refusal built from **this** object, below, so a kind
+ * added here (#182) is a kind the refusal stops claiming for itself: naming
+ * the explained kinds twice, once in a hand-written list and once in the
+ * table, is exactly the drift `KIND_BY_LABEL`'s own comment warns about —
+ * "built rather than hand-duplicated ... in the direction that fails
+ * silently".
  */
-const EXPLAINED_KINDS: readonly Kind[] = ["claim", "work", "enquiry"];
+const EXPLAINED = {
+  claim: explainClaim,
+  work: explainWork,
+  enquiry: explainEnquiry,
+} satisfies Partial<Record<Kind, Explainer>>;
 
-function refuseToExplain(kind: Kind): Explainer {
+const EXPLAINED_KINDS = Object.keys(EXPLAINED) as Kind[];
+
+/** Every kind `EXPLAINED` does not already have a case for. */
+type UnexplainedKind = Exclude<Kind, keyof typeof EXPLAINED>;
+
+/**
+ * The refusal every kind outside {@link EXPLAINED} gets — two parts, per the
+ * discipline this file states above `ReadSurface`: **what was asked** (the
+ * kind) and **what `why` explains instead**. There is deliberately no third
+ * part naming where else to look: the domain does not know which surface is
+ * calling, so it cannot name a command (that comment's own rule) — and a
+ * blanket "this record has no other verb for it yet either" was simply
+ * false for most of these (`gate`/`criteria`/`design` all read a gate,
+ * `origin`/`pursuits` a question, `reproducibility` an analysis). Naming a
+ * false absence is the #170 mistake this file's refusal discipline exists to
+ * prevent, so this says only what is true.
+ */
+function refuseToExplain(kind: UnexplainedKind): Explainer {
   return async () => {
     throw new Error(
-      `why does not yet explain a ${kind}; it explains ${EXPLAINED_KINDS.join(", ")} -- ` +
-        `this record has no other verb for it yet either`,
+      `why does not yet explain a ${kind}; it explains ${EXPLAINED_KINDS.join(", ")}`,
     );
   };
 }
 
 /**
- * The total table `why` dispatches through — one entry per {@link Kind}, so
- * a fourteenth kind added to `LABEL_BY_KIND` without a matching entry here is
- * a `tsc` failure, not a runtime "unknown kind". Claim, Work and LineOfEnquiry
- * are #128's three cases; everything else is #182, and a refusal here is
- * correct for this PR rather than a gap in it (scope line on #177).
+ * One refusal per {@link UnexplainedKind} — still a literal object, so
+ * `satisfies` checks it totally over exactly the kinds `EXPLAINED` has not
+ * claimed. That cuts both ways: when #182 moves `gate` into `EXPLAINED`,
+ * `UnexplainedKind` drops it and this object's `gate` entry becomes an
+ * *excess* property `satisfies` refuses — the compiler forces its removal
+ * rather than leaving a dead refusal nobody's dispatch can reach.
  */
-const EXPLAINERS = {
-  claim: explainClaim,
-  work: explainWork,
-  enquiry: explainEnquiry,
+const REFUSED = {
   question: refuseToExplain("question"),
   unit: refuseToExplain("unit"),
   evidence: refuseToExplain("evidence"),
@@ -2406,7 +2425,15 @@ const EXPLAINERS = {
   review: refuseToExplain("review"),
   observations: refuseToExplain("observations"),
   analysis: refuseToExplain("analysis"),
-} satisfies Record<Kind, Explainer>;
+} satisfies Record<UnexplainedKind, Explainer>;
+
+/**
+ * The total table `why` dispatches through — one entry per {@link Kind}, so
+ * a fourteenth kind added to `LABEL_BY_KIND` without a matching entry in
+ * `EXPLAINED` or `REFUSED` is a `tsc` failure, not a runtime "unknown kind".
+ * `EXPLAINED`'s three cases are #128's; `REFUSED` is everything else, #182.
+ */
+const EXPLAINERS = { ...EXPLAINED, ...REFUSED } satisfies Record<Kind, Explainer>;
 
 /**
  * A gate's state, from the checks governing it.

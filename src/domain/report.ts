@@ -79,6 +79,17 @@ export const LABEL_BY_KIND = {
 export type Kind = keyof typeof LABEL_BY_KIND;
 
 /**
+ * A handle of any kind — every {@link Ref} this record can mint, in one type.
+ *
+ * Earned by `why` (#128, redesigned on review): its subject is a handle whose
+ * kind is not yet known, or a proposition, and `check:no-stringly-typed`
+ * reads the written type node rather than resolving it — so this, unlike a
+ * bare `string`, is never flagged, without needing an allowlist entry for a
+ * parameter that genuinely does name a record.
+ */
+export type AnyRef = Ref<Kind>;
+
+/**
  * Builds a handle, and **refuses one whose id does not match its kind**.
  *
  * The check is new with the branded form and is the point of keeping `kind` as
