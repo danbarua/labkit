@@ -66,10 +66,13 @@ live="${1:-${LABKIT_HOME:-}}"
 fresh="$(mktemp -d)"
 trap 'rm -rf "$fresh"' EXIT
 
-echo "replaying the four scripts into $fresh" >&2
-for script in probe-bonsai-1a.sh probe-bonsai-1b2-1d.sh probe-bonsai-2a.sh probe-bonsai-2b.sh; do
+echo "replaying the five scripts into $fresh" >&2
+for script in probe-bonsai-1a.sh probe-bonsai-1b2-1d.sh probe-bonsai-2a.sh probe-bonsai-2b.sh probe-bonsai-3-gates.sh; do
   echo "  $script" >&2
-  if ! bash "$root/scripts/$script" "$fresh" >/dev/null; then
+  # probe-bonsai-3-gates.sh reads gates.toml from a real Bonsai checkout,
+  # which $fresh (a disposable temp dir) doesn't have -- $live is that
+  # checkout. Every other script ignores the second argument.
+  if ! bash "$root/scripts/$script" "$fresh" "$live" >/dev/null; then
     echo "ERROR: $script failed replaying; the record was not compared." >&2
     exit 2
   fi
