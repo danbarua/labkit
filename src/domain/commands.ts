@@ -64,9 +64,9 @@ export interface RecordAnalysisCommand {
   enquiry: EnquiryRef;
   method: string;
   /**
-   * What this analysis read. Earned by S-11d, row AE.
+   * What this analysis read.
    *
-   * Until it accepted an `AnalysisRef`, a two-stage pipeline had one
+   * **It accepts an `AnalysisRef`**, without which a two-stage pipeline has one
    * recordable form — re-enter the intermediate as if it were fresh
    * measurement — and that produced a confidently wrong answer: stage two
    * reported `reproducible: true` while resting on data the record itself
@@ -80,21 +80,19 @@ export interface RecordAnalysisCommand {
   /**
    * The planned work this analysis carries out, if it carries out any.
    *
-   * Earned by S-7: a gate protects work, and until an analysis said which
-   * work it was, the blast radius of amending a gated condition reached the
-   * *work* and stopped there — so "was any confirmatory result affected?"
-   * could only be answered by asserting it. `IMPLEMENTS` already existed
-   * for this and had never been written.
+   * A gate protects work, so without this the blast radius of amending a gated
+   * condition reaches the *work* and stops there, and "was any confirmatory
+   * result affected?" can only be answered by asserting it. Writes
+   * `IMPLEMENTS`.
    */
   implementing?: WorkRef;
   /**
    * The prespecified conditions this analysis's conclusions are held to.
    *
-   * Earned by S-3b: criteria that qualify a finding and gate nothing. The
-   * checks are agreed before the run, so they are stated separately and
-   * named here; recording them at evaluation time cannot work, because a
-   * check nobody ran must still count against the finding. See
-   * EDGE_SCHEMA.QUALIFIES.
+   * Criteria that qualify a finding and gate nothing. The checks are agreed
+   * before the run, so they are stated separately and named here: recording
+   * them at evaluation time cannot work, because a check nobody ran must still
+   * count against the finding. See EDGE_SCHEMA.QUALIFIES.
    */
   heldTo?: CriterionRef[];
 }
@@ -118,22 +116,18 @@ export interface PlanWorkCommand {
   /**
    * What this work is permitted to read. Closed-world — see `TaskContract`.
    *
-   * Earned by S-8, and the first walk of `TaskProps.inputs`, which
-   * `planWork()` had hardcoded to `""` since it was written. Stored as JSON
-   * rather than a delimited string so an entry containing punctuation cannot
-   * silently split; if a scenario ever needs to query *by element*, that is
-   * when it becomes a real list property rather than a serialised one.
+   * Stored as JSON rather than a delimited string, so an entry containing
+   * punctuation cannot silently split. It becomes a real list property when
+   * something needs to query *by element*.
    */
   mayRead?: string[];
   /**
    * The line of enquiry this work exists to advance, if any.
    *
-   * Earned by #98: `labkit contract` could not say why a piece of planned
-   * work exists, and the real Bonsai record has a task (Stage 2A's
-   * feasibility-ladder gate) that exists specifically to serve a question,
-   * with nothing to say so. Optional because `planWork` allows ungated work
-   * (#91) — a task with no enquiry is still an honest answer, not a missing
-   * one, matching PJ-011 §5.
+   * Without it, *why does this piece of planned work exist* has no answer.
+   *
+   * Optional, because `planWork` allows ungated work: a task with no enquiry is
+   * an honest answer rather than a missing one.
    */
   addressing?: EnquiryRef;
 }
@@ -150,9 +144,8 @@ export interface EvaluateCriterionCommand {
   criterion: CriterionRef;
   /**
    * The gate this verdict is being reached for, if it is being reached for
-   * one. Omitted when the condition qualifies a finding and gates no work —
-   * S-3b, where requiring a gate forced the caller to mint one that
-   * protected nothing.
+   * one. Omitted when the condition qualifies a finding and gates no work;
+   * requiring a gate would force the caller to mint one protecting nothing.
    */
   gate?: GateRef;
   value: string;
@@ -305,9 +298,8 @@ export interface ReplaceAnalysisCommand {
 /** `reinterpret` — narrow what a claim is taken to mean, without re-running anything. */
 export interface ReinterpretCommand {
   /**
-   * Which claim. A bare proposition while the sentence is asserted once;
-   * naming the analysis that concluded it when it is not — S-5, where
-   * withdrawing by wording alone retracted an unrelated line of work.
+   * Which claim, by handle. Withdrawing by wording alone retracts every claim
+   * asserting the sentence, including an unrelated line of work.
    */
   of: ClaimRef;
   as: string;

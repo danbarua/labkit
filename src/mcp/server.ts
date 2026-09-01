@@ -21,9 +21,8 @@
  * rather than chosen: the embedded PGlite file is single-writer, so a process
  * holding it locks every *other* process out of the project. Usually that other
  * process is a person: `labkit known` in a terminal while an agent session is
- * live is the ordinary workflow, not an edge case. Several agents at once is the
- * rarer reason and was the only one written down until 2026-08-26. See
- * {@link main}.
+ * live is the ordinary workflow, not an edge case. Several agents at once is
+ * the rarer reason. See {@link main}.
  *
  * **Import from subpaths only.** `@modelcontextprotocol/sdk`'s `exports` maps
  * `"."` to a `dist/esm/index.js` that is not on disk — verified under Bun, not
@@ -113,14 +112,12 @@ export type WithSurfaces = <T>(
  * the connection: it has to be released between calls, so something has to own
  * a `finally`.
  *
- * The read half is built per call too, which it did not used to be. Reads never
- * touch the clock and never emit, so there was nothing per-call for them to
- * carry — but they do read through a connection, and that is now per call for
- * both.
+ * The read half is built per call too. Reads never touch the clock and never
+ * emit, so there is nothing per-call for them to carry — but they do read
+ * through a connection, and that is per call for both.
  *
- * Every tool declares an `outputSchema`. This reverses what this comment said
- * until 2026-08-22 — that a mirror of the report interfaces would exist only to
- * go stale against them. The objection was to an *unchecked* mirror; the ones in
+ * Every tool declares an `outputSchema`. A mirror of the report interfaces
+ * would exist only to go stale against them if nothing checked it; the ones in
  * `./schemas` are held to their interfaces by `tsc`, which is a gate that
  * already runs. What the compiler cannot see — a dropped optional field —
  * `tests/mcp.test.ts` parses for. The structured result is still returned
@@ -348,12 +345,10 @@ export function surfacesOver(tenant: string, session: SessionRegistry): WithSurf
       // event and the writes it describes commit together. A second connection
       // would silently end that.
       //
-      // It was `inMemoryEventLog()` on the grounds that a store was unearned:
-      // the graph is the record, `read.ts` never consulted the log, and the
-      // scenarios that mention it assert it is *empty* when a historical answer
-      // is read. What earned it is the consumer PJ-031 named — attribution rode
-      // on every event and nothing could read it, because the log died with the
-      // process. It must be built here rather than left to a surface's default:
+      // The graph is the record and `read.ts` never consults the log, so the
+      // store is earned by attribution rather than by history: it rides on every
+      // event, and an in-memory log dies with the process before anything can
+      // read it. It must be built here rather than left to a surface's default:
       // a surface defaulting its own log would give the two halves of one call
       // separate streams.
       const events = pgEventLog(connection.db, tenantCtx.tenantId);
@@ -405,8 +400,7 @@ export function surfacesOver(tenant: string, session: SessionRegistry): WithSurf
  * The tenant is resolved inside each scope and never cached: below the boundary
  * every function takes a resolved context, and there is no "current tenant"
  * anyone can change mid-session. Resolution is also the self-healing
- * reconciliation pass PJ-005 argued for, so paying it per call is a feature
- * rather than a tax.
+ * reconciliation pass, so paying it per call is a feature rather than a tax.
  */
 export async function main(
   tenant = process.env.LABKIT_TENANT ?? "labkit",
@@ -432,26 +426,20 @@ export async function main(
   // and at no other time.
   //
   // **What keeps the process alive is the stdin subscription, not a held
-  // database connection**, which matters now that there is no held connection
-  // to fall back on. The comment here used to credit the connection; measured
-  // under Bun 1.3.14, a process whose only handle is a `data` listener on
-  // stdin stays up indefinitely and keeps answering.
+  // database connection** — there is no held connection to fall back on.
+  // Measured under Bun 1.3.14: a process whose only handle is a `data` listener
+  // on stdin stays up indefinitely and keeps answering.
   //
-  // The first attempt at this hung `transport.onclose` off the transport and
-  // was dead code. It was "verified" by a pipeline whose exit status came from
-  // `wc -l` rather than from the server -- the trap CLAUDE.md documents, walked
-  // straight into. Measured without the pipe, the process sat there for the
-  // full 15 seconds.
+  // Measure it without a pipe. `$?` after a pipeline is the *last* command's
+  // status, so a check ending in `| wc -l` reports the pipe's success and not
+  // the server's.
   process.stdin.on("end", () => {
     void drainThenExit(server);
   });
 
-  // **Never settles, and that is the contract.** `main()` used to resolve as
-  // soon as the transport was connected, on the reasoning that the stdin
-  // subscription keeps the process alive — true when this file was the entry
-  // point, and false the moment it became one. `src/cli/cli.ts` ends with
-  // `process.exit(await main())`, so a resolving promise here meant the
-  // compiled binary's `labkit mcp` connected, returned, and exited **0 with no
+  // **Never settles, and that is the contract.** `src/cli/cli.ts` ends with
+  // `process.exit(await main())`, so a promise that resolves once the transport
+  // is connected makes `labkit mcp` connect, return, and exit **0 with no
   // output** before answering a single request.
   //
   // Serving ends by `process.exit` inside `drainThenExit`, so there is nothing

@@ -1,15 +1,11 @@
 /**
  * Zod mirrors of the report types the seven read tools return.
  *
- * **Why these exist, given that a mirror is a copy.** `server.ts` used to say
- * no `outputSchema` was declared, because declaring one meant "hand-writing a
- * Zod mirror of seven report interfaces whose only job is to go stale against
- * them". That objection was to an *unchecked* mirror. Every schema below is
- * held to its interface by `Exact<>` at the bottom of this file, so drift is a
- * `tsc --noEmit` failure rather than a wrong answer discovered by a caller.
- * A copy a gate holds to its original is a different thing from a copy nobody
- * checks — that distinction is the whole of CLAUDE.md's document rule applied
- * to types instead of prose.
+ * **Why a mirror is allowed here, given that a mirror is a copy.** Every schema
+ * below is held to its interface by `Exact<>` at the bottom of this file, so
+ * drift is a `tsc --noEmit` failure rather than a wrong answer a caller
+ * discovers. A copy a gate holds to its original is a different thing from a
+ * copy nobody checks.
  *
  * **What the check does not cover, measured rather than reasoned about.**
  * Two-way assignability catches a field added, removed or retyped — all three
@@ -109,13 +105,12 @@ import type { EdgeLabel } from "../db/domain";
  * The `kind` argument is kept for readability at the ~46 call sites — it says
  * which handle a field carries — and is deliberately unused.
  *
- * The check that used to live here as `kind: z.literal(kind)` has not been
- * dropped; it moved and got stronger. It only ever verified that a caller had
- * *said* "gate", never that the id was one, and the two could disagree. Input
- * handles now reach the domain through `ref()` (`src/domain/report.ts`), which
- * refuses an id whose prefix names another label — so `"CLM_3"` where a gate
- * belongs is a refusal, and `server.ts` turns that throw into an `isError`
- * result carrying the message.
+ * **The check is `ref()`, not a `z.literal(kind)` here.** A literal would
+ * verify only that a caller *said* "gate", never that the id was one, and the
+ * two can disagree. Input handles reach the domain through `ref()`
+ * (`src/domain/report.ts`), which refuses an id whose prefix names another
+ * label, and `server.ts` turns that throw into an `isError` result carrying the
+ * message.
  */
 const ref = <K extends string>(_kind: K) => z.string() as unknown as z.ZodType<Ref<K>>;
 
@@ -194,9 +189,8 @@ export const whatHappenedSchema = z.strictObject({
 });
 
 /**
- * A `DomainEvent` as a write verb hands it back — #161's mechanism. Every
- * write tool's output includes `events`, and this is the one mirror all of
- * them share.
+ * A `DomainEvent` as a write verb hands it back. Every write tool's output
+ * includes `events`, and this is the one mirror they share.
  *
  * `edges[].label` is `z.string()` cast to the domain's union, the same trick
  * `ref()` above uses: this is an output schema with nothing to validate, since
@@ -408,8 +402,8 @@ export const enquiryStatusSchema = z.strictObject({
 
 /**
  * `enquiry_in_context` — `enquiryStatusSchema` alongside where this enquiry's
- * own question currently sits in the overall survey (#128) -- one bucket, not
- * the whole survey; see `EnquiryInContext`'s own doc comment.
+ * own question sits in the overall survey: one bucket, not the whole survey.
+ * See `EnquiryInContext`'s own doc comment.
  */
 export const enquiryInContextSchema = z.strictObject({
   enquiry: enquiryStatusSchema,
@@ -471,8 +465,8 @@ export const originOfSchema = z.strictObject({
 
 /**
  * The line of enquiry (and question) a task exists to advance -- see
- * `Addressing` in `src/domain/report.ts`. Shared, not inlined per schema:
- * `taskContractSchema` and `workListWithWhySchema` (#128) both carry it.
+ * `Addressing` in `src/domain/report.ts`. Shared rather than inlined per
+ * schema, since `taskContractSchema` and `workListWithWhySchema` both carry it.
  */
 const addressingSchema = z.strictObject({
   enquiry: ref("enquiry"),
@@ -623,11 +617,9 @@ export const reproducibilityReportSchema = z.strictObject({
  * reference is the only handle the caller gets. `structuredContent` must be an
  * object, so a handle cannot cross on its own — hence this wrapper.
  *
- * It used to cross by accident: a handle was `{"kind":"question","id":"Q_1"}`,
- * which is an object already. It is `"Q_1"` now, so the field has to be named —
- * and naming it says more than the tag did. `{"question":"Q_1"}` says what the
- * id is *for* in this reply, where `kind` only ever repeated what the prefix
- * already carried, and could contradict it.
+ * Naming the field says more than a `kind` tag would: `{"question":"Q_1"}` says
+ * what the id is *for* in this reply, where a tag repeats what the prefix
+ * already carries and can contradict it.
  */
 const minted = <K extends string>(kind: K) =>
   z.strictObject({ [kind]: ref(kind) } as { [P in K]: z.ZodType<Ref<K>> });
