@@ -2056,10 +2056,13 @@ export class ReadSurface extends SessionCore {
     const rows = await this.graph.query(
       `MATCH (a:Artefact) WHERE a.natural_id IN $ids
        MATCH (e:Evidence)-[:RECORDED_IN]->(a)
+       // The supersession check is supersededClaim() below, per claim, not a
+       // clause here: it reads BOTH predicates, and this query has no way to
+       // ask for "neither" -- AGE has no NOT (pattern) predicate in WHERE. Two
+       // clauses binding nothing returned used to sit here, which made the
+       // query look like it did the check it does not do.
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sup:Claim)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(chal:Claim)
-       OPTIONAL MATCH (:Decision)-[:SUPERSEDES]->(sup)
-       OPTIONAL MATCH (:Decision)-[:SUPERSEDES]->(chal)
        RETURN a, e, sup, chal`,
       {
         a: vertexProps<{ natural_id: string }>(),
