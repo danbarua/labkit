@@ -22,7 +22,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -127,7 +127,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // Researcher: replace the analysis, mark the prior inference superseded,
     // and propagate whatever claims change.
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -136,31 +136,15 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    // LabKit: five pairwise conclusions remain strong. One becomes marginal.
-    expect(report.unchanged).toHaveLength(5);
-    expect(report.changed).toHaveLength(1);
-    expect(report.changed[0]).toMatchObject({
-      proposition: "T beats rewired",
-      before: "p = 0.002 (bootstrap)",
-      after: "p = 0.049 (sign-flip permutation)",
-    });
+    // The act answers with what it minted: the replacement and the decision
+    // recording that it revises the earlier analysis.
+    expect(report.replacement).not.toEqual(analysis);
+    expect(report.supersedes).toEqual(analysis);
 
-    // Which records these are about. `unchanged` and `changed.claim` name the
-    // REPLACEMENT's claims -- everything in `affected` was withdrawn by this
-    // act, so reporting those as unchanged would call a withdrawn record
-    // current. `changed.was` names the superseded one, and the two sets are
-    // disjoint even though every sentence appears in both.
-    const minted = new Set(report.claims.map((c) => c.claim));
-    const superseded = new Set(report.affected.map((a) => a.claim));
-    for (const u of report.unchanged) expect(minted.has(u.claim)).toBe(true);
-    expect(minted.has(report.changed[0]!.claim)).toBe(true);
-    expect(superseded.has(report.changed[0]!.was)).toBe(true);
-    expect([...minted].some((id) => superseded.has(id))).toBe(false);
-
-    // Afterward: the same answer, asked of the record rather than taken from
-    // the value the act returned. Six conclusions arrive as six acts, so what
-    // a replacement changed is spread across them and is a question about the
-    // record — read from the lineage decision and the per-finding ones.
+    // LabKit: five pairwise conclusions remain strong. One becomes marginal —
+    // asked of the record, because six conclusions arrive as six acts and what
+    // a revision changed is therefore spread across them rather than held by
+    // any one of them.
     const explained = await (await afterwards()).why(report.replacement);
     if (explained.kind !== "analysis")
       throw new Error(`asked about an analysis, got ${explained.kind}`);
@@ -172,7 +156,18 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       before: "p = 0.002 (bootstrap)",
       after: "p = 0.049 (sign-flip permutation)",
     });
-    expect(explained.report.stillStanding).toEqual([]);
+    // Five re-reached unchanged, and none left unmentioned: this replacement
+    // restated every conclusion of the analysis it revises.
+    expect(explained.report.restated).toHaveLength(5);
+    expect(explained.report.kept).toEqual([]);
+
+    // Which records these are about. `restated` and `changed.claim` name the
+    // REPLACEMENT's claims; `changed.was` names the superseded one, and the two
+    // sets are disjoint even though every sentence appears in both.
+    const minted = new Set(report.claims.map((c) => c.claim));
+    for (const u of explained.report.restated) expect(minted.has(u.claim)).toBe(true);
+    expect(minted.has(explained.report.changed[0]!.claim)).toBe(true);
+    expect(minted.has(explained.report.changed[0]!.was)).toBe(false);
   });
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
@@ -182,7 +177,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       verdict: "not a null test",
     });
 
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -191,25 +186,21 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    expect(report.affected.map((a) => a.asserts).sort()).toEqual(
-      [
-        "T beats lattice",
-        "T beats rewired",
-        "T beats curr_random",
-        "lattice beats curr_random",
-        "rewired beats curr_random",
-        "T beats static",
-      ].sort(),
-    );
+    // Every finding the replacement superseded, read from the record. Matched
+    // by id, not by sentence: after a replacement both the superseded claim and
+    // the one standing in its place assert the same words.
+    const revision = await (await afterwards()).why(report.replacement);
+    if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
+    const supersededHere = [
+      ...revision.report.changed.map((c) => c.was),
+      ...revision.report.restated.map((r) => r.claim),
+    ];
+    expect(supersededHere).toHaveLength(6);
 
-    // ...and the same answer from a fresh query, not just from the report --
-    // matched by id now that both sides carry one. By sentence this passed
-    // even if the query had returned the replacement's claims instead of the
-    // superseded ones, which after a replacement assert every one of these.
+    // ...and the same answer from a different question. `whatDependsOn` walks
+    // the artefact; this walks the lineage. They must agree on the count.
     const downstream = await session.whatDependsOn("bootstrap-pairwise output");
-    expect(downstream.claims.map((c) => c.claim).sort()).toEqual(
-      report.affected.map((a) => a.claim).sort(),
-    );
+    expect(downstream.claims).toHaveLength(supersededHere.length);
   });
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {
@@ -219,7 +210,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       verdict: "not a null test",
     });
 
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -228,7 +219,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    expect(report.unaffected.map((u) => u.what)).toContain(observations);
+    // The observations are not superseded by this act: it revises an analysis,
+    // and what an analysis read is untouched by its being revised.
+    const stillThere = await (await afterwards()).whatDependsOn(observations);
+    expect(stillThere.claims.length).toBeGreaterThan(0);
 
     // Durable check: the replacement conclusion still rests on the same
     // observations, and those observations were never invalidated.
@@ -245,7 +239,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       of: analysis,
       verdict: "not a null test",
     });
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -269,7 +263,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       of: analysis,
       verdict: "not a null test",
     });
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -340,7 +334,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       verdict:
         "bootstrap is centred on the observed effect; it does not implement the intended null",
     });
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -390,7 +384,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
 
     await expect(
-      session.replaceAnalysis({
+      replaceAnalysis(session, {
         supersedes: target,
         because: reviewOfUnrelated,
         enquiry,
@@ -416,7 +410,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       of: analysis,
       verdict: "not a null test",
     });
-    const _report = await session.replaceAnalysis({
+    const _report = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,

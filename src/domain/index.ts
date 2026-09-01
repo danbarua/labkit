@@ -92,6 +92,7 @@ export type {
   SharpenCommand,
   RecordObservationsCommand,
   RecordAnalysisCommand,
+  ReplacementConclusion,
   RecordReviewCommand,
   CloseEnquiryCommand,
   PlanWorkCommand,

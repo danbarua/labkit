@@ -21,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 
@@ -99,7 +99,7 @@ describe("S-11b: which review retracted it?", () => {
   test("two worlds differing in what the replacement concluded are told apart", async () => {
     const build = (finding: string) => async (s: ResearchSession) => {
       const { enquiry, readings, analysis, critical } = await anAnalysisWithTwoReviews(s);
-      const report = await s.replaceAnalysis({
+      const report = await replaceAnalysis(s, {
         supersedes: analysis,
         because: critical,
         enquiry,
@@ -132,7 +132,7 @@ describe("S-11b: which review retracted it?", () => {
   test("the reason a finding was superseded is the review that caused it", async () => {
     const build = (pick: "critical" | "confirming") => async (s: ResearchSession) => {
       const w = await anAnalysisWithTwoReviews(s);
-      const report = await s.replaceAnalysis({
+      const report = await replaceAnalysis(s, {
         supersedes: w.analysis,
         because: pick === "critical" ? w.critical : w.confirming,
         enquiry: w.enquiry,
@@ -172,7 +172,7 @@ describe("S-11b: which review retracted it?", () => {
   test("one supersession is reported once, with the reason that caused it", async () => {
     const reasons = await inOneWorld(async (s) => {
       const w = await anAnalysisWithTwoReviews(s);
-      const report = await s.replaceAnalysis({
+      const report = await replaceAnalysis(s, {
         supersedes: w.analysis,
         because: w.critical,
         enquiry: w.enquiry,

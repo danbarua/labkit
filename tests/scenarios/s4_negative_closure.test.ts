@@ -16,7 +16,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -411,7 +411,7 @@ describe("S-4: a negative result that closes the question", () => {
       of: refutation,
       verdict: "the clustering metric was misapplied",
     });
-    const report = await session.replaceAnalysis({
+    const report = await replaceAnalysis(session, {
       supersedes: refutation,
       because: review,
       enquiry: specificity,
@@ -426,14 +426,16 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    // conclusionsOf() saw nothing at all when an analysis only challenged.
+    // A challenging finding is superseded exactly as a supporting one is —
+    // reading only the supporting side saw nothing here at all.
+    //
     // By handle, not by sentence: after the replacement two records assert
-    // these words, and this names the refutation's own claim -- the one that
-    // was withdrawn.
-    expect(report.affected).toEqual([
-      { claim: claimOf(refutationClaims, SPECIFICITY), asserts: SPECIFICITY },
-    ]);
-    expect(report.changed).toHaveLength(1);
+    // these words, and this names the refutation's own claim, the one that was
+    // withdrawn.
+    const revision = await (await afterwards()).why(report.replacement);
+    if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
+    expect(revision.report.changed).toHaveLength(1);
+    expect(revision.report.changed[0]!.was).toEqual(claimOf(refutationClaims, SPECIFICITY));
 
     // After the replacement the sentence is claimed twice; this asks about
     // the original, which is the one that was withdrawn.

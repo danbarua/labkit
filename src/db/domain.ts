@@ -123,6 +123,7 @@ export const EDGE_LABELS = [
   "CHALLENGES", // Evidence -> Claim
   "REVERIFIES", // Evidence -> Evidence
   "PROMOTES", // Decision -> Claim
+  "KEEPS", // Decision -> Claim (a conclusion a revision carried forward)
   "USES", // EvidenceUnit -> Computation
   "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
   "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
@@ -364,6 +365,24 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * happened.
    */
   PROMOTES: [["Decision", "Claim"]],
+  /**
+   * A conclusion a revision carried forward unchanged.
+   *
+   * Written by `keep`, on the same decision that supersedes the rest. A reader
+   * of that decision sees the whole act: these findings fell, those were kept,
+   * this analysis stands in place of the old one.
+   *
+   * **The kept claim is not re-parented.** It keeps the evidence that produced
+   * it, so `why` on it still rests on the superseded analysis's output — which
+   * is the honest answer, because that is where the number came from. This edge
+   * says the revision carried it forward, not that the successor derived it.
+   *
+   * Not inferable as "the ones nothing superseded". That is the same set today
+   * and says something weaker: an analysis nobody revised has no kept
+   * conclusions, only unmentioned ones, and the difference is whether anyone
+   * looked.
+   */
+  KEEPS: [["Decision", "Claim"]],
   /**
    * What a decision withdrew or replaced. A design condition (S-7), an
    * interpretation (S-12).

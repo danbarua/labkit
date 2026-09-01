@@ -1954,83 +1954,57 @@ export class ReadSurface extends SessionCore {
     const lineage = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
        OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
-       RETURN old, rev`,
+       RETURN old, rev, d`,
       {
         old: vertexProps<{ natural_id: string }>(),
         rev: optional(vertexProps<{ natural_id: string; verdict: string }>()),
+        d: vertexProps<{ natural_id: string }>(),
       },
       { id: analysis },
     );
     const revises = lineage[0];
-    if (!revises) return { analysis, changed: [], restated: [], stillStanding: [] };
+    if (!revises) return { analysis, changed: [], restated: [], kept: [], unpaired: [] };
 
-    // Both bearings: a finding that challenges a claim is superseded exactly as
-    // one that supports it, and reading one is silent.
+    // What the successor concluded, and what the revision superseded and kept.
+    // Both bearings throughout: a finding that challenges a claim is superseded
+    // and carried forward exactly as a supporting one is, and reading one side
+    // is silent.
+    const now = await this.conclusionsIn(analysis);
+    const fell = await this.claimsFrom(revises.d.natural_id, "SUPERSEDES");
+    const kept = await this.claimsFrom(revises.d.natural_id, "KEEPS");
+
+    // **Paired by proposition, and only where the proposition is unique on both
+    // sides.** An analysis may assert the same sentence twice about different
+    // endpoints, so a wording match can name two; this is a description rather
+    // than an act and cannot refuse, so an ambiguous or absent match is
+    // reported unpaired instead of guessed.
+    const countBy = (cs: ConcludedClaim[], p: string) => cs.filter((c) => c.asserts === p).length;
     const changed: RevisedFinding[] = [];
     const restated: ConcludedClaim[] = [];
-    const supersededClaims = new Set<string>();
-    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const rows = await this.graph.query(
-        `MATCH (:Computation {natural_id: $id})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-         MATCH (e)-[:${bearing}]->(now:Claim)
-         MATCH (now)<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(was:Claim)
-         MATCH (before:Evidence)-[:${bearing}]->(was)
-         RETURN now, was, e, before`,
-        {
-          now: vertexProps<{ natural_id: string; name: string }>(),
-          was: vertexProps<{ natural_id: string }>(),
-          e: vertexProps<{ statement: string }>(),
-          before: vertexProps<{ statement: string }>(),
-        },
-        { id: analysis },
-      );
-      for (const row of rows) {
-        supersededClaims.add(row.was.natural_id);
-        // Same wording means the re-run reached the earlier answer again. It
-        // still supersedes -- the old claim is withdrawn -- but a reader asking
-        // what this revision changed wants the ones that moved.
-        if (row.before.statement === row.e.statement) {
-          restated.push({
-            claim: ref("claim", row.now.natural_id),
-            asserts: row.now.name,
-          });
-          continue;
-        }
+    const unpaired: ConcludedClaim[] = [];
+    for (const was of fell) {
+      const successor =
+        countBy(fell, was.asserts) === 1 && countBy(now, was.asserts) === 1
+          ? now.find((c) => c.asserts === was.asserts)
+          : undefined;
+      if (!successor) {
+        unpaired.push({ claim: was.claim, asserts: was.asserts });
+        continue;
+      }
+      const before = await this.findingText(was.claim);
+      const after = await this.findingText(successor.claim);
+      if (before === after) restated.push({ claim: successor.claim, asserts: successor.asserts });
+      else
         changed.push({
-          proposition: row.now.name,
-          was: ref("claim", row.was.natural_id),
-          before: row.before.statement,
-          claim: ref("claim", row.now.natural_id),
-          after: row.e.statement,
+          proposition: was.asserts,
+          was: was.claim,
+          before,
+          claim: successor.claim,
+          after,
         });
-      }
     }
 
-    // The superseded analysis's own conclusions. One this act did not name is
-    // still current -- the whole of a partial re-analysis.
-    const stillStanding: ConcludedClaim[] = [];
-    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const rows = await this.graph.query(
-        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-         MATCH (e)-[:${bearing}]->(c:Claim)
-         RETURN c, e`,
-        {
-          c: vertexProps<{ natural_id: string; name: string }>(),
-          e: vertexProps<{ natural_id: string }>(),
-        },
-        { id: revises.old.natural_id },
-      );
-      for (const row of rows) {
-        if (supersededClaims.has(row.c.natural_id)) continue;
-        if (stillStanding.some((s) => s.claim === row.c.natural_id)) continue;
-        stillStanding.push({
-          claim: ref("claim", row.c.natural_id),
-          asserts: row.c.name,
-          finding: ref("evidence", row.e.natural_id),
-        });
-      }
-    }
-
+    const byClaim = (a: { claim: string }, b: { claim: string }) => a.claim.localeCompare(b.claim);
     return {
       analysis,
       supersedes: ref("analysis", revises.old.natural_id),
@@ -2043,9 +2017,56 @@ export class ReadSurface extends SessionCore {
           }
         : {}),
       changed: changed.sort((a, b) => a.was.localeCompare(b.was)),
-      restated: restated.sort((a, b) => a.claim.localeCompare(b.claim)),
-      stillStanding: stillStanding.sort((a, b) => a.claim.localeCompare(b.claim)),
+      restated: restated.sort(byClaim),
+      kept: kept.sort(byClaim),
+      unpaired: unpaired.sort(byClaim),
     };
+  }
+
+  /** The claims an analysis concluded, both bearings. */
+  private async conclusionsIn(analysis: AnalysisRef): Promise<ConcludedClaim[]> {
+    const out: ConcludedClaim[] = [];
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
+         MATCH (e)-[:${bearing}]->(c:Claim)
+         RETURN c`,
+        { c: vertexProps<{ natural_id: string; name: string }>() },
+        { id: analysis },
+      );
+      for (const row of rows)
+        if (!out.some((o) => o.claim === row.c.natural_id))
+          out.push({ claim: ref("claim", row.c.natural_id), asserts: row.c.name });
+    }
+    return out;
+  }
+
+  /** The claims one decision points at over one edge. */
+  private async claimsFrom(
+    decision: string,
+    edge: "SUPERSEDES" | "KEEPS",
+  ): Promise<ConcludedClaim[]> {
+    const rows = await this.graph.query(
+      `MATCH (:Decision {natural_id: $id})-[:${edge}]->(c:Claim)
+       RETURN c`,
+      { c: vertexProps<{ natural_id: string; name: string }>() },
+      { id: decision },
+    );
+    return rows.map((r) => ({ claim: ref("claim", r.c.natural_id), asserts: r.c.name }));
+  }
+
+  /** The wording of the finding bearing on a claim. */
+  private async findingText(claim: ClaimRef): Promise<string> {
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (e:Evidence)-[:${bearing}]->(:Claim {natural_id: $id})
+         RETURN e`,
+        { e: vertexProps<{ statement: string }>() },
+        { id: claim },
+      );
+      if (rows[0]) return rows[0].e.statement;
+    }
+    return "";
   }
 
   /**
@@ -2794,11 +2815,13 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
     because.push({ handle: report.because.review, wording: report.because.verdict });
   for (const c of report.changed)
     because.push({ handle: c.was, wording: `${c.proposition}: ${c.before} → ${c.after}` });
-  for (const s of report.stillStanding)
-    because.push({ handle: s.claim, wording: `${s.asserts} — not revisited, still standing` });
+  for (const s of report.kept)
+    because.push({ handle: s.claim, wording: `${s.asserts} — kept, on its original evidence` });
+  for (const u of report.unpaired)
+    because.push({ handle: u.claim, wording: `${u.asserts} — superseded, no successor named` });
 
   const moved = report.changed.length;
-  const stood = report.stillStanding.length;
+  const stood = report.kept.length;
   return {
     kind: "analysis",
     subject: analysis,

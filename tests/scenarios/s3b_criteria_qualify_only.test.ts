@@ -21,7 +21,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf, whyOf } from "../helpers/claims";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -286,7 +286,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       of: analysis,
       verdict: "the aggregation was the wrong one",
     });
-    const replacement = await session.replaceAnalysis({
+    const replacement = await replaceAnalysis(session, {
       supersedes: analysis,
       because: review,
       enquiry,

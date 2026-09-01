@@ -17,7 +17,7 @@ import { openScenario, type Scenario } from "./helpers/scenario";
 import { vertexProps } from "../src/db/cypher";
 import type { TenantGraph } from "../src/db/graph";
 import { claimNamed, claimOf } from "./helpers/claims";
-import { recordAnalysis } from "../fragments";
+import { recordAnalysis, replaceAnalysis } from "../fragments";
 
 let scenario: Scenario;
 let graph: TenantGraph;
@@ -558,7 +558,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
     of: analysis,
     verdict: "the sweep dropped the last decade",
   });
-  await session.replaceAnalysis({
+  await replaceAnalysis(session, {
     supersedes: analysis,
     because: review,
     enquiry,

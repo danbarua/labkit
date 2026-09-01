@@ -87,8 +87,10 @@ import type {
   ObservationsRef,
   QuestionRef,
   WorkRef,
+  ReviewRef,
+  ReplacementReport,
 } from "../src/domain/report";
-import type { ResearchWrites } from "../src/domain";
+import type { ResearchWrites, ReplacementConclusion } from "../src/domain";
 
 /** Every fragment writes through the public surface and nothing else. */
 type W = ResearchWrites;
@@ -365,7 +367,7 @@ export async function acceptUnresolved(
 }
 
 /** A review finds the method wrong, and a corrected analysis supersedes it. */
-export async function replaceAnalysis(
+export async function reviewAndReplace(
   w: W,
   input: {
     supersedes: AnalysisRef;
@@ -383,12 +385,59 @@ export async function replaceAnalysis(
   const report = await w.replaceAnalysis({
     supersedes: input.supersedes,
     because: review,
-    enquiry: input.enquiry,
     method: input.method,
     from: input.from,
-    concludes: [...input.concludes],
   });
-  return { replacement: report.replacement, claims: report.claims };
+  // **The array lives here, not on the verb.** `replaceAnalysis` records the
+  // replacement and the lineage; each finding it supersedes is its own act.
+  // `replacing` names the one it stands in for, so a conclusion the caller
+  // does not restate is not superseded.
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) {
+    const drawn = await w.conclude({ analysis: report.replacement, ...c });
+    claims.push(...drawn.claims);
+  }
+  return { replacement: report.replacement, claims };
+}
+
+/**
+ * A replacement and the findings it supersedes — the signature
+ * `WriteSurface.replaceAnalysis` had before its conclusions became acts of
+ * their own.
+ *
+ * `replacing` on each conclusion names the finding it stands in for; one the
+ * caller does not name is not superseded. Omitting it falls back to matching by
+ * proposition, which refuses an ambiguous match rather than picking.
+ *
+ * Distinct from {@link reviewAndReplace}, which mints the review as well — this
+ * takes one already on the record, as the verb does.
+ */
+export async function replaceAnalysis(
+  w: W,
+  input: {
+    supersedes: AnalysisRef;
+    because: ReviewRef;
+    enquiry: EnquiryRef;
+    method: string;
+    from: InputRef[];
+    concludes: readonly ReplacementConclusion[];
+  },
+): Promise<ReplacementReport & { claims: ConcludedClaim[] }> {
+  const report = await w.replaceAnalysis({
+    supersedes: input.supersedes,
+    because: input.because,
+    method: input.method,
+    from: input.from,
+  });
+  // Each conclusion names the finding it supersedes. One the caller does not
+  // name is not superseded, which is what lets a re-analysis address some of a
+  // run's conclusions and leave the rest standing.
+  const claims: ConcludedClaim[] = [];
+  for (const c of input.concludes) {
+    const drawn = await w.conclude({ analysis: report.replacement, ...c });
+    claims.push(...drawn.claims);
+  }
+  return { ...report, claims };
 }
 
 /**

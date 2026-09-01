@@ -537,7 +537,8 @@ const analysisRevisionSchema = z.strictObject({
   because: z.strictObject({ review: ref("review"), verdict: z.string() }).optional(),
   changed: z.array(revisedFinding),
   restated: z.array(concludedClaim),
-  stillStanding: z.array(concludedClaim),
+  kept: z.array(concludedClaim),
+  unpaired: z.array(concludedClaim),
 });
 
 /**
@@ -766,11 +767,10 @@ export const amendmentReportSchema = z.strictObject({
 export const replacementReportSchema = z.strictObject({
   at: z.string(),
   replacement: ref("analysis"),
-  claims: z.array(concludedClaim),
-  affected: z.array(concludedClaim),
-  unaffected: z.array(unaffectedRecord),
-  changed: z.array(changedConclusion),
-  unchanged: z.array(concludedClaim),
+  decision: ref("decision"),
+  supersedes: ref("analysis"),
+  kept: z.array(ref("claim")),
+  superseded: z.array(concludedClaim),
   events: z.array(domainEventSchema),
 });
 

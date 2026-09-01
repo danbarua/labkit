@@ -1022,6 +1022,43 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
+    name: "keep",
+    title: "Revise an analysis, naming the conclusions that survive",
+    description:
+      "Records a successor to the analysis those claims came from, supersedes every other " +
+      "conclusion of it, and carries the named ones forward on their original evidence — " +
+      "`why` on a kept claim still rests on the run that produced the number. Record the " +
+      "successor's own findings with `conclude`. The successor reads what its predecessor " +
+      "read; `from` adds to that. Answers with what was superseded, which is the complement " +
+      "of what you named.",
+    inputSchema: {
+      keeping: z
+        .array(z.string())
+        .describe(
+          `ids of the conclusions that survive, e.g. ${CLAIM_PREFIX}6 — all from one analysis`,
+        ),
+      because: z
+        .string()
+        .describe(`id of the review that found it wanting, e.g. ${REVIEW_PREFIX}1`),
+      method: z.string().describe("what the revision did differently"),
+      from: z
+        .array(z.string())
+        .optional()
+        .describe(
+          `ids the successor read in ADDITION to its predecessor's — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
+        ),
+    },
+    outputSchema: replacementReportSchema,
+    handler: (write, { keeping, because, method, from }) =>
+      write.keep({
+        keeping: (keeping as string[]).map((id) => ref("claim", id)),
+        because: ref("review", because),
+        method,
+        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
+      }),
+  }),
+
+  writeTool({
     name: "replace_analysis",
     title: "Supersede a defective analysis",
     description:
@@ -1045,14 +1082,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         ),
     },
     outputSchema: replacementReportSchema,
-    handler: (write, { supersedes, because, enquiry, method, from }) =>
+    handler: (write, { supersedes, because, method, from }) =>
       write.replaceAnalysis({
         supersedes: ref("analysis", supersedes),
         because: ref("review", because),
-        enquiry: ref("enquiry", enquiry),
         method,
-        from: (from as string[]).map(inputRef),
-        concludes: [],
+        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
       }),
   }),
 

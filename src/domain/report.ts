@@ -585,51 +585,31 @@ export interface ChangedConclusion {
  */
 export interface ReplacementReport {
   at: string;
-  /**
-   * The analysis this act brought into existence.
-   *
-   * The act recorded what it replaced and what that cost, and not what it
-   * produced — so the replacement was unreachable to the caller that had just
-   * created it. Row AB's shape for the fourth time, and the first where the
-   * omission blocks a scenario outright rather than degrading an answer: S-3c
-   * has to cite the corrected check to evaluate a criterion against it, and
-   * could not name it. The remedy is the smallest of the four, which is the
-   * point of the heuristic — it says look, not what to do.
-   */
+  /** The analysis this act brought into existence — what `conclude` is called on next. */
   replacement: AnalysisRef;
+  /** The lineage decision recording that `replacement` revises `supersedes`. */
+  decision: Ref<"decision">;
+  /** The analysis being revised, echoed so a caller holds both ends of the lineage. */
+  supersedes: AnalysisRef;
+  /** The conclusions carried forward, exactly as the caller named them. */
+  kept: ClaimRef[];
   /**
-   * The claims the replacement minted.
+   * The conclusions this act superseded — everything the revised analysis
+   * concluded that was not kept.
    *
-   * Same reason `recordAnalysis` returns its own (PJ-030): a replacement
-   * asserts its predecessor's propositions afresh, so after one there are two
-   * claims saying each sentence and a caller holding only the analysis has no
-   * way to name either. The sixth time CLAUDE.md's *"does the act record what
-   * it produced?"* has caught something.
+   * Returned because it is what the caller most needs to check and cannot have
+   * predicted: it is the complement of what they typed, over a set they may not
+   * have had in front of them.
    */
-  claims: ConcludedClaim[];
+  superseded: ConcludedClaim[];
   /**
-   * The claims whose support ran through the replaced analysis — enumerable,
-   * not "everything downstream". These are the **superseded** records: each is
-   * withdrawn by this act, and the replacement's claim asserting the same
-   * sentence is in `claims`.
-   */
-  affected: ConcludedClaim[];
-  /** Still valid, and still cited by the replacement. */
-  unaffected: UnaffectedRecord[];
-  changed: ChangedConclusion[];
-  /**
-   * The **replacement's** claims whose supporting finding is the same as
-   * before. Deliberately the new records and not the superseded ones: every
-   * claim in `affected` is withdrawn by this act, so naming those here would
-   * report a withdrawn record as unchanged.
-   */
-  unchanged: ConcludedClaim[];
-  /**
-   * The event this act recorded — `events[0].created` names the replacement's
-   * own output artefact, which is the handle #161 first added a dedicated
-   * `artefact` field for and then withdrew once this existed.
-   * `outputArtefactOf()` still earns its keep here: it resolves the
-   * *superseded* analysis's artefact, which no event of this act can name.
+   * The event this act recorded.
+   *
+   * **What it does not carry is the point.** Recording a replacement mints an
+   * analysis and a lineage decision, and nothing else: its findings arrive
+   * afterwards, one `conclude --replacing` at a time. What the revision changed
+   * is therefore spread across those calls and is not a fact this act holds —
+   * it is read back with `why <analysis>`.
    */
   events: DomainEvent[];
 }
@@ -1775,13 +1755,22 @@ export interface AnalysisRevision {
    */
   restated: ConcludedClaim[];
   /**
-   * Conclusions of the superseded analysis that nothing here named.
+   * Conclusions the revision carried forward, and which still stand.
    *
-   * Empty when this analysis revises nothing. A partial re-analysis is what
-   * fills it, and every claim in it is still current: the act that superseded
-   * its siblings did not touch it.
+   * They keep their original evidence, so asking why one holds answers with the
+   * superseded analysis's own output — that is where the number came from.
    */
-  stillStanding: ConcludedClaim[];
+  kept: ConcludedClaim[];
+  /**
+   * Superseded findings with no successor this read could identify.
+   *
+   * **It never guesses.** New conclusions are paired to superseded ones by
+   * proposition, and an analysis may assert the same sentence twice about
+   * different endpoints — so where the match is ambiguous, or where nothing
+   * new asserts the sentence at all, the finding is reported here rather than
+   * paired with an arbitrary one.
+   */
+  unpaired: ConcludedClaim[];
 }
 
 /** One superseded finding and the one standing in its place. */

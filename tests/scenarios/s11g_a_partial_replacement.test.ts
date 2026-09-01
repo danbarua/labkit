@@ -17,7 +17,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis, replaceAnalysis } from "../../fragments";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -89,7 +89,7 @@ async function theLogScaleReAnalysis(w: Awaited<ReturnType<typeof aRunPartlyReAn
     of: w.v1,
     verdict: "raw-scale aggregation is untrustworthy for the stochastic-control comparisons",
   });
-  return session.replaceAnalysis({
+  return replaceAnalysis(session, {
     supersedes: w.v1,
     because: review,
     enquiry: w.enquiry,
@@ -170,7 +170,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     const { review } = await session.recordReview({ of: v1, verdict: "wrong scale" });
 
     await expect(
-      session.replaceAnalysis({
+      replaceAnalysis(session, {
         supersedes: v1,
         because: review,
         enquiry,

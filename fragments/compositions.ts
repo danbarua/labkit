@@ -32,7 +32,7 @@ import {
   prespecify,
   promoteFinding,
   reinterpretClaim,
-  replaceAnalysis,
+  reviewAndReplace,
   rerunCheck,
   reverifyEarlier,
   sharpenQuestion,
@@ -141,7 +141,7 @@ const theAnalysisWasWrong: Composition = {
       method: "survival fit",
       concludes: [{ proposition: "recovery shortens by 2.1 days", finding: "-2.1 days" }],
     });
-    await replaceAnalysis(w, {
+    await reviewAndReplace(w, {
       supersedes: first.analysis,
       verdict: "censoring handled wrongly",
       enquiry,
@@ -445,7 +445,7 @@ const aProgramme: Composition = {
     });
 
     // A review finds the analysis wrong, not the data.
-    const corrected = await replaceAnalysis(w, {
+    const corrected = await reviewAndReplace(w, {
       supersedes: firstRead.analysis,
       verdict: "non-responders at week 4 were carried forward, inflating the denominator",
       enquiry: efficacy,

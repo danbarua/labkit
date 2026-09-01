@@ -128,6 +128,7 @@ import type {
   ReplaceAnalysisCommand,
   ReverifyCommand,
   SharpenCommand,
+  KeepCommand,
 } from "./commands";
 import { SessionCore } from "./core";
 import type { DomainEvent, Operation } from "./events";
@@ -827,6 +828,38 @@ export class WriteSurface extends SessionCore {
     };
   }
 
+  /** The analyses that concluded these claims — one entry per distinct analysis. */
+  private async analysesConcluding(claims: ClaimRef[]): Promise<AnalysisRef[]> {
+    const found = new Set<string>();
+    // Both bearings: a claim reached by a challenging finding was concluded by
+    // the analysis that challenged it, exactly as a supporting one was.
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (c:Claim) WHERE c.natural_id IN $ids
+         MATCH (e:Evidence)-[:${bearing}]->(c)
+         MATCH (:EvidenceUnit)-[:PRODUCES]->(e)
+         MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
+         MATCH (u)-[:USES]->(comp:Computation)
+         RETURN comp`,
+        { comp: vertexProps<{ natural_id: string }>() },
+        { ids: claims },
+      );
+      for (const row of rows) found.add(row.comp.natural_id);
+    }
+    return [...found].sort().map((id) => ref("analysis", id));
+  }
+
+  /** What an analysis consumed, so a revision of it inherits the same inputs. */
+  private async inputsOf(analysis: AnalysisRef): Promise<ObservationsRef[]> {
+    const rows = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact)
+       RETURN a`,
+      { a: vertexProps<{ natural_id: string }>() },
+      { id: analysis },
+    );
+    return rows.map((r) => ref("observations", r.a.natural_id));
+  }
+
   /** The enquiry an analysis was recorded under, for the withdrawal guard's scope. */
   private async enquiryOf(analysis: AnalysisRef): Promise<EnquiryRef | undefined> {
     const rows = await this.graph.query(
@@ -1502,248 +1535,107 @@ export class WriteSurface extends SessionCore {
    * point of S-11.
    */
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
+    return this.revise({ ...input, keeping: [] });
+  }
+
+  /**
+   * Revises an analysis by naming the conclusions that survive.
+   *
+   * Everything else that analysis concluded is superseded here, at this moment,
+   * rather than one `conclude --replacing` at a time. A caller who forgets an
+   * entry supersedes something still true — visible in the answer — where
+   * forgetting to supersede leaves something stale reading as current.
+   *
+   * The kept claims identify the analysis, so they must come from one.
+   */
+  async keep(input: KeepCommand): Promise<ReplacementReport> {
+    if (input.keeping.length === 0)
+      throw new Error(
+        `keep needs at least one conclusion to carry forward and was given none; ` +
+          `name the claims that survive, or use 'replace' to supersede an analysis whole`,
+      );
+    const spans = await this.analysesConcluding(input.keeping);
+    if (spans.length !== 1)
+      throw new Error(
+        spans.length === 0
+          ? `no analysis concluded ${input.keeping.join(", ")}; keep carries forward conclusions ` +
+              `of the analysis being revised, and 'why' on a claim names the analysis that drew it`
+          : `${input.keeping.join(", ")} were concluded by ${spans.join(" and ")}, and a revision ` +
+              `revises one analysis; keep the claims of one of them`,
+      );
+    return this.revise({ ...input, supersedes: spans[0]! });
+  }
+
+  /** `keep` and `replaceAnalysis`, which differ only in how much they carry forward. */
+  private async revise(
+    input: KeepCommand & { supersedes: AnalysisRef },
+  ): Promise<ReplacementReport> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
-      // Atomic, and this is the one that made transactions necessary rather than
-      // tidy. Invalidating the superseded output is not an isolated write: since
-      // S-3c it withdraws the criterion evaluations that cited it, so a failure
-      // between the halves leaves an earlier failure no longer deciding its check
-      // and no corrected check in existence. External review named it the
-      // blocking finding; S-3c carries the negative test. See
-      // TenantGraph.inTransaction.
       const {
-        before,
         analysis: replacement,
-        output: supersededOutput,
+        decision,
+        superseded,
       } = await this.graph.inTransaction(async () => {
         await this.assertReviewOf(input.because, input.supersedes);
-        const before = await this.conclusionsOf(input.supersedes);
 
-        // **The superseded output is NOT invalidated.** A flag on the artefact
+        // The superseded output is not invalidated. A flag on the artefact
         // would summarise the standing of every finding it carries, and
-        // standing is per finding: each `conclude --replacing` supersedes
-        // exactly one, and coverage is which calls the caller made.
+        // standing is per finding.
         const output = await this.outputArtefactOf(input.supersedes);
-        // Which review this rested on, recorded rather than validated and
-        // discarded (row O). `because` was checked against the analysis and then
-        // written nowhere, so a reader asking why the finding no longer stands
-        // got the verdict of an arbitrary review of the same unit -- and with a
-        // critical review and a confirming one on one analysis, reported the
-        // approval as the reason for the retraction. See
-        // EDGE_SCHEMA.INVALIDATED_BY.
         await this.graph.createEdge(output, "INVALIDATED_BY", input.because);
 
-        // Note what is NOT recorded here: no Decision, and no SUPERSEDES edge.
-        //
-        // Not a Decision. An earlier draft minted one ("we replaced X because of
-        // review Y") and linked it BASED_ON to the REPLACEMENT's evidence, which
-        // points causality backwards -- the decision to replace preceded that
-        // evidence and cannot rest on it. No assertion used it. S-11 contains an
-        // invalidated analysis and a replacement, both of which the graph
-        // represents directly; it does not contain a researcher decision. S-7,
-        // which turns on an explicit decision to amend a locked procedure, is
-        // where a Decision should be earned.
-        //
-        // Nor supersession. Invalidating the replaced analysis's output plus the
-        // replacement's own support answers every question this scenario asks.
-        // That is not the same as concluding invalidation *is* supersession:
-        // `invalidated = true` means "no longer valid as a source of current
-        // inference", and the two merely coincide here. S-12 is the
-        // discriminator -- there the numbers stay valid and only the
-        // interpretation changes, which invalidation cannot honestly carry.
+        // Add-only: the successor reads what its predecessor read, plus
+        // whatever this call names.
+        const inherited = await this.inputsOf(input.supersedes);
         const { analysis } = await this.recorded({
-          enquiry: input.enquiry,
+          enquiry: (await this.enquiryOf(input.supersedes)) as EnquiryRef,
           method: input.method,
-          from: input.from,
+          from: [...inherited, ...(input.from ?? [])],
         });
 
-        // **The lineage link, and `replace` mints a Decision like every other
-        // revision.** `reinterpret`'s shape, lifted one grain: the review
-        // records that someone objected, the decision records that the
-        // objection was acted on.
-        //
-        // It says *this analysis is a revision of that one* and nothing about
-        // whether the old analysis's findings still stand -- see the
-        // `Computation` pair on `EDGE_SCHEMA.CHANGES`, which carries the whole
-        // discipline. Retraction is one grain lower, per finding.
-        const lineage = await this.graph.createNode("Decision", {
+        // **One decision carries the whole act**: this analysis stands in
+        // place of that one, on this review, superseding these findings and
+        // keeping those. A reader of the decision sees all of it.
+        const decision = await this.graph.createNode("Decision", {
           decided_at: at,
           reason: `superseded by a re-run: ${input.method}`,
           invalidation_check: "evidence that the superseded analysis was sound after all",
         });
-        await this.graph.createEdge(lineage.natural_id, "SUPERSEDES", input.supersedes);
-        await this.graph.createEdge(lineage.natural_id, "MOTIVATES", analysis);
-        // The review this revision rested on, on the decision that records the
-        // revision. Every finding superseded afterwards reads it from here, so
-        // the answer to "which review retracted this?" comes from the act that
-        // named one rather than from any review of the same unit.
-        await this.graph.createEdge(lineage.natural_id, "INVALIDATED_BY", input.because);
+        await this.graph.createEdge(decision.natural_id, "SUPERSEDES", input.supersedes);
+        await this.graph.createEdge(decision.natural_id, "MOTIVATES", analysis);
+        await this.graph.createEdge(decision.natural_id, "INVALIDATED_BY", input.because);
 
-        return { before, analysis, output };
+        // Every conclusion not kept falls now. A kept one is **not
+        // re-parented**: it keeps the evidence that produced it, so asking
+        // why it holds still answers with the run that produced the number.
+        const kept = new Set<string>(input.keeping);
+        const before = await this.conclusionsOf(input.supersedes);
+        const superseded: ConcludedClaim[] = [];
+        for (const c of before) {
+          if (kept.has(c.claim)) {
+            await this.graph.createEdge(decision.natural_id, "KEEPS", c.claim);
+            continue;
+          }
+          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", c.claim);
+          superseded.push({ claim: c.claim, asserts: c.proposition });
+        }
+
+        return { analysis, decision: ref("decision", decision.natural_id), superseded };
       });
 
-      // Both sides carry a handle. After a replacement two records assert each
-      // sentence -- the withdrawn one and the fresh one -- so a report naming
-      // only the wording leaves a reader unable to say which it means. `was`
-      // comes from the superseded analysis, `claim` from the replacement, and
-      // the replacement's claims are taken BY INDEX: `recorded()` mints one per
-      // conclusion in order, so position is identity and a lookup keyed by the
-      // sentence would collapse two conclusions phrased alike.
-      //
-      // The `before` match is by wording because it has to be -- the superseded
-      // analysis's claims and the replacement's share no handle, and "the same
-      // proposition, re-derived" is precisely what the caller asserts by passing
-      // them.
-      // Each conclusion names the finding it supersedes, so one the caller does
-      // not restate is not superseded.
-      //
-      // **The pairing is resolved once and reused** by the report below. Two
-      // derivations would key the emitted event's `replaced` list by
-      // proposition while the SUPERSEDES edges follow the caller's
-      // `replacing` -- and those disagree on any pair the wording cannot match.
-      const claims: ConcludedClaim[] = [];
-      const paired: (RecordedConclusion | undefined)[] = [];
-      const replacementEvents: DomainEvent[] = [];
-      for (const now of input.concludes) {
-        // Explicit wins; the proposition match is the fallback the ordinary
-        // re-run relies on. See `ReplacementConclusion.replacing`.
-        //
-        // **The fallback lives here and nowhere else.** `conclude` itself never
-        // matches on text: a caller at the CLI or over MCP names the finding it
-        // supersedes or supersedes nothing, because there the wording is the
-        // agent's own and matching it would guess. This is a composition, where
-        // the caller handed in a whole list to be paired.
-        let was: RecordedConclusion | undefined;
-        if (now.replacing === undefined) {
-          // **Refuses rather than picks.** Two conclusions of one analysis may
-          // assert the same sentence about different endpoints, so a wording
-          // match can name two; taking the first is a coin toss recorded as a
-          // fact.
-          const candidates = before.filter((b) => b.proposition === now.proposition);
-          if (candidates.length > 1)
-            throw new Error(
-              `analysis ${input.supersedes} concluded "${now.proposition}" more than once ` +
-                `(${candidates.map((b) => b.claim).join(", ")}), so which one this replaces ` +
-                `cannot be inferred from the wording; name it with 'replacing'`,
-            );
-          was = candidates[0];
-        } else {
-          was = before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
-        }
-        paired.push(was);
-        const concluded = await this.concludeOne({
-          analysis: replacement,
-          proposition: now.proposition,
-          finding: now.finding,
-          ...(was === undefined ? {} : { replacing: was.claim }),
-          ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
-          ...(now.standing === undefined ? {} : { standing: now.standing }),
-        });
-        claims.push(...concluded.claims);
-        replacementEvents.push(...concluded.events);
-      }
-
-      const changed: ChangedConclusion[] = [];
-      const unchanged: ConcludedClaim[] = [];
-      for (const [i, now] of input.concludes.entries()) {
-        const was = paired[i];
-        const claim = claims[i]?.claim;
-        if (!was || !claim) continue;
-        if (was.finding === now.finding) unchanged.push({ claim, asserts: now.proposition });
-        else
-          changed.push({
-            proposition: now.proposition,
-            was: was.claim,
-            before: was.finding,
-            claim,
-            after: now.finding,
-          });
-      }
-
-      // The wording half. `what` was a naked id -- the inverse of the convention
-      // every other pair follows, and unreadable without a second lookup.
-      //
-      // An analysis handle has to be dereferenced to its output artefact first:
-      // the id is a `COMP_`, and looking THAT up as an artefact matches nothing
-      // and silently fell back to printing the id. Same one hop `recorded()`
-      // makes to write the CONSUMES edge.
-      const inputNames = new Map<InputRef, IndexedString>();
-      // **Which inputs this act retracted outright**, computed from what this
-      // call did rather than queried: `before` is every conclusion the
-      // superseded analysis drew and `paired` is the ones this call superseded,
-      // so its output is retracted exactly when those agree. **Every, not
-      // any** -- a partial replacement leaves standing findings in that
-      // artefact, and it stays a live record.
-      const supersededWhole =
-        before.length > 0 && before.every((b) => paired.some((pr) => pr?.claim === b.claim));
-      const retracted = new Set<InputRef>();
-      // One query for every input, not one per input. `logical_name` is what an
-      // Artefact carries; this read `.name` -- a property no Artefact has -- so it
-      // set `undefined` and printed the id instead.
-      const artefactFor = new Map<InputRef, ObservationsRef>();
-      for (const o of input.from) {
-        artefactFor.set(
-          o,
-          labelForNaturalId(o) === "Computation"
-            ? await this.outputArtefactOf(o as AnalysisRef)
-            : (o as ObservationsRef),
-        );
-      }
-      const found = new Map(
-        (
-          await this.graph.query(
-            `MATCH (a:Artefact) WHERE a.natural_id IN $ids RETURN a`,
-            { a: vertexProps<ArtefactProps & { natural_id: string }>() },
-            { ids: [...new Set(artefactFor.values())] },
-          )
-        ).map((r) => [r.a.natural_id, r.a] as const),
-      );
-      for (const [handle, artefact] of artefactFor) {
-        const a = found.get(artefact);
-        if (!a) continue;
-        inputNames.set(handle, a.logical_name);
-        if (supersededWhole && artefact === supersededOutput) retracted.add(handle);
-      }
-
-      // `why` is computed, not asserted. Two things had been wrong with the fixed
-      // sentence: it said "observations" while `what` reports `kind: "analysis"`
-      // for an analysis input, and for an input that IS the replaced analysis it
-      // asserted the opposite of what the record says (S-11e).
-      const unaffected: UnaffectedRecord[] = input.from.map((o) => ({
-        what: o,
-        ...(retracted.has(o) ? { invalidated: true as const } : {}),
-        named: inputNames.get(o) ?? o,
-        why: retracted.has(o)
-          ? "produced by the replaced analysis and retracted by this replacement, which rests on it anyway"
-          : "not produced by the replaced analysis, and the replacement rests on it",
-      }));
-
-      const affected = before.map((b) => ({
-        claim: b.claim,
-        asserts: b.proposition,
-      }));
       const events = await this.emit("replaceAnalysis", replacement, {
         supersedes: input.supersedes,
         because: input.because,
-        // Which findings this act replaced with which -- the sentence-level
-        // pairing `changed` already computed, not a second lookup.
-        replaced: changed.map((c) => ({
-          proposition: c.proposition,
-          was: c.was,
-          before: c.before,
-          claim: c.claim,
-          after: c.after,
-        })),
+        keeping: input.keeping,
       });
-      events.push(...replacementEvents);
       return {
         at,
         replacement,
-        claims,
-        affected,
-        unaffected,
-        changed,
-        unchanged,
+        decision,
+        supersedes: input.supersedes,
+        kept: input.keeping,
+        superseded,
         events,
       };
     });
