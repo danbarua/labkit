@@ -115,6 +115,29 @@ reader found that, not a test.
 `docs/session-log/`, `docs/consumer-contract/`. They say their date and are
 measurements of it, so they cannot go stale. Do not "correct" them.
 
+## A comment describes the code; history goes to git and the journal
+
+A code comment says **what the code does, and anything that would trip a
+reader that the code does not make clear**. Nothing else. How the code came to
+be this way — what it *used to* do, the issue that found the defect, the date,
+the measurement that settled the argument — is a commit message, a PR body, or
+a project-journal entry, in that order of weight. **Stdout help text and MCP
+tool descriptions carry no project history and cite no user story**: they
+describe the verb to the person or agent about to use it.
+
+**The tell:** `used to`, a date, an issue number, a `PJ-` or `S-` or
+`CLAUDE.md` reference, inside a comment or a description string.
+
+Dan's inline review of #186 (2026-09-01) was twenty-five comments and this
+one rule — a screen-full of lore above `EDGE_SCHEMA`, *"the measurement that
+earned the two pairs below"*, issue numbers in a tool description a stranger's
+agent will read. The reviewer had asked for exactly that all week: *put the
+argument in the doc comment, write the sentence verbatim beside the
+declaration*. A comment that argues is a comment that goes stale the moment
+the argument is over, and the argument belongs where dated records live. His
+A-grade example, `src/mcp/tools.ts`'s *"evaluation time."*: says what the
+field is and stops.
+
 ## When these conflict with a task
 
 They do not override an instruction. They override your instinct to add
