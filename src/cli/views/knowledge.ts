@@ -120,13 +120,15 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       ? `  replaced by: "${why.replacedBy.asserts}"  ${p.handle(`(${why.replacedBy.claim})`)}`
       : "",
     "",
-    p.heading("Resting on"),
+    // **One word, one meaning.** This list is the supporting *findings*; the
+    // inputs they rest on are `restingOn`, below.
+    p.heading("Supported by"),
     bullets(
       why.support.map(
         (s) =>
           `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${p.handle(s.analysis)}${p.quiet(")")}`,
       ),
-      "nothing",
+      "no supporting findings",
     ),
     why.against.length
       ? `\nBearing against\n${bullets(
@@ -170,7 +172,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
         )}`
       : "",
     why.restingOn.length
-      ? `\nUltimately resting on\n${bullets(
+      ? `\nResting on\n${bullets(
           why.restingOn.map((a) => `${a.name}  [${a.part}]`),
           "",
         )}`

@@ -1669,7 +1669,7 @@ export interface Cause {
  * 2026-08-04 and CRIT_3 "…" has never been run` is Gate's, dictated on #182.
  * `report` carries the kind's own existing report **unflattened**: an
  * envelope that dictated the embedded shape would have cost `why CLM_1` the
- * *Resting on / Held to / Ultimately resting on* view it has today, for a
+ * *Supported by / Held to / Resting on* view it has today, for a
  * one-line sentence — a regression wearing a redesign.
  *
  * A discriminated union, not one interface with optional fields: `report`'s
