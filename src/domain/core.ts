@@ -251,13 +251,27 @@ export class SessionCore {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
-       OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)
-       OPTIONAL MATCH (d)-[:MOTIVATES]->(now:Claim)
-       RETURN c, d, now`,
+       // **Both predicates, and AGE has no edge alternation** -- [:CHANGES|SUPERSEDES]
+       // is a syntax error, so this is two clauses and the fold below must read
+       // both. Naming only one is SILENT: the row is simply absent and a reader
+       // concludes the claim still stands. That is this repository's
+       // six-occurrence defect, so it is spelled once here rather than at each
+       // caller.
+       //
+       // A claim is withdrawn either way: its reading was narrowed (CHANGES)
+       // or its finding superseded (SUPERSEDES). Different acts, same
+       // consequence for whether it still stands.
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       OPTIONAL MATCH (replaced)-[:MOTIVATES]->(successor:Claim)
+       RETURN c, narrowed, insteadof, replaced, successor`,
       {
         c: vertexProps<{ natural_id: string }>(),
-        d: optional(vertexProps<{ natural_id: string }>()),
-        now: optional(vertexProps<{ name: string; natural_id: string }>()),
+        narrowed: optional(vertexProps<{ natural_id: string }>()),
+        insteadof: optional(vertexProps<{ name: string; natural_id: string }>()),
+        replaced: optional(vertexProps<{ natural_id: string }>()),
+        successor: optional(vertexProps<{ name: string; natural_id: string }>()),
       },
       { name: scope.proposition, ...this.scopeParams(scope) },
     );
@@ -266,13 +280,19 @@ export class SessionCore {
     // Every node asserting this proposition must have been withdrawn. One left
     // standing means the record still claims it -- which is exactly the
     // duplicate-claim case S-12 was built to catch.
-    const standing = new Set(rows.filter((r) => !r.d).map((r) => r.c.natural_id));
+    // Either predicate counts. Reading one and not the other is the silent
+    // half of the two-clause trap above: a claim superseded but not narrowed
+    // would have read as standing.
+    const standing = new Set(
+      rows.filter((r) => !r.narrowed && !r.replaced).map((r) => r.c.natural_id),
+    );
     if (standing.size > 0) return { withdrawn: false };
 
     // Identity as well as wording. This was the claim's NAME, picked from
     // whichever row happened to carry one -- arbitrary row and arbitrary text,
     // in the field that says what the record asserts instead (PJ-030 §7).
-    const now = rows.find((r) => r.now)?.now;
+    const now =
+      rows.find((r) => r.insteadof)?.insteadof ?? rows.find((r) => r.successor)?.successor;
     return {
       withdrawn: true,
       ...(now

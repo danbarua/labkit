@@ -31,9 +31,6 @@ interface CriterionNode extends Node {
 interface BasisNode extends Node {
   statement: string;
 }
-interface ArtefactNode extends Node {
-  invalidated?: boolean;
-}
 
 const id = (row: Row, key: string): string | null => (row[key] as Node | null)?.natural_id ?? null;
 
@@ -139,13 +136,22 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
   return {
     name,
     grain: byEvaluation,
+    // **Standing is per finding, not per artefact**: a finding is superseded
+    // when a decision stands instead of the claim it bears on.
+    //
+    // **Two clauses because AGE has no edge alternation.** Naming one is
+    // silent: `[:SUPPORTS|CHALLENGES]` is a syntax error, and a verdict
+    // resting on a challenging finding would simply never match. The fold
+    // below reads both.
     clause: `${evaluationClause}
            OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
-           OPTIONAL MATCH (basis)-[:RECORDED_IN]->(basisout:Artefact)`,
+           OPTIONAL MATCH (basis)-[:SUPPORTS]->(supported:Claim)<-[:SUPERSEDES]-(:Decision)
+           OPTIONAL MATCH (basis)-[:CHALLENGES]->(challenged:Claim)<-[:SUPERSEDES]-(:Decision)`,
     yields: {
       ev: optional(vertexProps<EvaluationNode>()),
       basis: optional(vertexProps<Node>()),
-      basisout: optional(vertexProps<ArtefactNode>()),
+      supported: optional(vertexProps<Node>()),
+      challenged: optional(vertexProps<Node>()),
     },
     empty: () => ({ cited: 0, standing: 0, outcome: null, at: "", value: "", basis: [] }),
     fold: (verdict, row) => {
@@ -172,7 +178,10 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
               { evidence: ref("evidence", basis.natural_id), states: basis.statement },
             ],
         cited: seen.cited + 1,
-        standing: seen.standing + ((row.basisout as ArtefactNode | null)?.invalidated ? 0 : 1),
+        // Either bearing. A finding superseded on the challenging side counts
+        // exactly as one superseded on the supporting side; reading one is the
+        // silent half of the two-clause pair above.
+        standing: seen.standing + (row.supported || row.challenged ? 0 : 1),
       };
     },
   };

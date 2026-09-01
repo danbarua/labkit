@@ -36,11 +36,15 @@ q=$(lab pose 'does the effect survive a held-out set?')
 echo "\$ labkit --db $db pursue $q --approach 'held-out replication'"
 e=$(lab pursue "$q" --approach 'held-out replication')
 echo "\$ labkit --db $db observe $e --name held-out-raw --finding '...'"
-obs=$(lab observe "$e" --name held-out-raw --finding 'convergence counts on the held-out split' --hash sha256:demo1)
-echo "\$ labkit --db $db analyse $e --method 'held-out comparison' --from $obs --concludes '{...}'"
-lab analyse "$e" --method 'held-out comparison' --from "$obs" \
-  --concludes '{"proposition": "the effect holds on the held-out set", "finding": "it does, smaller margin"}' > /dev/null
-echo "-> $db/.labkit  (4 events)"
+# The ART_ line: `observe` mints three things and prints a handle for each.
+obs=$(lab observe "$e" --name held-out-raw --finding 'convergence counts on the held-out split' --hash sha256:demo1 | grep '^ART_')
+echo "\$ labkit --db $db analyse $e --method 'held-out comparison' --from $obs"
+a=$(lab analyse "$e" --method 'held-out comparison' --from "$obs" | head -1)
+echo "\$ labkit --db $db conclude $a --proposition '...' --finding '...'"
+lab conclude "$a" \
+  --proposition 'the effect holds on the held-out set' \
+  --finding 'it does, smaller margin' > /dev/null
+echo "-> $db/.labkit  (5 events)"
 echo
 
 if [ "$verify_only" = "1" ]; then

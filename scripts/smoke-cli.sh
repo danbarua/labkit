@@ -167,16 +167,22 @@ observations=$(pick ART "$(lab observe "$enquiry" \
   --hash 'sha256:9f2b')")
 echo "  observations $observations"
 
-# The compound verb: a computation, its evidence unit, its output artefact, and
-# one claim per conclusion -- one act, and the log records one event for it.
+# The run: a computation, its evidence unit, its output artefact. No findings
+# yet, which is a real state and not an empty one -- a run whose analysis is
+# still being done.
 analysis_out=$(lab analyse "$enquiry" \
   --method 'paired comparison against the unpruned baseline' \
   --from "$observations" \
   --implementing "$work" \
-  --held-to "$criterion" \
-  --concludes '{"proposition": "the pruning schedule moves convergence", "finding": "converges ~3 steps earlier at every depth"}')
+  --held-to "$criterion")
 analysis=$(handle COMP "$(printf '%s' "$analysis_out" | head -1)")
-claim=$(handle CLM "$(printf '%s' "$analysis_out" | tail -1)")
+
+# Then the finding, as its own act. Findings arrive one at a time, over days,
+# and `conclude` is the primitive that records one (#173).
+conclude_out=$(lab conclude "$analysis" \
+  --proposition 'the pruning schedule moves convergence' \
+  --finding 'converges ~3 steps earlier at every depth')
+claim=$(handle CLM "$(printf '%s' "$conclude_out" | tail -1)")
 echo "  analysis $analysis claiming $claim"
 
 echo "== checking, promoting, closing =="
@@ -238,7 +244,11 @@ refute "an observed one is not marked, being the ordinary case" \
 
 # A handle appears in `created`, not only as a subject: six verbs mint a
 # Decision and only one names it as what the act was about.
-expect "an act is findable by what it minted" "$(lab happened "$claim")" "recordAnalysis"
+#
+# `conclude`, not `recordAnalysis`, since #173 -- the claim is minted by the
+# act that asserts it, and the analysis is the run it belongs to. Which verb
+# this names is the point of the assertion, so it is not a detail.
+expect "an act is findable by what it minted" "$(lab happened "$claim")" "conclude"
 
 echo
 echo "OK: $step assertions over a real database, all passed."

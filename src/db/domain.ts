@@ -210,6 +210,10 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Question", "LineOfEnquiry"],
     ["Decision", "Question"],
     ["Decision", "Claim"],
+    // The revision an act produced, at analysis grain — the half that pairs
+    // with `SUPERSEDES -> Computation`. `MOTIVATES` names what an act put in
+    // place; `SUPERSEDES` names what it stands instead of.
+    ["Decision", "Computation"],
   ],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
   // A Task earns this pair by #98: `labkit contract` had no way to say why a
@@ -383,7 +387,49 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   RESOLVES: [["Decision", "Question"]],
   NARROWS: [["Decision", "Question"]],
   DEFERS: [["Decision", "Question"]],
-  SUPERSEDES: [["Decision", "Decision"]],
+  /**
+   * **A later record stands instead of an earlier one.**
+   *
+   * The line between this and {@link CHANGES}:
+   *
+   * - `CHANGES` — the *same evidence read differently*. A reading narrowed, a
+   *   condition amended. Nothing is replaced; the record still stands and its
+   *   meaning moved.
+   * - `SUPERSEDES` — *this stands instead of that*. An amendment over an
+   *   amendment, a corrected finding over a defective one, a re-analysis over
+   *   the analysis it replaced.
+   *
+   * > supersedes is a substitution of one record for another; the research
+   * > journey follows a different fork in the road. changes = looking back at
+   * > the map — same thing, interpreted differently from a perspective further
+   * > down the road.
+   *
+   * That image is the rule for readers. `interpretationHistory` must never see
+   * a supersession — it walks the map being looked back at, and a fork taken is
+   * not a step along it. Both decisions change exactly one claim and motivate
+   * exactly one, so there is no structural discriminator: a reader that wants
+   * one of the two readings has to select on the label.
+   *
+   * Who reads which:
+   *
+   * - `interpretationHistory` — `CHANGES` only.
+   * - `withdrawalOf` — both. A claim no longer stands whether its reading was
+   *   narrowed or its finding superseded.
+   * - `whySupported` — `SUPERSEDES`, for *instead of*.
+   *
+   * `reinterpret` does not supersede: the evidence is untouched and only the
+   * reading moved.
+   *
+   * The `Computation` pair is analysis-grain **lineage** — this analysis is a
+   * revision of that one. It says nothing about the standing of the old
+   * analysis's conclusions, and no reader may infer that they fell from this
+   * edge existing. Retraction is one grain lower, per finding.
+   */
+  SUPERSEDES: [
+    ["Decision", "Decision"],
+    ["Decision", "Claim"],
+    ["Decision", "Computation"],
+  ],
   /**
    * `Review -> EvidenceUnit` is the second relationship S-11 earned: a review
    * of an *analysis* previously had nowhere to point, so its subject survived
@@ -418,25 +464,26 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * a retraction, demonstrated in two worlds that differ only in which review
    * the researcher acted on and that the read surface could not tell apart.
    *
-   * **Not `EVALUATES`.** `Review -> Evidence` already exists and means *this
-   * was reviewed*; using it for *this caused the retraction* is one edge with
-   * two readings, which CLAUDE.md names as the failure shape behind every
-   * expensive mistake here. `PROMOTES` was split from `CHANGES` for exactly
-   * this reason.
+   * **Not `EVALUATES`**, which means *this was reviewed*; and not `BASED_ON`,
+   * whose sources are judgments (`Decision`, `CriterionEvaluation`) where an
+   * `Artefact` is not one.
    *
-   * **Not `BASED_ON`.** Semantically it fits — the invalidation rested on this
-   * review — and that is the trap. Row AA is a live `boundary` recording that
-   * `BASED_ON` already carries two senses, and a third would widen a row while
-   * closing this one. Its sources are also judgments (`Decision`,
-   * `CriterionEvaluation`); an `Artefact` is not one.
+   * The direction is passive, like `BASED_ON` and `RECORDED_IN`, because a
+   * review does not retract anything — a researcher does, on the strength of it.
    *
-   * The endpoint is the invalidated `Artefact` because that is the thing whose
-   * standing changed and the thing a reader is holding when the question
-   * arises: *why is this no longer valid?* The direction is passive, like
-   * `BASED_ON` and `RECORDED_IN`, because a review does not retract anything —
-   * a researcher does, on the strength of it.
+   * **Two sources, at two grains, and a reader needs to know which it has.**
+   * `Artefact -> Review` answers *why was this analysis replaced?* and nothing
+   * narrower: one edge covers every finding the analysis produced, so a
+   * replacement that revisits some of them has no single answer to it.
+   * `Decision -> Review` is written on the per-finding decision a supersession
+   * mints, and answers *why is this finding no longer standing?*
+   *
+   * Both are written and both are read; the artefact edge is the fallback.
    */
-  INVALIDATED_BY: [["Artefact", "Review"]],
+  INVALIDATED_BY: [
+    ["Artefact", "Review"],
+    ["Decision", "Review"],
+  ],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
 };
 

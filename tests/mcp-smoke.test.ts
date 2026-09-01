@@ -175,11 +175,16 @@ describe("every tool answers when an agent actually calls it", () => {
         enquiry: id(enquiry),
         method: "paired timing",
         from: [id(observations)],
-        concludes: [{ proposition: SPARSE, finding: "median speedup 1.4x" }],
         implementing: id(work),
         held_to: [id(criterion)],
       });
-      const claim = claimIn(analysis, SPARSE);
+      // The run, then the finding: two acts, two calls.
+      const concluded = await call(c, "conclude", {
+        analysis: id(analysis.analysis as Json),
+        proposition: SPARSE,
+        finding: "median speedup 1.4x",
+      });
+      const claim = claimIn(concluded, SPARSE);
 
       await call(c, "evaluate_criterion", {
         criterion: id(criterion),
@@ -301,8 +306,15 @@ describe("every tool answers when an agent actually calls it", () => {
         enquiry: id(enquiry),
         method: "linear fit",
         from: [id(observations)],
-        concludes: [{ proposition: COATING, finding: "rate down 40%" }],
       });
+      const firstClaim = claimIn(
+        await call(c, "conclude", {
+          analysis: id(first.analysis as Json),
+          proposition: COATING,
+          finding: "rate down 40%",
+        }),
+        COATING,
+      );
       const review = await call(c, "record_review", {
         of: id(first.analysis as Json),
         verdict: "the fit ignores the induction period",
@@ -313,19 +325,22 @@ describe("every tool answers when an agent actually calls it", () => {
         enquiry: id(enquiry),
         method: "segmented fit",
         from: [id(observations)],
-        concludes: [{ proposition: COATING, finding: "rate down 25% after induction" }],
       });
-      expect(replacement.changed as unknown[]).toHaveLength(1);
+      // `replacing` names the one finding this supersedes, so a replacement
+      // that revisits some of a run's conclusions leaves the rest standing.
+      const restated = await call(c, "conclude", {
+        analysis: id(replacement.replacement as Json),
+        replacing: firstClaim,
+        finding: "rate down 25% after induction",
+      });
 
       const verification = await call(c, "reverify", {
         historical: id(replacement.replacement as Json),
         enquiry: id(enquiry),
         method: "segmented fit, second batch",
         under: [id(observations)],
-        concludes: {
-          proposition: COATING,
-          finding: "rate down 27% after induction",
-        },
+        proposition: COATING,
+        finding: "rate down 27% after induction",
       });
       const reproduction = await call(c, "reproduction_of", {
         analysis: id(verification.verification as Json),
@@ -333,7 +348,7 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(reproduction.conclusion).toBe("agrees");
 
       const narrowed = await call(c, "reinterpret", {
-        claim: claimIn(replacement, COATING),
+        claim: claimIn(restated, COATING),
         as: NARROWER,
         because: "the reduction is in the post-induction rate, not overall",
       });
@@ -406,7 +421,11 @@ describe("every tool answers when an agent actually calls it", () => {
         enquiry: id(sparse),
         method: "paired timing",
         from: [id(sparseObs)],
-        concludes: [{ proposition: HOLDS, finding: "speedup 1.4x" }],
+      });
+      const sparseConcl = await call(c, "conclude", {
+        analysis: id(sparseAnalysis.analysis as Json),
+        proposition: HOLDS,
+        finding: "speedup 1.4x",
       });
       const denseObs = await call(c, "record_observations", {
         enquiry: id(dense),
@@ -417,20 +436,19 @@ describe("every tool answers when an agent actually calls it", () => {
         enquiry: id(dense),
         method: "paired timing",
         from: [id(denseObs)],
-        concludes: [
-          {
-            proposition: HOLDS,
-            finding: "speedup 0.98x",
-            bearing: "challenges",
-          },
-        ],
+      });
+      const denseConcl = await call(c, "conclude", {
+        analysis: id(denseAnalysis.analysis as Json),
+        proposition: HOLDS,
+        finding: "speedup 0.98x",
+        bearing: "challenges",
       });
 
       // The same sentence, two enquiries, opposite bearing — and not a
       // contradiction, because they asked about different instance sets.
       const verdict = await call(c, "do_these_conflict", {
-        a: claimIn(sparseAnalysis, HOLDS),
-        b: claimIn(denseAnalysis, HOLDS),
+        a: claimIn(sparseConcl, HOLDS),
+        b: claimIn(denseConcl, HOLDS),
       });
       expect(verdict.conflict).toBe(false);
       expect(verdict.relation).toBe("dissociation");
@@ -439,7 +457,7 @@ describe("every tool answers when an agent actually calls it", () => {
         enquiry: id(dense),
         because: "the dense set needs an instance generator nobody has written",
         until: "a dense generator exists",
-        in_light_of: claimIn(denseAnalysis, HOLDS),
+        in_light_of: claimIn(denseConcl, HOLDS),
       });
       const left = await call(c, "enquiry_status", { enquiry: id(dense) });
       expect((left.question as Json).closure).toBe("accepted-as-unresolved");

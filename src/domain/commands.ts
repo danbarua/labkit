@@ -29,6 +29,7 @@ import type {
   ReviewRef,
   WorkRef,
   ClaimRef,
+  EvidenceRef,
 } from "./report";
 
 /** `pursue` — open a line of enquiry against a question already on the record. */
@@ -184,6 +185,73 @@ export interface AmendDesignCommand {
   citing: ClaimRef;
 }
 
+/**
+ * `conclude` — assert one thing an analysis found.
+ *
+ * One conclusion, one call, one event. `recordAnalysis`, `replaceAnalysis` and
+ * `reverify` compose it; both surfaces expose this one.
+ *
+ * `proposition` is required **unless** `replacing` is given, in which case it
+ * and `bearing` are inherited from the finding being superseded. Passing both is
+ * an override, not a conflict.
+ */
+export interface ConcludeCommand {
+  /** The analysis this conclusion belongs to. */
+  analysis: AnalysisRef;
+  /** What was found, in this analysis's own words. */
+  finding: string;
+  /**
+   * The proposition the finding bears on.
+   *
+   * Optional only in the `replacing` case. Absent with nothing to inherit from
+   * is a refusal, not a default: a conclusion is *about* something, and there is
+   * no sensible thing to assume.
+   */
+  proposition?: string;
+  /** Which way the finding cuts. Inherited when replacing; otherwise `supports`. */
+  bearing?: "supports" | "challenges";
+  /** Confirmatory standing. Defaults to `exploratory` — see {@link Conclusion}. */
+  standing?: "exploratory" | "confirmatory";
+  /**
+   * The single finding this supersedes — a claim or an evidence handle.
+   *
+   * **One finding, not an analysis.** Coverage is exactly the calls the caller
+   * made: a conclusion nothing names goes on standing, and so does everything
+   * citing it.
+   */
+  replacing?: ClaimRef | EvidenceRef;
+}
+
+/**
+ * One of a replacement's conclusions, and which earlier finding it stands in
+ * for.
+ *
+ * `Conclusion` plus `replacing`, rather than a field on `Conclusion` itself:
+ * `recordAnalysis` records a run that supersedes nothing.
+ */
+export interface ReplacementConclusion extends Conclusion {
+  /**
+   * The earlier finding this one stands in for.
+   *
+   * **Inferred by proposition when absent**, which covers the ordinary re-run —
+   * the same claim, re-derived — so most callers never write this. Name it when
+   * the correction *reverses* its predecessor: the two then assert different
+   * propositions and there is no wording to match on.
+   *
+   * Two things the inference will not do:
+   *
+   * - **It is composition-only.** `conclude` never matches on wording, because
+   *   there the proposition is the caller's own sentence and matching it would
+   *   guess at another caller's words. Only `replaceAnalysis`, handed a whole
+   *   list to pair against another whole list, infers.
+   * - **An ambiguous match is refused, not picked.** Two conclusions of one
+   *   analysis may assert the same sentence about different endpoints, so a
+   *   wording match can name two; `replaceAnalysis` then refuses and asks for
+   *   this field rather than taking the first.
+   */
+  replacing?: ClaimRef | EvidenceRef;
+}
+
 /** `replaceAnalysis` — supersede a defective analysis, invalidating its output and withdrawing what cited it. */
 export interface ReplaceAnalysisCommand {
   supersedes: AnalysisRef;
@@ -192,7 +260,7 @@ export interface ReplaceAnalysisCommand {
   method: string;
   /** What the replacement read. {@link InputRef} — an earlier analysis's output counts. */
   from: InputRef[];
-  concludes: Conclusion[];
+  concludes: ReplacementConclusion[];
 }
 
 /** `reinterpret` — narrow what a claim is taken to mean, without re-running anything. */

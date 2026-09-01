@@ -670,12 +670,22 @@ export class ReadSurface extends SessionCore {
        MATCH (u)-[:USES]->(comp:Computation)
        OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
        OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
-       RETURN e, comp, a, r`,
+       // Supersession, per claim -- the same pair withdrawalOf reads: a
+       // decision that stands instead of this one.
+       OPTIONAL MATCH (d:Decision)-[:SUPERSEDES]->(c)
+       // Which review THIS retraction rested on (row O), at the grain the
+       // question is asked. Distinct from the 'r' above, which is any review of
+       // the unit -- reading that as the cause is what reported a confirming
+       // review as a reason work was retracted.
+       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(caused:Review)
+       RETURN e, comp, a, r, d, caused`,
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
         comp: vertexProps<ComputationProps & Identified>(),
         a: optional(vertexProps<ArtefactProps & { natural_id: string }>()),
         r: optional(vertexProps<{ verdict: string }>()),
+        d: optional(vertexProps<{ reason: string }>()),
+        caused: optional(vertexProps<{ verdict: string }>()),
       },
       {
         name: scope.proposition,
@@ -1563,17 +1573,28 @@ export class ReadSurface extends SessionCore {
           method: row.comp.kind,
           analysis: ref("analysis", row.comp.natural_id),
         };
-        if (row.a?.invalidated) {
-          // Deduped, and the reason comes from INVALIDATED_BY rather than from
-          // whichever review the OPTIONAL MATCH happened to return. Two defects
-          // in one line before row O: a finding superseded once was reported
-          // once per review of its unit, each with a different reason, and the
-          // reasons contradicted each other.
+        // **Per claim, not per artefact**: a decision that changed *this*
+        // claim, which is the same fact `withdrawalOf` reads. An artefact-grain
+        // answer could only say why the whole *analysis* was replaced.
+        //
+        // Deduped, and one reason per finding rather than one per review of
+        // its unit.
+        if (row.d) {
           if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
             superseded.push({
               ...entry,
               bearing,
-              reason: retractedBy.get(row.a.natural_id) ?? "its analysis was replaced",
+              // **The review that caused THIS retraction first** (row O). The
+              // decision's own `reason` is generated text -- useful when a
+              // bare `conclude --replacing` superseded a finding with no
+              // review behind it, and not an answer to "which review
+              // retracted it?" when there is one.
+              reason:
+                row.caused?.verdict ||
+                row.d.reason ||
+                (row.a
+                  ? (retractedBy.get(row.a.natural_id) ?? "it was superseded")
+                  : "it was superseded"),
             });
         } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
           // A re-verification is not a second independent finding. Counting it
@@ -1630,6 +1651,12 @@ export class ReadSurface extends SessionCore {
     // it is a loop rather than two hand-written anchors is that the one-sided
     // version is silent: a promoted negative result reported "held to no
     // prespecified standard" while the record held the check.
+    // Which of the inputs this claim rests on have been retracted outright --
+    // every finding they record superseded. One query for all of them.
+    const retractedInputs = await this.retractedArtefacts([
+      ...new Set(resting.map((r) => ref("observations", r.a.natural_id))),
+    ]);
+
     const byCriterion = new Map<CriterionRef, CheckStatus>();
     for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
       const { cypher, decoders } = compose(checksAnchor(bearing), checkStatus, {
@@ -1723,7 +1750,10 @@ export class ReadSurface extends SessionCore {
               {
                 part: ref("observations", r.a.natural_id),
                 name: r.a.logical_name,
-                ...(r.a.invalidated ? { invalidated: true as const } : {}),
+                // Computed, not stored -- see `retractedArtefacts`.
+                ...(retractedInputs.has(ref("observations", r.a.natural_id))
+                  ? { invalidated: true as const }
+                  : {}),
               },
             ]),
         ).values(),
@@ -1964,22 +1994,91 @@ export class ReadSurface extends SessionCore {
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
     bearing: "SUPPORTS" | "CHALLENGES",
   ): Promise<{ a: ArtefactProps & Identified; e: Identified }[]> {
-    return this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+    return this.graph
+      .query(
+        `MATCH (c:Claim {name: $name})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
        MATCH (u)-[:USES]->(comp:Computation)
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
-       MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL OR out.invalidated = false
-       RETURN a, e`,
+       // **Per claim, not per artefact**: a finding stops counting when a
+       // decision stands instead of the claim it bears on.
+       //
+       // Two clauses, because AGE has no edge alternation; filtered in
+       // TypeScript, because it has no NOT (pattern) predicate in WHERE.
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       RETURN a, e, narrowed, replaced`,
+        {
+          // `natural_id` because `restingOn` deduplicates by identity: two
+          // artefacts can share a `logical_name`.
+          a: vertexProps<ArtefactProps & { natural_id: string }>(),
+          e: vertexProps<{ natural_id: string }>(),
+          narrowed: optional(vertexProps<{ natural_id: string }>()),
+          replaced: optional(vertexProps<{ natural_id: string }>()),
+        },
+        { name: scope.proposition, ...this.scopeParams(scope) },
+      )
+      .then((rows) => rows.filter((r) => !r.narrowed && !r.replaced));
+  }
+
+  /**
+   * The artefacts among these whose every recorded finding has been superseded.
+   *
+   * **Every, not any.** An artefact holds one finding per conclusion its
+   * analysis drew; replacing one leaves the rest standing, and so leaves the
+   * artefact a live record a reader may still rest on. Only when nothing in it
+   * stands has the record itself been retracted.
+   *
+   * An artefact holding no findings at all is **not** retracted: there is
+   * nothing in it to have fallen.
+   */
+  private async retractedArtefacts(ids: ObservationsRef[]): Promise<Set<ObservationsRef>> {
+    if (ids.length === 0) return new Set();
+    const rows = await this.graph.query(
+      `MATCH (a:Artefact) WHERE a.natural_id IN $ids
+       MATCH (e:Evidence)-[:RECORDED_IN]->(a)
+       // The supersession check is supersededClaim() below, per claim, not a
+       // clause here: it reads BOTH predicates, and this query has no way to
+       // ask for "neither" -- AGE has no NOT (pattern) predicate in WHERE. Two
+       // ask for "neither" in one clause.
+       OPTIONAL MATCH (e)-[:SUPPORTS]->(sup:Claim)
+       OPTIONAL MATCH (e)-[:CHALLENGES]->(chal:Claim)
+       RETURN a, e, sup, chal`,
       {
-        // `natural_id` because `restingOn` deduplicates by identity, not by
-        // name — see S-9d.
-        a: vertexProps<ArtefactProps & { natural_id: string }>(),
+        a: vertexProps<{ natural_id: string }>(),
         e: vertexProps<{ natural_id: string }>(),
+        sup: optional(vertexProps<{ natural_id: string }>()),
+        chal: optional(vertexProps<{ natural_id: string }>()),
       },
-      { name: scope.proposition, ...this.scopeParams(scope) },
+      { ids },
     );
+    // Both bearings. A finding that CHALLENGES a claim is a finding, and
+    // reading only the supporting side is the silent half of this repo's
+    // six-occurrence defect.
+    const standing = new Map<ObservationsRef, boolean>();
+    for (const row of rows) {
+      const bears = row.sup?.natural_id ?? row.chal?.natural_id;
+      const gone = bears === undefined ? false : await this.supersededClaim(ref("claim", bears));
+      const artefact = ref("observations", row.a.natural_id);
+      standing.set(artefact, (standing.get(artefact) ?? false) || !gone);
+    }
+    return new Set([...standing].filter(([, anyStanding]) => !anyStanding).map(([id]) => id));
+  }
+
+  /** Whether a decision stands instead of this claim. Both predicates; see `withdrawalOf`. */
+  private async supersededClaim(claim: ClaimRef): Promise<boolean> {
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $id})
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       RETURN narrowed, replaced`,
+      {
+        narrowed: optional(vertexProps<{ natural_id: string }>()),
+        replaced: optional(vertexProps<{ natural_id: string }>()),
+      },
+      { id: claim },
+    );
+    return rows.some((r) => r.narrowed || r.replaced);
   }
 
   /** The claims and enquiries resting on one artefact, by the two direct routes. */

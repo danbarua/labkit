@@ -264,26 +264,23 @@ describe("an event records the edges the act created", () => {
     labels.sort();
 
     // Every one of these is written by `recorded()` and none appears in
-    // `detail`, which carries the enquiry, the method and the propositions.
+    // `detail`, which carries the enquiry and the method.
     //
-    // **Three `PRODUCES`, and the third is the point of writing this list
-    // out.** Two are obvious — the computation's artefact and the evidence
-    // unit's evidence. The third is `EvidenceUnit -> Artefact`, which CLAUDE.md
-    // names as the repository's one endpoint pair with a writer and no reader.
-    // It was invisible to the event log until this column existed, and the
-    // first run of this test expected two and found three.
-    expect(labels).toEqual(
-      [
-        "ADDRESSES",
-        "CONSUMES",
-        "PRODUCES",
-        "PRODUCES",
-        "PRODUCES",
-        "RECORDED_IN",
-        "SUPPORTS",
-        "USES",
-      ].sort(),
-    );
+    // **Two `PRODUCES`, and which two is the point of writing the list out.**
+    // The computation's artefact, and `EvidenceUnit -> Artefact`, which no
+    // read reaches — the event log is the only place it is visible.
+    //
+    // The rest of what an analysis produces is on the `conclude` event
+    // asserted below, minted by an act of its own.
+    expect(labels).toEqual(["ADDRESSES", "CONSUMES", "PRODUCES", "PRODUCES", "USES"].sort());
+
+    // The other half, which makes the assertion above a split rather than a
+    // loss: every edge is recorded, by the act that made it.
+    const [drawn] = await log.select({ operation: "conclude" });
+    // `string[]`, for the same reason the list above is: the expectation is a
+    // literal and unifying it on the branded union buys nothing.
+    const drawnLabels: string[] = (drawn!.edges ?? []).map((e) => e.label);
+    expect(drawnLabels.sort()).toEqual(["PRODUCES", "RECORDED_IN", "SUPPORTS"].sort());
 
     // Endpoints, not just labels: a collector that recorded the label and lost
     // the pair would satisfy the assertion above.

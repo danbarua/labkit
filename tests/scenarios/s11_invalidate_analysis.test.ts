@@ -416,19 +416,23 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
 
     // Every research action left a trace, in order — one per action, not one
-    // per write. This list used to carry a second `recordAnalysis` between the
-    // review and the replacement, because `replaceAnalysis()` called the
-    // public analysis verb and so emitted its event too. That is the same
-    // defect `openEnquiry` was fixed for (PJ-014), and this assertion had
-    // quietly encoded it; external review of S-10 found it in `reverify()` and
-    // it was here as well. A researcher who replaced an analysis did one
-    // thing, and a log that also records the analysis underneath describes the
-    // implementation.
+    // per write.
+    //
+    // **The `conclude` entries are actions**: this run drew six conclusions and
+    // the record says so six times, as it would had a person typed `labkit
+    // conclude` six times. The count is the caller's, not the graph's.
+    //
+    // Spelled out rather than counted, because the absence is half the claim:
+    // there is no second `recordAnalysis` between the review and the
+    // replacement. A researcher who replaced an analysis did one thing.
+    const concluded = (n: number) => Array.from({ length: n }, () => "conclude" as const);
     expect((await events.all()).map((e) => e.operation)).toEqual([
       "openEnquiry",
       "recordObservations",
       "recordAnalysis",
+      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
       "recordReview",
+      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
       "replaceAnalysis",
     ]);
   });

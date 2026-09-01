@@ -19,7 +19,7 @@
 import { InvalidArgumentError } from "commander";
 import { z } from "zod";
 import { ref } from "../domain/report";
-import type { AnalysisRef, Conclusion, ObservationsRef, Ref } from "../domain";
+import type { AnalysisRef, ClaimRef, EvidenceRef, ObservationsRef, Ref } from "../domain";
 
 /**
  * A whole number, refused rather than coerced.
@@ -101,38 +101,33 @@ export function inputRef(raw: string): ObservationsRef | AnalysisRef {
 }
 
 /**
- * One conclusion, as JSON.
+ * The handle `conclude --replacing` supersedes: a claim or a finding.
  *
- * JSON and not a delimited string, which is not a style choice:
- * `PlanWorkCommand.mayRead` is stored as JSON inside the domain for the reason
- * its doc comment gives — an entry containing the delimiter splits silently —
- * and a conclusion carries two sentences of a researcher's prose, which is the
- * worst possible thing to put either side of a separator character.
- *
- * The shape is zod's, so the message names the field rather than the argument.
+ * Two kinds, because both come back from the act that recorded the finding,
+ * and a caller passes whichever they
+ * are holding. **Discriminated on the prefix, never on `typeof`** — a `Ref` is
+ * a branded string and every arm of the union is `"string"` at runtime, which
+ * is the defect `isRefOfKind` exists for.
  */
-const conclusionShape = z.object({
-  proposition: z.string().min(1),
-  finding: z.string().min(1),
-  bearing: z.enum(["supports", "challenges"]).optional(),
-  standing: z.enum(["exploratory", "confirmatory"]).optional(),
-});
+export function supersededRef(raw: string): ClaimRef | EvidenceRef {
+  if (raw.startsWith("CLM_")) return handle("claim")(raw);
+  if (raw.startsWith("EV_")) return handle("evidence")(raw);
+  throw new InvalidArgumentError(
+    `\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…); ` +
+      `both come back from the act that recorded them, and 'why' names them for a claim already on the record`,
+  );
+}
 
-export function conclusion(raw: string): Conclusion {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new InvalidArgumentError(
-      `takes JSON: '{"proposition": "…", "finding": "…"}'  (got \`${raw}\`)`,
-    );
-  }
-  const result = conclusionShape.safeParse(parsed);
-  if (!result.success) {
-    const first = result.error.issues[0]!;
-    throw new InvalidArgumentError(`${first.path.join(".") || "value"}: ${first.message}`);
-  }
-  return result.data;
+/** Which way a finding cuts. The domain's own two words, so a typo is refused rather than defaulted. */
+export function bearing(raw: string): "supports" | "challenges" {
+  if (raw === "supports" || raw === "challenges") return raw;
+  throw new InvalidArgumentError(`expected \`supports\` or \`challenges\` (got \`${raw}\`)`);
+}
+
+/** Whether a conclusion is asserted as a confirmatory result. See `Conclusion.standing`. */
+export function standing(raw: string): "exploratory" | "confirmatory" {
+  if (raw === "exploratory" || raw === "confirmatory") return raw;
+  throw new InvalidArgumentError(`expected \`exploratory\` or \`confirmatory\` (got \`${raw}\`)`);
 }
 
 /**

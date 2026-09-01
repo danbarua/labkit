@@ -120,6 +120,7 @@ import type {
   PlanWorkCommand,
   PromoteCommand,
   PursueCommand,
+  ConcludeCommand,
   RecordAnalysisCommand,
   RecordObservationsCommand,
   RecordReviewCommand,
@@ -143,6 +144,8 @@ interface RecordedConclusion {
   claim: ClaimRef;
   proposition: string;
   finding: string;
+  evidence: EvidenceRef;
+  bearing: "supports" | "challenges";
 }
 
 /**
@@ -170,6 +173,50 @@ interface RecordedConclusion {
 const noFindingBearsOn = (claim: ClaimRef): string =>
   `no finding bears on claim ${claim}; a claim can be cited only once an analysis ` +
   `has concluded it and produced the evidence bearing on it`;
+
+/**
+ * The write verbs a research *move* needs — what a fragment depends on.
+ *
+ * **Narrower than `WriteSurface` on purpose.** A fragment composes a few of
+ * these into one thing a researcher did; the class carries 28 members it never
+ * calls — protected helpers, the event sink, `SessionCore`'s internals.
+ *
+ * Depending on the class also excludes `ResearchSession`, which *composes* a
+ * `WriteSurface` rather than extending one and keeps `writes` private, so it is
+ * not assignable:
+ *
+ *     TS2740: missing … posed, pursued, standingFindings, recorded, and 24 more
+ *
+ * A scenario holds a `ResearchSession`, so with the class as the dependency it
+ * cannot call a fragment at all.
+ *
+ * Naming the dependency here rather than inside `fragments/` is what lets
+ * `ResearchSession` be checked against it (see `./session.ts`): a delegating
+ * property whose signature drifts then fails to compile **where the drift is**,
+ * rather than three files away in whichever fragment happened to call it.
+ */
+export type ResearchWrites = Pick<
+  WriteSurface,
+  | "pose"
+  | "pursue"
+  | "openEnquiry"
+  | "sharpen"
+  | "recordObservations"
+  | "recordAnalysis"
+  | "conclude"
+  | "recordReview"
+  | "replaceAnalysis"
+  | "reverify"
+  | "reinterpret"
+  | "closeEnquiry"
+  | "acceptAsUnresolved"
+  | "promote"
+  | "planWork"
+  | "stateCriterion"
+  | "declareGate"
+  | "evaluateCriterion"
+  | "amendDesign"
+>;
 
 export class WriteSurface extends SessionCore {
   /**
@@ -424,13 +471,31 @@ export class WriteSurface extends SessionCore {
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
-      const analysis = await this.graph.inTransaction(() => this.recorded(input));
-      const events = await this.emit("recordAnalysis", analysis.analysis, {
+      const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
+      // The analysis is its own act, and each conclusion is another. **N+1
+      // events, and that is the truthful count**: concluding four things is
+      // four things a researcher did, and this must record them the same way
+      // the CLI does when a person makes the same four calls. An analysis with
+      // no conclusions yet emits exactly one and is a real, honest state --
+      // `enquiry` prints "has produced nothing yet" and `known` buckets it as
+      // worked-on-no-answer.
+      const events = await this.emit("recordAnalysis", analysis, {
         enquiry: input.enquiry,
         method: input.method,
-        conclusions: this.conclusionEvents(analysis.claims),
       });
-      return { ...analysis, events };
+      const claims: ConcludedClaim[] = [];
+      for (const conclusion of input.concludes) {
+        const concluded = await this.conclude({
+          analysis,
+          proposition: conclusion.proposition,
+          finding: conclusion.finding,
+          ...(conclusion.bearing === undefined ? {} : { bearing: conclusion.bearing }),
+          ...(conclusion.standing === undefined ? {} : { standing: conclusion.standing }),
+        });
+        claims.push(...concluded.claims);
+        events.push(...concluded.events);
+      }
+      return { analysis, claims, events };
     });
   }
 
@@ -444,29 +509,8 @@ export class WriteSurface extends SessionCore {
    * were each emitting two events while their journals claimed one.
    */
   private async recorded(
-    input: RecordAnalysisCommand,
-  ): Promise<{ analysis: AnalysisRef; claims: ConcludedClaim[] }> {
-    // Checked before anything is written. A proposition the record has
-    // withdrawn cannot be re-asserted as a side effect of recording an
-    // analysis: a fresh claim node would restore it while the objection that
-    // withdrew it still stood, and the record would un-retract itself. See
-    // PJ-008 row AC -- re-opening a withdrawn reading is a deliberate act, and
-    // there is no verb for it yet.
-    for (const conclusion of input.concludes) {
-      // Scoped to the line of enquiry being recorded. Unscoped, this guard had
-      // the very defect S-5 is about: a sentence withdrawn in one enquiry
-      // would block legitimate work concluding the same words in another.
-      const { withdrawn, replacedBy } = await this.withdrawalOf({
-        proposition: conclusion.proposition,
-        enquiry: input.enquiry,
-      });
-      if (withdrawn) {
-        throw new Error(
-          `"${conclusion.proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy}"` : ""}; it cannot be re-asserted by recording another analysis`,
-        );
-      }
-    }
-
+    input: Omit<RecordAnalysisCommand, "concludes">,
+  ): Promise<{ analysis: AnalysisRef }> {
     const computation = await this.graph.createNode("Computation", {
       kind: input.method,
       status: "completed",
@@ -539,48 +583,272 @@ export class WriteSurface extends SessionCore {
       });
     }
 
-    const minted: ConcludedClaim[] = [];
-    for (const conclusion of input.concludes) {
-      const evidence = await this.graph.createNode("Evidence", {
-        statement: conclusion.finding,
-      });
-      const claim = await this.graph.createNode("Claim", {
-        name: conclusion.proposition,
-        kind: conclusion.standing ?? "exploratory",
-      });
-      // `endpointIsNew`: `evidence` and `claim` were created two lines up, so
-      // no edge can already reach them and the duplicate check is buying a
-      // guarantee already held. Three edges per conclusion, one round trip each
-      // — 18% of the queries in the heaviest scenario file.
-      await this.graph.createEdge(
-        unit.natural_id,
-        "PRODUCES",
-        evidence.natural_id,
-        undefined,
-        true,
-      );
-      await this.graph.createEdge(
-        evidence.natural_id,
-        "RECORDED_IN",
-        output.natural_id,
-        undefined,
-        true,
-      );
-      // A null result is a finding, not an absence of one -- it bears
-      // against the proposition rather than failing to bear on it.
-      const bearing = conclusion.bearing === "challenges" ? "CHALLENGES" : "SUPPORTS";
-      await this.graph.createEdge(evidence.natural_id, bearing, claim.natural_id, undefined, true);
-      minted.push({
-        claim: ref("claim", claim.natural_id),
-        asserts: conclusion.proposition,
-        finding: ref("evidence", evidence.natural_id),
-      });
-    }
+    return { analysis: ref("analysis", computation.natural_id) };
+  }
 
-    return {
-      analysis: ref("analysis", computation.natural_id),
-      claims: minted,
-    };
+  /**
+   * Assert one thing an analysis found. **The primitive the compound verbs are
+   * built from.**
+   *
+   * A conclusion is a research act of its own: a run draws its findings one at a
+   * time, and each is recorded when it is reached.
+   *
+   * ## `replacing` supersedes exactly one finding, and needs no new edge
+   *
+   * `Decision -[:CHANGES]-> Claim` already means *this decision changed which
+   * claim stands*, and `MOTIVATES` already names what replaced it —
+   * `withdrawalOf()` reads precisely that pair. So a partial replacement is
+   * expressible with the edges the model has.
+   *
+   * **That is one reading, not two**, and the distinction matters because
+   * `PROMOTES` was split out of `CHANGES` for being a second one. `reinterpret`
+   * writes `CHANGES` for *this reading was narrowed* and this writes it for
+   * *this finding was superseded*; both are a decision withdrawing a claim and
+   * naming its successor, and every reader — `withdrawalOf`, `whySupported` —
+   * wants the same answer from both: that claim no longer stands, this one does.
+   * `PROMOTES` was different in kind: it asserts a claim *more strongly*, so
+   * reading it as `CHANGES` made promotion retract what it promoted.
+   *
+   * `REVERIFIES` is the edge that looks right here and is not. It means
+   * *re-verified* — the same proposition checked again — where this means
+   * *superseded*. Using it would be the one-edge-two-readings shape above.
+   *
+   * ## What is not written
+   *
+   * **The output artefact's `invalidated` flag is untouched.** A flag over the
+   * whole artefact would summarise the standing of every finding it carries.
+   * Standing is per finding, and `whySupported` computes it.
+   */
+  async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
+    return this.concludeOne(input);
+  }
+
+  /**
+   * `conclude`, plus the review a composition can supply. **The compounds call
+   * this one.**
+   *
+   * `because` is not on {@link ConcludeCommand} and this is not plumbing: a
+   * researcher concluding one thing at a terminal is not holding a review
+   * handle, and `replaceAnalysis` is the act that says a review caused the
+   * supersession. Keeping it off the command is what stops the CLI and MCP
+   * asking for a value neither of their callers has.
+   */
+  private async concludeOne(
+    input: ConcludeCommand,
+    because?: ReviewRef,
+  ): Promise<RecordedAnalysis> {
+    return this.graph.inTransaction(async () =>
+      // **Its own mint scope, so a composition calling this keeps its own.**
+      // `emit` drains what has been minted since the last event, and without a
+      // scope that meant everything the enclosing verb had minted too — the
+      // parent's edges carried off into the child's event. See
+      // `TenantGraph.inMintScope`, which also records why suppressing the inner
+      // event was the wrong fix.
+      this.graph.inMintScope(async () => {
+        const concluded = await this.concluding(input, because);
+        const events = await this.emit("conclude", input.analysis, {
+          conclusions: this.conclusionEvents([concluded]),
+          ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
+        });
+        return { analysis: input.analysis, claims: [concluded], events };
+      }),
+    );
+  }
+
+  /**
+   * `conclude`'s work, without the event. **The compounds call this one.**
+   *
+   * `emit` DRAINS the ids and edges `TenantGraph` has minted since the last
+   * event, which is what lets an act report what it brought into existence
+   * without listing it. A nested emit therefore does not merely add an event —
+   * it takes the parent's edges away. `recordAnalysis`'s event lost `PRODUCES`,
+   * `RECORDED_IN` and `SUPPORTS` to the `conclude` events underneath it, and
+   * `tests/event-store.test.ts` is what noticed.
+   *
+   * So the split is not tidiness. **A verb that composes others records one
+   * event, not one per step** — `openEnquiry` is `pose` + `pursue` and emits
+   * only `openEnquiry`, and this is that rule at a second call site. The event
+   * stream is a record of research actions; five events for one call describes
+   * the implementation.
+   *
+   * That does not contradict `conclude`'s own doc above. A researcher who
+   * concludes four things in four calls did four things, and gets four events.
+   * One who calls a compound made one call and gets one, with every conclusion
+   * in its payload — the same distinction `pose` and `openEnquiry` already make.
+   */
+  private async concluding(
+    input: ConcludeCommand,
+    /**
+     * The review this supersession rested on, when a compound had one.
+     *
+     * Not on `ConcludeCommand`, and that is a claim about the domain rather
+     * than about plumbing: a researcher concluding one thing at a terminal is
+     * not holding a review handle, and `replaceAnalysis` is the act that says
+     * a review caused this. Row O's question is asked of a finding, so the
+     * edge lands on the per-finding decision — see EDGE_SCHEMA.INVALIDATED_BY.
+     */
+    because?: ReviewRef,
+  ): Promise<Required<ConcludedClaim>> {
+    return this.graph.inTransaction(async () => {
+      const at = this.clock.now();
+      {
+        const unit = await this.unitOf(input.analysis);
+        const output = await this.outputArtefactOf(input.analysis);
+
+        // Superseded analyses take no new conclusions. Adding one would put a
+        // fresh finding on a record the caller has already declared spent, and
+        // nothing downstream distinguishes it from a live one.
+        const [artefact] = await this.graph.query(
+          `MATCH (a:Artefact {natural_id: $id}) RETURN a`,
+          { a: vertexProps<ArtefactProps>() },
+          { id: output },
+        );
+        if (artefact?.a.invalidated)
+          throw new Error(
+            `analysis ${input.analysis} has been superseded and takes no further conclusions; ` +
+              `record this on the analysis that replaced it`,
+          );
+
+        // What is being superseded, if anything — matched on whichever handle
+        // the caller held; both come back from the act that recorded it.
+        let superseded: RecordedConclusion | undefined;
+        if (input.replacing !== undefined) {
+          // **Scoped to the analysis this one revises, not to this one.** A
+          // replacement supersedes findings of the analysis it replaced, so the
+          // handle the caller holds belongs to the OLD analysis. The lineage
+          // decision is what makes that reachable:
+          // `new <-MOTIVATES- Decision -CHANGES-> old`.
+          const revised = await this.revisedBy(input.analysis);
+          if (revised === undefined)
+            throw new Error(
+              `analysis ${input.analysis} replaces nothing, so ${input.replacing} is not its ` +
+                `to supersede; record a replacement first, or conclude without --replacing`,
+            );
+          const already = await this.conclusionsOf(revised);
+          superseded = already.find(
+            (c) => c.claim === input.replacing || c.evidence === input.replacing,
+          );
+          if (!superseded) {
+            const named = already.length
+              ? already.map((c) => `${c.claim} "${c.proposition}"`).join(", ")
+              : "nothing at all";
+            throw new Error(
+              `analysis ${revised} did not conclude ${input.replacing}, so there is nothing ` +
+                `here to supersede; it concluded: ${named}`,
+            );
+          }
+
+          // **A finding falls once.** Naming `replacing` exempts this call from
+          // the withdrawn-proposition guard below -- the act that supersedes a
+          // finding is exactly the act allowed to restate it -- and without
+          // this that exemption reached a finding somebody else had already
+          // withdrawn. Two decisions would then stand instead of one claim,
+          // each naming a different successor, and no reader can say which
+          // holds: `withdrawalOf` picks whichever row it happens to see first.
+          //
+          // The refusal names the claim, not the wording.
+          const gone = await this.supersessionOf(superseded.claim);
+          if (gone)
+            throw new Error(
+              `${superseded.claim} has already been superseded (${gone}), and a finding is ` +
+                `superseded once; supersede the finding that stands in its place, or record ` +
+                `this conclusion without naming one`,
+            );
+        }
+
+        // Inherited from what is being superseded, overridden when given. A
+        // replacement restates the same proposition by default -- that is what
+        // makes it a replacement rather than a new finding.
+        const proposition = input.proposition ?? superseded?.proposition;
+        if (proposition === undefined)
+          throw new Error(
+            `conclude needs the proposition this finding bears on and none was given; ` +
+              `pass it, or pass the claim or finding being superseded so it can be inherited`,
+          );
+        const bearing = input.bearing ?? superseded?.bearing ?? "supports";
+
+        // The same guard `recordAnalysis` applied per conclusion, now applied
+        // where a conclusion is actually made. A withdrawn proposition cannot
+        // be re-asserted as a side effect -- except by the act that supersedes
+        // it, which is what `replacing` says.
+        if (superseded === undefined) {
+          const enquiry = await this.enquiryOf(input.analysis);
+          const { withdrawn, replacedBy } = await this.withdrawalOf({
+            proposition,
+            ...(enquiry === undefined ? {} : { enquiry }),
+          });
+          if (withdrawn)
+            throw new Error(
+              `"${proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy}"` : ""}; ` +
+                `it cannot be re-asserted by recording another analysis`,
+            );
+        }
+
+        const evidence = await this.graph.createNode("Evidence", { statement: input.finding });
+        const claim = await this.graph.createNode("Claim", {
+          name: proposition,
+          kind: input.standing ?? "exploratory",
+        });
+        await this.graph.createEdge(unit, "PRODUCES", evidence.natural_id, undefined, true);
+        await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", output, undefined, true);
+        await this.graph.createEdge(
+          evidence.natural_id,
+          bearing === "challenges" ? "CHALLENGES" : "SUPPORTS",
+          claim.natural_id,
+          undefined,
+          true,
+        );
+
+        // Per-finding supersession, on the edges the model already has.
+        if (superseded) {
+          const decision = await this.graph.createNode("Decision", {
+            decided_at: at,
+            reason: `superseded by "${input.finding}"`,
+            invalidation_check: "evidence that the superseded finding was right after all",
+          });
+          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", superseded.claim);
+          await this.graph.createEdge(decision.natural_id, "MOTIVATES", claim.natural_id);
+          if (because !== undefined)
+            await this.graph.createEdge(decision.natural_id, "INVALIDATED_BY", because);
+        }
+
+        return {
+          claim: ref("claim", claim.natural_id),
+          asserts: proposition,
+          finding: ref("evidence", evidence.natural_id),
+        };
+      }
+    });
+  }
+
+  /**
+   * The analysis this one is a revision of, by way of the lineage decision.
+   *
+   * `new <-MOTIVATES- Decision -CHANGES-> old`. Lineage only: that this
+   * analysis revises that one, never that the old one's findings fell. See the
+   * `Computation` pair on `EDGE_SCHEMA.CHANGES`.
+   */
+  private async revisedBy(analysis: AnalysisRef): Promise<AnalysisRef | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(:Decision)-[:SUPERSEDES]->(old:Computation)
+       RETURN old`,
+      { old: vertexProps<{ natural_id: string }>() },
+      { id: analysis },
+    );
+    const found = rows[0];
+    return found ? ref("analysis", found.old.natural_id) : undefined;
+  }
+
+  /** The enquiry an analysis was recorded under, for the withdrawal guard's scope. */
+  private async enquiryOf(analysis: AnalysisRef): Promise<EnquiryRef | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(l:LineOfEnquiry)
+       RETURN l`,
+      { l: vertexProps<{ natural_id: string }>() },
+      { id: analysis },
+    );
+    const found = rows[0];
+    return found ? ref("enquiry", found.l.natural_id) : undefined;
   }
 
   /** `{claim, finding, proposition}` per conclusion — the event's own record of the pairing, independent of the typed report. */
@@ -929,28 +1197,42 @@ export class WriteSurface extends SessionCore {
             `analysis ${input.historical} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
           );
         }
-        const recorded = await this.recorded({
+        const { analysis } = await this.recorded({
           enquiry: input.enquiry,
           method: input.method,
           from: input.under,
-          concludes: [input.concludes],
         });
-        const restated = await this.findingFor(recorded.analysis, input.concludes.proposition);
-        if (!restated) throw new Error("unreachable: the analysis just recorded this conclusion");
-        await this.graph.createEdge(restated, "REVERIFIES", original);
-        return recorded;
+        return { analysis, original };
       });
+
+      // The conclusion first, then the edge, then the emit: `emit` drains what
+      // has been minted since the last event, so anything written after it
+      // lands in the next act's event instead of this one.
+      const concluded = await this.concluding({
+        analysis: verification.analysis,
+        proposition: input.concludes.proposition,
+        finding: input.concludes.finding,
+        ...(input.concludes.bearing === undefined ? {} : { bearing: input.concludes.bearing }),
+        ...(input.concludes.standing === undefined ? {} : { standing: input.concludes.standing }),
+      });
+
+      // `REVERIFIES` is evidence-to-evidence and says the same proposition was
+      // checked again -- deliberately NOT the supersession `conclude
+      // --replacing` writes, which says a finding was replaced. Two different
+      // claims about two different acts; see `conclude`'s header.
+      await this.graph.createEdge(concluded.finding, "REVERIFIES", verification.original);
 
       const events = await this.emit("reverify", verification.analysis, {
         of: input.historical,
         proposition: input.concludes.proposition,
-        conclusions: this.conclusionEvents(verification.claims),
+        conclusions: this.conclusionEvents([concluded]),
       });
+
       return {
         at,
         verification: verification.analysis,
         of: input.historical,
-        claims: verification.claims,
+        claims: [concluded],
         events,
       };
     });
@@ -1241,16 +1523,19 @@ export class WriteSurface extends SessionCore {
       // and no corrected check in existence. External review named it the
       // blocking finding; S-3c carries the negative test. See
       // TenantGraph.inTransaction.
-      const { before, replacement } = await this.graph.inTransaction(async () => {
+      const {
+        before,
+        analysis: replacement,
+        output: supersededOutput,
+      } = await this.graph.inTransaction(async () => {
         await this.assertReviewOf(input.because, input.supersedes);
         const before = await this.conclusionsOf(input.supersedes);
 
+        // **The superseded output is NOT invalidated.** A flag on the artefact
+        // would summarise the standing of every finding it carries, and
+        // standing is per finding: each `conclude --replacing` supersedes
+        // exactly one, and coverage is which calls the caller made.
         const output = await this.outputArtefactOf(input.supersedes);
-        await this.graph.query(
-          `MATCH (a:Artefact {natural_id: $id}) SET a.invalidated = true RETURN a`,
-          { a: vertexProps<ArtefactProps>() },
-          { id: output },
-        );
         // Which review this rested on, recorded rather than validated and
         // discarded (row O). `because` was checked against the analysis and then
         // written nowhere, so a reader asking why the finding no longer stands
@@ -1278,13 +1563,30 @@ export class WriteSurface extends SessionCore {
         // inference", and the two merely coincide here. S-12 is the
         // discriminator -- there the numbers stay valid and only the
         // interpretation changes, which invalidation cannot honestly carry.
-        const replacement = await this.recorded({
+        const { analysis } = await this.recorded({
           enquiry: input.enquiry,
           method: input.method,
           from: input.from,
-          concludes: input.concludes,
         });
-        return { before, replacement };
+
+        // **The lineage link, and `replace` mints a Decision like every other
+        // revision.** `reinterpret`'s shape, lifted one grain: the review
+        // records that someone objected, the decision records that the
+        // objection was acted on.
+        //
+        // It says *this analysis is a revision of that one* and nothing about
+        // whether the old analysis's findings still stand -- see the
+        // `Computation` pair on `EDGE_SCHEMA.CHANGES`, which carries the whole
+        // discipline. Retraction is one grain lower, per finding.
+        const lineage = await this.graph.createNode("Decision", {
+          decided_at: at,
+          reason: `superseded by a re-run: ${input.method}`,
+          invalidation_check: "evidence that the superseded analysis was sound after all",
+        });
+        await this.graph.createEdge(lineage.natural_id, "SUPERSEDES", input.supersedes);
+        await this.graph.createEdge(lineage.natural_id, "MOTIVATES", analysis);
+
+        return { before, analysis, output };
       });
 
       // Both sides carry a handle. After a replacement two records assert each
@@ -1299,11 +1601,63 @@ export class WriteSurface extends SessionCore {
       // analysis's claims and the replacement's share no handle, and "the same
       // proposition, re-derived" is precisely what the caller asserts by passing
       // them.
+      // Each conclusion names the finding it supersedes, so one the caller does
+      // not restate is not superseded.
+      //
+      // **The pairing is resolved once and reused** by the report below. Two
+      // derivations would key the emitted event's `replaced` list by
+      // proposition while the SUPERSEDES edges follow the caller's
+      // `replacing` -- and those disagree on any pair the wording cannot match.
+      const claims: ConcludedClaim[] = [];
+      const paired: (RecordedConclusion | undefined)[] = [];
+      const replacementEvents: DomainEvent[] = [];
+      for (const now of input.concludes) {
+        // Explicit wins; the proposition match is the fallback the ordinary
+        // re-run relies on. See `ReplacementConclusion.replacing`.
+        //
+        // **The fallback lives here and nowhere else.** `conclude` itself never
+        // matches on text: a caller at the CLI or over MCP names the finding it
+        // supersedes or supersedes nothing, because there the wording is the
+        // agent's own and matching it would guess. This is a composition, where
+        // the caller handed in a whole list to be paired.
+        let was: RecordedConclusion | undefined;
+        if (now.replacing === undefined) {
+          // **Refuses rather than picks.** Two conclusions of one analysis may
+          // assert the same sentence about different endpoints, so a wording
+          // match can name two; taking the first is a coin toss recorded as a
+          // fact.
+          const candidates = before.filter((b) => b.proposition === now.proposition);
+          if (candidates.length > 1)
+            throw new Error(
+              `analysis ${input.supersedes} concluded "${now.proposition}" more than once ` +
+                `(${candidates.map((b) => b.claim).join(", ")}), so which one this replaces ` +
+                `cannot be inferred from the wording; name it with 'replacing'`,
+            );
+          was = candidates[0];
+        } else {
+          was = before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
+        }
+        paired.push(was);
+        const concluded = await this.concludeOne(
+          {
+            analysis: replacement,
+            proposition: now.proposition,
+            finding: now.finding,
+            ...(was === undefined ? {} : { replacing: was.claim }),
+            ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
+            ...(now.standing === undefined ? {} : { standing: now.standing }),
+          },
+          input.because,
+        );
+        claims.push(...concluded.claims);
+        replacementEvents.push(...concluded.events);
+      }
+
       const changed: ChangedConclusion[] = [];
       const unchanged: ConcludedClaim[] = [];
       for (const [i, now] of input.concludes.entries()) {
-        const was = before.find((b) => b.proposition === now.proposition);
-        const claim = replacement.claims[i]?.claim;
+        const was = paired[i];
+        const claim = claims[i]?.claim;
         if (!was || !claim) continue;
         if (was.finding === now.finding) unchanged.push({ claim, asserts: now.proposition });
         else
@@ -1324,7 +1678,14 @@ export class WriteSurface extends SessionCore {
       // and silently fell back to printing the id. Same one hop `recorded()`
       // makes to write the CONSUMES edge.
       const inputNames = new Map<InputRef, IndexedString>();
-      // Read after the transaction above, so it sees this act's own invalidation.
+      // **Which inputs this act retracted outright**, computed from what this
+      // call did rather than queried: `before` is every conclusion the
+      // superseded analysis drew and `paired` is the ones this call superseded,
+      // so its output is retracted exactly when those agree. **Every, not
+      // any** -- a partial replacement leaves standing findings in that
+      // artefact, and it stays a live record.
+      const supersededWhole =
+        before.length > 0 && before.every((b) => paired.some((pr) => pr?.claim === b.claim));
       const retracted = new Set<InputRef>();
       // One query for every input, not one per input. `logical_name` is what an
       // Artefact carries; this read `.name` -- a property no Artefact has -- so it
@@ -1351,7 +1712,7 @@ export class WriteSurface extends SessionCore {
         const a = found.get(artefact);
         if (!a) continue;
         inputNames.set(handle, a.logical_name);
-        if (a.invalidated) retracted.add(handle);
+        if (supersededWhole && artefact === supersededOutput) retracted.add(handle);
       }
 
       // `why` is computed, not asserted. Two things had been wrong with the fixed
@@ -1371,10 +1732,9 @@ export class WriteSurface extends SessionCore {
         claim: b.claim,
         asserts: b.proposition,
       }));
-      const events = await this.emit("replaceAnalysis", replacement.analysis, {
+      const events = await this.emit("replaceAnalysis", replacement, {
         supersedes: input.supersedes,
         because: input.because,
-        conclusions: this.conclusionEvents(replacement.claims),
         // Which findings this act replaced with which -- the sentence-level
         // pairing `changed` already computed, not a second lookup.
         replaced: changed.map((c) => ({
@@ -1385,10 +1745,11 @@ export class WriteSurface extends SessionCore {
           after: c.after,
         })),
       });
+      events.push(...replacementEvents);
       return {
         at,
-        replacement: replacement.analysis,
-        claims: replacement.claims,
+        replacement,
+        claims,
         affected,
         unaffected,
         changed,
@@ -1561,6 +1922,33 @@ export class WriteSurface extends SessionCore {
     });
     return [recorded];
   }
+  /**
+   * Why a claim no longer stands, or `undefined` if it does.
+   *
+   * **Both predicates, and AGE has no edge alternation** — `[:CHANGES|SUPERSEDES]`
+   * is a syntax error, so this is two clauses. Naming one is silent: the row is
+   * absent and the caller reads a withdrawn claim as standing.
+   *
+   * Claim grain, where `withdrawalOf` is proposition grain. The two answer
+   * different questions and both are wanted: whether the record has stopped
+   * asserting a sentence, and whether this particular finding has already
+   * fallen.
+   */
+  private async supersessionOf(claim: ClaimRef): Promise<Prose | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $id})
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       RETURN narrowed, replaced`,
+      {
+        narrowed: optional(vertexProps<{ reason: string }>()),
+        replaced: optional(vertexProps<{ reason: string }>()),
+      },
+      { id: claim },
+    );
+    return rows.map((r) => r.narrowed?.reason ?? r.replaced?.reason).find((r) => r !== undefined);
+  }
+
   private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(
       // Either bearing: an analysis whose findings all CHALLENGE returned no
@@ -1570,7 +1958,7 @@ export class WriteSurface extends SessionCore {
        OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
        RETURN e, sc, cc`,
       {
-        e: vertexProps<EvidenceProps>(),
+        e: vertexProps<EvidenceProps & { natural_id: string }>(),
         sc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
         cc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
       },
@@ -1584,6 +1972,11 @@ export class WriteSurface extends SessionCore {
               claim: ref("claim", claim.natural_id),
               proposition: claim.name,
               finding: r.e.statement,
+              // The handle, beside the text. `conclude --replacing` takes
+              // either a CLM_ or an EV_ and has to match on whichever it was
+              // given; without this the evidence half was unaddressable.
+              evidence: ref("evidence", r.e.natural_id),
+              bearing: r.sc ? ("supports" as const) : ("challenges" as const),
             },
           ]
         : [];

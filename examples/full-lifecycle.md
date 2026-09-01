@@ -74,16 +74,27 @@ prespecified condition its conclusions are held to:
 ```
 $ labkit analyse LOE_1 \
         --method 'paired comparison against the unpruned baseline' \
-        --from ART_1 --implementing TASK_1 --held-to CRIT_1 \
-        --concludes '{"proposition": "the pruning schedule moves convergence",
-                      "finding": "converges ~3 steps earlier at every depth"}'
+        --from ART_1 --implementing TASK_1 --held-to CRIT_1
 COMP_1
+```
+
+That is the run: a computation, an evidence unit, and an artefact to hold its
+output. It has concluded nothing yet, which is a real state and not an empty
+one — the analysis is still being done.
+
+Each finding is its own act, because that is how findings arrive: one at a
+time, over days.
+
+```
+$ labkit conclude COMP_1 \
+        --proposition 'the pruning schedule moves convergence' \
+        --finding 'converges ~3 steps earlier at every depth'
 CLM_1
 ```
 
-One command, five records: a computation, an evidence unit, an output artefact,
-the evidence, and a claim. It answers with the analysis and then a claim per
-conclusion, so the next command can take them straight off stdout.
+It answers with the claim, so the next command can take it straight off stdout.
+Later, `labkit conclude COMP_1 --replacing CLM_1 --finding '…'` supersedes that
+one finding and leaves every other conclusion of the same run standing.
 
 ## Check, promote, close
 

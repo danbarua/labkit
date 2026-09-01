@@ -148,11 +148,44 @@ export class TenantGraph {
   }
 
   /**
+   * Runs `work` with its own mint list, so an `emit` inside it claims only what
+   * `work` minted, and the enclosing act keeps its own.
+   *
+   * **{@link drainMinted} splices the whole list**, so without a scope a nested
+   * event does not merely add an event — it takes the parent's ids and edges
+   * with it, and the parent's event then reports having created almost nothing.
+   *
+   * What a scope does not claim is **handed back up**, not dropped: a verb that
+   * mints something and emits nothing has still brought it into existence, and
+   * the enclosing act is what recorded that.
+   *
+   * Scope, rather than suppressing the inner event: the event grain must not
+   * depend on which caller wrote the record. A composition and a person making
+   * the same calls one at a time have to leave the same log, or a trace built
+   * from one disagrees with a record built from the other about identical work.
+   */
+  async inMintScope<T>(work: () => Promise<T>): Promise<T> {
+    const outer = this.minted;
+    const outerEdges = this.mintedEdges;
+    this.minted = [];
+    this.mintedEdges = [];
+    try {
+      return await work();
+    } finally {
+      outer.push(...this.minted);
+      outerEdges.push(...this.mintedEdges);
+      this.minted = outer;
+      this.mintedEdges = outerEdges;
+    }
+  }
+
+  /**
    * The natural ids minted since the last call, and clears them.
    *
    * Read once per event, by `WriteSurface.emit`. Draining rather than reading
    * is deliberate: two events in one transaction must not both claim the same
-   * new records.
+   * new records. See {@link inMintScope} for what "since the last call" means
+   * when one emitting verb is called by another.
    */
   drainMinted(): string[] {
     return this.minted.splice(0);

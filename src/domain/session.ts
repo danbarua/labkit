@@ -23,7 +23,7 @@
 import type { TenantGraph } from "../db/graph";
 import type { EventSink } from "./events";
 import { ReadSurface } from "./read";
-import { WriteSurface } from "./write";
+import { WriteSurface, type ResearchWrites } from "./write";
 import type { ResearchSessionOptions } from "./core";
 
 export type { ResearchSessionOptions } from "./core";
@@ -60,6 +60,7 @@ export class ResearchSession {
     this.writes.recordObservations(...args);
   readonly recordAnalysis: WriteSurface["recordAnalysis"] = (...args) =>
     this.writes.recordAnalysis(...args);
+  readonly conclude: WriteSurface["conclude"] = (...args) => this.writes.conclude(...args);
   readonly recordReview: WriteSurface["recordReview"] = (...args) =>
     this.writes.recordReview(...args);
   readonly closeEnquiry: WriteSurface["closeEnquiry"] = (...args) =>
@@ -103,3 +104,21 @@ export class ResearchSession {
   readonly whatDependsOn: ReadSurface["whatDependsOn"] = (...args) =>
     this.reads.whatDependsOn(...args);
 }
+
+/**
+ * **`ResearchSession` delegates every research verb, checked at compile time.**
+ *
+ * `ResearchWrites` names the write verbs a research move calls;
+ * `fragments/` depends on that type rather than on `WriteSurface`, and this is
+ * what keeps a session able to satisfy it. A delegate whose signature drifts,
+ * or one nobody added, fails to compile **here** rather than three files away
+ * in whichever fragment happened to call it.
+ *
+ * A type, not a test, because the claim is about signatures: a runtime check
+ * could only see that the properties exist, and the drift worth catching is a
+ * delegate that still exists and no longer matches. A verb with no delegate at
+ * all is invisible to the suite — every scenario writes through this class, and
+ * one nobody has called yet is simply never reached.
+ */
+const _sessionDelegatesEveryResearchVerb: ResearchWrites = null as unknown as ResearchSession;
+void _sessionDelegatesEveryResearchVerb;
