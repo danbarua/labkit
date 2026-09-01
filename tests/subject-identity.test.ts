@@ -32,9 +32,9 @@
  * only computation ids tried it — so row 2 needs a read that is wrong, not an
  * argument that the naming is untidy.
  *
- * One diagnosis does not imply one remedy. CLAUDE.md records four scenarios
- * asking *does the act record what it produced?* that needed four different
- * fixes. Section 2's dereference is one of them: it is convenient, it writes
+ * One diagnosis does not imply one remedy: the same question -- *does the act
+ * record what it produced?* -- has needed four different fixes across this
+ * model. Section 2's dereference is one of them: it is convenient, it writes
  * the correct edge, and making it "honest" would mean callers naming artefacts
  * they do not hold — which is precisely what row 3 was fixed by *not* making
  * them do.
@@ -125,8 +125,8 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
    * Ana runs the seed sweep, Bruno the ablation, on one question. Ana's is
    * decisive and gets closed. Bruno asks where his is up to.
    *
-   * S-1's fourth Afterward already establishes the setup — two pursuits of one
-   * question stay one question — and stops one step before this.
+   * The setup — two pursuits of one question stay one question — is already
+   * established elsewhere and stops one step before this.
    */
   test("closing one pursuit no longer reports the other as having produced it", async () => {
     const s = await session();
@@ -163,9 +163,10 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       expect(bruno.question!.closure).toBe("answered");
 
       // **The fix.** What each pursuit itself produced -- the thing the two
-      // reports must NOT agree on. Before PJ-030 §6 the closing evidence was a
-      // top-level field on both, so a caller summing findings across pursuits
-      // counted one finding twice.
+      // reports must NOT agree on. The closing evidence is nested under
+      // `question`, not a top-level field on both: were it a top-level field,
+      // a caller summing findings across pursuits would count one finding
+      // twice.
       // Ana's pursuit produced the observations AND the analysis; the closure
       // cites only the latter. Two different sets, deliberately -- "what this
       // pursuit produced" is not "what the answer rests on".
@@ -177,7 +178,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       expect(bruno.contributed).toEqual([]);
       expect(bruno.pursuing).not.toBe(ana.pursuing);
 
-      // The reader that used to be wrong: sum findings over every pursuit.
+      // Summing findings over every pursuit must not double-count.
       const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence));
       expect(counted.length).toBe(new Set(counted).size);
     } finally {
@@ -186,9 +187,10 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
   });
 
   test("both facts a second pursuit needs are now separately readable", async () => {
-    // The scenario's first Afterward bullet: *where is my ablation up to?*
-    // Two facts, and one report used to answer only the question's -- under the
-    // enquiry's name, which made it look like the enquiry's own.
+    // *Where is my ablation up to?* Two facts a caller here needs: the
+    // question's own status, and what this particular pursuit contributed --
+    // separately readable, rather than the first answering under the
+    // enquiry's name in a way that would make it look like the enquiry's own.
     const s = await session();
     try {
       const { question } = await s.pose("does width matter?");
@@ -268,12 +270,9 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       expect(output.every((id) => id.startsWith("ART_"))).toBe(true);
 
       // So the two are **indistinguishable by handle**, which is the finding.
-      // A handle used to carry a `kind` field beside the id, and this assertion
-      // used to read `observations.kind === "observations"` -- a tag saying
-      // something the id could not support, about an id whose prefix is shared
-      // with outputs. Handles are branded strings now, so there is no second
-      // field to disagree with the first and the ambiguity is in the open where
-      // a scenario can decide it.
+      // Handles are branded strings, with no separate `kind` field that could
+      // disagree with the id -- an id whose prefix is shared with outputs --
+      // so the ambiguity is in the open where a scenario can decide it.
       expect(output).toContain(observations);
     } finally {
       await scenario.end();
@@ -330,7 +329,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
 
 describe("4. the read models drop identifiers the graph already minted", () => {
   /**
-   * PJ-030 §4. Every entity here has a natural id, minted in the same round
+   * Every entity here has a natural id, minted in the same round
    * trip that created it. Three reports carry one **beside** the wording, which
    * is the template; the rest emit wording alone and the caller cannot follow
    * it anywhere.
@@ -434,7 +433,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       expect(status.question!.question).toBe(question);
       expect(looksLikeAnId(status.question!.asks)).toBe(false);
 
-      // Evidence too, as of PJ-030 §5: identity beside the statement.
+      // Evidence too: identity beside the statement.
       expect(status.question!.evidence.length).toBeGreaterThan(0);
       expect(status.question!.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
       expect(status.question!.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
@@ -534,20 +533,16 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
 describe("3. a consumer can now repair a two-stage pipeline with its own handles — FIXED", () => {
   /**
-   * What this test used to assert, and why it is worth reading the diff.
+   * `record_analysis` takes an analysis id as an input reference; the other
+   * two recording verbs take observations alone — while all three write the
+   * same `CONSUMES` edge, which does not allow `Computation -> Computation`.
    *
-   * `replace_analysis(supersedes=A2, from=[A1])` came back
-   * `CONSUMES does not allow Computation -> Computation`, because
-   * `record_analysis` took an analysis id and the other two recording verbs
-   * took observations alone — while all three write the same edge. The
-   * reachable workaround was to call `why_supported` on a claim in order to
-   * learn what a computation had read, then pass the `ART_` id that surfaced.
-   *
-   * Section 2's measurement said the two routes were *equivalent*, and that
-   * was measured inside the process holding an artefact id the domain had
-   * handed back. A consumer over the wire holds what the tools returned, which
-   * for an analysis is a computation id — so the equivalence was checked on
-   * the wrong side of the adapter, which is what PJ-030 §7 records.
+   * Section 2's measurement said the two routes were *equivalent*, measured
+   * inside the process holding an artefact id the domain had handed back. A
+   * consumer over the wire holds what the tools returned, which for an
+   * analysis is a computation id, not the `ART_` id the edge needs — so the
+   * repair takes the handle the consumer actually holds, with no detour
+   * through `why_supported` to surface an artefact id first.
    */
   test("the repair takes the handle the consumer holds, with no detour", async () => {
     // Section 2 showed the two routes equivalent -- measured inside the process,

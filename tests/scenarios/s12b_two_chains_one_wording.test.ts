@@ -2,10 +2,10 @@
  * S-12b — "Two revision chains that meet at a sentence."
  * External review of PR #2, discriminator 4.
  *
- * S-12 established that a reinterpretation narrows a *reading*, and that a
- * reading two analyses reached must be withdrawn in full. This asks the
- * question one step along: when two **independent** chains happen to pass
- * through the same wording, can each still be read back?
+ * A reinterpretation narrows a *reading*, and a reading two analyses reached
+ * must be withdrawn in full. This asks the question one step along: when two
+ * **independent** chains happen to pass through the same wording, can each
+ * still be read back?
  *
  * The review's framing, which is this repo's own lesson arriving from outside:
  *
@@ -72,8 +72,8 @@ const B3 = "the instrument drifts above 40 degrees";
  * Two chains, three claims each, meeting only at their middle wording.
  *
  * Different lines of enquiry, so nothing about this is a duplicate reading:
- * these are two programmes that happened to arrive at the same sentence, which
- * S-5 already established is the ordinary case rather than a collision.
+ * these are two programmes that happened to arrive at the same sentence,
+ * which is the ordinary case rather than a collision.
  */
 async function twoChains() {
   const chain = async (opens: string, first: string, middle: string, last: string) => {

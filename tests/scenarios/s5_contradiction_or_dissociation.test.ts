@@ -229,9 +229,9 @@ describe("S-5 — contradiction or dissociation?", () => {
    * Afterward 3 — does revising or withdrawing one interpretation affect the
    * other?
    *
-   * It must not. This is the sharpest consequence of S-12's revision path
-   * meeting two identically worded claims: withdrawing one reading in one line
-   * of work, and finding an unrelated line of work silently retracted, with no
+   * It must not. This is the sharpest consequence of a revision path meeting
+   * two identically worded claims: withdrawing one reading in one line of
+   * work, and finding an unrelated line of work silently retracted, with no
    * decision anywhere saying so.
    */
   test("withdrawing one reading leaves the identically worded one alone", async () => {
@@ -321,9 +321,9 @@ describe("S-5 — contradiction or dissociation?", () => {
    * A sentence withdrawn in one line of enquiry does not block work in
    * another.
    *
-   * S-12 added a guard refusing to re-assert a withdrawn proposition. Unscoped,
-   * that guard had the defect this scenario is about, in the opposite
-   * direction: it would have blocked legitimate work.
+   * A guard refuses to re-assert a withdrawn proposition. Unscoped, that
+   * guard would have the defect this scenario is about, in the opposite
+   * direction: it would block legitimate work.
    */
   test("withdrawing a sentence here does not block concluding it elsewhere", async () => {
     const programme = await twoStages();
@@ -396,11 +396,10 @@ describe("S-5 — contradiction or dissociation?", () => {
   test("an ambiguous proposition is refused at the one place wording is resolved", async () => {
     const programme = await twoStages();
 
-    // **The refusal moved, and that is the point.** It used to live inside
-    // `whySupported` and `reinterpret`, each of which took a sentence and had
-    // to work out which claim was meant. Both take a handle now, so neither
-    // can guess -- and `claimsAsserting` is the single seam where text becomes
-    // a handle. It reports every match rather than choosing.
+    // **The refusal lives in one place, and that is the point.** Both
+    // `whySupported` and `reinterpret` take a handle, so neither has to guess
+    // which claim was meant -- `claimsAsserting` is the single seam where
+    // text becomes a handle. It reports every match rather than choosing.
     const found = await session.claimsAsserting(IMMATERIAL);
     expect(found).toHaveLength(2);
     expect(found.map((c) => c.claim).sort()).toEqual(

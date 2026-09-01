@@ -31,7 +31,7 @@ export function claimOf(claims: ConcludedClaim[], proposition: string): ClaimRef
  * The same seam the CLI uses: a person (or a test) names a sentence, the domain
  * only ever sees a handle. Refuses rather than picking when two lines of
  * enquiry assert the same sentence — which is exactly what a caller must be
- * made to notice (S-5).
+ * made to notice.
  */
 export async function claimNamed(
   read: { claimsAsserting(p: string): Promise<ConcludedClaim[]> },

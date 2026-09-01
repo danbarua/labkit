@@ -53,10 +53,10 @@ const commandSource = commandFiles
  * today, so an exclusion has to carry a reason.
  */
 const NO_COMMAND_FOR: Readonly<Record<string, string>> = {
-  // Both reached only through `why`'s dispatch table in src/domain/read.ts
-  // (#128 round 2), not called directly from any command module -- the `why`
-  // command itself calls `read.why(subject)`. `whySupported` is still called
-  // directly from src/mcp/tools.ts, so it keeps an MCP tool of its own.
+  // Both reached only through `why`'s dispatch table in src/domain/read.ts,
+  // not called directly from any command module -- the `why` command itself
+  // calls `read.why(subject)`. `whySupported` is still called directly from
+  // src/mcp/tools.ts, so it keeps an MCP tool of its own.
   whySupported: "reached only through `why`, as the Claim case's body",
   enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",
   analysisRevision: "reached only through `why`, as the Computation case's body",

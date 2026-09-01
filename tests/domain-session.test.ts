@@ -82,12 +82,9 @@ test("whySupported treats an explicit invalidated:false the same as an absent on
  * allowed to touch. It is an invariant of the service layer, not an acceptance
  * conversation.
  *
- * External review of S-3c earned the boundary for `replaceAnalysis()` and
- * `reverify()` with a negative test that a scenario *could* express, because
- * the harm there was visible through research verbs. The same review named
- * `reinterpret()` and `amendDesign()` as having the same shape. They do, and
- * both leave a demonstrably wrong record when interrupted -- so they get the
- * boundary too, tested from here.
+ * `replaceAnalysis()`, `reverify()`, `reinterpret()`, and `amendDesign()` all
+ * leave a demonstrably wrong record when interrupted, so they get the
+ * boundary tested from here.
  */
 function failingOn(
   graph: TenantGraph,
@@ -238,8 +235,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
  *
  * Deterministic by injection rather than by racing: the graph's `createNode` is
  * made to throw on the `EvidenceUnit` specifically, which is the one ordering
- * where a partial write would be indistinguishable from history. See CLAUDE.md
- * on why `Promise.all()` against two live connections is not an option here.
+ * where a partial write would be indistinguishable from history.
  */
 test("recordObservations writes the unit and the evidence together or not at all", async () => {
   const { enquiry } = await session.openEnquiry("does the coating hold at temperature?");
@@ -287,42 +283,10 @@ test("recordObservations writes the unit and the evidence together or not at all
 });
 
 /**
- * `sharpen` is NOT transactional, and this test records that it does not need
- * to be — the first item taken off PJ-028's *inferred* pile, and the first to
- * come back "read wrong, was fine".
- *
- * `write.ts`'s header says a compound verb runs inside `inTransaction()`.
- * `sharpen` writes five things and does not. On reading alone that looks like
- * the defect `recordObservations` above was fixed for. It is not, and the
- * discriminator is the one PJ-011 §5 already gives, applied to interruption:
- *
- *   **A partial state is acceptable exactly when some other verb could
- *   legitimately have produced it, or when no reader can reach it at all.**
- *
- * Both of `sharpen`'s failure windows clear that bar, which is why the fix was
- * to the sentence and not to the code:
- *
- * - Fail inside the `BASED_ON` loop and the decision keeps a *subset* of what
- *   was standing — a confidently wrong answer if anything read it. Nothing can:
- *   `originOf()` is the only reader of `NARROWS`, and it matches `MOTIVATES`
- *   first, which `sharpen` writes last. The leftover is unreachable.
- * - Fail on `MOTIVATES` and the sharper question survives with no origin —
- *   exactly what `pose()` produces, reported as `untested`, which is true: it
- *   is on the books and nothing has been run against it.
- *
- * **All of that is now history, and the test says what it says because the
- * prediction above came true from an unexpected direction.** It named its own
- * trigger — "if someone adds a reader of `NARROWS` that does not require
- * `MOTIVATES` … `sharpen` becomes transactional". Nobody added that reader. The
- * persisted event store did it instead: an event has to commit with the writes
- * it describes, so every write verb is wrapped in `inTransaction`, and
- * `sharpen` got a transaction as a side effect of something else entirely.
- *
- * So the reasoning above is preserved as the argument that *was* correct while
- * it applied, and the assertion below is now the stronger one: an interrupted
- * `sharpen` leaves **nothing at all**, reachable or otherwise. Unreachable
- * leftovers were acceptable; no leftovers is better, and it is what a reader
- * checking the record after a failure would expect.
+ * Every write verb runs inside `inTransaction()`, because an event has to
+ * commit with the writes it describes. So an interrupted `sharpen` leaves
+ * nothing at all -- not even an unreachable leftover -- which is what a
+ * reader checking the record after a failure would expect.
  */
 test("an interrupted sharpen leaves nothing at all", async () => {
   const { enquiry } = await session.openEnquiry("does the coating hold?");
@@ -367,9 +331,7 @@ test("an interrupted sharpen leaves nothing at all", async () => {
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
-  // No decision at all. This used to assert the opposite -- a half-built
-  // decision keeping one finding of three, harmless only because no reader
-  // could reach it. The rollback means there is nothing to reach.
+  // No decision at all: the rollback means there is nothing to reach.
   const decisions = await graph.query(`MATCH (d:Decision) RETURN d`, {
     d: vertexProps<{ reason: string }>(),
   });
@@ -385,16 +347,12 @@ test("an interrupted sharpen leaves nothing at all", async () => {
 });
 
 /**
- * `evaluateCriterion`'s three interruption windows — the second item off
- * PJ-028's inferred pile, and a real test of `039`'s rule rather than a repeat.
+ * `evaluateCriterion`'s three interruption windows.
  *
  * `sharpen` cleared because its reachability edge (`MOTIVATES`) is written
  * **last**, so an interruption leaves nothing to walk to. This verb writes
  * `EVALUATED_AS` **second**, so from the third write onward the evaluation is
  * reachable and the edges after it are the ones that say what it means.
- *
- * Predictions in `docs/consumer-contract/040`, including the competing rule the
- * third window discriminates between. See `041` for the verdict.
  */
 const aGatedCheck = async () => {
   const { enquiry } = await session.openEnquiry("does the solver converge?");
@@ -423,19 +381,16 @@ const aGatedCheck = async () => {
 };
 
 /**
- * All three edges, one test each, because the verb is now transactional and the
- * assertion is the same at every window: nothing survives.
+ * All three edges, one test each: the verb is transactional, so nothing
+ * survives an interruption at any of them.
  *
- * Before the fix these behaved differently, and the difference is the finding.
- * Window 1 (`EVALUATED_AS`) left an orphan node no reader could reach — an
- * absence. Window 2 (`TRIGGERS`) left a state in which one gate reported the
- * check `never-run` *and* `everFailed: true` from a single call — startling, and
- * **not** a defect, because the no-gate S-3b path produces it legitimately and
+ * Window 1 (`EVALUATED_AS`) leaves no orphan node reachable — an absence.
+ * Window 2 (`TRIGGERS`) can leave a gate reporting the check `never-run`
+ * *and* `everFailed: true` from a single call — startling, and **not** a
+ * defect, because the no-gate path produces it legitimately and
  * `everFailed`'s scope is documented as deliberately unfiltered by gate.
- *
- * Window 3 is the one that earned the transaction, and it is asserted below in
- * the only form that stays true after the fix: the verdict does not exist, so it
- * cannot stand. What it did before is in `041`.
+ * Window 3 is asserted below in the only form that stays true: the verdict
+ * does not exist, so it cannot stand.
  */
 for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
   test(`evaluateCriterion interrupted at ${edge} writes no verdict at all`, async () => {
@@ -529,16 +484,11 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
 });
 
 /**
- * The wrong answer the transaction exists to prevent, asserted from the other
- * side: with the writes intact, retracting the evidence a verdict was reached
- * against **does** withdraw it.
- *
- * Before the fix, an interruption before `BASED_ON` left `cited === 0`, and
- * `isWithdrawn` is `cited > 0 && standing === 0` — so the verdict could never be
- * withdrawn, and the gate stayed `blocked` by a `fail` the record insisted still
- * stood. `basis: []` alone is an empty result and not a wrong answer (PJ-011 §5);
- * *"this verdict still stands"* after its basis was retracted is a wrong answer,
- * and that distinction is what `041` settles.
+ * With the writes intact, retracting the evidence a verdict was reached
+ * against **does** withdraw it: `isWithdrawn` is `cited > 0 && standing === 0`.
+ * `basis: []` alone is an empty result, not a wrong answer; a verdict that
+ * insists *"this still stands"* after its basis was retracted is the wrong
+ * answer this distinguishes.
  */
 test("a verdict is withdrawn when the evidence it was reached against is retracted", async () => {
   const { enquiry, obs, analysis, analysisClaims, criterion, gate } = await aGatedCheck();
@@ -577,15 +527,16 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
  *
  * A second `closeEnquiry` writes a second `RESOLVES`, and `enquiryStatus()`
  * picks between them with `.find()` over rows AGE returns in no defined order.
- * Which close a reader sees is then arbitrary — and this is reachable through
- * the public API with **no interruption**, so it survives the transaction that
- * `docs/consumer-contract/043` added for the interrupted-then-retried route.
+ * Which close a reader sees would then be arbitrary -- reachable through the
+ * public API with **no interruption**, which is why this is guarded directly
+ * rather than left to the transaction that covers the interrupted-then-retried
+ * route.
  *
- * The wrong answer, demonstrated before the guard existed: abandon an enquiry,
- * later find a result and close it citing the evidence, and the record still
- * reports `closure: "abandoned"`, `answer: null`, `evidence: []`. The answer is
- * erased. `abandoned` is a positive classification, not an empty result, so
- * PJ-011 §5 does not excuse it.
+ * Without the guard: abandon an enquiry, later find a result and close it
+ * citing the evidence, and the record could still report `closure: "abandoned"`,
+ * `answer: null`, `evidence: []` -- the answer erased. `abandoned` is a
+ * positive classification, not an empty result, so that would be a wrong
+ * answer, not a harmless absence.
  */
 test("an enquiry cannot be closed twice, and the refusal names the existing close", async () => {
   const s = session;
@@ -630,11 +581,10 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
  * The guard keys on `RESOLVES`, and that is load-bearing rather than incidental.
  *
  * `acceptAsUnresolved()` writes `DEFERS`, not `RESOLVES` — a question left open
- * on purpose, with the condition that would reopen it recorded (S-14). If the
+ * on purpose, with the condition that would reopen it recorded. If the
  * "already closed" test treated that as closed, a question deliberately left
- * open could **never afterwards be closed on evidence**, which is the one case
- * S-14 exists to keep available. Asserted rather than argued from reading the
- * query, because `labkit-minion` asked and reading is not evidence.
+ * open could **never afterwards be closed on evidence**. Asserted rather than
+ * argued from reading the query, since reading is not evidence.
  */
 test("a question accepted as unresolved can still be closed when evidence arrives", async () => {
   const s = session;
@@ -677,9 +627,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
 });
 
 /**
- * `pursue` is NOT transactional and does not need to be — fourth verb off
- * PJ-028's inferred pile, and the second to come back clean. Predictions in
- * `docs/consumer-contract/044`, verdict in `045`.
+ * `pursue` is NOT transactional and does not need to be.
  *
  * It writes the `LineOfEnquiry` node and then `MOTIVATES`: **reachability edge
  * last**, `sharpen`'s arrangement rather than `evaluateCriterion`'s. An
@@ -707,10 +655,8 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
   );
   graph.createEdge = realCreateEdge;
 
-  // No enquiry at all. This used to assert that an orphan survived carrying no
-  // inbound edge -- unreachable, therefore harmless. Since the event store made
-  // every write verb transactional, the orphan does not exist to be reasoned
-  // about.
+  // No enquiry at all: the event store makes every write verb transactional,
+  // so no orphan exists to be reasoned about.
   const orphans = await graph.query(`MATCH (loe:LineOfEnquiry) RETURN loe`, {
     loe: vertexProps<{ natural_id: string; name: string }>(),
   });
@@ -732,9 +678,6 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
 });
 
 /**
- * The last four verbs of PJ-028's inferred pile. Predictions in
- * `docs/consumer-contract/046`, verdict in `047`.
- *
  * `stateCriterion` and `planWork` write **one node and no edge**, so they have no
  * interruption window at all — a single `createNode` either commits or does not.
  * That is a third *kind* of answer rather than two more clean results, and the
@@ -807,20 +750,10 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
 });
 
 /**
- * `declareGate` writes its edges **after** the node — `evaluateCriterion`'s
- * dangerous arrangement — and is clean for a weaker reason: **every `Gate` reader
- * is keyed by `natural_id`**, and an interrupted call returns none.
- *
- * That was unreachable-by-handle rather than unreachable-by-structure — the
- * weakest of the three guarantees on this page, and the one most easily lost to
- * a new reader. **It no longer has to hold.** The persisted event store requires
- * an event to commit with the writes it describes, so every write verb runs
- * inside `inTransaction`, and an interrupted `declareGate` now leaves no gate
- * for a reader to enumerate or fail to enumerate.
- *
- * The reasoning above is kept because it was the correct argument while it
- * applied, and because it names what the weaker guarantee cost: it depended on
- * nothing on the read surface ever enumerating gates.
+ * `declareGate` writes its edges **after** the node -- `evaluateCriterion`'s
+ * arrangement. Every write verb runs inside `inTransaction`, because an event
+ * has to commit with the writes it describes, so an interrupted call leaves
+ * no gate at all: nothing for a reader to enumerate or fail to enumerate.
  */
 test("an interrupted declareGate leaves no gate at all", async () => {
   const { criterion: c1 } = await session.stateCriterion("residual below 1e-8");
@@ -848,18 +781,14 @@ test("an interrupted declareGate leaves no gate at all", async () => {
   ).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
-  // No gate at all. This used to assert that a half-built one survived,
-  // governed by one of its two criteria and protecting nothing -- safe only
-  // because every Gate reader is keyed by natural_id and the caller held none.
-  // That guarantee is no longer load-bearing.
+  // No gate at all.
   const gateReaders = await graph.query(`MATCH (g:Gate) RETURN g`, {
     g: vertexProps<{ natural_id: string }>(),
   });
   expect(gateReaders).toEqual([]);
 
-  // The work the gate would have protected is untouched, which is the half of
-  // the old assertion that still means something: a failed `declareGate` must
-  // not damage what it was declared over.
+  // The work the gate would have protected is untouched: a failed
+  // `declareGate` must not damage what it was declared over.
   const contract = await session.contractFor(work);
   expect(contract.objective).toBe("scale up");
 });
@@ -868,11 +797,11 @@ test("an interrupted declareGate leaves no gate at all", async () => {
  * The empty contract, which is the case the array conversion could have broken
  * quietly.
  *
- * `Task.mayRead` was a JSON string until 2026-08-24, read back through a
- * `JSON.parse` in a try/catch. S-8 covers the populated round trip with real
- * values; nothing covered **no** values, and that is where a native agtype
- * array can differ from a serialised one — an empty list is the shape most
- * likely to come back absent rather than empty.
+ * `Task.mayRead` is read back through a `JSON.parse` in a try/catch. The
+ * populated round trip is covered elsewhere; nothing covered **no** values,
+ * and that is where a native agtype array can differ from a serialised one --
+ * an empty list is the shape most likely to come back absent rather than
+ * empty.
  *
  * Both spellings are asserted because `planWork` accepts either, and both mean
  * "reads nothing". `contractFor` has **no fallback** for a missing property, so

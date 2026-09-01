@@ -3,10 +3,9 @@
  * docs/project-journal/008_user_story_mining.md
  *
  * A gate's status must depend on evidence that its criterion was actually
- * evaluated, not on the presence of something named "gate". PJ-008 predicts
- * this passes: PJ-004 #9 reshaped the chain so nothing flows out of a gate
- * that no evaluation triggered. S-17 tests whether that reshaping bought what
- * it was supposed to.
+ * evaluated, not on the presence of something named "gate" -- nothing may
+ * flow out of a gate that no evaluation triggered. S-17 tests whether that
+ * holds.
  *
  * Imports only src/domain — never src/db (enforced).
  */

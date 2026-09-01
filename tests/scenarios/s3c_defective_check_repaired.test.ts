@@ -2,16 +2,16 @@
  * S-3c — "The check was wrong, not the result."
  * docs/project-journal/008_user_story_mining.md, §3, row X
  *
- * S-3 earned one policy and one only: re-running a robustness check until it
- * happens to come back green must not erase the earlier failure. What shipped
- * is broader — *any* failing evaluation is decisive forever — and since S-3b it
- * disqualifies a finding as well as blocking work.
+ * One policy: re-running a robustness check until it happens to come back
+ * green must not erase the earlier failure. What shipped is broader — *any*
+ * failing evaluation is decisive forever, and disqualifies a finding as well
+ * as blocking work.
  *
  * This is the case that rule was never asked about. The check itself was
  * defective; it was reviewed, corrected and re-run. Nothing about the result
  * changed. Under the shipped rule the original failure remains permanently
  * decisive, and the record cannot tell that case apart from someone re-rolling
- * the dice — which is the distinction S-3 actually cared about.
+ * the dice — which is the distinction the policy exists to protect.
  *
  * Both cases appear here side by side, deliberately: a fix that clears the
  * second while also clearing the first has not narrowed the rule, it has
@@ -80,7 +80,7 @@ const AGREES = "median aggregation agrees";
  * Researcher: "I've a significant pairwise result, and before I ran it we
  *  agreed it only counts if the median aggregation agrees with the mean."
  *
- * The standard is stated before the run it qualifies, as S-3b requires.
+ * The standard is stated before the run it qualifies.
  */
 async function aResultHeldToARobustnessCheck() {
   const { criterion: robustness } = await session.stateCriterion(ROBUSTNESS);
@@ -121,10 +121,9 @@ async function theCheckIsRun(
 
 describe("S-3c: the check was wrong, not the result", () => {
   /**
-   * Case 1, which must not change. S-3's earned policy, restated as a
-   * regression: the researcher does not like the answer, runs the same check
-   * again, and gets the number they wanted. The record must not let that
-   * stand, and none of what follows may weaken it.
+   * Case 1, which must not change: the researcher does not like the answer,
+   * runs the same check again, and gets the number they wanted. The record
+   * must not let that stand, and none of what follows may weaken it.
    */
   test("re-running the same check until it comes back green does not clear the failure", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
@@ -215,8 +214,8 @@ describe("S-3c: the check was wrong, not the result", () => {
     );
 
     // The fault is found in the check, and the check is replaced -- the same
-    // act S-11 established for an analysis that was wrong, aimed at a piece of
-    // work that happens to be a check.
+    // act used for an analysis that was wrong, aimed here at a piece of work
+    // that happens to be a check.
     const { review } = await session.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
@@ -262,9 +261,8 @@ describe("S-3c: the check was wrong, not the result", () => {
 
   /**
    * The same two cases through the other reader. `checksFrom()` is shared by
-   * the work a condition gates and the finding it qualifies, which is exactly
-   * why row X's blast radius grew when S-3b landed — so a fix that only
-   * reaches one of them has fixed half a rule.
+   * the work a condition gates and the finding it qualifies, so a fix that
+   * only reaches one of them has fixed half a rule.
    */
   test("the same distinction holds for work a check gates, not just findings it qualifies", async () => {
     const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();
@@ -329,7 +327,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(status.state).toBe("satisfied");
     expect(status.unmet.map((u) => u.requires)).toEqual([]);
     // The guard has still been seen to fail. Correcting a defective check does
-    // not turn it into a check nobody has shown can fail -- S-17's question is
+    // not turn it into a check nobody has shown can fail -- that question is
     // about the criterion, and its answer is unchanged.
     expect(status.everFailed).toBe(true);
   });
@@ -407,9 +405,8 @@ describe("S-3c: the check was wrong, not the result", () => {
 
   /**
    * A verdict nobody measured cannot be cleared this way, because there is
-   * nothing to withdraw. S-8's distinction (row W) doing load-bearing work:
-   * an asserted failure and a measured one must not become the same thing just
-   * because one of them can now be retired.
+   * nothing to withdraw: an asserted failure and a measured one must not
+   * become the same thing just because one of them can now be retired.
    */
   test("a failure that cited nothing cannot be cleared by withdrawing something else", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
@@ -573,21 +570,19 @@ describe("S-3c: the check was wrong, not the result", () => {
   });
 
   /**
-   * External review of labkit#137, found reviewing #135's Bonsai transcript.
    * The itemised check above is right — `no-standing-verdict` is exactly what
    * "a check whose every verdict has been withdrawn" test asserts. This is
-   * the *aggregate*: `gateStateFrom` fed on the same checks fell through its
-   * `else` branch to `satisfied`, because a retracted verdict matched neither
-   * `failed` nor `never-run`. One function, three readers — `gateStatus`,
-   * `gateList`, and `work` (via `workStateFrom`, which treats anything short
-   * of `blocked` as not holding a task) — so all three are asserted here,
-   * not just the one `gate <id>` prints.
+   * the *aggregate*: `gateStateFrom` fed on the same checks could fall
+   * through its `else` branch to `satisfied`, because a retracted verdict
+   * matches neither `failed` nor `never-run`. One function, three readers —
+   * `gateStatus`, `gateList`, and `work` (via `workStateFrom`, which treats
+   * anything short of `blocked` as not holding a task) — so all three are
+   * asserted here, not just the one `gate <id>` prints.
    *
-   * The passing evaluation (not a failing one, unlike the test above) is
-   * deliberate: it is #137's own repro, and it is the sharper case — a
-   * *retracted pass* is the one a stale four-branch chain can misreport as
-   * `satisfied` outright, where a retracted fail at least used to read as
-   * something-other-than-satisfied by accident.
+   * The passing evaluation (not a failing one, unlike the test above) is the
+   * sharper case — a *retracted pass* is the one a stale four-branch chain
+   * can misreport as `satisfied` outright, where a retracted fail at least
+   * reads as something-other-than-satisfied by accident.
    */
   test("a gate whose only verdict was withdrawn reads incomplete, not satisfied", async () => {
     const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();

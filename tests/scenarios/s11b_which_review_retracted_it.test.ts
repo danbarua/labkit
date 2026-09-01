@@ -3,12 +3,10 @@
  * docs/project-journal/008_user_story_mining.md §3 row O
  * docs/consumer-contract/031_row_o_predictions.md
  *
- * Row O has been deferred since PJ-008 on the grounds that *which review caused
- * an invalidation* describes why state changed rather than what is true now, and
- * therefore belongs to the event history. The deferral was withdrawn on an
- * external challenge: the row's own verified-state line describes a
- * present-tense question, and whether a standing retraction rests on valid
- * grounds is exactly what dependency propagation is for.
+ * *Which review caused an invalidation* describes why state changed and
+ * belongs to event history. Row O's own verified-state line asks a
+ * different, present-tense question instead: whether a standing retraction
+ * rests on valid grounds -- exactly what dependency propagation is for.
  *
  * The scenario is ordinary, which is the point. An analysis draws two reviews —
  * one critical, one confirming — and is then replaced on the strength of one of

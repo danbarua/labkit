@@ -196,8 +196,8 @@ describe("every tool answers when an agent actually calls it", () => {
       const status = await call(c, "gate_status", { gate: id(gate) });
       expect(status.state).toBe("satisfied");
 
-      // #182: the `Gate` case of `why`. Every check passed, so the cause
-      // cites the one condition that did, not an absence.
+      // The `Gate` case of `why`. Every check passed, so the cause cites the
+      // one condition that did, not an absence.
       const gateWhy = await call(c, "why", { subject: id(gate) });
       expect(gateWhy.kind).toBe("gate");
       expect(gateWhy.is).toBe("satisfied");
@@ -219,9 +219,9 @@ describe("every tool answers when an agent actually calls it", () => {
       // satisfied, so nothing is blocking it.
       expect((workRows.work as Array<{ work: string }>).map((w) => w.work)).toContain(id(work));
 
-      // #128, redesigned on review: `why` dispatches on the handle's own
-      // kind. This task was planned with no enquiry (line 149), so its
-      // `Work` case names that honestly rather than an empty `because`.
+      // `why` dispatches on the handle's own kind. This task was planned
+      // with no enquiry (line 149), so its `Work` case names that honestly
+      // rather than an empty `because`.
       const taskWhy = await call(c, "why", { subject: id(work) });
       expect(taskWhy.kind).toBe("work");
       expect(taskWhy.is as string).toContain("no question named");
@@ -391,22 +391,20 @@ describe("every tool answers when an agent actually calls it", () => {
       const closed = await call(c, "enquiry_status", { enquiry: id(enquiry) });
       expect((closed.question as Json).closure).toBe("answered");
 
-      // #128, redesigned on review: `why`'s `LineOfEnquiry` case is what
-      // `enquiry --in-context` computed before the redesign folded it in --
-      // where this enquiry's own question now sits in the overall survey,
-      // one bucket rather than the whole survey (PJ-030, PJ-034 §5).
-      // Answered on `narrowedClaim`, which nothing here ever promoted, so it
-      // lands in `provisional` -- "answered, but not something to build on
-      // yet".
+      // `why`'s `LineOfEnquiry` case reports where this enquiry's own
+      // question sits in the overall survey, one bucket rather than the
+      // whole survey. Answered on `narrowedClaim`, which nothing here ever
+      // promoted, so it lands in `provisional` -- "answered, but not
+      // something to build on yet".
       const enquiryWhy = await call(c, "why", { subject: id(enquiry) });
       expect(enquiryWhy.kind).toBe("enquiry");
       expect((enquiryWhy.report as Json).enquiry).toEqual(closed);
       expect(enquiryWhy.because as unknown[]).toHaveLength(1);
       expect((enquiryWhy.because as Json[])[0]!.wording as string).toContain("provisional");
 
-      // The refusal case: `why` does not yet explain a review (still #182 --
-      // Gate is done, Review is not). Names what it explains instead rather
-      // than going quiet or guessing.
+      // The refusal case: `why` does not yet explain a review (Gate is
+      // done, Review is not). Names what it explains instead rather than
+      // going quiet or guessing.
       await expect(call(c, "why", { subject: id(review) })).rejects.toThrow(
         /claim, work, enquiry, gate/,
       );

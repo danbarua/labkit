@@ -202,10 +202,9 @@ describe("parseAgtype — against live pglite-age", () => {
     await testDb.close();
   });
 
-  // One labelled client per test. This used to be a *fresh connection* per
-  // test, containing a pglite-socket defect that could permanently corrupt one;
-  // there is no socket any more, so it is now bookkeeping and a trace label
-  // rather than containment — see tests/helpers/db.ts's file-level comment.
+  // One labelled client per test -- bookkeeping and a trace label, not
+  // connection isolation, since there is one shared session underneath —
+  // see tests/helpers/db.ts's file-level comment.
   beforeEach(async () => {
     db = await testDb.openClient();
   });
@@ -260,9 +259,8 @@ describe("parseAgtype — against live pglite-age", () => {
   // provisioning order — past Number.MAX_SAFE_INTEGER on its very first edge,
   // in every tenant, today, not hypothetically.
   //
-  // No counts here. This comment carried "13 node + 19 edge labels" and was
-  // wrong by six, because a number in a comment is a maintenance claim nobody
-  // agreed to keep (PJ-028).
+  // No counts here: a number in a comment is a maintenance claim nobody
+  // agreed to keep.
   //
   // Nor are they asserted, which was the first instinct and is wrong: the
   // property that matters is asserted empirically below — `Number.isSafeInteger`
@@ -310,8 +308,7 @@ describe("parseAgtype — against live pglite-age", () => {
  * The AS clause AGE requires is unquoted SQL, so Postgres case-folds it while
  * AGE keys its result rows by the name the Cypher RETURN used. A camelCase
  * column therefore comes back present and NULL for every row -- no error, and
- * a decoder reads it as "nothing matched". S-3c lost a debugging cycle to
- * exactly this, and blamed AGE's OPTIONAL MATCH for it.
+ * a decoder reads it as "nothing matched".
  */
 describe("buildAsClause rejects names that would decode as null", () => {
   test("a camelCase column name is refused, with the alias to use instead", () => {

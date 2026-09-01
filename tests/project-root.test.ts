@@ -4,11 +4,12 @@
  * `resolveProjectRoot()` (`src/db/connect.ts`) is the whole of that decision,
  * pure and parameterised so these cases cost no database. The last `describe`
  * is the exception and says why: it is about *when* the question is asked
- * rather than how it is answered, which only `connectDb` can show. Both behaviours it
- * asserts were defects, and they failed in opposite directions: a mistyped
- * `LABKIT_HOME` used to be *created*, and a working directory below a project
- * root used to be taken at face value. Each produced a fresh empty record that
- * a reader cannot tell from a project nobody has worked on yet.
+ * rather than how it is answered, which only `connectDb` can show. Both
+ * behaviours it asserts guard opposite failure directions: a mistyped
+ * `LABKIT_HOME` is refused rather than created, and a working directory
+ * below a project root is walked up rather than taken at face value.
+ * Either mistake would otherwise produce a fresh empty record that a
+ * reader cannot tell from a project nobody has worked on yet.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -244,12 +245,6 @@ describe("dotGitProjectRoot — the answer with no git to ask", () => {
 describe("connectDb asks for a project root only when it needs one", () => {
   /**
    * `LABKIT_DB_URL` is checked before the root is resolved.
-   *
-   * This was a default parameter until 2026-08-28 —
-   * `connectDb(projectRoot = resolveProjectRoot())` — and JavaScript evaluates
-   * a default on entry, before the body reads the environment. The doc comment
-   * claiming `LABKIT_DB_URL` "wins over both" was true of the outcome and false
-   * of the order.
    *
    * **Asserted on which error, not on success**, because a connection to a
    * closed port must still fail. A `LABKIT_HOME` error means the root was

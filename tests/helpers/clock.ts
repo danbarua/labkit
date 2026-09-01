@@ -22,7 +22,7 @@
  *   separate two worlds by wall-clock, which is what the paired-world probes
  *   need: a read that distinguishes them only because time passed has
  *   distinguished the test runs, not the research states.
- * - **auto-advancing** (`tick++`, as the PJ-008 scenarios use) — right when a
+ * - **auto-advancing** (`tick++`, as the scenario tests use) — right when a
  *   test needs distinct stamps but does not care what they are.
  * - **windable** (here) — right when the *interval* is the subject: when a test
  *   must place two acts at stated times and ask what the record can recover.

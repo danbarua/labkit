@@ -2,10 +2,10 @@
  * S-10e — "A run that read the same record twice."
  * External peer review of PR #2, merge blocker 1.
  *
- * S-10d established the principle the previous correction was made under:
  * LabKit does not decide what a run's inputs mean, but it must faithfully
- * retain what the caller said. This is that principle turned on the case the
- * S-10d regression could not see, because it used two distinct inputs.
+ * retain what the caller said. This is that principle turned on the case a
+ * regression using two distinct inputs cannot see: two occurrences of the
+ * same input, not two different ones.
  *
  * > LabKit accepted two occurrences and later reports one. That is pure
  * > bookkeeping loss.
@@ -18,8 +18,7 @@
  *
  * A null test is the ordinary reason to do this: comparing a series against
  * itself. There is nothing exotic about `from = [A, A]`, and refusing it would
- * be LabKit deciding that a legitimate run is not recordable — the thing S-10d
- * removed.
+ * be LabKit deciding that a legitimate run is not recordable.
  *
  * Imports only src/domain — never src/db (enforced).
  */

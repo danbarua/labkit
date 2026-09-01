@@ -1,14 +1,13 @@
 /**
  * S-11d — "Reproducible, on top of something that isn't."
- * The missing verb S-11c exposed.
  *
  * `recordAnalysis({ from })` takes only observations handles, and
  * `recordObservations()` is the only thing that makes one. So an analysis
  * cannot read another analysis's output, and a two-stage pipeline can only be
  * recorded by re-entering the intermediate as if it were fresh measurement.
  *
- * S-11c showed that breaks `whatDependsOn()`. This shows it produces a
- * confidently wrong answer somewhere else, which is what PJ-011 §5 asks for.
+ * That breaks `whatDependsOn()`, and this test shows it produces a
+ * confidently wrong answer rather than merely an empty or missing one.
  *
  * Imports only src/domain — never src/db (enforced).
  */
@@ -120,10 +119,8 @@ describe("S-11d: a stage cannot read a stage", () => {
   });
 
   /**
-   * S-11c's omission had two causes stacked: the chain was severed at the write
-   * surface, *and* the query walked one hop. Row AE fixed the first; this is
-   * the second. Invalidating the raw series now reaches the trend claim two
-   * stages downstream.
+   * Invalidating the raw series reaches the trend claim two stages
+   * downstream -- the query walks more than one hop.
    *
    * Still open-world. Transitive is not complete: `complete: false` and
    * `routesWalked` stay, because a longer walk is still a walk of *some* routes.

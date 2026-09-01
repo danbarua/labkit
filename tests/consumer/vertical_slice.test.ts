@@ -15,17 +15,17 @@
  *   3. if it returns the same answer, that is a demonstrated failure rather
  *      than an absence.
  *
- * **Two bars are in play and they must not be conflated.** PJ-011 §5 needs a
- * *confidently incorrect* answer before the model changes; an empty or absent
- * one is unanswerable, not wrong. `023`'s bar 4 needs only that losing the
+ * **Two bars are in play and they must not be conflated.** A model change
+ * needs a *confidently incorrect* answer; an empty or absent one is
+ * unanswerable, not wrong. This contract needs only that losing the
  * distinction "materially prevent or corrupt a read the frozen contract
  * requires", and *prevent* covers absence.
  *
- * **None of the probes below clears §5.** Every read they call returns a
- * correct answer in both worlds. What they clear is bar 4. That is a real
- * result and it earns investigation — it does not license a model change, and
- * it does not engage CLAUDE.md's one-wrong-answer-at-a-time rule, which keys
- * off §5. Nothing is fixed here.
+ * **None of the probes below demonstrate a wrong answer.** Every read they
+ * call returns a correct answer in both worlds. What they demonstrate is that
+ * losing the distinction would prevent a required read. That is a real result
+ * and it earns investigation — it does not license a model change. Nothing is
+ * fixed here.
  *
  * Imports only src/domain, never src/db (enforced — see .dependency-cruiser.cjs).
  */
@@ -147,16 +147,15 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
    * different vocabularies, which is semantic convergence despite lexical
    * disagreement.
    *
-   * **Not a §5 wrong answer.** `whatIsKnown()` is *correct* in both worlds:
-   * both programmes really do hold both beliefs. There is no incorrect answer
-   * and not even an empty one. What is missing is the read — no operation on
-   * the surface accepts a time — and that is prevention, not corruption.
+   * **Not a wrong answer.** `whatIsKnown()` is *correct* in both worlds: both
+   * programmes really do hold both beliefs. There is no incorrect answer and
+   * not even an empty one. What is missing is the read — no operation on the
+   * surface accepts a time — and that is prevention, not corruption.
    *
-   * The first draft of this probe compared `asks` and asserted the two worlds
-   * were indistinguishable. That was **false**, and the way it was false is the
-   * finding: sorting by natural id recovers creation order exactly, so the
-   * durable record *does* carry the ordering. It carries it in a generator
-   * artefact CLAUDE.md forbids reading meaning into — which is a different and
+   * Comparing `asks` between the two worlds does not distinguish them either:
+   * sorting by natural id recovers creation order exactly, so the durable
+   * record *does* carry the ordering. It carries it in a generator artefact
+   * this record's own contract forbids reading meaning into — a different and
    * more precise claim than "the record cannot say".
    */
   const FIRST = {
@@ -198,28 +197,17 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
   };
 
   /**
-   * **Renamed 2026-08-21. Its old name became false and the test did not
-   * notice** — the detector it carried was pointed at the wrong thing.
-   *
-   * It was called *"no read on the surface takes a time, so the as-of question
-   * has no answer"*, and its comment said *"it flips the day row Z closes"*.
-   * Row Z closed. `whatWasKnown(at)` exists, the CLI ships `known --at` and the
-   * MCP server exposes it — and this went on passing, because it scanned the
-   * keys of a survey **row** and the capability arrived as a **method**. A
-   * condition recorded where nothing re-reads it is not a mechanism (PJ-025);
-   * a condition pointed at the wrong object is not one either, and this is the
-   * cleanest instance of it in the repo.
-   *
-   * What it actually checks is still worth checking, so it keeps the assertion
-   * and takes a name that matches: the as-of answer is a separate read, not a
-   * timestamp smuggled onto a present-tense row. Those are different designs
-   * and only one of them was chosen.
+   * The as-of answer is a separate read, not a timestamp smuggled onto a
+   * present-tense row: `whatWasKnown(at)` exists as its own capability
+   * (`known --at` on the CLI, exposed on the MCP server too), distinct from
+   * scanning a present-tense survey row for a hint. Those are different
+   * designs and only one of them was chosen.
    */
   test("the as-of answer is a separate read, not a field on a present-tense row", async () => {
     const { a, b } = await inTwoWorlds(inOrder(FIRST, SECOND), inOrder(SECOND, FIRST));
 
-    // Both worlds hold both beliefs. Correct in both, which is why the original
-    // probe was bar 4 rather than PJ-011 §5.
+    // Both worlds hold both beliefs. Correct in both -- what is missing is the
+    // read itself, not a right answer.
     expect(a.map((q) => q.asks).sort()).toEqual([FIRST.asks, SECOND.asks].sort());
     expect(b.map((q) => q.asks).sort()).toEqual(a.map((q) => q.asks).sort());
 
@@ -235,8 +223,7 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     // is the one that would catch that, and does.
     expect(Object.keys(a[0]!).sort()).toEqual(["answer", "asks", "claim", "question"]);
 
-    // And the other half, which is what the old detector was reaching for and
-    // could not see: the capability exists, as a read of its own.
+    // And the other half: the capability exists, as a read of its own.
     expect(typeof ReadSurface.prototype.whatWasKnown).toBe("function");
   });
 
@@ -253,10 +240,9 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     expect(bySequence(a)).toEqual([FIRST.asks, SECOND.asks]);
     expect(bySequence(b)).toEqual([SECOND.asks, FIRST.asks]);
 
-    // And it must not be relied on. CLAUDE.md forbids reading meaning into
-    // natural-id values; the sequence is global, shared across entity types,
-    // and not reset between tests. A consumer keying on it would be reading a
-    // generator artefact as scientific chronology.
+    // And it must not be relied on: the sequence is global, shared across
+    // entity types, and not reset between tests. A consumer keying on it
+    // would be reading a generator artefact as scientific chronology.
   });
 });
 
@@ -264,29 +250,19 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
 
 describe("Probe 3 — reconstruction provenance: what was this reconstructing?", () => {
   /**
-   * BAR 4 — ledger row F. Required by Designer 2, which named a durable
-   * reconstruction attempt whose remembered fields include its historical
-   * target.
+   * A durable reconstruction attempt whose remembered fields include its
+   * historical target -- required by the contract's Designer 2.
    *
-   * The first draft of this probe was **incoherent and tautological**, and both
-   * faults are worth keeping visible because they are the ones this project
-   * keeps making.
-   *
-   * *Incoherent:* both worlds passed the same `contentHash`. Under S-9 the
-   * content hash **is** artefact identity — `reproducibilityOf()` compares
-   * exactly that field to decide `exact` versus `differing` — so a
+   * The content hash **is** artefact identity: `reproducibilityOf()` compares
+   * exactly that field to decide `exact` versus `differing`, so a
    * byte-identical "regeneration" is a successful reproduction, not a distinct
-   * artefact. World A contradicted the rule the probe's own comment cited.
+   * artefact. Two worlds built from the same free-text-independent output
+   * cannot be told apart by comparing non-text-derived fields, since that only
+   * asserts the same code returns the same result.
    *
-   * *Tautological:* the two worlds were one builder differing in a free-text
-   * argument, so asserting that non-text-derived outputs matched was asserting
-   * that the same code returns the same result. PJ-021 removed a row F boundary
-   * test for exactly this and it was rebuilt here.
-   *
-   * The finding is not a comparison at all. It is a **single-world fact about
-   * the write surface**, in probe 4's category: no verb records that one
-   * artefact was an attempt to reconstruct another, so the question has nowhere
-   * to be answered from.
+   * The finding is not a comparison at all. It is a single-world fact about
+   * the write surface: no verb records that one artefact was an attempt to
+   * reconstruct another, so the question has nowhere to be answered from.
    */
   test("reproducibility is a read the caller must already know the answer to", async () => {
     const graph = await scenario.begin();

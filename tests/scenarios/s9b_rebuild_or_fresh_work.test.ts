@@ -8,14 +8,15 @@
  *
  * Where the story comes from matters more than usual here. Row F is the oldest
  * unowned row in the ledger and a scenario written to satisfy it would
- * manufacture its own result (PJ-011 §5). This one is not: Designer 2 — cold,
- * with no access to S-9, row F or this repository — independently required a
- * durable reconstruction attempt whose remembered fields include its historical
- * target. `023` recorded that as the external pressure the scenario method was
- * waiting for and could not produce from inside itself.
+ * manufacture its own result. This one is not: Designer 2 — cold, with no
+ * access to row F or this repository — independently required a durable
+ * reconstruction attempt whose remembered fields include its historical
+ * target, which is the external pressure the scenario method was waiting for
+ * and could not produce from inside itself.
  *
- * S-9 left row F half-settled. It settled **identity**: two artefacts may share
- * a `logical_name`, and refusing the ambiguous name stops the regenerated one
+ * Row F was already half-settled elsewhere. Identity was settled: two
+ * artefacts may share a `logical_name`, and refusing the ambiguous name stops
+ * the regenerated one
  * inheriting the historical one's dependants. What it did not settle is
  * **direction** — a reader holding only the rebuilt artefact cannot say what it
  * was rebuilding, because the rebuild is written by an ordinary
@@ -93,8 +94,9 @@ async function inTwoWorlds<T>(
  *  that went into it has no recorded provenance — nobody wrote down what
  *  generated it."
  *
- * S-9's opening situation, kept deliberately identical so that what this
- * scenario adds is visible against it.
+ * The same opening situation as the scenario before this one, kept
+ * deliberately identical so that what this scenario adds is visible
+ * against it.
  */
 async function theCachedConstruction(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("does the accelerated path match the reference?");
@@ -228,12 +230,12 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * And here is the part that decides whether row F clears PJ-011 §5 or stays
-   * an absence: **what does the record actually claim** in the world where the
+   * And here is the part that decides whether row F clears or stays an
+   * absence: **what does the record actually claim** in the world where the
    * second control is a rebuild?
    *
    * If `whySupported()` reports the proposition resting on two independent
-   * findings, that is the S-10 wrong answer at the artefact level — a claim
+   * findings, that is a wrong answer at the artefact level — a claim
    * established once reporting itself corroborated twice — and it is
    * demonstrated, not argued.
    */
@@ -295,31 +297,21 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * **Row AD, and this test has been inverted rather than deleted.**
-   *
-   * It shipped asserting the wrong answer on purpose, with the assertion it
-   * *should* make sitting in a comment beside it, and those are now the two
-   * live lines. Nothing about the scenario changed — only what the record says
-   * about it.
-   *
    * A researcher opens the question of what generated the historical control
    * and works on it: three candidate algorithms tried, none reproduces the
    * recorded series. That is real, recorded, durable work, and a negative
-   * result is a result. `whatIsKnown()` used to report the question
-   * **`untested`** — *"one nothing has ever been run against"*, in the survey's
-   * own words — because `recordObservations()` created `Evidence` with no
-   * producing `EvidenceUnit`, which PJ-001 defines as impossible, and the
-   * survey's `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`.
-   * Work recorded as observations was invisible to it; work recorded as an
-   * analysis was not. The sibling question below reads `unresolved` and always
-   * did, which is what isolated the cause rather than alleging it.
+   * result is a result.
    *
-   * Three cold reviewers flagged the missing unit independently and three
-   * scenarios were pointed at it without finding harm beyond a reader's. This
-   * was the fourth and the first to produce a wrong answer, which is what
-   * PJ-011 §5 asks for and what made the fix mandatory rather than optional.
+   * `whatIsKnown()` must report the question **`unresolved`**, not
+   * **`untested`** — *"one nothing has ever been run against"* would be
+   * false here. `recordObservations()` mints an `EvidenceUnit`, and the
+   * survey's `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`;
+   * work recorded as observations is reachable through it exactly as work
+   * recorded as an analysis is. The sibling question below reads
+   * `unresolved` regardless, which is what isolates the cause rather than
+   * alleging it.
    *
-   * The sibling assertion is kept for the same reason it was useful as a
+   * The sibling assertion is kept for the same reason it is useful as a
    * diagnosis: if a future change makes `unresolved` unreachable, this test
    * must fail for that too, not quietly agree with itself.
    */
@@ -429,22 +421,20 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       });
 
       const reader = await afterwards();
-      // Asking by name is refused, which is S-9's answer and is correct.
+      // Asking by name is refused, correctly.
       await expect(reader.whatDependsOn(CONTROL)).rejects.toThrow(/2 artefacts are named/);
 
       // Asking by reference answers about that artefact only. The assertion is
       // on the report's **shape**, not on its values, and that is deliberate:
-      // a test that only checked `claims` would stay green after row F was
-      // closed, which is the defect external review found in the first draft
-      // of consumer probe 3. Give any read on this path a field naming what
-      // was rebuilt and this line fails.
+      // a test that only checked `claims` would stay green even if a field
+      // naming what was rebuilt were added to this report by mistake. Give
+      // any read on this path such a field and this line fails.
       //
-      // It has now fired twice, correctly, on changes that had nothing to do
-      // with row F: S-11c added `routesWalked` and `complete`, and PJ-030
-      // added `subject` -- the handle of the artefact ASKED ABOUT, which is
-      // not the artefact it was an attempt to rebuild. The detector cannot
-      // tell which field arrived, only that the shape moved, which is what it
-      // is for and why the list is updated rather than loosened.
+      // The detector cannot tell which field arrived, only that the shape
+      // moved -- `subject` is the handle of the artefact ASKED ABOUT, which is
+      // not the artefact it was an attempt to rebuild, so its presence alone
+      // does not answer the question this scenario is about. That is what the
+      // detector is for, and why the list is updated rather than loosened.
       const exact = await reader.whatDependsOn(regenerated);
       expect(Object.keys(exact).sort()).toEqual([
         "claims",

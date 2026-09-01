@@ -83,16 +83,17 @@ describe("S-10: rerunning is not reproducing", () => {
    * The wrong answer this scenario was built on, kept as the contrast that
    * gives `reverify()` its meaning.
    *
-   * Before `REVERIFIES` this was the *only* way to record a re-run: an analysis
-   * in the same line of enquiry concluding the same proposition, which S-5's
-   * scope rules resolve to the same claim. The record then said the proposition
-   * rested on two independent findings when it rested on one, checked twice,
-   * by a run that specified conditions the original never recorded.
+   * Without `REVERIFIES`, the only way to record a re-run is: an analysis in
+   * the same line of enquiry concluding the same proposition, which resolves
+   * to the same claim under the scope rules. The record then says the
+   * proposition rests on two independent findings when it rests on one,
+   * checked twice, by a run that specified conditions the original never
+   * recorded.
    *
    * It still says that, and correctly. Recording two analyses is a claim of
    * two independent results, which is a real and different situation from a
    * re-verification — so `recordAnalysis()` is not made to refuse this the way
-   * `declareGate()` refuses a phantom gate (S-3b). What was missing was a way
+   * `declareGate()` refuses a phantom gate. What was missing was a way
    * to say the other thing, not a way to stop saying this one. The two tests
    * below run the identical pair of executions through `reverify()` and get a
    * different answer; that difference is the whole finding.
@@ -149,8 +150,7 @@ describe("S-10: rerunning is not reproducing", () => {
     const report = await (await afterwards()).reproductionOf(rerun.verification);
     expect(report.conclusion).toBe("agrees");
     // The original recorded nothing it read, so there is nothing to have
-    // reproduced. LabKit says that and stops: `execution: "not-reproduced"`
-    // used to sit here and was a verdict on what the two runs mean.
+    // reproduced. LabKit says that and stops.
     expect(report.ofRead).toEqual([]);
     expect(report.differs.map((d) => d.standing)).toEqual(["unrecorded-in-the-original"]);
   });
@@ -158,8 +158,7 @@ describe("S-10: rerunning is not reproducing", () => {
   /**
    * Afterward 2. "What differs between the two runs?" — the initial
    * conditions, named as **unrecorded** rather than as equal. Absence of a
-   * record is not evidence the two agree; that is row I's distinction, asked
-   * of execution instead of evidence.
+   * record is not evidence the two agree.
    */
   test("Afterward 2: the difference is named as unrecorded, not as equal", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
@@ -214,11 +213,10 @@ describe("S-10: rerunning is not reproducing", () => {
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
     expect(report.bearing).toBe("raises");
-    // `confirms` was removed after external review: S-10 established that
-    // "raises confidence" and "reproduced the execution" are different, not
-    // that an independent re-check can never confirm a claim. Those two fields
-    // already say everything demonstrated, without settling what the overloaded
-    // word means.
+    // There is no `confirms` field: "raises confidence" and "reproduced the
+    // execution" are different questions, asked separately, without settling
+    // what the overloaded word would mean. That is not the same as saying an
+    // independent re-check can never confirm a claim.
     expect(report.ofRead).toEqual([]);
 
     // And the claim itself now reads as re-verified rather than as twice
@@ -232,11 +230,10 @@ describe("S-10: rerunning is not reproducing", () => {
    * Afterward 4. "Can the two be compared numerically?" — no, and the record
    * says so unprompted, alongside the rest of the answer.
    *
-   * Predicted as a refusing verb (S-5's shape) and built as a field instead.
-   * LabKit has no verb that plots or compares numbers, so a `compareNumerically()`
-   * existing only to reject its arguments would be a feature invented to
-   * manufacture a wrong answer — PJ-011 §5, from the other side. The caveat has
-   * to travel with the report a reader already asks for.
+   * LabKit has no verb that plots or compares numbers, so a
+   * `compareNumerically()` existing only to reject its arguments would be a
+   * feature invented to manufacture a wrong answer. The caveat has to travel
+   * with the report a reader already asks for.
    */
   test("Afterward 4: the record says the original never recorded what it read", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
@@ -257,11 +254,10 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    // `comparable: false` with a prose reason used to sit here, and it was
-    // LabKit deciding whether two sets of numbers may be put side by side --
-    // which is the reader's call, not the record's. The fact it rested on is
-    // still here and is what a reader needs: the re-run named what it read and
-    // the original named nothing.
+    // LabKit does not decide whether two sets of numbers may be put side by
+    // side -- that is the reader's call, not the record's. What the record
+    // gives is the fact a comparison call would rest on: the re-run named
+    // what it read and the original named nothing.
     expect(report.ofRead).toEqual([]);
     expect(report.verificationRead.map((i) => i.name)).toEqual([
       "initial conditions, newly specified",
@@ -310,9 +306,8 @@ describe("S-10: rerunning is not reproducing", () => {
   });
 
   /**
-   * External review, finding 3a. Execution equality was compared by artefact
-   * *name*, which is the identity-versus-wording mistake this project has now
-   * found in four unrelated places (S-5, S-12, S-3b, and here).
+   * Execution equality must not be compared by artefact *name* -- that is the
+   * identity-versus-wording mistake, and it recurs.
    *
    * Two runs can each record "initial conditions" and mean different data.
    */
@@ -352,10 +347,8 @@ describe("S-10: rerunning is not reproducing", () => {
     // conditions" the original did not, and the original read one the re-run
     // did not. Identical names, two artefacts, two differences.
     //
-    // This test named that situation and then asserted the two entries by their
-    // identical names, which could not tell them apart -- the defect S-10c
-    // found, sitting inside the test whose own comment describes it. The
-    // entries now carry identity, so "which one changed" is answerable.
+    // The entries carry identity, so "which one changed" is answerable even
+    // though the names collide.
     expect(report.differs.map((d) => d.what.name)).toEqual([
       "initial conditions",
       "initial conditions",
@@ -371,10 +364,9 @@ describe("S-10: rerunning is not reproducing", () => {
   });
 
   /**
-   * External review, finding 3b, and the sharpest of them: two runs that each
-   * recorded *nothing* compared equal, so the report said the execution was
-   * reproduced. S-10's entire premise is that an empty input record means
-   * provenance was never captured, not that the run consumed nothing.
+   * Two runs that each recorded *nothing* must not compare equal — an empty
+   * input record means provenance was never captured, not that the run
+   * consumed nothing.
    */
   test("two runs that both recorded no inputs have not reproduced anything", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();

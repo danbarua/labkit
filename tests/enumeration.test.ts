@@ -228,8 +228,7 @@ describe("enumerating gates and work", () => {
       // The grain trap `gateList` is bucketed to avoid: `checkStatusForGate` is
       // grained by criterion, so folding an all-gates result by criterion would
       // give both gates one answer. Here the same criterion is evaluated for
-      // one gate and not the other -- which is S-17 and S-3's case reached from
-      // a new direction.
+      // one gate and not the other.
       const { criterion: shared } = await s.stateCriterion("one check, two gates");
       const { work: workA } = await s.planWork({ objective: "A", acceptance: "done" });
       const { work: workB } = await s.planWork({ objective: "B", acceptance: "done" });

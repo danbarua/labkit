@@ -18,20 +18,16 @@
  * `Object.getOwnPropertyNames` cannot tell a public verb from a helper — it
  * returns `outputArtefactOf` and `standingFindings` alongside `recordAnalysis`.
  *
- * **Read with the compiler, not with a regex**, and that part was learnt the
- * hard way. Both functions below matched source text until 2026-08-25, when
- * biome arrived and split `write.pursue({…})` onto two lines in five tools.
- * `\bwrite\.pursue\s*\(` stopped matching, `tests/mcp.test.ts` reported five
- * verbs unreachable that were reached fine, and the failing test named the
- * wrong thing entirely. A derivation over source text is a test of the
- * formatter's preferences unless it goes through a parser — which two `check:*`
- * scripts in this repo already knew (`check-no-stringly-typed.ts`,
- * `check-prop-classes.ts`) and this one did not.
+ * **Read with the compiler, not with a regex.** A derivation over source
+ * text is a test of the formatter's preferences unless it goes through a
+ * parser: a line break inserted by a reflow, or a verb merely named in a
+ * comment, would otherwise change what a text match reports without
+ * changing what the code does.
  *
- * Two things that came free with the parser, both of which had been worked
- * around: callers no longer strip comments before matching (the AST does not
- * contain them, so naming a verb in prose was never going to look like calling
- * it), and a call chained off a newline is the same node as one that is not.
+ * Two things that come free with the parser: callers need not strip
+ * comments before matching (the AST does not contain them, so naming a
+ * verb in prose was never going to look like calling it), and a call
+ * chained off a newline is the same node as one that is not.
  *
  * The escape hatch is deliberate and narrow: a verb may be excluded, and the
  * exclusion must carry a reason. A list of names with no reasons would decay
@@ -110,8 +106,7 @@ export function verbsCalledOn(paths: readonly string[], receiver: string): Set<s
  * When something belongs here, the reason goes here with it.
  */
 export const NOT_EXPOSED: Readonly<Record<string, string>> = {
-  // Folded into `why <enquiry>`'s `LineOfEnquiry` case (#128 round 2) --
-  // `explainEnquiry` in src/domain/read.ts is its one caller now, and it is a
+  // `explainEnquiry` in src/domain/read.ts is its one caller, and it is a
   // module-level function rather than a class member (see `Explainer`), so
   // this stays public rather than `private`.
   enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",

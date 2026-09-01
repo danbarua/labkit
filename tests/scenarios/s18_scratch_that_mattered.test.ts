@@ -2,10 +2,6 @@
  * S-18 — "Scratch work that unexpectedly mattered."
  * docs/project-journal/008_user_story_mining.md, §1 story 18, §3 row K
  *
- * Promoted from a story rather than authored: §4 held it back with an explicit
- * condition — "if row K survives the build, promote this to a scenario" — and
- * row K survived S-8, which gave it no verdict.
- *
  * The story: low-friction exploration must be capturable without ephemeral
  * scratch becoming part of the scientific record by accident. Its rule is
  * *capture cheaply, promote before citing*. The premise matters — scratch is
@@ -86,18 +82,8 @@ async function scratchExploration() {
 
 describe("S-18: scratch work that unexpectedly mattered", () => {
   /**
-   * Afterward 1, carrying the wrong answer it replaced.
-   *
-   * **What this used to report.** Standing existed — `Conclusion.standing` has
-   * defaulted to `exploratory` since S-7 — but almost nothing read it. Closing
-   * this question on a lunchtime notebook sweep reported it settled and the
-   * survey filed it under `established`, exactly as if a confirmatory result
-   * stood behind it. That is ephemeral scratch becoming part of the scientific
-   * record by accident, which is story 18's own sentence, and it was a
-   * populated and confident answer rather than a missing one.
-   *
-   * **What it reports now.** Still answered — the question *is* settled as far
-   * as anyone has taken it, and pretending otherwise would be its own lie — but
+   * Afterward 1. Still answered — the question *is* settled as far as anyone
+   * has taken it, and pretending otherwise would be its own lie — but
    * `provisional` rather than `established`, and the closure says what it rests
    * on. A reader asking "what do we actually know" no longer gets scratch mixed
    * in silently.
@@ -171,8 +157,8 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     ]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["lunchtime sweep"]);
     // And promoting must not read as retracting. `CHANGES: Decision -> Claim`
-    // means "withdrawn" to `withdrawalOf()` (S-12), so reusing it for
-    // promotion makes a promoted finding report as no longer asserted.
+    // means "withdrawn" to `withdrawalOf()`, so reusing it for promotion
+    // makes a promoted finding report as no longer asserted.
     expect(why.withdrawn).toBe(false);
     expect(why.supported).toBe(true);
   });
@@ -180,8 +166,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   /**
    * The control. Cheap capture must stay cheap: recording scratch takes no
    * ceremony, and an unpromoted finding is not a *failure*, it is simply not
-   * confirmatory. PJ-001's "should not accumulate ceremony" bullet, from the
-   * other side of S-14.
+   * confirmatory.
    */
   test("scratch that nobody promotes is provisional, not wrong", async () => {
     const { analysisClaims } = await scratchExploration();
@@ -196,8 +181,8 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
 
   /**
    * Promotion is about a claim, and a claim is identified by its proposition
-   * within a line of enquiry — S-5, reaching standing. Two programmes can
-   * explore the same sentence, and promoting one must not promote the other.
+   * within a line of enquiry. Two programmes can explore the same sentence,
+   * and promoting one must not promote the other.
    */
   test("promoting one line of enquiry's finding does not promote another's", async () => {
     const { analysisClaims } = await scratchExploration();

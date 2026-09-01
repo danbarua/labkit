@@ -26,16 +26,17 @@ export interface Scenario {
    * a `ResearchSession` or `TenantGraph` that started memoising. Today
    * neither holds any query state, so against a plain re-query on the same
    * session the marginal proof is **nil** — checked, not assumed: pointing
-   * every durable read in S-3 back at the writing session leaves all nine
-   * tests passing. This is cheap insurance against a future cache, not a
-   * proof in itself, and it should not be described as one.
+   * every durable read in the scenario suite back at the writing session
+   * leaves every test still passing. This is cheap insurance against a
+   * future cache, not a proof in itself, and it should not be described as
+   * one.
    *
    * It reuses the `TenantContext` `begin()` already resolved, rather than
    * calling `resolveTenantContext()` a second time. That call's
    * reconciliation pass is what `begin()` exists to prove happened; repeating
    * it microseconds later against the same tenant is waste, not a second
    * proof, and `begin()` still runs it unconditionally — the self-healing
-   * guarantee PJ-005 argued for is exactly as strong as before. `TenantContext`
+   * guarantee is exactly as strong as before. `TenantContext`
    * (`src/db/tenant.ts`) is plain `{tenantId, graphName}` data with no query
    * state of its own, so reusing it carries none of the memoising risk this
    * method exists to catch — that risk lives in the `TenantGraph`/
@@ -110,8 +111,8 @@ export async function openScenario(): Promise<Scenario> {
 
       // Reset only when nothing is left running. A late teardown from an
       // abandoned test finds the live test's connection still open and skips
-      // it, which is the whole cascade: it used to drop the graphs of a test
-      // already querying them.
+      // it — without that check, it would drop the graphs of a test already
+      // querying them.
       //
       // **Kept here rather than moved into `begin()`, and that placement is
       // load-bearing.** Twenty-three of the twenty-nine files call `end()`

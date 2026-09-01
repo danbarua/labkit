@@ -1,5 +1,6 @@
 /**
- * The scenario harness itself, under the one condition that used to break it.
+ * The scenario harness itself, under the one condition that produces a
+ * teardown cascade.
  *
  * The suite's intermittent `graph "labkit_t1" does not exist` and
  * `Connection terminated unexpectedly` bursts were a **teardown cascade**, not
@@ -7,8 +8,8 @@
  * a defect since removed along with the socket itself.
  * bun's fixed 5000ms per-test timeout does not cancel the test body: an
  * overrunning test keeps executing while the next one starts, and its late
- * `scenario.end()` used to reset the database and close a connection that by
- * then belonged to the live test.
+ * `scenario.end()` resets the database and closes a connection that by
+ * then belongs to the live test.
  *
  * **The overrun is the trigger; the cascade is the defect.** This file tests
  * the defect and not the trigger, so it needs no six-second sleep and no
@@ -54,8 +55,8 @@ test("a late end() from an abandoned test cannot touch the live test", async () 
   await live.createNode("Question", { name: "live", ...posed });
 
   // ...and only now does the abandoned test tear down. This is the exact
-  // ordering bun produces on a timeout, and it used to reset the database and
-  // close `live`'s connection.
+  // ordering bun produces on a timeout, and it resets the database and
+  // closes `live`'s connection.
   await scenario.end();
 
   // The live test still has its connection, its graph, and its own rows. It is

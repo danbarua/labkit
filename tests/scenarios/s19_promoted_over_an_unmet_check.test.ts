@@ -1,7 +1,7 @@
 /**
  * S-19 — "Somebody vouched for it. Nobody checked it."
- * Issue #62. The wrong answer is demonstrated first, in §1, and the fix's
- * shape is what §2 asserts.
+ * The wrong answer is demonstrated first, in §1, and the fix's shape is
+ * what §2 asserts.
  *
  * The story: a researcher agrees a condition *before* running, records the run
  * holding it to that condition, decides the result matters and promotes it,
@@ -16,13 +16,11 @@
  *
  * **This is a positive assertion, not an absence**, which is the distinction
  * that earns the change. `whatIsKnown` is not silent about the question; it
- * answers, and the answer is wrong. An earlier attempt to justify a standup
- * view on `known` merely *omitting* gates failed PJ-011 §5 for exactly the
- * reason this passes it.
+ * answers, and the answer is wrong.
  *
- * **Never-run rather than failed, deliberately.** S-3b's rule is that a
- * prespecified check nobody ran must count against the finding it qualifies —
- * which is why `QUALIFIES` is written when the analysis is recorded and not
+ * **Never-run rather than failed, deliberately.** A prespecified check
+ * nobody ran must count against the finding it qualifies — which is why
+ * `QUALIFIES` is written when the analysis is recorded and not
  * when the check is evaluated. The survey is the one reader that ignored it,
  * and never-run is the case with no gate, no evaluation and no second act in
  * it: three verbs and the contradiction is there.
@@ -177,9 +175,9 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
    *
    * **The never-run test above passed for the wrong reason** while that was
    * true: dropping the row and finding the check unmet give the same bucket.
-   * That is PJ-029's shape — a right conclusion with the reasoning under it
-   * wrong, and no test catching it because the tests pass either way. This is
-   * the case that could have been positive and was not.
+   * That is a right conclusion with the reasoning under it wrong, and no test
+   * catching it because the tests pass either way. This is the case that
+   * could have been positive and was not.
    */
   test("a promoted negative result whose check passed is established", async () => {
     const { criterion: check } = await session.stateCriterion(CHECK);

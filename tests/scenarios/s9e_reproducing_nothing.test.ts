@@ -2,9 +2,9 @@
  * S-9e — "Did it reproduce?" asked about nothing.
  * docs/consumer-contract/037_reproducibility_of_nothing_predictions.md
  *
- * Found by the deliberate PJ-027 sweep rather than by a researcher's question,
- * which is worth saying: nobody asked for this scenario, a sweep for prose that
- * disagrees with its code did.
+ * Found by a deliberate sweep for prose that disagrees with its code, rather
+ * than by a researcher's question -- worth saying: nobody asked for this
+ * scenario.
  *
  * `ReproducibilityReport.reproducible` is documented as "False unless every part
  * was rebuilt and matched ... **this is the field that must not quietly say
@@ -107,8 +107,8 @@ describe("S-9e: reproducing nothing", () => {
    * was never created is not asking an unanswerable question — it is naming
    * nothing. Every other read on the surface throws when its subject is absent.
    *
-   * This is the refusal S-10 permits: it is not manufactured to be rejected,
-   * there is a real caller error to refuse.
+   * This is a refusal, not manufactured to be rejected -- there is a real
+   * caller error to refuse.
    */
   test("an analysis that does not exist is refused, not reported on", async () => {
     await expect(session.reproducibilityOf(ref("analysis", "COMP_999999"), [])).rejects.toThrow(
@@ -117,8 +117,8 @@ describe("S-9e: reproducing nothing", () => {
   });
 
   /**
-   * The distinction is the point, so it is asserted rather than left in prose —
-   * PJ-027's "where a prose guard can be an assertion, it should be".
+   * The distinction is the point, so it is asserted rather than left in
+   * prose -- where a prose guard can be an assertion, it should be.
    *
    * Same empty offering, same empty result set, two different answers, because
    * the two states are different: one record says nothing was read, the other

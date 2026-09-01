@@ -74,9 +74,7 @@ test("a throwing query is still cleared from the in-flight set", async () => {
 
   // And the failure mode this test exists for: a leaked entry would make the
   // watchdog report a phantom stuck query forever, which is the one thing that
-  // would make this module lie. Until PJ-028 it was described in a comment
-  // above `expect(true).toBe(true)` -- and moving `inFlight.delete(id)` out of
-  // traced()'s `finally` left the whole suite green.
+  // would make this module lie.
   const boom: LabKitDB = {
     async query() {
       throw new Error("nope");

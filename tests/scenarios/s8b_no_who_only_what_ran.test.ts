@@ -2,15 +2,12 @@
  * S-8b — "There is no who."
  * docs/project-journal/008_user_story_mining.md §3 row S
  *
- * Row S has been open since S-8, where its Afterward asked *"who approved the
- * scale-up, and on what projected cost?"* and the answer was recorded as out of
- * scope: identity is cross-cutting infrastructure, not domain. Three cold
- * designers then independently required persistent attribution, in four
- * unanimous clusters, and `docs/consumer-contract/021` scored it the strongest
- * consumer finding of the exercise.
+ * *"Who approved the scale-up, and on what projected cost?"* has no answer,
+ * and not because attribution is hard: identity is cross-cutting
+ * infrastructure, not domain.
  *
- * **The designers were wrong about the domain, and the reason is not that
- * attribution is hard.** They were designing for a population of actors this
+ * **A design requiring persistent attribution would be wrong about the
+ * domain.** It would be designing for a population of actors this
  * system does not have. Substitute the real one — analyses run by agents, not by
  * people with names, tenure and accountability — and *who* has no referent. An
  * agent invocation is not a person: it does not persist between runs, accrues no
@@ -20,8 +17,8 @@
  * What the question was actually reaching for survives, and it is provenance:
  * **what ran, on what inputs, under what configuration.** That is what this
  * scenario checks, and the answer is that the model already carries it — the
- * configuration is an input artefact like any other, which is row L's
- * `CONSUMES` lineage doing exactly the job S-11 earned it for.
+ * configuration is an input artefact like any other, carried by `CONSUMES`
+ * lineage.
  *
  * Imports only src/domain — never src/db (enforced).
  */
@@ -57,12 +54,9 @@ async function afterwards(): Promise<ResearchSession> {
 }
 
 /**
- * Scopes a session over the world the hooks opened.
- *
- * It used to call `begin()`/`end()` itself, which put both on the **test's own
- * clock** — bun's 5000ms ceiling times the body and runs `beforeEach`/
- * `afterEach` outside it. Both tests here open exactly one world, so the
- * lifecycle moved to the hooks and the call sites did not change.
+ * Scopes a session over the world the hooks opened. The world's lifecycle
+ * lives in `beforeEach`/`afterEach`, outside bun's 5000ms per-test ceiling,
+ * since both tests here open exactly one world.
  */
 async function inOneWorld<T>(build: (s: ResearchSession) => Promise<T>): Promise<T> {
   return build(new ResearchSession(graph, { clock, events: inMemoryEventLog() }));
@@ -144,15 +138,14 @@ describe("S-8b: there is no who, only what ran", () => {
   });
 
   /**
-   * The other half of S-8's Afterward, which was never the hard half:
-   * *"and on what projected cost?"*
+   * *"On what projected cost?"*
    *
    * A cost projection is a finding with provenance like any other, and an
-   * approval is a decision taken on evidence against a stated condition. Both
-   * were already expressible when S-8 ran. Asserted here so the claim that
-   * "who approved it" dissolves into things the model has is checked rather
-   * than argued — the decision names its reason, cites the finding it rests on,
-   * and the criterion it was held to is recoverable.
+   * approval is a decision taken on evidence against a stated condition.
+   * Asserted here so the claim that "who approved it" dissolves into things
+   * the model has is checked rather than argued — the decision names its
+   * reason, cites the finding it rests on, and the criterion it was held to
+   * is recoverable.
    */
   test("approval is a decision on evidence against a condition, with no signer", async () => {
     const answer = await inOneWorld(async (s) => {

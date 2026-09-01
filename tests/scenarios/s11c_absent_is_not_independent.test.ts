@@ -9,9 +9,6 @@
  * asks for: **a scenario in which a reader acts on "unaffected" and is wrong.**
  * This is that scenario.
  *
- * It is the fourth catch on this one verb. PJ-021 found it returning
- * `claims: []` for an input while still naming the enquiry.
- *
  * Imports only src/domain — never src/db (enforced).
  */
 
