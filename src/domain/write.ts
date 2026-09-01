@@ -480,28 +480,33 @@ export class WriteSurface extends SessionCore {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
       const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
-      // The analysis is its own act, and each conclusion is another. **N+1
-      // events, and that is the truthful count** rather than drift: the rule is
-      // one *act* one event, and concluding four things is four things a
-      // researcher did. An analysis with no conclusions yet emits exactly one
-      // and is a real, honest state -- `enquiry` prints "has produced nothing
-      // yet" and `known` buckets it as worked-on-no-answer.
+      const claims: ConcludedClaim[] = [];
+      for (const conclusion of input.concludes) {
+        // `concluding`, not `conclude` -- one act, one event, and the caller
+        // made one call. See its header for the half that is not style: a
+        // nested emit DRAINS this act's edges into an event of its own.
+        claims.push(
+          await this.concluding({
+            analysis,
+            proposition: conclusion.proposition,
+            finding: conclusion.finding,
+            ...(conclusion.bearing === undefined ? {} : { bearing: conclusion.bearing }),
+            ...(conclusion.standing === undefined ? {} : { standing: conclusion.standing }),
+          }),
+        );
+      }
+      // **Last, not first**, for the same reason. `emit` drains what has been
+      // minted since the previous event, so emitting before the conclusions
+      // exist reports a computation with no findings hanging off it --
+      // `PRODUCES`, `RECORDED_IN` and `SUPPORTS` all missing, which is most of
+      // what an analysis is. An analysis with no conclusions still emits
+      // exactly one event and is a real, honest state: `enquiry` prints "has
+      // produced nothing yet" and `known` buckets it as worked-on-no-answer.
       const events = await this.emit("recordAnalysis", analysis, {
         enquiry: input.enquiry,
         method: input.method,
+        conclusions: this.conclusionEvents(claims),
       });
-      const claims: ConcludedClaim[] = [];
-      for (const conclusion of input.concludes) {
-        const concluded = await this.conclude({
-          analysis,
-          proposition: conclusion.proposition,
-          finding: conclusion.finding,
-          ...(conclusion.bearing === undefined ? {} : { bearing: conclusion.bearing }),
-          ...(conclusion.standing === undefined ? {} : { standing: conclusion.standing }),
-        });
-        claims.push(...concluded.claims);
-        events.push(...concluded.events);
-      }
       return { analysis, claims, events };
     });
   }
@@ -641,8 +646,40 @@ export class WriteSurface extends SessionCore {
    */
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
+      const concluded = await this.concluding(input);
+      const events = await this.emit("conclude", input.analysis, {
+        conclusions: this.conclusionEvents([concluded]),
+        ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
+      });
+      return { analysis: input.analysis, claims: [concluded], events };
+    });
+  }
+
+  /**
+   * `conclude`'s work, without the event. **The compounds call this one.**
+   *
+   * `emit` DRAINS the ids and edges `TenantGraph` has minted since the last
+   * event, which is what lets an act report what it brought into existence
+   * without listing it. A nested emit therefore does not merely add an event —
+   * it takes the parent's edges away. `recordAnalysis`'s event lost `PRODUCES`,
+   * `RECORDED_IN` and `SUPPORTS` to the `conclude` events underneath it, and
+   * `tests/event-store.test.ts` is what noticed.
+   *
+   * So the split is not tidiness. **A verb that composes others records one
+   * event, not one per step** — `openEnquiry` is `pose` + `pursue` and emits
+   * only `openEnquiry`, and this is that rule at a second call site. The event
+   * stream is a record of research actions; five events for one call describes
+   * the implementation.
+   *
+   * That does not contradict `conclude`'s own doc above. A researcher who
+   * concludes four things in four calls did four things, and gets four events.
+   * One who calls a compound made one call and gets one, with every conclusion
+   * in its payload — the same distinction `pose` and `openEnquiry` already make.
+   */
+  private async concluding(input: ConcludeCommand): Promise<Required<ConcludedClaim>> {
+    return this.graph.inTransaction(async () => {
       const at = this.clock.now();
-      const concluded = await this.graph.inTransaction(async () => {
+      {
         const unit = await this.unitOf(input.analysis);
         const output = await this.outputArtefactOf(input.analysis);
 
@@ -768,13 +805,7 @@ export class WriteSurface extends SessionCore {
           asserts: proposition,
           finding: ref("evidence", evidence.natural_id),
         };
-      });
-
-      const events = await this.emit("conclude", input.analysis, {
-        conclusions: this.conclusionEvents([concluded]),
-        ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
-      });
-      return { analysis: input.analysis, claims: [concluded], events };
+      }
     });
   }
 
@@ -1162,33 +1193,36 @@ export class WriteSurface extends SessionCore {
         return { analysis, original };
       });
 
-      // The re-verification is one act; the conclusion it restates is another.
-      const events = await this.emit("reverify", verification.analysis, {
-        of: input.historical,
-        proposition: input.concludes.proposition,
-      });
-      const concluded = await this.conclude({
+      // **Re-verifying is one act, and the emit comes last.** It used to come
+      // first and the conclusion followed it, which put every node and edge the
+      // conclusion minted after the drain -- so the event for a re-verification
+      // reported a computation and none of the finding that is the whole point
+      // of running one. See `concluding`.
+      const concluded = await this.concluding({
         analysis: verification.analysis,
         proposition: input.concludes.proposition,
         finding: input.concludes.finding,
         ...(input.concludes.bearing === undefined ? {} : { bearing: input.concludes.bearing }),
         ...(input.concludes.standing === undefined ? {} : { standing: input.concludes.standing }),
       });
-      events.push(...concluded.events);
 
       // `REVERIFIES` is evidence-to-evidence and says the same proposition was
       // checked again -- deliberately NOT the supersession `conclude
       // --replacing` writes, which says a finding was replaced. Two different
       // claims about two different acts; see `conclude`'s header.
-      const restated = concluded.claims[0]?.finding;
-      if (!restated) throw new Error("unreachable: the analysis just recorded this conclusion");
-      await this.graph.createEdge(restated, "REVERIFIES", verification.original);
+      await this.graph.createEdge(concluded.finding, "REVERIFIES", verification.original);
+
+      const events = await this.emit("reverify", verification.analysis, {
+        of: input.historical,
+        proposition: input.concludes.proposition,
+        conclusions: this.conclusionEvents([concluded]),
+      });
 
       return {
         at,
         verification: verification.analysis,
         of: input.historical,
-        claims: concluded.claims,
+        claims: [concluded],
         events,
       };
     });
@@ -1573,7 +1607,6 @@ export class WriteSurface extends SessionCore {
       // proposition match cannot see -- so the record and the event describing
       // it would have disagreed about which finding fell.
       const claims: ConcludedClaim[] = [];
-      const replacementEvents: DomainEvent[] = [];
       const paired: (RecordedConclusion | undefined)[] = [];
       for (const now of input.concludes) {
         // Explicit wins; the proposition match is the fallback the ordinary
@@ -1583,16 +1616,16 @@ export class WriteSurface extends SessionCore {
             ? before.find((b) => b.proposition === now.proposition)
             : before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
         paired.push(was);
-        const concluded = await this.conclude({
-          analysis: replacement,
-          proposition: now.proposition,
-          finding: now.finding,
-          ...(was === undefined ? {} : { replacing: was.claim }),
-          ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
-          ...(now.standing === undefined ? {} : { standing: now.standing }),
-        });
-        claims.push(...concluded.claims);
-        replacementEvents.push(...concluded.events);
+        claims.push(
+          await this.concluding({
+            analysis: replacement,
+            proposition: now.proposition,
+            finding: now.finding,
+            ...(was === undefined ? {} : { replacing: was.claim }),
+            ...(now.bearing === undefined ? {} : { bearing: now.bearing }),
+            ...(now.standing === undefined ? {} : { standing: now.standing }),
+          }),
+        );
       }
 
       const changed: ChangedConclusion[] = [];
@@ -1680,7 +1713,6 @@ export class WriteSurface extends SessionCore {
           after: c.after,
         })),
       });
-      events.push(...replacementEvents);
       return {
         at,
         replacement,
