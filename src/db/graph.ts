@@ -168,6 +168,13 @@ export class TenantGraph {
    * Explorer's traces and the live record would then disagree about identical
    * arcs. Scope the drain; leave the grain alone.
    *
+   * **"A verb that composes others records one event, not one per step" is
+   * about aspects of one act, not a list of acts the caller batched.**
+   * `openEnquiry` is `pose` + `pursue` and emits once because posing and
+   * pursuing are two halves of asking; concluding four things is four things a
+   * researcher did, and a composition that batches them must record what the
+   * CLI records when a person makes the same four calls.
+   *
    * What a scope does not claim is **handed back up**, not dropped: a verb that
    * mints something and emits nothing has still brought it into existence, and
    * the enclosing act is what recorded that.
