@@ -824,6 +824,7 @@ session id is worth taking on the caller's word because it is checkable in
 principle against a bus that knows its sessions, and a commit is not checkable
 against anything. Asking for one would buy a value nothing could contradict.
 
+<<<<<<< HEAD
 #### The vocabulary is the user's
 
 **`labkit why <handle>` is one verb whatever the handle names** — a claim, a
@@ -835,6 +836,17 @@ tell that a flag vocabulary is forming is the same intent spelled twice —
 one afternoon (#177), and the flags went. A new read earns a **verb a
 researcher would say**, or a case of one that exists; it does not earn a flag
 that names how the answer is stored.
+=======
+#### A variable is named for what it holds
+
+In every example script, snippet and document, a shell variable holding a
+handle says **what the handle is**: `analysis`, `replacement`, `enquiry`,
+`lattice_claim` — never `comp`, `q1`, `loe2`, `clm6`. Dan, 2026-09-01, on a
+snippet whose `comp=$(labkit analyse …)` told the reader nothing: someone
+reading an example should not need the prefix table to know what is in a
+variable. The Bonsai probe scripts were written the short way and are being
+rewritten the long way under #173.
+>>>>>>> ff97015 (docs: a variable is named for what it holds)
 
 #### Colour is a parameter, not a global
 
