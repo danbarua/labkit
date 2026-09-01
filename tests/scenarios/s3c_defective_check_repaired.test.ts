@@ -226,7 +226,16 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{ proposition: AGREES, finding: "median p = 0.04" }],
+      concludes: [{
+        proposition: AGREES,
+        finding: "median p = 0.04",
+        // The correction REVERSES its predecessor, so there is no shared
+        // proposition to pair them by and the caller has to say. Before #132
+        // it needed saying nowhere, because a replacement retracted the whole
+        // superseded analysis by construction -- which is that issue's root
+        // cause, not a convenience.
+        replacing: claimOf(defectiveClaims, DISAGREES),
+      }],
     });
     await session.evaluateCriterion({
       criterion: robustness,
@@ -298,7 +307,16 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{ proposition: AGREES, finding: "median p = 0.04" }],
+      concludes: [{
+        proposition: AGREES,
+        finding: "median p = 0.04",
+        // The correction REVERSES its predecessor, so there is no shared
+        // proposition to pair them by and the caller has to say. Before #132
+        // it needed saying nowhere, because a replacement retracted the whole
+        // superseded analysis by construction -- which is that issue's root
+        // cause, not a convenience.
+        replacing: claimOf(defectiveClaims, DISAGREES),
+      }],
     });
     await session.evaluateCriterion({
       criterion: robustness,
@@ -372,7 +390,16 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{ proposition: AGREES, finding: "median p = 0.04" }],
+      concludes: [{
+        proposition: AGREES,
+        finding: "median p = 0.04",
+        // The correction REVERSES its predecessor, so there is no shared
+        // proposition to pair them by and the caller has to say. Before #132
+        // it needed saying nowhere, because a replacement retracted the whole
+        // superseded analysis by construction -- which is that issue's root
+        // cause, not a convenience.
+        replacing: claimOf(failedClaims, DISAGREES),
+      }],
     });
 
     expect(
@@ -462,7 +489,16 @@ describe("S-3c: the check was wrong, not the result", () => {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{ proposition: AGREES, finding: "median p = 0.04" }],
+      concludes: [{
+        proposition: AGREES,
+        finding: "median p = 0.04",
+        // The correction REVERSES its predecessor, so there is no shared
+        // proposition to pair them by and the caller has to say. Before #132
+        // it needed saying nowhere, because a replacement retracted the whole
+        // superseded analysis by construction -- which is that issue's root
+        // cause, not a convenience.
+        replacing: claimOf(defectiveClaims, DISAGREES),
+      }],
     });
 
     const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
@@ -488,8 +524,13 @@ describe("S-3c: the check was wrong, not the result", () => {
    * longer decides its check and no corrected check in existence — a partially
    * committed scientific state, which is the thing LabKit exists to prevent.
    *
-   * The failure is provoked through a real guard rather than a mock:
-   * `recordAnalysis()` refuses to re-assert a withdrawn proposition.
+   * The failure is provoked through a real guard rather than a mock. **Which
+   * guard changed with #173** and the comment is worth keeping accurate: it
+   * used to be `recordAnalysis()` refusing to re-assert a withdrawn
+   * proposition, and it is now `conclude()` refusing to supersede a finding
+   * that has already been superseded. The narrowing below is what makes the
+   * second half of the replacement impossible either way; the difference is
+   * that the refusal now names the claim rather than the wording.
    */
   test("a replacement that cannot be completed leaves the earlier failure standing", async () => {
     const { robustness, enquiry, observations, analysisClaims } =

@@ -400,6 +400,18 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    *   amendment, a corrected finding over a defective one, a re-analysis over
    *   the analysis it replaced.
    *
+   * Dan's own line for it, which is the sentence to pattern-match on rather
+   * than any paraphrase of it:
+   *
+   * > supersedes is a substitution of one record for another; the research
+   * > journey follows a different fork in the road. changes = looking back at
+   * > the map — same thing, interpreted differently from a perspective further
+   * > down the road.
+   *
+   * That image is also the reason `interpretationHistory` must never see a
+   * supersession: it walks the map being looked back at, and a fork taken is
+   * not a step along it.
+   *
    * **`reinterpret` does not supersede**, which is the case that makes the
    * distinction load-bearing rather than tidy: the evidence is untouched and
    * only the reading moved.

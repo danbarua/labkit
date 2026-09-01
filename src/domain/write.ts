@@ -688,6 +688,25 @@ export class WriteSurface extends SessionCore {
                 `here to supersede; it concluded: ${named}`,
             );
           }
+
+          // **A finding falls once.** Naming `replacing` exempts this call from
+          // the withdrawn-proposition guard below -- the act that supersedes a
+          // finding is exactly the act allowed to restate it -- and without
+          // this that exemption reached a finding somebody else had already
+          // withdrawn. Two decisions would then stand instead of one claim,
+          // each naming a different successor, and no reader can say which
+          // holds: `withdrawalOf` picks whichever row it happens to see first.
+          //
+          // Found by S-3c's atomicity test, whose provoked failure this used to
+          // be. It is a stricter refusal than the one it replaces, and a
+          // narrower one -- it names the claim rather than the wording.
+          const gone = await this.supersessionOf(superseded.claim);
+          if (gone)
+            throw new Error(
+              `${superseded.claim} has already been superseded (${gone}), and a finding is ` +
+                `superseded once; supersede the finding that stands in its place, or record ` +
+                `this conclusion without naming one`,
+            );
         }
 
         // Inherited from what is being superseded, overridden when given. A
@@ -1545,10 +1564,25 @@ export class WriteSurface extends SessionCore {
       // supersedes -- so a conclusion the caller does not restate is simply not
       // superseded. That is #132's fix falling out of the decomposition rather
       // than being special-cased: coverage is which calls were made.
+      //
+      // **The pairing is resolved once and then reused**, rather than computed
+      // here and re-derived below for the report. Two derivations of one fact is
+      // this repo's most expensive shape: the `replaced` list on the emitted
+      // event would have been keyed by proposition while the SUPERSEDES edges
+      // were keyed by the caller's `replacing`, and S-3c is precisely a pair the
+      // proposition match cannot see -- so the record and the event describing
+      // it would have disagreed about which finding fell.
       const claims: ConcludedClaim[] = [];
       const replacementEvents: DomainEvent[] = [];
+      const paired: (RecordedConclusion | undefined)[] = [];
       for (const now of input.concludes) {
-        const was = before.find((b) => b.proposition === now.proposition);
+        // Explicit wins; the proposition match is the fallback the ordinary
+        // re-run relies on. See `ReplacementConclusion.replacing`.
+        const was =
+          now.replacing === undefined
+            ? before.find((b) => b.proposition === now.proposition)
+            : before.find((b) => b.claim === now.replacing || b.evidence === now.replacing);
+        paired.push(was);
         const concluded = await this.conclude({
           analysis: replacement,
           proposition: now.proposition,
@@ -1564,7 +1598,7 @@ export class WriteSurface extends SessionCore {
       const changed: ChangedConclusion[] = [];
       const unchanged: ConcludedClaim[] = [];
       for (const [i, now] of input.concludes.entries()) {
-        const was = before.find((b) => b.proposition === now.proposition);
+        const was = paired[i];
         const claim = claims[i]?.claim;
         if (!was || !claim) continue;
         if (was.finding === now.finding) unchanged.push({ claim, asserts: now.proposition });
@@ -1823,6 +1857,33 @@ export class WriteSurface extends SessionCore {
     });
     return [recorded];
   }
+  /**
+   * Why a claim no longer stands, or `undefined` if it does.
+   *
+   * **Both predicates, and AGE has no edge alternation** — `[:CHANGES|SUPERSEDES]`
+   * is a syntax error, so this is two clauses. Naming one is silent: the row is
+   * absent and the caller reads a withdrawn claim as standing.
+   *
+   * Claim grain, where `withdrawalOf` is proposition grain. The two answer
+   * different questions and both are wanted: whether the record has stopped
+   * asserting a sentence, and whether this particular finding has already
+   * fallen.
+   */
+  private async supersessionOf(claim: ClaimRef): Promise<string | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $id})
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       RETURN narrowed, replaced`,
+      {
+        narrowed: optional(vertexProps<{ reason: string }>()),
+        replaced: optional(vertexProps<{ reason: string }>()),
+      },
+      { id: claim },
+    );
+    return rows.map((r) => r.narrowed?.reason ?? r.replaced?.reason).find((r) => r !== undefined);
+  }
+
   private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(
       // Either bearing: an analysis whose findings all CHALLENGE returned no

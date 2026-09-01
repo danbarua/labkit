@@ -227,6 +227,34 @@ export interface ConcludeCommand {
   replacing?: ClaimRef | EvidenceRef;
 }
 
+/**
+ * One of a replacement's conclusions, and which earlier finding it stands in
+ * for.
+ *
+ * `Conclusion` plus `replacing`, rather than a field on `Conclusion` itself:
+ * `recordAnalysis` records a run that supersedes nothing, and no consumer has
+ * asked it to.
+ */
+export interface ReplacementConclusion extends Conclusion {
+  /**
+   * The earlier finding this one stands in for, named rather than inferred.
+   *
+   * **Inferred by proposition when absent**, which covers the ordinary re-run —
+   * the same claim, re-derived — and is why most callers never write this.
+   *
+   * It exists for the case that inference cannot reach: a correction that
+   * **reverses** its predecessor concludes a different proposition, so there is
+   * no wording to match on. S-3c is exactly that — a defective check said the
+   * folds disagreed, the corrected re-run says they agree — and until #132 it
+   * worked only because a replacement retracted the superseded analysis
+   * wholesale, by construction. That construction is #132's named root cause:
+   * a partial re-analysis, which is what Bonsai actually does, retracted
+   * findings the act never mentioned. Coverage is which conclusions the caller
+   * paired; one nobody pairs stands.
+   */
+  replacing?: ClaimRef | EvidenceRef;
+}
+
 /** `replaceAnalysis` — supersede a defective analysis, invalidating its output and withdrawing what cited it. */
 export interface ReplaceAnalysisCommand {
   supersedes: AnalysisRef;
@@ -235,7 +263,7 @@ export interface ReplaceAnalysisCommand {
   method: string;
   /** What the replacement read. {@link InputRef} — an earlier analysis's output counts. */
   from: InputRef[];
-  concludes: Conclusion[];
+  concludes: ReplacementConclusion[];
 }
 
 /** `reinterpret` — narrow what a claim is taken to mean, without re-running anything. */
