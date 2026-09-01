@@ -338,9 +338,7 @@ describe("every tool answers when an agent actually calls it", () => {
       const replacement = await call(c, "replace_analysis", {
         supersedes: id(first.analysis as Json),
         because: id(review),
-        enquiry: id(enquiry),
         method: "segmented fit",
-        from: [id(observations)],
       });
       // `replacing` names the one finding this supersedes, so a replacement
       // that revisits some of a run's conclusions leaves the rest standing.
@@ -468,6 +466,36 @@ describe("every tool answers when an agent actually calls it", () => {
       });
       expect(verdict.conflict).toBe(false);
       expect(verdict.relation).toBe("dissociation");
+
+      // `keep` — the other half of the same act: name what survives, and
+      // everything else the analysis concluded falls with it.
+      const twoFindings = await call(c, "record_analysis", {
+        enquiry: id(sparse),
+        method: "paired timing, two arms",
+        from: [id(sparseObs)],
+      });
+      const armOne = await call(c, "conclude", {
+        analysis: id(twoFindings.analysis as Json),
+        proposition: "arm one is faster",
+        finding: "1.4x",
+      });
+      await call(c, "conclude", {
+        analysis: id(twoFindings.analysis as Json),
+        proposition: "arm two is faster",
+        finding: "1.1x",
+      });
+      const kept = await call(c, "keep", {
+        keeping: [claimIn(armOne, "arm one is faster")],
+        because: id(
+          await call(c, "record_review", {
+            of: id(twoFindings.analysis as Json),
+            verdict: "arm two used the wrong baseline",
+          }),
+        ),
+        method: "paired timing, corrected baseline",
+      });
+      expect(kept.kept as string[]).toHaveLength(1);
+      expect((kept.superseded as Array<{ asserts: string }>)[0]!.asserts).toBe("arm two is faster");
 
       await call(c, "accept_as_unresolved", {
         enquiry: id(dense),

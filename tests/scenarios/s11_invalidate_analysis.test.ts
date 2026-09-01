@@ -422,10 +422,9 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     const replacement = (await events.all()).filter((e) => e.operation === "replaceAnalysis");
     expect(replacement).toHaveLength(1);
     expect(replacement[0]!.at).toBe(FIXED_NOW);
-    expect(replacement[0]!.detail).toMatchObject({
-      supersedes: analysis,
-      replaced: [expect.objectContaining({ proposition: "T beats rewired" })],
-    });
+    // Nothing kept: this replacement supersedes every conclusion of the
+    // analysis it revises, which is what `replace` means.
+    expect(replacement[0]!.detail).toMatchObject({ supersedes: analysis, keeping: [] });
 
     // Every research action left a trace, in order — one per action, not one
     // per write.
@@ -444,8 +443,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       "recordAnalysis",
       ...concluded(SIGN_FLIP_CONCLUSIONS.length),
       "recordReview",
-      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
+      // The revision first, then its findings: superseding happens when the
+      // successor is recorded, and each new conclusion is an act after it.
       "replaceAnalysis",
+      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
     ]);
   });
 });

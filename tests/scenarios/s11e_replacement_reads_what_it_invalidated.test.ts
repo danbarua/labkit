@@ -100,8 +100,12 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // rests on has been retracted — every finding in it superseded by this very
     // act. Read from the claim, because that is where a reader arrives.
     const resting = (await (await afterwards()).whySupported(report.claims[0]!.claim)).restingOn;
-    expect(resting).toHaveLength(1);
-    expect(resting[0]!.invalidated).toBe(true);
+    // **Two inputs, and that is the add-only rule.** The successor inherits
+    // what its predecessor read, and consumes the predecessor's own output
+    // besides, because this call named it. Only the second is retracted:
+    // every finding in it fell when the revision was recorded.
+    expect(resting).toHaveLength(2);
+    expect(resting.filter((r) => r.invalidated)).toHaveLength(1);
 
     // An ordinary input is unchanged, so the flag is a discriminator and not a
     // relabelling of every row.
@@ -142,13 +146,14 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // What was missing is the half that makes the doctrine honest — the reader
     // could not see, from this answer, that the sole input had been retracted.
     expect(why.supported).toBe(true);
-    expect(why.restingOn).toHaveLength(1);
-    expect(why.restingOn[0]!.invalidated).toBe(true);
+    expect(why.restingOn).toHaveLength(2);
+    expect(why.restingOn.filter((r) => r.invalidated)).toHaveLength(1);
 
     // And the enumerable route actually reaches this claim, which is what
     // "not automatic" is relying on. If it did not, `supported: true` would be
     // a wrong answer with no way to find out.
-    const affected = await later.whatDependsOn(why.restingOn[0]!.part);
+    const retracted = why.restingOn.find((r) => r.invalidated)!;
+    const affected = await later.whatDependsOn(retracted.part);
     expect(affected.claims.map((c) => c.claim)).toContain(report.claims[0]!.claim);
   });
 });

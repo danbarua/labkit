@@ -603,23 +603,22 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
       // Recording stage two on stage one was accepted all along.
       expect(String(stageOne).startsWith("COMP_")).toBe(true);
 
-      // Repairing it, on the same input, is now accepted too.
+      // Repairing it is now accepted too, and needs no `from` at all: the
+      // successor inherits what its predecessor read, which here is stage one
+      // by its COMP_ id.
       const repair = await call(client, "replace_analysis", {
         supersedes: stageTwo,
         because: id(review),
-        enquiry: id(enquiry),
         method: "stage two, corrected",
-        from: [stageOne],
       });
       expect(repair.failed).toBe(false);
-      await call(client, "conclude", {
+      expect(repair.body.supersedes).toEqual(stageTwo);
+      const corrected = await call(client, "conclude", {
         analysis: repair.body.replacement as string,
         replacing: p2,
         finding: "f2 corrected",
       });
-      // And the report names the input as the caller named it, rather than as
-      // an artefact relabelled "observations".
-      expect((repair.body.unaffected as Array<{ what: string }>)[0]!.what).toEqual(stageOne);
+      expect(corrected.failed).toBe(false);
 
       // The detour still works and is no longer the only route. It is what a
       // consumer had to do: ask why a claim was supported in order to learn

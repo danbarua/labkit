@@ -687,7 +687,9 @@ export class WriteSurface extends SessionCore {
         // What is being superseded, if anything — matched on whichever handle
         // the caller held; both come back from the act that recorded it.
         let superseded: RecordedConclusion | undefined;
-        let revision: { old: AnalysisRef; decision: string; because?: ReviewRef } | undefined;
+        let revision:
+          | { old: AnalysisRef; decision: Ref<"decision">; because?: ReviewRef }
+          | undefined;
         if (input.replacing !== undefined) {
           // **Scoped to the analysis this one revises, not to this one.** A
           // replacement supersedes findings of the analysis it replaced, so the
@@ -818,7 +820,7 @@ export class WriteSurface extends SessionCore {
    */
   private async revisedBy(
     analysis: AnalysisRef,
-  ): Promise<{ old: AnalysisRef; decision: string; because?: ReviewRef } | undefined> {
+  ): Promise<{ old: AnalysisRef; decision: Ref<"decision">; because?: ReviewRef } | undefined> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
        OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
@@ -834,7 +836,7 @@ export class WriteSurface extends SessionCore {
     if (!found) return undefined;
     return {
       old: ref("analysis", found.old.natural_id),
-      decision: found.d.natural_id,
+      decision: ref("decision", found.d.natural_id),
       ...(found.rev ? { because: ref("review", found.rev.natural_id) } : {}),
     };
   }
@@ -1628,6 +1630,18 @@ export class WriteSurface extends SessionCore {
             await this.graph.createEdge(decision.natural_id, "KEEPS", c.claim);
             continue;
           }
+          // **A finding falls once.** One already withdrawn by another act --
+          // narrowed by a reinterpretation, superseded by an earlier revision --
+          // cannot fall again here: two decisions would stand instead of one
+          // claim, each naming a different successor, and no reader can say
+          // which holds.
+          const gone = await this.supersessionOf(c.claim);
+          if (gone !== undefined)
+            throw new Error(
+              `${c.claim} "${c.proposition}" has already been withdrawn by ${gone}, so this ` +
+                `revision cannot supersede it as well and a finding falls once; keep it, ` +
+                `since it no longer stands on its own account`,
+            );
           await this.graph.createEdge(decision.natural_id, "SUPERSEDES", c.claim);
           superseded.push({ claim: c.claim, asserts: c.proposition });
         }
@@ -1827,7 +1841,7 @@ export class WriteSurface extends SessionCore {
    * asserting a sentence, and whether this particular finding has already
    * fallen.
    */
-  private async supersessionOf(claim: ClaimRef): Promise<string | undefined> {
+  private async supersessionOf(claim: ClaimRef): Promise<Ref<"decision"> | undefined> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id})
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
@@ -1839,9 +1853,10 @@ export class WriteSurface extends SessionCore {
       },
       { id: claim },
     );
-    return rows
+    const found = rows
       .map((r) => r.narrowed?.natural_id ?? r.replaced?.natural_id)
       .find((r) => r !== undefined);
+    return found === undefined ? undefined : ref("decision", found);
   }
 
   private async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {

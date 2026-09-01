@@ -79,6 +79,7 @@ import type {
   AnalysisRevision,
   RevisedFinding,
   AnalysisExplanation,
+  Ref,
 } from "./report";
 import { ref, isRefOfKind, KIND_BY_LABEL, kindOf } from "./report";
 import { compose, per, type Row } from "./facts";
@@ -1970,8 +1971,9 @@ export class ReadSurface extends SessionCore {
     // and carried forward exactly as a supporting one is, and reading one side
     // is silent.
     const now = await this.conclusionsIn(analysis);
-    const fell = await this.claimsFrom(revises.d.natural_id, "SUPERSEDES");
-    const kept = await this.claimsFrom(revises.d.natural_id, "KEEPS");
+    const decision = ref("decision", revises.d.natural_id);
+    const fell = await this.claimsFrom(decision, "SUPERSEDES");
+    const kept = await this.claimsFrom(decision, "KEEPS");
 
     // **Paired by proposition, and only where the proposition is unique on both
     // sides.** An analysis may assert the same sentence twice about different
@@ -2043,7 +2045,7 @@ export class ReadSurface extends SessionCore {
 
   /** The claims one decision points at over one edge. */
   private async claimsFrom(
-    decision: string,
+    decision: Ref<"decision">,
     edge: "SUPERSEDES" | "KEEPS",
   ): Promise<ConcludedClaim[]> {
     const rows = await this.graph.query(
@@ -2056,7 +2058,7 @@ export class ReadSurface extends SessionCore {
   }
 
   /** The wording of the finding bearing on a claim. */
-  private async findingText(claim: ClaimRef): Promise<string> {
+  private async findingText(claim: ClaimRef): Promise<Prose> {
     for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
       const rows = await this.graph.query(
         `MATCH (e:Evidence)-[:${bearing}]->(:Claim {natural_id: $id})

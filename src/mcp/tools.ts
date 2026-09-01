@@ -1063,20 +1063,19 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Supersede a defective analysis",
     description:
       "Record a corrected analysis in place of a defective one, citing the review that " +
-      "justified the retraction, and the lineage between them. Record its findings with " +
-      "`conclude`, passing `replacing` for each finding actually revisited; a conclusion of " +
-      "the superseded analysis that nothing names goes on standing, and so do the checks " +
-      "resting on it. `from` takes observation ids or the ids of earlier analyses whose " +
-      "output the replacement read, exactly as `record_analysis` does.",
+      "justified the retraction, and the lineage between them. **Every conclusion of the " +
+      "superseded analysis falls here** — use `keep` instead to carry some of them forward. " +
+      "Record the successor's own findings with `conclude`. It reads what its predecessor " +
+      "read; `from` adds to that.",
     inputSchema: {
       supersedes: z
         .string()
         .describe(`id of the analysis being replaced, e.g. ${ANALYSIS_PREFIX}2`),
       because: z.string().describe(`id of the review justifying it, e.g. ${REVIEW_PREFIX}1`),
-      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
       method: z.string().describe("what the replacement did"),
       from: z
         .array(z.string())
+        .optional()
         .describe(
           `ids the replacement read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
         ),
