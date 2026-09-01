@@ -114,16 +114,11 @@ export class ResearchSession {
  * or one nobody added, fails to compile **here** rather than three files away
  * in whichever fragment happened to call it.
  *
- * **It found something the day it was written**, which is the case for having
- * it: `conclude` — the primitive #173 is about — had no delegate at all. Every
- * scenario writes through a `ResearchSession`, none had called the new verb
- * directly yet, and a green suite is entirely compatible with a verb being
- * unreachable from the class that is supposed to expose it. Nothing else in
- * the repository would have said so.
- *
  * A type, not a test, because the claim is about signatures: a runtime check
  * could only see that the properties exist, and the drift worth catching is a
- * delegate that still exists and no longer matches.
+ * delegate that still exists and no longer matches. A verb with no delegate at
+ * all is invisible to the suite — every scenario writes through this class, and
+ * one nobody has called yet is simply never reached.
  */
 const _sessionDelegatesEveryResearchVerb: ResearchWrites = null as unknown as ResearchSession;
 void _sessionDelegatesEveryResearchVerb;

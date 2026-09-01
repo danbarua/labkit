@@ -188,8 +188,7 @@ beforeAll(async () => {
     criterion,
   ]);
   const analysis = recorded.analysis as string;
-  // A second call, because `analyse` records the run and `conclude` records a
-  // finding. Findings arrive over days, one at a time (#173).
+  // A second call: `analyse` records the run, `conclude` records a finding.
   const concluded = await out([
     "conclude",
     analysis,

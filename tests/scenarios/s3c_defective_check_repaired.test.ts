@@ -231,10 +231,7 @@ describe("S-3c: the check was wrong, not the result", () => {
           proposition: AGREES,
           finding: "median p = 0.04",
           // The correction REVERSES its predecessor, so there is no shared
-          // proposition to pair them by and the caller has to say. Before #132
-          // it needed saying nowhere, because a replacement retracted the whole
-          // superseded analysis by construction -- which is that issue's root
-          // cause, not a convenience.
+          // proposition to pair them by, so the caller names it.
           replacing: claimOf(defectiveClaims, DISAGREES),
         },
       ],
@@ -314,10 +311,7 @@ describe("S-3c: the check was wrong, not the result", () => {
           proposition: AGREES,
           finding: "median p = 0.04",
           // The correction REVERSES its predecessor, so there is no shared
-          // proposition to pair them by and the caller has to say. Before #132
-          // it needed saying nowhere, because a replacement retracted the whole
-          // superseded analysis by construction -- which is that issue's root
-          // cause, not a convenience.
+          // proposition to pair them by, so the caller names it.
           replacing: claimOf(defectiveClaims, DISAGREES),
         },
       ],
@@ -399,10 +393,7 @@ describe("S-3c: the check was wrong, not the result", () => {
           proposition: AGREES,
           finding: "median p = 0.04",
           // The correction REVERSES its predecessor, so there is no shared
-          // proposition to pair them by and the caller has to say. Before #132
-          // it needed saying nowhere, because a replacement retracted the whole
-          // superseded analysis by construction -- which is that issue's root
-          // cause, not a convenience.
+          // proposition to pair them by, so the caller names it.
           replacing: claimOf(failedClaims, DISAGREES),
         },
       ],
@@ -500,10 +491,7 @@ describe("S-3c: the check was wrong, not the result", () => {
           proposition: AGREES,
           finding: "median p = 0.04",
           // The correction REVERSES its predecessor, so there is no shared
-          // proposition to pair them by and the caller has to say. Before #132
-          // it needed saying nowhere, because a replacement retracted the whole
-          // superseded analysis by construction -- which is that issue's root
-          // cause, not a convenience.
+          // proposition to pair them by, so the caller names it.
           replacing: claimOf(defectiveClaims, DISAGREES),
         },
       ],
@@ -523,22 +511,17 @@ describe("S-3c: the check was wrong, not the result", () => {
   });
 
   /**
-   * External review, finding 1 — the blocking one, as a negative test.
+   * A replacement that cannot be completed must leave nothing behind.
    *
-   * `replaceAnalysis()` invalidates the superseded output *before* recording
-   * the replacement. Since S-3c, invalidating an output withdraws the criterion
-   * evaluations that cited it, so a failure can stop counting. If the
-   * replacement write then fails, the record is left with a failure that no
-   * longer decides its check and no corrected check in existence — a partially
-   * committed scientific state, which is the thing LabKit exists to prevent.
+   * Replacing an analysis withdraws the criterion evaluations that cited its
+   * findings, so a failure can stop counting. If the replacement's own writes
+   * then fail, the record would hold a failure that no longer decides its check
+   * and no corrected check in existence — a partially committed scientific
+   * state, which is the thing LabKit exists to prevent.
    *
-   * The failure is provoked through a real guard rather than a mock. **Which
-   * guard changed with #173** and the comment is worth keeping accurate: it
-   * used to be `recordAnalysis()` refusing to re-assert a withdrawn
-   * proposition, and it is now `conclude()` refusing to supersede a finding
-   * that has already been superseded. The narrowing below is what makes the
-   * second half of the replacement impossible either way; the difference is
-   * that the refusal now names the claim rather than the wording.
+   * The failure is provoked through a real guard rather than a mock: the
+   * narrowing below withdraws the finding, and `conclude()` refuses to
+   * supersede one that has already been superseded.
    */
   test("a replacement that cannot be completed leaves the earlier failure standing", async () => {
     const { robustness, enquiry, observations, analysisClaims } =

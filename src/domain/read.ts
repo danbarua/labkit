@@ -670,10 +670,8 @@ export class ReadSurface extends SessionCore {
        MATCH (u)-[:USES]->(comp:Computation)
        OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
        OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
-       // Supersession, per claim. This was read off Artefact.invalidated --
-       // one flag over every finding an analysis produced, so replacing one
-       // conclusion reported the rest superseded too (#132). Same pair
-       // withdrawalOf reads: a decision that changed which claim stands.
+       // Supersession, per claim -- the same pair withdrawalOf reads: a
+       // decision that stands instead of this one.
        OPTIONAL MATCH (d:Decision)-[:SUPERSEDES]->(c)
        // Which review THIS retraction rested on (row O), at the grain the
        // question is asked. Distinct from the 'r' above, which is any review of
@@ -1575,18 +1573,12 @@ export class ReadSurface extends SessionCore {
           method: row.comp.kind,
           analysis: ref("analysis", row.comp.natural_id),
         };
-        // **Per claim, not per artefact.** `row.a?.invalidated` decided this
-        // until 2026-09-01: one flag over every finding an analysis produced,
-        // so replacing one conclusion reported the others superseded and
-        // withdrew the evaluations citing them (#132). A decision that changed
-        // *this* claim is the honest grain, and it is the same fact
-        // `withdrawalOf` reads.
+        // **Per claim, not per artefact**: a decision that changed *this*
+        // claim, which is the same fact `withdrawalOf` reads. An artefact-grain
+        // answer could only say why the whole *analysis* was replaced.
         //
-        // The reason now comes from that decision rather than from
-        // INVALIDATED_BY, which was an artefact-grain answer to a per-finding
-        // question — it could only ever say why the *analysis* was replaced.
-        // Row O's defect stays fixed: still deduped, and still one reason per
-        // finding rather than one per review of its unit.
+        // Deduped, and one reason per finding rather than one per review of
+        // its unit.
         if (row.d) {
           if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
             superseded.push({
@@ -1758,10 +1750,7 @@ export class ReadSurface extends SessionCore {
               {
                 part: ref("observations", r.a.natural_id),
                 name: r.a.logical_name,
-                // Computed, not stored. `r.a.invalidated` said this until
-                // 2026-09-01, and a partial replacement no longer sets it --
-                // so a reader resting on a record whose findings had all been
-                // superseded was told nothing. See `retractedArtefacts`.
+                // Computed, not stored -- see `retractedArtefacts`.
                 ...(retractedInputs.has(ref("observations", r.a.natural_id))
                   ? { invalidated: true as const }
                   : {}),
@@ -2011,22 +2000,17 @@ export class ReadSurface extends SessionCore {
        ${this.withinScope(scope)}
        MATCH (u)-[:USES]->(comp:Computation)
        MATCH (comp)-[:CONSUMES]->(a:Artefact)
-       // **Per claim, not per artefact.** This filtered on
-       // out.invalidated -- one flag over every finding an analysis produced,
-       // so a partial replacement dropped the inputs of conclusions it never
-       // touched (#132). A finding stops counting when a decision stands
-       // instead of the claim it bears on.
+       // **Per claim, not per artefact**: a finding stops counting when a
+       // decision stands instead of the claim it bears on.
        //
-       // Two clauses, because AGE has no edge alternation, and filtered in
-       // TypeScript because AGE has no NOT (pattern) predicate in WHERE either
-       // -- both traps are in CLAUDE.md and the second is a syntax error, not
-       // a silent wrong answer.
+       // Two clauses, because AGE has no edge alternation; filtered in
+       // TypeScript, because it has no NOT (pattern) predicate in WHERE.
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
        RETURN a, e, narrowed, replaced`,
         {
-          // `natural_id` because `restingOn` deduplicates by identity, not by
-          // name — see S-9d.
+          // `natural_id` because `restingOn` deduplicates by identity: two
+          // artefacts can share a `logical_name`.
           a: vertexProps<ArtefactProps & { natural_id: string }>(),
           e: vertexProps<{ natural_id: string }>(),
           narrowed: optional(vertexProps<{ natural_id: string }>()),
@@ -2040,16 +2024,13 @@ export class ReadSurface extends SessionCore {
   /**
    * The artefacts among these whose every recorded finding has been superseded.
    *
-   * **Every, not any**, and that is #132 in one word. An artefact holds one
-   * finding per conclusion its analysis drew; replacing one of them leaves the
-   * rest standing, and so leaves the artefact a live record that a reader may
-   * still rest on. Only when nothing in it stands has the record itself been
-   * retracted.
+   * **Every, not any.** An artefact holds one finding per conclusion its
+   * analysis drew; replacing one leaves the rest standing, and so leaves the
+   * artefact a live record a reader may still rest on. Only when nothing in it
+   * stands has the record itself been retracted.
    *
-   * It replaces `Artefact.invalidated`, which said the same thing for the
-   * all-or-nothing case and the wrong thing for every other. An artefact
-   * holding no findings at all is not retracted — there is nothing to have
-   * fallen, which is PJ-011 §5's distinction between empty and wrong.
+   * An artefact holding no findings at all is **not** retracted: there is
+   * nothing in it to have fallen.
    */
   private async retractedArtefacts(ids: ObservationsRef[]): Promise<Set<ObservationsRef>> {
     if (ids.length === 0) return new Set();
@@ -2059,8 +2040,7 @@ export class ReadSurface extends SessionCore {
        // The supersession check is supersededClaim() below, per claim, not a
        // clause here: it reads BOTH predicates, and this query has no way to
        // ask for "neither" -- AGE has no NOT (pattern) predicate in WHERE. Two
-       // clauses binding nothing returned used to sit here, which made the
-       // query look like it did the check it does not do.
+       // ask for "neither" in one clause.
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sup:Claim)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(chal:Claim)
        RETURN a, e, sup, chal`,

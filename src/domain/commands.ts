@@ -186,13 +186,10 @@ export interface AmendDesignCommand {
 }
 
 /**
- * `conclude` — assert one thing an analysis found. **The primitive.**
+ * `conclude` — assert one thing an analysis found.
  *
  * One conclusion, one call, one event. `recordAnalysis`, `replaceAnalysis` and
- * `reverify` are compositions over this, and the CLI and MCP expose only this,
- * because the compound form was a transaction boundary drawn around the graph's
- * convenience rather than around what a person does — Bonsai's researchers
- * wrote `FINDINGS.md` over days, one conclusion at a time (#173).
+ * `reverify` compose it; both surfaces expose this one.
  *
  * `proposition` is required **unless** `replacing` is given, in which case it
  * and `bearing` are inherited from the finding being superseded. Passing both is
@@ -218,11 +215,9 @@ export interface ConcludeCommand {
   /**
    * The single finding this supersedes — a claim or an evidence handle.
    *
-   * **Evidence grain, which is what #132 turned on.** `replaceAnalysis` used to
-   * invalidate the superseded *output artefact*, one flag over every conclusion
-   * the analysis produced, so replacing one finding retracted the others. Naming
-   * them one at a time makes coverage exactly the calls the caller made: a
-   * conclusion nobody names stands, and so does everything citing it.
+   * **One finding, not an analysis.** Coverage is exactly the calls the caller
+   * made: a conclusion nothing names goes on standing, and so does everything
+   * citing it.
    */
   replacing?: ClaimRef | EvidenceRef;
 }
@@ -232,39 +227,27 @@ export interface ConcludeCommand {
  * for.
  *
  * `Conclusion` plus `replacing`, rather than a field on `Conclusion` itself:
- * `recordAnalysis` records a run that supersedes nothing, and no consumer has
- * asked it to.
+ * `recordAnalysis` records a run that supersedes nothing.
  */
 export interface ReplacementConclusion extends Conclusion {
   /**
-   * The earlier finding this one stands in for, named rather than inferred.
+   * The earlier finding this one stands in for.
    *
    * **Inferred by proposition when absent**, which covers the ordinary re-run —
-   * the same claim, re-derived — and is why most callers never write this.
+   * the same claim, re-derived — so most callers never write this. Name it when
+   * the correction *reverses* its predecessor: the two then assert different
+   * propositions and there is no wording to match on.
    *
-   * It exists for the case that inference cannot reach: a correction that
-   * **reverses** its predecessor concludes a different proposition, so there is
-   * no wording to match on. S-3c is exactly that — a defective check said the
-   * folds disagreed, the corrected re-run says they agree — and until #132 it
-   * worked only because a replacement retracted the superseded analysis
-   * wholesale, by construction. That construction is #132's named root cause:
-   * a partial re-analysis, which is what Bonsai actually does, retracted
-   * findings the act never mentioned. Coverage is which conclusions the caller
-   * paired; one nobody pairs stands.
+   * Two things the inference will not do:
    *
-   * Two guards on that inference, both about not guessing:
-   *
-   * - **It is composition-only.** `conclude` itself never matches on wording —
-   *   a caller at the CLI or over MCP names the finding it supersedes or
-   *   supersedes nothing. There the proposition is the agent's own sentence and
-   *   matching it would be a guess about someone else's words; here the caller
-   *   handed in a whole list to be paired against another whole list.
+   * - **It is composition-only.** `conclude` never matches on wording, because
+   *   there the proposition is the caller's own sentence and matching it would
+   *   guess at another caller's words. Only `replaceAnalysis`, handed a whole
+   *   list to pair against another whole list, infers.
    * - **An ambiguous match is refused, not picked.** Two conclusions of one
-   *   analysis may assert the same sentence about different endpoints — S-5's
-   *   case, and the reason a claim has a handle of its own — so
-   *   `replaceAnalysis` refuses when the wording matches more than one and asks
-   *   for this field. Taking the first would be a coin toss recorded as a fact,
-   *   which is what `claimsAsserting` already refuses to do.
+   *   analysis may assert the same sentence about different endpoints, so a
+   *   wording match can name two; `replaceAnalysis` then refuses and asks for
+   *   this field rather than taking the first.
    */
   replacing?: ClaimRef | EvidenceRef;
 }

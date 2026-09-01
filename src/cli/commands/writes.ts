@@ -127,9 +127,8 @@ export function registerWrites(program: Command, run: Run): void {
     .command("analyse")
     .summary("record a computation and what it read")
     .description(
-      "The run itself: a computation, its evidence unit, and an output artefact. Findings are " +
-        "added with `labkit conclude`, one at a time, as they are reached. Answers with the " +
-        "analysis handle, which is what `conclude` takes.",
+      "Records the run: a computation, its evidence unit, and an output artefact. Answers with " +
+        "the analysis handle, which is what `labkit conclude` takes to add each finding.",
     )
     .argument("<enquiry-id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what was done")
@@ -164,10 +163,8 @@ export function registerWrites(program: Command, run: Run): void {
     .command("conclude")
     .summary("assert one thing an analysis found")
     .description(
-      "The primitive. One conclusion, one call — findings arrive over days, one at a time, and " +
-        "the compound form made a caller serialise a tree through flat flags. Give " +
-        "--replacing to supersede exactly one earlier finding: the proposition and bearing are " +
-        "then inherited, and a finding nobody names stands.",
+      "One conclusion per call. --replacing supersedes exactly one earlier finding and " +
+        "inherits its proposition and bearing; a finding nothing names goes on standing.",
     )
     .argument("<analysis-id>", "the analysis this conclusion belongs to", handle("analysis"))
     .requiredOption("--finding <text>", "what was found, in this analysis's own words")
@@ -448,10 +445,9 @@ export function registerWrites(program: Command, run: Run): void {
     .command("replace")
     .summary("supersede a defective analysis with a corrected one")
     .description(
-      "Records the replacement and the lineage to what it supersedes. Its findings are added " +
-        "with `labkit conclude --replacing <claim>`, one per finding actually revisited — a " +
-        "re-analysis that addresses three of four conclusions leaves the fourth standing, " +
-        "which is what a whole-analysis retraction could not express (#132).",
+      "Records the replacement and the lineage to what it supersedes. Add its findings with " +
+        "`labkit conclude --replacing <claim>`, one per finding actually revisited; a " +
+        "conclusion of the superseded analysis that nothing names goes on standing.",
     )
     .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
     .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))

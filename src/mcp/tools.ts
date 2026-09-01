@@ -377,8 +377,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "The claims asserting a sentence. **The one place wording is resolved**: every other " +
       "tool takes a claim id, and this is how a caller holding only text finds one. Returns " +
       "all matches rather than picking — two lines of enquiry can assert the same sentence " +
-      "about different endpoints, and they are two claims (S-5). `record_analysis` hands back " +
-      "claim ids directly, so an agent that recorded the work never needs this.",
+      "about different endpoints, and they are two claims. `conclude` hands back the claim id " +
+      "directly, so an agent that recorded the work never needs this.",
     inputSchema: {
       proposition: z.string().describe("the sentence, as worded"),
     },
@@ -632,14 +632,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     name: "record_analysis",
     title: "Record a computation and what it read",
     description:
-      "The run itself: a computation, what it read, and an artefact to hold its output. Call " +
-      "`conclude` for each finding it reached — findings arrive one at a time, and an " +
-      "analysis with none yet is an honest state. `from` takes observation ids or the ids of " +
-      "earlier analyses whose output this one read — a two-stage pipeline records the second " +
-      "stage as consuming the first, never by re-entering the intermediate as if it were " +
-      "fresh measurement. `held_to` names prespecified checks the conclusions must answer to; " +
-      "a check nobody runs still counts against the finding, so it is named here and not at " +
-      "evaluation time.",
+      "Records the run: a computation, what it read, and an artefact to hold its output. Call " +
+      "`conclude` for each finding it reached; an analysis with none yet is a valid state. " +
+      "`from` takes observation ids or the ids of earlier analyses whose output this one " +
+      "read — a two-stage pipeline records the second stage as consuming the first, never by " +
+      "re-entering the intermediate as if it were fresh measurement. `held_to` names " +
+      "prespecified checks the conclusions must answer to; a check nobody runs still counts " +
+      "against the finding, so it is named here and not at evaluation time.",
     inputSchema: {
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
       method: z.string().describe("what was done"),
@@ -713,13 +712,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     name: "conclude",
     title: "Assert one thing an analysis found",
     description:
-      "The primitive. One conclusion, one call — a researcher reaches findings one at a time, " +
-      "over days, and the compound form made a caller serialise a tree in order to record " +
-      "them. `replacing` supersedes exactly one earlier finding, naming its claim or evidence " +
-      "id: `proposition` and `bearing` are then inherited, and a finding nobody names stands. " +
-      "That is what lets a re-analysis address three of four conclusions and leave the fourth " +
-      "alone. `replacing` is only accepted on an analysis that `replace_analysis` recorded as " +
-      "superseding the one that concluded it.",
+      "One conclusion per call. `replacing` supersedes exactly one earlier finding, named by " +
+      "its claim or evidence id, and inherits its `proposition` and `bearing`; a conclusion " +
+      "nothing names goes on standing. `replacing` is accepted only on an analysis that " +
+      "`replace_analysis` recorded as superseding the one that concluded the named finding.",
     inputSchema: {
       analysis: z
         .string()
@@ -1011,11 +1007,11 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Supersede a defective analysis",
     description:
       "Record a corrected analysis in place of a defective one, citing the review that " +
-      "justified the retraction, and the lineage between them. Its findings are recorded " +
-      "with `conclude`, passing `replacing` for each finding actually revisited — so a " +
-      "re-analysis that addresses three of four conclusions leaves the fourth standing, and " +
-      "so do the checks resting on it. `from` takes observation ids or the ids of earlier " +
-      "analyses whose output the replacement read, exactly as `record_analysis` does.",
+      "justified the retraction, and the lineage between them. Record its findings with " +
+      "`conclude`, passing `replacing` for each finding actually revisited; a conclusion of " +
+      "the superseded analysis that nothing names goes on standing, and so do the checks " +
+      "resting on it. `from` takes observation ids or the ids of earlier analyses whose " +
+      "output the replacement read, exactly as `record_analysis` does.",
     inputSchema: {
       supersedes: z
         .string()

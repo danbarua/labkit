@@ -240,8 +240,7 @@ describe("an agent can track work through the tools alone", () => {
         method: "paired comparison",
         from: [id(observations)],
       });
-      // Two calls, because the run and the finding are two acts. An agent
-      // records the analysis, then concludes as it reaches each finding.
+      // Two calls, because the run and the finding are two acts.
       const concluded = await call(c, "conclude", {
         analysis: id(analysis),
         proposition: PROP,

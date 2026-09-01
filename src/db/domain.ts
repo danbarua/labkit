@@ -390,62 +390,40 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   /**
    * **A later record stands instead of an earlier one.**
    *
-   * The line between this and {@link CHANGES} is what keeps either honest, and
-   * it was drawn by a reader that broke without it:
+   * The line between this and {@link CHANGES}:
    *
-   * - `CHANGES` — the *same evidence read differently*. A reading narrowed
-   *   (S-12), a condition amended (S-7). Nothing is replaced; the record still
-   *   stands and its meaning moved.
+   * - `CHANGES` — the *same evidence read differently*. A reading narrowed, a
+   *   condition amended. Nothing is replaced; the record still stands and its
+   *   meaning moved.
    * - `SUPERSEDES` — *this stands instead of that*. An amendment over an
    *   amendment, a corrected finding over a defective one, a re-analysis over
    *   the analysis it replaced.
-   *
-   * Dan's own line for it, which is the sentence to pattern-match on rather
-   * than any paraphrase of it:
    *
    * > supersedes is a substitution of one record for another; the research
    * > journey follows a different fork in the road. changes = looking back at
    * > the map — same thing, interpreted differently from a perspective further
    * > down the road.
    *
-   * That image is also the reason `interpretationHistory` must never see a
-   * supersession: it walks the map being looked back at, and a fork taken is
-   * not a step along it.
+   * That image is the rule for readers. `interpretationHistory` must never see
+   * a supersession — it walks the map being looked back at, and a fork taken is
+   * not a step along it. Both decisions change exactly one claim and motivate
+   * exactly one, so there is no structural discriminator: a reader that wants
+   * one of the two readings has to select on the label.
    *
-   * **`reinterpret` does not supersede**, which is the case that makes the
-   * distinction load-bearing rather than tidy: the evidence is untouched and
-   * only the reading moved.
+   * Who reads which:
    *
-   * ## The measurement that earned the two `Decision` pairs below
+   * - `interpretationHistory` — `CHANGES` only.
+   * - `withdrawalOf` — both. A claim no longer stands whether its reading was
+   *   narrowed or its finding superseded.
+   * - `whySupported` — `SUPERSEDES`, for *instead of*.
    *
-   * #173 first wrote per-finding supersession as `CHANGES -> Claim`, argued as
-   * one reading — *this decision changed which claim stands*. Building it
-   * refuted the argument. `interpretationHistory` walks
-   * `Decision -MOTIVATES-> Claim` with `-CHANGES-> Claim` to build a narrowing
-   * chain, so a replacement entered the interpretation history and looped it:
+   * `reinterpret` does not supersede: the evidence is untouched and only the
+   * reading moved.
    *
-   *     interpretation history for "…" loops at "…"
-   *
-   * There is no structural discriminator — both decisions change exactly one
-   * claim and motivate exactly one. So the edge did carry two readings and a
-   * reader that wanted one got both. **That is the third instance of this
-   * project's most expensive shape**, after `PROMOTES` (split out of `CHANGES`
-   * because promotion read as retraction) and row V's `GATES`.
-   *
-   * ## Who reads which
-   *
-   * - `interpretationHistory` reads `CHANGES` only — a supersession is not a
-   *   step in a narrowing chain.
-   * - `withdrawalOf` reads both: a claim no longer stands whether its reading
-   *   was narrowed or its finding was superseded.
-   * - `whySupported` reads `SUPERSEDES` for *instead of*.
-   *
-   * The `Computation` pair is analysis-grain **lineage**: this analysis is a
+   * The `Computation` pair is analysis-grain **lineage** — this analysis is a
    * revision of that one. It says nothing about the standing of the old
-   * analysis's conclusions — no reader may infer that they fell from this
-   * edge's existence. Retraction is one grain lower, per finding, which is
-   * exactly #132's fix: the old code carried it on `Artefact.invalidated`, one
-   * flag over every finding, so replacing one conclusion withdrew the rest.
+   * analysis's conclusions, and no reader may infer that they fell from this
+   * edge existing. Retraction is one grain lower, per finding.
    */
   SUPERSEDES: [
     ["Decision", "Decision"],
@@ -486,39 +464,21 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * a retraction, demonstrated in two worlds that differ only in which review
    * the researcher acted on and that the read surface could not tell apart.
    *
-   * **Not `EVALUATES`.** `Review -> Evidence` already exists and means *this
-   * was reviewed*; using it for *this caused the retraction* is one edge with
-   * two readings, which CLAUDE.md names as the failure shape behind every
-   * expensive mistake here. `PROMOTES` was split from `CHANGES` for exactly
-   * this reason.
-   *
-   * **Not `BASED_ON`.** Semantically it fits — the invalidation rested on this
-   * review — and that is the trap. Row AA is a live `boundary` recording that
-   * `BASED_ON` already carries two senses, and a third would widen a row while
-   * closing this one. Its sources are also judgments (`Decision`,
-   * `CriterionEvaluation`); an `Artefact` is not one.
+   * **Not `EVALUATES`**, which means *this was reviewed*; and not `BASED_ON`,
+   * whose sources are judgments (`Decision`, `CriterionEvaluation`) where an
+   * `Artefact` is not one.
    *
    * The direction is passive, like `BASED_ON` and `RECORDED_IN`, because a
    * review does not retract anything — a researcher does, on the strength of it.
    *
-   * ## Two sources, and the second is the one row O actually wanted
+   * **Two sources, at two grains, and a reader needs to know which it has.**
+   * `Artefact -> Review` answers *why was this analysis replaced?* and nothing
+   * narrower: one edge covers every finding the analysis produced, so a
+   * replacement that revisits some of them has no single answer to it.
+   * `Decision -> Review` is written on the per-finding decision a supersession
+   * mints, and answers *why is this finding no longer standing?*
    *
-   * `Artefact -> Review` was the original, on the reasoning that the artefact
-   * is the thing whose standing changed and the thing a reader is holding when
-   * the question arises. **That is artefact grain, and #132 is the bill for
-   * it**: one edge over every finding an analysis produced, so it could only
-   * ever answer *why was this analysis replaced?* — and a partial replacement
-   * has no single answer to that.
-   *
-   * `Decision -> Review` is the same fact one grain lower. `conclude
-   * --replacing` mints a decision per superseded finding, and this says which
-   * review that particular retraction rested on. Row O's question — *why is
-   * this finding no longer standing?* — is asked of a finding, and now
-   * answered at that grain.
-   *
-   * Both endpoints stay. The artefact edge is still written and still read as
-   * a fallback, and it remains the honest answer to the question it can
-   * actually answer.
+   * Both are written and both are read; the artefact edge is the fallback.
    */
   INVALIDATED_BY: [
     ["Artefact", "Review"],

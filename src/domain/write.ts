@@ -177,25 +177,18 @@ const noFindingBearsOn = (claim: ClaimRef): string =>
 /**
  * The write verbs a research *move* needs — what a fragment depends on.
  *
- * **Structural, and that is the point.** A fragment in `fragments/` composes a
- * few of these into one thing a researcher did. It has no business depending on
- * `WriteSurface` the class, which carries 28 members it never calls — protected
- * helpers, the event sink, `SessionCore`'s internals — and that dependency was
- * not merely untidy, it was **load-bearing in the wrong direction**.
+ * **Narrower than `WriteSurface` on purpose.** A fragment composes a few of
+ * these into one thing a researcher did; the class carries 28 members it never
+ * calls — protected helpers, the event sink, `SessionCore`'s internals.
  *
- * Measured 2026-09-01: `ResearchSession` *composes* a `WriteSurface` rather
- * than extending one, so it is not assignable to it —
- * `TS2740: missing … posed, pursued, standingFindings, recorded, and 24 more`
- * — and `writes` is private, so there is no accessor either. A scenario holds a
- * `ResearchSession`. It therefore **could not call a fragment at all**, and
- * `tests/fragments.test.ts` builds a bare `WriteSurface` to get past it, saying
- * so in a comment.
+ * Depending on the class also excludes `ResearchSession`, which *composes* a
+ * `WriteSurface` rather than extending one and keeps `writes` private, so it is
+ * not assignable:
  *
- * That matters beyond the inconvenience. `fragments/index.ts`'s header explained
- * its absence from `tests/` as a *choice* — "someone would import it into a
- * scenario" — while this barrier made the import impossible regardless. A true
- * sentence naming the wrong reason, which is the defect class CLAUDE.md's
- * document rule is about, found in a type rather than in prose.
+ *     TS2740: missing … posed, pursued, standingFindings, recorded, and 24 more
+ *
+ * A scenario holds a `ResearchSession`, so with the class as the dependency it
+ * cannot call a fragment at all.
  *
  * Naming the dependency here rather than inside `fragments/` is what lets
  * `ResearchSession` be checked against it (see `./session.ts`): a delegating
@@ -597,18 +590,8 @@ export class WriteSurface extends SessionCore {
    * Assert one thing an analysis found. **The primitive the compound verbs are
    * built from.**
    *
-   * `recordAnalysis` used to take an array of these and mint them in one call,
-   * and that array was a transaction boundary drawn around the graph's
-   * convenience rather than around what a person does. Bonsai's researchers
-   * wrote `FINDINGS.md` over days, one conclusion at a time; the compound form
-   * made them serialise a tree through flat flags, which is why exactly three of
-   * eighteen CLI commands took JSON and they were exactly the three that mint
-   * conclusions (#173).
-   *
-   * **One conclusion, one call, one event.** That is not a relaxation of
-   * one-act-one-event — it is that rule read as written. The log must not record
-   * *implementation steps*, and concluding four things is four things a
-   * researcher did.
+   * A conclusion is a research act of its own: a run draws its findings one at a
+   * time, and each is recorded when it is reached.
    *
    * ## `replacing` supersedes exactly one finding, and needs no new edge
    *
@@ -633,11 +616,8 @@ export class WriteSurface extends SessionCore {
    * ## What is not written
    *
    * **The output artefact's `invalidated` flag is untouched.** A flag over the
-   * whole artefact summarises the standing of every finding it carries, which is
-   * what made `replaceAnalysis` retract untouched conclusions (#132). Standing
-   * lives per finding and `whySupported` computes it. That is the same verdict
-   * `Task.is_open` and `DecisionProps.is_open` got — stored state a computed
-   * answer already covers.
+   * whole artefact would summarise the standing of every finding it carries.
+   * Standing is per finding, and `whySupported` computes it.
    */
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.concludeOne(input);
@@ -730,7 +710,7 @@ export class WriteSurface extends SessionCore {
           );
 
         // What is being superseded, if anything — matched on whichever handle
-        // the caller held, since #162 hands back both.
+        // the caller held; both come back from the act that recorded it.
         let superseded: RecordedConclusion | undefined;
         if (input.replacing !== undefined) {
           // **Scoped to the analysis this one revises, not to this one.** A
@@ -766,9 +746,7 @@ export class WriteSurface extends SessionCore {
           // each naming a different successor, and no reader can say which
           // holds: `withdrawalOf` picks whichever row it happens to see first.
           //
-          // Found by S-3c's atomicity test, whose provoked failure this used to
-          // be. It is a stricter refusal than the one it replaces, and a
-          // narrower one -- it names the claim rather than the wording.
+          // The refusal names the claim, not the wording.
           const gone = await this.supersessionOf(superseded.claim);
           if (gone)
             throw new Error(
@@ -1227,11 +1205,9 @@ export class WriteSurface extends SessionCore {
         return { analysis, original };
       });
 
-      // **Re-verifying is one act, and the emit comes last.** It used to come
-      // first and the conclusion followed it, which put every node and edge the
-      // conclusion minted after the drain -- so the event for a re-verification
-      // reported a computation and none of the finding that is the whole point
-      // of running one. See `concluding`.
+      // The conclusion first, then the edge, then the emit: `emit` drains what
+      // has been minted since the last event, so anything written after it
+      // lands in the next act's event instead of this one.
       const concluded = await this.concluding({
         analysis: verification.analysis,
         proposition: input.concludes.proposition,
@@ -1555,17 +1531,10 @@ export class WriteSurface extends SessionCore {
         await this.assertReviewOf(input.because, input.supersedes);
         const before = await this.conclusionsOf(input.supersedes);
 
-        // **The superseded output is NOT invalidated, and that is #132's fix.**
-        // A flag on the artefact summarises the standing of every finding it
-        // carries, so replacing one conclusion retracted the others -- an
-        // untouched claim, and every evaluation citing it, withdrawn by an act
-        // that never named them. Standing lives per finding now: each
-        // `conclude --replacing` supersedes exactly one, and coverage is which
-        // calls the caller made.
-        //
-        // Same verdict `Task.is_open` and `DecisionProps.is_open` got -- stored
-        // state a computed answer already covers. `whySupported` computes
-        // standing from `Decision -CHANGES-> Claim`, which is per claim.
+        // **The superseded output is NOT invalidated.** A flag on the artefact
+        // would summarise the standing of every finding it carries, and
+        // standing is per finding: each `conclude --replacing` supersedes
+        // exactly one, and coverage is which calls the caller made.
         const output = await this.outputArtefactOf(input.supersedes);
         // Which review this rested on, recorded rather than validated and
         // discarded (row O). `because` was checked against the analysis and then
@@ -1632,18 +1601,13 @@ export class WriteSurface extends SessionCore {
       // analysis's claims and the replacement's share no handle, and "the same
       // proposition, re-derived" is precisely what the caller asserts by passing
       // them.
-      // Each conclusion is its own act now, and each names the finding it
-      // supersedes -- so a conclusion the caller does not restate is simply not
-      // superseded. That is #132's fix falling out of the decomposition rather
-      // than being special-cased: coverage is which calls were made.
+      // Each conclusion names the finding it supersedes, so one the caller does
+      // not restate is not superseded.
       //
-      // **The pairing is resolved once and then reused**, rather than computed
-      // here and re-derived below for the report. Two derivations of one fact is
-      // this repo's most expensive shape: the `replaced` list on the emitted
-      // event would have been keyed by proposition while the SUPERSEDES edges
-      // were keyed by the caller's `replacing`, and S-3c is precisely a pair the
-      // proposition match cannot see -- so the record and the event describing
-      // it would have disagreed about which finding fell.
+      // **The pairing is resolved once and reused** by the report below. Two
+      // derivations would key the emitted event's `replaced` list by
+      // proposition while the SUPERSEDES edges follow the caller's
+      // `replacing` -- and those disagree on any pair the wording cannot match.
       const claims: ConcludedClaim[] = [];
       const paired: (RecordedConclusion | undefined)[] = [];
       const replacementEvents: DomainEvent[] = [];
@@ -1659,10 +1623,9 @@ export class WriteSurface extends SessionCore {
         let was: RecordedConclusion | undefined;
         if (now.replacing === undefined) {
           // **Refuses rather than picks.** Two conclusions of one analysis may
-          // assert the same sentence about different endpoints -- S-5's case,
-          // and the reason a claim has its own handle -- so a wording match can
-          // be ambiguous, and taking the first is a coin toss recorded as a
-          // fact. That is the shape `claimsAsserting` already refuses.
+          // assert the same sentence about different endpoints, so a wording
+          // match can name two; taking the first is a coin toss recorded as a
+          // fact.
           const candidates = before.filter((b) => b.proposition === now.proposition);
           if (candidates.length > 1)
             throw new Error(
@@ -1715,17 +1678,12 @@ export class WriteSurface extends SessionCore {
       // and silently fell back to printing the id. Same one hop `recorded()`
       // makes to write the CONSUMES edge.
       const inputNames = new Map<InputRef, IndexedString>();
-      // **Which inputs this act retracted outright.** It read
-      // `Artefact.invalidated`, and this call no longer sets it (#132) -- so
-      // the answer was silently always "none", and a replacement resting on
-      // the record it had just emptied said it rested on something intact.
-      //
-      // Computed from what this call actually did, not queried: `before` is
-      // every conclusion the superseded analysis drew and `paired` is the ones
-      // this call superseded, so the superseded output is retracted exactly
-      // when those two agree. **Every, not any** -- a partial replacement
-      // leaves standing findings in that artefact and it remains a live
-      // record, which is the whole of #132.
+      // **Which inputs this act retracted outright**, computed from what this
+      // call did rather than queried: `before` is every conclusion the
+      // superseded analysis drew and `paired` is the ones this call superseded,
+      // so its output is retracted exactly when those agree. **Every, not
+      // any** -- a partial replacement leaves standing findings in that
+      // artefact, and it stays a live record.
       const supersededWhole =
         before.length > 0 && before.every((b) => paired.some((pr) => pr?.claim === b.claim));
       const retracted = new Set<InputRef>();

@@ -267,22 +267,15 @@ describe("an event records the edges the act created", () => {
     // `detail`, which carries the enquiry and the method.
     //
     // **Two `PRODUCES`, and which two is the point of writing the list out.**
-    // The computation's artefact, and `EvidenceUnit -> Artefact` — which
-    // CLAUDE.md names as this repository's one endpoint pair with a writer and
-    // no reader, and which was invisible to the event log until this column
-    // existed.
+    // The computation's artefact, and `EvidenceUnit -> Artefact`, which no
+    // read reaches — the event log is the only place it is visible.
     //
-    // The third `PRODUCES` was here until #173 and has moved, along with
-    // `RECORDED_IN` and `SUPPORTS`, to the `conclude` event asserted below.
-    // That is the split working: those three are minted by concluding, which
-    // is its own act. **A nested emit used to take the edges above with it**,
-    // leaving this event reporting a computation and nothing produced by it —
-    // see `TenantGraph.inMintScope`, and note that this test is what found it.
+    // The rest of what an analysis produces is on the `conclude` event
+    // asserted below, minted by an act of its own.
     expect(labels).toEqual(["ADDRESSES", "CONSUMES", "PRODUCES", "PRODUCES", "USES"].sort());
 
-    // The other half, and it is the half that makes the assertion above a
-    // split rather than a loss: every edge is still recorded, by the act that
-    // made it.
+    // The other half, which makes the assertion above a split rather than a
+    // loss: every edge is recorded, by the act that made it.
     const [drawn] = await log.select({ operation: "conclude" });
     // `string[]`, for the same reason the list above is: the expectation is a
     // literal and unifying it on the branded union buys nothing.

@@ -136,17 +136,13 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
   return {
     name,
     grain: byEvaluation,
-    // **Standing is per finding now, not per artefact.** This walked
-    // `basis -RECORDED_IN-> Artefact` and read `invalidated` — one flag over
-    // every finding an analysis produced, so replacing one conclusion withdrew
-    // the verdicts citing the others (#132). A finding is superseded when a
-    // decision stands instead of the claim it bears on.
+    // **Standing is per finding, not per artefact**: a finding is superseded
+    // when a decision stands instead of the claim it bears on.
     //
-    // **Two clauses because AGE has no edge alternation**, and this file exists
-    // because naming one is silent: `[:SUPPORTS|CHALLENGES]` is a syntax error,
-    // and a verdict resting on a challenging finding would simply never match.
-    // The fold below reads both, which is the whole point of spelling a pair
-    // once in a fact rather than at each reader.
+    // **Two clauses because AGE has no edge alternation.** Naming one is
+    // silent: `[:SUPPORTS|CHALLENGES]` is a syntax error, and a verdict
+    // resting on a challenging finding would simply never match. The fold
+    // below reads both.
     clause: `${evaluationClause}
            OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
            OPTIONAL MATCH (basis)-[:SUPPORTS]->(supported:Claim)<-[:SUPERSEDES]-(:Decision)

@@ -103,7 +103,8 @@ export function inputRef(raw: string): ObservationsRef | AnalysisRef {
 /**
  * The handle `conclude --replacing` supersedes: a claim or a finding.
  *
- * Two kinds, because #162 hands both back and a caller passes whichever they
+ * Two kinds, because both come back from the act that recorded the finding,
+ * and a caller passes whichever they
  * are holding. **Discriminated on the prefix, never on `typeof`** — a `Ref` is
  * a branded string and every arm of the union is `"string"` at runtime, which
  * is the defect `isRefOfKind` exists for.

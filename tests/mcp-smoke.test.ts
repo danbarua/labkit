@@ -178,7 +178,7 @@ describe("every tool answers when an agent actually calls it", () => {
         implementing: id(work),
         held_to: [id(criterion)],
       });
-      // The run, then the finding. Two acts, two calls (#173).
+      // The run, then the finding: two acts, two calls.
       const concluded = await call(c, "conclude", {
         analysis: id(analysis.analysis as Json),
         proposition: SPARSE,

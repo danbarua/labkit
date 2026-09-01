@@ -1,26 +1,14 @@
 /**
  * S-11g — "The replacement addressed three of four conclusions."
- * labkit#132, found transcribing Bonsai's real Stage 1A re-verification (#125).
  *
- * This is the demonstrated wrong answer #173 was built to clear, and it was
- * found by hand at a terminal rather than by a test. Bonsai's re-verification
- * produced one analysis with four conclusions. A log-scale re-analysis resolved
- * three of them and **deliberately excluded the fourth** — its own text: *"T vs
- * lattice is excluded from this iteration... the v1 result for T-vs-lattice
- * stands as final."*
+ * One analysis with two conclusions. A review, and a re-analysis that restates
+ * one of them and deliberately excludes the other — a real re-analysis, whose
+ * own text says the excluded result *"stands as final"*.
  *
- * Asking why that fourth finding was supported reported it retracted, citing a
- * review whose verdict never mentions it. Populated, plausible, and wrong —
- * PJ-011 §5's bar, not an absence.
- *
- * The cause was grain. `replaceAnalysis` set `invalidated = true` on the
- * superseded analysis's **output artefact**, which is one flag over every
- * finding that analysis produced, and every reader of standing went through it.
- * So an act that named three conclusions retracted a fourth it never mentioned,
- * and withdrew the criterion evaluations resting on it too.
- *
- * The scenario is deliberately *not* a new one. #132 says so itself: Bonsai's
- * own v1 → v2 chain is the scenario, and what was missing was a test of it.
+ * What it holds the record to: the excluded finding still stands and still
+ * rests on its input; the restated one falls and names the review that caused
+ * it; and a criterion evaluation falls or stands according to which of the two
+ * findings it cited.
  *
  * Imports only src/domain — never src/db (enforced).
  */
@@ -118,9 +106,8 @@ async function afterwards(): Promise<ResearchSession> {
 
 describe("S-11g — a replacement that addresses only some of a run's conclusions", () => {
   /**
-   * **#132's repro, as an assertion.** The transcript's `why CLM_6` reported
-   * "Resting on nothing" and a supersession citing a review that never
-   * mentions the lattice comparison.
+   * The finding nothing named. Both halves matter: a fix that cleared
+   * `superseded` while leaving `restingOn` empty would read as a whole fix.
    */
   test("a finding the replacement never named still stands, and still rests on its input", async () => {
     const w = await aRunPartlyReAnalysed();
@@ -158,9 +145,9 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
    * The inference has to be able to say "I cannot tell", or it is guessing.
    *
    * Two conclusions of one analysis may assert the same sentence about
-   * different endpoints — S-5's case, and the reason a claim has a handle of
-   * its own. Pairing a replacement's conclusions by wording is then ambiguous,
-   * and taking the first is a coin toss recorded as a fact.
+   * different endpoints, which is why a claim has a handle of its own. Pairing
+   * a replacement's conclusions by wording is then ambiguous, and taking the
+   * first is a coin toss recorded as a fact.
    */
   test("a replacement whose wording matches two earlier findings is refused, not guessed", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from its controls?");
@@ -195,10 +182,9 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
-   * **The regression pair, on the evaluations.** #132's cost was not only the
-   * claim: withdrawing an artefact withdrew every criterion evaluation that
-   * cited any finding recorded in it. Both halves are asserted against one
-   * record, because a fix that withdrew neither would pass either alone.
+   * **The pair, on the evaluations.** A verdict falls or stands according to
+   * which finding it cited. Both halves are asserted, because a record that
+   * withdrew all of them or none would satisfy either alone.
    */
   test("an evaluation citing a superseded finding falls; one citing an untouched finding stands", async () => {
     // Two worlds identical but for which finding the one verdict was reached
@@ -219,14 +205,13 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     };
 
     // The verdict reached against the finding this act superseded falls with
-    // it. That is S-3c, and it must keep working.
+    // it.
     expect(await state("revisited")).toBe("no-standing-verdict");
     await scenario.end();
     session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
 
     // The verdict reached against the finding this act never mentioned does
-    // not. That is #132, and asserting only one of these would pass on a fix
-    // that withdrew everything or nothing.
+    // not.
     expect(await state("stands")).toBe("failed");
   });
 });

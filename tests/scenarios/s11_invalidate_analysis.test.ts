@@ -418,18 +418,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // Every research action left a trace, in order — one per action, not one
     // per write.
     //
-    // **The `conclude` entries are actions, not writes**, and that is #173:
-    // this run drew six conclusions and the record says so six times, exactly
-    // as it would had a person typed `labkit conclude` six times. The count is
-    // the caller's, not the graph's.
+    // **The `conclude` entries are actions**: this run drew six conclusions and
+    // the record says so six times, as it would had a person typed `labkit
+    // conclude` six times. The count is the caller's, not the graph's.
     //
-    // The original point of this assertion is untouched and is the reason it
-    // is spelled out rather than counted: there is still no second
-    // `recordAnalysis` between the review and the replacement.
-    // `replaceAnalysis()` used to call the public analysis verb and emit its
-    // event too — the same defect `openEnquiry` was fixed for (PJ-014), which
-    // this assertion had quietly encoded. A researcher who replaced an
-    // analysis did one thing.
+    // Spelled out rather than counted, because the absence is half the claim:
+    // there is no second `recordAnalysis` between the review and the
+    // replacement. A researcher who replaced an analysis did one thing.
     const concluded = (n: number) => Array.from({ length: n }, () => "conclude" as const);
     expect((await events.all()).map((e) => e.operation)).toEqual([
       "openEnquiry",

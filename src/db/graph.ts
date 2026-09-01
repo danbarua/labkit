@@ -149,35 +149,20 @@ export class TenantGraph {
 
   /**
    * Runs `work` with its own mint list, so an `emit` inside it claims only what
-   * `work` minted — and the enclosing act keeps its own.
+   * `work` minted, and the enclosing act keeps its own.
    *
-   * **Nesting-safe draining, and without it a nested event is not merely an
-   * extra one — it steals.** `drainMinted` splices the whole list, so a
-   * composition that calls a verb which emits had its own already-minted ids
-   * and edges carried off into the child's event. `recordAnalysis` wrote a
-   * computation, an evidence unit and an output artefact, then called
-   * `conclude` once per conclusion, and its event came out reporting a
-   * computation with no `PRODUCES`, no `RECORDED_IN` and no `SUPPORTS` — most
-   * of what an analysis is. `tests/event-store.test.ts` is what noticed.
-   *
-   * **Suppressing the inner event was the other available fix and is the wrong
-   * one.** It makes the grain depend on the client: a composition would record
-   * one event for an analysis with four conclusions while the CLI, doing the
-   * same four acts, records five. The same research action must not leave a
-   * different log for having been written through a different tool — the
-   * Explorer's traces and the live record would then disagree about identical
-   * arcs. Scope the drain; leave the grain alone.
-   *
-   * **"A verb that composes others records one event, not one per step" is
-   * about aspects of one act, not a list of acts the caller batched.**
-   * `openEnquiry` is `pose` + `pursue` and emits once because posing and
-   * pursuing are two halves of asking; concluding four things is four things a
-   * researcher did, and a composition that batches them must record what the
-   * CLI records when a person makes the same four calls.
+   * **{@link drainMinted} splices the whole list**, so without a scope a nested
+   * event does not merely add an event — it takes the parent's ids and edges
+   * with it, and the parent's event then reports having created almost nothing.
    *
    * What a scope does not claim is **handed back up**, not dropped: a verb that
    * mints something and emits nothing has still brought it into existence, and
    * the enclosing act is what recorded that.
+   *
+   * Scope, rather than suppressing the inner event: the event grain must not
+   * depend on which caller wrote the record. A composition and a person making
+   * the same calls one at a time have to leave the same log, or a trace built
+   * from one disagrees with a record built from the other about identical work.
    */
   async inMintScope<T>(work: () => Promise<T>): Promise<T> {
     const outer = this.minted;

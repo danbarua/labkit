@@ -258,9 +258,9 @@ export class SessionCore {
        // six-occurrence defect, so it is spelled once here rather than at each
        // caller.
        //
-       // A claim is withdrawn either way. Its reading was narrowed (CHANGES,
-       // S-12) or its finding was superseded (SUPERSEDES, #173) -- different
-       // acts, same consequence for whether it still stands.
+       // A claim is withdrawn either way: its reading was narrowed (CHANGES)
+       // or its finding superseded (SUPERSEDES). Different acts, same
+       // consequence for whether it still stands.
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
        OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
