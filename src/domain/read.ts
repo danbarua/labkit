@@ -670,12 +670,18 @@ export class ReadSurface extends SessionCore {
        MATCH (u)-[:USES]->(comp:Computation)
        OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
        OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
-       RETURN e, comp, a, r`,
+       // Supersession, per claim. This was read off Artefact.invalidated --
+       // one flag over every finding an analysis produced, so replacing one
+       // conclusion reported the rest superseded too (#132). Same pair
+       // withdrawalOf reads: a decision that changed which claim stands.
+       OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)
+       RETURN e, comp, a, r, d`,
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
         comp: vertexProps<ComputationProps & Identified>(),
         a: optional(vertexProps<ArtefactProps & { natural_id: string }>()),
         r: optional(vertexProps<{ verdict: string }>()),
+        d: optional(vertexProps<{ reason: string }>()),
       },
       {
         name: scope.proposition,
@@ -1563,17 +1569,28 @@ export class ReadSurface extends SessionCore {
           method: row.comp.kind,
           analysis: ref("analysis", row.comp.natural_id),
         };
-        if (row.a?.invalidated) {
-          // Deduped, and the reason comes from INVALIDATED_BY rather than from
-          // whichever review the OPTIONAL MATCH happened to return. Two defects
-          // in one line before row O: a finding superseded once was reported
-          // once per review of its unit, each with a different reason, and the
-          // reasons contradicted each other.
+        // **Per claim, not per artefact.** `row.a?.invalidated` decided this
+        // until 2026-09-01: one flag over every finding an analysis produced,
+        // so replacing one conclusion reported the others superseded and
+        // withdrew the evaluations citing them (#132). A decision that changed
+        // *this* claim is the honest grain, and it is the same fact
+        // `withdrawalOf` reads.
+        //
+        // The reason now comes from that decision rather than from
+        // INVALIDATED_BY, which was an artefact-grain answer to a per-finding
+        // question — it could only ever say why the *analysis* was replaced.
+        // Row O's defect stays fixed: still deduped, and still one reason per
+        // finding rather than one per review of its unit.
+        if (row.d) {
           if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
             superseded.push({
               ...entry,
               bearing,
-              reason: retractedBy.get(row.a.natural_id) ?? "its analysis was replaced",
+              reason:
+                row.d.reason ||
+                (row.a
+                  ? (retractedBy.get(row.a.natural_id) ?? "it was superseded")
+                  : "it was superseded"),
             });
         } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
           // A re-verification is not a second independent finding. Counting it

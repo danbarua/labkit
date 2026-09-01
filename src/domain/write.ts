@@ -502,7 +502,7 @@ export class WriteSurface extends SessionCore {
         claims.push(...concluded.claims);
         events.push(...concluded.events);
       }
-      return { at, analysis, claims, events };
+      return { analysis, claims, events };
     });
   }
 
@@ -755,7 +755,7 @@ export class WriteSurface extends SessionCore {
         conclusions: this.conclusionEvents([concluded]),
         ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
       });
-      return { at, analysis: input.analysis, claims: [concluded], events };
+      return { analysis: input.analysis, claims: [concluded], events };
     });
   }
 
