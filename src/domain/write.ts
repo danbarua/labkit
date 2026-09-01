@@ -130,7 +130,7 @@ import type {
   SharpenCommand,
   KeepCommand,
 } from "./commands";
-import { SessionCore } from "./core";
+import { SessionCore, type Methods } from "./core";
 import type { DomainEvent, Operation } from "./events";
 
 /**
@@ -196,29 +196,7 @@ const noFindingBearsOn = (claim: ClaimRef): string =>
  * property whose signature drifts then fails to compile **where the drift is**,
  * rather than three files away in whichever fragment happened to call it.
  */
-export type ResearchWrites = Pick<
-  WriteSurface,
-  | "pose"
-  | "pursue"
-  | "openEnquiry"
-  | "sharpen"
-  | "recordObservations"
-  | "recordAnalysis"
-  | "conclude"
-  | "recordReview"
-  | "replaceAnalysis"
-  | "keep"
-  | "reverify"
-  | "reinterpret"
-  | "closeEnquiry"
-  | "acceptAsUnresolved"
-  | "promote"
-  | "planWork"
-  | "stateCriterion"
-  | "declareGate"
-  | "evaluateCriterion"
-  | "amendDesign"
->;
+export type ResearchWrites = Pick<WriteSurface, Methods<WriteSurface>>;
 
 export class WriteSurface extends SessionCore {
   /**
