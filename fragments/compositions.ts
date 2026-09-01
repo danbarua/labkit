@@ -18,7 +18,7 @@
  * `fragments/index.ts`'s header.
  */
 
-import type { WriteSurface } from "../src/domain";
+import type { ResearchWrites } from "../src/domain";
 import {
   acceptUnresolved,
   amendLockedDesign,
@@ -42,7 +42,7 @@ export interface Composition {
   /** The scenario whose arc this borrows, for a reader who wants the real one. */
   ref: string;
   name: string;
-  run: (w: WriteSurface) => Promise<void>;
+  run: (w: ResearchWrites) => Promise<void>;
 }
 
 /** S-19: gated, failed its prespecified check, re-run, promoted, closed. */
