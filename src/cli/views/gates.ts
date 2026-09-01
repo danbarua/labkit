@@ -14,7 +14,6 @@ import type {
   GateStatus,
   ListedGate,
   ListedWork,
-  ListedWorkWithWhy,
   TaskContract,
 } from "../../domain";
 import type { Palette } from "../palette";
@@ -234,34 +233,6 @@ export function renderWorkList(work: ListedWork[], p: Palette): string {
             ? p.contested(padded)
             : p.untested(padded);
       return `${state}  ${p.handle(w.work)}  ${w.objective}`;
-    })
-    .join("\n");
-}
-
-/**
- * `renderWorkList`, with why each task exists on the line below it (#128).
- *
- * A second function rather than a flag on `renderWorkList`: the two report
- * shapes differ (`ListedWorkWithWhy` is a superset), and a view that has to
- * ask "was I given the with-why shape?" is the same branch `known`'s two
- * views were split apart to avoid.
- */
-export function renderWorkListWithWhy(work: ListedWorkWithWhy[], p: Palette): string {
-  if (work.length === 0) return "nothing";
-  const width = Math.max(...work.map((w) => w.state.length));
-  return work
-    .map((w) => {
-      const padded = w.state.padEnd(width);
-      const state =
-        w.state === "carried-out"
-          ? p.settled(padded)
-          : w.state === "blocked"
-            ? p.contested(padded)
-            : p.untested(padded);
-      const why = w.addressing
-        ? `\n${" ".repeat(width + 2)}  addressing: ${p.handle(w.addressing.enquiry)} "${w.addressing.pursuing}"  pursuing: ${p.handle(w.addressing.question)} "${w.addressing.asks}"`
-        : "";
-      return `${state}  ${p.handle(w.work)}  ${w.objective}${why}`;
     })
     .join("\n");
 }

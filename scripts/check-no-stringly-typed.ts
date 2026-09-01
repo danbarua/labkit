@@ -64,6 +64,11 @@ const ALLOWED = new Map<string, string>([
   // decoder produced -- this is where a handle is *made*, not somewhere one is
   // passed, and typing the row shape would be typing the database's answer.
   ["checksFrom", "takes decoded query rows, not handles"],
+  // Dispatches on `kindOf(subject)` before it is known which kind's `Ref` the
+  // string names, or whether it is a proposition rather than a handle at all
+  // -- the one parameter in this file whose classification is the method's
+  // own job, not something a caller could narrow first (#128).
+  ["why", "not yet known to be one kind's handle or a proposition; that's what it dispatches on"],
 ]);
 
 type Finding = {

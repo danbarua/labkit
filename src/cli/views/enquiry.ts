@@ -5,14 +5,7 @@
  * why the comments came with the code.
  */
 
-import type {
-  EnquiryInContext,
-  EnquiryRef,
-  EnquiryStatus,
-  QuestionBucket,
-  QuestionOrigin,
-  QuestionRef,
-} from "../../domain";
+import type { EnquiryRef, EnquiryStatus, QuestionOrigin, QuestionRef } from "../../domain";
 import type { Palette } from "../palette";
 import { bullets } from "./format";
 
@@ -71,39 +64,6 @@ export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
   ]
     .filter(Boolean)
     .join("\n");
-}
-
-/** Colours a bucket name the same way `renderKnown`'s heading for it would. */
-function colourBucket(bucket: QuestionBucket, p: Palette): (text: string) => string {
-  switch (bucket) {
-    case "established":
-      return p.settled;
-    case "provisional":
-    case "accepted":
-      return p.provisional;
-    case "unresolved":
-    case "untested":
-      return p.untested;
-  }
-}
-
-/**
- * `renderEnquiry`, followed by one line: where this enquiry's own question
- * currently sits in the overall survey (#128) -- not the whole survey. The
- * real Bonsai transcript chained `enquiry` with `known` to answer exactly
- * this ("did closing this enquiry move its question's bucket?"), never to
- * read every other question in the programme; see `EnquiryInContext`'s own
- * doc comment for why an earlier version of this got that wrong.
- */
-export function renderEnquiryInContext(status: EnquiryInContext, p: Palette): string {
-  const s = status.standing;
-  return [
-    renderEnquiry(status.enquiry, p),
-    "",
-    s
-      ? `Currently in the overall survey: ${colourBucket(s.bucket, p)(s.bucket)}`
-      : p.untested("No question stands behind this enquiry."),
-  ].join("\n");
 }
 
 export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef, p: Palette): string {

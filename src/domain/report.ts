@@ -53,7 +53,7 @@ export type Ref<K extends string> = string & { readonly [KIND]: K };
  * `Artefact`, *work* and means a `Task`. Five of the thirteen differ, so the
  * mapping has to be written down rather than derived from the name.
  */
-export const LABEL_BY_KIND: Record<string, NodeLabel> = {
+export const LABEL_BY_KIND = {
   question: "Question",
   enquiry: "LineOfEnquiry",
   unit: "EvidenceUnit",
@@ -67,7 +67,16 @@ export const LABEL_BY_KIND: Record<string, NodeLabel> = {
   observations: "Artefact",
   analysis: "Computation",
   work: "Task",
-};
+} satisfies Record<string, NodeLabel>;
+
+/**
+ * Every kind a handle can name — the closed union `why` (#128, redesigned on
+ * review) dispatches on. `satisfies` rather than a `: Record<string, NodeLabel>`
+ * annotation is what keeps this closed: the annotation used to erase the
+ * literal keys, so `keyof typeof LABEL_BY_KIND` was `string` and there was
+ * nowhere for a total `Record<Kind, …>` table to be checked against.
+ */
+export type Kind = keyof typeof LABEL_BY_KIND;
 
 /**
  * Builds a handle, and **refuses one whose id does not match its kind**.
@@ -84,7 +93,13 @@ export const LABEL_BY_KIND: Record<string, NodeLabel> = {
  * label it was matched on says it cannot be.
  */
 export function isRefOfKind(kind: string, id: string): boolean {
-  const expected = LABEL_BY_KIND[kind];
+  // Widened, not narrowed: `LABEL_BY_KIND`'s literal keys (needed so `Kind` is
+  // closed, see above) would otherwise refuse to be indexed by the caller's
+  // plain `string`. This assignment is sound in a way a cast to `Kind` would
+  // not be -- it is not claiming `kind` IS one of the closed keys, only asking
+  // an object typed for arbitrary string keys, same runtime lookup either way.
+  const table: Record<string, NodeLabel> = LABEL_BY_KIND;
+  const expected = table[kind];
   if (!expected) return true;
   try {
     return labelForNaturalId(id) === expected;
@@ -97,10 +112,12 @@ export function isRefOfKind(kind: string, id: string): boolean {
 }
 
 export const ref = <K extends string>(kind: K, id: string): Ref<K> => {
-  if (!isRefOfKind(kind, id))
+  if (!isRefOfKind(kind, id)) {
+    const table: Record<string, NodeLabel> = LABEL_BY_KIND;
     throw new Error(
-      `${kind} handle expected a ${LABEL_BY_KIND[kind]} id, got "${id}" — pass the handle the act that minted it returned`,
+      `${kind} handle expected a ${table[kind]} id, got "${id}" — pass the handle the act that minted it returned`,
     );
+  }
   return id as Ref<K>;
 };
 
@@ -322,9 +339,27 @@ export interface Promoted {
  * with no matching entry there would mint a `Ref` `isRefOfKind` could never
  * agree with.
  */
-export const KIND_BY_LABEL: { readonly [L in NodeLabel]?: string } = Object.fromEntries(
+export const KIND_BY_LABEL: { readonly [L in NodeLabel]?: Kind } = Object.fromEntries(
   Object.entries(LABEL_BY_KIND).map(([kind, label]) => [label, kind]),
 );
+
+/**
+ * The kind a handle's own prefix names, or `null` for text that is not
+ * shaped like one of this record's ~97 mintable ids at all.
+ *
+ * Earned by `why` (#128, redesigned on review): dispatching a single verb on
+ * a handle's kind needs to tell "a handle of a kind I don't explain yet"
+ * apart from "ordinary prose, go look it up by wording" -- `isRefOfKind`
+ * answers only "is this ONE kind", which cannot make that distinction without
+ * calling it once per kind and hoping none throw.
+ */
+export function kindOf(id: string): Kind | null {
+  try {
+    return KIND_BY_LABEL[labelForNaturalId(id)] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * One record `search()` found containing the wording, and the text it
@@ -1476,7 +1511,8 @@ export interface ConflictVerdict {
  * construction.
  *
  * Named and shared (not inlined per report) because #128 gave it a second
- * reader: `ListedWorkWithWhy` carries the same shape `TaskContract` does.
+ * reader: `WorkExplanation`'s `report` is the same `TaskContract` this shape
+ * already sat on.
  */
 export interface Addressing {
   enquiry: EnquiryRef;
@@ -1570,15 +1606,59 @@ export interface ListedWork {
 }
 
 /**
- * `ListedWork`, with why each task exists alongside it.
+ * One record a `why` explanation cites, and what it says — the shape
+ * `because` is built from (#128, redesigned on review).
  *
- * Earned by #128: the real Bonsai transcript never answered "what work exists
- * and why" in one command -- `work` names the tasks, `contract` resolves one
- * at a time, and every instance of the question in the transcript chained
- * both. This is that chain, done once for the whole list rather than once per
- * task (the same "ask once for all of them" the list's own `gateStates`
- * already does).
+ * The same `{handle, wording}` convention every other report in this file
+ * uses (PJ-030 §4); `when` is present only where the cited record carries an
+ * instant of its own (an evaluation, a decision), which is why it is optional
+ * rather than always asked for.
  */
-export interface ListedWorkWithWhy extends ListedWork {
-  addressing?: Addressing;
+export interface Cause {
+  handle: Ref<Kind>;
+  wording: string;
+  when?: string;
 }
+
+/**
+ * `why <handle>` — a mini-app dispatching on the handle's own kind, over
+ * reports that already exist. Not new queries: a report is the plan, `why`
+ * renders it as causes (Postgres `EXPLAIN`, for *why*).
+ *
+ * One shape for every kind it explains, so `--json` and MCP get structure and
+ * the tty gets a sentence — `GATE_1 is blocked because CRIT_2 "…" failed on
+ * 2026-08-04 and CRIT_3 "…" has never been run` is the target once Gate joins
+ * (#182). `report` carries the kind's own existing report **unflattened**: an
+ * envelope that dictated the embedded shape would have cost `why CLM_1` the
+ * *Resting on / Held to / Ultimately resting on* view it has today, for a
+ * one-line sentence — a regression wearing a redesign.
+ *
+ * A discriminated union, not one interface with optional fields: `report`'s
+ * type differs by `kind`, and a caller narrowing on `kind` gets the right one
+ * without a cast. Only the three kinds this PR builds are members — Gate,
+ * Question, Criterion and the rest are #182, and a kind `why` does not yet
+ * explain never constructs one of these; it throws instead (see `read.ts`'s
+ * `EXPLAINERS` table).
+ */
+export interface ClaimExplanation {
+  kind: "claim";
+  subject: ClaimRef;
+  is: string;
+  because: Cause[];
+  report: SupportExplanation;
+}
+export interface WorkExplanation {
+  kind: "work";
+  subject: WorkRef;
+  is: string;
+  because: Cause[];
+  report: TaskContract;
+}
+export interface EnquiryExplanation {
+  kind: "enquiry";
+  subject: EnquiryRef;
+  is: string;
+  because: Cause[];
+  report: EnquiryInContext;
+}
+export type Explanation = ClaimExplanation | WorkExplanation | EnquiryExplanation;

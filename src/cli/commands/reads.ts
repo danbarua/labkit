@@ -23,21 +23,16 @@ import type { Command } from "commander";
 import { gateState, handle, rebuilt, whole, workState } from "../args";
 import { answer } from "../output";
 import type { Run } from "../session";
-import type { ClaimRef, EventFilter } from "../../domain";
+import type { EventFilter } from "../../domain";
 import {
   renderHistorical,
   renderKnown,
-  renderWhy,
+  renderWhyDispatch,
   renderClaims,
   renderConflict,
   renderSearch,
 } from "../views/knowledge";
-import {
-  renderEnquiry,
-  renderEnquiryInContext,
-  renderOrigin,
-  renderPursuits,
-} from "../views/enquiry";
+import { renderEnquiry, renderOrigin, renderPursuits } from "../views/enquiry";
 import {
   renderContract,
   renderCriteria,
@@ -45,7 +40,6 @@ import {
   renderGate,
   renderGateList,
   renderWorkList,
-  renderWorkListWithWhy,
 } from "../views/gates";
 import {
   renderAffects,
@@ -81,35 +75,18 @@ export function registerReads(program: Command, run: Run): void {
 
   program
     .command("why")
-    .summary("why a conclusion counts as supported")
+    .summary("why a record is in the state it's in")
     .description(
-      "The findings resting under a proposition, those bearing against it, the prespecified " +
-        "standard it is held to, what re-checked it, and what has been superseded. Takes a " +
-        "claim id, or a proposition when exactly one claim asserts it.",
+      "Dispatches on the handle's own kind: a claim (the findings resting under it, what " +
+        "bears against it, what standard it was held to, what has superseded it), a task " +
+        "(the line of enquiry and question it exists to advance), or a line of enquiry (its " +
+        "status, and where its own question currently sits in `known`'s five buckets). Takes " +
+        "a proposition too, when exactly one claim asserts it. Anything else this record does " +
+        "not explain yet is refused, naming what it does.",
     )
-    .argument("<claim-or-proposition>", "a CLM_… id, or the sentence itself")
+    .argument("<subject>", "a handle of any kind, or a claim's proposition")
     .action(async (subject: string) =>
-      run(async ({ read }) => {
-        // A person types a sentence; the domain takes a handle. Resolving one to
-        // the other happens HERE, at the human boundary, and refuses rather than
-        // picking when a sentence is asserted in more than one line of enquiry
-        // (S-5). No read verb guesses.
-        let claim: ClaimRef;
-        if (subject.startsWith("CLM_")) {
-          claim = handle("claim")(subject);
-        } else {
-          const found = await read.claimsAsserting(subject);
-          if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);
-          if (found.length > 1)
-            throw new Error(
-              `"${subject}" is claimed ${found.length} times; name one: ${found
-                .map((c) => c.claim)
-                .join(", ")}`,
-            );
-          claim = found[0]!.claim;
-        }
-        return answer(await read.whySupported(claim), renderWhy);
-      }),
+      run(async ({ read }) => answer(await read.why(subject), renderWhyDispatch)),
     );
 
   program
@@ -194,18 +171,13 @@ export function registerReads(program: Command, run: Run): void {
     .summary("is this enquiry open, and how did it close")
     .description(
       "Whether a line of enquiry is still open, and if not how it closed — answered, abandoned, " +
-        "or deliberately left open — with the answer and the evidence behind it. `--in-context` " +
+        "or deliberately left open — with the answer and the evidence behind it. `why <id>` " +
         "adds which of `known`'s five buckets this enquiry's own question currently sits in — " +
         "did closing it move the bucket?",
     )
     .argument("<enquiry-id>", "e.g. LOE_7", handle("enquiry"))
-    .option("--in-context", "also show which bucket this enquiry's question currently sits in")
-    .action(async (enquiry, opts: { inContext?: boolean }) =>
-      run(async ({ read }) =>
-        opts.inContext
-          ? answer(await read.enquiryInContext(enquiry), renderEnquiryInContext)
-          : answer(await read.enquiryStatus(enquiry), renderEnquiry),
-      ),
+    .action(async (enquiry) =>
+      run(async ({ read }) => answer(await read.enquiryStatus(enquiry), renderEnquiry)),
     );
 
   program
@@ -235,19 +207,14 @@ export function registerReads(program: Command, run: Run): void {
     .description(
       "`--state planned` is what is ready to start: on the books, nothing blocking, no " +
         "analysis against it yet. Not the same question as `gates` — a gate reaches only " +
-        "the work it protects, and work planned without one appears nowhere else. " +
-        "`--with-why` adds the line of enquiry (and question) each task exists to advance, " +
+        "the work it protects, and work planned without one appears nowhere else. `why " +
+        "<task-id>` gives the line of enquiry (and question) a task exists to advance, " +
         "where `planWork` was told one.",
     )
     // Commander's parser, for the reason given on `gates` above.
     .option("--state <state>", "planned | blocked | carried-out", workState)
-    .option("--with-why", "also show why each task exists, where it was told")
-    .action(async (opts: { state?: ReturnType<typeof workState>; withWhy?: boolean }) =>
-      run(async ({ read }) =>
-        opts.withWhy
-          ? answer(await read.workListWithWhy(opts.state), renderWorkListWithWhy)
-          : answer(await read.workList(opts.state), renderWorkList),
-      ),
+    .action(async (opts: { state?: ReturnType<typeof workState> }) =>
+      run(async ({ read }) => answer(await read.workList(opts.state), renderWorkList)),
     );
 
   program

@@ -13,6 +13,7 @@ import type {
   ConcludedClaim,
   ConflictSide,
   ConflictVerdict,
+  Explanation,
   HistoricalSurvey,
   KnowledgeSurvey,
   QuestionStanding,
@@ -160,6 +161,54 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * The `Work`/`LineOfEnquiry` cases of `why` — one sentence, then the causes
+ * behind it (#128, redesigned on review). `Claim` gets the richer view above
+ * instead (`renderWhyDispatch`, below); this is deliberately the smaller of
+ * the two, since a task or an enquiry's own detail command already prints the
+ * embedded `report` in full.
+ */
+function renderExplanation(explanation: Explanation, p: Palette): string {
+  const sentence = `${p.handle(explanation.subject)} is ${explanation.is}`;
+  if (explanation.because.length === 0) return sentence;
+  return [
+    `${sentence} because`,
+    bullets(
+      explanation.because.map(
+        (c) => `${c.wording}  ${p.handle(`(${c.handle})`)}${c.when ? `  on ${c.when}` : ""}`,
+      ),
+      "",
+    ),
+  ].join("\n");
+}
+
+/**
+ * `why <handle>` — dispatches on `Explanation.kind`, not on what the caller
+ * passed in: the redesign's whole point is that the CLI does not know which
+ * kind it got until the domain says so.
+ *
+ * `Claim` renders through the existing rich view over its embedded
+ * `SupportExplanation` (the *Resting on / Held to / Ultimately resting on*
+ * page); `Work` and `LineOfEnquiry` render the sentence-plus-causes shape
+ * instead, since their own detail commands (`contract`, `enquiry`) already
+ * show the fuller report. `--json` gets the same `{kind, subject, is,
+ * because, report}` envelope regardless of which branch prints for a
+ * terminal.
+ */
+export function renderWhyDispatch(explanation: Explanation, p: Palette): string {
+  switch (explanation.kind) {
+    case "claim":
+      return renderWhy(explanation.report, p);
+    case "work":
+    case "enquiry":
+      return renderExplanation(explanation, p);
+    default: {
+      const check: never = explanation;
+      throw new Error(`unreached why kind: ${JSON.stringify(check)}`);
+    }
+  }
 }
 
 /**

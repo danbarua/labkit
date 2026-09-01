@@ -66,14 +66,12 @@ import {
   dependencyReportSchema,
   designHistorySchema,
   enquiryStatusSchema,
-  enquiryInContextSchema,
   interpretationHistorySchema,
   reproductionReportSchema,
   supportExplanationSchema,
   registeredSessionSchema,
   gateListSchema,
   workListSchema,
-  workListWithWhySchema,
 } from "./schemas";
 
 /**
@@ -180,22 +178,6 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     handler: async (read, { state }) => ({ work: await read.workList(state) }),
   }),
   tool({
-    name: "work_list_with_why",
-    title: "List the planned work, with why each task exists",
-    description:
-      "`work_list`, with the line of enquiry (and question) each task exists to advance, " +
-      "where `plan_work` was told one (#98). Earned by the real record: 'what work exists " +
-      "and why' never answered in one call, chaining `work_list` then `contract` per task.",
-    inputSchema: {
-      state: z
-        .enum(["planned", "blocked", "carried-out"])
-        .optional()
-        .describe("only work in this state (default: all of it)"),
-    },
-    outputSchema: workListWithWhySchema,
-    handler: async (read, { state }) => ({ work: await read.workListWithWhy(state) }),
-  }),
-  tool({
     name: "known",
     title: "What the programme knows",
     description:
@@ -245,6 +227,30 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   }),
 
   tool({
+    name: "why",
+    title: "Why a record is in the state it's in",
+    description:
+      "Dispatches on the handle's own kind, over the report that already exists for it (#128, " +
+      "redesigned on review): a claim (the same answer as `why_supported`, in the one uniform " +
+      "envelope every kind returns), a task (the line of enquiry and question it exists to " +
+      "advance), or a line of enquiry (its status, and where its own question now sits in " +
+      "`known`'s five buckets). Also takes a proposition, resolved through `claims_asserting` " +
+      "exactly as `why_supported` does. Every other kind this record does not explain yet is " +
+      "refused, naming the kinds it does.",
+    inputSchema: {
+      subject: z.string().describe("a handle of any kind, or a claim's proposition"),
+    },
+    // No `outputSchema` -- see `known`'s comment for the measured reason. The
+    // installed SDK's `normalizeObjectSchema` cannot carry a `known` (plain
+    // union) at all; `explanationSchema`'s `z.discriminatedUnion` fares worse
+    // here, crashing every call rather than silently validating nothing --
+    // measured against the same `@modelcontextprotocol/sdk@1.30.0`, 2026-09-01.
+    // The schema exists either way and `tests/mcp.test.ts` parses this tool's
+    // output against it, so the shape is still checked -- just not by the SDK.
+    handler: (read, { subject }) => read.why(subject),
+  }),
+
+  tool({
     name: "what_depends_on",
     title: "What rests on a record",
     description:
@@ -275,22 +281,6 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     outputSchema: enquiryStatusSchema,
     handler: (read, { enquiry }) => read.enquiryStatus(ref("enquiry", enquiry)),
   }),
-  tool({
-    name: "enquiry_in_context",
-    title: "Whether a line of enquiry is open, and where its question now stands",
-    description:
-      "`enquiry_status`, alongside which of `known`'s five buckets this enquiry's own question " +
-      "currently sits in -- did closing it move the bucket? (#128). Earned by the real record: " +
-      "'is this reopening/closure decision warranted?' recurred three times in one transcript, " +
-      "always chaining `enquiry_status` with `known` by hand and scrolling the whole survey to " +
-      "find one question. This is that lookup, narrowed to the one question this call is about.",
-    inputSchema: {
-      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
-    },
-    outputSchema: enquiryInContextSchema,
-    handler: (read, { enquiry }) => read.enquiryInContext(ref("enquiry", enquiry)),
-  }),
-
   tool({
     name: "design_history",
     title: "How a gate's conditions were amended",

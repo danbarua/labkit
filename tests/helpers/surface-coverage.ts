@@ -107,7 +107,12 @@ export function verbsCalledOn(paths: readonly string[], receiver: string): Set<s
 /**
  * Verbs deliberately not exposed, and why.
  *
- * Empty, and that is the current state rather than a claim that it must stay
- * empty. When something belongs here, the reason goes here with it.
+ * When something belongs here, the reason goes here with it.
  */
-export const NOT_EXPOSED: Readonly<Record<string, string>> = {};
+export const NOT_EXPOSED: Readonly<Record<string, string>> = {
+  // Folded into `why <enquiry>`'s `LineOfEnquiry` case (#128 round 2) --
+  // `explainEnquiry` in src/domain/read.ts is its one caller now, and it is a
+  // module-level function rather than a class member (see `Explainer`), so
+  // this stays public rather than `private`.
+  enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",
+};

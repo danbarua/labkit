@@ -39,7 +39,6 @@ import { z } from "zod";
 import type {
   ListedGate,
   ListedWork,
-  ListedWorkWithWhy,
   RecordedAnalysis,
   RecordedObservations,
   OpenedEnquiry,
@@ -90,6 +89,9 @@ import type {
   ReproductionReport,
   Revision,
   SupportExplanation,
+  Kind,
+  Cause,
+  Explanation,
 } from "../domain/report";
 import type { Ref } from "../domain/report";
 import type { DomainEvent, MintedEdge, Operation } from "../domain/events";
@@ -476,6 +478,52 @@ export const taskContractSchema = z.strictObject({
   addressing: addressingSchema.optional(),
 });
 
+/**
+ * `why` — one record's `{handle, wording}` citation, the shape `because`
+ * arrays are built from. `handle` spans every {@link Kind}, exactly like
+ * `SearchMatch.handle` above -- the same `ref()` cast, since it is an output
+ * schema and there is nothing here to validate.
+ */
+const explanationCause: z.ZodType<Cause> = z.strictObject({
+  handle: z.string() as unknown as z.ZodType<Ref<Kind>>,
+  wording: z.string(),
+  when: z.string().optional(),
+});
+
+/**
+ * `why` — a discriminated union on `kind`, not one shape with optional
+ * fields: `report` differs by kind (`SupportExplanation` for a claim,
+ * `TaskContract` for work, `EnquiryInContext` for a line of enquiry), and a
+ * caller narrowing on `kind` gets the right one without a cast. Only the
+ * three kinds #128 builds are members here -- see `Explanation`'s own doc
+ * comment in `src/domain/report.ts` for why a kind `why` does not yet explain
+ * has no member and no schema: it never reaches `structuredContent` at all,
+ * because the domain throws before returning one.
+ */
+export const explanationSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("claim"),
+    subject: ref("claim"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: supportExplanationSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("work"),
+    subject: ref("work"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: taskContractSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("enquiry"),
+    subject: ref("enquiry"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: enquiryInContextSchema,
+  }),
+]);
+
 /** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */
 export const criteriaGoverningSchema = z.strictObject({
   criteria: z.array(ref("criterion")),
@@ -755,6 +803,7 @@ export type _AnalysisRef = Assert<Exact<z.infer<typeof analysisRefSchema>, Analy
 export type _Pursuits = Assert<Exact<z.infer<typeof pursuitsSchema>["enquiries"], EnquiryRef[]>>;
 export type _QuestionOrigin = Assert<Exact<z.infer<typeof questionOriginSchema>, QuestionOrigin>>;
 export type _TaskContract = Assert<Exact<z.infer<typeof taskContractSchema>, TaskContract>>;
+export type _Explanation = Assert<Exact<z.infer<typeof explanationSchema>, Explanation>>;
 export type _CriteriaGoverning = Assert<
   Exact<z.infer<typeof criteriaGoverningSchema>["criteria"], CriterionRef[]>
 >;
@@ -865,18 +914,5 @@ export const workListSchema = z.strictObject({
   work: z.array(listedWork),
 });
 
-/** One task in a list, with why it exists alongside it (#128). */
-const listedWorkWithWhy = listedWork.extend({
-  addressing: addressingSchema.optional(),
-});
-
-/** `work_list_with_why` — the same wrapping, for the same reason. */
-export const workListWithWhySchema = z.strictObject({
-  work: z.array(listedWorkWithWhy),
-});
-
 export type _ListedGate = Assert<Exact<z.infer<typeof listedGate>, ListedGate>>;
 export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;
-export type _ListedWorkWithWhy = Assert<
-  Exact<z.infer<typeof listedWorkWithWhy>, ListedWorkWithWhy>
->;

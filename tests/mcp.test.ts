@@ -41,7 +41,11 @@ import {
   type SessionRegistry,
 } from "../src/attribution";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
-import { historicalSurveySchema, knowledgeSurveySchema } from "../src/mcp/schemas";
+import {
+  explanationSchema,
+  historicalSurveySchema,
+  knowledgeSurveySchema,
+} from "../src/mcp/schemas";
 import { DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
@@ -800,16 +804,33 @@ describe("behaviour — the same answers, over the wire", () => {
           await structured(client, "known", { at: "2026-04-01T00:00:00.000Z" }),
         ).success,
       ).toBe(true);
+
+      // `why` is the same story, over `explanationSchema`'s discriminated
+      // union -- checked here for both cases this test already has a handle
+      // for. `work`'s case is checked the same way in tests/mcp-smoke.test.ts.
+      const claimWhy = explanationSchema.safeParse(
+        await structured(client, "why", { subject: (await read.claimsAsserting(PROP))[0]!.claim }),
+      );
+      expect(claimWhy.success).toBe(true);
+      expect(claimWhy.success && claimWhy.data.kind).toBe("claim");
+      const enquiryWhy = explanationSchema.safeParse(
+        await structured(client, "why", { subject: enquiry }),
+      );
+      expect(enquiryWhy.success).toBe(true);
+      expect(enquiryWhy.success && enquiryWhy.data.kind).toBe("enquiry");
       await client.close();
     } finally {
       await scenario.end();
     }
   });
 
-  test("every tool but `known` declares an output schema", () => {
+  test("every tool but `known` and `why` declares an output schema", () => {
     // Derived, not listed: a tool added later without one fails here rather
-    // than shipping unvalidated.
-    expect(TOOLS.filter((t) => !t.outputSchema).map((t) => t.name)).toEqual(["known"]);
+    // than shipping unvalidated. `why`'s reason is on its own definition in
+    // `src/mcp/tools.ts` -- the same SDK limitation `known`'s comment
+    // documents, measured against `explanationSchema`'s discriminated union
+    // rather than assumed to be the same failure.
+    expect(TOOLS.filter((t) => !t.outputSchema).map((t) => t.name)).toEqual(["known", "why"]);
   });
 
   test("a domain refusal arrives as an error, never as an empty success", async () => {

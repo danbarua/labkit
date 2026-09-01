@@ -64,7 +64,6 @@ export type {
   GateStatus,
   ListedGate,
   ListedWork,
-  ListedWorkWithWhy,
   WorkState,
   CheckStatus,
   EnquiryStatus,
@@ -74,6 +73,12 @@ export type {
   CriterionRef,
   GateRef,
   WorkRef,
+  Kind,
+  Cause,
+  Explanation,
+  ClaimExplanation,
+  WorkExplanation,
+  EnquiryExplanation,
 } from "./report";
 // The write half's command shapes. `report.ts` above is what a read returns;
 // these are what an act takes. Exported so an adapter can hold one -- which is
