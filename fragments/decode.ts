@@ -15,12 +15,16 @@
  * **One property is not prose and does change: `Claim.kind`.** `promote`
  * mutates it in place, no new node or edge, so a claim promoted after it was
  * concluded reads back from the live record as `confirmatory` no matter when
- * `conclude` ran. Read that way, `conclude`/`reverify` would decode the claim
- * as confirmatory from birth — wrong, and invisible to `replayIntoScratch`'s
- * own check, which compares `created`/`edges` and cannot see a property.
- * `wasPromoted` is the fix: a claim promoted anywhere in the history was
- * exploratory when it was concluded, because promotion is defined as moving
- * an exploratory finding to confirmatory standing, never the reverse.
+ * the conclusion that named it ran. Read that way, a decoder would report the
+ * claim as confirmatory from birth — wrong, and invisible to
+ * `replayIntoScratch`'s own check, which compares `created`/`edges` and
+ * cannot see a property. `conclude`'s own event now carries the `standing`
+ * it recorded (#211), which is the real fix and is what its decoder reads.
+ * `reverify`'s does not — it composes the same private write-side helper but
+ * emits its own event, which #211 did not touch — so its decoder still uses
+ * `wasPromoted`: a claim promoted anywhere in the history was exploratory
+ * when it was concluded, because promotion is defined as moving an
+ * exploratory finding to confirmatory standing, never the reverse.
  *
  * `DECODERS` is exhaustive over `Operation` at compile time
  * (`satisfies Record<Operation, Decoder>`), so a write verb with no decoder
@@ -57,10 +61,27 @@ function bearingOf(event: DomainEvent): "supports" | "challenges" {
   return findEdge(event, "CHALLENGES") ? "challenges" : "supports";
 }
 
-/** See this file's header: a claim promoted anywhere in the history was exploratory at conclude time. */
-function standingOf(ctx: DecodeContext, claim: string): "exploratory" | "confirmatory" | undefined {
+/**
+ * `reverify` only — see this file's header on why it still needs `wasPromoted`
+ * rather than reading `standing` off its own event, the way `conclude` now can.
+ */
+function standingFromPromotion(ctx: DecodeContext, claim: string): "exploratory" | "confirmatory" | undefined {
   if (ctx.wasPromoted(claim)) return "exploratory";
   return ctx.nodeProp(claim, "kind") as "exploratory" | "confirmatory" | undefined;
+}
+
+/** `keep` and `replaceAnalysis` emit the same detail shape and differ only in which verb the caller named (#211). */
+async function revisionArgs(ctx: DecodeContext, e: DomainEvent) {
+  const method = ctx.nodeProp(e.subject, "kind") as string;
+  const supersedes = e.detail?.supersedes as string;
+  const because = ref("review", e.detail?.because as string);
+  const consumesNow = findEdges(e, "CONSUMES")
+    .filter((x) => x.from === e.subject)
+    .map((x) => x.to);
+  const inherited = new Set(await ctx.consumesOf(supersedes));
+  const extra = consumesNow.filter((a) => !inherited.has(a));
+  const from = extra.length ? extra.map((a) => ref("observations", a)) : undefined;
+  return { because, method, supersedes: ref("analysis", supersedes), from };
 }
 
 export const DECODERS = {
@@ -119,7 +140,7 @@ export const DECODERS = {
   conclude: async (ctx, e) => {
     const c = (e.detail?.conclusions as { claim: string; finding: string; proposition: string }[])[0]!;
     const bearing = bearingOf(e);
-    const standing = standingOf(ctx, c.claim);
+    const standing = e.detail?.standing as "exploratory" | "confirmatory" | undefined;
     const finding = ctx.nodeProp(c.finding, "statement") as string;
     const replacing = e.detail?.replacing as string | undefined;
     await ctx.writes.conclude({
@@ -199,7 +220,7 @@ export const DECODERS = {
     const method = ctx.nodeProp(e.subject, "kind") as string;
     const c = (e.detail?.conclusions as { claim: string; finding: string; proposition: string }[])[0]!;
     const bearing = bearingOf(e);
-    const standing = standingOf(ctx, c.claim);
+    const standing = standingFromPromotion(ctx, c.claim);
     const finding = ctx.nodeProp(c.finding, "statement") as string;
     await ctx.writes.reverify({
       historical: ref("analysis", e.detail?.of as string),
@@ -245,32 +266,15 @@ export const DECODERS = {
     });
   },
 
+  keep: async (ctx, e) => {
+    const { because, method, from } = await revisionArgs(ctx, e);
+    const keeping = (e.detail?.keeping as string[]).map((k) => ref("claim", k));
+    await ctx.writes.keep({ keeping, because, method, ...(from ? { from } : {}) });
+  },
+
   replaceAnalysis: async (ctx, e) => {
-    const method = ctx.nodeProp(e.subject, "kind") as string;
-    const keeping = (e.detail?.keeping as string[] | undefined) ?? [];
-    const supersedes = e.detail?.supersedes as string;
-    const because = ref("review", e.detail?.because as string);
-    const consumesNow = findEdges(e, "CONSUMES")
-      .filter((x) => x.from === e.subject)
-      .map((x) => x.to);
-    const inherited = new Set(await ctx.consumesOf(supersedes));
-    const extra = consumesNow.filter((a) => !inherited.has(a));
-    const from = extra.length ? extra.map((a) => ref("observations", a)) : undefined;
-    if (keeping.length > 0) {
-      await ctx.writes.keep({
-        keeping: keeping.map((k) => ref("claim", k)),
-        because,
-        method,
-        ...(from ? { from } : {}),
-      });
-    } else {
-      await ctx.writes.replaceAnalysis({
-        supersedes: ref("analysis", supersedes),
-        because,
-        method,
-        ...(from ? { from } : {}),
-      });
-    }
+    const { because, method, supersedes, from } = await revisionArgs(ctx, e);
+    await ctx.writes.replaceAnalysis({ supersedes, because, method, ...(from ? { from } : {}) });
   },
 
   reinterpret: async (ctx, e) => {

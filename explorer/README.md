@@ -86,11 +86,12 @@ Given a sequence of research-verb calls (`pose`, `pursue`, `recordAnalysis`,
   disposable scratch database, because there is no way to ask a durable log
   what a query would have answered at a past step after the fact; the live
   connection to the real record is long closed by the time this runs.
-  Measured against the real, rebuilt Bonsai record (133 events, 2026-09-01):
-  about 4.1s per request, of which the scratch database's own boot and
-  provisioning is roughly 1.1-1.2s — the remainder is the 133 replayed verb
-  calls and their `withProvenance` snapshots, which is the cost that grows
-  with the record, worth knowing before pointing this at a much larger one.
+  Measured against the real, rebuilt Bonsai record: about 4.1s per request at
+  133 events (2026-09-01), of which the scratch database's own boot and
+  provisioning is roughly 1.1-1.2s — the remainder is the replayed verb calls
+  and their `withProvenance` snapshots, and it scales with the record: about
+  10.2s at 335 events (2026-09-01, after #207's `gates.toml` import), close to
+  linear in the count. Worth knowing before pointing this at a much larger one.
 - **It does not reconstruct the CLI.** The command line shown per step
   (`labkit pose --question "..."`) is assembled for display from the event's
   `operation` and `detail` fields and is explicitly not a claim that string
