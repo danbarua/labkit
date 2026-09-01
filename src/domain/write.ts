@@ -131,7 +131,7 @@ import type {
   KeepCommand,
 } from "./commands";
 import { SessionCore, type Methods } from "./core";
-import type { DomainEvent, Operation } from "./events";
+import type { DomainEvent } from "./events";
 
 /**
  * A conclusion **already on the record**, as read back from the graph.
@@ -199,22 +199,18 @@ const noFindingBearsOn = (claim: ClaimRef): string =>
 export type ResearchWrites = Pick<WriteSurface, Methods<WriteSurface>>;
 
 /**
- * **Every write verb has an `Operation`, and every `Operation` is a verb.**
+ * The verb an event records — one name per public write verb, and the same name.
  *
- * Assigning each way makes the two sets identical: a verb with no entry fails
- * the first, an entry naming no verb fails the second, and the error names the
- * member rather than saying the types differ. `keep` shipped without an entry
- * and nothing said so, because emitting is the only thing that would have
- * noticed and it emitted somebody else's name.
+ * **Derived, so there is no list to keep.** Every method here is a research act
+ * and emits one event named for itself; a hand-kept union was a second place to
+ * add a verb and it drifted, shipping `keep` with no entry.
  *
- * A check rather than a derivation, and the direction is why: `./events.ts`
- * cannot compute `Methods<WriteSurface>` without importing this module, which
- * already imports it. The check lives where the class is instead.
+ * It is a union rather than `string` for one job: a typo at the point of
+ * emission. `emit("recordAnalyis", …)` is a compile error rather than an event
+ * nobody can filter for. The stored record holds a plain string, which is what
+ * comes back out of Postgres — see `DomainEvent.operation`.
  */
-const _everyVerbIsAnOperation: Operation = null as unknown as Methods<WriteSurface>;
-const _everyOperationIsAVerb: Methods<WriteSurface> = null as unknown as Operation;
-void _everyVerbIsAnOperation;
-void _everyOperationIsAVerb;
+export type Operation = Methods<WriteSurface>;
 
 export class WriteSurface extends SessionCore {
   /**

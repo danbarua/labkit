@@ -97,7 +97,7 @@ import type {
   Explanation,
 } from "../domain/report";
 import type { Ref } from "../domain/report";
-import type { DomainEvent, MintedEdge, Operation } from "../domain/events";
+import type { DomainEvent, MintedEdge } from "../domain/events";
 import type { EdgeLabel } from "../db/domain";
 
 /**
@@ -198,11 +198,12 @@ export const whatHappenedSchema = z.strictObject({
  * write tool's output includes `events`, and this is the one mirror all of
  * them share.
  *
- * `operation`/`edges[].label` are `z.string()` cast to the domain's union
- * types, the same trick `ref()` above uses: this is an output schema with
- * nothing to validate, since LabKit only ever emits values it minted itself.
+ * `edges[].label` is `z.string()` cast to the domain's union, the same trick
+ * `ref()` above uses: this is an output schema with nothing to validate, since
+ * LabKit only ever emits values it minted itself. `operation` needs no cast —
+ * a stored event's verb is a string.
  */
-const operation = z.string() as unknown as z.ZodType<Operation>;
+const operation = z.string();
 const edgeLabel = z.string() as unknown as z.ZodType<EdgeLabel>;
 
 const mintedEdge = z.strictObject({

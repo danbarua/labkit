@@ -178,40 +178,6 @@ export const UNATTRIBUTED: AttributionContext = {
 };
 
 /**
- * The verb an event records — one name per public write verb, and the same name.
- *
- * **It must equal the set of methods on `WriteSurface`, and `write.ts` asserts
- * that it does.** It cannot be *derived* from the class here: `write.ts`
- * already imports this module, so reaching back for `WriteSurface` would make
- * a cycle. The assertion is where the class is, and fails to compile naming
- * the member that drifted — which is how `keep` was found missing.
- *
- * A union rather than `string`, so `emit("recordAnalyis", …)` is a compile
- * error rather than an event nobody can filter for.
- */
-export type Operation =
-  | "pose"
-  | "pursue"
-  | "openEnquiry"
-  | "sharpen"
-  | "recordObservations"
-  | "recordAnalysis"
-  | "conclude"
-  | "recordReview"
-  | "closeEnquiry"
-  | "planWork"
-  | "stateCriterion"
-  | "declareGate"
-  | "evaluateCriterion"
-  | "reverify"
-  | "acceptAsUnresolved"
-  | "promote"
-  | "amendDesign"
-  | "replaceAnalysis"
-  | "keep"
-  | "reinterpret";
-
-/**
  * One recorded domain operation. `subject` is the natural id of whatever the
  * operation was primarily about; `detail` carries the operation-specific
  * payload a later query would need to reconstruct what happened.
@@ -252,7 +218,16 @@ export interface DomainEvent {
    * that and nothing else — see the column comment in `src/db/schema.ts`.
    */
   attribution: RecordedAttribution;
-  operation: Operation;
+  /**
+   * The verb this event records.
+   *
+   * **A string, because that is what the record holds** — it comes back out of
+   * Postgres as one, and nothing on the read side narrows on it. The set of
+   * valid names is `Operation` in `./write.ts`, derived from the surface, and
+   * it does its work at the point of emission where a typo would otherwise
+   * write an event nobody can filter for.
+   */
+  operation: string;
   subject: string;
   /**
    * Every handle this act minted. Always an array, empty if the act minted
