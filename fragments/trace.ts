@@ -81,6 +81,14 @@ export interface Trace {
    */
   origin: "labkit-ts" | "labkit-rust" | "labkit-db";
   steps: TraceStep[];
+  /**
+   * Set only when a `labkit-db` trace's replay (`fragments/replay.ts`)
+   * diverged from the record it was reproducing. Every step from the named
+   * `seq` onward reports empty `derived` and no `fragment`, the same as a
+   * trace with no provenance at all — this names where and why, rather than
+   * leaving the gap to look like nobody tried.
+   */
+  derivedUnavailable?: string;
 }
 
 /**
