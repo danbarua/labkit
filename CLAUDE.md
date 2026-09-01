@@ -1275,9 +1275,22 @@ did not:
    manufactures a refusal exactly as a missing feature manufactures an empty
    result (S-10, PJ-019). Where no such verb exists, the caveat travels with
    a report a reader already asks for.
-3. The new edge needs a **reader, not just a writer**. An edge that is
-   written and never queried is the dead-code shape PJ-007 found in
-   `buildAsClause`.
+3. The new edge needs a **reader, not just a writer** — **for structure
+   nobody's act asserts.** A relationship the researcher's act plainly states
+   — *this analysis replaces that one*, *this task serves that question*,
+   *this decision deferred that question* — is recorded **when the act is
+   recorded**, reader or not; the reader bar is for relationships someone
+   wants to *infer* into the model. This rule was applied the wrong way round
+   once: `replaceAnalysis` declined to record what it replaced because
+   nothing read the edge, and the read side then grew inference to recover a
+   fact the act had in hand. Dan, 2026-09-01, on the day `conclude
+   --replacing` needed that edge and found it missing: *"Academic
+   theoretical exercise said no edge because no reader. Did not survive first
+   contact with reality. Record the edge."* An edge that is written and never
+   queried is still the dead-code shape PJ-007 found in `buildAsClause` — when
+   it was *invented*, not when it was *stated*. In the words of the rules'
+   own author, the same day: *"Both rules were excellent experimental controls
+   and are becoming terrible product constraints."*
 4. A predicted gap that fails to materialise is a **result**. PJ-008's §3
    ledger keeps such rows — see row B, and row A, which PJ-008 called its
    strongest single prediction and which S-3 refuted. The ledger distinguishes
