@@ -1,10 +1,10 @@
 # LabKit
 
 <!--
-  Real output, pasted from a run against a live research record (a genetic-
-  algorithm programme called Bonsai) at commit 3fec73e, 2026-09-01. Re-paste
-  after the record rebuild tracked in #190 step 5 — TASK_2 and GATE_1 will
-  read differently once it lands.
+  Real output, pasted from a run against a live research record (a coupled-
+  oscillator dynamics research programme called Bonsai) at commit 3fec73e,
+  2026-09-01. Re-paste after the record rebuild tracked in #190 step 5 —
+  TASK_2 and GATE_1 will read differently once it lands.
 -->
 
 ```sh
