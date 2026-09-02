@@ -51,6 +51,12 @@ function writeOut(line: string): void {
       written += writeSync(1, out, written, out.length - written);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EAGAIN") throw err;
+      // The pipe is full and the reader has not caught up -- `labkit happened
+      // | less` sitting at the first page, waiting on a person. Retrying
+      // straight away spins a core for as long as they read; a millisecond
+      // costs nothing on a reader that is actually draining, since it is only
+      // reached when a write was refused.
+      Bun.sleepSync(1);
     }
   }
 }
