@@ -10,13 +10,19 @@
  * way `replayIntoScratch`'s own scratch database always does, and every
  * step would diverge for a reason that has nothing to do with the
  * mechanism under test.
+ *
+ * **`connectScratch`, not `connectDb`, and that is what this file is about
+ * as much as the replay is.** `connectDb` reads `LABKIT_DB_URL` before it
+ * reads the directory, so under `bun run test:pg` the "fresh" database above
+ * was the suite's shared Postgres — the fixture started at `Q_90`, the
+ * scratch at `Q_1`, and the mechanism under test was blamed.
  */
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { connectDb, type LabKitDBConnection } from "../src/db/connect";
+import { connectScratch, type LabKitDBConnection } from "../src/db/connect";
 import { resolveTenantContext } from "../src/db/tenant";
 import { scopeToTenant } from "../src/db/scoped";
 import { TenantGraph } from "../src/db/graph";
@@ -33,7 +39,7 @@ async function realHistory(): Promise<{
   connection: LabKitDBConnection;
 }> {
   const dir = mkdtempSync(join(home, "run-"));
-  const connection = await connectDb(dir);
+  const connection = await connectScratch(dir);
   const ctx = await resolveTenantContext(connection.db, connection.tx, "labkit");
   await scopeToTenant(connection.db, ctx);
   const graph = new TenantGraph(ctx, connection.db, connection.tx);
