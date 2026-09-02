@@ -242,7 +242,9 @@ They are dated records: read them for reasoning, never for current state.
   primitive's build record — why one act is the caller's and not the graph's,
   and the four wrong answers that moving conclusions to their own verb turned
   up; 036 is the reviewer's account of the usage era's first two days — what
-  the real record found, which rules fell, and what the vocabulary became.
+  the real record found, which rules fell, and what the vocabulary became;
+  037 is the .toml era retrospective, verbatim from the agent inside it —
+  read it before designing any verb a researcher must type.
 - **025-029 are about the method, not the model**, and are the ones worth
   reading if you are about to write a document. Their rules, which is all you
   need from them:
