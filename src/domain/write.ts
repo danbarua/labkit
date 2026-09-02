@@ -95,6 +95,7 @@ import type {
   EvaluatedCriterion,
   AcceptedAsUnresolved,
   Promoted,
+  Restated,
   CitedFinding,
   Conclusion,
   EnquiryRef,
@@ -112,6 +113,7 @@ import type {
   DeclareGateCommand,
   EvaluateCriterionCommand,
   PlanWorkCommand,
+  IsCommand,
   PromoteCommand,
   PursueCommand,
   NoteCommand,
@@ -1353,6 +1355,7 @@ export class WriteSurface extends SessionCore {
    * gate reading exploratory, and an amendment check would miss a scientific
    * change. Promotion is an act with a reason.
    */
+
   async promote(input: PromoteCommand): Promise<Promoted> {
     return this.graph.inTransaction(async () => {
       const decision = await this.graph.inTransaction(async () => {
@@ -1390,6 +1393,57 @@ export class WriteSurface extends SessionCore {
         to: "confirmatory",
       });
       return { decision: ref("decision", decision.decision.natural_id), events };
+    });
+  }
+
+  /**
+   * Puts a claim into a state its evidence does not carry, and records what
+   * put it there.
+   *
+   * **The state is on the claim, not on a third kind of edge.** A finding that
+   * settles nothing is not a third direction for evidence to point — AGE has
+   * no edge alternation, so every clause reaching a claim already spells
+   * `SUPPORTS` and `CHALLENGES` separately, and a third label would have to be
+   * added to each of them with silence as the failure mode. `promote` is the
+   * shape this follows: mint the deciding act, connect it, set the property.
+   *
+   * The Decision carries `GRADES`, not `CHANGES`: `supersededClaim()` reads
+   * every `CHANGES` into a claim as that claim no longer standing, and a
+   * finding recorded as undecided is not withdrawn — it is real, and it still
+   * rests under the claim.
+   */
+  async is(input: IsCommand): Promise<Restated> {
+    return this.graph.inTransaction(async () => {
+      const written = await this.graph.inTransaction(async () => {
+        const decision = await this.graph.createNode("Decision", {
+          decided_at: this.clock.now(),
+          reason: `recorded as ${input.state}`,
+          invalidation_check: "a further finding that settles the proposition either way",
+        });
+        await this.graph.createEdge(decision.natural_id, "GRADES", input.claim);
+        await this.graph.createEdge(decision.natural_id, "BASED_ON", input.because);
+        // Read before the write, so the event can say what the state moved
+        // from -- the act overwrites `kind` in place, exactly as `promote`
+        // does, and afterwards nothing holds the value it replaced.
+        const [existing] = await this.graph.query(
+          `MATCH (c:Claim {natural_id: $id}) RETURN c`,
+          { c: vertexProps<ClaimProps>() },
+          { id: input.claim },
+        );
+        await this.graph.query(
+          `MATCH (c:Claim {natural_id: $id}) SET c.kind = $state RETURN c`,
+          { c: vertexProps<ClaimProps>() },
+          { id: input.claim, state: input.state },
+        );
+        return { decision, was: existing?.c.kind ?? "exploratory" };
+      });
+      const events = await this.emit("is", input.claim, {
+        proposition: await this.assertedBy(input.claim),
+        from: written.was,
+        to: input.state,
+        because: input.because,
+      });
+      return { decision: ref("decision", written.decision.natural_id), events };
     });
   }
 

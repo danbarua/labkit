@@ -104,4 +104,6 @@ export type {
   ReplaceAnalysisCommand,
   ReinterpretCommand,
   PromoteCommand,
+  IsCommand,
+  ClaimState,
 } from "./commands";

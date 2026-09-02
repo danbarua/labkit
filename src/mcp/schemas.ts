@@ -50,6 +50,7 @@ import type {
   EvaluatedCriterion,
   AcceptedAsUnresolved,
   Promoted,
+  Restated,
   QuestionClosure,
   ConflictSide,
   ConflictVerdict,
@@ -353,7 +354,7 @@ export const supportExplanationSchema = z.strictObject({
   claim: ref("claim"),
   proposition: z.string(),
   supported: z.boolean(),
-  standing: z.enum(["exploratory", "confirmatory"]),
+  standing: z.enum(["exploratory", "confirmatory", "undecided"]),
   promotedBecause: z.string().optional(),
   support: z.array(bearingFinding),
   reverifiedBy: z.array(z.strictObject({ analysis: ref("analysis"), method: z.string() })),
@@ -719,6 +720,11 @@ export const promotedSchema = z.strictObject({
   events: z.array(domainEventSchema),
 });
 
+export const restatedSchema = z.strictObject({
+  decision: ref("decision"),
+  events: z.array(domainEventSchema),
+});
+
 const changedConclusion = z.strictObject({
   proposition: z.string(),
   was: ref("claim"),
@@ -912,6 +918,7 @@ export type _AcceptedAsUnresolved = Assert<
   Exact<z.infer<typeof acceptedAsUnresolvedSchema>, AcceptedAsUnresolved>
 >;
 export type _Promoted = Assert<Exact<z.infer<typeof promotedSchema>, Promoted>>;
+export type _Restated = Assert<Exact<z.infer<typeof restatedSchema>, Restated>>;
 
 /**
  * What `register_session` recorded.

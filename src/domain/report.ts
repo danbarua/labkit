@@ -314,6 +314,10 @@ export interface Promoted {
   decision: DecisionRef;
   events: DomainEvent[];
 }
+export interface Restated {
+  decision: DecisionRef;
+  events: DomainEvent[];
+}
 
 /**
  * The inverse of {@link LABEL_BY_KIND} — a label's research-concept kind,
@@ -1068,7 +1072,7 @@ export interface SupportExplanation {
    * anyone knows it matters, so the standing cannot always be declared at
    * birth.
    */
-  standing: "exploratory" | "confirmatory";
+  standing: "exploratory" | "confirmatory" | "undecided";
   /** Why it was promoted. Present only when `standing` is `confirmatory`. */
   promotedBecause?: string;
   /** Findings currently supporting the proposition, each with the analysis that produced it. */

@@ -500,6 +500,31 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(kept.kept as string[]).toHaveLength(1);
       expect((kept.superseded as Array<{ asserts: string }>)[0]!.asserts).toBe("arm two is faster");
 
+      // `is` — a finding that settles the proposition neither way. Its own
+      // analysis, so the state lands on a claim nothing else here reads.
+      const inconclusive = await call(c, "record_analysis", {
+        enquiry: id(sparse),
+        method: "paired timing, ten seeds",
+        from: [id(sparseObs)],
+      });
+      const settlesNothing = await call(c, "conclude", {
+        analysis: id(inconclusive.analysis as Json),
+        proposition: "the speedup survives at ten seeds",
+        finding: "two of three tests agree, the third does not; no further transformation",
+      });
+      const openClaim = (settlesNothing.claims as Array<{ claim: string; finding: string }>)[0]!;
+      await call(c, "is", {
+        claim: openClaim.claim,
+        state: "undecided",
+        because: openClaim.finding,
+      });
+      const stillOpen = await call(c, "why_supported", { claim: openClaim.claim });
+      expect(stillOpen.standing).toBe("undecided");
+      // Not supported, and the finding stays under it: an emptied report would
+      // say the analysis produced nothing.
+      expect(stillOpen.supported).toBe(false);
+      expect(stillOpen.support as unknown[]).toHaveLength(1);
+
       await call(c, "accept_as_unresolved", {
         enquiry: id(dense),
         because: "the dense set needs an instance generator nobody has written",

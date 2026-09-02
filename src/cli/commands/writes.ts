@@ -27,10 +27,19 @@
  */
 
 import type { Command } from "commander";
-import { anyRef, bearing, collect, handle, inputRef, standing, supersededRef } from "../args";
+import {
+  anyRef,
+  bearing,
+  claimState,
+  collect,
+  handle,
+  inputRef,
+  standing,
+  supersededRef,
+} from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
-import type { ClaimRef, DomainEvent, EnquiryRef, GateRef } from "../../domain";
+import type { ClaimRef, DomainEvent, EnquiryRef, EvidenceRef, GateRef } from "../../domain";
 
 /**
  * Every handle an act minted, across however many events it recorded — in
@@ -428,6 +437,21 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--because <text>", "what justifies promoting it")
     .action(async (claim, { because }: { because: string }) =>
       run(async ({ write }) => answer(await write.promote({ claim, because }), mintedView())),
+    );
+
+  program
+    .command("is")
+    .summary("record what a claim now is: a state, and the finding that put it there")
+    .description(
+      "For a finding that settles the proposition neither way. The evidence is real and stays " +
+        "under the claim; what is absent is a direction anyone will stand behind, and `labkit why` " +
+        "then reports neither supports nor challenges rather than picking the less wrong one.",
+    )
+    .argument("<claim-id>", "the claim", handle("claim"))
+    .argument("<state>", "undecided", claimState)
+    .requiredOption("--because <evidence-id>", "the finding that put it there", handle("evidence"))
+    .action(async (claim, state, { because }: { because: EvidenceRef }) =>
+      run(async ({ write }) => answer(await write.is({ claim, state, because }), mintedView())),
     );
 
   program

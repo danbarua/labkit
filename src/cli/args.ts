@@ -20,7 +20,14 @@ import { InvalidArgumentError } from "commander";
 import { z } from "zod";
 import { ref, kindOf } from "../domain/report";
 import type { AnyRef } from "../domain/report";
-import type { AnalysisRef, ClaimRef, EvidenceRef, ObservationsRef, Ref } from "../domain";
+import type {
+  AnalysisRef,
+  ClaimRef,
+  ClaimState,
+  EvidenceRef,
+  ObservationsRef,
+  Ref,
+} from "../domain";
 
 /**
  * A whole number, refused rather than coerced.
@@ -145,6 +152,17 @@ export function bearing(raw: string): "supports" | "challenges" {
 export function standing(raw: string): "exploratory" | "confirmatory" {
   if (raw === "exploratory" || raw === "confirmatory") return raw;
   throw new InvalidArgumentError(`expected \`exploratory\` or \`confirmatory\` (got \`${raw}\`)`);
+}
+
+/**
+ * A state a claim can be put into. See `ClaimState`.
+ *
+ * The refusal lists the set, which is the whole of what makes a closed set
+ * usable from a terminal: a caller who guesses is told what the words are.
+ */
+export function claimState(raw: string): ClaimState {
+  if (raw === "undecided") return raw;
+  throw new InvalidArgumentError(`expected \`undecided\` (got \`${raw}\`)`);
 }
 
 /**

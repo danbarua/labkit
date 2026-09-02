@@ -120,6 +120,7 @@ export const EDGE_LABELS = [
   "CHALLENGES", // Evidence -> Claim
   "REVERIFIES", // Evidence -> Evidence
   "PROMOTES", // Decision -> Claim
+  "GRADES", // Decision -> Claim
   "KEEPS", // Decision -> Claim (a conclusion a revision carried forward)
   "USES", // EvidenceUnit -> Computation
   "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
@@ -329,6 +330,20 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * happened.
    */
   PROMOTES: [["Decision", "Claim"]],
+  /**
+   * **A decision put a claim into a state its evidence does not carry.**
+   *
+   * Distinct from `CHANGES`, and the distinction is load-bearing: `CHANGES`
+   * means a claim no longer stands, and `supersededClaim()` reads it that way
+   * for every decision carrying it. A claim recorded as `undecided` is not
+   * withdrawn — its finding is real and still rests under it — so grading it
+   * through `CHANGES` would report a retraction nobody performed.
+   *
+   * Distinct from `PROMOTES`, which names one state in its own label.
+   * This one carries the state on the claim, so a further state joins the
+   * closed set in `ClaimProps.kind` without a further edge.
+   */
+  GRADES: [["Decision", "Claim"]],
   /**
    * A conclusion a revision carried forward unchanged.
    *
@@ -644,10 +659,19 @@ export interface ClaimProps {
    * than one absent, because the annotation is what a reader trusts instead of
    * grepping.
    *
-   * Optional because it is unset until promotion, and absence is read as
+   * Optional because it is unset until an act sets it, and absence is read as
    * exploratory rather than defaulted at the write.
+   *
+   * **A closed set, and every value has an act that produces it**: nothing
+   * writes `exploratory` (it is what absence means), `confirmatory` comes from
+   * `is <claim> confirmed`, and `undecided` from `is <claim> undecided`. A
+   * value nothing can write is one a reader cannot interpret.
+   *
+   * `undecided` is not a weaker `exploratory`. It says the evidence bears on
+   * the proposition and settles it neither way — a state a researcher reaches
+   * deliberately, and the one thing a two-value bearing cannot record.
    */
-  kind?: "exploratory" | "confirmatory";
+  kind?: "exploratory" | "confirmatory" | "undecided";
 }
 
 /**
