@@ -270,6 +270,34 @@ export async function connectDb(projectRoot?: string): Promise<LabKitDBConnectio
 }
 
 /**
+ * Opens a throwaway database in `dir`, and never anything else.
+ *
+ * **`connectDb` cannot be used for this, and the difference is not a
+ * preference.** It reads `LABKIT_DB_URL` first and returns before it looks at
+ * the directory it was handed, which is right for every caller naming a
+ * project root — a caller pointed at a real Postgres is not asking for a file.
+ * A caller asking for scratch *is*, and handing that request to `connectDb`
+ * means the environment decides whether the writes land in a temporary
+ * directory or in the deployment's own database.
+ *
+ * So this names the backend rather than resolving one. It still goes through
+ * `pgliteBackend` and takes the lock: the rule against opening PGlite raw is
+ * about the `dataDir` argument, not about which backend, and a missing final
+ * path segment silently initialises a fresh cluster rather than erroring.
+ *
+ * `scripts/snapshot-record.ts` deliberately does the opposite and goes through
+ * `connectDb` — it dumps a **live** record, so it must reach whatever database
+ * that record is in.
+ */
+export async function connectScratch(dir: string): Promise<LabKitDBConnection> {
+  const connection = await pgliteBackend({
+    dataDir: join(dir, "pglite"),
+    lockPath: join(dir, "pglite.lock"),
+  }).connect();
+  return withTrace(connection, "pglite");
+}
+
+/**
  * Threads the connection through `traced()` while keeping whatever else the
  * backend hung off it (`close`, and anything a backend adds later).
  *

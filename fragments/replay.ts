@@ -27,7 +27,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { connectDb } from "../src/db/connect";
+import { connectScratch } from "../src/db/connect";
 import { resolveTenantContext } from "../src/db/tenant";
 import { scopeToTenant } from "../src/db/scoped";
 import { TenantGraph } from "../src/db/graph";
@@ -129,8 +129,10 @@ function diverges(original: DomainEvent, replayed: DomainEvent): string | undefi
  * tags a composition's own moves — so a real record's `fragment` is exactly
  * the probe script (or reviewer) attribution already on the event, verbatim.
  *
- * Hermetic: `dir` is created and removed here, never the caller's own
- * project directory. `nodeProps` must come from the live record — see
+ * Hermetic: `dir` is created and removed here, never the caller's own project
+ * directory, and `connectScratch` is what makes that true of the *database*
+ * as well as of the path — `connectDb` would hand the whole replay to
+ * `LABKIT_DB_URL` whenever it is set. `nodeProps` must come from the live record — see
  * {@link fetchNodeProps} — read and handed in before this opens anything,
  * so the live connection need not stay open for the replay's duration.
  */
@@ -141,7 +143,7 @@ export async function replayIntoScratch(
   const claimIndex = buildClaimIndex(history);
   const dir = mkdtempSync(join(tmpdir(), "labkit-replay-"));
   try {
-    const connection = await connectDb(dir);
+    const connection = await connectScratch(dir);
     try {
       const tenantCtx = await resolveTenantContext(connection.db, connection.tx, "labkit");
       await scopeToTenant(connection.db, tenantCtx);
