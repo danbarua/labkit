@@ -31,7 +31,7 @@
 import { z } from "zod";
 import type { ReadSurface, WriteSurface } from "../domain";
 import type { SessionRegistry } from "../attribution";
-import { ref } from "../domain/report";
+import { ref, kindOf } from "../domain/report";
 import type { AnalysisRef, ObservationsRef } from "../domain";
 import {
   claimsAssertingSchema,
@@ -45,6 +45,7 @@ import {
   taskContractSchema,
   amendmentReportSchema,
   posedSchema,
+  notedSchema,
   pursuedSchema,
   openedEnquirySchema,
   recordedObservationsSchema,
@@ -578,6 +579,28 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     inputSchema: { question: z.string().describe("the question, as asked") },
     outputSchema: posedSchema,
     handler: (write, { question }) => write.pose(question),
+  }),
+
+  writeTool({
+    name: "note",
+    title: "Put a note on the record",
+    description:
+      "A dated, attributed record with nothing else required -- the one write with no " +
+      "prerequisites besides `pose`. `search` reaches it like anything else with prose on it. " +
+      "`on` attaches it to anything already on the record; omitting it costs nothing, since " +
+      "attaching is the part this verb exists to make optional.",
+    inputSchema: {
+      text: z.string().describe("the note, in your own words"),
+      on: z
+        .string()
+        .optional()
+        .describe("what this note concerns, if anything -- any handle already on the record"),
+    },
+    outputSchema: notedSchema,
+    handler: (write, { text, on }) => {
+      const kind = on ? kindOf(on) : null;
+      return write.note({ text, ...(on && kind ? { on: ref(kind, on) } : {}) });
+    },
   }),
 
   writeTool({

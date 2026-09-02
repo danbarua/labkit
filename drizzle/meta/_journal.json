@@ -50,6 +50,13 @@
       "when": 1787945703435,
       "tag": "0006_sour_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788351054416,
+      "tag": "0007_note_natural_id",
+      "breakpoints": true
     }
   ]
 }

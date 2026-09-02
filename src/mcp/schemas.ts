@@ -40,6 +40,7 @@ import type {
   OpenedEnquiry,
   SharpenedQuestion,
   Posed,
+  Noted,
   Pursued,
   RecordedReview,
   ClosedEnquiry,
@@ -650,6 +651,11 @@ export const posedSchema = z.strictObject({
   question: ref("question"),
   events: z.array(domainEventSchema),
 });
+/** What `note` returns. */
+export const notedSchema = z.strictObject({
+  note: ref("note"),
+  events: z.array(domainEventSchema),
+});
 /** What `pursue` returns. */
 export const pursuedSchema = z.strictObject({
   enquiry: ref("enquiry"),
@@ -883,6 +889,7 @@ export type _ReinterpretationReport = Assert<
 >;
 export type _DomainEvent = Assert<Exact<z.infer<typeof domainEventSchema>, DomainEvent>>;
 export type _Posed = Assert<Exact<z.infer<typeof posedSchema>, Posed>>;
+export type _Noted = Assert<Exact<z.infer<typeof notedSchema>, Noted>>;
 export type _Pursued = Assert<Exact<z.infer<typeof pursuedSchema>, Pursued>>;
 export type _OpenedEnquiry = Assert<Exact<z.infer<typeof openedEnquirySchema>, OpenedEnquiry>>;
 export type _RecordedObservations = Assert<

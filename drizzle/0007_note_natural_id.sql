@@ -1,0 +1,13 @@
+-- lock-strategy: online
+--
+-- One new sequence for one new label (#179's `Note`). `labkit_next_natural_id`
+-- (drizzle/0002_natural_ids.sql) already resolves the sequence name from
+-- whatever label is passed at call time -- `nextval('public.labkit_' ||
+-- lower(label) || '_natural_id_seq')` -- so this is the only DDL a new label
+-- needs; the function itself does not change.
+--
+-- 0002's own header explains why this is a new file rather than an edit to
+-- it: that file's licence to be amended in place held only while every
+-- database was destroyed and recreated freely, which stopped being true once
+-- a real record (bonsai-2026) existed.
+CREATE SEQUENCE IF NOT EXISTS public.labkit_note_natural_id_seq;

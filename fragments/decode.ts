@@ -27,7 +27,7 @@
  */
 
 import type { WriteSurface, DomainEvent, Operation } from "../src/domain";
-import { ref } from "../src/domain/report";
+import { ref, kindOf } from "../src/domain/report";
 import { labelForNaturalId } from "../src/db/domain";
 
 export interface DecodeContext {
@@ -95,6 +95,15 @@ async function revisionArgs(ctx: DecodeContext, e: DomainEvent) {
 export const DECODERS = {
   pose: async (ctx, e) => {
     await ctx.writes.pose(e.detail?.question as string);
+  },
+
+  note: async (ctx, e) => {
+    const on = e.detail?.on as string | undefined;
+    const kind = on ? kindOf(on) : null;
+    await ctx.writes.note({
+      text: e.detail?.text as string,
+      ...(on && kind ? { on: ref(kind, on) } : {}),
+    });
   },
 
   openEnquiry: async (ctx, e) => {

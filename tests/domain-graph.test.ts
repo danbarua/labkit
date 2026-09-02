@@ -418,6 +418,7 @@ describe("all node labels", () => {
     Artefact: { kind: "json", logical_name: "a" },
     Computation: { kind: "k", status: "s" },
     Task: { objective: "o", mayRead: ["a.csv"], outputs: "o", acceptance: "a" },
+    Note: { text: "n" },
   };
 
   // Generic helper rather than an inline call: inside it `L` is a single

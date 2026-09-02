@@ -85,6 +85,7 @@ import type {
   OpenedEnquiry,
   SharpenedQuestion,
   Posed,
+  Noted,
   Pursued,
   RecordedReview,
   ClosedEnquiry,
@@ -113,6 +114,7 @@ import type {
   PlanWorkCommand,
   PromoteCommand,
   PursueCommand,
+  NoteCommand,
   ConcludeCommand,
   RecordAnalysisCommand,
   RecordObservationsCommand,
@@ -250,6 +252,29 @@ export class WriteSurface extends SessionCore {
       const asked = await this.posed(question);
       const events = await this.emit("pose", asked, { question });
       return { question: asked, events };
+    });
+  }
+
+  /**
+   * Puts a note on the record — a dated, attributed `Prose` record and
+   * nothing else required (#179). The one write with no prerequisites
+   * besides `pose`, and this one has no shape to satisfy at all: no `kind`,
+   * no required attachment.
+   *
+   * `on` is optional and costs the caller nothing to skip — attaching a note
+   * is cheap, requiring one is the gate this verb removes. A note nothing
+   * is ever attached to is still exactly what was on the researcher's mind,
+   * which is the whole point.
+   */
+  async note(input: NoteCommand): Promise<Noted> {
+    return this.graph.inTransaction(async () => {
+      const noted = await this.graph.createNode("Note", { text: input.text });
+      if (input.on) await this.graph.createEdge(noted.natural_id, "CONCERNS", input.on);
+      const events = await this.emit("note", ref("note", noted.natural_id), {
+        text: input.text,
+        ...(input.on ? { on: input.on } : {}),
+      });
+      return { note: ref("note", noted.natural_id), events };
     });
   }
 
