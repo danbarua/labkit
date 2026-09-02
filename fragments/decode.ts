@@ -17,14 +17,9 @@
  * concluded reads back from the live record as `confirmatory` no matter when
  * the conclusion that named it ran. Read that way, a decoder would report the
  * claim as confirmatory from birth — wrong, and invisible to
- * `replayIntoScratch`'s own check, which compares `created`/`edges` and
- * cannot see a property. `conclude`'s own event now carries the `standing`
- * it recorded (#211), which is the real fix and is what its decoder reads.
- * `reverify`'s does not — it composes the same private write-side helper but
- * emits its own event, which #211 did not touch — so its decoder still uses
- * `wasPromoted`: a claim promoted anywhere in the history was exploratory
- * when it was concluded, because promotion is defined as moving an
- * exploratory finding to confirmatory standing, never the reverse.
+ * `replayIntoScratch`'s own check, which compares `created`/`edges` and cannot
+ * see a property. So every event that records a conclusion carries the
+ * `standing` it recorded, and that is what the decoders read.
  *
  * `DECODERS` is exhaustive over `Operation` at compile time
  * (`satisfies Record<Operation, Decoder>`), so a write verb with no decoder
@@ -43,8 +38,6 @@ export interface DecodeContext {
   claimFor(evidence: string): string | undefined;
   /** What an already-replayed analysis consumed, for `keep`/`replaceAnalysis`'s add-only `from`. */
   consumesOf(analysis: string): Promise<string[]>;
-  /** Whether a `promote` event names this claim anywhere in the history — see this file's header. */
-  wasPromoted(claim: string): boolean;
 }
 
 export type Decoder = (ctx: DecodeContext, event: DomainEvent) => Promise<void>;
@@ -61,13 +54,28 @@ function bearingOf(event: DomainEvent): "supports" | "challenges" {
   return findEdge(event, "CHALLENGES") ? "challenges" : "supports";
 }
 
+/** One conclusion as an event records it. */
+interface RecordedConclusion {
+  claim: string;
+  finding: string;
+  proposition: string;
+  standing?: "exploratory" | "confirmatory";
+}
+
 /**
- * `reverify` only — see this file's header on why it still needs `wasPromoted`
- * rather than reading `standing` off its own event, the way `conclude` now can.
+ * The standing an act recorded, read from its own event.
+ *
+ * **Two shapes, because the stored record has both.** Standing lives on each
+ * conclusion; it was briefly a single field beside the array, and events
+ * written then are still in the log. Never `Claim.kind`: that is what the claim
+ * reads *now*, so a claim promoted afterwards replays as confirmatory from
+ * birth.
  */
-function standingFromPromotion(ctx: DecodeContext, claim: string): "exploratory" | "confirmatory" | undefined {
-  if (ctx.wasPromoted(claim)) return "exploratory";
-  return ctx.nodeProp(claim, "kind") as "exploratory" | "confirmatory" | undefined;
+function standingOf(
+  event: DomainEvent,
+  conclusion: RecordedConclusion,
+): "exploratory" | "confirmatory" | undefined {
+  return conclusion.standing ?? (event.detail?.standing as "exploratory" | "confirmatory" | undefined);
 }
 
 /** `keep` and `replaceAnalysis` emit the same detail shape and differ only in which verb the caller named (#211). */
@@ -138,9 +146,9 @@ export const DECODERS = {
   },
 
   conclude: async (ctx, e) => {
-    const c = (e.detail?.conclusions as { claim: string; finding: string; proposition: string }[])[0]!;
+    const c = (e.detail?.conclusions as RecordedConclusion[])[0]!;
     const bearing = bearingOf(e);
-    const standing = e.detail?.standing as "exploratory" | "confirmatory" | undefined;
+    const standing = standingOf(e, c);
     const finding = ctx.nodeProp(c.finding, "statement") as string;
     const replacing = e.detail?.replacing as string | undefined;
     await ctx.writes.conclude({
@@ -220,7 +228,7 @@ export const DECODERS = {
     const method = ctx.nodeProp(e.subject, "kind") as string;
     const c = (e.detail?.conclusions as { claim: string; finding: string; proposition: string }[])[0]!;
     const bearing = bearingOf(e);
-    const standing = standingFromPromotion(ctx, c.claim);
+    const standing = standingOf(e, c);
     const finding = ctx.nodeProp(c.finding, "statement") as string;
     await ctx.writes.reverify({
       historical: ref("analysis", e.detail?.of as string),

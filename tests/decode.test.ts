@@ -28,13 +28,17 @@ function stubContext(
     nodeProp: () => undefined,
     claimFor: () => undefined,
     consumesOf: async () => [],
-    wasPromoted: () => false,
     ...overrides,
   };
 }
 
-test("conclude reads standing off its own event, not the live record's mutated Claim.kind", async () => {
-  // #211: conclude's own emit now carries the standing it recorded, so its
+test("conclude reads standing from the shape stored before it moved per-conclusion", async () => {
+  // **The old shape, deliberately.** Standing was briefly a single field beside
+  // the conclusions array, and events written then are still in the log — so a
+  // decoder that reads only the per-conclusion field replays them wrong. The
+  // test below covers the current shape.
+  //
+  // conclude's own emit carries the standing it recorded, so its
   // decoder no longer needs to infer anything about a later promotion.
   const calls: Record<string, unknown>[] = [];
   const writes = {
@@ -69,7 +73,6 @@ test("conclude reads standing off its own event, not the live record's mutated C
         : handle === "EV_1" && key === "statement"
           ? "the finding"
           : undefined,
-    wasPromoted: (claim) => claim === "CLM_1",
   });
 
   await DECODERS.conclude(ctx, event);
@@ -77,9 +80,11 @@ test("conclude reads standing off its own event, not the live record's mutated C
   expect(calls[0]?.standing).toBe("exploratory");
 });
 
-test("reverify falls back to wasPromoted, since its own event carries no standing", async () => {
-  // #211 gave conclude's emit a standing field and left reverify's alone --
-  // it composes the same private write-side helper but emits its own event.
+test("reverify reads the standing off its own event, not from a later promote", async () => {
+  // The trap is the same one `conclude`'s test sets: `nodeProp` answers
+  // "confirmatory" for the claim, because it *was* promoted afterwards. A
+  // decoder reading the record's current state replays a claim as confirmatory
+  // from birth; the event says what standing the act recorded.
   const calls: Record<string, unknown>[] = [];
   const writes = {
     reverify: async (cmd: Record<string, unknown>) => {
@@ -108,7 +113,14 @@ test("reverify falls back to wasPromoted, since its own event carries no standin
     detail: {
       of: "COMP_8",
       proposition: "the finding",
-      conclusions: [{ claim: "CLM_16", finding: "EV_23", proposition: "the finding" }],
+      conclusions: [
+        {
+          claim: "CLM_16",
+          finding: "EV_23",
+          proposition: "the finding",
+          standing: "exploratory",
+        },
+      ],
     },
   };
 
@@ -122,7 +134,6 @@ test("reverify falls back to wasPromoted, since its own event carries no standin
           : handle === "EV_23" && key === "statement"
             ? "the finding"
             : undefined,
-    wasPromoted: (claim) => claim === "CLM_16",
   });
 
   await DECODERS.reverify(ctx, event);

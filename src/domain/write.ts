@@ -66,7 +66,7 @@
  */
 
 import { optional, scalar, vertexProps } from "../db/cypher";
-import type { ArtefactProps, ClaimProps, EvidenceProps, IndexedString, Prose } from "../db/domain";
+import type { ArtefactProps, ClaimProps, EvidenceProps, Prose } from "../db/domain";
 import { labelForNaturalId } from "../db/domain";
 import type {
   VerificationReport,
@@ -75,11 +75,9 @@ import type {
   CriterionRef,
   DecisionRef,
   EvidenceRef,
-  InputRef,
   Ref,
   GateRef,
   UnitRef,
-  ChangedConclusion,
   ClaimRef,
   ConcludedClaim,
   RecordedAnalysis,
@@ -104,7 +102,6 @@ import type {
   ReinterpretationReport,
   ReplacementReport,
   ReviewRef,
-  UnaffectedRecord,
 } from "./report";
 import { ref } from "./report";
 import type {
@@ -128,6 +125,33 @@ import type {
 } from "./commands";
 import { SessionCore, type Methods } from "./core";
 import type { DomainEvent } from "./events";
+
+/**
+ * A conclusion as this file records it — the public shape plus the standing the
+ * write resolved.
+ *
+ * `ConcludedClaim` is what a caller gets back and does not carry standing: the
+ * claim itself does, and `whySupported` reports it. This is for the event,
+ * which has to say what standing the act *recorded* rather than what the claim
+ * reads today.
+ */
+type ConcludedWithStanding = Required<ConcludedClaim> & {
+  standing: "exploratory" | "confirmatory";
+};
+
+/**
+ * The public half of a {@link ConcludedWithStanding}.
+ *
+ * The standing is for the event, not for the caller: the claim carries it and
+ * `whySupported` reports it. Returning it would widen `ConcludedClaim`, and
+ * MCP's output schemas are `strictObject`, so an extra key is a validation
+ * error at the wire rather than an unused field.
+ */
+const asConcludedClaim = (c: ConcludedWithStanding): Required<ConcludedClaim> => ({
+  claim: c.claim,
+  asserts: c.asserts,
+  finding: c.finding,
+});
 
 /**
  * A conclusion **already on the record**, as read back from the graph.
@@ -584,14 +608,9 @@ export class WriteSurface extends SessionCore {
         const concluded = await this.concluding(input);
         const events = await this.emit("conclude", input.analysis, {
           conclusions: this.conclusionEvents([concluded]),
-          // The standing this conclusion was recorded with. Without it the log
-          // cannot say whether a claim now reading `confirmatory` was recorded
-          // that way or promoted later, and a reader has to infer it from
-          // whether a `promote` happens to follow.
-          standing: input.standing ?? "exploratory",
           ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
         });
-        return { analysis: input.analysis, claims: [concluded], events };
+        return { analysis: input.analysis, claims: [asConcludedClaim(concluded)], events };
       }),
     );
   }
@@ -617,7 +636,7 @@ export class WriteSurface extends SessionCore {
    * One who calls a compound made one call and gets one, with every conclusion
    * in its payload — the same distinction `pose` and `openEnquiry` already make.
    */
-  private async concluding(input: ConcludeCommand): Promise<Required<ConcludedClaim>> {
+  private async concluding(input: ConcludeCommand): Promise<ConcludedWithStanding> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
       {
@@ -766,6 +785,7 @@ export class WriteSurface extends SessionCore {
           claim: ref("claim", claim.natural_id),
           asserts: proposition,
           finding: ref("evidence", evidence.natural_id),
+          standing: input.standing ?? "exploratory",
         };
       }
     });
@@ -845,8 +865,17 @@ export class WriteSurface extends SessionCore {
   }
 
   /** `{claim, finding, proposition}` per conclusion — the event's own record of the pairing, independent of the typed report. */
-  private conclusionEvents(claims: ConcludedClaim[]): Record<string, unknown>[] {
-    return claims.map((c) => ({ claim: c.claim, finding: c.finding, proposition: c.asserts }));
+  private conclusionEvents(claims: ConcludedWithStanding[]): Record<string, unknown>[] {
+    return claims.map((c) => ({
+      claim: c.claim,
+      finding: c.finding,
+      proposition: c.asserts,
+      // **Per conclusion, because the array is the record of what was
+      // concluded.** Without it the log cannot say whether a claim now reading
+      // `confirmatory` was recorded that way or promoted afterwards, and a
+      // reader has to infer it from whether a `promote` happens to follow.
+      standing: c.standing,
+    }));
   }
 
   /**
@@ -1218,7 +1247,7 @@ export class WriteSurface extends SessionCore {
         at,
         verification: verification.analysis,
         of: input.historical,
-        claims: [concluded],
+        claims: [asConcludedClaim(concluded)],
         events,
       };
     });

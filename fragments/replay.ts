@@ -93,15 +93,6 @@ function buildClaimIndex(history: readonly DomainEvent[]): Map<string, string> {
   return index;
 }
 
-/** Every claim a `promote` event names, anywhere in the history — see `decode.ts`'s header on `Claim.kind`. */
-function buildPromotedClaims(history: readonly DomainEvent[]): Set<string> {
-  const promoted = new Set<string>();
-  for (const event of history) {
-    if (event.operation === "promote") promoted.add(event.subject);
-  }
-  return promoted;
-}
-
 async function consumesOf(graph: TenantGraph, analysis: string): Promise<string[]> {
   const rows = await graph.query(
     `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
@@ -148,7 +139,6 @@ export async function replayIntoScratch(
   nodeProps: ReadonlyMap<string, Record<string, unknown>>,
 ): Promise<ReplayResult> {
   const claimIndex = buildClaimIndex(history);
-  const promotedClaims = buildPromotedClaims(history);
   const dir = mkdtempSync(join(tmpdir(), "labkit-replay-"));
   try {
     const connection = await connectDb(dir);
@@ -165,7 +155,6 @@ export async function replayIntoScratch(
         nodeProp: (handle, key) => nodeProps.get(handle)?.[key],
         claimFor: (evidence) => claimIndex.get(evidence),
         consumesOf: (analysis) => consumesOf(graph, analysis),
-        wasPromoted: (claim) => promotedClaims.has(claim),
       };
 
       for (const original of history) {

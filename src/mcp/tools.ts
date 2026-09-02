@@ -567,20 +567,6 @@ function inputRef(id: string): ObservationsRef | AnalysisRef {
   );
 }
 
-/** One conclusion, as it crosses the wire. */
-const conclusionShape = z.object({
-  proposition: z.string().describe("the claim, as a sentence"),
-  finding: z.string().describe("what was found, in this analysis's own words"),
-  bearing: z
-    .enum(["supports", "challenges"])
-    .optional()
-    .describe("whether the finding supports or challenges the proposition (default: supports)"),
-  standing: z
-    .enum(["exploratory", "confirmatory"])
-    .optional()
-    .describe("confirmatory means it was prespecified; exploratory is the default"),
-});
-
 export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "pose",
