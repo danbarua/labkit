@@ -886,6 +886,18 @@ one afternoon (#177), and the flags went. A new read earns a **verb a
 researcher would say**, or a case of one that exists; it does not earn a flag
 that names how the answer is stored.
 
+**An act names what it acts on; one hop is inferred, never restated.** A
+handle one hop from what the caller already named — the gate a criterion
+governs, the enquiry a superseded analysis addressed — is inferred when
+unique, accepted as an explicit flag, and refused with the candidates named
+when ambiguous; never guessed. `keep` and `replace` are the shape to copy:
+`keep` infers the superseded analysis from the kept claims and refuses when
+they span two. What stays a flag is the act's own content — what was read,
+which claim decided it, why — which no walk can know. Decided on #199
+(2026-09-02) from the measured surface: after #194 the CLI had zero
+always-restated flags left, and the one sometimes-inferable one
+(`evaluate --gate`) is retrofitted whenever that command is next touched.
+
 #### A variable is named for what it holds
 
 In every example script, snippet and document, a shell variable holding a
