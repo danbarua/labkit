@@ -48,7 +48,7 @@
 
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, join, normalize, resolve, sep } from "node:path";
+import { basename, extname, join, resolve } from "node:path";
 
 import { COMPOSITIONS } from "../fragments/compositions";
 import { runComposition } from "../fragments/run";
@@ -56,6 +56,7 @@ import type { Trace } from "../fragments/trace";
 import { worktreeName } from "../src/worktree";
 import { readDbTrace } from "./read-db-trace";
 import { readRustTraces } from "./read-rust-traces";
+import { staticFilePath } from "./static-path";
 
 const args = process.argv.slice(2);
 const value = (name: string, fallback: string): string => {
@@ -129,15 +130,10 @@ Bun.serve({
       }
     }
 
-    // Path traversal guard: the resolved file must stay under staticRoot.
-    // Not defensive theatre against a hypothetical attacker this dev tool
-    // doesn't have -- it's the same "don't trust a path built from request
-    // input" rule CLAUDE.md applies everywhere else in this repo.
-    const requested = normalize(url.pathname === "/" ? "/index.html" : url.pathname);
-    const filePath = resolve(staticRoot, `.${requested}`);
-    if (filePath !== staticRoot && !filePath.startsWith(staticRoot + sep)) {
-      return new Response("not found", { status: 404 });
-    }
+    // A path built from request input is not trusted to stay under
+    // staticRoot -- see `staticFilePath` for what actually keeps it there.
+    const filePath = staticFilePath(staticRoot, url.pathname);
+    if (filePath === undefined) return new Response("not found", { status: 404 });
     const file = Bun.file(filePath);
     if (!(await file.exists())) return new Response("not found", { status: 404 });
     return new Response(file, {
