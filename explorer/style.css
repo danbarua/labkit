@@ -125,15 +125,21 @@ button:active { transform: translateY(1px); }
 #speed { width: 100px; }
 
 #progress {
-  height: 3px;
+  height: 10px;
   background: var(--panel-border);
   flex: 0 0 auto;
+  cursor: pointer;
+  touch-action: none; /* the drag is the gesture -- don't let the page scroll under it */
+}
+#progress:hover {
+  height: 14px;
 }
 #progress-fill {
   height: 100%;
   width: 0%;
   background: var(--accent);
   transition: width 120ms linear;
+  pointer-events: none; /* the bar's own listeners own the drag; the fill is a visual only */
 }
 
 main {

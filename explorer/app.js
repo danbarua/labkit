@@ -18,6 +18,7 @@ const queueList = document.getElementById("queue-list");
 const popover = document.getElementById("popover");
 const hint = document.getElementById("hint");
 const scenarioSelect = document.getElementById("scenario");
+const progressBar = document.getElementById("progress");
 const progressFill = document.getElementById("progress-fill");
 const speedInput = document.getElementById("speed");
 const playBtn = document.getElementById("play");
@@ -51,6 +52,7 @@ const state = (window.__labkitExplorerState = {
   zoom: 1,
   lastStepSeq: null, // seq of the most recently applied step, for the temporal overlay
   lastTouched: new Set(), // handles created, connected, or named as subject by the last step
+  timeRange: null, // {min, max} of this trace's step.at, in ms -- null until a trace is selected
 });
 
 const STANDING_COLOR = {
@@ -68,7 +70,14 @@ const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
 const TEMPORAL_HISTORICAL = "hsl(220deg 10% 34%)";
 
-const ZSPACING = 46; // px of depth per step, in 3D
+// A trace's full 3D depth, fixed regardless of how many steps it has -- a
+// 15-step composition and the real Bonsai record (335 steps and growing)
+// span the same tunnel; what changes is how finely packed a trace's nodes
+// are along it, not how far back the camera has to pull to see the whole
+// thing. 14 steps' worth at the old fixed per-step spacing (46px) is what a
+// typical composition already looked like, so this keeps that case visually
+// unchanged and only compresses larger traces down to match.
+const TOTAL_DEPTH = 46 * 14;
 const FOCAL = 640;
 
 function colorFor(kind) {
@@ -142,6 +151,16 @@ function originBadge() {
 function selectTrace(index) {
   state.current = state.traces[index];
   scenarioSelect.value = String(index);
+  // Fixed once per trace, from every step's own `at` -- not recomputed as
+  // playback advances, so a node's z-position never shifts once it's placed.
+  // A record built from one script run has almost no spread here (all `at`s
+  // within the same second or so) and renders indistinguishably from the old
+  // seq-based depth; a `--db` trace with a backfilled `--date` import is
+  // exactly the case this exists for -- see the header on `zOf()`.
+  const ats = (state.current?.steps ?? []).map((s) => Date.parse(s.at)).filter(Number.isFinite);
+  state.timeRange = ats.length
+    ? { min: Math.min(...ats), max: Math.max(...ats) }
+    : null;
   const badge = originBadge();
   if (badge) {
     const origin = state.current?.origin ?? "labkit-ts";
@@ -207,6 +226,7 @@ function applyStep(step) {
       vx: 0,
       vy: 0,
       createdStep: step.seq,
+      createdAt: Date.parse(step.at),
       alpha: 1,
       concluded: false,
     });
@@ -543,7 +563,7 @@ function project(node) {
   }
   const rect = canvas.getBoundingClientRect();
   const { yaw, pitch, distance } = state.camera;
-  const z = node.createdStep * ZSPACING;
+  const z = zOf(node);
   const maxZ = maxCreatedZ();
   // Camera looks at the midpoint of the depth range so the whole run stays
   // roughly centred instead of drifting off as new, deeper steps arrive.
@@ -570,9 +590,36 @@ function project(node) {
   };
 }
 
+// z is a node's real `at`, not its position in the sequence -- a `--db`
+// trace with a `--date`-backfilled import (a batch of criteria recorded
+// today about checks made weeks ago) has `seq` and `at` disagreeing sharply
+// for exactly that batch, and placing it by `seq` drew it as a cluster
+// bolted onto the newest end of the tree, disconnected from the historical
+// moment its own timestamps actually name. `state.timeRange` is fixed once
+// per trace (see `selectTrace`), so this is a stable function of the node,
+// not of how far playback has progressed.
+//
+// Every trace maps onto the same `TOTAL_DEPTH`, whatever its step count --
+// a real record only ever grows, and depth scaling with size would mean
+// re-deriving how far back the camera needs to sit every time more of it
+// gets imported. What changes with size is density along the tunnel, not
+// the tunnel's length.
+function zOf(node) {
+  const range = state.timeRange;
+  const totalSteps = Math.max(1, (state.current?.steps.length ?? 1) - 1);
+  // Same fallback for a degenerate range (every `at` identical or absent) and
+  // for one node whose own `at` didn't parse -- `state.timeRange` already
+  // excludes non-finite values from min/max, but a single bad one here would
+  // still NaN this node's own z without this check.
+  if (!range || range.max === range.min || !Number.isFinite(node.createdAt)) {
+    return (node.createdStep / totalSteps) * TOTAL_DEPTH;
+  }
+  return ((node.createdAt - range.min) / (range.max - range.min)) * TOTAL_DEPTH;
+}
+
 function maxCreatedZ() {
   let max = 0;
-  for (const n of state.nodes.values()) max = Math.max(max, n.createdStep * ZSPACING);
+  for (const n of state.nodes.values()) max = Math.max(max, zOf(n));
   return max;
 }
 
@@ -771,6 +818,42 @@ function stepForward() {
   next();
 }
 
+// Bidirectional, unlike `goToStep` on `window.__labkitExplorer` (forward-only
+// by design, for scripted automation that never wants to lose progress by
+// accident). The scrubber has the opposite requirement -- dragging left must
+// go back -- so a backward seek resets and replays from zero rather than
+// trying to undo state nothing here tracks how to unwind.
+function seekToStep(target) {
+  if (!state.current) return;
+  pause();
+  const clamped = Math.max(0, Math.min(target, state.current.steps.length));
+  if (clamped < state.step) resetRun();
+  while (state.step < clamped) next();
+}
+
+function seekFromPointer(e) {
+  if (!state.current) return;
+  const rect = progressBar.getBoundingClientRect();
+  const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  seekToStep(Math.round(fraction * state.current.steps.length));
+}
+
+let scrubbing = false;
+progressBar.addEventListener("pointerdown", (e) => {
+  scrubbing = true;
+  progressBar.setPointerCapture(e.pointerId);
+  seekFromPointer(e);
+});
+progressBar.addEventListener("pointermove", (e) => {
+  if (scrubbing) seekFromPointer(e);
+});
+progressBar.addEventListener("pointerup", () => {
+  scrubbing = false;
+});
+progressBar.addEventListener("pointercancel", () => {
+  scrubbing = false;
+});
+
 function setSpeed(speed) {
   state.speed = speed;
   speedInput.value = String(speed);
@@ -792,7 +875,7 @@ function setView(view) {
   state.view = view;
   for (const b of document.querySelectorAll("#view-toggle button"))
     b.classList.toggle("active", b.dataset.view === view);
-  hint.textContent = view === "3d" ? "drag to orbit · scroll to zoom · z = step sequence" : "";
+  hint.textContent = view === "3d" ? "drag to orbit · scroll to zoom · z = when it was recorded" : "";
 }
 
 function setOverlay(overlay) {
@@ -870,7 +953,7 @@ function showPopover(handle, clientX, clientY, rect) {
   popover.innerHTML = `
     <div><span class="kind">${node.label}</span> <span class="handle">${handle}</span></div>
     <dl>
-      <dt>created at</dt><dd>step ${node.createdStep}${step ? ` — ${step.operation}` : ""}</dd>
+      <dt>created at</dt><dd>step ${node.createdStep}${step ? ` — ${step.operation}` : ""}${step ? ` — ${new Date(step.at).toLocaleString()}` : ""}</dd>
       ${node.concluded ? "<dt>status</dt><dd>concluded</dd>" : ""}
     </dl>
   `;
@@ -918,6 +1001,12 @@ window.__labkitExplorer = {
     if (!state.current) throw new Error("no scenario selected");
     const target = Math.max(0, Math.min(n, state.current.steps.length));
     while (state.step < target) stepForward();
+    return state.step;
+  },
+  /** Bidirectional, the way dragging the progress bar is -- resets and replays forward when `n` is behind. */
+  seekToStep: (n) => {
+    if (!state.current) throw new Error("no scenario selected");
+    seekToStep(n);
     return state.step;
   },
   play,
