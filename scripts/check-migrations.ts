@@ -76,6 +76,14 @@ function fail(msg: string) {
 
 const migrations = readMigrations();
 
+// A green run over nothing reads exactly like a green run over everything.
+// `readMigrations` filters by `.sql`, so an existing-but-empty `drizzle/` --
+// a renamed folder, a drizzle-kit that changed where it writes -- reaches
+// the loop below with no files and prints OK having examined none.
+if (migrations.length === 0) {
+  fail(`FAILED: no .sql migrations found in ${MIGRATIONS_DIR} -- nothing was checked.`);
+}
+
 for (const m of migrations) {
   // 1) Block destructive ops unless explicitly allowed
   for (const rx of FORBIDDEN_BY_DEFAULT) {
@@ -101,5 +109,6 @@ for (const m of migrations) {
 }
 
 console.log(
-  "OK: no migration drops a table or a column, and every ALTER declares a lock strategy.",
+  `OK: ${migrations.length} migrations, none drops a table or a column, ` +
+    "and every ALTER declares a lock strategy.",
 );
