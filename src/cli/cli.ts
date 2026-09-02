@@ -25,7 +25,35 @@
 
 import { buildProgram } from "./program";
 import { logFailedRequest, type Adapter } from "../request-log";
+import { writeSync } from "node:fs";
 import { runner } from "./session";
+
+/**
+ * Writes one report to stdout, whatever its size.
+ *
+ * **A single write does not necessarily write it all.** `runner` renders the
+ * whole answer and hands it over in one call, and stdout is not always a file:
+ * when it is a pipe — `labkit happened | less`, or `$(labkit …)` — the fd is
+ * non-blocking, so one write moves what fits in the pipe buffer, returns that
+ * count, and reports no error for the rest. Measured on a 1200-event record:
+ * 109,386 bytes to a file, exactly 65,536 through a pipe, exit 0 either way.
+ * A caller got a truncated report that looked complete.
+ *
+ * So the count is the answer, not a formality, and the loop is the fix.
+ * `EAGAIN` means the pipe is full rather than broken — the reader has not
+ * caught up — so it is retried rather than thrown.
+ */
+function writeOut(line: string): void {
+  const out = Buffer.from(`${line}\n`, "utf8");
+  let written = 0;
+  while (written < out.length) {
+    try {
+      written += writeSync(1, out, written, out.length - written);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EAGAIN") throw err;
+    }
+  }
+}
 
 /**
  * Parses and runs. Returns a process exit code rather than taking one, so a
@@ -36,13 +64,9 @@ import { runner } from "./session";
  * Commander reports those with `exitCode` already set and its message already
  * printed, so they pass straight through.
  */
+
 export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> {
-  const program = buildProgram(
-    runner(
-      () => program.opts(),
-      (line) => console.log(line),
-    ),
-  );
+  const program = buildProgram(runner(() => program.opts(), writeOut));
   program.exitOverride();
   try {
     await program.parseAsync(argv, { from: "user" });
