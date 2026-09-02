@@ -323,9 +323,12 @@ describe("an event records the edges the act created", () => {
       standing: "confirmatory",
     });
 
+    // Per conclusion, since the array is the record of what was concluded.
+    const standingIn = (e: { detail?: Record<string, unknown> }) =>
+      (e.detail?.conclusions as { standing?: string }[] | undefined)?.[0]?.standing;
     const [first, second] = await log.select({ operation: "conclude" });
-    expect(first!.detail).toMatchObject({ standing: "exploratory" });
-    expect(second!.detail).toMatchObject({ standing: "confirmatory" });
+    expect(standingIn(first!)).toBe("exploratory");
+    expect(standingIn(second!)).toBe("confirmatory");
 
     await write.promote({
       claim: exploratory.claims[0]!.claim,
