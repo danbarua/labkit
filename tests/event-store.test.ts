@@ -330,11 +330,12 @@ describe("an event records the edges the act created", () => {
     expect(standingIn(first!)).toBe("exploratory");
     expect(standingIn(second!)).toBe("confirmatory");
 
-    await write.promote({
+    await write.is({
+      state: "confirmed" as const,
       claim: exploratory.claims[0]!.claim,
       because: "the prespecified check passed",
     });
-    const [promoted] = await log.select({ operation: "promote" });
+    const [promoted] = await log.select({ operation: "is" });
     expect(promoted!.detail).toMatchObject({ from: "exploratory", to: "confirmatory" });
   });
 

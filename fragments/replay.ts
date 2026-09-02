@@ -34,7 +34,7 @@ import { TenantGraph } from "../src/db/graph";
 import { labelForNaturalId } from "../src/db/domain";
 import { vertexProps } from "../src/db/cypher";
 import { WriteSurface, inMemoryEventLog, systemClock } from "../src/domain";
-import type { DomainEvent, MintedEdge, Operation } from "../src/domain";
+import type { DomainEvent, MintedEdge, Operation, RetiredOperation } from "../src/domain";
 import { withProvenance, type StepProvenance } from "./derive";
 import { currentFragment } from "./provenance";
 import { DECODERS, type DecodeContext } from "./decode";
@@ -106,10 +106,23 @@ function edgeKey(e: MintedEdge): string {
   return `${e.from}|${e.label}|${e.to}`;
 }
 
+/**
+ * The operation a retired one replays as.
+ *
+ * A retired verb's decoder forwards to the verb that replaced it, so the
+ * replayed event carries the *new* name while the recorded one carries the
+ * old. Without this the check reads that as a divergence and refuses every
+ * record written before the retirement — which is every snapshot taken before
+ * it, and the whole population the replay exists to read.
+ */
+const REPLAYS_AS: Record<RetiredOperation, Operation> = { promote: "is" };
+
 /** `undefined` when the replayed step matches; otherwise a one-line reason naming what differed. */
 function diverges(original: DomainEvent, replayed: DomainEvent): string | undefined {
-  if (replayed.operation !== original.operation)
-    return `operation "${replayed.operation}" (expected "${original.operation}")`;
+  const expected =
+    REPLAYS_AS[original.operation as RetiredOperation] ?? (original.operation as Operation);
+  if (replayed.operation !== expected)
+    return `operation "${replayed.operation}" (expected "${expected}")`;
   if (replayed.subject !== original.subject)
     return `subject "${replayed.subject}" (expected "${original.subject}")`;
   const wantCreated = [...original.created].sort();

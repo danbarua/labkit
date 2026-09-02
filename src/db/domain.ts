@@ -339,9 +339,11 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * withdrawn — its finding is real and still rests under it — so grading it
    * through `CHANGES` would report a retraction nobody performed.
    *
-   * Distinct from `PROMOTES`, which names one state in its own label.
-   * This one carries the state on the claim, so a further state joins the
-   * closed set in `ClaimProps.kind` without a further edge.
+   * Distinct from `PROMOTES`, which is the edge for `confirmed` and stays
+   * that: `is <claim> confirmed` writes it, because it and `promote` are one
+   * act spelled two ways and a reader must not be able to tell which was
+   * typed. So a state uses its own edge where it has one and this where it
+   * does not — the closed set lives in `ClaimProps.kind`, not in the labels.
    */
   GRADES: [["Decision", "Claim"]],
   /**

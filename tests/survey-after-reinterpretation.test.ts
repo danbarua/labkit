@@ -78,7 +78,7 @@ test("a reinterpretation does not move the question between buckets", async () =
   // Promoted, so the two candidate answering claims give DIFFERENT buckets:
   // the original is promoted and its check is met -> established; the narrowed
   // one is neither -> provisional. Without this the probe cannot fail.
-  await s.promote({ claim, because: "held at the prespecified bar" });
+  await s.is({ claim, state: "confirmed", because: "held at the prespecified bar" });
   await s.closeEnquiry({ enquiry, answeredBy: claim });
 
   const before = await s.whatIsKnown();

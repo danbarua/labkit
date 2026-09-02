@@ -4,7 +4,12 @@ export type { ResearchSessionOptions } from "./session";
 // never constructs a WriteSurface cannot write -- worth more than a comment
 // saying it must not. See docs/session-log for the split's measurements.
 export { ReadSurface, type ResearchReads } from "./read";
-export { WriteSurface, type ResearchWrites, type Operation } from "./write";
+export {
+  WriteSurface,
+  type ResearchWrites,
+  type Operation,
+  type RetiredOperation,
+} from "./write";
 export { SessionCore } from "./core";
 export { systemClock, inMemoryEventLog, domainEvent, UNATTRIBUTED } from "./events";
 export type {

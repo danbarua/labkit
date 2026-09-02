@@ -39,7 +39,8 @@ import {
 } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
-import type { ClaimRef, DomainEvent, EnquiryRef, EvidenceRef, GateRef } from "../../domain";
+import type { ClaimRef, ClaimState, DomainEvent, EnquiryRef, GateRef } from "../../domain";
+import { ref } from "../../domain/report";
 
 /**
  * Every handle an act minted, across however many events it recorded — in
@@ -427,31 +428,31 @@ export function registerWrites(program: Command, run: Run): void {
     );
 
   program
-    .command("promote")
-    .summary("promote a finding from scratch to something others may build on")
-    .description(
-      "A separate act from concluding. Until a finding is promoted, an answer resting on it is " +
-        "*provisional* rather than *established*, and `labkit known` keeps those apart.",
-    )
-    .argument("<claim-id>", "the claim being promoted", handle("claim"))
-    .requiredOption("--because <text>", "what justifies promoting it")
-    .action(async (claim, { because }: { because: string }) =>
-      run(async ({ write }) => answer(await write.promote({ claim, because }), mintedView())),
-    );
-
-  program
     .command("is")
-    .summary("record what a claim now is: a state, and the finding that put it there")
+    .summary("record what a claim now is, and what put it there")
     .description(
-      "For a finding that settles the proposition neither way. The evidence is real and stays " +
-        "under the claim; what is absent is a direction anyone will stand behind, and `labkit why` " +
-        "then reports neither supports nor challenges rather than picking the less wrong one.",
+      "`undecided` is for a finding that settles the proposition neither way: the evidence is " +
+        "real and stays under the claim, and `labkit why` reports neither supports nor challenges " +
+        "rather than picking the less wrong one. `confirmed` is for a finding others may build " +
+        "on, which moves a question answered on it from provisional to established.\n\n" +
+        "`--because` follows the state: the finding's handle for `undecided`, since it is on the " +
+        "record already; a sentence for `confirmed`, since vouching is a judgement about evidence " +
+        "and not one more finding.",
     )
     .argument("<claim-id>", "the claim", handle("claim"))
-    .argument("<state>", "undecided", claimState)
-    .requiredOption("--because <evidence-id>", "the finding that put it there", handle("evidence"))
-    .action(async (claim, state, { because }: { because: EvidenceRef }) =>
-      run(async ({ write }) => answer(await write.is({ claim, state, because }), mintedView())),
+    .argument("<state>", "undecided or confirmed", claimState)
+    .requiredOption("--because <evidence-id|text>", "what put it there — see above")
+    .action(async (claim, state: ClaimState, { because }: { because: string }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.is(
+            state === "confirmed"
+              ? { claim, state, because }
+              : { claim, state, because: ref("evidence", because) },
+          ),
+          mintedView(),
+        ),
+      ),
     );
 
   program

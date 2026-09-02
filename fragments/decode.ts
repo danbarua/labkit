@@ -22,11 +22,11 @@
  * `standing` it recorded, and that is what the decoders read.
  *
  * `DECODERS` is exhaustive over `Operation` at compile time
- * (`satisfies Record<Operation, Decoder>`), so a write verb with no decoder
+ * (`satisfies Record<Operation | RetiredOperation, Decoder>`), so a write verb with no decoder
  * fails `tsc` here rather than tripping the runtime refusal in production.
  */
 
-import type { WriteSurface, DomainEvent, Operation, ClaimState } from "../src/domain";
+import type { WriteSurface, DomainEvent, Operation, RetiredOperation } from "../src/domain";
 import { ref, kindOf } from "../src/domain/report";
 import { labelForNaturalId } from "../src/db/domain";
 
@@ -265,20 +265,26 @@ export const DECODERS = {
     });
   },
 
+  // Retired, and still decoded -- see `RetiredOperation`. `is <claim>
+  // confirmed` writes what `promote` wrote, so a record built before the
+  // retirement replays into an identical one.
   promote: async (ctx, e) => {
     const promotes = findEdge(e, "PROMOTES")!;
     const because = ctx.nodeProp(promotes.from, "reason") as string;
-    await ctx.writes.promote({ claim: ref("claim", e.subject), because });
+    await ctx.writes.is({ claim: ref("claim", e.subject), state: "confirmed", because });
   },
 
   is: async (ctx, e) => {
-    // `because` is a handle the event carries, not a property to look up: the
-    // act's whole reason is which finding put the claim in this state.
-    await ctx.writes.is({
-      claim: ref("claim", e.subject),
-      state: e.detail?.to as ClaimState,
-      because: ref("evidence", e.detail?.because as string),
-    });
+    // `because` is a handle for one state and a sentence for the other, so the
+    // state decides how to read it. Wrapping a sentence in `ref("evidence")`
+    // would mint a handle to nothing and the replay would connect it.
+    const claim = ref("claim", e.subject);
+    const because = e.detail?.because as string;
+    await ctx.writes.is(
+      e.detail?.state === "confirmed"
+        ? { claim, state: "confirmed", because }
+        : { claim, state: "undecided", because: ref("evidence", because) },
+    );
   },
 
   amendDesign: async (ctx, e) => {
@@ -313,7 +319,7 @@ export const DECODERS = {
       because: e.detail?.because as string,
     });
   },
-} satisfies Record<Operation, Decoder>;
+} satisfies Record<Operation | RetiredOperation, Decoder>;
 
 /** `conclude --replacing` names a claim or an evidence handle, told apart the way `ref()` itself does. */
 function labelKind(handle: string): "claim" | "evidence" {

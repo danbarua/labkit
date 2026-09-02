@@ -83,7 +83,7 @@ describe("commands are values a caller can hold", () => {
       claim: claimOf(analysisClaims, PROP),
       because: "checked against the held-out split",
     };
-    await s.promote(promoting);
+    await s.is({ ...promoting, state: "confirmed" as const });
 
     const closing: CloseEnquiryCommand = {
       enquiry,

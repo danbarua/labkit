@@ -161,8 +161,8 @@ export function standing(raw: string): "exploratory" | "confirmatory" {
  * usable from a terminal: a caller who guesses is told what the words are.
  */
 export function claimState(raw: string): ClaimState {
-  if (raw === "undecided") return raw;
-  throw new InvalidArgumentError(`expected \`undecided\` (got \`${raw}\`)`);
+  if (raw === "undecided" || raw === "confirmed") return raw;
+  throw new InvalidArgumentError(`expected \`undecided\` or \`confirmed\` (got \`${raw}\`)`);
 }
 
 /**
