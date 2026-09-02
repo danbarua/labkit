@@ -7,7 +7,9 @@
  * runs a migration against a database that has real data in it -- a
  * migration that is clean by lint and loses rows on a populated record is
  * the case nobody has watched for. This is that watcher: restore, count,
- * migrate forward, count again, refuse to differ.
+ * migrate forward, count again, refuse to differ -- and refuse a restore that
+ * produced nothing, since an empty record compares equal to an empty record
+ * and would otherwise pass by having nothing to lose.
  *
  * **The "before" count is taken without migrating**, from a raw connection
  * to the freshly-restored data directory -- `connectDb`'s own pglite backend
@@ -143,6 +145,19 @@ try {
 
   console.log(`labkit: before ${JSON.stringify(before)}`);
   console.log(`labkit: after  ${JSON.stringify(after)}`);
+
+  // An empty record compares equal to an empty record, so the comparison
+  // below cannot fail and still prints OK. `resolveTenantContext` inserts a
+  // tenant it does not find, so `--tenant` naming one the snapshot never held
+  // provisions an empty one rather than erroring -- an operator typo, which
+  // is the way this arrives.
+  if (before.events === 0 && before.nodes === 0 && before.edges === 0) {
+    console.error(
+      `FAILED: ${snapshotPath} restored nothing for tenant "${tenant}" -- ` +
+        "an empty record cannot lose rows, so this compared nothing.",
+    );
+    process.exit(1);
+  }
 
   const lost = (Object.keys(before) as (keyof Counts)[]).filter((k) => before[k] !== after[k]);
   if (lost.length > 0) {
