@@ -57,7 +57,6 @@ import {
   declaredGateSchema,
   evaluatedCriterionSchema,
   acceptedAsUnresolvedSchema,
-  promotedSchema,
   restatedSchema,
   reinterpretationReportSchema,
   replacementReportSchema,
@@ -990,42 +989,33 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
-    name: "promote",
-    title: "Make a finding citable",
-    description:
-      "Move a finding from scratch to citable, recording why it was promoted. Until this " +
-      "happens a question answered on that finding reports as `provisional` rather than " +
-      "`established` — settled as far as anyone has taken it, but resting on something " +
-      "nobody has vouched for. Capture cheaply; promote before citing.",
-    inputSchema: {
-      claim: z.string().describe(`id of the claim being promoted, e.g. ${CLAIM_PREFIX}4`),
-      because: z.string().describe("what justifies promoting it"),
-    },
-    outputSchema: promotedSchema,
-    handler: (write, { claim, because }) => write.promote({ claim: ref("claim", claim), because }),
-  }),
-
-  writeTool({
     name: "is",
     title: "Record what a claim now is",
     description:
-      "Put a claim into a state its evidence does not carry, naming the finding that put it " +
-      "there. Today the one state is `undecided`: the analysis produced a real finding and it " +
-      "settles the proposition neither way. Use it instead of choosing the less wrong bearing — " +
-      "`why` then reports neither supports nor challenges, and the question stays `unresolved` " +
-      "rather than counting as answered.",
+      "Put a claim into a state its evidence does not carry, and say what put it there. " +
+      "`undecided`: the analysis produced a real finding and it settles the proposition neither " +
+      "way — use it instead of choosing the less wrong bearing, and `why` then reports neither " +
+      "supports nor challenges while the question stays `unresolved` rather than counting as " +
+      "answered. `confirmed`: the finding is something others may build on, which moves a " +
+      "question answered on it from `provisional` to `established`. Capture cheaply; confirm " +
+      "before citing.",
     inputSchema: {
       claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
-      state: z.enum(["undecided"]).describe("the state to record"),
-      because: z.string().describe(`id of the finding that put it there, e.g. ${EVIDENCE_PREFIX}7`),
+      state: z.enum(["undecided", "confirmed"]).describe("the state to record"),
+      because: z
+        .string()
+        .describe(
+          `for undecided, the id of the finding that left it open, e.g. ${EVIDENCE_PREFIX}7; ` +
+            "for confirmed, a sentence saying what justifies vouching for it",
+        ),
     },
     outputSchema: restatedSchema,
     handler: (write, { claim, state, because }) =>
-      write.is({
-        claim: ref("claim", claim),
-        state,
-        because: ref("evidence", because),
-      }),
+      write.is(
+        state === "confirmed"
+          ? { claim: ref("claim", claim), state, because }
+          : { claim: ref("claim", claim), state, because: ref("evidence", because) },
+      ),
   }),
 
   writeTool({

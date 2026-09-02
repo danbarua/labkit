@@ -32,6 +32,7 @@ import type {
   ClaimRef,
   EvidenceRef,
 } from "./report";
+import type { Prose } from "../db/domain";
 
 /** `pursue` — open a line of enquiry against a question already on the record. */
 export interface PursueCommand {
@@ -333,23 +334,24 @@ export interface PromoteCommand {
  * absent deliberately: it is what an unset `kind` means, so a value for it
  * would be a second way to say nothing happened.
  *
- * `confirmed` is the next member and is not here yet — `promote` writes
- * `confirmatory` today, and moving it is a migration of every script, tool and
- * transcript that names the verb, which is not what #139 asks for.
+ * `confirmed` is stored as `confirmatory`, which is the property's own word
+ * and predates the verb; `src/domain/write.ts` holds the map, so the two words
+ * meet in one place.
  */
-export type ClaimState = "undecided";
+export type ClaimState = "undecided" | "confirmed";
 
 /**
- * Puts a claim into a state, on the strength of a finding.
+ * Puts a claim into a state, and says what put it there.
  *
- * `because` is the evidence that puts it there, not a sentence about it: the
- * finding is already on the record, and naming it means a reader can follow
- * the state back to what produced it rather than to a paraphrase. The same
- * constraint the revision verbs inherited — a reason that is a handle, never
- * text.
+ * **The reason's shape is per state, not one shape for the set.** They are
+ * different kinds of reason and the record already holds both: what leaves a
+ * proposition open is a *finding*, which is on the record and has a handle, so
+ * naming it lets a reader follow the state back to what produced it rather
+ * than to a paraphrase. What confirms one is a *judgement* about evidence
+ * already gathered — every real promotion on this repo's own record supplies
+ * a sentence, and none of them has a single finding to point at. Requiring a
+ * handle there would make confirming cost a record nobody has.
  */
-export interface IsCommand {
-  claim: ClaimRef;
-  state: ClaimState;
-  because: EvidenceRef;
-}
+export type IsCommand =
+  | { claim: ClaimRef; state: "undecided"; because: EvidenceRef }
+  | { claim: ClaimRef; state: "confirmed"; because: Prose };

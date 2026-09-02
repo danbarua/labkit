@@ -296,7 +296,7 @@ export async function promoteFinding(
   w: W,
   input: { claim: ClaimRef; because: string },
 ): Promise<void> {
-  await w.promote({ claim: input.claim, because: input.because });
+  await w.is({ claim: input.claim, state: "confirmed", because: input.because });
 }
 
 /** The question is answered on cited evidence, and leaves `unresolved`. */

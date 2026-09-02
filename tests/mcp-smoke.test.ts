@@ -232,7 +232,8 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(taskWhy.is as string).toContain("no question named");
       expect(taskWhy.because as unknown[]).toHaveLength(0);
 
-      await call(c, "promote", {
+      await call(c, "is", {
+        state: "confirmed",
         claim,
         because: "re-timed on a quiet machine",
       });

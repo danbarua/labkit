@@ -73,7 +73,7 @@ unique_winner_claim=$(lab --date "$STAGE2B_STAGE4" conclude "$stage4_confirmator
   --finding "all three controls beat pre_evolution (Family 1, Holm-rejected); T beats each of the other three evolved graphs after Family-2 Holm correction (vs lattice t=-8.74 p=2.73e-18; vs rewired t=-38.10; vs curr_random t=-26.85), all six pairwise Holm-rejected, sign-flip robustness agreeing in direction and significance on all six; not established that T beats the CNN overall -- a separate model class outside both statistics families, mean clipped MSE 0.063069 vs T's 0.065623, reported descriptively per DESIGN.md's own framing" \
   --bearing supports | grep '^CLM_')
 
-lab --date "$STAGE2B_STAGE4" promote "$primary_denoising_claim" --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, with the denoising gate against identity also passing on its own paired bootstrap" >/dev/null
+lab --date "$STAGE2B_STAGE4" is "$primary_denoising_claim" confirmed --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, with the denoising gate against identity also passing on its own paired bootstrap" >/dev/null
 
 say "closing Stage 2B's own line of enquiry"
 lab --date "$STAGE2B_STAGE4" close "$denoising_enquiry" --answered-by "$primary_denoising_claim" >/dev/null

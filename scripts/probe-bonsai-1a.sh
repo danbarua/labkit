@@ -90,7 +90,7 @@ original_finding_claim=$(lab --date "$STAGE1A_ORIGINAL" conclude "$original_find
   --bearing challenges | grep '^CLM_')
 
 lab --date "$STAGE1A_ORIGINAL" evaluate "$no_significant_difference_criterion" --value "T-vs-rewired p=0.695, T-vs-random p=0.275, T-vs-lattice p=0.084; all above 0.0167" --outcome pass --citing "$original_finding_claim" >/dev/null
-lab --date "$STAGE1A_ORIGINAL" promote "$original_finding_claim" --because "high evidence strength: validated simulator, adaptive integration, independent-solver agreement, tangent-linear verification against finite differences, paired comparisons with multiplicity control; a genuine negative finding, not an exploratory null" >/dev/null
+lab --date "$STAGE1A_ORIGINAL" is "$original_finding_claim" confirmed --because "high evidence strength: validated simulator, adaptive integration, independent-solver agreement, tangent-linear verification against finite differences, paired comparisons with multiplicity control; a genuine negative finding, not an exploratory null" >/dev/null
 
 # "Add Post-hoc robustness note: class-0 pilot on T-vs-random seed-sensitivity",
 # 2026-08-01T10:51:27+01:00 -- the pilot that motivates the sharpening below.

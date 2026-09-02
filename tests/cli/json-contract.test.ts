@@ -52,7 +52,7 @@ import {
   recordedReviewSchema,
   verificationReportSchema,
   evaluatedCriterionSchema,
-  promotedSchema,
+  restatedSchema,
   closedEnquirySchema,
 } from "../../src/mcp/schemas";
 import { openScenario, type Scenario } from "../helpers/scenario";
@@ -200,7 +200,7 @@ beforeAll(async () => {
   const claim = (concluded.claims as Array<{ claim: string }>)[0]!.claim;
 
   await out(["evaluate", criterion, "--gate", gate, "--value", "n=24", "--outcome", "pass"]);
-  await out(["promote", claim, "--because", "the prespecified check passed"]);
+  await out(["is", claim, "confirmed", "--because", "the prespecified check passed"]);
   const review = id(await out(["review", analysis, "--verdict", "sound"]), "review");
   const verified = await out([
     "reverify",
@@ -335,7 +335,7 @@ test("every write command's --json parses against the MCP schema for the same ve
     ["review", recordedReviewSchema],
     ["reverify", verificationReportSchema],
     ["evaluate", evaluatedCriterionSchema],
-    ["promote", promotedSchema],
+    ["is", restatedSchema],
     ["close", closedEnquirySchema],
   ];
 

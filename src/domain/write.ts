@@ -114,6 +114,7 @@ import type {
   EvaluateCriterionCommand,
   PlanWorkCommand,
   IsCommand,
+  ClaimState,
   PromoteCommand,
   PursueCommand,
   NoteCommand,
@@ -235,6 +236,41 @@ export type ResearchWrites = Pick<WriteSurface, Methods<WriteSurface>>;
  * comes back out of Postgres — see `DomainEvent.operation`.
  */
 export type Operation = Methods<WriteSurface>;
+
+/**
+ * An operation no verb writes any more, but that recorded events still carry.
+ *
+ * A durable log is not migrated when a verb is retired: every snapshot taken
+ * before the change still holds the old name, and replaying one is how the
+ * Explorer reads a real record. So the *writer* goes and the *reader* stays,
+ * and `DECODERS` covers both sets — a retired name with no decoder is a replay
+ * that stops at the first such event.
+ *
+ * `promote` was retired by `is <claim> confirmed` (#184). It wrote `PROMOTES`
+ * and set `Claim.kind`, which is exactly what that state writes now, so its
+ * decoder forwards to it and the replayed record is identical.
+ */
+export type RetiredOperation = "promote";
+
+/**
+ * The `Claim.kind` each state is stored as.
+ *
+ * `confirmed` is the researcher's word and `confirmatory` is the stored one,
+ * which is not a translation layer creeping in: the property predates the verb
+ * and every read already branches on its value, so renaming it would be a data
+ * migration bought with nothing. The map is here so the two words meet in one
+ * place rather than at each write.
+ */
+const STORED_KIND: Record<ClaimState, NonNullable<ClaimProps["kind"]>> = {
+  undecided: "undecided",
+  confirmed: "confirmatory",
+};
+
+/** What would make a decision of each class wrong. */
+const INVALIDATION_CHECK: Record<ClaimState, string> = {
+  undecided: "a further finding that settles the proposition either way",
+  confirmed: "evidence that the promoted result does not replicate",
+};
 
 export class WriteSurface extends SessionCore {
   /**
@@ -1333,70 +1369,6 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * Promotes an exploratory finding to confirmatory standing.
-   *
-   * Standing can be **conferred by an act**, because scratch is captured before
-   * anyone knows it matters and the researcher recording it does not yet have
-   * what a declaration at birth would encode.
-   *
-   * It does **not** replace declaring standing at creation
-   * (`Conclusion.standing`). Both paths are legitimate, and the discriminator
-   * is whether the standing was knowable in advance: a prespecified comparison
-   * declares it *before* running, which is what prespecification is, and
-   * declaring it afterwards would be the p-hacking a design lock exists to
-   * prevent. Work that could not have declared it is promoted instead and pays
-   * for the lateness with a recorded reason, which a reader can see —
-   * `whySupported().promotedBecause` is present only for the second.
-   *
-   * Writes `PROMOTES`, not `CHANGES` — see `EDGE_SCHEMA.PROMOTES`.
-   *
-   * **Deliberately not a gate.** Declaring a gate does not satisfy it, so a
-   * gate-conferred model would leave a claim behind an unevaluated confirmatory
-   * gate reading exploratory, and an amendment check would miss a scientific
-   * change. Promotion is an act with a reason.
-   */
-
-  async promote(input: PromoteCommand): Promise<Promoted> {
-    return this.graph.inTransaction(async () => {
-      const decision = await this.graph.inTransaction(async () => {
-        const claim = input.claim;
-        // `invalidation_check` is the verb's own sentence about what would make a
-        // decision of *this class* wrong, as it is in `sharpen`, `closeEnquiry`,
-        // `amendDesign` and `reinterpret`. `acceptAsUnresolved` is the one place
-        // the researcher supplies it, because there naming the condition *is*
-        // the act.
-        const decision = await this.graph.createNode("Decision", {
-          decided_at: this.clock.now(),
-          reason: input.because,
-          invalidation_check: "evidence that the promoted result does not replicate",
-        });
-        await this.graph.createEdge(decision.natural_id, "PROMOTES", claim);
-        // **Read before the write, so the event can say what it changed from.**
-        // The act mutates `Claim.kind` in place, so afterwards nothing on the
-        // record holds the value it replaced and the log could only say that a
-        // promotion happened, never what it moved.
-        const [existing] = await this.graph.query(
-          `MATCH (c:Claim {natural_id: $id}) RETURN c`,
-          { c: vertexProps<ClaimProps>() },
-          { id: claim },
-        );
-        await this.graph.query(
-          `MATCH (c:Claim {natural_id: $id}) SET c.kind = 'confirmatory' RETURN c`,
-          { c: vertexProps<ClaimProps>() },
-          { id: claim },
-        );
-        return { decision, was: existing?.c.kind ?? "exploratory" };
-      });
-      const events = await this.emit("promote", input.claim, {
-        proposition: await this.assertedBy(input.claim),
-        from: decision.was,
-        to: "confirmatory",
-      });
-      return { decision: ref("decision", decision.decision.natural_id), events };
-    });
-  }
-
-  /**
    * Puts a claim into a state its evidence does not carry, and records what
    * put it there.
    *
@@ -1417,11 +1389,19 @@ export class WriteSurface extends SessionCore {
       const written = await this.graph.inTransaction(async () => {
         const decision = await this.graph.createNode("Decision", {
           decided_at: this.clock.now(),
-          reason: `recorded as ${input.state}`,
-          invalidation_check: "a further finding that settles the proposition either way",
+          reason: input.state === "confirmed" ? input.because : `recorded as ${input.state}`,
+          invalidation_check: INVALIDATION_CHECK[input.state],
         });
-        await this.graph.createEdge(decision.natural_id, "GRADES", input.claim);
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", input.because);
+        // **`confirmed` writes exactly what `promote` writes.** The two are one
+        // act spelled two ways, so they must leave one record; a reader able to
+        // tell which verb was typed is the leak the single grammar exists to
+        // close. `undecided` has no act-specific edge and takes `GRADES`.
+        if (input.state === "confirmed") {
+          await this.graph.createEdge(decision.natural_id, "PROMOTES", input.claim);
+        } else {
+          await this.graph.createEdge(decision.natural_id, "GRADES", input.claim);
+          await this.graph.createEdge(decision.natural_id, "BASED_ON", input.because);
+        }
         // Read before the write, so the event can say what the state moved
         // from -- the act overwrites `kind` in place, exactly as `promote`
         // does, and afterwards nothing holds the value it replaced.
@@ -1433,14 +1413,18 @@ export class WriteSurface extends SessionCore {
         await this.graph.query(
           `MATCH (c:Claim {natural_id: $id}) SET c.kind = $state RETURN c`,
           { c: vertexProps<ClaimProps>() },
-          { id: input.claim, state: input.state },
+          { id: input.claim, state: STORED_KIND[input.state] },
         );
         return { decision, was: existing?.c.kind ?? "exploratory" };
       });
       const events = await this.emit("is", input.claim, {
         proposition: await this.assertedBy(input.claim),
         from: written.was,
-        to: input.state,
+        to: STORED_KIND[input.state],
+        // The act's own word, beside the property it wrote. `to` is the stored
+        // kind so it pairs with `from`; `state` is what the caller said, and it
+        // is what decides whether `because` is a handle or a sentence.
+        state: input.state,
         because: input.because,
       });
       return { decision: ref("decision", written.decision.natural_id), events };

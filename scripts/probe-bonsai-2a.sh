@@ -182,7 +182,7 @@ curr_random_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$clas
 # context per DESIGN.md's own primary/secondary hierarchy, same treatment
 # Stage 1D's four non-promoted "challenges" claims got, mirrored here for
 # "supports" claims that are real but not the locked primary.
-lab --date "$STAGE2A_CONFIRMATORY" promote "$primary_classification_claim" --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, confirmed by an independent McNemar test on the same disagreement" >/dev/null
+lab --date "$STAGE2A_CONFIRMATORY" is "$primary_classification_claim" confirmed --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, confirmed by an independent McNemar test on the same disagreement" >/dev/null
 
 say "closing the externally-defined-task question, and checking the reopening hesitation a third time"
 lab --date "$STAGE2A_CONFIRMATORY" close "$external_task_enquiry" --answered-by "$primary_classification_claim" >/dev/null

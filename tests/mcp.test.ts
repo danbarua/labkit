@@ -266,7 +266,8 @@ describe("an agent can track work through the tools alone", () => {
       expect(asks(before.provisional)).toContain("does the pruning schedule move convergence?");
       expect(asks(before.established)).toEqual([]);
 
-      await call(c, "promote", {
+      await call(c, "is", {
+        state: "confirmed",
         claim: claimId,
         because: "checked against the held-out split",
       });

@@ -124,7 +124,7 @@ describe("a composition writes the record its moves describe", () => {
       "recordAnalysis",
       "conclude",
       "evaluateCriterion",
-      "promote",
+      "is",
       "closeEnquiry",
     ]);
 

@@ -180,7 +180,8 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
       from: [observations],
       concludes: [{ proposition, finding: `result for ${proposition}` }],
     });
-    await s.promote({
+    await s.is({
+      state: "confirmed" as const,
       claim: await claimNamed(s, proposition),
       because: "re-run under seed control",
     });

@@ -112,7 +112,7 @@ structured_transformation_claim=$(lab --date "$STAGE1B2_ORIGINAL" conclude "$str
   | grep '^CLM_')
 
 lab --date "$STAGE1B2_ORIGINAL" evaluate "$monte_carlo_floor_criterion" --value "all four representations hit p_MC~0.00010; 432/432 trials numerically valid" --outcome pass --citing "$structured_transformation_claim" >/dev/null
-lab --date "$STAGE1B2_ORIGINAL" promote "$structured_transformation_claim" --because "Level 2 (structured internal transformation) established: source-retention objection resolved with an audited common-support mask, both linear and nonlinear structure separately carry the mapping, all three input factors separately significant" >/dev/null
+lab --date "$STAGE1B2_ORIGINAL" is "$structured_transformation_claim" confirmed --because "Level 2 (structured internal transformation) established: source-retention objection resolved with an audited common-support mask, both linear and nonlinear structure separately carry the mapping, all three input factors separately significant" >/dev/null
 lab --date "$STAGE1B2_ORIGINAL" close "$structured_transformation_enquiry" --answered-by "$structured_transformation_claim" >/dev/null
 
 say "the three open items, each accepted with its own reopening condition"
