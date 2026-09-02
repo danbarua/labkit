@@ -1,5 +1,5 @@
 /**
- * `note` — the one write with no prerequisites besides `pose` (#179).
+ * `note` — the one write with no prerequisites besides `pose`.
  *
  * The behaviour worth asserting is exactly the shape of the promise: nothing
  * beyond `text` is required, `search` reaches it for free once it exists, and

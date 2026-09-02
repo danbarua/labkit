@@ -40,7 +40,7 @@ export interface PursueCommand {
 }
 
 /**
- * `note` — a dated, attributed record with nothing else required (#179).
+ * `note` — a dated, attributed record with nothing else required.
  *
  * `on` is the only other field, and it is optional on purpose: attaching a
  * note is cheap, and requiring an attachment is the gate this verb exists to

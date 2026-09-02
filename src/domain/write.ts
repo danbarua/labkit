@@ -257,9 +257,9 @@ export class WriteSurface extends SessionCore {
 
   /**
    * Puts a note on the record — a dated, attributed `Prose` record and
-   * nothing else required (#179). The one write with no prerequisites
-   * besides `pose`, and this one has no shape to satisfy at all: no `kind`,
-   * no required attachment.
+   * nothing else required. The one write with no prerequisites besides
+   * `pose`, and this one has no shape to satisfy at all: no `kind`, no
+   * required attachment.
    *
    * `on` is optional and costs the caller nothing to skip — attaching a note
    * is cheap, requiring one is the gate this verb removes. A note nothing

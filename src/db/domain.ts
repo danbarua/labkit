@@ -139,7 +139,7 @@ export const EDGE_LABELS = [
   "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
   "INVALIDATED_BY", // Artefact -> Review (which review the retraction rested on)
   "IMPLEMENTS", // Task -> EvidenceUnit
-  "CONCERNS", // Note -> anything (#179's --on: the one attachment point with no fixed target)
+  "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
 ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
 
@@ -466,9 +466,9 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   /**
    * Every other pair in this table names two specific labels because the
    * relationship means something specific about both. `CONCERNS` is the one
-   * exception, on purpose: #179's whole premise is that attaching a note
-   * costs nothing and requiring one is the gate `note` exists to remove, so
-   * `--on` takes any handle already on the record. Listing every label
+   * exception, on purpose: attaching a note costs nothing and requiring one
+   * is the gate `note` exists to remove, so `--on` takes any handle already
+   * on the record. Listing every label
    * individually would need a line added here for every future one; the
    * pairs below are `NODE_LABELS` itself, mapped, so a new label is a valid
    * `CONCERNS` target the moment it exists rather than the moment someone
@@ -794,7 +794,7 @@ export interface TaskProps {
 }
 
 /**
- * #179's whole node: one property, and it stops there.
+ * `note`'s whole node: one property, and it stops there.
  *
  * No `kind`, no status, no required attachment — the record already has a
  * timestamp and an attributed author for every act, on the event that
