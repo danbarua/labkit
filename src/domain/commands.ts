@@ -334,9 +334,9 @@ export interface PromoteCommand {
  * absent deliberately: it is what an unset `kind` means, so a value for it
  * would be a second way to say nothing happened.
  *
- * `confirmed` is the next member and is not here yet — `promote` writes
- * `confirmatory` today, and moving it is a migration of every script, tool and
- * transcript that names the verb, which is not what #139 asks for.
+ * `confirmed` is stored as `confirmatory`, which is the property's own word
+ * and predates the verb; `src/domain/write.ts` holds the map, so the two words
+ * meet in one place.
  */
 export type ClaimState = "undecided" | "confirmed";
 
