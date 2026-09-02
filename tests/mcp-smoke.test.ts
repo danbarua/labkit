@@ -139,6 +139,11 @@ describe("every tool answers when an agent actually calls it", () => {
       const origin = await call(c, "origin_of", { question: id(sharp) });
       expect(origin.origin as Json | null).not.toBeNull();
 
+      await call(c, "note", {
+        text: "worth checking the sparse generator is deterministic before trusting a paired run",
+        on: id(sharp),
+      });
+
       const enquiry = await call(c, "pursue", {
         question: id(sharp),
         approach: "paired timing runs",

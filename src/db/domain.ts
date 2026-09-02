@@ -23,6 +23,7 @@ export const NODE_LABELS = [
   "Artefact",
   "Computation",
   "Task",
+  "Note",
 ] as const;
 export type NodeLabel = (typeof NODE_LABELS)[number];
 
@@ -94,6 +95,7 @@ export const SEARCHABLE_PROSE: { readonly [L in NodeLabel]?: readonly string[] }
   Gate: ["consequence"],
   Review: ["verdict"],
   Task: ["objective", "acceptance"],
+  Note: ["text"],
 };
 
 /**
@@ -137,6 +139,7 @@ export const EDGE_LABELS = [
   "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
   "INVALIDATED_BY", // Artefact -> Review (which review the retraction rested on)
   "IMPLEMENTS", // Task -> EvidenceUnit
+  "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
 ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
 
@@ -460,6 +463,18 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Review"],
   ],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
+  /**
+   * Every other pair in this table names two specific labels because the
+   * relationship means something specific about both. `CONCERNS` is the one
+   * exception, on purpose: attaching a note costs nothing and requiring one
+   * is the gate `note` exists to remove, so `--on` takes any handle already
+   * on the record. Listing every label
+   * individually would need a line added here for every future one; the
+   * pairs below are `NODE_LABELS` itself, mapped, so a new label is a valid
+   * `CONCERNS` target the moment it exists rather than the moment someone
+   * remembers to list it.
+   */
+  CONCERNS: NODE_LABELS.map((label) => ["Note", label] as const),
 };
 
 // **What LabKit does with a stored string — five names instead of one.**
@@ -779,6 +794,21 @@ export interface TaskProps {
 }
 
 /**
+ * `note`'s whole node: one property, and it stops there.
+ *
+ * No `kind`, no status, no required attachment — the record already has a
+ * timestamp and an attributed author for every act, on the event that
+ * created it (`DomainEvent.at`/`attribution`), so a second copy on the node
+ * itself would be exactly the kind of field a caller doesn't supply but the
+ * schema pretends is structure. `LineOfEnquiryProps`/`EvidenceProps` are the
+ * same shape for the same reason — this is not the first node whose whole
+ * job is to hold one sentence.
+ */
+export interface NoteProps {
+  text: Prose;
+}
+
+/**
  * Binds each node label to the property shape it accepts. This is what makes
  * `createNode("Question", …)` reject `Computation` props at compile time —
  * before this map existed, `createNode` took `T extends Record<string, unknown>`
@@ -798,6 +828,7 @@ export interface NodePropsByLabel {
   Artefact: ArtefactProps;
   Computation: ComputationProps;
   Task: TaskProps;
+  Note: NoteProps;
 }
 
 /** Everything the persistence layer needs to know about one node label, in one place. */
@@ -847,6 +878,7 @@ export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
     prefix: "COMP",
   },
   Task: { prefix: "TASK" },
+  Note: { prefix: "NOTE" },
 };
 
 /** Reverse of `NODE_TYPES[label].prefix` — resolves a node's label from its natural id's prefix, e.g. "EU_17" -> "EvidenceUnit". */

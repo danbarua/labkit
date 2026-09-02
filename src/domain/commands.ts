@@ -20,6 +20,7 @@
 
 import type {
   AnalysisRef,
+  AnyRef,
   Conclusion,
   CriterionRef,
   EnquiryRef,
@@ -36,6 +37,19 @@ import type {
 export interface PursueCommand {
   question: QuestionRef;
   approach: string;
+}
+
+/**
+ * `note` — a dated, attributed record with nothing else required.
+ *
+ * `on` is the only other field, and it is optional on purpose: attaching a
+ * note is cheap, and requiring an attachment is the gate this verb exists to
+ * remove. It takes any handle already on the record, not one specific kind —
+ * a note may concern a question, a claim, a gate, another note, anything.
+ */
+export interface NoteCommand {
+  text: string;
+  on?: AnyRef;
 }
 
 /** `sharpen` — narrow a question into a more precise one, recording why. */

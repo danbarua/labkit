@@ -27,7 +27,7 @@
  */
 
 import type { Command } from "commander";
-import { bearing, collect, handle, inputRef, standing, supersededRef } from "../args";
+import { anyRef, bearing, collect, handle, inputRef, standing, supersededRef } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
 import type { ClaimRef, DomainEvent, EnquiryRef, GateRef } from "../../domain";
@@ -60,6 +60,25 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<question>", "the question, as worded")
     .action(async (question: string) =>
       run(async ({ write }) => answer(await write.pose(question), mintedView())),
+    );
+
+  program
+    .command("note")
+    .summary("put a note on the record -- the one write with no prerequisites")
+    .description(
+      "A dated, attributed record with nothing else required. `search` reaches it like anything " +
+        "else with prose on it. --on attaches it to anything already on the record; skipping it " +
+        "costs nothing, since attaching is the part this verb exists to make optional.",
+    )
+    .argument("<text>", "the note, in your own words")
+    .option("--on <handle>", "what this note concerns, if anything", anyRef)
+    .action(async (text: string, opts: { on?: ReturnType<typeof anyRef> }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.note({ text, ...(opts.on === undefined ? {} : { on: opts.on }) }),
+          mintedView(),
+        ),
+      ),
     );
 
   program

@@ -2825,6 +2825,7 @@ const REFUSED = {
   evaluation: refuseToExplain("evaluation"),
   review: refuseToExplain("review"),
   observations: refuseToExplain("observations"),
+  note: refuseToExplain("note"),
 } satisfies Record<UnexplainedKind, Explainer>;
 
 /**

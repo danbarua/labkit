@@ -42,7 +42,7 @@ export type Ref<K extends string> = string & { readonly [KIND]: K };
  *
  * Needed because the kinds are **research concepts, not labels** — a caller
  * says *analysis* and means a `Computation`, *observations* and means an
- * `Artefact`, *work* and means a `Task`. Five of the thirteen differ, so the
+ * `Artefact`, *work* and means a `Task`. Five of the fourteen differ, so the
  * mapping has to be written down rather than derived from the name.
  */
 export const LABEL_BY_KIND = {
@@ -59,6 +59,7 @@ export const LABEL_BY_KIND = {
   observations: "Artefact",
   analysis: "Computation",
   work: "Task",
+  note: "Note",
 } satisfies Record<string, NodeLabel>;
 
 /**
@@ -126,6 +127,7 @@ export const ref = <K extends string>(kind: K, id: string): Ref<K> => {
 export type ObservationsRef = Ref<"observations">;
 export type QuestionRef = Ref<"question">;
 export type CriterionRef = Ref<"criterion">;
+export type NoteRef = Ref<"note">;
 
 /**
  * One specific conclusion of an analysis. Closing a question cites *this*,
@@ -272,6 +274,10 @@ export interface Posed {
   question: QuestionRef;
   events: DomainEvent[];
 }
+export interface Noted {
+  note: NoteRef;
+  events: DomainEvent[];
+}
 export interface Pursued {
   enquiry: EnquiryRef;
   events: DomainEvent[];
@@ -363,7 +369,8 @@ export interface SearchMatch {
     | EvaluationRef
     | GateRef
     | ReviewRef
-    | WorkRef;
+    | WorkRef
+    | NoteRef;
   wording: string;
 }
 

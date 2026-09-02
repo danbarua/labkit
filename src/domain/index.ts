@@ -88,6 +88,7 @@ export type {
 // what an MCP write tool will need and what inline anonymous shapes prevented.
 export type {
   PursueCommand,
+  NoteCommand,
   SharpenCommand,
   RecordObservationsCommand,
   RecordAnalysisCommand,

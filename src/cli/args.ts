@@ -18,7 +18,8 @@
 
 import { InvalidArgumentError } from "commander";
 import { z } from "zod";
-import { ref } from "../domain/report";
+import { ref, kindOf } from "../domain/report";
+import type { AnyRef } from "../domain/report";
 import type { AnalysisRef, ClaimRef, EvidenceRef, ObservationsRef, Ref } from "../domain";
 
 /**
@@ -116,6 +117,22 @@ export function supersededRef(raw: string): ClaimRef | EvidenceRef {
     `\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…); ` +
       `both come back from the act that recorded them, and 'why' names them for a claim already on the record`,
   );
+}
+
+/**
+ * Any handle on the record, resolved to the kind its own prefix names.
+ *
+ * `inputRef`/`supersededRef` above hand-list the two prefixes each accepts,
+ * which is right for a verb reading one of two specific things. An
+ * attachment point that may be anything on the record needs the other
+ * direction — `kindOf()`, the same lookup `ref()` itself refuses a mismatch
+ * against, rather than a third hand-list that would need a line added for
+ * every future label.
+ */
+export function anyRef(raw: string): AnyRef {
+  const kind = kindOf(raw);
+  if (!kind) throw new InvalidArgumentError(`\`${raw}\` is not a handle this record recognises`);
+  return ref(kind, raw);
 }
 
 /** Which way a finding cuts. The domain's own two words, so a typo is refused rather than defaulted. */

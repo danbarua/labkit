@@ -48,6 +48,7 @@ export class ResearchSession {
   }
 
   readonly pose: WriteSurface["pose"] = (...args) => this.writes.pose(...args);
+  readonly note: WriteSurface["note"] = (...args) => this.writes.note(...args);
   readonly pursue: WriteSurface["pursue"] = (...args) => this.writes.pursue(...args);
   readonly openEnquiry: WriteSurface["openEnquiry"] = (...args) => this.writes.openEnquiry(...args);
   readonly pursuitsOf: ReadSurface["pursuitsOf"] = (...args) => this.reads.pursuitsOf(...args);
