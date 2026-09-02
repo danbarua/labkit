@@ -1703,6 +1703,10 @@ export class ReadSurface extends SessionCore {
       { claim },
     );
     const confirmed = promotion.some((r) => r.c.kind === "confirmatory");
+    // A finding that settles the proposition neither way. Read off the claim
+    // rather than off the edges, because the evidence is real and points
+    // somewhere -- what is absent is a direction anyone will stand behind.
+    const undecided = promotion.some((r) => r.c.kind === "undecided");
     const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
 
     return {
@@ -1710,13 +1714,14 @@ export class ReadSurface extends SessionCore {
       // subject once it is stored or sent.
       claim,
       proposition,
-      // Three ways to not be supported, and they are different states: no
-      // evidence at all, the interpretation withdrawn, and evidence that exists
-      // and fails the standard set for it. `support`
+      // Four ways to not be supported, and they are different states: no
+      // evidence at all, the interpretation withdrawn, evidence that exists
+      // and fails the standard set for it, and evidence that settles the
+      // proposition neither way. `support`
       // stays populated in the third case for the same reason it does in the
       // second: the numbers are fine, and blanking them would say otherwise.
-      supported: support.length > 0 && !withdrawn && unmet.length === 0,
-      standing: confirmed ? "confirmatory" : "exploratory",
+      supported: support.length > 0 && !withdrawn && unmet.length === 0 && !undecided,
+      standing: undecided ? "undecided" : confirmed ? "confirmatory" : "exploratory",
       ...(confirmed && promotedBecause ? { promotedBecause } : {}),
       support,
       reverifiedBy,

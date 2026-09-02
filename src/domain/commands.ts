@@ -325,3 +325,31 @@ export interface PromoteCommand {
   claim: ClaimRef;
   because: string;
 }
+
+/**
+ * A state a claim can be put into, and the whole of what `is` accepts.
+ *
+ * Closed, and every member names an act that writes it. `exploratory` is
+ * absent deliberately: it is what an unset `kind` means, so a value for it
+ * would be a second way to say nothing happened.
+ *
+ * `confirmed` is the next member and is not here yet — `promote` writes
+ * `confirmatory` today, and moving it is a migration of every script, tool and
+ * transcript that names the verb, which is not what #139 asks for.
+ */
+export type ClaimState = "undecided";
+
+/**
+ * Puts a claim into a state, on the strength of a finding.
+ *
+ * `because` is the evidence that puts it there, not a sentence about it: the
+ * finding is already on the record, and naming it means a reader can follow
+ * the state back to what produced it rather than to a paraphrase. The same
+ * constraint the revision verbs inherited — a reason that is a handle, never
+ * text.
+ */
+export interface IsCommand {
+  claim: ClaimRef;
+  state: ClaimState;
+  because: EvidenceRef;
+}

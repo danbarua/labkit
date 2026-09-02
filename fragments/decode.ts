@@ -26,7 +26,7 @@
  * fails `tsc` here rather than tripping the runtime refusal in production.
  */
 
-import type { WriteSurface, DomainEvent, Operation } from "../src/domain";
+import type { WriteSurface, DomainEvent, Operation, ClaimState } from "../src/domain";
 import { ref, kindOf } from "../src/domain/report";
 import { labelForNaturalId } from "../src/db/domain";
 
@@ -269,6 +269,16 @@ export const DECODERS = {
     const promotes = findEdge(e, "PROMOTES")!;
     const because = ctx.nodeProp(promotes.from, "reason") as string;
     await ctx.writes.promote({ claim: ref("claim", e.subject), because });
+  },
+
+  is: async (ctx, e) => {
+    // `because` is a handle the event carries, not a property to look up: the
+    // act's whole reason is which finding put the claim in this state.
+    await ctx.writes.is({
+      claim: ref("claim", e.subject),
+      state: e.detail?.to as ClaimState,
+      because: ref("evidence", e.detail?.because as string),
+    });
   },
 
   amendDesign: async (ctx, e) => {

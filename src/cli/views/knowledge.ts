@@ -103,15 +103,17 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
  * boundary, after the read surface had got it right.
  */
 export function renderWhy(why: SupportExplanation, p: Palette): string {
-  // Three ways to be unsupported, three colours: withdrawn and challenged are
-  // different states and the page has always said so in words.
+  // Four ways to be unsupported, and they are different states the page says
+  // in words: settles-nothing, withdrawn, challenged, and nothing found yet.
   const verdict = why.supported
     ? p.settled("supported")
-    : why.withdrawn
-      ? p.provisional("NOT supported — withdrawn; the record no longer asserts this wording")
-      : why.challenged
-        ? p.contested("NOT supported — challenged by evidence bearing against it")
-        : p.untested("NOT supported");
+    : why.standing === "undecided"
+      ? p.untested("NOT supported — the finding settles this neither way")
+      : why.withdrawn
+        ? p.provisional("NOT supported — withdrawn; the record no longer asserts this wording")
+        : why.challenged
+          ? p.contested("NOT supported — challenged by evidence bearing against it")
+          : p.untested("NOT supported");
   return [
     p.heading(`"${why.proposition}"`),
     `  ${verdict}, ${why.standing}`,
@@ -121,8 +123,10 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       : "",
     "",
     // **One word, one meaning.** This list is the supporting *findings*; the
-    // inputs they rest on are `restingOn`, below.
-    p.heading("Supported by"),
+    // inputs they rest on are `restingOn`, below. An undecided claim keeps its
+    // findings and they support nothing, so the heading names what they are
+    // rather than what they do -- a heading has to describe the list under it.
+    p.heading(why.standing === "undecided" ? "Findings" : "Supported by"),
     bullets(
       why.support.map(
         (s) =>

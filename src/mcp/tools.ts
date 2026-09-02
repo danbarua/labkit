@@ -58,6 +58,7 @@ import {
   evaluatedCriterionSchema,
   acceptedAsUnresolvedSchema,
   promotedSchema,
+  restatedSchema,
   reinterpretationReportSchema,
   replacementReportSchema,
   verificationReportSchema,
@@ -1002,6 +1003,29 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: promotedSchema,
     handler: (write, { claim, because }) => write.promote({ claim: ref("claim", claim), because }),
+  }),
+
+  writeTool({
+    name: "is",
+    title: "Record what a claim now is",
+    description:
+      "Put a claim into a state its evidence does not carry, naming the finding that put it " +
+      "there. Today the one state is `undecided`: the analysis produced a real finding and it " +
+      "settles the proposition neither way. Use it instead of choosing the less wrong bearing — " +
+      "`why` then reports neither supports nor challenges, and the question stays `unresolved` " +
+      "rather than counting as answered.",
+    inputSchema: {
+      claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
+      state: z.enum(["undecided"]).describe("the state to record"),
+      because: z.string().describe(`id of the finding that put it there, e.g. ${EVIDENCE_PREFIX}7`),
+    },
+    outputSchema: restatedSchema,
+    handler: (write, { claim, state, because }) =>
+      write.is({
+        claim: ref("claim", claim),
+        state,
+        because: ref("evidence", because),
+      }),
   }),
 
   writeTool({
