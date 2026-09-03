@@ -11,6 +11,14 @@ export {
   type RetiredOperation,
 } from "./write";
 export { SessionCore } from "./core";
+export {
+  READ_GROUPS,
+  WRITE_GROUPS,
+  VERB_GROUPS,
+  type ReadGroup,
+  type WriteGroup,
+  type VerbGroup,
+} from "./groups";
 export { systemClock, inMemoryEventLog, domainEvent, UNATTRIBUTED } from "./events";
 export type {
   Clock,
