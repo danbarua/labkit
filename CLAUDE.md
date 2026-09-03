@@ -452,6 +452,7 @@ bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
 bun run check:facts            # a fact's grain is named and its clause dependencies declared
+bun run check:cypher-labels    # every label written in a Cypher string is one the schema declares
 bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
 bun run check:compositions     # every fragments/ arc runs, and connects only what it created
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
