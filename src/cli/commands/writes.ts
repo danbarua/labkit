@@ -65,15 +65,53 @@ const mintedView =
 export function registerWrites(program: Command, run: Run): void {
   program
     .command("pose")
+    .helpGroup("Asking")
     .summary("put a question on the record")
     .description("A question, without starting work on it. `open` does both at once.")
     .argument("<question>", "the question, as worded")
     .action(async (question: string) =>
       run(async ({ write }) => answer(await write.pose(question), mintedView())),
     );
-
+  program
+    .command("open")
+    .helpGroup("Asking")
+    .summary("pose a question and pursue it, as one act")
+    .description(
+      "The common opening move. It records **one** event, not a `pose` and a `pursue`: the " +
+        "event stream is a record of research actions, and a researcher who opened an enquiry " +
+        "did one thing.",
+    )
+    .argument("<question>", "the question, as worded")
+    .action(async (question: string) =>
+      run(async ({ write }) => answer(await write.openEnquiry(question), mintedView())),
+    );
+  program
+    .command("pursue")
+    .helpGroup("Asking")
+    .summary("open a line of enquiry against a question already on the record")
+    .argument("<question-id>", "e.g. Q_12", handle("question"))
+    .requiredOption("--approach <text>", "how this line of enquiry will go about it")
+    .action(async (question, { approach }: { approach: string }) =>
+      run(async ({ write }) => answer(await write.pursue({ question, approach }), mintedView())),
+    );
+  program
+    .command("sharpen")
+    .helpGroup("Asking")
+    .summary("narrow a question into a more precise one, recording why")
+    .description(
+      "The new question records what was known at the moment it was asked, frozen rather than " +
+        "recomputed — so a later reader sees the evidence the sharpening was taken in light of, " +
+        "not everything that has arrived since.",
+    )
+    .argument("<question-id>", "the question being narrowed", handle("question"))
+    .requiredOption("--into <question>", "the sharper question")
+    .requiredOption("--because <text>", "what prompted the narrowing")
+    .action(async (from, { into, because }: { into: string; because: string }) =>
+      run(async ({ write }) => answer(await write.sharpen({ from, into, because }), mintedView())),
+    );
   program
     .command("note")
+    .helpGroup("Asking")
     .summary("put a note on the record -- the one write with no prerequisites")
     .description(
       "A dated, attributed record with nothing else required. `search` reaches it like anything " +
@@ -90,46 +128,9 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-
-  program
-    .command("open")
-    .summary("pose a question and pursue it, as one act")
-    .description(
-      "The common opening move. It records **one** event, not a `pose` and a `pursue`: the " +
-        "event stream is a record of research actions, and a researcher who opened an enquiry " +
-        "did one thing.",
-    )
-    .argument("<question>", "the question, as worded")
-    .action(async (question: string) =>
-      run(async ({ write }) => answer(await write.openEnquiry(question), mintedView())),
-    );
-
-  program
-    .command("pursue")
-    .summary("open a line of enquiry against a question already on the record")
-    .argument("<question-id>", "e.g. Q_12", handle("question"))
-    .requiredOption("--approach <text>", "how this line of enquiry will go about it")
-    .action(async (question, { approach }: { approach: string }) =>
-      run(async ({ write }) => answer(await write.pursue({ question, approach }), mintedView())),
-    );
-
-  program
-    .command("sharpen")
-    .summary("narrow a question into a more precise one, recording why")
-    .description(
-      "The new question records what was known at the moment it was asked, frozen rather than " +
-        "recomputed — so a later reader sees the evidence the sharpening was taken in light of, " +
-        "not everything that has arrived since.",
-    )
-    .argument("<question-id>", "the question being narrowed", handle("question"))
-    .requiredOption("--into <question>", "the sharper question")
-    .requiredOption("--because <text>", "what prompted the narrowing")
-    .action(async (from, { into, because }: { into: string; because: string }) =>
-      run(async ({ write }) => answer(await write.sharpen({ from, into, because }), mintedView())),
-    );
-
   program
     .command("observe")
+    .helpGroup("Doing the work")
     .summary("put measurement on the record without analysing it")
     .argument("<enquiry-id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--name <text>", "the artefact's logical name")
@@ -148,9 +149,9 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-
   program
     .command("analyse")
+    .helpGroup("Doing the work")
     .summary("record a computation and what it read")
     .description(
       "Records the run: a computation, its evidence unit, and an output artefact. Answers with " +
@@ -183,9 +184,9 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-
   program
     .command("conclude")
+    .helpGroup("Doing the work")
     .summary("assert one thing an analysis found")
     .description(
       "One conclusion per call. --replacing supersedes exactly one earlier finding and " +
@@ -212,9 +213,9 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-
   program
     .command("review")
+    .helpGroup("Doing the work")
     .summary("record a verdict on an analysis")
     .description("A later retraction can rest on this, which is why it is a record of its own.")
     .argument("<analysis-id>", "the analysis being reviewed", handle("analysis"))
@@ -222,33 +223,9 @@ export function registerWrites(program: Command, run: Run): void {
     .action(async (of, { verdict }: { verdict: string }) =>
       run(async ({ write }) => answer(await write.recordReview({ of, verdict }), mintedView())),
     );
-
-  program
-    .command("close")
-    .summary("close a line of enquiry — answered, or abandoned")
-    .description(
-      "With --answered-by it closes as answered on that claim; without, as abandoned. The two " +
-        "are different closures and the absence is read, not defaulted. Closing a question that " +
-        "is already closed is refused rather than recorded.",
-    )
-    .argument("<enquiry-id>", "the line of enquiry", handle("enquiry"))
-    .option("--answered-by <claim-id>", "the claim that answers its question", handle("claim"))
-    // `answeredBy` arrives already coerced -- the option declares `handle("claim")`
-    // as its parser, so a wrong-kind id was refused before this ran.
-    .action(async (enquiry, { answeredBy }: { answeredBy?: ClaimRef }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.closeEnquiry({
-            enquiry,
-            ...(answeredBy === undefined ? {} : { answeredBy }),
-          }),
-          mintedView(),
-        ),
-      ),
-    );
-
   program
     .command("plan")
+    .helpGroup("Saying in advance what counts")
     .summary("state an objective and what would count as meeting it")
     .requiredOption("--objective <text>", "what the work is for")
     .requiredOption("--acceptance <text>", "what would count as meeting it")
@@ -277,9 +254,9 @@ export function registerWrites(program: Command, run: Run): void {
           ),
         ),
     );
-
   program
     .command("criterion")
+    .helpGroup("Saying in advance what counts")
     .summary("state a condition a result will be held to")
     .description(
       "Stated before the work, which is the point: a check agreed after seeing the numbers is " +
@@ -290,9 +267,9 @@ export function registerWrites(program: Command, run: Run): void {
     .action(async (proposition: string) =>
       run(async ({ write }) => answer(await write.stateCriterion(proposition), mintedView())),
     );
-
   program
     .command("declare")
+    .helpGroup("Saying in advance what counts")
     .summary("bind conditions to the work they gate")
     .requiredOption(
       "--governed-by <criterion-id>",
@@ -317,9 +294,9 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-
   program
     .command("evaluate")
+    .helpGroup("Saying in advance what counts")
     .summary("record a prespecified check's outcome")
     .description(
       "--gate is optional on purpose: a condition can qualify a finding and gate no work, and " +
@@ -358,9 +335,126 @@ export function registerWrites(program: Command, run: Run): void {
           ),
         ),
     );
-
+  program
+    .command("amend")
+    .helpGroup("Saying in advance what counts")
+    .summary("replace a locked condition with another, recording the act")
+    .description(
+      "Not an edit: the original wording stays readable, the reason and its evidence survive, " +
+        "and one amendment is orderable against another. The report says whether the change was " +
+        "mechanical or scientific, and what needs re-running.",
+    )
+    .argument("<criterion-id>", "the condition being amended", handle("criterion"))
+    .requiredOption("--now-requires <text>", "the replacement condition")
+    .requiredOption("--because <text>", "what prompted the amendment")
+    .requiredOption("--citing <claim-id>", "the diagnosis it rests on", handle("claim"))
+    .action(async (criterion, opts: { nowRequires: string; because: string; citing: ClaimRef }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.amendDesign({
+            criterion,
+            nowRequires: opts.nowRequires,
+            because: opts.because,
+            citing: opts.citing,
+          }),
+          mintedView(),
+        ),
+      ),
+    );
+  program
+    .command("is")
+    .helpGroup("Revising")
+    .summary("record what a claim now is, and what put it there")
+    .description(
+      "`undecided` is for a finding that settles the proposition neither way: the evidence is " +
+        "real and stays under the claim, and `labkit why` reports neither supports nor challenges " +
+        "rather than picking the less wrong one. `confirmed` is for a finding others may build " +
+        "on, which moves a question answered on it from provisional to established.\n\n" +
+        "`--because` follows the state: the finding's handle for `undecided`, since it is on the " +
+        "record already; a sentence for `confirmed`, since vouching is a judgement about evidence " +
+        "and not one more finding.",
+    )
+    .argument("<claim-id>", "the claim", handle("claim"))
+    .argument("<state>", "undecided or confirmed", claimState)
+    .requiredOption("--because <evidence-id|text>", "what put it there — see above")
+    .action(async (claim, state: ClaimState, { because }: { because: string }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.is(
+            state === "confirmed"
+              ? { claim, state, because }
+              : { claim, state, because: ref("evidence", because) },
+          ),
+          mintedView(),
+        ),
+      ),
+    );
+  program
+    .command("keep")
+    .helpGroup("Revising")
+    .summary("revise an analysis, naming the conclusions that survive")
+    .description(
+      "Records a successor to the analysis those claims came from, supersedes every other " +
+        "conclusion of it, and carries the named ones forward on their original evidence — " +
+        "`labkit why` on a kept claim still rests on the run that produced the number. Add the " +
+        "successor's own findings with `labkit conclude`. The successor reads what its " +
+        "predecessor read; --from adds to that.",
+    )
+    .argument("<claim-id...>", "the conclusions that survive", (v, prev: string[] = []) => [
+      ...prev,
+      handle("claim")(v),
+    ])
+    .requiredOption("--because <review-id>", "the review that found it wanting", handle("review"))
+    .requiredOption("--method <text>", "what the revision did differently")
+    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
+    .action(async (keeping, opts) =>
+      run(async ({ write }) => {
+        const report = await write.keep({
+          keeping,
+          because: opts.because,
+          method: opts.method,
+          ...(opts.from === undefined ? {} : { from: opts.from }),
+        });
+        // **What was superseded is the complement of what the caller typed**,
+        // over a set they may not have had in front of them, so the act says
+        // out loud what it did. stderr, because stdout is the handles.
+        const total = report.superseded.length + report.kept.length;
+        process.stderr.write(
+          `labkit: superseding ${report.supersedes} — ${report.superseded.length} of ${total} ` +
+            `conclusions; keeping ${report.kept.join(", ")}\n`,
+        );
+        return answer(report, mintedView());
+      }),
+    );
+  program
+    .command("replace")
+    .helpGroup("Revising")
+    .summary("supersede a defective analysis with a corrected one")
+    .description(
+      "Every conclusion of the superseded analysis falls here — use `labkit keep` instead to " +
+        "carry some of them forward. Add the successor's own findings with `labkit conclude`. " +
+        "It reads what its predecessor read; --from adds to that.",
+    )
+    .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
+    .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))
+    .requiredOption("--method <text>", "what the replacement did")
+    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
+    .action(async (supersedes, opts) =>
+      run(async ({ write }) =>
+        answer(
+          await write.replaceAnalysis({
+            supersedes,
+            because: opts.because,
+            method: opts.method,
+            ...(opts.from === undefined ? {} : { from: opts.from }),
+          }),
+          mintedView(),
+        ),
+      ),
+    );
   program
     .command("reverify")
+    .helpGroup("Revising")
     .summary("re-check an earlier analysis under fresh inputs")
     .description(
       "One conclusion, not a list: a re-check reaches one verdict about the thing it " +
@@ -396,9 +490,57 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-
+  program
+    .command("reinterpret")
+    .helpGroup("Revising")
+    .summary("narrow what a claim is read to mean")
+    .description(
+      "Withdraws the old reading and records the new one. A single step can withdraw several " +
+        "claims — two analyses reaching one reading are withdrawn together — so the report names " +
+        "records rather than a sentence.",
+    )
+    .argument("<claim-id>", "the claim being narrowed", handle("claim"))
+    .requiredOption("--as <text>", "the narrower reading")
+    .requiredOption("--because <text>", "what prompted the narrowing")
+    .action(async (of, opts: { as: string; because: string }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.reinterpret({
+            of,
+            as: opts.as,
+            because: opts.because,
+          }),
+          mintedView(),
+        ),
+      ),
+    );
+  program
+    .command("close")
+    .helpGroup("Stopping")
+    .summary("close a line of enquiry — answered, or abandoned")
+    .description(
+      "With --answered-by it closes as answered on that claim; without, as abandoned. The two " +
+        "are different closures and the absence is read, not defaulted. Closing a question that " +
+        "is already closed is refused rather than recorded.",
+    )
+    .argument("<enquiry-id>", "the line of enquiry", handle("enquiry"))
+    .option("--answered-by <claim-id>", "the claim that answers its question", handle("claim"))
+    // `answeredBy` arrives already coerced -- the option declares `handle("claim")`
+    // as its parser, so a wrong-kind id was refused before this ran.
+    .action(async (enquiry, { answeredBy }: { answeredBy?: ClaimRef }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.closeEnquiry({
+            enquiry,
+            ...(answeredBy === undefined ? {} : { answeredBy }),
+          }),
+          mintedView(),
+        ),
+      ),
+    );
   program
     .command("accept")
+    .helpGroup("Stopping")
     .summary("leave a question open on purpose, and say what would reopen it")
     .description(
       "Not the same as abandoning it, and not the same as nobody having got round to it. The " +
@@ -421,147 +563,6 @@ export function registerWrites(program: Command, run: Run): void {
             because: opts.because,
             until: opts.until,
             inLightOf: opts.inLightOf,
-          }),
-          mintedView(),
-        ),
-      ),
-    );
-
-  program
-    .command("is")
-    .summary("record what a claim now is, and what put it there")
-    .description(
-      "`undecided` is for a finding that settles the proposition neither way: the evidence is " +
-        "real and stays under the claim, and `labkit why` reports neither supports nor challenges " +
-        "rather than picking the less wrong one. `confirmed` is for a finding others may build " +
-        "on, which moves a question answered on it from provisional to established.\n\n" +
-        "`--because` follows the state: the finding's handle for `undecided`, since it is on the " +
-        "record already; a sentence for `confirmed`, since vouching is a judgement about evidence " +
-        "and not one more finding.",
-    )
-    .argument("<claim-id>", "the claim", handle("claim"))
-    .argument("<state>", "undecided or confirmed", claimState)
-    .requiredOption("--because <evidence-id|text>", "what put it there — see above")
-    .action(async (claim, state: ClaimState, { because }: { because: string }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.is(
-            state === "confirmed"
-              ? { claim, state, because }
-              : { claim, state, because: ref("evidence", because) },
-          ),
-          mintedView(),
-        ),
-      ),
-    );
-
-  program
-    .command("amend")
-    .summary("replace a locked condition with another, recording the act")
-    .description(
-      "Not an edit: the original wording stays readable, the reason and its evidence survive, " +
-        "and one amendment is orderable against another. The report says whether the change was " +
-        "mechanical or scientific, and what needs re-running.",
-    )
-    .argument("<criterion-id>", "the condition being amended", handle("criterion"))
-    .requiredOption("--now-requires <text>", "the replacement condition")
-    .requiredOption("--because <text>", "what prompted the amendment")
-    .requiredOption("--citing <claim-id>", "the diagnosis it rests on", handle("claim"))
-    .action(async (criterion, opts: { nowRequires: string; because: string; citing: ClaimRef }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.amendDesign({
-            criterion,
-            nowRequires: opts.nowRequires,
-            because: opts.because,
-            citing: opts.citing,
-          }),
-          mintedView(),
-        ),
-      ),
-    );
-
-  program
-    .command("keep")
-    .summary("revise an analysis, naming the conclusions that survive")
-    .description(
-      "Records a successor to the analysis those claims came from, supersedes every other " +
-        "conclusion of it, and carries the named ones forward on their original evidence — " +
-        "`labkit why` on a kept claim still rests on the run that produced the number. Add the " +
-        "successor's own findings with `labkit conclude`. The successor reads what its " +
-        "predecessor read; --from adds to that.",
-    )
-    .argument("<claim-id...>", "the conclusions that survive", (v, prev: string[] = []) => [
-      ...prev,
-      handle("claim")(v),
-    ])
-    .requiredOption("--because <review-id>", "the review that found it wanting", handle("review"))
-    .requiredOption("--method <text>", "what the revision did differently")
-    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
-    .action(async (keeping, opts) =>
-      run(async ({ write }) => {
-        const report = await write.keep({
-          keeping,
-          because: opts.because,
-          method: opts.method,
-          ...(opts.from === undefined ? {} : { from: opts.from }),
-        });
-        // **What was superseded is the complement of what the caller typed**,
-        // over a set they may not have had in front of them, so the act says
-        // out loud what it did. stderr, because stdout is the handles.
-        const total = report.superseded.length + report.kept.length;
-        process.stderr.write(
-          `labkit: superseding ${report.supersedes} — ${report.superseded.length} of ${total} ` +
-            `conclusions; keeping ${report.kept.join(", ")}\n`,
-        );
-        return answer(report, mintedView());
-      }),
-    );
-
-  program
-    .command("replace")
-    .summary("supersede a defective analysis with a corrected one")
-    .description(
-      "Every conclusion of the superseded analysis falls here — use `labkit keep` instead to " +
-        "carry some of them forward. Add the successor's own findings with `labkit conclude`. " +
-        "It reads what its predecessor read; --from adds to that.",
-    )
-    .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
-    .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))
-    .requiredOption("--method <text>", "what the replacement did")
-    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
-    .action(async (supersedes, opts) =>
-      run(async ({ write }) =>
-        answer(
-          await write.replaceAnalysis({
-            supersedes,
-            because: opts.because,
-            method: opts.method,
-            ...(opts.from === undefined ? {} : { from: opts.from }),
-          }),
-          mintedView(),
-        ),
-      ),
-    );
-
-  program
-    .command("reinterpret")
-    .summary("narrow what a claim is read to mean")
-    .description(
-      "Withdraws the old reading and records the new one. A single step can withdraw several " +
-        "claims — two analyses reaching one reading are withdrawn together — so the report names " +
-        "records rather than a sentence.",
-    )
-    .argument("<claim-id>", "the claim being narrowed", handle("claim"))
-    .requiredOption("--as <text>", "the narrower reading")
-    .requiredOption("--because <text>", "what prompted the narrowing")
-    .action(async (of, opts: { as: string; because: string }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.reinterpret({
-            of,
-            as: opts.as,
-            because: opts.because,
           }),
           mintedView(),
         ),
