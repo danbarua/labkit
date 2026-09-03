@@ -412,6 +412,27 @@ made the log grow.
 
 ### Working alongside another session
 
+**A `mergeable` reading taken straight after a push is not to be trusted.**
+GitHub reported `CONFLICTING`/`DIRTY` for a while after a force-push had
+landed — the ref matched locally and remotely, and the state was simply stale.
+Re-querying returned `MERGEABLE`/`CLEAN`. Measured 2026-09-03 on #255. Ask
+twice before concluding a branch needs work.
+
+**`gh pr merge --delete-branch` fails from a worktree**, after the merge has
+already gone through: it tries to switch the current worktree to `main`, which
+the main checkout holds. The merge succeeds and the command errors, which reads
+as a failed merge and is not one. Delete the branches by hand.
+
+**Resolving a conflict on someone else's branch is their job, not yours.** You
+cannot see their working tree — `git log` says where a branch is and nothing
+says what it is holding. Send the diagnosis and the command; let the session
+that owns the branch run it. On #255 that was right twice over: the conflict
+was entirely on a cherry-picked commit the other half had already landed, and
+`git rebase --skip` dropped it more cleanly than the
+`git checkout main -- <files>` that was suggested, leaving the branch touching
+only its own directory.
+
+
 **Never suggest `git reset --hard` to another session.** You cannot see its
 working tree. Suggested to `labkit-minion` on 2026-08-21 to get it onto a merge
 commit; it had **five uncommitted files** at that moment, including a fix and a
