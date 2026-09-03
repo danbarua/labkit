@@ -46,19 +46,29 @@ one place and used everywhere.
 | **looks again vs acts** | The severity test for a read defect, sharper than *empty result versus wrong answer*: a query returning **too little** makes someone look again; a query re-asking a **settled question** makes someone act. From `exo-ledger`, 2026-08-28. Ours was the second kind — `established` is not a smaller answer than `provisional`, it is a prompt to build on something. Use it to decide which reads earn a mutation first: those feeding a bucket, a queue or a refusal before those feeding a detail view | `exo-ledger`, relayed via `labkit-review` |
 | **mutation coverage** | The testability argument for naming a fact: mutate it once and **every** reader must go red. Measured here — dropping the retraction rule from `checkState` fails 4 tests across two readers, and walking one bearing fails 3 across two scenario files, so a defect class that took six separate discoveries became reachable from two lines. It multiplies only where a fact has more than one reader, which is why it sharpens the compose-it line rather than widening it | CLAUDE.md, "The read side is a graph of facts" |
 
-## The bars a change has to clear
+## Retired: the bars a change had to clear
 
-Four separate tests, easy to conflate and conflated once already (`024` records
-it).
+**There are no bars.** Removed 2026-09-03 on Dan's directive — *"bars are bars
+on making progress; bars is ancient historical language. There are no bars on
+applying sensible software engineering decisions. There are no hypothetical
+scenarios gating us from implementing functionality needed in the real world.
+The real world drives requirements drives code changes."*
+
+The tokens are kept here **only so a reader who meets one in a dated journal
+entry knows what it meant and that it is dead**: `§5` (a correctness change
+needs a demonstrated wrong answer), `bar 1-3` (a wrong answer without the
+change; an empty result is not one; a new edge needs a reader), `bar 4`
+(contract necessity), `the change bar` / `the rungs` (the order a remedy had to
+be tried in), `the usage-era bar` (would this have saved the user the pain of
+Markdown + Git). None of them constrains anything today. What replaced them is
+in CLAUDE.md, "Changing the graph model": if there is a relationship between A
+and B, that is an edge; a new label or edge is earned by someone needing it.
+
+The one rule that survived, under its own name rather than as a bar:
 
 | Term | Means | Defined in |
 | --- | --- | --- |
-| **§5** | PJ-011 §5: a **correctness** change to the model needs a **demonstrated wrong answer**, not an empty result. Since PJ-008b that is one of **two bars** — a **capability** change is earned by a **demonstrated consumer need** instead | CLAUDE.md, "Changing the graph model" |
-| **the usage-era bar** | Dan's test for every speculative modelling question: *would this have saved the user weeks of frustration and cost building it in Markdown + Git, when he never asked for JIRA in Markdown + Git?* A read that saves one command and zero reading fails it | CLAUDE.md, same section |
-| **the slot / the one-wrong-answer rule** | At most one demonstrated wrong answer ships green at a time, and clearing it is the next thing built. Its state is the board's P0 | CLAUDE.md, "When a deferral stops being acceptable"; PJ-008b |
-| **bar 1–3** | The original three: a wrong answer without the change; an empty result is not one; a new edge needs a reader, not just a writer | CLAUDE.md, same section |
-| **bar 4** | *Contract necessity* — does losing this distinction prevent or corrupt a read the frozen consumer contract requires? Weaker than §5: *prevent* covers absence | `docs/consumer-contract/023` §3 |
-| **the change bar / the rungs** | The order a remedy must be tried in: reader semantics → existing relationships → new relationship, property or reference → a new noun only if unavoidable | CLAUDE.md, "Changing the graph model" |
+| **the slot / the one-wrong-answer rule** | At most one demonstrated wrong answer ships green at a time, and clearing it is the next thing built. Its state is the board's P0 | CLAUDE.md, "One wrong answer at a time" |
 
 ## Ledger status vocabulary
 

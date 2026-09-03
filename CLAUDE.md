@@ -211,8 +211,8 @@ If a reader wants its status they grep one table.
 **In the user's words (2026-09-01): *what am I blocked on right now, and what
 are my priorities?* The graph is a dependency tree that becomes a map once a
 gate has been advanced through, sidestepped, redefined or retired.** Every
-verb, report and rule is judged by whether it serves that — see the bar under
-"Changing the graph model".
+verb, report and rule is judged by whether it serves that — see "Changing the
+graph model".
 
 LabKit is a research control plane: it tracks provenance, justification, and
 dependency propagation for a research process (why a computation was run,
@@ -316,10 +316,11 @@ an empty SVG and a success code.
 
 ### Talking to the user
 
-**Do not use this repo's shorthand when reporting to the user.** `§5`, `bar 4`,
-`D2`, "the rungs", the ledger status words and the row letters are compression
-that pays between documents and costs on sight. Say *"we showed it gives a wrong
-answer"*, not *"it clears §5"*. A glossary makes documents readable and does
+**Do not use this repo's shorthand when reporting to the user.** `§5`, `D2`,
+"the rungs", the ledger status words and the row letters are compression that
+paid between documents and costs on sight. Say *"we showed it gives a wrong
+answer"*, not *"it clears §5"*. Most of those tokens are dead as well as
+opaque — see the glossary's retired section. A glossary makes documents readable and does
 nothing for a sentence in a reply — the user hit unexplained shorthand three
 times in one session, twice after it was noticed and once in the same message
 that announced the glossary.
@@ -333,7 +334,8 @@ changing tenancy, natural ids or provisioning. They lived at the top of
 far enough to reach, and in their own file until 2026-08-27.
 
 `docs/GLOSSARY.md` is a pointer table for the shorthand this repo uses across
-documents — `D2`, `§5`, `bar 4`, the rungs, the ledger status words. It defines
+documents — `D2`, `§5`, the rungs, the ledger status words — and a retired
+section for the ones that no longer constrain anything. It defines
 nothing itself; every entry names where the real definition lives, because a
 second copy is a second thing to go stale. Read it if a token in a journal entry
 means nothing to you; `D1`/`D2` in particular mean two unrelated things
@@ -846,7 +848,7 @@ protocol still carries neither fact — what changed is that the *agent* can say
 through `register_session`, and the **write tools refuse until it has**. That
 gate is not authentication and must not be described as one: any agent can
 register any string, so it stops an agent *forgetting* to sign and never stops
-it lying. What it refuses is real, which is the bar — before it, every MCP write
+it lying. What it refuses is real — before it, every MCP write
 was stamped `mock-session-0`, one value for every agent on every machine, in the
 identity column of a record whose whole purpose is provenance. A uniform
 placeholder is worse than an empty field, because empty reads as unknown.
@@ -1336,22 +1338,22 @@ findings to their successors by matching propositions, and gives up when an
 analysis asserts the same sentence twice. That is not a query that needs
 sharpening; it is a fact that was thrown away.
 
-**A new label or edge is earned by someone needing it** — a real user or agent
-asked, and the record could not answer. `search` (#155) is the precedent, and
-the usage-era bar is the test: would this have saved the user weeks of
-frustration and cost building it in Markdown + Git, when he never asked for
-JIRA in Markdown + Git? A read that saves one command and zero reading fails
-it.
+**The real world drives requirements, and requirements drive code changes.**
+A new label or edge is earned by someone needing it: a real user or agent
+asked, and the record could not answer. `search` (#155) is the precedent. The
+question to put to a proposed read is whether it saves the user the pain of
+doing this in Markdown + Git — a read that saves one command and zero reading
+does not.
 
-**These rules used to be five bars, and the bars are gone.** They required a
-demonstrated wrong answer, ruled an empty result insufficient, and demanded a
-*reader* before an edge could be written — which produced, in Dan's words on
-the day it bit for the second time, *"don't write an edge because an
-experiment says the database reads and writes nothing"*. They were
-experimental controls for validating a domain model against a scenario corpus,
-and that era closed with PJ-008b. They are not product constraints and were
-never meant to become them. What survives is the paragraph above: record what
-the act states, and let the reader arrive when someone asks.
+**No hypothetical scenario gates shipping something the real world needs, and
+nothing gates applying an ordinary engineering judgement.** There used to be a
+numbered list here requiring a demonstrated wrong answer, ruling an empty
+result insufficient, and demanding a *reader* before an edge could be
+written — which produced, in Dan's words on the day it bit for the second
+time, *"don't write an edge because an experiment says the database reads and
+writes nothing"*. Those were controls for validating a domain model against a
+scenario corpus; that era closed with PJ-008b, and they were never product
+constraints. They are gone, along with the vocabulary that carried them.
 
 **Prefer structure in the query over structure in the stored model.** A gate's
 four states and its per-criterion itemisation are computed, so there is no
