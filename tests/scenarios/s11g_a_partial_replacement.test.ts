@@ -196,6 +196,59 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
+   * The other half of the test above: named, so not a guess.
+   *
+   * Wording cannot separate two claims asserting one sentence — that is what
+   * the handle is for — so a successor that *names* what it replaces must be
+   * paired on the name. Reported unpaired, this says nothing stands in place
+   * of a finding whose replacement was stated at write time.
+   */
+  test("a successor that names what it replaces is paired on the handle, not the wording", async () => {
+    const { enquiry } = await session.openEnquiry("does T differ from its controls?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "per-image results",
+      finding: "two independent batches",
+    });
+    // One sentence, two findings: the same claim about two batches.
+    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "raw-scale aggregation",
+      from: [observations],
+      concludes: [
+        { proposition: REVISITED, finding: "p = 0.03 raw, batch one" },
+        { proposition: REVISITED, finding: "p = 0.04 raw, batch two" },
+      ],
+    });
+    const batchTwo = v1Claims[1]!.claim;
+    const { review } = await session.recordReview({ of: v1, verdict: "wrong scale" });
+    const report = await session.replaceAnalysis({
+      supersedes: v1,
+      because: review,
+      method: "log-scale re-aggregation",
+    });
+
+    // The successor names which of the two it stands in place of.
+    const { claims } = await session.conclude({
+      analysis: report.replacement,
+      proposition: REVISITED,
+      finding: "p = 0.007 log, batch two",
+      replacing: batchTwo,
+    });
+
+    const why = await (await afterwards()).why(report.replacement);
+    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
+
+    // Paired, and to the one that was named.
+    expect(why.report.changed.map((c) => c.was)).toEqual([batchTwo]);
+    expect(why.report.changed[0]!.claim).toBe(claims[0]!.claim);
+    expect(why.report.changed[0]!.before).toBe("p = 0.04 raw, batch two");
+    expect(why.report.changed[0]!.after).toBe("p = 0.007 log, batch two");
+    // The one nothing named is still unpaired -- naming one does not pair both.
+    expect(why.report.unpaired.map((u) => u.claim)).toEqual([v1Claims[0]!.claim]);
+  });
+
+  /**
    * **The boundary of the successor's exemption**, in a pair.
    *
    * A revision withdraws every conclusion it does not keep, so its successor
