@@ -1,0 +1,46 @@
+---
+references:
+  - "File: /src/cli/commands/reads.ts"
+  - "File: /src/domain/read.ts"
+generationTime: 2026-09-03T09:26:48.307Z
+---
+flowchart TD
+    A["CLI read command invoked"] --> B["Commander parses arguments and options"]
+    B --> C["Run wrapper calls ReadSurface verb"]
+    C --> D{"Which read verb?"}
+
+    D -->|"now"| E["now"]
+    D -->|"known"| F{"Has --at been provided?"}
+    D -->|"why"| G["why"]
+    D -->|"happened"| H["whatHappened"]
+    D -->|"other command"| I["Specialized read method"]
+
+    E --> J["Load events, gates, work, and knowledge in parallel"]
+    J --> K{"Has --since been provided?"}
+    K -->|"No"| L["Return current standing"]
+    K -->|"Yes"| M["Filter touched handles and return changes"]
+
+    F -->|"Yes"| N["whatWasKnown"]
+    F -->|"No"| O["whatIsKnown"]
+    N --> P["Build historical survey from time-scoped facts"]
+    O --> Q["Build current survey from composed facts"]
+    P --> R["Render historical knowledge"]
+    Q --> S["Render current knowledge"]
+
+    G --> T{"Handle or proposition?"}
+    T -->|"Handle"| U["Dispatch by record kind"]
+    T -->|"Proposition"| V["claimsAsserting"]
+    V --> W{"Exactly one claim found?"}
+    W -->|"No"| X["Refuse with error"]
+    W -->|"Yes"| U
+    U --> Y["Explain claim, work, enquiry, gate, or analysis"]
+
+    H --> Z["Select durable events by filter"]
+    I --> AA["Query graph and derive report"]
+    L --> AB["Render answer"]
+    M --> AB
+    R --> AB
+    S --> AB
+    Y --> AB
+    Z --> AB
+    AA --> AB

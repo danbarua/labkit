@@ -41,7 +41,7 @@ set -uo pipefail
 
 root="$(git rev-parse --show-toplevel)" || exit 1
 cd "$root" || exit 1
-mmd_out="docs/dependency-graph.mmd"
+mmd_out="docs/diagrams/dependency-graph.mmd"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

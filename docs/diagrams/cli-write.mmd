@@ -1,0 +1,38 @@
+---
+references:
+  - "File: /src/cli/commands/writes.ts"
+  - "File: /src/domain/write.ts"
+generationTime: 2026-09-03T09:24:36.993Z
+---
+flowchart TD
+    A(["CLI command invoked"]) --> B["Commander parses arguments and options"]
+    B --> C["registerWrites dispatches to write.someVerb()"]
+    C --> D{"Arguments and references valid?"}
+    D -->|"No"| E["Reject command with error"]
+    D -->|"Yes"| F["Enter graph transaction"]
+
+    F --> G{"Write operation type"}
+    G --> H["Simple write: pose, note, plan, criterion, review"]
+    G --> I["Research write: pursue, open, sharpen, observe, analyse, conclude"]
+    G --> J["Lifecycle or governance write: close, accept, is, amend, evaluate"]
+    G --> K["Revision write: reverify, keep, replace, reinterpret"]
+
+    H --> L["Create domain nodes and edges"]
+    I --> L
+    J --> L
+    K --> L
+
+    L --> M{"Repeatable or optional inputs present?"}
+    M -->|"Yes"| N["Iterate inputs and create corresponding edges"]
+    M -->|"No"| O["Continue with single operation"]
+    N --> P["Commit transaction"]
+    O --> P
+
+    P --> Q["emit(operation, subject, detail)"]
+    Q --> R["Drain minted handles and minted edges"]
+    R --> S{"--json requested?"}
+    S -->|"Yes"| T["Return full report including events"]
+    S -->|"No"| U["Return minted handles only"]
+    T --> V(["Command output"])
+    U --> V
+    E --> W(["Command failed"])
