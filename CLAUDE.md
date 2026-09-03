@@ -1314,11 +1314,19 @@ conventions — `bunx depcruise src tests --output-type err`:
 
 ### Changing the graph model
 
-**Record what the act states.** A relationship the researcher's act names —
-*this analysis replaces that one*, *this task serves that question*, *this
-decision deferred that question* — is written when the act is recorded. The
-handle is in hand at that moment; throwing it away and recovering the fact
-later by matching prose is how a read side ends up guessing.
+**If there is a relationship between A and B, that is an edge.** Dan's
+directive, 2026-09-03. It is not conditional on a reader existing, on a
+scenario asking for it, or on a demonstrated wrong answer. A relationship the
+act names — *this analysis replaces that one*, *this task serves that
+question*, *this decision deferred that question* — is written when the act is
+recorded, and the handle is in hand at that moment.
+
+**Not recording it is discarding data somebody may want to query later.** That
+is the whole of the argument. A record whose purpose is provenance does not get
+to drop a relationship it was handed on the grounds that today's queries have
+not asked for it yet; queries are cheap to add later and the moment of the act
+does not come back. Throwing the handle away and recovering the fact by
+matching prose is how a read side ends up guessing.
 
 **The tell is a string comparison.** If a query is comparing wording to work
 out which record is which, the edge it needed existed at write time and was
