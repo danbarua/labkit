@@ -17,6 +17,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, whyOf } from "../helpers/claims";
 import { recordAnalysis } from "../../fragments";
+import { decidedOn, evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -106,7 +107,10 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     expect(status.state).toBe("blocked");
     // ...and not "never evaluated" either. The work was done; it disagreed.
     expect(status.state).not.toBe("never-evaluated");
-    expect(status.evaluations).toHaveLength(3);
+    // Three evaluations across the gate's checks, reached through the
+    // drill-down: a gate carries states, not verdict text (#241).
+    const perCheck = await Promise.all(status.checks.map((c) => evaluationsOf(session, c)));
+    expect(perCheck.flat()).toHaveLength(3);
   });
 
   test("Afterward 2: the unmet condition is named before anyone spends the compute", async () => {
@@ -365,12 +369,12 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const check = (await session.gateStatus(gate)).checks.find((c) => c.proposition === MEDIAN)!;
     expect(check.state).toBe("failed");
     // The decisive record is the failure, not whichever row came back last.
-    expect(check.decidedBy).toMatchObject({
-      value: "median p = 0.21",
-      outcome: "fail",
-    });
+    // The check names which evaluation decided it; what that evaluation said
+    // is a question about the criterion (#241).
+    expect(check.decidedBy?.outcome).toBe("fail");
+    expect(await decidedOn(session, check)).toBe("median p = 0.21");
     // ...and the history is retained rather than overwritten.
-    expect(check.evaluations).toHaveLength(2);
+    expect(await evaluationsOf(session, check)).toHaveLength(2);
   });
 
   test("re-running a failed check until it passes does not clear it", async () => {

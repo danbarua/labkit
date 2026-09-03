@@ -17,6 +17,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf, whyOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../../fragments";
+import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -157,7 +158,10 @@ describe("S-3b: the same design with nothing downstream", () => {
     // The passing check kept its provenance: it was reached against the
     // finding itself, not asserted. Row W's distinction, on the qualification
     // side of the fence this time.
-    const decided = why.standard.find((c) => c.proposition === PRIMARY)?.decidedBy;
+    const check = why.standard.find((c) => c.proposition === PRIMARY)!;
+    const decided = (await evaluationsOf(session, check)).find(
+      (e) => e.evaluation === check.decidedBy?.evaluation,
+    );
     expect(decided?.basis?.map((b) => b.states)).toEqual(["p = 0.002, Holm-corrected"]);
   });
 

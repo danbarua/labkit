@@ -234,6 +234,10 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
     case "enquiry":
     case "gate":
     case "analysis":
+    // A criterion's causes are its evaluations, each already carrying the
+    // verdict text and its handle — which is the generic page's shape, so it
+    // needs no branch of its own.
+    case "criterion":
       return renderExplanation(explanation, p);
     default: {
       const check: never = explanation;

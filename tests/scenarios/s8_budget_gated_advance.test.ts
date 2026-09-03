@@ -24,6 +24,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
 import { recordAnalysis } from "../../fragments";
+import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -179,6 +180,19 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     expect(status.unmet.map((u) => u.requires)).toEqual([SOLVER_HEALTH]);
     expect(status.gating.map((g) => g.objective)).toEqual(["the full classification run"]);
 
+    // The same gate, from the condition's side, must name the same work.
+    // Two pages that disagree about what a gate protects is the defect the
+    // detail page was split out to remove -- and the first version of this
+    // read matched a `BLOCKS` edge that does not exist, so it reported
+    // nothing protected while the gate page reported the task.
+    const held = status.checks.find((c) => c.proposition === SOLVER_HEALTH)!;
+    const standing = await session.criterionStanding(held.criterion);
+    const governed = standing.governs.find((g) => g.gate === programme.advancement)!;
+    expect(governed.protecting.map((w) => w.objective)).toEqual(
+      status.gating.map((g) => g.objective),
+    );
+    expect(governed.protecting.map((w) => w.work)).toEqual(status.gating.map((g) => g.work));
+
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c.state]));
     expect(byName[THROUGHPUT]).toBe("passed");
     expect(byName[SOLVER_HEALTH]).toBe("never-run");
@@ -215,10 +229,13 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const status = await later.gateStatus(programme.advancement);
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c]));
 
-    expect(byName[THROUGHPUT]!.evaluations[0]!.basis.map((b) => b.states)).toEqual([
+    // Through the drill-down: a gate says what state each check is in, and
+    // what a verdict rested on is a question about one criterion (#241).
+    const throughput = await evaluationsOf(later, byName[THROUGHPUT]!);
+    expect(throughput[0]!.basis.map((b) => b.states)).toEqual([
       "sustained 44 images per second across the slice",
     ]);
-    expect(byName[SOLVER_HEALTH]!.evaluations[0]!.basis).toEqual([]);
+    expect((await evaluationsOf(later, byName[SOLVER_HEALTH]!))[0]!.basis).toEqual([]);
 
     // Both passed. Only one was shown anything.
     expect(status.state).toBe("satisfied");

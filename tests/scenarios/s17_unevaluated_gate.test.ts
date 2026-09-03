@@ -84,9 +84,13 @@ describe("S-17: does the guard actually guard?", () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
     const status = await session.gateStatus(gate);
-    expect(status.evaluations).toEqual([]);
+    // A gate carries no evaluation list any more (#241), so "nothing has been
+    // evaluated" is read off the counts and each check's own state.
+    expect(status.counts["never-run"]).toBe(status.checks.length);
+    expect(status.checks.every((c) => c.decidedBy === undefined)).toBe(true);
 
-    expect((await (await afterwards()).gateStatus(gate)).evaluations).toEqual([]);
+    const later = await (await afterwards()).gateStatus(gate);
+    expect(later.counts["never-run"]).toBe(later.checks.length);
   });
 
   test("Afterward 3: what relies on this gate is enumerable", async () => {
@@ -136,7 +140,8 @@ describe("S-17: does the guard actually guard?", () => {
     expect(status.state).toBe("blocked");
     expect(status.everFailed).toBe(true);
     // Distinguishable from never-evaluated -- the whole point.
-    expect(status.evaluations).toHaveLength(1);
+    // One evaluation now reads as one check having a deciding verdict.
+    expect(status.checks.filter((c) => c.decidedBy !== undefined)).toHaveLength(1);
 
     const durable = await (await afterwards()).gateStatus(gate);
     expect(durable.state).toBe("blocked");
@@ -184,7 +189,7 @@ describe("S-17: does the guard actually guard?", () => {
     const release = await session.gateStatus(releaseGate);
     // Release itself has never been evaluated -- that must not read as passed.
     expect(release.state).toBe("never-evaluated");
-    expect(release.evaluations).toEqual([]);
+    expect(release.counts["never-run"]).toBe(release.checks.length);
     // But the check it relies on HAS been shown able to fail.
     expect(release.everFailed).toBe(true);
   });
@@ -221,12 +226,12 @@ describe("S-17: does the guard actually guard?", () => {
     // stray evaluation is sitting in the graph.
     const status = await session.gateStatus(gate);
     expect(status.state).toBe("never-evaluated");
-    expect(status.evaluations).toEqual([]);
+    expect(status.counts["never-run"]).toBe(status.checks.length);
     expect(status.everFailed).toBe(false);
 
     const durable = await (await afterwards()).gateStatus(gate);
     expect(durable.state).toBe("never-evaluated");
-    expect(durable.evaluations).toEqual([]);
+    expect(durable.counts["never-run"]).toBe(durable.checks.length);
   });
 
   /**

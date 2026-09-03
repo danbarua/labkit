@@ -57,8 +57,10 @@ export function renderGate(status: GateStatus, p: Palette): string {
           ? p.untested(text)
           : p.provisional(text);
   const check = (c: CheckStatus): string => {
+    // The verdict's own sentence is not here -- see `DecidingEvaluation`. The
+    // handle is, so a reader can reach it.
     const decided = c.decidedBy
-      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")} on "${c.decidedBy.value}"`
+      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")} ${p.quiet(c.decidedBy.at)} ${p.handle(`(${c.decidedBy.evaluation})`)}`
       : "";
     // Padded before colouring: an escape sequence has length and would throw
     // the column off by exactly the bytes nobody can see.
@@ -67,6 +69,13 @@ export function renderGate(status: GateStatus, p: Palette): string {
   return [
     `${p.handle(status.gate)} — ${state(status.state)}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
     `  consequence: ${status.consequence}`,
+    "",
+    `${p.heading("Conditions by state")}\n${bullets(
+      (Object.entries(status.counts) as [CheckStatus["state"], number][])
+        .filter(([, n]) => n > 0)
+        .map(([s, n]) => `${state(s, s.padEnd(19))} ${n}`),
+      "none",
+    )}`,
     "",
     p.heading("Conditions"),
     bullets(status.checks.map(check), "none"),
@@ -79,18 +88,6 @@ export function renderGate(status: GateStatus, p: Palette): string {
     status.gating.length
       ? `\nGating\n${bullets(
           status.gating.map((w) => `${w.objective}  (${w.work})`),
-          "",
-        )}`
-      : "",
-    status.evaluations.length
-      ? `\n${p.heading("Evaluations")}\n${bullets(
-          status.evaluations.map(
-            (e) =>
-              `${p.quiet(e.at)}  ${state(e.outcome === "pass" ? "passed" : "failed")}  "${e.value}"  ${p.handle(`(${e.evaluation})`)}${e.withdrawn ? `  ${p.provisional("withdrawn")}` : ""}` +
-              (e.basis.length === 0
-                ? `  ${p.untested("asserted")}`
-                : `  resting on: ${e.basis.map((f) => `${f.states}  ${p.handle(`(${f.evidence})`)}`).join("; ")}`),
-          ),
           "",
         )}`
       : "",

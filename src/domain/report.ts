@@ -624,23 +624,17 @@ export interface GateStatus {
    * performed must be distinguishable.
    */
   checks: CheckStatus[];
+  /**
+   * How many checks are in each state — every state present, zero included.
+   *
+   * The tally rather than the reader's job: a gate may govern a hundred
+   * conditions, and a reader that has to count them before it can act was
+   * answered a different question than the one it asked. Every key is present
+   * at zero, so an absent state cannot read as one nobody asked about.
+   */
+  counts: Record<CheckStatus["state"], number>;
   /** Conditions not currently passing — what would have to change. Named before anyone spends the compute. */
   unmet: UnmetCheck[];
-  /**
-   * Evaluations of this gate's criteria, flattened from `checks`. Empty is an
-   * answer, not an absence.
-   *
-   * `EvaluationRecord`, which is what the code has always put here — the
-   * declared type said `{value, outcome, at}` and structural typing let a
-   * wider object through, because excess-property checking only applies to
-   * object literals. Nothing failed: `tsc` was satisfied, the `Exact<>` gate
-   * in `src/mcp/schemas.ts` compared two agreeing *declarations*, and the
-   * strict output schema then rejected the real payload at run time — so
-   * `gate_status` errored over MCP for any gate that had been evaluated, and
-   * no test called it. See `EvaluationRecord.criterion`, whose own comment
-   * says this flattened list loses the criterion otherwise.
-   */
-  evaluations: EvaluationRecord[];
   /** What is currently relying on this gate — the blast radius of a fake guard. */
   gating: GatedWork[];
   /**
@@ -661,22 +655,34 @@ export interface CheckStatus {
   /**
    * `no-standing-verdict` is the state between a check being found defective
    * and its correction being run: evaluations exist, and none of them still
-   * stands. It is emphatically not `never-run` — the check ran, and saying
-   * otherwise contradicts the `evaluations` list in the same object. It counts
-   * as unmet, exactly as `never-run` does.
+   * stands. It is emphatically not `never-run` — the check ran, and
+   * `decidedBy` being absent is not evidence that it did not. It counts as
+   * unmet, exactly as `never-run` does.
    */
   state: "passed" | "failed" | "never-run" | "no-standing-verdict";
-  /**
-   * Every evaluation of this criterion for this gate, oldest first, ties
-   * broken by identity. Cypher imposes no ordering, so without an explicit
-   * sort "the value of this check" is not a stable contract.
-   */
-  evaluations: EvaluationRecord[];
   /**
    * The evaluation that decided `state` — the failing one where a check
    * failed, since failure is decisive. Absent for a check never run.
    */
-  decidedBy?: EvaluationRecord;
+  decidedBy?: DecidingEvaluation;
+}
+
+/**
+ * Which evaluation decided a check, and when — **without its `value`**.
+ *
+ * The value is the sentence someone typed when they decided the check, and on
+ * a gate governing many conditions it is most of the answer's size — an order
+ * of magnitude more than the handles and outcomes beside it. A gate is asked
+ * *what state is everything in*; the sentences are a different question about
+ * one condition.
+ *
+ * The handle is what makes that a pointer rather than a loss: `why
+ * <criterion>` reads it, and `search` reaches one by its text.
+ */
+export interface DecidingEvaluation {
+  evaluation: EvaluationRef;
+  outcome: "pass" | "fail";
+  at: string;
 }
 
 export interface EvaluationRecord {
@@ -1612,8 +1618,49 @@ export interface AnalysisExplanation {
   because: Cause[];
   report: AnalysisRevision;
 }
+/**
+ * What one condition requires, what it has been evaluated to, and what it
+ * governs.
+ *
+ * **The detail a gate's page sheds.** `GateStatus` answers what state every
+ * condition is in; this answers what was actually said about one of them. They
+ * are different questions, and a gate governing many conditions cannot carry
+ * both.
+ */
+export interface CriterionStanding {
+  criterion: CriterionRef;
+  /** The condition's own wording. */
+  requires: string;
+  /** Its state across every gate, not scoped to one — see `evaluations`. */
+  state: CheckStatus["state"];
+  /**
+   * Every evaluation of this criterion, oldest first, whatever gate it was
+   * run for. A criterion can govern several and be evaluated separately
+   * against each, so this is deliberately wider than any one gate's view.
+   */
+  evaluations: EvaluationRecord[];
+  /** The gates this condition governs, and what each protects. */
+  governs: GateGoverned[];
+}
+
+/** One gate a criterion governs, and the work that gate protects. */
+export interface GateGoverned {
+  gate: GateRef;
+  consequence: string;
+  protecting: GatedWork[];
+}
+
+export interface CriterionExplanation {
+  kind: "criterion";
+  subject: CriterionRef;
+  is: string;
+  because: Cause[];
+  report: CriterionStanding;
+}
+
 export type Explanation =
   | ClaimExplanation
+  | CriterionExplanation
   | WorkExplanation
   | EnquiryExplanation
   | GateExplanation
