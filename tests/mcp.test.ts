@@ -49,7 +49,13 @@ import {
 import { DOCS_URI, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { NOT_EXPOSED, publicVerbsOf, verbsCalledOn } from "./helpers/surface-coverage";
+import {
+  NOT_EXPOSED,
+  publicVerbsOf,
+  verbsCalledOn,
+  READ_SURFACE,
+  WRITE_SURFACE,
+} from "./helpers/surface-coverage";
 import { claimNamed, claimOf } from "./helpers/claims";
 import { recordAnalysis } from "../fragments";
 
@@ -125,8 +131,8 @@ describe("structure", () => {
     // The check that would have caught six reads shipping unreachable. Both
     // lists are derived: the verbs from the surface declarations, the reached
     // set from the adapter's source. Nothing here names a tool.
-    const reads = publicVerbsOf("src/domain/read.ts");
-    const writes = publicVerbsOf("src/domain/write.ts");
+    const reads = publicVerbsOf(READ_SURFACE);
+    const writes = publicVerbsOf(WRITE_SURFACE);
 
     // Guard the derivation itself: a regex that stopped matching would make
     // this test pass by having nothing to check.
