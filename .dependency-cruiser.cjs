@@ -5,10 +5,10 @@ module.exports = {
       name: 'scenarios-no-persistence',
       severity: 'error',
       comment:
-        "A PJ-008 acceptance scenario must be expressible through research verbs alone " +
-        "(src/domain). Reaching into src/db from a scenario means the domain service " +
-        "failed to cover the interaction, which is a finding to record -- not something " +
-        "to route around. tests/helpers/ is exempt: it is harness, not caller.",
+        "An acceptance scenario must be expressible through research verbs alone " +
+        "(src/domain). Reaching into src/db proves nothing about the surface a user " +
+        "has: it means the verb the scenario wanted is missing, so add it. " +
+        "tests/helpers/ is exempt: it is harness, not caller.",
       from: { path: '^tests/scenarios' },
       to: { path: '^src/db' }
     },

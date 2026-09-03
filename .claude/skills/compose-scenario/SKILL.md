@@ -39,9 +39,11 @@ Then add it to `COMPOSITIONS`. Composition is **variable binding** — a move
 returns the handles the next one needs, and there is no registry or builder to
 learn.
 
-`ref` is the acceptance scenario whose arc you are borrowing, so a reader can
-find the real one. If you are not borrowing one, say so in the `name` and leave
-`ref` as the closest match rather than inventing a number.
+`ref` points at the acceptance scenario whose arc you are borrowing, when
+there is one, so a reader can find it. **An arc does not need one.** If you are
+composing something a researcher actually did rather than borrowing a test's
+shape, say so in the `name` and leave `ref` at the closest match — do not
+invent a number, and do not go looking for a scenario to justify the arc.
 
 ## 3. Run it
 
@@ -65,9 +67,13 @@ before changing anything** — it usually says the arc is wrong, not the code.
 ## 4. The one rule
 
 > the Researcher and Agent lines must never name a node or edge label
-> — `docs/project-journal/008_user_story_mining.md` §2
 
-A composition cannot break this, because it does not write a graph. That is the
+Because that is the storage model leaking into the words a user speaks. It is
+the rule that pays: an in-the-wild agent session drove the whole surface on
+2026-09-03 and its operator observed afterwards that at no point had anyone
+said the word *graph*.
+
+A composition cannot break it, because it does not write a graph. That is the
 point of the shape: the rule holds by construction rather than by review.
 
 **So do not add a "and this creates a Claim node" comment.** It will be true
@@ -107,5 +113,6 @@ are writing a scenario and this is the wrong tool. A composition asserts
 nothing; it produces a record.
 
 **Not a place to reach past the surface.** Every fragment goes through
-`WriteSurface` and nothing else. If a move needs something the surface cannot
-do, that is a finding about the surface — file it, do not work around it.
+`WriteSurface` and nothing else — a move that reaches past it proves nothing
+about what a user can do. If a move needs something the surface cannot do, the
+verb is missing: add it, or file it if the shape needs deciding first.

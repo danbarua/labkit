@@ -70,15 +70,13 @@ The one rule that survived, under its own name rather than as a bar:
 | --- | --- | --- |
 | **the slot / the one-wrong-answer rule** | At most one demonstrated wrong answer ships green at a time, and clearing it is the next thing built. Its state is the board's P0 | CLAUDE.md, "One wrong answer at a time" |
 
-## Ledger status vocabulary
+## Retired: ledger status vocabulary
 
 `open` + owned / `open` + unowned / `demonstrated` / `resolved` /
-`resolved (argued)` / `refuted` / `boundary`.
-
-**Defined in PJ-008 §3's Kind table, historical since PJ-008b closed the
-ledger.** The rows still read with these words; nothing new is written in them.
-`demonstrated` now means *the board's P0 issue*; `open` means an `open question`
-issue, Parked.
+`resolved (argued)` / `refuted` / `boundary` — PJ-008 §3's Kind table, closed
+by PJ-008b. Listed **only so a reader meeting one in a dated entry knows what
+it meant**. Nothing is written in these words any more: what was `demonstrated`
+is the board's P0 issue, and what was `open` is an open-question issue.
 
 ## The record, and what is said about it
 
