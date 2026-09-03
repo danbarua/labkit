@@ -1,12 +1,16 @@
 /**
  * What more than one write group needs to reach the same record the same way.
  *
- * A plain function threading `graph`/`clock` through every call would work too,
- * but `Shared extends SessionCore` gets `this.withdrawalOf` and the rest of
- * `SessionCore`'s protected helpers for free, exactly as `Work` and `Revising`
- * do — so a method that moves here keeps calling `this.foo()` rather than
- * `foo(this.graph, this.clock, ...)`. `WriteSurface` constructs one instance
- * and hands it to both.
+ * `Work` and `Revising` both `extend Shared` (which itself `extends
+ * SessionCore`) rather than holding an instance of it, and that choice is not
+ * style: `tests/helpers/surface-coverage.ts` derives every exposed verb by
+ * walking every class in `write/`'s files and reading `public`/`private` off
+ * the declaration, so a method here that were merely `public` — reachable via
+ * a held instance — would be counted as an unexposed write verb by that scan,
+ * exactly like a real one accidentally left off a command. `protected` is
+ * invisible to it, the same way `SessionCore`'s own helpers already are, and
+ * inheritance is what makes `protected` reachable from two unrelated classes
+ * that happen to share this ancestor.
  *
  * **Membership is by use, not by topic.** `unitOf`, `revisedBy`, `recorded`,
  * `concluding` and `conclusionEvents` read like `Work`'s own machinery — and
@@ -115,7 +119,7 @@ export class Shared extends SessionCore {
    * Computation (its execution) -- the review endpoint goes that way too.
    * Flagged rather than renamed: renaming nouns is not a reason to refactor.
    */
-  async unitOf(analysis: AnalysisRef): Promise<UnitRef> {
+  protected async unitOf(analysis: AnalysisRef): Promise<UnitRef> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:USES]-(u:EvidenceUnit) RETURN u`,
       { u: vertexProps<{ natural_id: string }>() },
@@ -136,7 +140,7 @@ export class Shared extends SessionCore {
    * analysis revises that one, never that the old one's findings fell. See the
    * `Computation` pair on `EDGE_SCHEMA.CHANGES`.
    */
-  async revisedBy(
+  protected async revisedBy(
     analysis: AnalysisRef,
   ): Promise<{ old: AnalysisRef; decision: Ref<"decision">; because?: ReviewRef } | undefined> {
     const rows = await this.graph.query(
@@ -171,7 +175,7 @@ export class Shared extends SessionCore {
    * asserting a sentence, and whether this particular finding has already
    * fallen.
    */
-  async supersessionOf(claim: ClaimRef): Promise<Ref<"decision"> | undefined> {
+  protected async supersessionOf(claim: ClaimRef): Promise<Ref<"decision"> | undefined> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id})
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
@@ -189,7 +193,7 @@ export class Shared extends SessionCore {
     return found === undefined ? undefined : ref("decision", found);
   }
 
-  async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
+  protected async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(
       // Either bearing: an analysis whose findings all CHALLENGE returned no
       // conclusions at all, so replacing one reported nothing as affected.
@@ -223,7 +227,7 @@ export class Shared extends SessionCore {
     });
   }
 
-  async outputArtefactOf(analysis: AnalysisRef): Promise<ObservationsRef> {
+  protected async outputArtefactOf(analysis: AnalysisRef): Promise<ObservationsRef> {
     // One hop, via the computation's own PRODUCES -- the direct counterpart
     // to CONSUMES. This previously had to go out through the evidence unit.
     const rows = await this.graph.query(
@@ -241,7 +245,7 @@ export class Shared extends SessionCore {
   }
 
   /** The enquiry an analysis was recorded under, for the withdrawal guard's scope. */
-  async enquiryOf(analysis: AnalysisRef): Promise<EnquiryRef | undefined> {
+  protected async enquiryOf(analysis: AnalysisRef): Promise<EnquiryRef | undefined> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(l:LineOfEnquiry)
        RETURN l`,
@@ -259,7 +263,7 @@ export class Shared extends SessionCore {
    * thing, and a log that also records the analysis underneath it describes the
    * implementation instead of the act.
    */
-  async recorded(
+  protected async recorded(
     input: Omit<RecordAnalysisCommand, "concludes">,
   ): Promise<{ analysis: AnalysisRef }> {
     const computation = await this.graph.createNode("Computation", {
@@ -351,7 +355,7 @@ export class Shared extends SessionCore {
    * stream is a record of research actions; five events for one call describes
    * the implementation.
    */
-  async concluding(input: ConcludeCommand): Promise<ConcludedWithStanding> {
+  protected async concluding(input: ConcludeCommand): Promise<ConcludedWithStanding> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
       {
@@ -523,7 +527,7 @@ export class Shared extends SessionCore {
   }
 
   /** `{claim, finding, proposition}` per conclusion — the event's own record of the pairing, independent of the typed report. */
-  conclusionEvents(claims: ConcludedWithStanding[]): Record<string, unknown>[] {
+  protected conclusionEvents(claims: ConcludedWithStanding[]): Record<string, unknown>[] {
     return claims.map((c) => ({
       claim: c.claim,
       finding: c.finding,

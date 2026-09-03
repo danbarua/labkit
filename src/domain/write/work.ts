@@ -1,11 +1,7 @@
 /** Measuring, analysing, concluding, reviewing. */
 
 import type { TenantGraph } from "../../db/graph";
-import type {
-  RecordedAnalysis,
-  RecordedObservations,
-  RecordedReview,
-} from "../report";
+import type { RecordedAnalysis, RecordedObservations, RecordedReview } from "../report";
 import { ref } from "../report";
 import type {
   ConcludeCommand,
@@ -13,16 +9,15 @@ import type {
   RecordObservationsCommand,
   RecordReviewCommand,
 } from "../commands";
-import { SessionCore, type ResearchSessionOptions } from "../core";
+import type { ResearchSessionOptions } from "../core";
 import type { Emit } from "./index";
-import { asConcludedClaim, type Shared } from "./shared";
+import { asConcludedClaim, Shared } from "./shared";
 
-export class Work extends SessionCore {
+export class Work extends Shared {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
     private readonly emit: Emit,
-    private readonly shared: Shared,
   ) {
     super(graph, options);
   }
@@ -116,7 +111,7 @@ export class Work extends SessionCore {
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
-      const { analysis } = await this.graph.inTransaction(() => this.shared.recorded(input));
+      const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
       // An analysis with no conclusions yet emits exactly one event and is a
       // real state: `enquiry` prints "has produced nothing yet" and `known`
       // buckets it as worked-on-no-answer.
@@ -169,9 +164,9 @@ export class Work extends SessionCore {
       // `TenantGraph.inMintScope`, which also records why suppressing the inner
       // event was the wrong fix.
       this.graph.inMintScope(async () => {
-        const concluded = await this.shared.concluding(input);
+        const concluded = await this.concluding(input);
         const events = await this.emit("conclude", input.analysis, {
-          conclusions: this.shared.conclusionEvents([concluded]),
+          conclusions: this.conclusionEvents([concluded]),
           ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
         });
         return { analysis: input.analysis, claims: [asConcludedClaim(concluded)], events };
@@ -194,7 +189,7 @@ export class Work extends SessionCore {
       await this.graph.createEdge(
         review.natural_id,
         "EVALUATES",
-        await this.shared.unitOf(input.of).then((u) => u),
+        await this.unitOf(input.of).then((u) => u),
       );
       const events = await this.emit("recordReview", ref("review", review.natural_id), {
         of: input.of,

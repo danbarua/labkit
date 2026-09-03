@@ -26,9 +26,9 @@ import type {
   ReplaceAnalysisCommand,
   ReverifyCommand,
 } from "../commands";
-import { SessionCore, type ResearchSessionOptions } from "../core";
+import type { ResearchSessionOptions } from "../core";
 import type { Emit } from "./index";
-import { asConcludedClaim, type Shared } from "./shared";
+import { asConcludedClaim, Shared } from "./shared";
 
 /**
  * The `Claim.kind` each state is stored as.
@@ -50,12 +50,11 @@ const INVALIDATION_CHECK: Record<ClaimState, string> = {
   confirmed: "evidence that the promoted result does not replicate",
 };
 
-export class Revising extends SessionCore {
+export class Revising extends Shared {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
     private readonly emit: Emit,
-    private readonly shared: Shared,
   ) {
     super(graph, options);
   }
@@ -87,7 +86,7 @@ export class Revising extends SessionCore {
       // named the analysis has already said which one. An explicit `enquiry`
       // wins: a re-check may legitimately belong to a different line of
       // enquiry than the analysis it re-checks, and only the caller knows that.
-      const enquiry = input.enquiry ?? (await this.shared.enquiryOf(input.historical));
+      const enquiry = input.enquiry ?? (await this.enquiryOf(input.historical));
       if (!enquiry)
         throw new Error(
           `analysis ${input.historical} is under no line of enquiry, so there is none to ` +
@@ -101,7 +100,7 @@ export class Revising extends SessionCore {
             `analysis ${input.historical} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
           );
         }
-        const { analysis } = await this.shared.recorded({
+        const { analysis } = await this.recorded({
           enquiry,
           method: input.method,
           from: input.under,
@@ -112,7 +111,7 @@ export class Revising extends SessionCore {
       // The conclusion first, then the edge, then the emit: `emit` drains what
       // has been minted since the last event, so anything written after it
       // lands in the next act's event instead of this one.
-      const concluded = await this.shared.concluding({
+      const concluded = await this.concluding({
         analysis: verification.analysis,
         proposition: input.concludes.proposition,
         finding: input.concludes.finding,
@@ -129,7 +128,7 @@ export class Revising extends SessionCore {
       const events = await this.emit("reverify", verification.analysis, {
         of: input.historical,
         proposition: input.concludes.proposition,
-        conclusions: this.shared.conclusionEvents([concluded]),
+        conclusions: this.conclusionEvents([concluded]),
       });
 
       return {
@@ -301,14 +300,14 @@ export class Revising extends SessionCore {
         // The superseded output is not invalidated. A flag on the artefact
         // would summarise the standing of every finding it carries, and
         // standing is per finding.
-        const output = await this.shared.outputArtefactOf(input.supersedes);
+        const output = await this.outputArtefactOf(input.supersedes);
         await this.graph.createEdge(output, "INVALIDATED_BY", input.because);
 
         // Add-only: the successor reads what its predecessor read, plus
         // whatever this call names.
         const inherited = await this.inputsOf(input.supersedes);
-        const { analysis } = await this.shared.recorded({
-          enquiry: (await this.shared.enquiryOf(input.supersedes)) as EnquiryRef,
+        const { analysis } = await this.recorded({
+          enquiry: (await this.enquiryOf(input.supersedes)) as EnquiryRef,
           method: input.method,
           from: [...inherited, ...(input.from ?? [])],
         });
@@ -329,7 +328,7 @@ export class Revising extends SessionCore {
         // re-parented**: it keeps the evidence that produced it, so asking
         // why it holds still answers with the run that produced the number.
         const kept = new Set<string>(input.keeping);
-        const before = await this.shared.conclusionsOf(input.supersedes);
+        const before = await this.conclusionsOf(input.supersedes);
         const superseded: ConcludedClaim[] = [];
         for (const c of before) {
           if (kept.has(c.claim)) {
@@ -341,7 +340,7 @@ export class Revising extends SessionCore {
           // cannot fall again here: two decisions would stand instead of one
           // claim, each naming a different successor, and no reader can say
           // which holds.
-          const gone = await this.shared.supersessionOf(c.claim);
+          const gone = await this.supersessionOf(c.claim);
           if (gone !== undefined)
             throw new Error(
               `${c.claim} "${c.proposition}" has already been withdrawn by ${gone}, so this ` +

@@ -22,8 +22,10 @@
  * — `recorded`, `concluding` and `conclusionEvents` look like `Work`'s own
  * machinery until `Revising`'s `reverify` turns out to call all three (two of
  * them via `concluding`'s own body, which also needs `unitOf` and
- * `revisedBy`). `WriteSurface` constructs one `Shared` and hands it to both
- * `Work` and `Revising`.
+ * `revisedBy`). `Work` and `Revising` both `extend Shared` rather than hold an
+ * instance of it, because its methods have to stay `protected` — see
+ * `shared.ts`'s own header for why a merely `public` one would read as an
+ * unexposed write verb to the coverage tests.
  *
  * Every verb below runs inside `graph.inTransaction()`, over its whole body —
  * not because each was reasoned about individually, but because `eec49b8`
@@ -90,7 +92,6 @@ import type { DomainEvent } from "../events";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
-import { Shared } from "./shared";
 import { Stopping } from "./stopping";
 import { Work } from "./work";
 
@@ -163,11 +164,10 @@ export class WriteSurface extends SessionCore {
   constructor(graph: TenantGraph, options: ResearchSessionOptions = {}) {
     super(graph, options);
     const emit: Emit = (operation, subject, detail) => this.emit(operation, subject, detail);
-    const shared = new Shared(graph, options);
     this.asking = new Asking(graph, options, emit);
-    this.work = new Work(graph, options, emit, shared);
+    this.work = new Work(graph, options, emit);
     this.counting = new Counting(graph, options, emit);
-    this.revising = new Revising(graph, options, emit, shared);
+    this.revising = new Revising(graph, options, emit);
     this.stopping = new Stopping(graph, options, emit);
   }
 
