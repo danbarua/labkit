@@ -278,7 +278,7 @@ export function renderSearch(groups: SearchGroup[], text: string, p: Palette): s
   return [
     p.heading(`Records containing "${text}"`),
     total === 0
-      ? p.untested("none — nothing on the record contains this text")
+      ? p.untested("none — nothing on the record's text contains this")
       : groups
           .map((g) =>
             [

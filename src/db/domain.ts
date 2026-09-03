@@ -62,32 +62,33 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
 /**
  * Which scalar node properties `search()` scans, per label.
  *
- * Every entry must be a property annotated `Prose` (not `Prose[]` — see
- * {@link SEARCHABLE_PROSE_ARRAYS}), and every such scalar property must
- * appear here — `bun run check:prop-classes` fails when the two disagree,
- * the same guarantee it already gives {@link INDEXED_PROPS}.
+ * Every entry must be a property annotated `Prose` or `IndexedString` (not
+ * `Prose[]` — see {@link SEARCHABLE_TEXT_ARRAYS}), and every such scalar
+ * property must appear here — `bun run check:prop-classes` fails when the two
+ * disagree, the same guarantee it already gives {@link INDEXED_PROPS}.
  *
- * **This table has no hand-written exclusions, and that is the point.**
- * Three properties hold free text a person might reasonably search for and
- * are absent anyway, each for a different, derivable reason rather than a
- * name typed into a skip list:
- * - `Computation.method` is `ReadOnlyString`, not `Prose` — its own doc
- *   comment already says the annotation is probably wrong ("either this
- *   property is misnamed, or the writes are misusing it"). A real type bug,
- *   left as one rather than compensated for here.
- * - `Claim.name` and `Artefact.logical_name` are `IndexedString` —
- *   deliberately, not a bug: `ClaimProps.name`'s own doc comment says
- *   wording is treated as a key there, and `claimsAsserting()` is already
- *   the exact-match search for it. `IndexedString` is a different search
- *   mode from `Prose`'s substring one, not a smaller version of it.
+ * **This table has no hand-written exclusions, and that is the point.** It is
+ * derived from the taxonomy: a property is here when its written annotation is
+ * `Prose` or `IndexedString` — the two classes that hold text a person typed.
+ * `Computation.method` is absent because it is annotated `ReadOnlyString`,
+ * which its own doc comment says is probably wrong; that is a type bug left as
+ * one rather than compensated for here.
  *
- * None of the three needed naming in this table's own logic — deriving
- * strictly from the written annotation excludes all three for free. They
- * are named here only so a reader does not have to rediscover why.
+ * **`IndexedString` was excluded until 2026-09-03**, on the argument that
+ * `claimsAsserting()` is already the exact-match search for a claim's wording
+ * and a substring search would be a weaker duplicate of it. That argument was
+ * about the two search *modes* and it did not survive a user: `claimsAsserting`
+ * needs the whole sentence, nobody retypes one, and `search "unique winner"`
+ * therefore answered that nothing on the record contained the text — about a
+ * record whose claim asserted it. What a string is *for* internally and whether
+ * a person might search for it are different questions; only the second decides
+ * this table.
  */
-export const SEARCHABLE_PROSE: { readonly [L in NodeLabel]?: readonly string[] } = {
+export const SEARCHABLE_TEXT: { readonly [L in NodeLabel]?: readonly string[] } = {
   Question: ["name"],
   LineOfEnquiry: ["name"],
+  Claim: ["name"],
+  Artefact: ["logical_name"],
   Evidence: ["statement"],
   Decision: ["reason", "invalidation_check"],
   Criterion: ["proposition"],
@@ -101,14 +102,14 @@ export const SEARCHABLE_PROSE: { readonly [L in NodeLabel]?: readonly string[] }
 /**
  * Which `Prose[]` (array) node properties `search()` scans, per label.
  *
- * Split from {@link SEARCHABLE_PROSE} because AGE's Cypher has no `ANY(x IN
+ * Split from {@link SEARCHABLE_TEXT} because AGE's Cypher has no `ANY(x IN
  * list WHERE cond)` form (measured 2026-08-31: syntax error) — an array
  * property needs `size([x IN n.prop WHERE toLower(x) CONTAINS
  * toLower($needle)]) > 0` instead of a plain `toLower(n.prop) CONTAINS …`,
  * so the query layer needs to know which shape it is building before it
  * runs, not just which properties are searchable.
  */
-export const SEARCHABLE_PROSE_ARRAYS: { readonly [L in NodeLabel]?: readonly string[] } = {
+export const SEARCHABLE_TEXT_ARRAYS: { readonly [L in NodeLabel]?: readonly string[] } = {
   Task: ["mayRead"],
 };
 
