@@ -21,12 +21,12 @@ Status says whether it can be picked up. Priority says what to look at first.
 | Todo | ready: no decision owed, someone could start today |
 | In progress | someone is on it — including *shipped, open under review* |
 | Blocked | waiting on another issue in this repo; name it in the body |
-| Parked | waiting on something outside the repo, or `open question` + `domain model`, which CLAUDE.md defines as *defined and tracked, not ready to work on* |
+| Parked | waiting on something outside the repo, or an `open question` whose answer nobody needs yet. Not a gate: an open question ships the day someone hits it (#174 → #245) |
 | Done | closed |
 
 | Priority | meaning |
 | --- | --- |
-| P0 | clear it next. A **demonstrated wrong answer shipping green**, or something that loses work. CLAUDE.md permits at most one of the first kind at a time and requires that clearing it be the next thing built, so P0 is normally one issue and never many. Which row is `demonstrated` is in PJ-008 §3's index table and nowhere else. |
+| P0 | clear it next. A **demonstrated wrong answer shipping green**, or something that loses work. CLAUDE.md permits at most one of the first kind at a time and requires that clearing it be the next thing built, so P0 is normally one issue and never many. This column is where that lives, and nowhere else. |
 | P1 | real, unblocked, and it slides if nobody ranks it |
 | P2 | everything else — Blocked and Parked included. The honest value for a thing nobody should be looking at. |
 

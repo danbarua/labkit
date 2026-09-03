@@ -369,12 +369,12 @@ It exists so a decision can be described precisely without being taken — which
 is a different job from a task, and mixing the two is how a decision gets made
 by whoever happened to implement first.
 
-**`domain model` + `open question` means defined and tracked, not ready to
-work on.** The first three were PJ-008 §3's open rows — AH, AI and AJ, now
-#63, #64 and #65 — which had been
-carried forward from one session log to the next, *"which feels like tracking
-and is closer to laundering, since every restatement sits in a document the next
-reader will not open"*.
+**`domain model` + `open question` means the decision is described but not
+taken.** It is not a queue anyone has to work through, and it is not a gate:
+an open question becomes ready the day someone needs the answer. #174 is the
+worked example — parked for two days as "not ready", then a live agent session
+hit exactly the dead end it described and it shipped the same day (#245). The
+label says *nobody is waiting on this yet*, not *this may not be built*.
 
 **PJ-008 §3's ledger is closed — see PJ-008b, the appendix that closes it.**
 Its forty rows stay as dated records of the validation era; issues carry
@@ -1184,14 +1184,15 @@ back up to the caller. One verb may write many nodes and edges:
 `recordAnalysis()` writes a computation, an evidence unit, an output artefact,
 and one evidence plus one claim per conclusion.
 
-**Verbs are added when a consumer needs them, not in anticipation** — a
-scenario, or since PJ-008b a real user (`search`, #155, shipped for a stated
-need with no scenario). The
-current set is what PJ-008's S-11, S-17, S-3, S-4, S-1, S-7, S-12, S-5, S-8,
-S-3b, S-3c, S-10, S-9, S-14 and S-18 required. Return types are derived one-per-bullet from a scenario's
-"Afterward" questions
-rather than designed — if a bullet has no natural home in the types, the API
-is wrong, not the bullet.
+**Verbs are added when a consumer needs them, not in anticipation.** A real
+user or agent asked and the record could not answer — `search` (#155) and
+`why <criterion>` (#245, from a live agent session) are the precedents.
+`labkit --help` is the current set; this file does not list it.
+
+**A return type is what the caller needs to name next.** If a caller cannot
+carry on without describing a record back to the API, the type is wrong — that
+is what *does the act record what it produced?* asks, and it is answerable
+from any real consumer's next command.
 
 A verb that composes others records **one** event, not one per step
 (`openEnquiry` is `pose` + `pursue` and emits only `openEnquiry`). The event
@@ -1206,9 +1207,10 @@ query leaves unnamed: a **Cypher clause**, a **fold** over the rows it returns,
 and the **grain** — the subject it is computed per. `compose()` walks the facts
 a report needs and emits one query; `per()` folds it once per subject.
 
-**Write-side queries stay hand-rolled Cypher, deliberately.** They are the
-reference documentation for *why* the graph is shaped as it is, and that is a
-different job from answering a question about it.
+**Write-side queries are hand-rolled Cypher today**, and nothing stops one
+becoming a fact if a second writer needs the same clause. The read side was
+composed because six readers had silently disagreed; no write-side clause has
+had that happen yet.
 
 **What earned this**, and it is one defect with six occurrences rather than an
 argument about elegance. AGE has no edge alternation, so `[:SUPPORTS|CHALLENGES]`
@@ -1253,8 +1255,9 @@ parses.
 to reach the same answer about the same subject**. That is what predicts the
 defect — it is *written once and forgotten the second time*, which requires a
 second time — and a single-reader query cannot have it whatever it computes.
-Queries with one reader stay raw until a second appears, which is the same rule
-this file applies to earning a relationship.
+Queries with one reader stay raw until a second appears — not as a rule about
+what may be built, but because the defect a fact prevents cannot occur with one
+reader. Compose one anyway if it reads better; nothing is lost.
 
 ### The execution-context seam
 
@@ -1297,11 +1300,10 @@ The rule that keeps the sink honest, and it did not change:
 > research state is*.
 
 Don't answer a "what is true now" question from the event log. Nor a "what was
-true then" one: S-1 asks what was known at the moment a question was sharpened,
-*after* later evidence has arrived, and it is answered from durable state — the
-sharpening freezes the findings it was taken in light of onto the decision. The
-scenario asserts it with an empty event log open beside it. See PJ-008 row Z for
-the level above that, which is not answerable and has not been made so.
+true then" one: *what was known when this question was sharpened*, asked after
+later evidence has arrived, is answered from durable state — the sharpening
+freezes the findings it was taken in light of onto the decision, and
+`tests/scenarios/s1_*` asserts it with an empty event log open beside it.
 
 ### The two layering rules
 
@@ -1309,9 +1311,10 @@ Two layering rules are enforced as `dependency-cruiser` **errors**, not
 conventions — `bunx depcruise src tests --output-type err`:
 
 - `tests/scenarios/` may not import `src/db`. A scenario asserts a
-  researcher's intent can be carried out through research verbs alone; if it
-  needs the persistence layer, that's a finding to record, not something to
-  route around. `tests/helpers/` is exempt (harness, not caller).
+  researcher's intent can be carried out through research verbs alone, so
+  reaching past them proves nothing about the surface a user has. If a
+  scenario needs the persistence layer, the verb it wanted is missing — add
+  it. `tests/helpers/` is exempt (harness, not caller).
 - `src/db` may not import `src/domain`, so the graph model can't come to
   depend on today's verbs.
 
@@ -1482,8 +1485,8 @@ that would have caught it stops applying.
 
 Two kinds of test, with different rules.
 
-**Acceptance scenarios** (`tests/scenarios/`) are PJ-008 corpus entries built
-as executable conversations. They may import only `src/domain` — never
+**Acceptance scenarios** (`tests/scenarios/`) are researcher conversations
+written as executable tests. They may import only `src/domain` — never
 `src/db` (enforced; see "The domain service layer"). `tests/helpers/scenario.ts`
 is the harness that hands them a ready session target.
 
@@ -1493,9 +1496,12 @@ reconstructible from durable state, not present in a return value the caller
 happened to keep — `scenario.current()` exists to open a second reader over
 the same graph for exactly this.
 
-Scenario conversations must not name a node or edge label in a Researcher or
-Agent line. Needing one means the vocabulary leaked and the scenario is
-failing its own premise (PJ-008 §2).
+**Scenario conversations must not name a node or edge label in a Researcher
+or Agent line.** Needing one means the storage model has leaked into the
+vocabulary a user speaks. This is the rule that pays: an in-the-wild agent
+session drove the whole surface on 2026-09-03 — `now`, `known --at`, `why`,
+`gate_status` — and its operator observed afterwards that at no point had
+anyone said the word *graph*.
 
 **Everything else** (`tests/*.test.ts`) tests the persistence layer directly
 and may import `src/db` freely. `tests/reconciliation.test.ts` covers
