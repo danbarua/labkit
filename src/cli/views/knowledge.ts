@@ -40,7 +40,7 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
 /**
  * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was
  * answered. Without the polarity, reading only `asks` for an established
- * question cannot tell a promoted, confirmed "no" apart from a "yes".
+ * question cannot tell a confirmed "no" apart from a "yes".
  */
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => `${q.asks}  ${p.handle(`(${q.question})`)}  — ${q.answer}`);
@@ -73,10 +73,10 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
   return [
     p.heading(`As of ${survey.at}:`),
     "",
-    p.settled("Established (resolved on a promoted finding)"),
+    p.settled("Established (resolved on a confirmed finding)"),
     list(survey.established),
     "",
-    p.provisional("Provisional (resolved, but on unpromoted work)"),
+    p.provisional("Provisional (resolved, but on unconfirmed work)"),
     list(survey.provisional),
     "",
     p.provisional("Accepted as unresolved"),
@@ -117,7 +117,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
   return [
     p.heading(`"${why.proposition}"`),
     `  ${verdict}, ${why.standing}`,
-    why.promotedBecause ? `  promoted because: ${why.promotedBecause}` : "",
+    why.promotedBecause ? `  confirmed because: ${why.promotedBecause}` : "",
     why.replacedBy
       ? `  replaced by: "${why.replacedBy.asserts}"  ${p.handle(`(${why.replacedBy.claim})`)}`
       : "",

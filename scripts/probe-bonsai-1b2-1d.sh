@@ -315,8 +315,14 @@ gpu_fix_observations=$(lab --date "$STAGE1D_GPU_FIX" observe "$topology_specific
 gpu_fix_replacement=$(lab --date "$STAGE1D_GPU_FIX" replace "$gpu_pilot_analysis" --because "$gpu_bug_review" \
   --method "corrected build_432_batch(), calling the real generate_fixed_replica_directions() instead of a hand-rolled uniform draw; smoke-tested against an independently computed replica state before touching a GPU, then re-verified end-to-end on a fresh A100 session" \
   --from "$trajectory_generalization_observations" --from "$gpu_fix_observations" | grep '^COMP_')
+# `--bearing supports`, explicitly: a replacing conclusion inherits the
+# replaced claim's bearing, and the replaced claim's was `challenges`.
+# The corrected run's exact match cuts the other way; without this the
+# record answers "does the GPU port reproduce? -- no" on a finding that
+# says it does.
 lab --date "$STAGE1D_GPU_FIX" conclude "$gpu_fix_replacement" --replacing "$gpu_pilot_claim" \
-  --finding "0.3505 vs. 0.3505 -- exact match, on a fresh GPU session, with verify_on_gpu.py's own field-by-field precision check re-confirmed first" >/dev/null
+  --finding "0.3505 vs. 0.3505 -- exact match, on a fresh GPU session, with verify_on_gpu.py's own field-by-field precision check re-confirmed first" \
+  --bearing supports >/dev/null
 
 say "closing item 2, and checking whether item 1's promoted claim needed narrowing"
 

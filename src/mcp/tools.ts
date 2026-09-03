@@ -634,7 +634,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Record what was measured",
     description:
       "Put measurement on the record without analysing it. This is the cheap act: capture " +
-      "first, and promote later if something ends up resting on it. `content_hash` is what " +
+      "first, and analyse later if something ends up resting on it. `content_hash` is what " +
       "makes a later re-run comparable — without it the record cannot say whether two runs " +
       "read the same data.",
     inputSchema: {
