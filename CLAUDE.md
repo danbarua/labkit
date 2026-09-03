@@ -292,7 +292,7 @@ to that. Generate into the running program, not into the tree.
 
 ### The dependency graph
 
-`docs/dependency-graph.mmd` is the module dependency graph, as text.
+`docs/diagrams/dependency-graph.mmd` is the module dependency graph, as text.
 `bun run dev:dependency-cruiser` regenerates it — **by hand, when you want it.**
 
 It was briefly self-maintaining, via a `.githooks/pre-commit` that regenerated on
@@ -434,7 +434,7 @@ bun run snapshot:record --db <dir> --name <slug>  # dump a real record's PGlite 
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
 bunx depcruise src tests --output-type err   # layering rules (errors) + cycles
-bun run dev:dependency-cruiser  # regenerate docs/dependency-graph.mmd
+bun run dev:dependency-cruiser  # regenerate docs/diagrams/dependency-graph.mmd
 bun run typecheck              # tsc --noEmit
 bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
 bun run check:all-checks       # every check script must introduce itself in one plain sentence

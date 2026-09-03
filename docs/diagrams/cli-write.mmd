@@ -25,11 +25,11 @@ flowchart TD
     L --> M{"Repeatable or optional inputs present?"}
     M -->|"Yes"| N["Iterate inputs and create corresponding edges"]
     M -->|"No"| O["Continue with single operation"]
-    N --> P["Commit transaction"]
-    O --> P
+    N --> Q["emit(operation, subject, detail)"]
+    O --> Q
 
-    P --> Q["emit(operation, subject, detail)"]
-    Q --> R["Drain minted handles and minted edges"]
+    Q --> P["Commit transaction — the writes and their event commit together"]
+    P --> R["Drain minted handles and minted edges"]
     R --> S{"--json requested?"}
     S -->|"Yes"| T["Return full report including events"]
     S -->|"No"| U["Return minted handles only"]
