@@ -1961,20 +1961,29 @@ export class ReadSurface extends SessionCore {
     const fell = await this.claimsFrom(decision, "SUPERSEDES");
     const kept = await this.claimsFrom(decision, "KEEPS");
 
-    // **Paired by proposition, and only where the proposition is unique on both
-    // sides.** An analysis may assert the same sentence twice about different
-    // endpoints, so a wording match can name two; this is a description rather
-    // than an act and cannot refuse, so an ambiguous or absent match is
-    // reported unpaired instead of guessed.
+    // **The recorded pairing first, wording only where there is none.**
+    // `conclude --replacing` mints a decision per finding carrying
+    // `SUPERSEDES` to what fell and `MOTIVATES` to what stands in its place,
+    // so which claim replaced which is on the record at write time. Matching
+    // propositions cannot recover it: an analysis may assert one sentence
+    // twice about different endpoints, which is what a claim's handle is for.
+    const named = await this.namedSuccessors(fell.map((c) => c.claim));
+
+    // The fallback, for a conclusion recorded without naming what it replaces.
+    // Unique on both sides or nothing: this is a description rather than an
+    // act and cannot refuse, so an ambiguous match is reported unpaired
+    // instead of guessed.
     const countBy = (cs: ConcludedClaim[], p: string) => cs.filter((c) => c.asserts === p).length;
     const changed: RevisedFinding[] = [];
     const restated: ConcludedClaim[] = [];
     const unpaired: ConcludedClaim[] = [];
     for (const was of fell) {
+      const stated = named.get(was.claim);
       const successor =
-        countBy(fell, was.asserts) === 1 && countBy(now, was.asserts) === 1
+        (stated && now.find((c) => c.claim === stated)) ??
+        (countBy(fell, was.asserts) === 1 && countBy(now, was.asserts) === 1
           ? now.find((c) => c.asserts === was.asserts)
-          : undefined;
+          : undefined);
       if (!successor) {
         unpaired.push({ claim: was.claim, asserts: was.asserts });
         continue;
@@ -2027,6 +2036,35 @@ export class ReadSurface extends SessionCore {
           out.push({ claim: ref("claim", row.c.natural_id), asserts: row.c.name });
     }
     return out;
+  }
+
+  /**
+   * Which claim was recorded as standing in place of each fallen one.
+   *
+   * `conclude --replacing` mints a decision per finding, `SUPERSEDES` to what
+   * fell and `MOTIVATES` to what replaces it — so the pairing is a fact the
+   * act stated, not one a reader has to infer from wording.
+   *
+   * Two clauses rather than one pattern because AGE has no edge alternation,
+   * and both are `MATCH`: a decision carrying only `SUPERSEDES` is the
+   * revision's own act of retiring the finding, which names no successor.
+   */
+  private async namedSuccessors(fallen: ClaimRef[]): Promise<Map<ClaimRef, ClaimRef>> {
+    if (fallen.length === 0) return new Map();
+    const rows = await this.graph.query(
+      `MATCH (d:Decision)-[:SUPERSEDES]->(was:Claim)
+       MATCH (d)-[:MOTIVATES]->(now:Claim)
+       WHERE was.natural_id IN $fallen
+       RETURN was, now`,
+      {
+        was: vertexProps<{ natural_id: string }>(),
+        now: vertexProps<{ natural_id: string }>(),
+      },
+      { fallen: [...fallen] },
+    );
+    return new Map(
+      rows.map((r) => [ref("claim", r.was.natural_id), ref("claim", r.now.natural_id)]),
+    );
   }
 
   /** The claims one decision points at over one edge. */
