@@ -47,9 +47,11 @@ function code(line: string): string {
 }
 
 const offenders: string[] = [];
+let scanned = 0;
 for (const file of readdirSync(DIR).sort()) {
   if (file === SELF || !(file.endsWith(".sh") || file.endsWith(".ts"))) continue;
   const path = join(DIR, file);
+  scanned++;
   readFileSync(path, "utf8")
     .split("\n")
     .forEach((line, i) => {
@@ -73,4 +75,12 @@ if (offenders.length > 0) {
   process.exit(1);
 }
 
-console.log("OK: every caller runs the suite through the test script, so the ceiling applies.");
+// A check that examined nothing reports the same OK: as one that examined
+// everything and found it good. Fail on an empty population rather than
+// reporting success over it -- `check:empty-population` holds every check here
+// to that.
+if (scanned === 0) {
+  console.error(`FAILED: no scripts under ${DIR}/ — this check examined nothing.`);
+  process.exit(1);
+}
+console.log(`OK: ${scanned} scripts, every caller running the suite through the test script.`);

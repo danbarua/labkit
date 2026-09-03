@@ -28,8 +28,10 @@ import { Glob } from "bun";
 
 const glob = new Glob("src/**/*.ts");
 let strays = 0;
+let scanned = 0;
 
 for await (const path of glob.scan(".")) {
+  scanned++;
   const lines = readFileSync(path, "utf8").split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]?.trim() ?? "";
@@ -71,4 +73,12 @@ if (strays > 0) {
   );
   process.exit(1);
 }
-console.log("OK: every doc comment sits directly above the thing it describes.");
+// A check that examined nothing reports the same OK: as one that examined
+// everything and found it good. Fail on an empty population rather than
+// reporting success over it -- `check:empty-population` holds every check
+// here to that.
+if (scanned === 0) {
+  console.error("FAILED: no TypeScript sources under src/ — this check examined nothing.");
+  process.exit(1);
+}
+console.log(`OK: ${scanned} sources, every doc comment directly above what it describes.`);

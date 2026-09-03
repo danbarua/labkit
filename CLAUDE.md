@@ -475,6 +475,7 @@ bun run check:no-stringly-typed  # no bare `string` in a core/read/write signatu
 bun run check:facts            # a fact's grain is named and its clause dependencies declared
 bun run check:help-groups      # every CLI command is in a declared group, groups in the domain order
 bun run check:cypher-labels    # every label written in a Cypher string is one the schema declares
+bun run check:empty-population # every check fails on an empty tree instead of reporting success
 bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
 bun run check:compositions     # every fragments/ arc runs, and connects only what it created
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
