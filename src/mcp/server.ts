@@ -160,6 +160,36 @@ export function buildServer(
     }),
   );
 
+  // **First in the list, deliberately.** `tools/list` is served in
+  // registration order, and this is the only tool whose absence makes every
+  // write refuse — an agent scanning the list meets it before the verbs it
+  // gates rather than two thirds of the way down.
+  // **Registered before the reads, because `tools/list` is served in
+  // registration order** and this is the only tool whose absence makes every
+  // write refuse — an agent scanning the list meets it before the verbs it
+  // gates rather than two thirds of the way down.
+  //
+  // Still behind the read-only check: a server with no write tools has nothing
+  // for a session to sign, and offering to register one would promise a
+  // capability that server does not have.
+  if (!readOnly) {
+    for (const definition of SESSION_TOOLS) {
+      server.registerTool(
+        definition.name,
+        {
+          title: definition.title,
+          description: definition.description,
+          inputSchema: definition.inputSchema,
+          outputSchema: definition.outputSchema,
+          // No `readOnlyHint`, matching the writes. It changes nothing in the
+          // record and is not a read either; an absent hint is the honest thing
+          // to say about a tool that is neither.
+        },
+        respond(definition.name, (args) => definition.handler(session, args)),
+      );
+    }
+  }
+
   for (const definition of TOOLS) {
     server.registerTool(
       definition.name,
@@ -186,21 +216,6 @@ export function buildServer(
 
   // Registered before the writes, and reachable when they are not: this is the
   // one tool whose whole job is to open the gate below.
-  for (const definition of SESSION_TOOLS) {
-    server.registerTool(
-      definition.name,
-      {
-        title: definition.title,
-        description: definition.description,
-        inputSchema: definition.inputSchema,
-        outputSchema: definition.outputSchema,
-        // No `readOnlyHint`, matching the writes. It changes nothing in the
-        // record and is not a read either; an absent hint is the honest thing
-        // to say about a tool that is neither.
-      },
-      respond(definition.name, (args) => definition.handler(session, args)),
-    );
-  }
 
   for (const definition of WRITE_TOOLS) {
     server.registerTool(
