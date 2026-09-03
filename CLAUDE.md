@@ -1314,83 +1314,57 @@ conventions — `bunx depcruise src tests --output-type err`:
 
 ### Changing the graph model
 
-New labels and edges are earned by a scenario, not designed up front. The bar
-PJ-009 set, and the reason `CONSUMES` cleared it while inference supersession
-did not:
+**Record what the act states.** A relationship the researcher's act names —
+*this analysis replaces that one*, *this task serves that question*, *this
+decision deferred that question* — is written when the act is recorded. The
+handle is in hand at that moment; throwing it away and recovering the fact
+later by matching prose is how a read side ends up guessing.
 
-1. A service query must return a **wrong answer** without the relationship —
-   demonstrated by running the test against the old traversal, not argued
-   from an ugly query path.
-2. An **empty** result is not a wrong one (PJ-011 §5) — for a *correctness*
-   change: an edge redirected, a grain moved, a derivation fixed. Since
-   PJ-008b, a *capability* change — a new verb, or an edge that exists so a
-   question can be asked at all — is instead earned by a **demonstrated
-   consumer need**: a real user or agent asked, and the record could not
-   answer. `search` (#155) is the precedent. The test to put to every
-   speculative modelling question, in Dan's words (2026-09-01): **would this
-   have saved the user weeks of frustration and cost building it in Markdown
-   + Git, when he never asked for JIRA in Markdown + Git?** A read that saves
-   one command and zero reading fails it. Only a confidently incorrect
-   answer shows the model claiming something it cannot support. The same rule read
-   from the other side: **a refusal needs something real to refuse.** S-5's
-   decline-rather-than-guess pattern applies to a verb a caller would
-   otherwise use wrongly; inventing a verb in order to reject its arguments
-   manufactures a refusal exactly as a missing feature manufactures an empty
-   result (S-10, PJ-019). Where no such verb exists, the caveat travels with
-   a report a reader already asks for.
-3. The new edge needs a **reader, not just a writer** — **for structure
-   nobody's act asserts.** A relationship the researcher's act plainly states
-   — *this analysis replaces that one*, *this task serves that question*,
-   *this decision deferred that question* — is recorded **when the act is
-   recorded**, reader or not; the reader bar is for relationships someone
-   wants to *infer* into the model. This rule was applied the wrong way round
-   once: `replaceAnalysis` declined to record what it replaced because
-   nothing read the edge, and the read side then grew inference to recover a
-   fact the act had in hand. Dan, 2026-09-01, on the day `conclude
-   --replacing` needed that edge and found it missing: *"Academic
-   theoretical exercise said no edge because no reader. Did not survive first
-   contact with reality. Record the edge."* An edge that is written and never
-   queried is still the dead-code shape PJ-007 found in `buildAsClause` — when
-   it was *invented*, not when it was *stated*. In the words of the rules'
-   own author, the same day: *"Both rules were excellent experimental controls
-   and are becoming terrible product constraints."*
-4. A predicted gap that fails to materialise is a **result**. PJ-008's §3
-   ledger keeps such rows — see row B, and row A, which PJ-008 called its
-   strongest single prediction and which S-3 refuted. The ledger distinguishes
-   three kinds of unfinished row — `open` + owned (an unbuilt discriminator is
-   named, marked `°`), `open` + unowned (every named probe built, a new one
-   needed), and `boundary`; only the middle kind is a gap in the method. See
-   its §3 legend.
-5. When two models both fit, **record both and pick neither** (row V). Do not
-   ship API for an undecided model either: a speculative verb written to
-   probe row V was removed rather than left in place.
+**The tell is a string comparison.** If a query is comparing wording to work
+out which record is which, the edge it needed existed at write time and was
+not written. `conclude --replacing CLM_3` validates the handle it is given,
+puts it in the event, and writes no edge — so `designHistory` pairs superseded
+findings to their successors by matching propositions, and gives up when an
+analysis asserts the same sentence twice. That is not a query that needs
+sharpening; it is a fact that was thrown away.
 
-#### Earning an edge after implementing it
+**A new label or edge is earned by someone needing it** — a real user or agent
+asked, and the record could not answer. `search` (#155) is the precedent, and
+the usage-era bar is the test: would this have saved the user weeks of
+frustration and cost building it in Markdown + Git, when he never asked for
+JIRA in Markdown + Git? A read that saves one command and zero reading fails
+it.
 
-A relationship can still be **earned after being implemented prematurely** —
-but the evidential sequence has to be reconstructed explicitly, by deleting the
-edge and demonstrating the wrong answer that returns. S-7 wired `IMPLEMENTS`
-before showing what it prevented, then showed it afterwards: with the edge
-gone, an amendment that moves a prespecified comparison reports itself
-*mechanical*. Implementing first is the wrong order; leaving the evidence
-unreconstructed is the actual defect.
+**These rules used to be five bars, and the bars are gone.** They required a
+demonstrated wrong answer, ruled an empty result insufficient, and demanded a
+*reader* before an edge could be written — which produced, in Dan's words on
+the day it bit for the second time, *"don't write an edge because an
+experiment says the database reads and writes nothing"*. They were
+experimental controls for validating a domain model against a scenario corpus,
+and that era closed with PJ-008b. They are not product constraints and were
+never meant to become them. What survives is the paragraph above: record what
+the act states, and let the reader arrive when someone asks.
 
-Ask of every verb that mints something: **does the act record what it
-produced, or only what it acted on?** Four scenarios in unrelated regions have
-hit it — S-1 sharpening a question, S-7 amending a design, S-12 narrowing an
-interpretation, S-3c replacing a defective check — and all four needed
-*different* remedies: a new edge, nothing at all, a new edge again, and a field
-on a return type. That is why it stays a review heuristic and not a
-relationship. S-3c adds the sharper form of the question: **ask it of a verb's
-return type, not only of its writes.** `replaceAnalysis()` wrote its replacement
-into the graph correctly and withheld the reference, which blocked a scenario
-outright rather than merely degrading an answer. See PJ-008 row AB.
+**Prefer structure in the query over structure in the stored model.** A gate's
+four states and its per-criterion itemisation are computed, so there is no
+`Gate.status` field to maintain and no value anyone can set to "passed".
+Stored shape is where change gets expensive; queries are free to be wrong and
+re-run. That is a different question from whether a *stated* relationship gets
+recorded — it always does.
 
-Ask also **when** a relationship is written, not only what it connects. A
+**Ask of every verb that mints something: does the act record what it
+produced, or only what it acted on?** Four unrelated regions have hit that one
+and needed four different remedies — a new edge, nothing, a new edge again,
+and a field on a return type — so it stays a question you ask rather than a
+rule. Ask it of the return type too: a verb that writes the right thing and
+withholds the reference leaves the caller unable to name what it just made.
+
+**Ask also when a relationship is written, not only what it connects.** A
 prespecified check nobody ran must still count against the finding it
-qualifies, so `QUALIFIES` is written when the analysis is recorded and not when
-the check is evaluated — the same edge minted at the later moment cannot
-express the case the scenario exists for (S-3b, PJ-016).
+qualifies, so `QUALIFIES` is written when the analysis is recorded rather than
+when the check is evaluated — the same edge minted later cannot express the
+case at all.
+
 
 #### Handles, and which record an answer is about
 
@@ -1438,18 +1412,12 @@ and the wording never stands in for it.
 #### What a verb returns
 
 **A verb that mints something returns what it minted.** `recordAnalysis`,
-`replaceAnalysis` and `reverify` all return their claims. This is the
-`does the act record what it produced, or only what it acted on?` heuristic, and
-it has now caught seven things — the last three because a caller could not name
-a claim without describing it.
+`replaceAnalysis` and `reverify` all return their claims, so a caller can name
+what it just made instead of describing it back.
 
-Six unrelated regions have had to decide the first form — claims (S-5), interpretations (S-12), criteria (S-3b), evaluations
-(S-3c), execution inputs (S-10, caught by review after shipping wrong) and
-artefacts (S-9, where a regenerated part carries the name of what it replaces).
-Three of the six got it right first time because someone asked at the time, so
-the rule is not "we keep failing at this" but **every new comparison is a fresh
-chance to fail at it**: when you write an equality test between two records, say
-out loud which field carries identity.
+**When you write an equality test between two records, say out loud which
+field carries identity.** Six unrelated regions have had to answer that, and
+the answer is never the wording.
 
 A claim has its own handle, `ClaimRef`. Two stages of one programme can assert
 the same sentence about different endpoints, and merging them reports a claim
@@ -1463,97 +1431,41 @@ consequence worth knowing: `whySupported` can no longer answer about a
 proposition nobody has claimed — there is no handle for one — so *"has anyone
 claimed this?"* is `claimsAsserting` returning empty, which S-4 and S-1 assert.
 
-Prefer structure in the **query** over structure in the **stored model**.
-S-3's four gate states and per-criterion itemisation are computed, not
-stored, so there is no `Gate.status` field to maintain and no value anyone
-can set to "passed". Stored shape is where change gets expensive; queries are
-free to be wrong and re-run.
+#### Unwalked labels and edges
 
-#### Why unwalked labels and edges stay
+**A declared label or edge with no reader stays.** Every label is provisioned
+into every tenant, so structure nobody walks is a map of where the model makes
+a claim nothing has tested — and the map is worth more than the tidiness.
+`DEFERS` is the case: it had a reader and no writer, so the branch was
+unreachable, and when something finally entered it the branch reported
+`open: false` for a question deliberately left open. A cull would have deleted
+the map along with the error.
 
-**Do not cull unused labels or edges during domain discovery** (PJ-011 §6).
-Every label is provisioned into every tenant up front, so declared-but-never-
-walked structure is a computable map of where the model has untested claims —
-**There is no such example at label granularity.** As of S-18 every label in
-`EDGE_SCHEMA` has both a writer and a reader, and every node label is created
-by some verb — `DEFERS` was the last unwalked edge, and `CHALLENGES` before it;
-`PROMOTES` arrived with both. That is the outcome the policy exists to allow,
-twice over.
+The unit is the endpoint pair, not the label: `PRODUCES` has readers in
+abundance and every one ends at an `Evidence`, so
+`PRODUCES: ["EvidenceUnit", "Artefact"]` is written and never read. Named
+rather than culled, for the same reason.
 
-**There is one at endpoint-pair granularity, and the distinction was not being
-made until row AD's review found it.** `PRODUCES` has readers in abundance, and
-every one of them ends at an `Evidence`; the single traversal reaching an
-`Artefact` starts at a `Computation` (`write.ts`'s `outputArtefactOf`). So
-`PRODUCES: ["EvidenceUnit", "Artefact"]` — written by `recorded()`, carried
-through every tenant — **has a writer and no reader**. A label's entry in
-`EDGE_SCHEMA` is a list of endpoint pairs and each pair is a separate claim
-about the domain, so "the label is walked" is the wrong unit to check.
+This covers labels and edges. It does not protect query conveniences with no
+consumer — the per-tenant CQRS views went on exactly that distinction (see
+"No relational read side"). A property value is not covered either:
+`EvidenceUnit.role` has one writer and no readers, and its type says so —
+`role: ReadOnlyString<EvidenceUnitRole>`, per the string taxonomy in
+`src/db/domain.ts`, so what LabKit does with a stored string is readable where
+the property is declared rather than reconstructed by auditing every query.
 
-Named rather than culled, which is the policy working: an unwalked pair is a
-computable map of where the model has an untested claim, and an *unnamed* one is
-a map nobody has. Contrast it with `EvidenceUnit.role` — one writer, no readers
-— which was **not** given the same protection and had a tenth value declined,
-because that policy covers labels and edges as claims about the domain and a
-property value is not one. The two are the same shape at different levels and
-the policy's answer differs; that contrast is the informative part.
 
-**The type now carries that fact, so this paragraph does not have to be found
-first.** `role: ReadOnlyString<EvidenceUnitRole>` says in the declaration that
-nothing reads it — see the string taxonomy in `src/db/domain.ts`, whose whole
-purpose is that *what LabKit does with a stored string* should be readable
-where the property is declared rather than reconstructed by auditing every
-Cypher query.
+### One wrong answer at a time
 
-Keep the policy anyway, for what it caught on the way out. `DEFERS` had a
-reader that could report `closure: "deferred"` and no writer, so the branch was
-unreachable — and when S-14 finally entered it, the branch was **wrong in two
-ways**: it reported `open: false` for a question deliberately left open, under
-a token naming a state nothing could produce. Unwalked structure is a
-computable map of where the model has untested claims, and that claim was
-untested and false. A cull would have deleted the map along with the error.
+**At most one demonstrated wrong answer ships green, and clearing it is the
+next thing built.** One is a considered trade; two means the trade stopped
+being considered. Which issue holds that slot, if any, is the project board's
+P0 column and nowhere else.
 
-This protects **labels and edges**, which are claims about the domain. It does
-not protect query conveniences with no consumer — the per-tenant CQRS views
-were removed on exactly that distinction (see "No relational read side").
+A change that makes a second known defect worse nominates it too, demonstrated
+or not — otherwise fixing one thing quietly degrades another while the rule
+that would have caught it stops applying.
 
-### When a deferral stops being acceptable
-
-Recording two models and picking neither is the right move often enough that
-the stack of deferred rows grows on its own. PJ-012 named the failure mode it
-risks and PJ-013 found it still unaddressed:
-
-> the model stays technically undecided while the code quietly encodes one
-> reading anyway.
-
-Two rules, so this is checkable rather than remembered:
-
-1. **At most one confirmed wrong answer ships green at a time, and clearing it
-   is the next thing built.** A deferred row that records a *demonstrated*
-   wrong answer — not an empty result, not an ugly query — is a live defect
-   with a comment on it. One is a considered trade; two means the trade stopped
-   being considered. **A row whose severity is widened by the change that
-   cleared another row is nominated too, demonstrated or not** — otherwise
-   clearing one row can quietly make a second worse while the rule that would
-   have caught it stops applying, which is exactly what happened to row X when
-   S-3b cleared row V (PJ-017 §3). Which issue, if any, is currently the
-   demonstrated wrong answer is the project board's P0 column and nowhere
-   else — PJ-008b closed the ledger that used to hold it. A checker
-   held two copies of that status to each other until 2026-08-22; the copies
-   were deleted instead, and a fact in one place needs no checker.
-   Row AD held it for a few hours on
-   2026-08-21: `recordObservations()` minted no `EvidenceUnit`, so a question
-   worked on through observations alone reported itself as one nothing had ever
-   been run against. It was found by S-9b and cleared the same day, which is the
-   rule working at the speed it was written for. Before AD, row V was cleared by
-   S-3b (PJ-016) and row X — nominated under
-   exactly that widening rule, then demonstrated and cleared by S-3c (PJ-018) —
-   was the last. The nomination rule worked end to end: a row made worse by
-   another row's fix was named, built and closed, and the four scenarios X spent
-   unowned are the measure of what the rule is for.
-2. **Every deferred row names the scenario that would settle it.** A row that
-   cannot name one is not deferred, it is unresolved and unowned, and it should
-   say so in its own cell. "Record both and pick neither" is a decision about
-   *models*; it is not a decision to stop looking for the discriminator.
 
 ## Testing patterns
 
