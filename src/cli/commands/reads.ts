@@ -53,6 +53,7 @@ import { renderStanding } from "../views/standing";
 export function registerReads(program: Command, run: Run): void {
   program
     .command("now")
+    .helpGroup("What stands")
     .summary("show me what the programme says matters")
     .description(
       "Blocked gates and the work each protects, gates nobody " +
@@ -65,9 +66,9 @@ export function registerReads(program: Command, run: Run): void {
     .action(async ({ since }: { since?: number }) =>
       run(async ({ read }) => answer(await read.now(since), renderStanding)),
     );
-
   program
     .command("known")
+    .helpGroup("What stands")
     .summary("what the programme knows, now or as of a moment")
     .description(
       "What this research programme currently knows, partitioned by how well each answer is " +
@@ -88,9 +89,9 @@ export function registerReads(program: Command, run: Run): void {
           : answer(await read.whatIsKnown(), renderKnown),
       ),
     );
-
   program
     .command("why")
+    .helpGroup("What stands")
     .summary("why a record is in the state it's in")
     .description(
       "Dispatches on the handle's own kind: a claim (the findings resting under it, what " +
@@ -104,25 +105,9 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (subject: string) =>
       run(async ({ read }) => answer(await read.why(subject), renderWhyDispatch)),
     );
-
-  program
-    .command("claims")
-    .summary("which claims assert a sentence — text to handle")
-    .description(
-      "The one place wording is resolved. Returns every match rather than picking: two lines " +
-        "of enquiry can assert the same sentence about different endpoints, and they are two " +
-        "claims (S-5).",
-    )
-    .argument("<proposition>", "the sentence, as worded")
-    .action(async (proposition: string) =>
-      run(async ({ read }) => {
-        const claims = await read.claimsAsserting(proposition);
-        return answer(claims, (c, p) => renderClaims(c, proposition, p));
-      }),
-    );
-
   program
     .command("search")
+    .helpGroup("Finding a handle")
     .summary("every record containing this text — a second seam where wording is resolved")
     .description(
       "Substring, case-insensitive, across every Prose property in the string taxonomy. " +
@@ -136,23 +121,25 @@ export function registerReads(program: Command, run: Run): void {
         return answer(groups, (g, p) => renderSearch(g, text, p));
       }),
     );
-
   program
-    .command("conflict")
-    .summary("whether two conclusions actually disagree")
+    .command("claims")
+    .helpGroup("Finding a handle")
+    .summary("which claims assert a sentence — text to handle")
     .description(
-      "Contradiction, dissociation, or corroboration. Two analyses reaching opposite-sounding " +
-        "results are not in conflict if they asked about different endpoints, and this is what " +
-        "tells them apart.",
+      "The one place wording is resolved. Returns every match rather than picking: two lines " +
+        "of enquiry can assert the same sentence about different endpoints, and they are two " +
+        "claims (S-5).",
     )
-    .argument("<claim-a>", "the first claim's id", handle("claim"))
-    .argument("<claim-b>", "the second claim's id", handle("claim"))
-    .action(async (a, b) =>
-      run(async ({ read }) => answer(await read.doTheseConflict(a, b), renderConflict)),
+    .argument("<proposition>", "the sentence, as worded")
+    .action(async (proposition: string) =>
+      run(async ({ read }) => {
+        const claims = await read.claimsAsserting(proposition);
+        return answer(claims, (c, p) => renderClaims(c, proposition, p));
+      }),
     );
-
   program
     .command("pursuits")
+    .helpGroup("Finding a handle")
     .summary("the lines of enquiry under a question")
     .description(
       "How a caller that did not open an enquiry finds one to work in. An empty list means the " +
@@ -165,9 +152,9 @@ export function registerReads(program: Command, run: Run): void {
         return answer(enquiries, (e, p) => renderPursuits(e, question, p));
       }),
     );
-
   program
     .command("origin")
+    .helpGroup("Finding a handle")
     .summary("where a question came from, if it was sharpened")
     .description(
       "The question it narrowed, why, and what was known at that moment — frozen when the " +
@@ -181,23 +168,9 @@ export function registerReads(program: Command, run: Run): void {
         return answer(origin, (o, p) => renderOrigin(o, question, p));
       }),
     );
-
-  program
-    .command("enquiry")
-    .summary("is this enquiry open, and how did it close")
-    .description(
-      "Whether a line of enquiry is still open, and if not how it closed — answered, abandoned, " +
-        "or deliberately left open — with the answer and the evidence behind it. `why <id>` " +
-        "adds which of `known`'s five buckets this enquiry's own question currently sits in — " +
-        "did closing it move the bucket?",
-    )
-    .argument("<enquiry-id>", "e.g. LOE_7", handle("enquiry"))
-    .action(async (enquiry) =>
-      run(async ({ read }) => answer(await read.enquiryStatus(enquiry), renderEnquiry)),
-    );
-
   program
     .command("gates")
+    .helpGroup("What is blocked")
     .summary("every gate and whether it is satisfied")
     .description(
       "Where to start with a record you do not know. Every other gate command takes a " +
@@ -216,9 +189,9 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (opts: { state?: ReturnType<typeof gateState> }) =>
       run(async ({ read }) => answer(await read.gateList(opts.state), renderGateList)),
     );
-
   program
     .command("work")
+    .helpGroup("What is blocked")
     .summary("every planned piece of work and whether anything has been done")
     .description(
       "`--state planned` is what is ready to start: on the books, nothing blocking, no " +
@@ -232,9 +205,9 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (opts: { state?: ReturnType<typeof workState> }) =>
       run(async ({ read }) => answer(await read.workList(opts.state), renderWorkList)),
     );
-
   program
     .command("gate")
+    .helpGroup("What is blocked")
     .summary("is this gate satisfied, itemised per condition")
     .description(
       "Which checks passed, which failed, which were never run, and which have no standing " +
@@ -244,9 +217,9 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (gate) =>
       run(async ({ read }) => answer(await read.gateStatus(gate), renderGate)),
     );
-
   program
     .command("criteria")
+    .helpGroup("What is blocked")
     .summary("which conditions a gate is bound to")
     .description("Pair it with `gate` for their wording and their current standing.")
     .argument("<gate-id>", "e.g. GATE_1", handle("gate"))
@@ -256,9 +229,9 @@ export function registerReads(program: Command, run: Run): void {
         return answer(criteria, (c, p) => renderCriteria(c, gate, p));
       }),
     );
-
   program
     .command("design")
+    .helpGroup("What is blocked")
     .summary("how a gate's conditions were amended")
     .description(
       "Each amendment, its reason, and whether it was mechanical or substantive. Ordered from " +
@@ -268,9 +241,9 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (gate) =>
       run(async ({ read }) => answer(await read.designHistory(gate), renderDesign)),
     );
-
   program
     .command("contract")
+    .helpGroup("What is blocked")
     .summary("what a piece of planned work is for")
     .description(
       "Its objective, what would count as meeting it, and what it may read. Not enforced, and " +
@@ -280,9 +253,23 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (work) =>
       run(async ({ read }) => answer(await read.contractFor(work), renderContract)),
     );
-
+  program
+    .command("enquiry")
+    .helpGroup("One record's story")
+    .summary("is this enquiry open, and how did it close")
+    .description(
+      "Whether a line of enquiry is still open, and if not how it closed — answered, abandoned, " +
+        "or deliberately left open — with the answer and the evidence behind it. `why <id>` " +
+        "adds which of `known`'s five buckets this enquiry's own question currently sits in — " +
+        "did closing it move the bucket?",
+    )
+    .argument("<enquiry-id>", "e.g. LOE_7", handle("enquiry"))
+    .action(async (enquiry) =>
+      run(async ({ read }) => answer(await read.enquiryStatus(enquiry), renderEnquiry)),
+    );
   program
     .command("interpretation")
+    .helpGroup("One record's story")
     .summary("how a claim's reading was narrowed")
     .description(
       "The claims each step withdrew, the decision that narrowed them and why. One step can " +
@@ -294,9 +281,9 @@ export function registerReads(program: Command, run: Run): void {
         answer(await read.interpretationHistory(claim), renderInterpretation),
       ),
     );
-
   program
     .command("reproduction")
+    .helpGroup("One record's story")
     .summary("what a re-run read, against what its original read")
     .description(
       "It does not say whether the re-run reproduced the original: whether reading the same " +
@@ -307,9 +294,9 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (analysis) =>
       run(async ({ read }) => answer(await read.reproductionOf(analysis), renderReproduction)),
     );
-
   program
     .command("reproducibility")
+    .helpGroup("One record's story")
     .summary("whether an analysis can be accounted for")
     .description(
       "Each input lands in one of four buckets: rebuilt and identical, rebuilt and different, " +
@@ -323,9 +310,9 @@ export function registerReads(program: Command, run: Run): void {
         answer(await read.reproducibilityOf(analysis, parts.map(rebuilt)), renderReproducibility),
       ),
     );
-
   program
     .command("affects")
+    .helpGroup("One record's story")
     .summary("what depends on a record, if it turns out wrong")
     .description(
       "The claims and lines of enquiry reached from an artefact, walking downstream through " +
@@ -343,9 +330,23 @@ export function registerReads(program: Command, run: Run): void {
         ),
       ),
     );
-
+  program
+    .command("conflict")
+    .helpGroup("One record's story")
+    .summary("whether two conclusions actually disagree")
+    .description(
+      "Contradiction, dissociation, or corroboration. Two analyses reaching opposite-sounding " +
+        "results are not in conflict if they asked about different endpoints, and this is what " +
+        "tells them apart.",
+    )
+    .argument("<claim-a>", "the first claim's id", handle("claim"))
+    .argument("<claim-b>", "the second claim's id", handle("claim"))
+    .action(async (a, b) =>
+      run(async ({ read }) => answer(await read.doTheseConflict(a, b), renderConflict)),
+    );
   program
     .command("happened")
+    .helpGroup("What was done")
     .summary("the acts themselves, oldest first, with who ran them")
     .description(
       "The only command that answers from the event log rather than the record. Every other " +

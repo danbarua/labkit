@@ -60,6 +60,7 @@ import type { Globals } from "../session";
 export function registerServe(program: Command): void {
   program
     .command("mcp")
+    .helpGroup("Operating LabKit")
     .description("run the MCP server over stdio (for an agent, not a terminal)")
     .option(
       "--read-only",

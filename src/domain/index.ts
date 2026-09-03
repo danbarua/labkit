@@ -14,9 +14,11 @@ export { SessionCore } from "./core";
 export {
   READ_GROUPS,
   WRITE_GROUPS,
+  OPERATING_GROUPS,
   VERB_GROUPS,
   type ReadGroup,
   type WriteGroup,
+  type OperatingGroup,
   type VerbGroup,
 } from "./groups";
 export { systemClock, inMemoryEventLog, domainEvent, UNATTRIBUTED } from "./events";

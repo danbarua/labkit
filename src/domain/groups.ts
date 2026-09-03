@@ -48,9 +48,24 @@ export const WRITE_GROUPS = [
   "Stopping",
 ] as const;
 
+/**
+ * Groups the CLI has and MCP does not.
+ *
+ * Not every command is a research verb. `mcp` starts a server and `backup`
+ * (#253) will dump the record — a person at a terminal wants both, and an
+ * agent has no use for either, so they have no tool and no place in the two
+ * arrays above. Grouping them says that in the help rather than leaving them
+ * loose at the end of a list of verbs.
+ */
+export const OPERATING_GROUPS = [
+  /** Running and looking after the record itself, rather than doing research in it. */
+  "Operating LabKit",
+] as const;
+
 export type ReadGroup = (typeof READ_GROUPS)[number];
 export type WriteGroup = (typeof WRITE_GROUPS)[number];
-export type VerbGroup = ReadGroup | WriteGroup;
+export type OperatingGroup = (typeof OPERATING_GROUPS)[number];
+export type VerbGroup = ReadGroup | WriteGroup | OperatingGroup;
 
 /**
  * Every group, reads before writes.
@@ -58,4 +73,4 @@ export type VerbGroup = ReadGroup | WriteGroup;
  * A surface that shows reads and writes together renders in this order; one
  * that shows them apart uses the two arrays above.
  */
-export const VERB_GROUPS = [...READ_GROUPS, ...WRITE_GROUPS] as const;
+export const VERB_GROUPS = [...READ_GROUPS, ...WRITE_GROUPS, ...OPERATING_GROUPS] as const;
