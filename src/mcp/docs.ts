@@ -187,8 +187,27 @@ export function renderToolDocs(
   const writeNames = new Set(writes.map((t) => t.name));
   const sessionNames = new Set(sessions.map((t) => t.name));
   const anchor = (t: AnyTool) => `#${t.name.replace(/_/g, "-")}`;
-  const index = (list: readonly AnyTool[]) =>
-    list.map((t) => `- [\`${t.name}\`](${anchor(t)}) — ${t.title}`);
+  const entry = (t: AnyTool) => `- [\`${t.name}\`](${anchor(t)}) — ${t.title}`;
+  /**
+   * The index, under the group each tool declares.
+   *
+   * Groups appear in the order the array does rather than in a list written
+   * here: the array *is* the presentation order, and a second copy of it would
+   * be a second thing to keep in step.
+   */
+  const index = (list: readonly AnyTool[]) => {
+    const lines: string[] = [];
+    let current: string | undefined;
+    for (const t of list) {
+      if (t.group !== current) {
+        if (current !== undefined) lines.push("");
+        lines.push(`**${t.group}**`, "");
+        current = t.group;
+      }
+      lines.push(entry(t));
+    }
+    return lines;
+  };
 
   const lines = [
     "# LabKit — the tools",

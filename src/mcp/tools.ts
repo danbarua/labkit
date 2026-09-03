@@ -29,7 +29,7 @@
  */
 
 import { z } from "zod";
-import type { ReadSurface, WriteSurface } from "../domain";
+import type { ReadGroup, ReadSurface, WriteGroup, WriteSurface } from "../domain";
 import type { SessionRegistry } from "../attribution";
 import { ref, kindOf } from "../domain/report";
 import type { AnalysisRef, ObservationsRef } from "../domain";
@@ -83,6 +83,19 @@ import {
 export interface ToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly name: string;
   readonly title: string;
+  /**
+   * What a caller is doing when they reach for this — see `READ_GROUPS`.
+   *
+   * **Required, and it does not reach the client.** Measured against the SDK
+   * (2026-09-03): a `group` key is stripped from both the tool object and its
+   * `annotations`, where `readOnlyHint` survives. So what an agent sees of the
+   * grouping is the *order* of `tools/list` and whatever the descriptions say;
+   * this field orders that list and renders the sections of
+   * `labkit://docs/tools`. Required rather than optional because a tool added
+   * later would otherwise land in no group silently, which is the shape of
+   * every one-place-forgot defect here.
+   */
+  readonly group: ReadGroup;
   readonly description: string;
   readonly inputSchema: Shape;
   /**
@@ -104,6 +117,8 @@ export interface ToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
 export interface WriteToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly name: string;
   readonly title: string;
+  /** What a caller is doing when they reach for this — see `ToolDefinition.group`. */
+  readonly group: WriteGroup;
   readonly description: string;
   readonly inputSchema: Shape;
   readonly outputSchema: z.ZodType;
@@ -141,47 +156,9 @@ const EVIDENCE_PREFIX = "EV_";
 
 export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   tool({
-    name: "gate_list",
-    title: "List the gates",
-    description:
-      "Every gate, with what it is holding up and whether it is satisfied. Start here when " +
-      "you do not already hold a handle: every other gate tool takes one, and until this " +
-      "existed the only route to a gate ran through a claim, so a record with work planned " +
-      "and nothing analysed yet looked empty. Pass `state` to filter — `blocked` is what " +
-      "is stopping work, `never-evaluated` is a condition nobody has checked. Use " +
-      "`gate_status` for the itemised checks behind any one of them.",
-    inputSchema: {
-      state: z
-        .enum(["never-evaluated", "incomplete", "blocked", "satisfied"])
-        .optional()
-        .describe("only gates in this state (default: all of them)"),
-    },
-    outputSchema: gateListSchema,
-    handler: async (read, { state }) => ({ gates: await read.gateList(state) }),
-  }),
-  tool({
-    name: "work_list",
-    title: "List the planned work",
-    description:
-      "Every piece of planned work, with whether anything has been done against it. " +
-      "`planned` is on the books with no analysis and nothing blocking — what is ready to " +
-      "start. `blocked` means a gate protecting it has a **failed** condition; a gate whose " +
-      "conditions are merely never-evaluated or incomplete does not hold work back, so such " +
-      "work still reads `planned`. `carried-out` means " +
-      "an analysis implements it. Not the same question as `gate_list`: a gate reaches only " +
-      "the work it protects, and work planned without one appears nowhere else.",
-    inputSchema: {
-      state: z
-        .enum(["planned", "blocked", "carried-out"])
-        .optional()
-        .describe("only work in this state (default: all of it)"),
-    },
-    outputSchema: workListSchema,
-    handler: async (read, { state }) => ({ work: await read.workList(state) }),
-  }),
-  tool({
     name: "now",
     title: "What am I blocked on right now, what are my priorities",
+    group: "What stands",
     description:
       "Gates currently blocking work and the work each " +
       "protects, gates nobody has finished checking, planned work nothing has touched yet, " +
@@ -201,6 +178,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   tool({
     name: "known",
     title: "What the programme knows",
+    group: "What stands",
     description:
       "What this research programme currently knows, partitioned by how well each answer is " +
       "held up: established, provisional, accepted as unresolved, unresolved, untested. " +
@@ -228,28 +206,9 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   }),
 
   tool({
-    name: "why_supported",
-    title: "Why a conclusion counts as supported",
-    description:
-      "Why a proposition counts as supported (or does not): the findings resting under it, " +
-      "the findings bearing against it, the prespecified standard it is held to and which " +
-      "checks are unmet, what re-checked it, and what has been superseded. Three states " +
-      "share `supported: false` and the answer keeps them apart — nothing has examined it, " +
-      "evidence bears against it (`challenged`), or the record no longer asserts this " +
-      "wording (`withdrawn`, with `replacedBy`). Takes the claim's id, so there is nothing " +
-      "to disambiguate: two lines of enquiry asserting the same sentence are two claims and " +
-      "this answers about one of them. `record_analysis` hands the id back; `claims_asserting` " +
-      "finds one from text.",
-    inputSchema: {
-      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
-    },
-    outputSchema: supportExplanationSchema,
-    handler: (read, { claim }) => read.whySupported(ref("claim", claim)),
-  }),
-
-  tool({
     name: "why",
     title: "Why a record is in the state it's in",
+    group: "What stands",
     description:
       "Dispatches on the handle's own kind, over the report that already exists for it (#128, " +
       "redesigned on review): a claim (the same answer as `why_supported`, in the one uniform " +
@@ -272,8 +231,279 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   }),
 
   tool({
+    name: "why_supported",
+    title: "Why a conclusion counts as supported",
+    group: "What stands",
+    description:
+      "Why a proposition counts as supported (or does not): the findings resting under it, " +
+      "the findings bearing against it, the prespecified standard it is held to and which " +
+      "checks are unmet, what re-checked it, and what has been superseded. Three states " +
+      "share `supported: false` and the answer keeps them apart — nothing has examined it, " +
+      "evidence bears against it (`challenged`), or the record no longer asserts this " +
+      "wording (`withdrawn`, with `replacedBy`). Takes the claim's id, so there is nothing " +
+      "to disambiguate: two lines of enquiry asserting the same sentence are two claims and " +
+      "this answers about one of them. `record_analysis` hands the id back; `claims_asserting` " +
+      "finds one from text.",
+    inputSchema: {
+      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
+    },
+    outputSchema: supportExplanationSchema,
+    handler: (read, { claim }) => read.whySupported(ref("claim", claim)),
+  }),
+
+  tool({
+    name: "search",
+    title: "Every record containing this text",
+    group: "Finding a handle",
+    description:
+      "Substring, case-insensitive, across every Prose property in the string taxonomy. " +
+      "Returns every match grouped by label rather than picking one — a second seam where " +
+      "wording is resolved, narrower than by `claims_asserting`, which finds a claim by its " +
+      "exact asserted sentence and is cheaper when that is what you have.",
+    inputSchema: {
+      text: z.string().describe("the text to search for"),
+    },
+    outputSchema: searchSchema,
+    handler: async (read, { text }) => ({
+      groups: await read.search(text),
+    }),
+  }),
+
+  tool({
+    name: "claims_asserting",
+    title: "Which claims assert a proposition",
+    group: "Finding a handle",
+    description:
+      "The claims asserting a sentence. **The one place wording is resolved**: every other " +
+      "tool takes a claim id, and this is how a caller holding only text finds one. Returns " +
+      "all matches rather than picking — two lines of enquiry can assert the same sentence " +
+      "about different endpoints, and they are two claims. `conclude` hands back the claim id " +
+      "directly, so an agent that recorded the work never needs this.",
+    inputSchema: {
+      proposition: z.string().describe("the sentence, as worded"),
+    },
+    outputSchema: claimsAssertingSchema,
+    handler: async (read, { proposition }) => ({
+      claims: await read.claimsAsserting(proposition),
+    }),
+  }),
+
+  tool({
+    name: "pursuits_of",
+    title: "The lines of enquiry under a question",
+    group: "Finding a handle",
+    description:
+      "Every line of enquiry pursuing a question. This is how a caller that did not open " +
+      "an enquiry itself finds one to work in: `known` gives question ids, this gives the " +
+      "enquiry ids beneath them, and every recording verb takes an enquiry. An empty list " +
+      "means the question is on the books and nothing has been started on it.",
+    inputSchema: {
+      question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
+    },
+    outputSchema: pursuitsSchema,
+    handler: async (read, { question }) => ({
+      enquiries: await read.pursuitsOf(ref("question", question)),
+    }),
+  }),
+
+  tool({
+    name: "origin_of",
+    title: "Where a question came from",
+    group: "Finding a handle",
+    description:
+      "Where a question came from, when it came from sharpening an earlier one — the " +
+      "question it narrowed, why, and **what was known at that moment**, frozen when the " +
+      "sharpening was recorded rather than recomputed now. `origin` is null for a question " +
+      "somebody simply asked, which is most of them; that is an answer, not a failure.",
+    inputSchema: {
+      question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
+    },
+    outputSchema: originOfSchema,
+    handler: async (read, { question }) => ({
+      origin: await read.originOf(ref("question", question)),
+    }),
+  }),
+  tool({
+    name: "gate_list",
+    title: "List the gates",
+    group: "What is blocked",
+    description:
+      "Every gate, with what it is holding up and whether it is satisfied. Start here when " +
+      "you do not already hold a handle: every other gate tool takes one, and until this " +
+      "existed the only route to a gate ran through a claim, so a record with work planned " +
+      "and nothing analysed yet looked empty. Pass `state` to filter — `blocked` is what " +
+      "is stopping work, `never-evaluated` is a condition nobody has checked. Use " +
+      "`gate_status` for the itemised checks behind any one of them.",
+    inputSchema: {
+      state: z
+        .enum(["never-evaluated", "incomplete", "blocked", "satisfied"])
+        .optional()
+        .describe("only gates in this state (default: all of them)"),
+    },
+    outputSchema: gateListSchema,
+    handler: async (read, { state }) => ({ gates: await read.gateList(state) }),
+  }),
+
+  tool({
+    name: "gate_status",
+    title: "Whether a gate is satisfied, and on what",
+    group: "What is blocked",
+    description:
+      "A gate's state, itemised per condition: which checks passed, which failed, which were " +
+      "never run, and which have no standing verdict. **Computed, never stored** — there is " +
+      "no value anyone can set to `satisfied`, and `everFailed` survives a later pass, so a " +
+      "gate that failed and was re-checked does not read as though it never failed.",
+    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
+    outputSchema: gateStatusSchema,
+    handler: (read, { gate }) => read.gateStatus(ref("gate", gate)),
+  }),
+
+  tool({
+    name: "criteria_governing",
+    title: "Which conditions a gate is bound to",
+    group: "What is blocked",
+    description:
+      "The prespecified conditions a gate is governed by. Pair it with `gate_status` to get " +
+      "their current standing; this answers only which conditions apply.",
+    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
+    outputSchema: criteriaGoverningSchema,
+    handler: async (read, { gate }) => ({
+      criteria: await read.criteriaGoverning(ref("gate", gate)),
+    }),
+  }),
+  tool({
+    name: "design_history",
+    title: "How a gate's conditions were amended",
+    group: "What is blocked",
+    description:
+      "How the conditions on a gate reached their current wording: each amendment, its " +
+      "reason, and whether it was mechanical or substantive. Ordered from the record itself " +
+      "rather than from timestamps. Takes the gate's id — the conditions belong to the gate, " +
+      "so that is the handle, not the design's name.",
+    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
+    outputSchema: designHistorySchema,
+    handler: (read, { gate }) => read.designHistory(ref("gate", gate)),
+  }),
+  tool({
+    name: "work_list",
+    title: "List the planned work",
+    group: "What is blocked",
+    description:
+      "Every piece of planned work, with whether anything has been done against it. " +
+      "`planned` is on the books with no analysis and nothing blocking — what is ready to " +
+      "start. `blocked` means a gate protecting it has a **failed** condition; a gate whose " +
+      "conditions are merely never-evaluated or incomplete does not hold work back, so such " +
+      "work still reads `planned`. `carried-out` means " +
+      "an analysis implements it. Not the same question as `gate_list`: a gate reaches only " +
+      "the work it protects, and work planned without one appears nowhere else.",
+    inputSchema: {
+      state: z
+        .enum(["planned", "blocked", "carried-out"])
+        .optional()
+        .describe("only work in this state (default: all of it)"),
+    },
+    outputSchema: workListSchema,
+    handler: async (read, { state }) => ({ work: await read.workList(state) }),
+  }),
+
+  tool({
+    name: "contract_for",
+    title: "What a piece of planned work is for",
+    group: "What is blocked",
+    description:
+      "A planned piece of work's objective, what would count as meeting it, and what it may " +
+      "read. `enforced` is always false and says so: the record states what the work may " +
+      "look at, and nothing stops a computation reading elsewhere.",
+    inputSchema: { work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1`) },
+    outputSchema: taskContractSchema,
+    handler: (read, { work }) => read.contractFor(ref("work", work)),
+  }),
+
+  tool({
+    name: "enquiry_status",
+    title: "Whether a line of enquiry is open",
+    group: "One record's story",
+    description:
+      "Whether a line of enquiry is still open, and if not how it closed — answered, " +
+      "abandoned, or deliberately left open — with the answer and the evidence behind it.",
+    inputSchema: {
+      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
+    },
+    outputSchema: enquiryStatusSchema,
+    handler: (read, { enquiry }) => read.enquiryStatus(ref("enquiry", enquiry)),
+  }),
+
+  tool({
+    name: "interpretation_history",
+    title: "How a claim's reading was narrowed",
+    group: "One record's story",
+    description:
+      "How a claim's current reading was arrived at: the claims each step withdrew, the " +
+      "decision that narrowed them and why. Takes the claim's id and walks backwards. One " +
+      "step can withdraw several claims — two analyses reaching one reading are withdrawn " +
+      "together — so every step names records, not a sentence.",
+    inputSchema: {
+      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4`),
+    },
+    outputSchema: interpretationHistorySchema,
+    handler: (read, { claim }) => read.interpretationHistory(ref("claim", claim)),
+  }),
+
+  tool({
+    name: "reproduction_of",
+    title: "What a re-run read, against what its original read",
+    group: "One record's story",
+    description:
+      "What a verifying analysis re-checked, what each of the two runs read (in the order " +
+      "given, repeats included) and what differs between them. It does **not** say whether " +
+      "the re-run reproduced the original: whether reading the same records constitutes the " +
+      "same execution depends on what the method does, which the record does not know. " +
+      "`conclusion` says only whether the two runs' findings cut the same way. Takes the id " +
+      "of the analysis that did the verifying, not the one being verified.",
+    inputSchema: {
+      analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`),
+    },
+    outputSchema: reproductionReportSchema,
+    handler: (read, { analysis }) => read.reproductionOf(ref("analysis", analysis)),
+  }),
+
+  tool({
+    name: "reproducibility_of",
+    title: "Whether an analysis could be rebuilt from what it read",
+    group: "One record's story",
+    description:
+      "Whether an analysis's inputs can be accounted for, given hashes of whatever you have " +
+      "rebuilt. Each input lands in one of four buckets: rebuilt and identical, rebuilt and " +
+      "different, **unverifiable** (the record kept no hash, so nothing can be said), or not " +
+      "rebuilt at all. `unverifiable` is deliberately not a failure — it is the record " +
+      "admitting it cannot answer, which is different from answering no.",
+    inputSchema: {
+      analysis: z.string().describe(`analysis id, e.g. ${ANALYSIS_PREFIX}3`),
+      rebuilt: z
+        .array(
+          z.object({
+            part: z.string().describe(`the input's id, ${ARTEFACT_PREFIX}\u2026`),
+            hash: z.string().describe("the hash of your rebuilt copy"),
+          }),
+        )
+        .optional()
+        .describe("what you rebuilt, and its hash — omit to ask what the record can account for"),
+    },
+    outputSchema: reproducibilityReportSchema,
+    handler: (read, { analysis, rebuilt }) =>
+      read.reproducibilityOf(
+        ref("analysis", analysis),
+        ((rebuilt ?? []) as Array<{ part: string; hash: string }>).map((r) => ({
+          part: ref("observations", r.part),
+          hash: r.hash,
+        })),
+      ),
+  }),
+
+  tool({
     name: "what_depends_on",
     title: "What rests on a record",
+    group: "One record's story",
     description:
       "What would be affected if a record turned out to be wrong: the claims and lines of " +
       "enquiry reached from it, walking the pipeline downstream through every analysis built " +
@@ -291,65 +521,27 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   }),
 
   tool({
-    name: "enquiry_status",
-    title: "Whether a line of enquiry is open",
+    name: "do_these_conflict",
+    title: "Whether two conclusions actually disagree",
+    group: "One record's story",
     description:
-      "Whether a line of enquiry is still open, and if not how it closed — answered, " +
-      "abandoned, or deliberately left open — with the answer and the evidence behind it.",
+      "Whether two conclusions contradict each other, are about different things " +
+      "(`dissociation`), or agree. Two analyses reaching opposite-sounding results are not " +
+      "in conflict if they asked about different endpoints, and this is what tells them " +
+      "apart. Each side is named by its claim id — two claims can assert the same sentence " +
+      "about different endpoints, which is exactly the case this tool exists to report on.",
     inputSchema: {
-      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
+      a: z.string().describe(`the first claim's id, e.g. ${CLAIM_PREFIX}4`),
+      b: z.string().describe(`the second claim's id, e.g. ${CLAIM_PREFIX}7`),
     },
-    outputSchema: enquiryStatusSchema,
-    handler: (read, { enquiry }) => read.enquiryStatus(ref("enquiry", enquiry)),
-  }),
-  tool({
-    name: "design_history",
-    title: "How a gate's conditions were amended",
-    description:
-      "How the conditions on a gate reached their current wording: each amendment, its " +
-      "reason, and whether it was mechanical or substantive. Ordered from the record itself " +
-      "rather than from timestamps. Takes the gate's id — the conditions belong to the gate, " +
-      "so that is the handle, not the design's name.",
-    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
-    outputSchema: designHistorySchema,
-    handler: (read, { gate }) => read.designHistory(ref("gate", gate)),
-  }),
-
-  tool({
-    name: "interpretation_history",
-    title: "How a claim's reading was narrowed",
-    description:
-      "How a claim's current reading was arrived at: the claims each step withdrew, the " +
-      "decision that narrowed them and why. Takes the claim's id and walks backwards. One " +
-      "step can withdraw several claims — two analyses reaching one reading are withdrawn " +
-      "together — so every step names records, not a sentence.",
-    inputSchema: {
-      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4`),
-    },
-    outputSchema: interpretationHistorySchema,
-    handler: (read, { claim }) => read.interpretationHistory(ref("claim", claim)),
-  }),
-
-  tool({
-    name: "reproduction_of",
-    title: "What a re-run read, against what its original read",
-    description:
-      "What a verifying analysis re-checked, what each of the two runs read (in the order " +
-      "given, repeats included) and what differs between them. It does **not** say whether " +
-      "the re-run reproduced the original: whether reading the same records constitutes the " +
-      "same execution depends on what the method does, which the record does not know. " +
-      "`conclusion` says only whether the two runs' findings cut the same way. Takes the id " +
-      "of the analysis that did the verifying, not the one being verified.",
-    inputSchema: {
-      analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`),
-    },
-    outputSchema: reproductionReportSchema,
-    handler: (read, { analysis }) => read.reproductionOf(ref("analysis", analysis)),
+    outputSchema: conflictVerdictSchema,
+    handler: (read, { a, b }) => read.doTheseConflict(ref("claim", a), ref("claim", b)),
   }),
 
   tool({
     name: "what_happened",
     title: "What was done, and by whom",
+    group: "What was done",
     description:
       "The acts themselves, oldest first — **the only tool that answers from the event log " +
       "rather than the record**. Every other read tells you what is true now; this tells you " +
@@ -389,162 +581,6 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       })),
     }),
   }),
-
-  tool({
-    name: "claims_asserting",
-    title: "Which claims assert a proposition",
-    description:
-      "The claims asserting a sentence. **The one place wording is resolved**: every other " +
-      "tool takes a claim id, and this is how a caller holding only text finds one. Returns " +
-      "all matches rather than picking — two lines of enquiry can assert the same sentence " +
-      "about different endpoints, and they are two claims. `conclude` hands back the claim id " +
-      "directly, so an agent that recorded the work never needs this.",
-    inputSchema: {
-      proposition: z.string().describe("the sentence, as worded"),
-    },
-    outputSchema: claimsAssertingSchema,
-    handler: async (read, { proposition }) => ({
-      claims: await read.claimsAsserting(proposition),
-    }),
-  }),
-
-  tool({
-    name: "search",
-    title: "Every record containing this text",
-    description:
-      "Substring, case-insensitive, across every Prose property in the string taxonomy. " +
-      "Returns every match grouped by label rather than picking one — a second seam where " +
-      "wording is resolved, narrower than by `claims_asserting`, which finds a claim by its " +
-      "exact asserted sentence and is cheaper when that is what you have.",
-    inputSchema: {
-      text: z.string().describe("the text to search for"),
-    },
-    outputSchema: searchSchema,
-    handler: async (read, { text }) => ({
-      groups: await read.search(text),
-    }),
-  }),
-
-  tool({
-    name: "pursuits_of",
-    title: "The lines of enquiry under a question",
-    description:
-      "Every line of enquiry pursuing a question. This is how a caller that did not open " +
-      "an enquiry itself finds one to work in: `known` gives question ids, this gives the " +
-      "enquiry ids beneath them, and every recording verb takes an enquiry. An empty list " +
-      "means the question is on the books and nothing has been started on it.",
-    inputSchema: {
-      question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
-    },
-    outputSchema: pursuitsSchema,
-    handler: async (read, { question }) => ({
-      enquiries: await read.pursuitsOf(ref("question", question)),
-    }),
-  }),
-
-  tool({
-    name: "origin_of",
-    title: "Where a question came from",
-    description:
-      "Where a question came from, when it came from sharpening an earlier one — the " +
-      "question it narrowed, why, and **what was known at that moment**, frozen when the " +
-      "sharpening was recorded rather than recomputed now. `origin` is null for a question " +
-      "somebody simply asked, which is most of them; that is an answer, not a failure.",
-    inputSchema: {
-      question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
-    },
-    outputSchema: originOfSchema,
-    handler: async (read, { question }) => ({
-      origin: await read.originOf(ref("question", question)),
-    }),
-  }),
-
-  tool({
-    name: "contract_for",
-    title: "What a piece of planned work is for",
-    description:
-      "A planned piece of work's objective, what would count as meeting it, and what it may " +
-      "read. `enforced` is always false and says so: the record states what the work may " +
-      "look at, and nothing stops a computation reading elsewhere.",
-    inputSchema: { work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1`) },
-    outputSchema: taskContractSchema,
-    handler: (read, { work }) => read.contractFor(ref("work", work)),
-  }),
-
-  tool({
-    name: "criteria_governing",
-    title: "Which conditions a gate is bound to",
-    description:
-      "The prespecified conditions a gate is governed by. Pair it with `gate_status` to get " +
-      "their current standing; this answers only which conditions apply.",
-    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
-    outputSchema: criteriaGoverningSchema,
-    handler: async (read, { gate }) => ({
-      criteria: await read.criteriaGoverning(ref("gate", gate)),
-    }),
-  }),
-
-  tool({
-    name: "gate_status",
-    title: "Whether a gate is satisfied, and on what",
-    description:
-      "A gate's state, itemised per condition: which checks passed, which failed, which were " +
-      "never run, and which have no standing verdict. **Computed, never stored** — there is " +
-      "no value anyone can set to `satisfied`, and `everFailed` survives a later pass, so a " +
-      "gate that failed and was re-checked does not read as though it never failed.",
-    inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
-    outputSchema: gateStatusSchema,
-    handler: (read, { gate }) => read.gateStatus(ref("gate", gate)),
-  }),
-
-  tool({
-    name: "do_these_conflict",
-    title: "Whether two conclusions actually disagree",
-    description:
-      "Whether two conclusions contradict each other, are about different things " +
-      "(`dissociation`), or agree. Two analyses reaching opposite-sounding results are not " +
-      "in conflict if they asked about different endpoints, and this is what tells them " +
-      "apart. Each side is named by its claim id — two claims can assert the same sentence " +
-      "about different endpoints, which is exactly the case this tool exists to report on.",
-    inputSchema: {
-      a: z.string().describe(`the first claim's id, e.g. ${CLAIM_PREFIX}4`),
-      b: z.string().describe(`the second claim's id, e.g. ${CLAIM_PREFIX}7`),
-    },
-    outputSchema: conflictVerdictSchema,
-    handler: (read, { a, b }) => read.doTheseConflict(ref("claim", a), ref("claim", b)),
-  }),
-
-  tool({
-    name: "reproducibility_of",
-    title: "Whether an analysis could be rebuilt from what it read",
-    description:
-      "Whether an analysis's inputs can be accounted for, given hashes of whatever you have " +
-      "rebuilt. Each input lands in one of four buckets: rebuilt and identical, rebuilt and " +
-      "different, **unverifiable** (the record kept no hash, so nothing can be said), or not " +
-      "rebuilt at all. `unverifiable` is deliberately not a failure — it is the record " +
-      "admitting it cannot answer, which is different from answering no.",
-    inputSchema: {
-      analysis: z.string().describe(`analysis id, e.g. ${ANALYSIS_PREFIX}3`),
-      rebuilt: z
-        .array(
-          z.object({
-            part: z.string().describe(`the input's id, ${ARTEFACT_PREFIX}\u2026`),
-            hash: z.string().describe("the hash of your rebuilt copy"),
-          }),
-        )
-        .optional()
-        .describe("what you rebuilt, and its hash — omit to ask what the record can account for"),
-    },
-    outputSchema: reproducibilityReportSchema,
-    handler: (read, { analysis, rebuilt }) =>
-      read.reproducibilityOf(
-        ref("analysis", analysis),
-        ((rebuilt ?? []) as Array<{ part: string; hash: string }>).map((r) => ({
-          part: ref("observations", r.part),
-          hash: r.hash,
-        })),
-      ),
-  }),
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;
 
 /**
@@ -572,6 +608,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "pose",
     title: "Ask a question",
+    group: "Asking",
     description:
       "Put a question on the record without starting work on it. It appears in `known` as " +
       "untested — on the books, never pursued, which is not a failure and not an " +
@@ -582,8 +619,56 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
+    name: "open_enquiry",
+    title: "Ask a question and start on it",
+    group: "Asking",
+    description:
+      "Ask and pursue in one act — the usual way work begins. Records one event, not two: " +
+      "a researcher who opened an enquiry did one thing.",
+    inputSchema: { question: z.string().describe("the question, as asked") },
+    outputSchema: openedEnquirySchema,
+    handler: (write, { question }) => write.openEnquiry(question),
+  }),
+
+  writeTool({
+    name: "pursue",
+    title: "Open a line of enquiry on an existing question",
+    group: "Asking",
+    description:
+      "Start work on a question already on the record, naming the approach. A question may " +
+      "be pursued more than once, by different approaches, and they stay distinct.",
+    inputSchema: {
+      question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
+      approach: z.string().describe("how this line of enquiry means to answer it"),
+    },
+    outputSchema: pursuedSchema,
+    handler: (write, { question, approach }) =>
+      write.pursue({ question: ref("question", question), approach }),
+  }),
+
+  writeTool({
+    name: "sharpen",
+    title: "Narrow a question into a more precise one",
+    group: "Asking",
+    description:
+      "Replace a broad question with a sharper one, recording why. The sharper question is " +
+      "new; the original stays on the record, and the act freezes the findings it was taken " +
+      "in light of — so asking later what was known at the moment of sharpening gets the " +
+      "answer as it stood then, not as it stands now.",
+    inputSchema: {
+      from: z.string().describe(`id of the question being sharpened, e.g. ${QUESTION_PREFIX}1`),
+      into: z.string().describe("the sharper question, as asked"),
+      because: z.string().describe("why it was sharpened"),
+    },
+    outputSchema: sharpenedQuestionSchema,
+    handler: (write, { from, into, because }) =>
+      write.sharpen({ from: ref("question", from), into, because }),
+  }),
+
+  writeTool({
     name: "note",
     title: "Put a note on the record",
+    group: "Asking",
     description:
       "A dated, attributed record with nothing else required -- the one write with no " +
       "prerequisites besides `pose`. `search` reaches it like anything else with prose on it. " +
@@ -604,34 +689,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
-    name: "pursue",
-    title: "Open a line of enquiry on an existing question",
-    description:
-      "Start work on a question already on the record, naming the approach. A question may " +
-      "be pursued more than once, by different approaches, and they stay distinct.",
-    inputSchema: {
-      question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
-      approach: z.string().describe("how this line of enquiry means to answer it"),
-    },
-    outputSchema: pursuedSchema,
-    handler: (write, { question, approach }) =>
-      write.pursue({ question: ref("question", question), approach }),
-  }),
-
-  writeTool({
-    name: "open_enquiry",
-    title: "Ask a question and start on it",
-    description:
-      "Ask and pursue in one act — the usual way work begins. Records one event, not two: " +
-      "a researcher who opened an enquiry did one thing.",
-    inputSchema: { question: z.string().describe("the question, as asked") },
-    outputSchema: openedEnquirySchema,
-    handler: (write, { question }) => write.openEnquiry(question),
-  }),
-
-  writeTool({
     name: "record_observations",
     title: "Record what was measured",
+    group: "Doing the work",
     description:
       "Put measurement on the record without analysing it. This is the cheap act: capture " +
       "first, and analyse later if something ends up resting on it. `content_hash` is what " +
@@ -659,6 +719,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "record_analysis",
     title: "Record a computation and what it read",
+    group: "Doing the work",
     description:
       "Records the run: a computation, what it read, and an artefact to hold its output. Call " +
       "`conclude` for each finding it reached; an analysis with none yet is a valid state. " +
@@ -695,49 +756,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
-    name: "close_enquiry",
-    title: "Close a line of enquiry",
-    description:
-      "Close an enquiry, answered or abandoned. Give `answered_by` — the id of the claim " +
-      "that answers it — to close it as answered; omit it to abandon. The claim carries the " +
-      "polarity, so a question answered *no* closes as answered, not abandoned. Closing an " +
-      "already-closed enquiry is refused rather than recorded twice.",
-    inputSchema: {
-      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
-      answered_by: z
-        .string()
-        .optional()
-        .describe(`id of the claim that answers it, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
-    },
-    outputSchema: closedEnquirySchema,
-    handler: (write, { enquiry, answered_by }) =>
-      write.closeEnquiry({
-        enquiry: ref("enquiry", enquiry),
-        ...(answered_by === undefined ? {} : { answeredBy: ref("claim", answered_by) }),
-      }),
-  }),
-
-  writeTool({
-    name: "sharpen",
-    title: "Narrow a question into a more precise one",
-    description:
-      "Replace a broad question with a sharper one, recording why. The sharper question is " +
-      "new; the original stays on the record, and the act freezes the findings it was taken " +
-      "in light of — so asking later what was known at the moment of sharpening gets the " +
-      "answer as it stood then, not as it stands now.",
-    inputSchema: {
-      from: z.string().describe(`id of the question being sharpened, e.g. ${QUESTION_PREFIX}1`),
-      into: z.string().describe("the sharper question, as asked"),
-      because: z.string().describe("why it was sharpened"),
-    },
-    outputSchema: sharpenedQuestionSchema,
-    handler: (write, { from, into, because }) =>
-      write.sharpen({ from: ref("question", from), into, because }),
-  }),
-
-  writeTool({
     name: "conclude",
     title: "Assert one thing an analysis found",
+    group: "Doing the work",
     description:
       "One conclusion per call. `replacing` supersedes exactly one earlier finding, named by " +
       "its claim or evidence id, and inherits its `proposition` and `bearing`; a conclusion " +
@@ -790,6 +811,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "record_review",
     title: "Record a verdict on an analysis",
+    group: "Doing the work",
     description:
       "Put a review of an analysis on the record. A retraction later rests on the review " +
       "that justified it, so this is what `replace_analysis` cites.",
@@ -804,6 +826,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "plan_work",
     title: "State an objective and what would count as meeting it",
+    group: "Saying in advance what counts",
     description:
       "Record planned work: what it is for, and what acceptance looks like. `may_read` names " +
       "what the work is allowed to look at — a contract, not an enforcement: nothing stops a " +
@@ -835,6 +858,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "state_criterion",
     title: "State a condition, before anything is run",
+    group: "Saying in advance what counts",
     description:
       "Put a prespecified condition on the record. Stating it separately is what makes it " +
       "prespecified: a criterion named at evaluation time cannot express the case that " +
@@ -849,6 +873,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "declare_gate",
     title: "Bind conditions to the work they gate",
+    group: "Saying in advance what counts",
     description:
       "Declare that some work is gated on some criteria, and say what the gate is for. The " +
       "gate's state is computed from its criteria's evaluations, never stored — there is no " +
@@ -884,6 +909,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "evaluate_criterion",
     title: "Record a check's outcome",
+    group: "Saying in advance what counts",
     description:
       "Record that a prespecified condition was checked and what it gave. Cite the analysis " +
       "and proposition the verdict rests on where there is one; a verdict citing nothing is " +
@@ -910,8 +936,137 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
+    name: "amend_design",
+    title: "Change a locked condition, and say what it costs",
+    group: "Saying in advance what counts",
+    description:
+      "Reword a prespecified criterion after work has begun, citing what prompted it. The " +
+      "answer says whether the change was **mechanical** (a repair that moves nothing) or " +
+      "**scientific** (one that does), and names the confirmatory results affected — the " +
+      "difference between a legitimate repair and p-hacking, decided from the record rather " +
+      "than from the author's account of it.",
+    inputSchema: {
+      criterion: z.string().describe(`criterion id, e.g. ${CRITERION_PREFIX}1`),
+      now_requires: z.string().describe("the new wording"),
+      because: z.string().describe("why it is being amended"),
+      citing: z.string().describe(`id of the claim prompting the amendment, e.g. ${CLAIM_PREFIX}4`),
+    },
+    outputSchema: amendmentReportSchema,
+    handler: (write, { criterion, now_requires, because, citing }) =>
+      write.amendDesign({
+        criterion: ref("criterion", criterion),
+        nowRequires: now_requires,
+        because,
+        citing: ref("claim", citing),
+      }),
+  }),
+
+  writeTool({
+    name: "is",
+    title: "Record what a claim now is",
+    group: "Revising",
+    description:
+      "Put a claim into a state its evidence does not carry, and say what put it there. " +
+      "`undecided`: the analysis produced a real finding and it settles the proposition neither " +
+      "way — use it instead of choosing the less wrong bearing, and `why` then reports neither " +
+      "supports nor challenges while the question stays `unresolved` rather than counting as " +
+      "answered. `confirmed`: the finding is something others may build on, which moves a " +
+      "question answered on it from `provisional` to `established`. Capture cheaply; confirm " +
+      "before citing.",
+    inputSchema: {
+      claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
+      state: z.enum(["undecided", "confirmed"]).describe("the state to record"),
+      because: z
+        .string()
+        .describe(
+          `for undecided, the id of the finding that left it open, e.g. ${EVIDENCE_PREFIX}7; ` +
+            "for confirmed, a sentence saying what justifies vouching for it",
+        ),
+    },
+    outputSchema: restatedSchema,
+    handler: (write, { claim, state, because }) =>
+      write.is(
+        state === "confirmed"
+          ? { claim: ref("claim", claim), state, because }
+          : { claim: ref("claim", claim), state, because: ref("evidence", because) },
+      ),
+  }),
+
+  writeTool({
+    name: "keep",
+    title: "Revise an analysis, naming the conclusions that survive",
+    group: "Revising",
+    description:
+      "Records a successor to the analysis those claims came from, supersedes every other " +
+      "conclusion of it, and carries the named ones forward on their original evidence — " +
+      "`why` on a kept claim still rests on the run that produced the number. Record the " +
+      "successor's own findings with `conclude`. The successor reads what its predecessor " +
+      "read; `from` adds to that. Answers with what was superseded, which is the complement " +
+      "of what you named.",
+    inputSchema: {
+      keeping: z
+        .array(z.string())
+        .describe(
+          `ids of the conclusions that survive, e.g. ${CLAIM_PREFIX}6 — all from one analysis`,
+        ),
+      because: z
+        .string()
+        .describe(`id of the review that found it wanting, e.g. ${REVIEW_PREFIX}1`),
+      method: z.string().describe("what the revision did differently"),
+      from: z
+        .array(z.string())
+        .optional()
+        .describe(
+          `ids the successor read in ADDITION to its predecessor's — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
+        ),
+    },
+    outputSchema: replacementReportSchema,
+    handler: (write, { keeping, because, method, from }) =>
+      write.keep({
+        keeping: (keeping as string[]).map((id) => ref("claim", id)),
+        because: ref("review", because),
+        method,
+        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
+      }),
+  }),
+
+  writeTool({
+    name: "replace_analysis",
+    title: "Supersede a defective analysis",
+    group: "Revising",
+    description:
+      "Record a corrected analysis in place of a defective one, citing the review that " +
+      "justified the retraction, and the lineage between them. **Every conclusion of the " +
+      "superseded analysis falls here** — use `keep` instead to carry some of them forward. " +
+      "Record the successor's own findings with `conclude`. It reads what its predecessor " +
+      "read; `from` adds to that.",
+    inputSchema: {
+      supersedes: z
+        .string()
+        .describe(`id of the analysis being replaced, e.g. ${ANALYSIS_PREFIX}2`),
+      because: z.string().describe(`id of the review justifying it, e.g. ${REVIEW_PREFIX}1`),
+      method: z.string().describe("what the replacement did"),
+      from: z
+        .array(z.string())
+        .optional()
+        .describe(
+          `ids the replacement read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
+        ),
+    },
+    outputSchema: replacementReportSchema,
+    handler: (write, { supersedes, because, method, from }) =>
+      write.replaceAnalysis({
+        supersedes: ref("analysis", supersedes),
+        because: ref("review", because),
+        method,
+        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
+      }),
+  }),
+
+  writeTool({
     name: "reverify",
     title: "Re-run a historical analysis under current observations",
+    group: "Revising",
     description:
       "Record that an earlier analysis was checked again against observations available now. " +
       "This is **not** reproduction: reproduction asks whether the same inputs give the same " +
@@ -965,8 +1120,56 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
+    name: "reinterpret",
+    title: "Narrow what a claim is taken to mean",
+    group: "Revising",
+    description:
+      "Record that a claim's reading has been narrowed — the evidence is unchanged, what it " +
+      "is taken to show is not. The answer says whether anything resting on the old reading " +
+      "needs recomputing. Takes the claim's id, so there is nothing to disambiguate: two " +
+      "lines of enquiry asserting the same sentence are two claims and this names one.",
+    inputSchema: {
+      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
+      as: z.string().describe("the narrower reading"),
+      because: z.string().describe("why it is being narrowed"),
+    },
+    outputSchema: reinterpretationReportSchema,
+    handler: (write, { claim, as: narrower, because }) =>
+      write.reinterpret({
+        of: ref("claim", claim),
+        as: narrower,
+        because,
+      }),
+  }),
+
+  writeTool({
+    name: "close_enquiry",
+    title: "Close a line of enquiry",
+    group: "Stopping",
+    description:
+      "Close an enquiry, answered or abandoned. Give `answered_by` — the id of the claim " +
+      "that answers it — to close it as answered; omit it to abandon. The claim carries the " +
+      "polarity, so a question answered *no* closes as answered, not abandoned. Closing an " +
+      "already-closed enquiry is refused rather than recorded twice.",
+    inputSchema: {
+      enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
+      answered_by: z
+        .string()
+        .optional()
+        .describe(`id of the claim that answers it, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
+    },
+    outputSchema: closedEnquirySchema,
+    handler: (write, { enquiry, answered_by }) =>
+      write.closeEnquiry({
+        enquiry: ref("enquiry", enquiry),
+        ...(answered_by === undefined ? {} : { answeredBy: ref("claim", answered_by) }),
+      }),
+  }),
+
+  writeTool({
     name: "accept_as_unresolved",
     title: "Leave a question open on purpose",
+    group: "Stopping",
     description:
       "Close a line of enquiry as deliberately unresolved: worked on, not settled, and left " +
       "that way with the condition that would reopen it. Its own state, not an abandonment " +
@@ -985,152 +1188,6 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         because,
         until,
         inLightOf: ref("claim", in_light_of),
-      }),
-  }),
-
-  writeTool({
-    name: "is",
-    title: "Record what a claim now is",
-    description:
-      "Put a claim into a state its evidence does not carry, and say what put it there. " +
-      "`undecided`: the analysis produced a real finding and it settles the proposition neither " +
-      "way — use it instead of choosing the less wrong bearing, and `why` then reports neither " +
-      "supports nor challenges while the question stays `unresolved` rather than counting as " +
-      "answered. `confirmed`: the finding is something others may build on, which moves a " +
-      "question answered on it from `provisional` to `established`. Capture cheaply; confirm " +
-      "before citing.",
-    inputSchema: {
-      claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
-      state: z.enum(["undecided", "confirmed"]).describe("the state to record"),
-      because: z
-        .string()
-        .describe(
-          `for undecided, the id of the finding that left it open, e.g. ${EVIDENCE_PREFIX}7; ` +
-            "for confirmed, a sentence saying what justifies vouching for it",
-        ),
-    },
-    outputSchema: restatedSchema,
-    handler: (write, { claim, state, because }) =>
-      write.is(
-        state === "confirmed"
-          ? { claim: ref("claim", claim), state, because }
-          : { claim: ref("claim", claim), state, because: ref("evidence", because) },
-      ),
-  }),
-
-  writeTool({
-    name: "amend_design",
-    title: "Change a locked condition, and say what it costs",
-    description:
-      "Reword a prespecified criterion after work has begun, citing what prompted it. The " +
-      "answer says whether the change was **mechanical** (a repair that moves nothing) or " +
-      "**scientific** (one that does), and names the confirmatory results affected — the " +
-      "difference between a legitimate repair and p-hacking, decided from the record rather " +
-      "than from the author's account of it.",
-    inputSchema: {
-      criterion: z.string().describe(`criterion id, e.g. ${CRITERION_PREFIX}1`),
-      now_requires: z.string().describe("the new wording"),
-      because: z.string().describe("why it is being amended"),
-      citing: z.string().describe(`id of the claim prompting the amendment, e.g. ${CLAIM_PREFIX}4`),
-    },
-    outputSchema: amendmentReportSchema,
-    handler: (write, { criterion, now_requires, because, citing }) =>
-      write.amendDesign({
-        criterion: ref("criterion", criterion),
-        nowRequires: now_requires,
-        because,
-        citing: ref("claim", citing),
-      }),
-  }),
-
-  writeTool({
-    name: "keep",
-    title: "Revise an analysis, naming the conclusions that survive",
-    description:
-      "Records a successor to the analysis those claims came from, supersedes every other " +
-      "conclusion of it, and carries the named ones forward on their original evidence — " +
-      "`why` on a kept claim still rests on the run that produced the number. Record the " +
-      "successor's own findings with `conclude`. The successor reads what its predecessor " +
-      "read; `from` adds to that. Answers with what was superseded, which is the complement " +
-      "of what you named.",
-    inputSchema: {
-      keeping: z
-        .array(z.string())
-        .describe(
-          `ids of the conclusions that survive, e.g. ${CLAIM_PREFIX}6 — all from one analysis`,
-        ),
-      because: z
-        .string()
-        .describe(`id of the review that found it wanting, e.g. ${REVIEW_PREFIX}1`),
-      method: z.string().describe("what the revision did differently"),
-      from: z
-        .array(z.string())
-        .optional()
-        .describe(
-          `ids the successor read in ADDITION to its predecessor's — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
-        ),
-    },
-    outputSchema: replacementReportSchema,
-    handler: (write, { keeping, because, method, from }) =>
-      write.keep({
-        keeping: (keeping as string[]).map((id) => ref("claim", id)),
-        because: ref("review", because),
-        method,
-        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
-      }),
-  }),
-
-  writeTool({
-    name: "replace_analysis",
-    title: "Supersede a defective analysis",
-    description:
-      "Record a corrected analysis in place of a defective one, citing the review that " +
-      "justified the retraction, and the lineage between them. **Every conclusion of the " +
-      "superseded analysis falls here** — use `keep` instead to carry some of them forward. " +
-      "Record the successor's own findings with `conclude`. It reads what its predecessor " +
-      "read; `from` adds to that.",
-    inputSchema: {
-      supersedes: z
-        .string()
-        .describe(`id of the analysis being replaced, e.g. ${ANALYSIS_PREFIX}2`),
-      because: z.string().describe(`id of the review justifying it, e.g. ${REVIEW_PREFIX}1`),
-      method: z.string().describe("what the replacement did"),
-      from: z
-        .array(z.string())
-        .optional()
-        .describe(
-          `ids the replacement read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
-        ),
-    },
-    outputSchema: replacementReportSchema,
-    handler: (write, { supersedes, because, method, from }) =>
-      write.replaceAnalysis({
-        supersedes: ref("analysis", supersedes),
-        because: ref("review", because),
-        method,
-        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
-      }),
-  }),
-
-  writeTool({
-    name: "reinterpret",
-    title: "Narrow what a claim is taken to mean",
-    description:
-      "Record that a claim's reading has been narrowed — the evidence is unchanged, what it " +
-      "is taken to show is not. The answer says whether anything resting on the old reading " +
-      "needs recomputing. Takes the claim's id, so there is nothing to disambiguate: two " +
-      "lines of enquiry asserting the same sentence are two claims and this names one.",
-    inputSchema: {
-      claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
-      as: z.string().describe("the narrower reading"),
-      because: z.string().describe("why it is being narrowed"),
-    },
-    outputSchema: reinterpretationReportSchema,
-    handler: (write, { claim, as: narrower, because }) =>
-      write.reinterpret({
-        of: ref("claim", claim),
-        as: narrower,
-        because,
       }),
   }),
 ] as ReadonlyArray<WriteToolDefinition<z.ZodRawShape>>;
@@ -1156,6 +1213,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
 export interface SessionToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly name: string;
   readonly title: string;
+  /** What a caller is doing when they reach for this — see `ToolDefinition.group`. */
+  readonly group: WriteGroup;
   readonly description: string;
   readonly inputSchema: Shape;
   readonly outputSchema: z.ZodType;
@@ -1173,11 +1232,12 @@ export const SESSION_TOOLS: readonly SessionToolDefinition<z.ZodRawShape>[] = [
   sessionTool({
     name: "register_session",
     title: "Say who you are",
+    group: "Before anything",
     description:
-      "Record which agent is on the other end of this connection, so every write that " +
-      "follows is stamped with it. Call this once, before writing anything: the write " +
-      "tools refuse until you have, because an entry nobody signed is worse than no " +
-      "entry — it looks attributed and is not. LabKit does not check the id and cannot: " +
+      "Call this first: every write tool refuses until you have. It records which agent " +
+      "is on the other end of this connection, so every write that follows is stamped " +
+      "with it — an entry nobody signed is worse than no entry, because it looks " +
+      "attributed and is not. LabKit does not check the id and cannot: " +
       "it records what you tell it. Pass the session id your harness gives you (from " +
       "`agent-bus whoami`, where there is one) so the same session is nameable in every " +
       "tool that logs about it. Registering again replaces the previous answer.",
