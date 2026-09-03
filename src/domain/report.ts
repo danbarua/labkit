@@ -627,11 +627,10 @@ export interface GateStatus {
   /**
    * How many checks are in each state — every state present, zero included.
    *
-   * The tally rather than the reader's job: the first consumer to meet a
-   * 107-criterion gate reached for `jq '.checks[].state' | sort | uniq -c`
-   * before it could act, and a report that makes its reader count answered a
-   * different question than the one asked. Every key is present at zero, so an
-   * absent state cannot read as one nobody asked about.
+   * The tally rather than the reader's job: a gate may govern a hundred
+   * conditions, and a reader that has to count them before it can act was
+   * answered a different question than the one it asked. Every key is present
+   * at zero, so an absent state cannot read as one nobody asked about.
    */
   counts: Record<CheckStatus["state"], number>;
   /** Conditions not currently passing — what would have to change. Named before anyone spends the compute. */
@@ -672,13 +671,13 @@ export interface CheckStatus {
  * Which evaluation decided a check, and when — **without its `value`**.
  *
  * The value is the sentence someone typed when they decided the check, and on
- * a gate governing many criteria it is the whole of the answer's size: 107
- * criteria on this repo's own record carry 60,351 bytes of it, against about
- * 6KB for the handles and outcomes beside them. A gate is asked *what state is
- * everything in*; the sentences are a different question about one criterion.
+ * a gate governing many conditions it is most of the answer's size — an order
+ * of magnitude more than the handles and outcomes beside it. A gate is asked
+ * *what state is everything in*; the sentences are a different question about
+ * one condition.
  *
- * The handle is what makes that a pointer rather than a loss — see #241, and
- * `search` for reaching one by its text.
+ * The handle is what makes that a pointer rather than a loss: `why
+ * <criterion>` reads it, and `search` reaches one by its text.
  */
 export interface DecidingEvaluation {
   evaluation: EvaluationRef;
@@ -1624,9 +1623,9 @@ export interface AnalysisExplanation {
  * governs.
  *
  * **The detail a gate's page sheds.** `GateStatus` answers what state every
- * condition is in; this answers what was actually said about one of them, and
- * the two are different questions asked at different moments — the split is
- * what let a 107-criterion gate answer at all (#241).
+ * condition is in; this answers what was actually said about one of them. They
+ * are different questions, and a gate governing many conditions cannot carry
+ * both.
  */
 export interface CriterionStanding {
   criterion: CriterionRef;

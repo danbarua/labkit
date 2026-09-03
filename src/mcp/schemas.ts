@@ -306,7 +306,7 @@ const condition = z.strictObject({
   requires: z.string(),
 });
 
-/** No `value` — see `DecidingEvaluation`, and #241 for what it cost. */
+/** No `value` — see `DecidingEvaluation`. */
 const decidingEvaluation = z.strictObject({
   evaluation: ref("evaluation"),
   outcome: z.enum(["pass", "fail"]),

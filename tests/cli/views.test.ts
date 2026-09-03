@@ -26,6 +26,7 @@ import { PLAIN, palette } from "../../src/cli/palette";
 import {
   renderKnown,
   renderWhy,
+  renderWhyDispatch,
   renderClaims,
   renderConflict,
 } from "../../src/cli/views/knowledge";
@@ -36,6 +37,7 @@ import { renderHappened } from "../../src/cli/views/events";
 import type {
   ConflictVerdict,
   DomainEvent,
+  Explanation,
   EnquiryStatus,
   GateStatus,
   KnowledgeSurvey,
@@ -599,4 +601,49 @@ test("a write command's handle is never coloured, even forced", () => {
   // that a handle-only answer never takes the palette at all.
   expect(asHandles(["CRIT_1", "CLM_2"], COLOUR)).toBe("CRIT_1\nCLM_2");
   expect(asHandles(["CRIT_1"], COLOUR)).toBe(asHandles(["CRIT_1"], PLAIN));
+});
+
+test("an evaluation with no basis reads as asserted, not as measured", () => {
+  // Empty `basis` means the verdict was asserted, not measured (report.ts's
+  // EvaluationRecord.basis doc comment) -- the page renders that distinction
+  // rather than printing an asserted verdict the same as a cited one.
+  //
+  // It reads off `why <criterion>`, which is where a verdict's text lives; a
+  // gate's page carries states, so it never had the basis to render.
+  const explanation: Explanation = {
+    kind: "criterion",
+    subject: ref("criterion", "CRIT_1"),
+    is: "passed",
+    because: [
+      {
+        handle: ref("evaluation", "CEVAL_1"),
+        wording: "passed: 0.61 — asserted",
+        when: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        // Same value and outcome as CEVAL_1 on purpose: if the two lines
+        // differed only because 0.61 != 0.31, this would pass even with the
+        // basis-driven suffix broken or missing entirely. Identical values
+        // mean the only thing that can make the lines differ is basis.
+        handle: ref("evaluation", "CEVAL_2"),
+        wording: "passed: 0.61 — resting on cracks at 40MPa (EV_1)",
+        when: "2026-03-01T00:00:00.000Z",
+      },
+    ],
+    report: {
+      criterion: ref("criterion", "CRIT_1"),
+      requires: "the effect holds at n>=20",
+      state: "passed",
+      evaluations: [],
+      governs: [],
+    },
+  };
+  const out = renderWhyDispatch(explanation, PLAIN);
+  expect(out).toContain("asserted");
+  // Its evidence needs something the next command can take, same as enquiry.
+  expect(out).toContain("(EV_1)");
+  // The two verdicts must not read alike -- an asserted one is not a synonym
+  // for "rests on nothing named" the way a cited one's finding text would be.
+  const lines = out.split("\n").filter((l) => l.includes("CEVAL_"));
+  expect(lines[0]).not.toBe(lines[1]);
 });

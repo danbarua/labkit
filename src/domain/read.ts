@@ -1237,12 +1237,16 @@ export class ReadSurface extends SessionCore {
     // The gates it governs, and what each protects. A separate read because
     // it is a different grain -- per gate, not per criterion.
     const governed = await this.graph.query(
+      // `GATES`, and the target is deliberately unlabelled: a gate reaches a
+      // Task or a Computation, and `gateStatus` reads the same edge the same
+      // way. Naming a label a gate does not use binds nothing and reports it
+      // as nothing protected.
       `MATCH (c:Criterion {natural_id: $id})-[:GOVERNS]->(g:Gate)
-       OPTIONAL MATCH (g)-[:BLOCKS]->(w:Task)
+       OPTIONAL MATCH (g)-[:GATES]->(w)
        RETURN g, w`,
       {
         g: vertexProps<{ natural_id: string; consequence: string }>(),
-        w: optional(vertexProps<{ natural_id: string; objective: string }>()),
+        w: optional(vertexProps<{ objective?: string } & Identified>()),
       },
       { id: criterion },
     );
@@ -1254,7 +1258,10 @@ export class ReadSurface extends SessionCore {
         protecting: [] as GatedWork[],
       };
       if (r.w)
-        existing.protecting.push({ work: ref("work", r.w.natural_id), objective: r.w.objective });
+        existing.protecting.push({
+          work: ref("work", r.w.natural_id),
+          objective: r.w.objective ?? "",
+        });
       byGate.set(r.g.natural_id, existing);
     }
 
@@ -2809,8 +2816,7 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
  *
  * **The detail `gate` sheds.** A gate's page answers what state every
  * condition is in and deliberately carries no verdict text; this is where the
- * text lives, one criterion at a time — which is the shape the first consumer
- * to meet a 107-criterion gate built by hand out of a 299KB answer (#241).
+ * text lives, one criterion at a time.
  *
  * The evaluations are **not** scoped to a gate: one criterion can govern
  * several and be evaluated separately against each, so a reader asking about
@@ -2831,7 +2837,15 @@ async function explainCriterion(self: ReadSurface, subject: string): Promise<Cri
   // the state, and the handle is what the next command takes.
   const because: Cause[] = [...report.evaluations].reverse().map((e) => ({
     handle: e.evaluation,
-    wording: `${e.outcome === "pass" ? "passed" : "failed"}: ${e.value}${e.withdrawn ? " (withdrawn)" : ""}`,
+    // **Whether a verdict rested on anything is part of what it says.** An
+    // empty `basis` means it was asserted rather than measured, and printing
+    // the two alike would make a judgement read as a reading.
+    wording:
+      `${e.outcome === "pass" ? "passed" : "failed"}: ${e.value}` +
+      `${e.withdrawn ? " (withdrawn)" : ""}` +
+      (e.basis.length === 0
+        ? " — asserted"
+        : ` — resting on ${e.basis.map((f) => `${f.states} (${f.evidence})`).join("; ")}`),
     when: e.at,
   }));
   return {

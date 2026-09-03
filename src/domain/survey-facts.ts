@@ -324,9 +324,8 @@ function recordsOf(
  *
  * Separate from {@link checkStatusOver} because the two are asked different
  * questions: a gate wants each check's *state*, and a reader looking at one
- * criterion wants what was actually said. Splitting them is what let the gate
- * answer shrink (#241); sharing `recordsOf` is what keeps the ordering one
- * rule rather than two.
+ * criterion wants what was actually said. Sharing `recordsOf` is what keeps
+ * the ordering one rule rather than two.
  */
 export function evaluationsOver(verdicts: Leaf<Verdict>): Derived<EvaluationRecord[]> {
   return {
