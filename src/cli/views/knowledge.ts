@@ -103,6 +103,7 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
  * boundary, after the read surface had got it right.
  */
 export function renderWhy(why: SupportExplanation, p: Palette): string {
+  const undecided = why.standing === "undecided";
   // Four ways to be unsupported, and they are different states the page says
   // in words: settles-nothing, withdrawn, challenged, and nothing found yet.
   const verdict = why.supported
@@ -126,15 +127,24 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
     // inputs they rest on are `restingOn`, below. An undecided claim keeps its
     // findings and they support nothing, so the heading names what they are
     // rather than what they do -- a heading has to describe the list under it.
-    p.heading(why.standing === "undecided" ? "Findings" : "Supported by"),
+    // **An undecided claim's findings are one list.** The claim-level state
+    // says the evidence settles this neither way; splitting them into a
+    // supporting list and a `Bearing against` one re-asserts a per-finding
+    // direction that state has overridden, under a heading that picks a side
+    // directly below a verdict line saying nobody has. Merged rather than
+    // hidden: each line still carries how the finding was recorded.
+    p.heading(undecided ? "Findings" : "Supported by"),
     bullets(
-      why.support.map(
+      (undecided ? [...why.support, ...why.against] : why.support).map(
         (s) =>
-          `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${p.handle(s.analysis)}${p.quiet(")")}`,
+          `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${p.handle(s.analysis)}${p.quiet(")")}` +
+          (undecided && why.against.includes(s as (typeof why.against)[number])
+            ? `  ${p.quiet("recorded as bearing against")}`
+            : ""),
       ),
-      "no supporting findings",
+      undecided ? "no findings" : "no supporting findings",
     ),
-    why.against.length
+    !undecided && why.against.length
       ? `\nBearing against\n${bullets(
           why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis})`),
           "",

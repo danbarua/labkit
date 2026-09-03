@@ -196,6 +196,60 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
+   * **A replacement whose finding flips the answer.**
+   *
+   * A corrected number usually cuts the same way, so a replacement inherits
+   * the proposition it restates. Which way it cuts is not the same kind of
+   * fact: a replacement exists because something changed, and the case that
+   * matters most is the one where what changed is the answer. Inheriting
+   * `challenges` onto a finding that says *exact match* puts a confidently
+   * wrong sentence on a record whose purpose is to be true.
+   */
+  test("a replacement does not inherit a challenging bearing in silence", async () => {
+    const { enquiry } = await session.openEnquiry("does the port reproduce the cached map?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "pilot run",
+      finding: "one seed, one session",
+    });
+    const REPRODUCES = "the port reproduces the cached map";
+    const { analysis: pilot, claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "GPU pilot",
+      from: [observations],
+      concludes: [{ proposition: REPRODUCES, finding: "0.2842 vs 0.3505", bearing: "challenges" }],
+    });
+    const buggy = claims[0]!.claim;
+    const { review } = await session.recordReview({ of: pilot, verdict: "the pilot had a bug" });
+    const report = await session.replaceAnalysis({
+      supersedes: pilot,
+      because: review,
+      method: "GPU, bug fixed",
+    });
+
+    // The corrected run says the opposite, and does not say which way it cuts.
+    await expect(
+      session.conclude({
+        analysis: report.replacement,
+        proposition: REPRODUCES,
+        finding: "0.3505 vs 0.3505 — exact match",
+        replacing: buggy,
+      }),
+    ).rejects.toThrow(/bearing/);
+
+    // Stating it is all that is asked, and then it stands as stated.
+    const { claims: fixed } = await session.conclude({
+      analysis: report.replacement,
+      proposition: REPRODUCES,
+      finding: "0.3505 vs 0.3505 — exact match",
+      replacing: buggy,
+      bearing: "supports",
+    });
+    const why = await (await afterwards()).whySupported(fixed[0]!.claim);
+    expect(why.supported).toBe(true);
+  });
+
+  /**
    * The other half of the test above: named, so not a guess.
    *
    * Wording cannot separate two claims asserting one sentence — that is what

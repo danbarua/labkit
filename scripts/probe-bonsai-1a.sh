@@ -220,12 +220,15 @@ log_scale_replacement=$(lab --date "$STAGE1A_V2_RESULTS" keep "$lattice_claim" -
   | grep '^COMP_')
 historical_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$historical_random_claim" \
   --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322); 95% CI on multiplicative scale x[0.280, 1.541] brackets 1.0" \
+  --bearing challenges \
   | grep '^CLM_')
 current_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$current_random_claim" \
   --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320); 95% CI x[0.146, 1.250] brackets 1.0" \
+  --bearing challenges \
   | grep '^CLM_')
 rewiring_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$rewiring_claim" \
   --finding "NOT resolved: primary (p=0.037) and sign-flip (p=0.041) still say significant, median (p=0.084) still says not -- narrowed from v1 but not closed; per pre-commitment, no further transformation attempted, reported as genuinely inconclusive at n=10/25 seeds. LabKit's bearing is binary (supports/challenges); there is no way to record \"inconclusive\", so the criterion below is left without a fresh evaluation rather than forced to one." \
+  --bearing challenges \
   | grep '^CLM_')
 
 # #189: the two comparisons v2 actually resolved get a fresh evaluation

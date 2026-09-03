@@ -647,3 +647,45 @@ test("an evaluation with no basis reads as asserted, not as measured", () => {
   const lines = out.split("\n").filter((l) => l.includes("CEVAL_"));
   expect(lines[0]).not.toBe(lines[1]);
 });
+
+test("an undecided claim's findings are one list, and no heading picks a side", () => {
+  // The claim-level state says the evidence settles this neither way. Splitting
+  // the findings into a supporting list and a `Bearing against` list re-asserts
+  // a per-finding direction that state has overridden, and puts a heading that
+  // picks a side directly under a verdict line saying nobody has.
+  //
+  // Merged, not hidden: each line still says how the finding was recorded, so
+  // the stored bearing survives where a reader can act on it.
+  const base: SupportExplanation = {
+    claim: ref("claim", "CLM_7"),
+    proposition: "T vs rewiring is distinguishable",
+    supported: false,
+    standing: "undecided",
+    support: [],
+    against: [
+      {
+        finding: "NOT resolved: primary and sign-flip still say significant, median does not",
+        method: "log-scale re-aggregation",
+        analysis: ref("analysis", "COMP_4"),
+        evidence: ref("evidence", "EV_9"),
+      },
+    ],
+    reverifiedBy: [],
+    standard: [],
+    unmet: [],
+    superseded: [],
+    restingOn: [],
+    challenged: false,
+    withdrawn: false,
+  };
+  const out = renderWhy(base, PLAIN);
+
+  // The finding is on the page, under the neutral heading.
+  expect(out).toContain("Findings");
+  expect(out).toContain("NOT resolved:");
+  expect(out).not.toContain("Bearing against");
+  // And its recorded direction is not lost.
+  expect(out).toMatch(/against/i);
+  // The words the #228 rename existed to avoid.
+  expect(out).not.toContain("no supporting findings");
+});

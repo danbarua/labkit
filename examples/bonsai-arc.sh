@@ -195,7 +195,8 @@ lab --date 2026-08-01T11:46:49.000Z keep "$lattice_claim" --because "$raw_scale_
 log_scale_analysis=$(handle COMP "$(printf '%s' "$LAST" | head -1)")
 
 lab --date 2026-08-01T11:46:49.000Z conclude "$log_scale_analysis" --replacing "$random_claim" \
-  --finding 'log-scale resolves the disagreement: primary, median and sign-flip all agree non-significant (p=0.322)'
+  --finding 'log-scale resolves the disagreement: primary, median and sign-flip all agree non-significant (p=0.322)' \
+  --bearing challenges
 random_resolved_claim=$(pick CLM "$LAST")
 
 lab --date 2026-08-01T11:46:49.000Z evaluate "$random_criterion" --gate "$robustness_gate" \
@@ -207,7 +208,8 @@ say "The rewiring comparison does not resolve: two reads still say" \
     "The finding stays on the record and settles the proposition neither way:"
 
 lab --date 2026-08-01T11:46:49.000Z conclude "$log_scale_analysis" --replacing "$rewiring_claim" \
-  --finding 'NOT resolved: primary (p=0.037) and sign-flip (p=0.041) still say significant, median (p=0.084) still says not; genuinely inconclusive at n=10/25 seeds'
+  --finding 'NOT resolved: primary (p=0.037) and sign-flip (p=0.041) still say significant, median (p=0.084) still says not; genuinely inconclusive at n=10/25 seeds' \
+  --bearing challenges
 rewiring_inconclusive_evidence=$(pick EV "$LAST")
 rewiring_inconclusive_claim=$(pick CLM "$LAST")
 

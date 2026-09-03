@@ -780,6 +780,22 @@ export class WriteSurface extends SessionCore {
             `conclude needs the proposition this finding bears on and none was given; ` +
               `pass it, or pass the claim or finding being superseded so it can be inherited`,
           );
+        // **A challenging bearing is never inherited in silence.**
+        // Inheriting `supports` is indistinguishable from the default, so
+        // nothing is being assumed on the caller's behalf. Inheriting
+        // `challenges` is: it asserts a direction nobody typed, onto a
+        // replacement that exists *because* something changed — and what
+        // changed is sometimes the answer. A corrected run reading "exact
+        // match" then reports the proposition challenged by its own evidence.
+        //
+        // Which way a finding cuts is the act's own content and no walk
+        // recovers it, so the remedy is to ask rather than to guess.
+        if (input.bearing === undefined && superseded?.bearing === "challenges")
+          throw new Error(
+            `${superseded.claim} challenges "${superseded.proposition}", and a replacement ` +
+              `does not inherit that: say which way this finding cuts with --bearing ` +
+              `supports or --bearing challenges`,
+          );
         const bearing = input.bearing ?? superseded?.bearing ?? "supports";
 
         // A withdrawn proposition cannot be re-asserted as a side effect of
