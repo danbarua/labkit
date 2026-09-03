@@ -114,4 +114,9 @@ export const NOT_EXPOSED: Readonly<Record<string, string>> = {
   // and which findings moved, which is what `why <analysis>` renders; a second
   // reader would make it worth a tool of its own.
   analysisRevision: "reached only through `why`, as the Computation case's body",
+  // Same shape again, for the Criterion case. It is the detail `gate_status`
+  // stopped carrying (#241), and `why <criterion>` is the question a
+  // researcher asks for it — a tool of its own would be a second spelling of
+  // one intent, which is what #182's closing rule refuses.
+  criterionStanding: "reached only through `why`, as the Criterion case's body",
 };

@@ -32,6 +32,7 @@ import {
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../../fragments";
+import { decidedOn, evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -172,10 +173,10 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("failed");
-    expect(check?.decidedBy?.value).toBe("median p = 0.21");
+    expect(await decidedOn(session, check!)).toBe("median p = 0.21");
     // Both runs remain readable. The failure is not erased, it is out-ranked
     // by nothing.
-    expect(check?.evaluations.map((e) => e.outcome)).toEqual(["fail", "pass"]);
+    expect((await evaluationsOf(session, check!)).map((e) => e.outcome)).toEqual(["fail", "pass"]);
   });
 
   /**
@@ -252,11 +253,11 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("passed");
-    expect(check?.decidedBy?.value).toBe("median p = 0.04");
+    expect(await decidedOn(session, check!)).toBe("median p = 0.04");
     // Afterward: "which historical evaluations remain readable?" -- both. The
     // withdrawn verdict is out-ranked, not deleted; a record that erased it
     // could not answer why the finding was ever in doubt.
-    expect(check?.evaluations.map((e) => e.outcome)).toEqual(["fail", "pass"]);
+    expect((await evaluationsOf(session, check!)).map((e) => e.outcome)).toEqual(["fail", "pass"]);
   });
 
   /**
@@ -501,8 +502,8 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect(check?.decidedBy).toBeUndefined();
     // The history is intact, which is what makes `never-run` a contradiction
     // rather than merely a poor label.
-    expect(check?.evaluations.map((e) => e.outcome)).toEqual(["fail"]);
-    expect(check?.evaluations[0]?.withdrawn).toBe(true);
+    expect((await evaluationsOf(session, check!)).map((e) => e.outcome)).toEqual(["fail"]);
+    expect((await evaluationsOf(session, check!))[0]?.withdrawn).toBe(true);
     // And the finding does not stand: nothing has met the agreed standard.
     expect(why.supported).toBe(false);
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);

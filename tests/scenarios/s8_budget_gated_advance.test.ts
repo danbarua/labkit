@@ -24,6 +24,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
 import { recordAnalysis } from "../../fragments";
+import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -215,10 +216,13 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const status = await later.gateStatus(programme.advancement);
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c]));
 
-    expect(byName[THROUGHPUT]!.evaluations[0]!.basis.map((b) => b.states)).toEqual([
+    // Through the drill-down: a gate says what state each check is in, and
+    // what a verdict rested on is a question about one criterion (#241).
+    const throughput = await evaluationsOf(later, byName[THROUGHPUT]!);
+    expect(throughput[0]!.basis.map((b) => b.states)).toEqual([
       "sustained 44 images per second across the slice",
     ]);
-    expect(byName[SOLVER_HEALTH]!.evaluations[0]!.basis).toEqual([]);
+    expect((await evaluationsOf(later, byName[SOLVER_HEALTH]!))[0]!.basis).toEqual([]);
 
     // Both passed. Only one was shown anything.
     expect(status.state).toBe("satisfied");

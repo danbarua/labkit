@@ -54,6 +54,7 @@ import type {
   ConflictSide,
   ConflictVerdict,
   GateStatus,
+  CriterionStanding,
   QuestionOrigin,
   ReproducibilityReport,
   TaskContract,
@@ -305,12 +306,18 @@ const condition = z.strictObject({
   requires: z.string(),
 });
 
+/** No `value` — see `DecidingEvaluation`, and #241 for what it cost. */
+const decidingEvaluation = z.strictObject({
+  evaluation: ref("evaluation"),
+  outcome: z.enum(["pass", "fail"]),
+  at: z.string(),
+});
+
 const checkStatus = z.strictObject({
   criterion: ref("criterion"),
   proposition: z.string(),
   state: z.enum(["passed", "failed", "never-run", "no-standing-verdict"]),
-  evaluations: z.array(evaluationRecord),
-  decidedBy: evaluationRecord.optional(),
+  decidedBy: decidingEvaluation.optional(),
 });
 
 const amendmentRecord = z.strictObject({
@@ -500,7 +507,12 @@ export const gateStatusSchema = z.strictObject({
   state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
   checks: z.array(checkStatus),
   unmet: z.array(unmetCheck),
-  evaluations: z.array(evaluationRecord),
+  counts: z.strictObject({
+    passed: z.number(),
+    failed: z.number(),
+    "never-run": z.number(),
+    "no-standing-verdict": z.number(),
+  }),
   gating: z.array(gatedWork),
   everFailed: z.boolean(),
 });
@@ -548,6 +560,21 @@ const analysisRevisionSchema = z.strictObject({
  * member and no schema: it never reaches `structuredContent` at all, because
  * the domain throws before returning one.
  */
+const gateGoverned = z.strictObject({
+  gate: ref("gate"),
+  consequence: z.string(),
+  protecting: z.array(gatedWork),
+});
+
+/** What `why <criterion>` answers — the detail a gate's page no longer carries. */
+export const criterionStandingSchema = z.strictObject({
+  criterion: ref("criterion"),
+  requires: z.string(),
+  state: z.enum(["passed", "failed", "never-run", "no-standing-verdict"]),
+  evaluations: z.array(evaluationRecord),
+  governs: z.array(gateGoverned),
+});
+
 export const explanationSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("claim"),
@@ -555,6 +582,13 @@ export const explanationSchema = z.discriminatedUnion("kind", [
     is: z.string(),
     because: z.array(explanationCause),
     report: supportExplanationSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("criterion"),
+    subject: ref("criterion"),
+    is: z.string(),
+    because: z.array(explanationCause),
+    report: criterionStandingSchema,
   }),
   z.strictObject({
     kind: z.literal("work"),
@@ -858,6 +892,9 @@ export type _CriteriaGoverning = Assert<
   Exact<z.infer<typeof criteriaGoverningSchema>["criteria"], CriterionRef[]>
 >;
 export type _GateStatus = Assert<Exact<z.infer<typeof gateStatusSchema>, GateStatus>>;
+export type _CriterionStanding = Assert<
+  Exact<z.infer<typeof criterionStandingSchema>, CriterionStanding>
+>;
 export type _ConflictSide = Assert<Exact<z.infer<typeof conflictSide>, ConflictSide>>;
 export type _ConflictVerdict = Assert<
   Exact<z.infer<typeof conflictVerdictSchema>, ConflictVerdict>

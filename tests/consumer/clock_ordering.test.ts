@@ -33,6 +33,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, minutes, days } from "../helpers/clock";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../../fragments";
+import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;
 
@@ -107,8 +108,8 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       // The evaluation kept its instant, and it is the wound one rather than
       // the start -- so the clock genuinely drives durable state here.
       const why = await reader.whySupported(claimOf(analysisClaims, CONVERGES));
-      expect(why.standard[0]?.evaluations[0]?.at).toBe(whenEvaluated);
-      expect(why.standard[0]?.evaluations[0]?.at).not.toBe("2026-03-01T09:00:00.000Z");
+      expect(why.standard[0]?.decidedBy?.at).toBe(whenEvaluated);
+      expect(why.standard[0]?.decidedBy?.at).not.toBe("2026-03-01T09:00:00.000Z");
 
       // The closure carries no instant at all. Sixty days of wound clock left no
       // durable trace of *when* the programme came to believe this, which is the
@@ -161,7 +162,13 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
   /** A lower bound on when a question was settled, from evidence alone. Null when none exists. */
   async function settledNoEarlierThan(s: ResearchSession, claim: ClaimRef): Promise<string | null> {
     const why = await s.whySupported(claim);
-    const stamps = why.standard.flatMap((c) => c.evaluations.map((e) => e.at)).sort();
+    // Through the drill-down: a check carries which evaluation decided it and
+    // when, not every evaluation's text -- see helpers/criteria.ts.
+    const perCheck = await Promise.all(why.standard.map((c) => evaluationsOf(s, c)));
+    const stamps = perCheck
+      .flat()
+      .map((e) => e.at)
+      .sort();
     return stamps.at(-1) ?? null;
   }
 

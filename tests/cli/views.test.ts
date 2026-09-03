@@ -241,65 +241,17 @@ test("a gate that failed and was re-checked does not read as though it never fai
         criterion: ref("criterion", "CRIT_1"),
         proposition: "the effect holds at n=20",
         state: "passed",
-        evaluations: [],
       },
     ],
     unmet: [],
-    evaluations: [],
     gating: [],
+    counts: { passed: 0, failed: 0, "never-run": 0, "no-standing-verdict": 0 },
     everFailed: true,
   };
   expect(renderGate(base, PLAIN)).toContain("failed at least once");
   // The flag is a separate fact from the state, so the state still prints.
   expect(renderGate(base, PLAIN)).toContain("satisfied");
   expect(renderGate({ ...base, everFailed: false }, PLAIN)).not.toContain("failed at least once");
-});
-
-test("an evaluation with no basis reads as asserted, not as measured", () => {
-  // Empty `basis` means the verdict was asserted, not measured (report.ts's
-  // EvaluationRecord.basis doc comment) -- the view renders that distinction
-  // rather than printing an asserted verdict the same as a cited one.
-  const status: GateStatus = {
-    gate: ref("gate", "GATE_2"),
-    consequence: "the release is blocked",
-    state: "satisfied",
-    checks: [],
-    unmet: [],
-    evaluations: [
-      {
-        evaluation: ref("evaluation", "CEVAL_1"),
-        criterion: ref("criterion", "CRIT_1"),
-        value: "0.61",
-        outcome: "pass",
-        at: "2026-03-01T00:00:00.000Z",
-        basis: [],
-      },
-      {
-        evaluation: ref("evaluation", "CEVAL_2"),
-        criterion: ref("criterion", "CRIT_2"),
-        // Same value and outcome as CEVAL_1 on purpose: if the two lines
-        // differed only because 0.61 != 0.31, this would pass even with the
-        // basis-driven suffix broken or missing entirely. Identical values
-        // mean the only thing that can make the lines differ is basis.
-        value: "0.61",
-        outcome: "pass",
-        at: "2026-03-01T00:00:00.000Z",
-        basis: [{ evidence: ref("evidence", "EV_1"), states: "cracks at 40MPa" }],
-      },
-    ],
-    gating: [],
-    everFailed: false,
-  };
-  const out = renderGate(status, PLAIN);
-  expect(out).toContain("asserted");
-  expect(out).toContain("cracks at 40MPa");
-  // The handle, not just the finding text -- a reader following a verdict to
-  // its evidence needs something the next command can take, same as enquiry.
-  expect(out).toContain("(EV_1)");
-  // The two verdicts must not read alike -- an asserted one is not a synonym
-  // for "rests on nothing named" the way a cited one's finding text would be.
-  const lines = out.split("\n").filter((l) => l.includes("CEVAL_"));
-  expect(lines[0]).not.toBe(lines[1]);
 });
 
 test("never-run and no-standing-verdict are printed apart, not as one 'not passed'", () => {
@@ -312,28 +264,16 @@ test("never-run and no-standing-verdict are printed apart, not as one 'not passe
         criterion: ref("criterion", "CRIT_1"),
         proposition: "nobody has run this",
         state: "never-run",
-        evaluations: [],
       },
       {
         criterion: ref("criterion", "CRIT_2"),
         proposition: "this was decided and then withdrawn",
         state: "no-standing-verdict",
-        evaluations: [
-          {
-            evaluation: ref("evaluation", "CEVAL_1"),
-            criterion: ref("criterion", "CRIT_2"),
-            value: "0.31",
-            outcome: "fail",
-            at: "2026-03-01T00:00:00.000Z",
-            withdrawn: true,
-            basis: [],
-          },
-        ],
       },
     ],
     unmet: [],
-    evaluations: [],
     gating: [],
+    counts: { passed: 0, failed: 0, "never-run": 0, "no-standing-verdict": 0 },
     everFailed: false,
   };
   const out = renderGate(status, PLAIN);
@@ -570,29 +510,18 @@ const gateFixture: GateStatus = {
       criterion: ref("criterion", "CRIT_1"),
       proposition: "the effect holds at n>=20",
       state: "failed",
-      evaluations: [],
     },
     {
       criterion: ref("criterion", "CRIT_2"),
       proposition: "nobody has run this",
       state: "never-run",
-      evaluations: [],
     },
   ],
   unmet: [
     { criterion: ref("criterion", "CRIT_1"), requires: "the effect holds at n>=20", blocks: [] },
   ],
-  evaluations: [
-    {
-      evaluation: ref("evaluation", "CEVAL_1"),
-      criterion: ref("criterion", "CRIT_1"),
-      value: "0.31",
-      outcome: "fail",
-      at: "2026-03-01T00:00:00.000Z",
-      basis: [],
-    },
-  ],
   gating: [],
+  counts: { passed: 0, failed: 0, "never-run": 0, "no-standing-verdict": 0 },
   everFailed: true,
 };
 

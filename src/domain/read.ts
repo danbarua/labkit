@@ -43,6 +43,10 @@ import type {
   EvidenceRef,
   GateRef,
   GateStatus,
+  GateGoverned,
+  GatedWork,
+  CriterionStanding,
+  CriterionExplanation,
   WorkRef,
   DesignHistory,
   EnquiryRef,
@@ -81,6 +85,7 @@ import {
   answeringClaimBearing,
   checkStatus,
   checkStatusForGate,
+  criterionDetail,
   checksAnchor,
   checksMetBearing,
   standingAsOf,
@@ -1152,8 +1157,14 @@ export class ReadSurface extends SessionCore {
     );
     const rows = (await this.graph.query(cypher, decoders, { id: gate })) as unknown as Row[];
     const checks = [...per(checkStatusForGate, rows).values()];
-    // Flattened in the same order the checks were assembled in.
-    const evaluations = checks.flatMap((c) => c.evaluations);
+    // Every state present, zero included -- see `GateStatus.counts`.
+    const counts: GateStatus["counts"] = {
+      passed: 0,
+      failed: 0,
+      "never-run": 0,
+      "no-standing-verdict": 0,
+    };
+    for (const c of checks) counts[c.state] += 1;
     const unmetChecks = checks.filter((c) => c.state !== "passed");
     // The same computation as `whySupported`'s, and not redundant here even
     // though the caller is holding this gate: a criterion may govern several,
@@ -1190,12 +1201,69 @@ export class ReadSurface extends SessionCore {
       state,
       checks,
       unmet,
-      evaluations,
+      counts,
       gating: gating.map((g) => ({
         work: ref("work", g.w.natural_id),
         objective: g.w.objective ?? "",
       })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
+    };
+  }
+
+  /**
+   * One condition: what it requires, what has been said about it, and what it
+   * holds up.
+   *
+   * **Reached only through `why`** — a researcher asks *why is this condition
+   * in the state it is*, and that is one verb, not a second one named for the
+   * report. See `NO_COMMAND_FOR` in tests/cli/coverage.test.ts.
+   *
+   * Evaluations here are **criterion-scoped, not gate-scoped**: one criterion
+   * can govern several gates and be evaluated separately against each, and a
+   * reader asking about the condition itself is asking about all of them.
+   * `gateStatus` keeps the narrower scope for the opposite reason, stated
+   * there.
+   */
+  async criterionStanding(criterion: CriterionRef): Promise<CriterionStanding> {
+    const { cypher, decoders } = compose(
+      `MATCH (crit:Criterion {natural_id: $id})`,
+      criterionDetail,
+      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
+    );
+    const rows = (await this.graph.query(cypher, decoders, { id: criterion })) as unknown as Row[];
+    const detail = [...per(criterionDetail, rows).values()][0];
+    if (!detail) throw new Error(`no criterion named "${criterion}"`);
+
+    // The gates it governs, and what each protects. A separate read because
+    // it is a different grain -- per gate, not per criterion.
+    const governed = await this.graph.query(
+      `MATCH (c:Criterion {natural_id: $id})-[:GOVERNS]->(g:Gate)
+       OPTIONAL MATCH (g)-[:BLOCKS]->(w:Task)
+       RETURN g, w`,
+      {
+        g: vertexProps<{ natural_id: string; consequence: string }>(),
+        w: optional(vertexProps<{ natural_id: string; objective: string }>()),
+      },
+      { id: criterion },
+    );
+    const byGate = new Map<string, GateGoverned>();
+    for (const r of governed) {
+      const existing = byGate.get(r.g.natural_id) ?? {
+        gate: ref("gate", r.g.natural_id),
+        consequence: r.g.consequence,
+        protecting: [] as GatedWork[],
+      };
+      if (r.w)
+        existing.protecting.push({ work: ref("work", r.w.natural_id), objective: r.w.objective });
+      byGate.set(r.g.natural_id, existing);
+    }
+
+    return {
+      criterion,
+      requires: detail.status.proposition,
+      state: detail.status.state,
+      evaluations: detail.evaluations,
+      governs: [...byGate.values()],
     };
   }
 
@@ -2736,6 +2804,46 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
 }
 
 /**
+ * `why <criterion>` — what a condition requires, what has been said about it,
+ * and what it holds up.
+ *
+ * **The detail `gate` sheds.** A gate's page answers what state every
+ * condition is in and deliberately carries no verdict text; this is where the
+ * text lives, one criterion at a time — which is the shape the first consumer
+ * to meet a 107-criterion gate built by hand out of a 299KB answer (#241).
+ *
+ * The evaluations are **not** scoped to a gate: one criterion can govern
+ * several and be evaluated separately against each, so a reader asking about
+ * the condition itself is asking about all of them. `gateStatus` keeps the
+ * narrower scope, and its own comment says why.
+ */
+async function explainCriterion(self: ReadSurface, subject: string): Promise<CriterionExplanation> {
+  const criterion = ref("criterion", subject);
+  const report = await self.criterionStanding(criterion);
+  const last = report.evaluations.at(-1);
+  const is =
+    report.state === "never-run"
+      ? "never evaluated"
+      : report.state === "no-standing-verdict"
+        ? "evaluated, with no verdict still standing"
+        : report.state;
+  // The evaluations themselves, newest first: what was said is the cause of
+  // the state, and the handle is what the next command takes.
+  const because: Cause[] = [...report.evaluations].reverse().map((e) => ({
+    handle: e.evaluation,
+    wording: `${e.outcome === "pass" ? "passed" : "failed"}: ${e.value}${e.withdrawn ? " (withdrawn)" : ""}`,
+    when: e.at,
+  }));
+  return {
+    kind: "criterion",
+    subject: criterion,
+    is: last ? `${is}, last evaluated ${last.at}` : is,
+    because,
+    report,
+  };
+}
+
+/**
  * The `Gate` case: `gateStatus`, exhaustive over `GateStatus.state` — the same
  * four-way split `gateStateFrom` computes, worded rather than coloured.
  * `blocked` and `incomplete` both cite every condition not currently passing,
@@ -2743,6 +2851,7 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
  * `satisfied` and `never-evaluated` cite every condition, all of them sharing
  * one state there.
  */
+
 async function explainGate(self: ReadSurface, subject: string): Promise<GateExplanation> {
   const gate = ref("gate", subject);
   const report = await self.gateStatus(gate);
@@ -2786,6 +2895,7 @@ const EXPLAINED = {
   work: explainWork,
   enquiry: explainEnquiry,
   gate: explainGate,
+  criterion: explainCriterion,
   analysis: explainAnalysis,
 } satisfies Partial<Record<Kind, Explainer>>;
 
@@ -2826,7 +2936,6 @@ const REFUSED = {
   unit: refuseToExplain("unit"),
   evidence: refuseToExplain("evidence"),
   decision: refuseToExplain("decision"),
-  criterion: refuseToExplain("criterion"),
   evaluation: refuseToExplain("evaluation"),
   review: refuseToExplain("review"),
   observations: refuseToExplain("observations"),

@@ -18,6 +18,7 @@ import { vertexProps } from "../src/db/cypher";
 import type { TenantGraph } from "../src/db/graph";
 import { claimNamed, claimOf } from "./helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../fragments";
+import { evaluationsOf } from "./helpers/criteria";
 
 let scenario: Scenario;
 let graph: TenantGraph;
@@ -501,7 +502,9 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
     citing: claimOf(analysisClaims, "the solver converges"),
   });
   const before = await session.gateStatus(gate);
-  expect(before.checks[0]?.evaluations[0]?.basis?.map((b) => b.states)).toEqual(["residual 1e-9"]);
+  expect((await evaluationsOf(session, before.checks[0]!))[0]?.basis?.map((b) => b.states)).toEqual(
+    ["residual 1e-9"],
+  );
   expect(before.state).toBe("blocked");
 
   const { review } = await session.recordReview({
@@ -518,7 +521,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
   });
 
   const after = await session.gateStatus(gate);
-  expect(after.checks[0]?.evaluations[0]?.withdrawn).toBe(true);
+  expect((await evaluationsOf(session, after.checks[0]!))[0]?.withdrawn).toBe(true);
   expect(after.state).not.toBe("blocked");
 });
 

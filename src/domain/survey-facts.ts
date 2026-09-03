@@ -10,7 +10,7 @@
 
 import { optional, vertexProps } from "../db/cypher";
 import { ref } from "./report";
-import type { CheckStatus, EvidenceRef } from "./report";
+import type { CheckStatus, EvaluationRecord, EvidenceRef } from "./report";
 import type { Derived, Leaf, Row } from "./facts";
 
 /** Shapes the folds below assert. A row is decoded, not typed, at the seam. */
@@ -256,6 +256,31 @@ export const checkStatus = checkStatusOver(anyVerdict);
 /** A gate's conditions, itemised, scoped to verdicts reached for that gate. */
 export const checkStatusForGate = checkStatusOver(verdictForGate);
 
+/** Every evaluation of a criterion, whatever gate it was run for. */
+export const criterionEvaluations = evaluationsOver(anyVerdict);
+
+/**
+ * One criterion's state and its evaluations, from one query.
+ *
+ * A `Derived` needing both rather than folding the two over rows composed from
+ * one of them: `compose` builds its clauses from the root fact's leaves, so
+ * reading a second fact off those rows would work only for as long as the
+ * first happened to need the same ones — the silent-omission shape `facts.ts`
+ * exists to prevent, arrived at from the caller's side.
+ */
+export const criterionDetail: Derived<{
+  status: CheckStatus;
+  evaluations: EvaluationRecord[];
+}> = {
+  name: "criterionDetail",
+  grain: byCriterion,
+  needs: [checkStatus, criterionEvaluations],
+  from: (needs) => ({
+    status: needs[checkStatus.name] as CheckStatus,
+    evaluations: needs[criterionEvaluations.name] as EvaluationRecord[],
+  }),
+};
+
 /** Every prespecified check on the answering claim passed. Vacuously true when there are none. */
 export function checksMetBearing(bearing: "SUPPORTS" | "CHALLENGES"): Derived<boolean> {
   return {
@@ -272,6 +297,52 @@ export function checksMetBearing(bearing: "SUPPORTS" | "CHALLENGES"): Derived<bo
 
 /** The two ways a claim is reached. Callers run both and merge; see {@link answeringClaimBearing}. */
 export const BEARINGS = ["SUPPORTS", "CHALLENGES"] as const;
+
+/**
+ * One criterion's evaluations as records, oldest first, ties broken by
+ * identity — the ordering rule `checkStatusOver` states, applied in the one
+ * place both readers get it from.
+ */
+function recordsOf(
+  ordered: (Verdict & { evaluation: string })[],
+  criterion: string,
+): EvaluationRecord[] {
+  return ordered.map((v) => ({
+    evaluation: ref("evaluation", v.evaluation),
+    criterion: ref("criterion", criterion),
+    value: v.value ?? "",
+    outcome: (v.outcome ?? "pass") as "pass" | "fail",
+    at: v.at,
+    basis: v.basis,
+    ...(retracted(v) ? { withdrawn: true as const } : {}),
+  }));
+}
+
+/**
+ * Every evaluation of one criterion, in full — the detail a gate's page no
+ * longer carries.
+ *
+ * Separate from {@link checkStatusOver} because the two are asked different
+ * questions: a gate wants each check's *state*, and a reader looking at one
+ * criterion wants what was actually said. Splitting them is what let the gate
+ * answer shrink (#241); sharing `recordsOf` is what keeps the ordering one
+ * rule rather than two.
+ */
+export function evaluationsOver(verdicts: Leaf<Verdict>): Derived<EvaluationRecord[]> {
+  return {
+    name: `${verdicts.name}Records`,
+    grain: byCriterion,
+    needs: [verdicts, criterionProps],
+    from: (needs) => {
+      const found = needs[verdicts.name] as Map<string, Verdict>;
+      const criterion = needs.criterionProps as CriterionNode;
+      const ordered = [...found]
+        .map(([evaluation, v]) => ({ evaluation, ...v }))
+        .sort((a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation));
+      return recordsOf(ordered, criterion.natural_id);
+    },
+  };
+}
 
 /**
  * A check, itemised — the shape a reader is shown, not just its state.
@@ -296,24 +367,25 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus> {
       const ordered = [...found]
         .map(([evaluation, v]) => ({ evaluation, ...v }))
         .sort((a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation));
-      const records = ordered.map((v) => ({
-        evaluation: ref("evaluation", v.evaluation),
-        criterion: ref("criterion", criterion.natural_id),
-        value: v.value ?? "",
-        outcome: (v.outcome ?? "pass") as "pass" | "fail",
-        at: v.at,
-        basis: v.basis,
-        ...(retracted(v) ? { withdrawn: true as const } : {}),
-      }));
+      const records = recordsOf(ordered, criterion.natural_id);
       const standing = ordered.filter((v) => !retracted(v));
       const decisive = standing.find((v) => v.outcome === "fail") ?? standing[0];
+      const decided = decisive && records.find((r) => r.evaluation === decisive.evaluation);
       return {
         criterion: ref("criterion", criterion.natural_id),
         proposition: criterion.proposition,
         state: needs[state.name] as CheckState,
-        evaluations: records,
-        ...(decisive
-          ? { decidedBy: records.find((r) => r.evaluation === decisive.evaluation) }
+        // **The verdict's sentence is not carried here** -- see
+        // `DecidingEvaluation`. A gate governing many criteria is asked what
+        // state everything is in, and the sentences are the whole of its size.
+        ...(decided
+          ? {
+              decidedBy: {
+                evaluation: decided.evaluation,
+                outcome: decided.outcome,
+                at: decided.at,
+              },
+            }
           : {}),
       } as CheckStatus;
     },
