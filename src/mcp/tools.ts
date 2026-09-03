@@ -233,7 +233,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
   tool({
     name: "why_supported",
     title: "Why a conclusion counts as supported",
-    group: "What stands",
+    group: "One record's story",
     description:
       "Why a proposition counts as supported (or does not): the findings resting under it, " +
       "the findings bearing against it, the prespecified standard it is held to and which " +
