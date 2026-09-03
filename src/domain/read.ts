@@ -6,7 +6,7 @@
  */
 
 import { edgeProps, optional, scalar, vertexProps } from "../db/cypher";
-import { NODE_LABELS, SEARCHABLE_PROSE, SEARCHABLE_PROSE_ARRAYS } from "../db/domain";
+import { NODE_LABELS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } from "../db/domain";
 import type {
   ArtefactProps,
   ClaimProps,
@@ -134,7 +134,7 @@ export type ResearchReads = Pick<ReadSurface, Methods<ReadSurface>>;
  * **A verb may be named only if both surfaces spell it identically AND its
  * promise has been checked against the code that implements it.** Spelling is
  * not enough: `search` is spelled the same on both surfaces but scans only
- * {@link SEARCHABLE_PROSE}, and `Computation`, `Claim` and `Artefact` are
+ * {@link SEARCHABLE_TEXT}, and `Computation`, `Claim` and `Artefact` are
  * absent from that table — so *"'search' finds its handle by the method"* sends
  * a caller to a search that returns nothing.
  *
@@ -1535,12 +1535,11 @@ export class ReadSurface extends SessionCore {
    * one specific claim by its sentence should still use that verb — it is
    * both narrower and cheaper.
    *
-   * **Scans `Prose` only** — `src/db/domain.ts`'s `SEARCHABLE_PROSE`/
-   * `SEARCHABLE_PROSE_ARRAYS`, derived from the string taxonomy and held to
-   * it by `check:prop-classes`. `IndexedString` properties (`Claim.name`,
-   * `Artefact.logical_name`) are exact-match territory — a claim's own
-   * wording is already searchable by `claimsAsserting`, and this does not
-   * duplicate that with a weaker substring version of it.
+   * **Scans every stored string a person typed** — `src/db/domain.ts`'s
+   * `SEARCHABLE_TEXT`/`SEARCHABLE_TEXT_ARRAYS`, which is every `Prose` and
+   * `IndexedString` property, held to the annotations by
+   * `check:prop-classes`. A machine value is not scanned: a timestamp, a
+   * content hash, a role nothing reads.
    *
    * Case-insensitive (`toLower` both sides — measured against AGE 2026-08-31:
    * plain `CONTAINS` works, `toLower(...) CONTAINS toLower(...)` also
@@ -1551,11 +1550,11 @@ export class ReadSurface extends SessionCore {
   async search(text: Prose): Promise<SearchGroup[]> {
     const groups: SearchGroup[] = [];
     for (const label of NODE_LABELS) {
-      const scalarProps = SEARCHABLE_PROSE[label] ?? [];
-      const arrayProps = SEARCHABLE_PROSE_ARRAYS[label] ?? [];
+      const scalarProps = SEARCHABLE_TEXT[label] ?? [];
+      const arrayProps = SEARCHABLE_TEXT_ARRAYS[label] ?? [];
       if (scalarProps.length === 0 && arrayProps.length === 0) continue;
-      // Every label reachable here is a key of SEARCHABLE_PROSE or
-      // SEARCHABLE_PROSE_ARRAYS, and check:prop-classes holds both to the
+      // Every label reachable here is a key of SEARCHABLE_TEXT or
+      // SEARCHABLE_TEXT_ARRAYS, and check:prop-classes holds both to the
       // Prose annotations -- so a label with no research-concept kind would
       // be a finding worth its own sentence, not a runtime case to guard.
       const kind = KIND_BY_LABEL[label];

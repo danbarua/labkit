@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Holds `INDEXED_PROPS` and `SEARCHABLE_PROSE`(`_ARRAYS`) to the string taxonomy they mirror.
+ * Holds `INDEXED_PROPS` and `SEARCHABLE_TEXT`(`_ARRAYS`) to the string taxonomy they mirror.
  *
  * `src/db/domain.ts` says what LabKit does with each stored string by annotating
  * it `IndexedString`, `Timestamp`, `IdentityString`, `ReadOnlyString` or
  * `Prose`. TypeScript erases all five, so `provisionTenantGraph()` cannot read
  * them and loops `INDEXED_PROPS` instead, and `search()` cannot read them
- * either and loops `SEARCHABLE_PROSE`/`SEARCHABLE_PROSE_ARRAYS`. That is one
+ * either and loops `SEARCHABLE_TEXT`/`SEARCHABLE_TEXT_ARRAYS`. That is one
  * fact in two places twice over, which CLAUDE.md is right to distrust —
  * `check:ledger` was deleted rather than kept for exactly this shape.
  *
@@ -14,7 +14,7 @@
  * copies of each pair fail differently and silently.** A property annotated
  * `IndexedString` and missing from `INDEXED_PROPS` gets no index and stays a
  * sequential scan, invisible until someone profiles. A property annotated
- * `Prose` and missing from `SEARCHABLE_PROSE` is worse — `search()` returns
+ * `Prose` and missing from `SEARCHABLE_TEXT` is worse — `search()` returns
  * an empty result for a real match, which reads as "nothing on the record
  * says that" rather than as the tool's own gap. Neither shows up in a test,
  * because both spellings return the same rows on the fixtures that exist.
@@ -36,8 +36,12 @@ import { readFileSync } from "node:fs";
 const DOMAIN = "src/db/domain.ts";
 /** Annotations whose properties must be indexed. The other three must not be. */
 const INDEXED_TYPES = new Set(["IndexedString", "Timestamp"]);
-/** The one annotation `search()` scans — everything else is exact-match territory or not text at all. */
-const SEARCHABLE_TYPE = "Prose";
+/**
+ * The annotations `search()` scans — the two classes holding text a person
+ * typed. Everything else is a machine value: a timestamp, a hash, a role
+ * nothing reads.
+ */
+const SEARCHABLE_TYPES = new Set(["Prose", "IndexedString"]);
 
 const source = ts.createSourceFile(
   DOMAIN,
@@ -59,7 +63,7 @@ function labelOf(interfaceName: string): string | undefined {
  * special case. `Prose[]` is an array whose element is a reference, hence the
  * `array` flag — `INDEXED_PROPS` never had to care about this distinction,
  * but `search()` builds a different Cypher shape for each (see
- * `SEARCHABLE_PROSE_ARRAYS`'s own doc comment).
+ * `SEARCHABLE_TEXT_ARRAYS`'s own doc comment).
  */
 function writtenType(
   node: ts.TypeNode | undefined,
@@ -94,15 +98,13 @@ source.forEachChild((node) => {
     if (!written) continue;
     const prop = member.name.getText(source);
     if (INDEXED_TYPES.has(written.name)) record(indexedAnnotated, label, prop);
-    if (written.name === SEARCHABLE_TYPE) {
+    if (SEARCHABLE_TYPES.has(written.name)) {
       record(written.array ? searchableArrayAnnotated : searchableAnnotated, label, prop);
     }
   }
 });
 
-const { INDEXED_PROPS, SEARCHABLE_PROSE, SEARCHABLE_PROSE_ARRAYS } = await import(
-  "../src/db/domain"
-);
+const { INDEXED_PROPS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } = await import("../src/db/domain");
 
 const problems: string[] = [];
 
@@ -129,8 +131,8 @@ function reconcile(
 }
 
 reconcile("INDEXED_PROPS", indexedAnnotated, INDEXED_PROPS, "IndexedString/Timestamp");
-reconcile("SEARCHABLE_PROSE", searchableAnnotated, SEARCHABLE_PROSE, "Prose");
-reconcile("SEARCHABLE_PROSE_ARRAYS", searchableArrayAnnotated, SEARCHABLE_PROSE_ARRAYS, "Prose[]");
+reconcile("SEARCHABLE_TEXT", searchableAnnotated, SEARCHABLE_TEXT, "Prose/IndexedString");
+reconcile("SEARCHABLE_TEXT_ARRAYS", searchableArrayAnnotated, SEARCHABLE_TEXT_ARRAYS, "Prose[]");
 
 if (problems.length > 0) {
   console.error("FAILED: a table and the string taxonomy disagree\n");

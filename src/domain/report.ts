@@ -354,7 +354,7 @@ export function kindOf(id: string): Kind | null {
  * caller who wants to know *why* it matched needs this, not just the
  * handle.
  *
- * `handle` is a proper `Ref` — a union of every kind {@link SEARCHABLE_PROSE}
+ * `handle` is a proper `Ref` — a union of every kind {@link SEARCHABLE_TEXT}
  * names a label for — rather than a bare string, because every handle in a
  * report is one. {@link SearchGroup} narrows to a single label per group, so
  * the kind is never mixed within one `matches` array, only across groups.
