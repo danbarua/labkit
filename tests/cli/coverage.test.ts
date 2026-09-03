@@ -22,7 +22,12 @@ import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ReadSurface, WriteSurface } from "../../src/domain";
-import { publicVerbsOf, verbsCalledOn } from "../helpers/surface-coverage";
+import {
+  publicVerbsOf,
+  verbsCalledOn,
+  READ_SURFACE,
+  WRITE_SURFACE,
+} from "../helpers/surface-coverage";
 
 const COMMANDS_DIR = "src/cli/commands";
 
@@ -73,7 +78,7 @@ test("the command modules were found at all", () => {
 });
 
 test("every read verb the domain exposes has a CLI command", () => {
-  const reads = publicVerbsOf("src/domain/read.ts");
+  const reads = publicVerbsOf(READ_SURFACE);
   expect(reads.length).toBeGreaterThan(10);
   expect(reads).toContain("gateStatus");
   for (const verb of reads) {
@@ -88,7 +93,7 @@ test("every read verb the domain exposes has a CLI command", () => {
 });
 
 test("every write verb the domain exposes has a CLI command", () => {
-  const writes = publicVerbsOf("src/domain/write.ts");
+  const writes = publicVerbsOf(WRITE_SURFACE);
   expect(writes.length).toBeGreaterThan(10);
   expect(writes).toContain("recordAnalysis");
   for (const verb of writes) {

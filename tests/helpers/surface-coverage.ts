@@ -34,7 +34,8 @@
  * into whatever happens to be unexposed today.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import ts from "typescript";
 
 /** Parses one file. `true` keeps parent pointers and node text available. */
@@ -49,24 +50,71 @@ function parse(path: string): ts.SourceFile {
  * and a leading underscore is still honoured as a convention. Constructors and
  * property declarations are not methods and do not appear.
  */
-export function publicVerbsOf(sourcePath: string): string[] {
-  const source = parse(sourcePath);
+/**
+ * Where each surface lives — a file today, a directory when it outgrows one.
+ *
+ * Named here rather than at four call sites so a split moves one line.
+ */
+export const READ_SURFACE = existsSync("src/domain/read")
+  ? "src/domain/read"
+  : "src/domain/read.ts";
+export const WRITE_SURFACE = existsSync("src/domain/write")
+  ? "src/domain/write"
+  : "src/domain/write.ts";
+
+/**
+ * Every source under a path: the file itself, or every `.ts` in a directory.
+ *
+ * A surface is one file today and a directory when it outgrows one. Naming the
+ * directory means the answer does not change on the day it is split.
+ */
+function sourcesUnder(path: string): string[] {
+  if (!existsSync(path)) throw new Error(`no surface at ${path}: nothing to derive verbs from`);
+  if (!statSync(path).isDirectory()) return [path];
+  return readdirSync(path)
+    .filter((f) => f.endsWith(".ts"))
+    .map((f) => join(path, f))
+    .sort();
+}
+
+export function publicVerbsOf(surfacePath: string): string[] {
   const verbs: string[] = [];
 
-  const visit = (node: ts.Node): void => {
-    if (ts.isMethodDeclaration(node) && node.name) {
-      const hidden = ts
-        .getModifiers(node)
-        ?.some(
-          (m) =>
-            m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword,
-        );
-      const name = node.name.getText(source);
-      if (!hidden && !name.startsWith("_")) verbs.push(name);
-    }
-    ts.forEachChild(node, visit);
-  };
-  ts.forEachChild(source, visit);
+  for (const sourcePath of sourcesUnder(surfacePath)) {
+    const source = parse(sourcePath);
+
+    const visit = (node: ts.Node): void => {
+      // **A method and a function-typed property both declare a verb.** The
+      // facade idiom `readonly x: Surface["x"] = (...a) => …` is a
+      // PropertyDeclaration, so counting methods alone would report a
+      // delegating surface as having no verbs at all -- and every assertion
+      // below would then pass over an empty list, which is the silent no this
+      // helper exists to catch.
+      const declaresVerb =
+        (ts.isMethodDeclaration(node) ||
+          (ts.isPropertyDeclaration(node) &&
+            (node.initializer !== undefined
+              ? ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)
+              : node.type !== undefined && ts.isFunctionTypeNode(node.type)))) &&
+        node.name !== undefined;
+      if (declaresVerb) {
+        const hidden = ts
+          .getModifiers(node)
+          ?.some(
+            (m) =>
+              m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword,
+          );
+        const name = node.name.getText(source);
+        if (!hidden && !name.startsWith("_")) verbs.push(name);
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(source, visit);
+  }
+
+  // A surface with no verbs is a wrong path, not a small surface. Without this
+  // every coverage assertion downstream iterates nothing and passes.
+  if (verbs.length === 0) throw new Error(`no public verbs found under ${surfacePath}`);
   return verbs;
 }
 

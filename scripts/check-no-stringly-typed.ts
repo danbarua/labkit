@@ -35,9 +35,21 @@
  */
 
 import ts from "typescript";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
-const FILES = ["src/domain/core.ts", "src/domain/read.ts", "src/domain/write.ts"];
+// Every surface file, whether a surface is one file or a directory. The
+// hardcoded triple examined nothing the day either became a directory.
+const FILES = ["src/domain/core.ts", ...surfaceFiles("read"), ...surfaceFiles("write")];
+
+function surfaceFiles(surface: string): string[] {
+  const dir = `src/domain/${surface}`;
+  if (existsSync(dir) && statSync(dir).isDirectory())
+    return readdirSync(dir)
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `${dir}/${f}`)
+      .sort();
+  return [`${dir}.ts`];
+}
 
 /** The taxonomy aliases. Anything else non-`string` is a handle or a DTO and is fine. */
 const VALUE_TYPES = new Set([
