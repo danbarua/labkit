@@ -94,7 +94,6 @@ import type {
   DeclaredGate,
   EvaluatedCriterion,
   AcceptedAsUnresolved,
-  Promoted,
   Restated,
   CitedFinding,
   Conclusion,

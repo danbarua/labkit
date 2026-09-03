@@ -19,8 +19,8 @@ import { bullets } from "./format";
  * from not having started, and they now print.
  *
  * Answered enquiries say what their closure rests on for the same reason:
- * `exploratory` does not mean the answer is wrong, it means nothing has
- * promoted what it rests on, and a reader deciding whether to build on it
+ * `exploratory` does not mean the answer is wrong, it means nobody has
+ * confirmed what it rests on, and a reader deciding whether to build on it
  * should not have to go and look.
  */
 export function renderEnquiry(status: EnquiryStatus, p: Palette): string {

@@ -49,7 +49,6 @@ import type {
   DeclaredGate,
   EvaluatedCriterion,
   AcceptedAsUnresolved,
-  Promoted,
   Restated,
   QuestionClosure,
   ConflictSide,
@@ -714,11 +713,6 @@ export const acceptedAsUnresolvedSchema = z.strictObject({
   decision: ref("decision"),
   events: z.array(domainEventSchema),
 });
-/** What `promote` returns — #161's audit: this verb returned nothing. */
-export const promotedSchema = z.strictObject({
-  decision: ref("decision"),
-  events: z.array(domainEventSchema),
-});
 
 export const restatedSchema = z.strictObject({
   decision: ref("decision"),
@@ -917,7 +911,6 @@ export type _EvaluatedCriterion = Assert<
 export type _AcceptedAsUnresolved = Assert<
   Exact<z.infer<typeof acceptedAsUnresolvedSchema>, AcceptedAsUnresolved>
 >;
-export type _Promoted = Assert<Exact<z.infer<typeof promotedSchema>, Promoted>>;
 export type _Restated = Assert<Exact<z.infer<typeof restatedSchema>, Restated>>;
 
 /**

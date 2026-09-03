@@ -310,10 +310,6 @@ export interface AcceptedAsUnresolved {
   decision: DecisionRef;
   events: DomainEvent[];
 }
-export interface Promoted {
-  decision: DecisionRef;
-  events: DomainEvent[];
-}
 export interface Restated {
   decision: DecisionRef;
   events: DomainEvent[];

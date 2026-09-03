@@ -2,7 +2,7 @@
 	"name": "labkit",
 	"description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
 	"license": "MIT",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"main": "src/index.ts",
 	"type": "module",
 	"bin": {
@@ -46,6 +46,7 @@
 		"check:binary": "bash scripts/smoke-binary.sh",
 		"check:cli": "bash scripts/smoke-cli.sh",
 		"example": "bash examples/full-lifecycle.sh",
+		"example:bonsai": "bash examples/bonsai-arc.sh",
 		"probe:dogfood": "bash scripts/probe-dogfood.sh",
 		"db:generate": "drizzle-kit generate",
 		"db:generate:custom": "drizzle-kit generate --custom",
