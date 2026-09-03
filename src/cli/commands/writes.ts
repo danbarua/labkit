@@ -461,7 +461,11 @@ export function registerWrites(program: Command, run: Run): void {
         "re-checked. It does not claim reproduction — see `labkit reproduction`.",
     )
     .argument("<analysis-id>", "the analysis being re-checked", handle("analysis"))
-    .requiredOption("--enquiry <id>", "the line of enquiry this belongs to", handle("enquiry"))
+    .option(
+      "--enquiry <id>",
+      "the line of enquiry this belongs to (default: the analysis's own)",
+      handle("enquiry"),
+    )
     .requiredOption("--method <text>", "what the re-check did")
     .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(inputRef))
     .requiredOption("--proposition <text>", "what the re-check reached a verdict about")
@@ -473,7 +477,7 @@ export function registerWrites(program: Command, run: Run): void {
         answer(
           await write.reverify({
             historical,
-            enquiry: opts.enquiry,
+            ...(opts.enquiry === undefined ? {} : { enquiry: opts.enquiry }),
             method: opts.method,
             under: opts.under,
             // Flat flags rather than JSON, and this one stays on the verb: a

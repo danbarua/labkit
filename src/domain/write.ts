@@ -1283,6 +1283,18 @@ export class WriteSurface extends SessionCore {
       // Atomic: without the second write the durable state is a second
       // independent support standing where a re-verification was meant. See
       // TenantGraph.inTransaction.
+      // **One hop, inferred rather than restated.** The analysis being
+      // re-checked knows the enquiry it was recorded under, so a caller who
+      // named the analysis has already said which one. An explicit `enquiry`
+      // wins: a re-check may legitimately belong to a different line of
+      // enquiry than the analysis it re-checks, and only the caller knows that.
+      const enquiry = input.enquiry ?? (await this.enquiryOf(input.historical));
+      if (!enquiry)
+        throw new Error(
+          `analysis ${input.historical} is under no line of enquiry, so there is none to ` +
+            `infer; name one with the enquiry this re-check belongs to`,
+        );
+
       const verification = await this.graph.inTransaction(async () => {
         const original = await this.findingFor(input.historical, input.concludes.proposition);
         if (!original) {
@@ -1291,7 +1303,7 @@ export class WriteSurface extends SessionCore {
           );
         }
         const { analysis } = await this.recorded({
-          enquiry: input.enquiry,
+          enquiry,
           method: input.method,
           from: input.under,
         });

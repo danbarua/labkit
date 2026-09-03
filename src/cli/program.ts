@@ -17,6 +17,7 @@ import { worktreeName } from "../worktree";
 import { isoInstant } from "./args";
 import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
+import { registerBackup } from "./commands/backup";
 import { registerServe } from "./commands/serve";
 import type { Run } from "./session";
 
@@ -86,5 +87,6 @@ export function buildProgram(run: Run): Command {
   // Outside the two registries and without `run`: the server owns its own
   // connection lifecycle and prints no report. See ./commands/serve.ts.
   registerServe(program);
+  registerBackup(program);
   return program;
 }

@@ -16,15 +16,39 @@
  * asserting the groups appear in the order the domain lists them.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { READ_GROUPS, WRITE_GROUPS, OPERATING_GROUPS } from "../src/domain/groups";
 
-/** In the order commander meets them: reads, then writes, then the rest. */
-const FILES = [
-  { path: "src/cli/commands/reads.ts", groups: READ_GROUPS as readonly string[] },
-  { path: "src/cli/commands/writes.ts", groups: WRITE_GROUPS as readonly string[] },
-  { path: "src/cli/commands/serve.ts", groups: OPERATING_GROUPS as readonly string[] },
-];
+/**
+ * Every command module, and which groups each may use.
+ *
+ * **Derived, not listed.** The first version named three files, and a fourth
+ * (`backup.ts`) then declared a command the check could not see — it reported
+ * 42 commands against 43 and passed. A module is now matched by name: the two
+ * surface files use their surface's groups, and anything else under
+ * `commands/` is an operating command.
+ */
+const COMMANDS_DIR = "src/cli/commands";
+const SURFACE_GROUPS: Record<string, readonly string[]> = {
+  "reads.ts": READ_GROUPS,
+  "writes.ts": WRITE_GROUPS,
+};
+const FILES = readdirSync(COMMANDS_DIR)
+  .filter((f) => f.endsWith(".ts"))
+  .map((f) => ({
+    path: join(COMMANDS_DIR, f),
+    groups: SURFACE_GROUPS[f] ?? (OPERATING_GROUPS as readonly string[]),
+  }))
+  // reads, then writes, then the rest — the order commander meets them, which
+  // is what makes the ordering assertion below mean anything.
+  .sort((a, b) => order(a.path) - order(b.path));
+
+function order(path: string): number {
+  if (path.endsWith("reads.ts")) return 0;
+  if (path.endsWith("writes.ts")) return 1;
+  return 2;
+}
 
 /** `.command("x")` optionally followed by `.helpGroup("Y")`, in file order. */
 const DECLARATION = /\.command\("([a-z-]+)"\)\s*(?:\.helpGroup\("([^"]+)"\))?/g;
