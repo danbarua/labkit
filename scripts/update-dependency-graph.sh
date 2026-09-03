@@ -2,6 +2,13 @@
 #
 # Regenerate docs/dependency-graph.mmd — the module dependency graph, as text.
 #
+# **Cruises `src` only.** The graph once covered tests/ too, which it needed
+# while the early domain/graphdb entanglement was being refactored with no CLI
+# layer and no domain-level suites to lean on. With those in place, the test
+# wiring buried the application structure the graph exists to show — a reader
+# wants src's layering, and the layering rules over tests/ are the gate's job
+# (`bunx depcruise src tests --output-type err`), which still covers both.
+#
 # **Run by hand, when you want it.** There was a pre-commit hook that regenerated
 # on every commit touching src/ or tests/ and staged the result; it was removed
 # on 2026-08-21 along with the SVG. The graph is documentation, and documentation
@@ -39,7 +46,7 @@ mmd_out="docs/dependency-graph.mmd"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-if ! bunx depcruise tests --output-type json > "$tmp/cruise.json" 2> "$tmp/err.txt"; then
+if ! bunx depcruise src --output-type json > "$tmp/cruise.json" 2> "$tmp/err.txt"; then
   echo "update-dependency-graph: depcruise failed; graphs left unchanged." >&2
   sed 's/^/  /' "$tmp/err.txt" >&2
   exit 1
