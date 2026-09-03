@@ -127,6 +127,17 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
+// A check that examined nothing reports the same OK: as one that examined
+// everything and found it good. Fail on an empty population rather than
+// reporting success over it -- `check:empty-population` holds every check here
+// to that.
+if (files.length === 0) {
+  console.error(
+    "FAILED: no src/domain/*facts.ts modules — this check examined nothing. It printed\n" +
+      "        the zero and exited 0 until 2026-09-03.",
+  );
+  process.exit(1);
+}
 console.log(
   `OK: ${files.length} fact module(s), every grain named and every clause dependency declared.`,
 );

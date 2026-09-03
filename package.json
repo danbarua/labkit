@@ -38,6 +38,7 @@
 		"check:orm-unwrapped": "bun scripts/check-orm-unwrapped.ts",
 		"check:cypher-labels": "bun scripts/check-cypher-labels.ts",
 		"check:help-groups": "bun scripts/check-help-groups.ts",
+		"check:empty-population": "bun scripts/check-empty-population.ts",
 		"check:facts": "bun scripts/check-facts.ts",
 		"check:no-stringly-typed": "bun scripts/check-no-stringly-typed.ts",
 		"check:prop-classes": "bun scripts/check-prop-classes.ts",

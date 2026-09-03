@@ -46,10 +46,12 @@ const TAUTOLOGY = new RegExp(
 );
 
 const glob = new Glob("tests/**/*.test.ts");
+let scanned = 0;
 const silent: string[] = [];
 const tautologies: Array<{ path: string; line: number; text: string }> = [];
 
 for await (const path of glob.scan(".")) {
+  scanned++;
   const source = readFileSync(path, "utf8");
   // Strip comments before counting: a commented-out assertion is not one, and
   // this repo writes the *correct* assertion in a comment on purpose.
@@ -67,8 +69,19 @@ for await (const path of glob.scan(".")) {
   }
 }
 
+// A check that examined nothing reports the same OK: as one that examined
+// everything and found it good. Fail on an empty population rather than
+// reporting success over it -- `check:empty-population` holds every check here
+// to that.
+if (scanned === 0) {
+  console.error("FAILED: no test files under tests/ — this check examined nothing.");
+  process.exit(1);
+}
+
 if (silent.length === 0 && tautologies.length === 0) {
-  console.log("OK: every test file asserts something, and no assertion compares two literals.");
+  console.log(
+    `OK: ${scanned} test files, each asserting something, no assertion comparing two literals.`,
+  );
   process.exit(0);
 }
 

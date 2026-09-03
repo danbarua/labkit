@@ -58,8 +58,9 @@ function insideWrapper(node: ts.Node): boolean {
 }
 
 const failures: string[] = [];
+const scanned = ROOTS.flatMap((r) => sources(r));
 
-for (const file of ROOTS.flatMap((r) => sources(r))) {
+for (const file of scanned) {
   const text = readFileSync(file, "utf8");
   if (!text.includes(`${FACTORY}(`)) continue;
 
@@ -105,4 +106,12 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`OK: every ORM handle is used only inside ${WRAPPER}().`);
+// A check that examined nothing reports the same OK: as one that examined
+// everything and found it good. Fail on an empty population rather than
+// reporting success over it -- `check:empty-population` holds every check here
+// to that.
+if (scanned.length === 0) {
+  console.error("FAILED: no TypeScript sources under src/ — this check examined nothing.");
+  process.exit(1);
+}
+console.log(`OK: ${scanned.length} sources, every ORM handle used only inside ${WRAPPER}().`);

@@ -43,10 +43,12 @@ const code = (source: string): string =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 const offenders: Array<{ file: string; missing: string[] }> = [];
+let openers = 0;
 
 for (const file of testFiles("tests")) {
   const source = code(readFileSync(file, "utf8"));
   if (!source.includes("openScenario(")) continue;
+  openers++;
   const missing = [
     ...(source.includes(".end(") ? [] : ["scenario.end()"]),
     ...(source.includes(".close(") ? [] : ["scenario.close()"]),
@@ -67,6 +69,15 @@ if (offenders.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  `OK: all ${testFiles("tests").filter((f) => code(readFileSync(f, "utf8")).includes("openScenario(")).length} scenario files reset the database.`,
-);
+// A check that examined nothing reports the same OK: as one that examined
+// everything and found it good. Fail on an empty population rather than
+// reporting success over it -- `check:empty-population` holds every check here
+// to that.
+if (openers === 0) {
+  console.error(
+    "FAILED: no test file opens a scenario — this check examined nothing. It printed\n" +
+      '        "all 0 scenario files reset the database" and exited 0 until 2026-09-03.',
+  );
+  process.exit(1);
+}
+console.log(`OK: all ${openers} scenario files reset the database.`);
