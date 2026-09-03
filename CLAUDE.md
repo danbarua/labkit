@@ -485,6 +485,7 @@ bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted
 bun run check:binary          # builds bin/labkit and drives it against a fresh database
 bun run dev                    # the CLI (src/cli/cli.ts)
 bun run mcp                    # the MCP server over stdio -- `labkit mcp`, src/cli/commands/serve.ts
+labkit backup --path <f.tar.gz>  # the whole record in one file, before a release (#253)
 bun run spike:web             # the same tools over HTTP in containers, against Postgres + AGE
 bun run spike:web:down        # stop it
 bun run ports                  # this worktree's host-port offset and the five ports it implies

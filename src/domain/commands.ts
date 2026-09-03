@@ -172,7 +172,13 @@ export interface EvaluateCriterionCommand {
 /** `reverify` — re-run a historical analysis under current observations. Not reproduction (S-10). */
 export interface ReverifyCommand {
   historical: AnalysisRef;
-  enquiry: EnquiryRef;
+  /**
+   * Optional: the analysis being re-checked knows its own enquiry, and one
+   * hop from what the caller already named is inferred rather than restated.
+   * Given explicitly it is honoured — a re-check may be recorded under a
+   * different line of enquiry than the analysis it re-checks.
+   */
+  enquiry?: EnquiryRef;
   method: string;
   /** What the re-verification read this time. {@link InputRef} — an earlier analysis's output counts. */
   under: InputRef[];
