@@ -33,8 +33,18 @@ module.exports = {
         "the write side. Either half importing the other would let a read emit or a write answer, " +
         "and the seam would rot back into one file. Shared helpers go in core.ts, which is small " +
         "and enumerated on purpose so it cannot become a junk drawer.",
-      from: { path: '^src/domain/(read|write)\\.ts$' },
-      to: { path: '^src/domain/(read|write)\\.ts$', pathNot: '$1' }
+      from: { path: '^src/domain/read(/|\\.ts$)' },
+      to: { path: '^src/domain/write(/|\\.ts$)' }
+    },
+    {
+      name: 'writes-do-not-read',
+      severity: 'error',
+      comment:
+        "The mirror of reads-and-writes-do-not-mix. It was one rule with a `pathNot: '$1'` " +
+        "backreference, which worked only while the alternation had exactly two members and " +
+        "matched nothing once either surface became a directory.",
+      from: { path: '^src/domain/write(/|\\.ts$)' },
+      to: { path: '^src/domain/read(/|\\.ts$)' }
     },
     {
       name: 'core-knows-no-verbs',
@@ -43,7 +53,7 @@ module.exports = {
         "SessionCore holds the graph, the clock, the sink and the nine helpers both halves need. " +
         "If it reaches back to a surface the layering inverts and the split buys nothing.",
       from: { path: '^src/domain/core\\.ts$' },
-      to: { path: '^src/domain/(read|write|session)\\.ts$' }
+      to: { path: '^src/domain/(read|write|session)(/|\\.ts$)' }
     },
     {
       name: 'persistence-knows-no-domain',
