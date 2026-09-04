@@ -31,7 +31,7 @@ import {
   type WriteSurface,
 } from "../src/domain";
 import { DECODERS, type DecodeContext } from "../fragments/decode";
-import { fetchNodeProps, replayIntoScratch } from "../fragments/replay";
+import { replayIntoScratch } from "../fragments/replay";
 
 const home = mkdtempSync(join(tmpdir(), "labkit-retired-promote-"));
 afterAll(() => rmSync(home, { recursive: true, force: true }));
@@ -58,20 +58,21 @@ test("a recorded promote event decodes into `is confirmed`, carrying its reason"
     attribution,
     operation: "promote",
     subject: "CLM_4",
-    created: ["DEC_1"],
-    edges: [{ from: "DEC_1", label: "PROMOTES", to: "CLM_4" }],
-    detail: { proposition: "the speedup holds", from: "exploratory", to: "confirmatory" },
-  };
+    // The command as `promote` recorded it. Its reason used to live only on
+    // the Decision it minted, and the decoder read it back off that node.
+    command: { claim: "CLM_4", because: "re-timed on a quiet machine" },
+    changes: [
+      {
+        change: "NodeCreated",
+        id: "DEC_1",
+        label: "Decision",
+        props: { decided_at: "2026-08-28T09:00:00.000Z", reason: "re-timed on a quiet machine" },
+      },
+      { change: "EdgeCreated", from: "DEC_1", label: "PROMOTES", to: "CLM_4" },
+    ],
+  } as unknown as DomainEvent;
 
-  const ctx: DecodeContext = {
-    writes,
-    // `promote` never put its reason in the event; it lives on the Decision it
-    // minted, which is why the decoder reads a node property here.
-    nodeProp: (handle, key) =>
-      handle === "DEC_1" && key === "reason" ? "re-timed on a quiet machine" : undefined,
-    claimFor: () => undefined,
-    consumesOf: async () => [],
-  };
+  const ctx: DecodeContext = { writes };
 
   await DECODERS.promote(ctx, event);
 
@@ -101,7 +102,7 @@ test("a history containing a retired promote replays end to end, not just decode
     const events = inMemoryEventLog();
     const w = new Writes(graph, { clock: systemClock, events });
 
-    const { question } = await w.pose("does the speedup hold");
+    const { question } = await w.pose({ question: "does the speedup hold" });
     const { enquiry } = await w.pursue({ question, approach: "time it" });
     const { observations } = await w.recordObservations({
       enquiry,
@@ -130,8 +131,7 @@ test("a history containing a retired promote replays end to end, not just decode
       .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
       .map((e) => (e.operation === "is" ? { ...e, operation: "promote" } : e));
 
-    const nodeProps = await fetchNodeProps(graph, history);
-    const result = await replayIntoScratch(history, nodeProps);
+    const result = await replayIntoScratch(history);
 
     expect(result.refusedAt).toBeUndefined();
   } finally {

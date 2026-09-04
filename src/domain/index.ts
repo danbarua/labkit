@@ -31,8 +31,11 @@ export type {
   EventFilter,
   EventSink,
   // Re-exported from `src/db/domain` through `./events`, so a consumer of the
-  // domain barrel can name an edge without importing the persistence layer.
-  MintedEdge,
+  // domain barrel can name a change without importing the persistence layer.
+  GraphChange,
+  NodeCreated,
+  EdgeCreated,
+  PropsChanged,
 } from "./events";
 export type {
   Ref,
@@ -102,6 +105,7 @@ export type {
 // these are what an act takes. Exported so an adapter can hold one -- which is
 // what an MCP write tool will need and what inline anonymous shapes prevented.
 export type {
+  Command,
   PursueCommand,
   NoteCommand,
   SharpenCommand,

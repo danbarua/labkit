@@ -18,9 +18,10 @@
  * `AttributionContext` below.
  */
 
-import type { MintedEdge } from "../db/domain";
+import type { EdgeCreated, GraphChange, NodeCreated, PropsChanged } from "../db/domain";
+import type { Command } from "./commands";
 
-export type { MintedEdge };
+export type { EdgeCreated, GraphChange, NodeCreated, PropsChanged };
 
 /** Injected so scenario tests can assert on exact timestamps instead of racing the wall clock. */
 export interface Clock {
@@ -148,9 +149,9 @@ export const UNATTRIBUTED: AttributionContext = {
 };
 
 /**
- * One recorded domain operation. `subject` is the natural id of whatever the
- * operation was primarily about; `detail` carries the operation-specific
- * payload a later query would need to reconstruct what happened.
+ * One recorded domain operation: the command that was issued, and every change
+ * it made. `subject` is the natural id of whatever the operation was primarily
+ * about.
  */
 export interface DomainEvent {
   /**
@@ -197,54 +198,22 @@ export interface DomainEvent {
    */
   operation: string;
   subject: string;
+  /** Every change this act made to the graph, in the order it made them. */
+  changes: readonly GraphChange[];
   /**
-   * Every handle this act minted. Always an array, empty if the act minted
-   * nothing — never absent. See {@link domainEvent}, the one place that
-   * default is applied, for why nothing downstream needs a null check.
+   * What the caller asked for, verbatim.
    *
-   * `subject` says what the act was *about*; this says what came into
-   * existence, and for most verbs they differ. Six verbs mint a `Decision` and
-   * only `amendDesign` names that decision as its subject — the others name the
-   * enquiry or the claim, because that is what the researcher was doing. So
-   * "which act created this record?" is answerable from here and not from
-   * `subject`.
+   * Not a summary of it: a hand-built subset is a subset somebody chose by
+   * typing, and every field left out is one a later reader cannot recover.
    */
-  created: readonly string[];
-  /**
-   * Every edge this act created. Always an array, for the same reason as
-   * {@link created} — see {@link domainEvent}.
-   *
-   * The other half of {@link created}. Without it an act's nodes are visible
-   * and what connected them is not.
-   *
-   * **Unreconstructable from the graph**, which is why it is recorded rather
-   * than derived: the graph holds the edge and not the act that made it, and
-   * unlike a node there is no `created` to fall back on.
-   */
-  edges: readonly MintedEdge[];
-  detail?: Record<string, unknown>;
+  command: Command;
 }
 
-/**
- * Builds a `DomainEvent`, defaulting `created`/`edges` to `[]` so a caller
- * building one by hand never states "this minted nothing" twice.
- *
- * **Not the type's own job.** Optional fields make a consumer three call-sites
- * away know that "absent" means "empty" — a `?? []` at every read, and a `null`
- * sentinel in the store to tell "empty" apart from "nobody was collecting yet".
- * That distinction only earns its keep for rows written before the column
- * existed, and the one durable record this repo has is script-derived:
- * `probe-bonsai-replay.sh` regenerates it byte for byte, so no data anywhere
- * could be stranded by a schema change.
- *
- * `WriteSurface.emit` already supplies both fields unconditionally, from
- * `TenantGraph`'s drain calls — this constructor is for the other caller, a
- * fixture built by hand in a test that never went through `emit` at all.
- */
+/** Builds a `DomainEvent`, defaulting `changes` to empty. */
 export function domainEvent(
-  fields: Omit<DomainEvent, "created" | "edges"> & Partial<Pick<DomainEvent, "created" | "edges">>,
+  fields: Omit<DomainEvent, "changes"> & Partial<Pick<DomainEvent, "changes">>,
 ): DomainEvent {
-  return { ...fields, created: fields.created ?? [], edges: fields.edges ?? [] };
+  return { ...fields, changes: fields.changes ?? [] };
 }
 
 /**
@@ -276,6 +245,15 @@ export interface EventFilter {
 export interface EventSink {
   /** Returns the stored event, `seq` included -- the caller built one without it. */
   record(event: DomainEvent): Promise<DomainEvent>;
+  /**
+   * Called once the event has been projected into the graph.
+   *
+   * The graph is a projection of the stream, so anything that reads the graph
+   * in response to an event has to run after that projection, not inside
+   * `record` — which happens first, by design, and sees the record as it stood
+   * *before* the act.
+   */
+  projected?(event: DomainEvent): Promise<void>;
   /** Everything recorded so far, oldest first. */
   all(): Promise<readonly DomainEvent[]>;
   /** The subset a caller asked for, oldest first. */
@@ -309,7 +287,9 @@ export function inMemoryEventLog(): EventSink {
     (f.since === undefined || (e.seq ?? 0) > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
-    (f.touching === undefined || e.subject === f.touching || e.created.includes(f.touching));
+    (f.touching === undefined ||
+      e.subject === f.touching ||
+      e.changes.some((c) => c.change === "NodeCreated" && c.id === f.touching));
   return {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is

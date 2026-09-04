@@ -12,6 +12,7 @@
  * a research question and does not belong in a research conversation.
  */
 
+import type { PoseCommand } from "../src/domain/commands";
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, test } from "bun:test";
 import {
   ResearchSession,
@@ -66,7 +67,7 @@ describe("an event says who caused it", () => {
     const events = inMemoryEventLog();
     const write = new WriteSurface(graph, { clock, attribution, events });
 
-    await write.pose("does the coating slow corrosion?");
+    await write.pose({ question: "does the coating slow corrosion?" });
 
     const [recorded] = await events.all();
     expect(recorded?.operation).toBe("pose");
@@ -87,7 +88,7 @@ describe("an event says who caused it", () => {
     const events = inMemoryEventLog();
     const session = new ResearchSession(graph, { clock, events });
 
-    await session.pose("is the solver faster?");
+    await session.pose({ question: "is the solver faster?" });
 
     expect((await events.all())[0]?.attribution).toEqual(UNATTRIBUTED);
   });
@@ -107,12 +108,12 @@ describe("an event says who caused it", () => {
     const dan = agent("dan", "human-1", "b".repeat(40));
     const claude = agent("claude-opus-5", "agent-1", "b".repeat(40));
 
-    await new WriteSurface(graph, { clock, attribution: dan, events }).pose(
-      "does the coating slow corrosion?",
-    );
-    await new WriteSurface(graph, { clock, attribution: claude, events }).pose(
-      "is the solver faster?",
-    );
+    await new WriteSurface(graph, { clock, attribution: dan, events }).pose({
+      question: "does the coating slow corrosion?",
+    });
+    await new WriteSurface(graph, { clock, attribution: claude, events }).pose({
+      question: "is the solver faster?",
+    });
 
     expect((await events.all()).map((e) => e.attribution.attribution_id)).toEqual([
       "human-1",
@@ -136,10 +137,10 @@ describe("an event says who caused it", () => {
     const events = inMemoryEventLog();
     const ctx = commandContext(mockGitContext, mockSessionContext, clock);
 
-    await new WriteSurface(graph, { ...ctx, events }).pose("first question");
-    await new WriteSurface(graph, { ...ctx, events }).pose("second question");
+    await new WriteSurface(graph, { ...ctx, events }).pose({ question: "first question" });
+    await new WriteSurface(graph, { ...ctx, events }).pose({ question: "second question" });
 
-    expect((await events.all()).map((e) => e.detail?.question)).toEqual([
+    expect((await events.all()).map((e) => (e.command as PoseCommand).question)).toEqual([
       "first question",
       "second question",
     ]);

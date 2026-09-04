@@ -22,46 +22,49 @@ import type {
   PlanWorkCommand,
 } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
+import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 export class Counting extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
 
   /** Records a piece of work whose start a gate may protect. */
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
-    return this.graph.inTransaction(async () => {
-      const task = await this.graph.createNode("Task", {
-        objective: input.objective,
-        mayRead: input.mayRead ?? [],
-        outputs: "",
-        acceptance: input.acceptance,
-      });
-      if (input.addressing)
-        await this.graph.createEdge(task.natural_id, "ADDRESSES", input.addressing);
-      const events = await this.emit("planWork", ref("work", task.natural_id), {
-        objective: input.objective,
-      });
-      return { work: ref("work", task.natural_id), events };
+    return this.handle("planWork", input, async (unitOfWork) => {
+      const work = ref(
+        "work",
+        await unitOfWork.node("Task", {
+          objective: input.objective,
+          mayRead: input.mayRead ?? [],
+          outputs: "",
+          acceptance: input.acceptance,
+        }),
+      );
+      if (input.addressing) unitOfWork.edge(work, "ADDRESSES", input.addressing);
+
+      return {
+        subject: work,
+        result: { work },
+      };
     });
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
-    return this.graph.inTransaction(async () => {
-      const criterion = await this.graph.createNode("Criterion", {
-        proposition,
-      });
-      const events = await this.emit("stateCriterion", ref("criterion", criterion.natural_id), {
-        proposition,
-      });
-      return { criterion: ref("criterion", criterion.natural_id), events };
+    return this.handle("stateCriterion", { proposition }, async (unitOfWork) => {
+      const criterion = ref("criterion", await unitOfWork.node("Criterion", { proposition }));
+
+      return {
+        subject: criterion,
+        result: { criterion },
+      };
     });
   }
 
@@ -70,7 +73,7 @@ export class Counting extends SessionCore {
    * work. **Declaring a gate must not make it satisfied.**
    */
   async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("declareGate", input, async (unitOfWork) => {
       if (input.governedBy.length === 0)
         throw new Error(
           "a gate needs at least one criterion to govern it: a gate enforces a condition, and one " +
@@ -88,20 +91,14 @@ export class Counting extends SessionCore {
             "— name it in protecting, or hold the analysis to the criterion instead if nothing " +
             "downstream depends on it",
         );
-      const gate = await this.graph.createNode("Gate", {
-        consequence: input.consequence,
-      });
-      for (const criterion of input.governedBy) {
-        await this.graph.createEdge(criterion, "GOVERNS", gate.natural_id);
-      }
-      for (const work of input.protecting) {
-        await this.graph.createEdge(gate.natural_id, "GATES", work);
-      }
-      const events = await this.emit("declareGate", ref("gate", gate.natural_id), {
-        governedBy: input.governedBy.map((c) => c),
-        protecting: input.protecting.map((w) => w),
-      });
-      return { gate: ref("gate", gate.natural_id), events };
+      const gate = ref("gate", await unitOfWork.node("Gate", { consequence: input.consequence }));
+      for (const criterion of input.governedBy) unitOfWork.edge(criterion, "GOVERNS", gate);
+      for (const work of input.protecting) unitOfWork.edge(gate, "GATES", work);
+
+      return {
+        subject: gate,
+        result: { gate },
+      };
     });
   }
 
@@ -122,7 +119,7 @@ export class Counting extends SessionCore {
    * anything is written so a rejected command leaves no partial state.
    */
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("evaluateCriterion", input, async (unitOfWork) => {
       if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
       // Same invariant class as `assertCriterionGovernsGate`, for the other job
       // a criterion can do: an evaluation that neither triggers a gate nor bears
@@ -135,46 +132,26 @@ export class Counting extends SessionCore {
         basis = found.evidence;
       }
       const at = this.clock.now();
-      // Transactional, demonstrated rather than assumed — `docs/consumer-contract/041`.
-      //
-      // The docstring above argues against exactly one durable state, and guards
-      // it on the caller-error path only. Interruption is the other side of the
-      // same operation, and it was open: `EVALUATED_AS` is written *second*, so
-      // from that point the evaluation is reachable and the edges after it are
-      // the ones that say what it means.
-      //
-      // The window that earns this is `BASED_ON`. A verdict that lost it reads
-      // as reached against nothing — `basis: []`, which on its own is an
-      // absence rather than a wrong answer. But withdrawal is
-      // `cited > 0 && standing === 0`, so a verdict that cited nothing can never
-      // be withdrawn: retract the evidence it was actually reached against and
-      // the gate stays **blocked** by a `fail` the record insists still stands.
-      // That is positively false, which is what separates this verb from
-      // `sharpen`, whose partial states no reader can reach.
-      const evaluation = await this.graph.inTransaction(async () => {
-        const ev = await this.graph.createNode("CriterionEvaluation", {
+
+      const evaluation = ref(
+        "evaluation",
+        await unitOfWork.node("CriterionEvaluation", {
           value: input.value,
           outcome: input.outcome,
           evaluated_at: at,
-        });
-        await this.graph.createEdge(input.criterion, "EVALUATED_AS", ev.natural_id);
-        if (input.gate) await this.graph.createEdge(ev.natural_id, "TRIGGERS", input.gate);
-        // What the verdict was reached against. Without it, a condition
-        // established by measurement and one asserted by an agent return
-        // identical records.
-        if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
-        return ev;
-      });
-      const events = await this.emit(
-        "evaluateCriterion",
-        ref("evaluation", evaluation.natural_id),
-        {
-          criterion: input.criterion,
-          ...(input.gate ? { gate: input.gate } : {}),
-          outcome: input.outcome,
-        },
+        }),
       );
-      return { evaluation: ref("evaluation", evaluation.natural_id), events };
+      unitOfWork.edge(input.criterion, "EVALUATED_AS", evaluation);
+      if (input.gate) unitOfWork.edge(evaluation, "TRIGGERS", input.gate);
+      // What the verdict was reached against. Without it, a condition
+      // established by measurement and one asserted by an agent return
+      // identical records.
+      if (basis) unitOfWork.edge(evaluation, "BASED_ON", basis);
+
+      return {
+        subject: evaluation,
+        result: { evaluation },
+      };
     });
   }
 
@@ -198,7 +175,7 @@ export class Counting extends SessionCore {
    * remembering to pass the right handle is not an ordering.
    */
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("amendDesign", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       // Everything validated before anything is written -- a rejected amendment
@@ -243,57 +220,45 @@ export class Counting extends SessionCore {
 
       const prior = await this.latestAmendmentOn(gates);
 
-      // Atomic, for the same reason: interrupted after the replacement condition
-      // governs the gate but before the original is retired, the gate is governed
-      // by two conditions, one of which nobody agreed to. See
-      // TenantGraph.inTransaction.
-      const { replacement, decision } = await this.graph.inTransaction(async () => {
-        const replacement = await this.graph.createNode("Criterion", {
-          proposition: input.nowRequires,
-        });
-        for (const gate of gates)
-          await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
-
-        const decision = await this.graph.createNode("Decision", {
-          decided_at: this.clock.now(),
-          reason: input.because,
-          invalidation_check: "evidence that the amended setting was not the constraint after all",
-        });
-        await this.graph.createEdge(decision.natural_id, "CHANGES", input.criterion);
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
-        if (prior) await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
-        return { replacement, decision };
-      });
-
       const rerun = await this.workGatedBy(gates);
       const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
 
-      const events = await this.emit("amendDesign", ref("decision", decision.natural_id), {
-        criterion: input.criterion,
-        replaced,
-        nowRequires: input.nowRequires,
-        supersedes: prior ?? null,
-      });
+      const replacement = ref(
+        "criterion",
+        await unitOfWork.node("Criterion", { proposition: input.nowRequires }),
+      );
+      for (const gate of gates) unitOfWork.edge(replacement, "GOVERNS", gate);
+
+      const decision = ref(
+        "decision",
+        await unitOfWork.node("Decision", {
+          decided_at: this.clock.now(),
+          reason: input.because,
+          invalidation_check: "evidence that the amended setting was not the constraint after all",
+        }),
+      );
+      unitOfWork.edge(decision, "CHANGES", input.criterion);
+      unitOfWork.edge(decision, "BASED_ON", diagnosis);
+      if (prior) unitOfWork.edge(decision, "SUPERSEDES", prior);
 
       return {
-        at,
-        amendment: ref("decision", decision.natural_id),
-        // `void replacement;` stood here: the amended criterion was created and
-        // its handle thrown away, so the report named both conditions by wording
-        // and a caller could reach neither.
-        replaced: { criterion: input.criterion, requires: replaced ?? "" },
-        nowRequires: {
-          criterion: ref("criterion", replacement.natural_id),
-          requires: input.nowRequires,
+        subject: decision,
+        result: {
+          at,
+          amendment: decision,
+          // `void replacement;` stood here: the amended criterion was created and
+          // its handle thrown away, so the report named both conditions by wording
+          // and a caller could reach neither.
+          replaced: { criterion: input.criterion, requires: replaced ?? "" },
+          nowRequires: { criterion: replacement, requires: input.nowRequires },
+          rerun,
+          confirmatoryAffected,
+          // Derived, never declared. An amendment is scientific exactly when
+          // something the confirmatory boundary rests on is in its blast radius --
+          // which is the difference between repairing a solver and moving the
+          // goalposts, and is not a thing the person amending gets to assert.
+          nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
         },
-        rerun,
-        confirmatoryAffected,
-        // Derived, never declared. An amendment is scientific exactly when
-        // something the confirmatory boundary rests on is in its blast radius --
-        // which is the difference between repairing a solver and moving the
-        // goalposts, and is not a thing the person amending gets to assert.
-        nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
-        events,
       };
     });
   }

@@ -10,14 +10,15 @@ import type {
   RecordReviewCommand,
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
+import type { Handle } from "./index";
 import { asConcludedClaim, Shared } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 export class Work extends Shared {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -49,52 +50,34 @@ export class Work extends Shared {
    * neither of, or through a required `USES -> Computation`.
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
-    return this.graph.inTransaction(async () => {
-      // Atomic. A failure between the evidence and its unit writes *precisely*
-      // the invariant this verb exists to prevent --
-      // durably, and looking exactly like the eighteen scenarios of records that
-      // predate the fix. See TenantGraph.inTransaction.
-      const { artefact } = await this.graph.inTransaction(async () => {
-        const artefact = await this.graph.createNode("Artefact", {
-          kind: "observations",
-          logical_name: input.name,
-          ...(input.contentHash ? { content_hash: input.contentHash } : {}),
-        });
-        const evidence = await this.graph.createNode("Evidence", {
-          statement: input.finding,
-        });
-        // `role` is recorded because the property is not optional, not because
-        // anything reads it: `EvidenceUnitRole` has one writer and no readers
-        // anywhere in `src/`. An "observation" value was declined -- adding
-        // vocabulary to a union nothing consumes is dead shape, and the no-cull
-        // policy covers labels and edges, which are claims about the domain,
-        // not property values. `experiment` is
-        // the nearest existing value for a measurement taken rather than
-        // inferred, and it is a placeholder until something reads the field.
-        const unit = await this.graph.createNode("EvidenceUnit", {
-          role: "experiment",
-        });
-        await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", artefact.natural_id);
-        await this.graph.createEdge(unit.natural_id, "PRODUCES", evidence.natural_id);
-        await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry);
-        // The enquiry requires these observations -- a statement about the
-        // enquiry, not about any analysis. What a given analysis actually read is
-        // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
-        // it. Kept alongside ADDRESSES rather than replaced by it: REQUIRES says
-        // the enquiry depends on this evidence, ADDRESSES says this work was done
-        // towards the enquiry, and `whatDependsOn()` reads the first.
-        await this.graph.createEdge(input.enquiry, "REQUIRES", evidence.natural_id);
-        return { artefact, evidence };
+    return this.handle("recordObservations", input, async (unitOfWork) => {
+      const artefact = await unitOfWork.node("Artefact", {
+        kind: "observations",
+        logical_name: input.name,
+        ...(input.contentHash ? { content_hash: input.contentHash } : {}),
       });
+      const evidence = await unitOfWork.node("Evidence", { statement: input.finding });
+      // `role` is recorded because the property is not optional, not because
+      // anything reads it: `EvidenceUnitRole` has one writer and no readers
+      // anywhere in `src/`. `experiment` is the nearest existing value for a
+      // measurement taken rather than inferred, and it is a placeholder until
+      // something reads the field.
+      const unit = await unitOfWork.node("EvidenceUnit", { role: "experiment" });
+      unitOfWork.edge(evidence, "RECORDED_IN", artefact);
+      unitOfWork.edge(unit, "PRODUCES", evidence);
+      unitOfWork.edge(unit, "ADDRESSES", input.enquiry);
+      // The enquiry requires these observations -- a statement about the
+      // enquiry, not about any analysis. What a given analysis actually read is
+      // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
+      // it. REQUIRES says the enquiry depends on this evidence, ADDRESSES says
+      // this work was done towards the enquiry, and `whatDependsOn()` reads the
+      // first.
+      unitOfWork.edge(input.enquiry, "REQUIRES", evidence);
 
-      const events = await this.emit(
-        "recordObservations",
-        ref("observations", artefact.natural_id),
-        { name: input.name },
-      );
+      const observations = ref("observations", artefact);
       return {
-        observations: ref("observations", artefact.natural_id),
-        events,
+        subject: observations,
+        result: { observations },
       };
     });
   }
@@ -110,16 +93,15 @@ export class Work extends Shared {
    * EDGE_SCHEMA.CONSUMES.
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
-    return this.graph.inTransaction(async () => {
-      const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
+    return this.handle("recordAnalysis", input, async (unitOfWork) => {
+      const { analysis } = await this.recorded(input, unitOfWork);
       // An analysis with no conclusions yet emits exactly one event and is a
       // real state: `enquiry` prints "has produced nothing yet" and `known`
       // buckets it as worked-on-no-answer.
-      const events = await this.emit("recordAnalysis", analysis, {
-        enquiry: input.enquiry,
-        method: input.method,
-      });
-      return { analysis, claims: [], events };
+      return {
+        subject: analysis,
+        result: { analysis, claims: [] },
+      };
     });
   }
 
@@ -152,26 +134,15 @@ export class Work extends Shared {
     return this.concludeOne(input);
   }
 
-  /**
-   * `conclude`'s work in its own mint scope. **The compounds call this one.**
-   */
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.graph.inTransaction(async () =>
-      // **Its own mint scope, so a composition calling this keeps its own.**
-      // `emit` drains what has been minted since the last event, and without a
-      // scope that meant everything the enclosing verb had minted too — the
-      // parent's edges carried off into the child's event. See
-      // `TenantGraph.inMintScope`, which also records why suppressing the inner
-      // event was the wrong fix.
-      this.graph.inMintScope(async () => {
-        const concluded = await this.concluding(input);
-        const events = await this.emit("conclude", input.analysis, {
-          conclusions: this.conclusionEvents([concluded]),
-          ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
-        });
-        return { analysis: input.analysis, claims: [asConcludedClaim(concluded)], events };
-      }),
-    );
+    return this.handle("conclude", input, async (unitOfWork) => {
+      const concluded = await this.concluding(input, unitOfWork);
+
+      return {
+        subject: input.analysis,
+        result: { analysis: input.analysis, claims: [asConcludedClaim(concluded)] },
+      };
+    });
   }
 
   /**
@@ -182,20 +153,16 @@ export class Work extends Shared {
    * nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.graph.inTransaction(async () => {
-      const review = await this.graph.createNode("Review", {
-        verdict: input.verdict,
-      });
-      await this.graph.createEdge(
-        review.natural_id,
-        "EVALUATES",
-        await this.unitOf(input.of).then((u) => u),
-      );
-      const events = await this.emit("recordReview", ref("review", review.natural_id), {
-        of: input.of,
-        verdict: input.verdict,
-      });
-      return { review: ref("review", review.natural_id), events };
+    return this.handle("recordReview", input, async (unitOfWork) => {
+      const unit = await this.unitOf(input.of);
+
+      const review = ref("review", await unitOfWork.node("Review", { verdict: input.verdict }));
+      unitOfWork.edge(review, "EVALUATES", unit);
+
+      return {
+        subject: review,
+        result: { review },
+      };
     });
   }
 }

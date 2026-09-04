@@ -11,6 +11,8 @@
  * research question.
  */
 
+import type { DomainEvent, EdgeCreated, GraphChange } from "../src/domain/events";
+import type { PoseCommand } from "../src/domain/commands";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
@@ -52,6 +54,14 @@ const surfaceFor = async (slug: string) => {
   };
 };
 
+/** The handles an act created, from its changes. */
+const createdIn = (e: DomainEvent): string[] =>
+  e.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : []));
+
+/** The edges an act created, from its changes. */
+const edgesIn = (e: DomainEvent): EdgeCreated[] =>
+  e.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : []));
+
 describe("the event log outlives the process that wrote it", () => {
   /**
    * The whole point, stated as the thing the in-memory sink could not do.
@@ -61,7 +71,7 @@ describe("the event log outlives the process that wrote it", () => {
    */
   test("an event written through one connection is readable through another", async () => {
     const { write } = await surfaceFor("labkit");
-    const { question } = await write.pose("does the coating hold?");
+    const { question } = await write.pose({ question: "does the coating hold?" });
 
     const other = await testDb.openClient();
     try {
@@ -86,15 +96,15 @@ describe("the event log outlives the process that wrote it", () => {
   test("two tenants do not see each other's events", async () => {
     const a = await surfaceFor("tenant-a");
     const b = await surfaceFor("tenant-b");
-    await a.write.pose("is A's question recorded?");
-    await b.write.pose("is B's question recorded?");
+    await a.write.pose({ question: "is A's question recorded?" });
+    await b.write.pose({ question: "is B's question recorded?" });
 
     const seenByA = await pgEventLog(db, a.ctx.tenantId).all();
     const seenByB = await pgEventLog(db, b.ctx.tenantId).all();
     expect(seenByA).toHaveLength(1);
     expect(seenByB).toHaveLength(1);
-    expect(seenByA[0]!.detail?.question).toBe("is A's question recorded?");
-    expect(seenByB[0]!.detail?.question).toBe("is B's question recorded?");
+    expect((seenByA[0]!.command as PoseCommand).question).toBe("is A's question recorded?");
+    expect((seenByB[0]!.command as PoseCommand).question).toBe("is B's question recorded?");
   });
 });
 
@@ -144,9 +154,9 @@ describe("an event commits with the writes it describes, or not at all", () => {
     await expect(write.openEnquiry("the one that fails")).rejects.toThrow(/injected/);
     graph.createEdge = realCreateEdge;
 
-    const { question } = await write.pose("the one that succeeds");
+    const { question } = await write.pose({ question: "the one that succeeds" });
     const [event] = await log.all();
-    expect(event!.created).toEqual([question]);
+    expect(createdIn(event!)).toEqual([question]);
   });
 
   /**
@@ -188,9 +198,9 @@ describe("an event commits with the writes it describes, or not at all", () => {
 
     // `pose` connects nothing, so the only way this is non-empty is residue
     // from the six edges the failed analysis had already written.
-    await write.pose("the one that succeeds");
+    await write.pose({ question: "the one that succeeds" });
     const events = await log.select({ operation: "pose" });
-    expect(events.at(-1)!.edges).toEqual([]);
+    expect(edgesIn(events.at(-1)!)).toEqual([]);
   });
 });
 
@@ -214,8 +224,8 @@ describe("the two sinks answer one filter the same way", () => {
       attribution: UNATTRIBUTED,
       operation: "pose" as const,
       subject,
-      created: [],
-      edges: [],
+      command: { question: "does it hold?" },
+      changes: [],
     });
     await log.record(ev("Q_1"));
     await log.record(ev("Q_2"));
@@ -324,8 +334,13 @@ describe("an event records the edges the act created", () => {
     });
 
     // Per conclusion, since the array is the record of what was concluded.
-    const standingIn = (e: { detail?: Record<string, unknown> }) =>
-      (e.detail?.conclusions as { standing?: string }[] | undefined)?.[0]?.standing;
+    const standingIn = (e: DomainEvent): string | undefined => {
+      const claim = e.changes.find(
+        (c): c is Extract<GraphChange, { change: "NodeCreated"; label: "Claim" }> =>
+          c.change === "NodeCreated" && c.label === "Claim",
+      );
+      return claim?.props.kind;
+    };
     const [first, second] = await log.select({ operation: "conclude" });
     expect(standingIn(first!)).toBe("exploratory");
     expect(standingIn(second!)).toBe("confirmatory");
@@ -336,7 +351,14 @@ describe("an event records the edges the act created", () => {
       because: "the prespecified check passed",
     });
     const [promoted] = await log.select({ operation: "is" });
-    expect(promoted!.detail).toMatchObject({ from: "exploratory", to: "confirmatory" });
+    // The act's own words, and the change it made: `is <claim> confirmed`
+    // sets `kind` in place, and the delta is what carries that.
+    expect(promoted!.command).toMatchObject({ state: "confirmed" });
+    expect(promoted!.changes).toContainEqual({
+      change: "PropsChanged",
+      id: exploratory.claims[0]!.claim,
+      props: { kind: "confirmatory" },
+    });
   });
 
   test("recordAnalysis reports every edge, not only its nodes", async () => {
@@ -358,11 +380,11 @@ describe("an event records the edges the act created", () => {
     const [analysis] = await log.select({ operation: "recordAnalysis" });
     // `string[]`, not `EdgeLabel[]`: the expectation below is a literal list
     // and unifying the two on the branded union buys nothing here.
-    const labels: string[] = (analysis!.edges ?? []).map((e) => e.label);
+    const labels: string[] = edgesIn(analysis!).map((e) => e.label);
     labels.sort();
 
-    // Every one of these is written by `recorded()` and none appears in
-    // `detail`, which carries the enquiry and the method.
+    // Every one of these is written by `recorded()` and none appears in the
+    // command, which carries the enquiry and the method.
     //
     // **Two `PRODUCES`, and which two is the point of writing the list out.**
     // The computation's artefact, and `EvidenceUnit -> Artefact`, which no
@@ -377,12 +399,12 @@ describe("an event records the edges the act created", () => {
     const [drawn] = await log.select({ operation: "conclude" });
     // `string[]`, for the same reason the list above is: the expectation is a
     // literal and unifying it on the branded union buys nothing.
-    const drawnLabels: string[] = (drawn!.edges ?? []).map((e) => e.label);
+    const drawnLabels: string[] = edgesIn(drawn!).map((e) => e.label);
     expect(drawnLabels.sort()).toEqual(["PRODUCES", "RECORDED_IN", "SUPPORTS"].sort());
 
     // Endpoints, not just labels: a collector that recorded the label and lost
     // the pair would satisfy the assertion above.
-    const consumes = analysis!.edges!.find((e) => e.label === "CONSUMES");
+    const consumes = edgesIn(analysis!).find((e) => e.label === "CONSUMES");
     expect(consumes!.to).toBe(raw);
   });
 
@@ -396,11 +418,11 @@ describe("an event records the edges the act created", () => {
   test("an act that connects nothing records an empty list, not an absent one", async () => {
     const { ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);
-    await write.pose("does the coating hold?");
+    await write.pose({ question: "does the coating hold?" });
 
     const [event] = await log.all();
-    expect(event!.edges).toEqual([]);
-    expect(event!.edges).not.toBeUndefined();
+    expect(edgesIn(event!)).toEqual([]);
+    expect(event!.changes).not.toBeUndefined();
   });
 });
 
@@ -442,12 +464,12 @@ describe("the log answers what the graph cannot", () => {
   test("seq orders two events a frozen clock stamps identically", async () => {
     const { ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);
-    await write.pose("first");
-    await write.pose("second");
+    await write.pose({ question: "first" });
+    await write.pose({ question: "second" });
 
     const events = await log.all();
     expect(events.map((e) => e.at)).toEqual([clock.now(), clock.now()]); // indistinguishable...
-    expect(events.map((e) => e.detail?.question)).toEqual(["first", "second"]); // ...but ordered.
+    expect(events.map((e) => (e.command as PoseCommand).question)).toEqual(["first", "second"]); // ...but ordered.
     expect(events[0]!.seq!).toBeLessThan(events[1]!.seq!);
 
     // And `since` pages from one, which is what makes seq a cursor.

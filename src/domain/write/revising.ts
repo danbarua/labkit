@@ -27,8 +27,9 @@ import type {
   ReverifyCommand,
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
+import type { Handle } from "./index";
 import { asConcludedClaim, Shared } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 /**
  * The `Claim.kind` each state is stored as.
@@ -54,7 +55,7 @@ export class Revising extends Shared {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -76,11 +77,8 @@ export class Revising extends Shared {
    * One event, not two: a researcher who re-verified a result did one thing.
    */
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("reverify", input, async (unitOfWork) => {
       const at = this.clock.now();
-      // Atomic: without the second write the durable state is a second
-      // independent support standing where a re-verification was meant. See
-      // TenantGraph.inTransaction.
       // **One hop, inferred rather than restated.** The analysis being
       // re-checked knows the enquiry it was recorded under, so a caller who
       // named the analysis has already said which one. An explicit `enquiry`
@@ -93,50 +91,46 @@ export class Revising extends Shared {
             `infer; name one with the enquiry this re-check belongs to`,
         );
 
-      const verification = await this.graph.inTransaction(async () => {
-        const original = await this.findingFor(input.historical, input.concludes.proposition);
-        if (!original) {
-          throw new Error(
-            `analysis ${input.historical} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
-          );
-        }
-        const { analysis } = await this.recorded({
-          enquiry,
-          method: input.method,
-          from: input.under,
-        });
-        return { analysis, original };
-      });
+      const original = await this.findingFor(input.historical, input.concludes.proposition);
+      if (!original) {
+        throw new Error(
+          `analysis ${input.historical} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
+        );
+      }
 
-      // The conclusion first, then the edge, then the emit: `emit` drains what
-      // has been minted since the last event, so anything written after it
-      // lands in the next act's event instead of this one.
-      const concluded = await this.concluding({
-        analysis: verification.analysis,
-        proposition: input.concludes.proposition,
-        finding: input.concludes.finding,
-        ...(input.concludes.bearing === undefined ? {} : { bearing: input.concludes.bearing }),
-        ...(input.concludes.standing === undefined ? {} : { standing: input.concludes.standing }),
-      });
+      const { analysis, unit, output } = await this.recorded(
+        { enquiry, method: input.method, from: input.under },
+        unitOfWork,
+      );
+
+      // The analysis this conclusion hangs off is in the same delta, so its
+      // unit, output and enquiry are handed over rather than queried for.
+      const concluded = await this.concluding(
+        {
+          analysis,
+          proposition: input.concludes.proposition,
+          finding: input.concludes.finding,
+          ...(input.concludes.bearing === undefined ? {} : { bearing: input.concludes.bearing }),
+          ...(input.concludes.standing === undefined ? {} : { standing: input.concludes.standing }),
+        },
+        unitOfWork,
+        { unit, output, enquiry },
+      );
 
       // `REVERIFIES` is evidence-to-evidence and says the same proposition was
       // checked again -- deliberately NOT the supersession `conclude
       // --replacing` writes, which says a finding was replaced. Two different
       // claims about two different acts; see `conclude`'s header.
-      await this.graph.createEdge(concluded.finding, "REVERIFIES", verification.original);
-
-      const events = await this.emit("reverify", verification.analysis, {
-        of: input.historical,
-        proposition: input.concludes.proposition,
-        conclusions: this.conclusionEvents([concluded]),
-      });
+      unitOfWork.edge(concluded.finding, "REVERIFIES", original);
 
       return {
-        at,
-        verification: verification.analysis,
-        of: input.historical,
-        claims: [asConcludedClaim(concluded)],
-        events,
+        subject: analysis,
+        result: {
+          at,
+          verification: analysis,
+          of: input.historical,
+          claims: [asConcludedClaim(concluded)],
+        },
       };
     });
   }
@@ -158,49 +152,42 @@ export class Revising extends Shared {
    * rests under the claim.
    */
   async is(input: IsCommand): Promise<Restated> {
-    return this.graph.inTransaction(async () => {
-      const written = await this.graph.inTransaction(async () => {
-        const decision = await this.graph.createNode("Decision", {
+    return this.handle("is", input, async (unitOfWork) => {
+      // Read before the delta is stated, so the event can say what the state
+      // moved from -- the act overwrites `kind` in place, and afterwards
+      // nothing holds the value it replaced.
+      const [existing] = await this.graph.query(
+        `MATCH (c:Claim {natural_id: $id}) RETURN c`,
+        { c: vertexProps<ClaimProps>() },
+        { id: input.claim },
+      );
+      const was = existing?.c.kind ?? "exploratory";
+      const proposition = await this.assertedBy(input.claim);
+
+      const decision = ref(
+        "decision",
+        await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: input.state === "confirmed" ? input.because : `recorded as ${input.state}`,
           invalidation_check: INVALIDATION_CHECK[input.state],
-        });
-        // **`confirmed` writes exactly what `promote` writes.** The two are one
-        // act spelled two ways, so they must leave one record; a reader able to
-        // tell which verb was typed is the leak the single grammar exists to
-        // close. `undecided` has no act-specific edge and takes `GRADES`.
-        if (input.state === "confirmed") {
-          await this.graph.createEdge(decision.natural_id, "PROMOTES", input.claim);
-        } else {
-          await this.graph.createEdge(decision.natural_id, "GRADES", input.claim);
-          await this.graph.createEdge(decision.natural_id, "BASED_ON", input.because);
-        }
-        // Read before the write, so the event can say what the state moved
-        // from -- the act overwrites `kind` in place, exactly as `promote`
-        // does, and afterwards nothing holds the value it replaced.
-        const [existing] = await this.graph.query(
-          `MATCH (c:Claim {natural_id: $id}) RETURN c`,
-          { c: vertexProps<ClaimProps>() },
-          { id: input.claim },
-        );
-        await this.graph.query(
-          `MATCH (c:Claim {natural_id: $id}) SET c.kind = $state RETURN c`,
-          { c: vertexProps<ClaimProps>() },
-          { id: input.claim, state: STORED_KIND[input.state] },
-        );
-        return { decision, was: existing?.c.kind ?? "exploratory" };
-      });
-      const events = await this.emit("is", input.claim, {
-        proposition: await this.assertedBy(input.claim),
-        from: written.was,
-        to: STORED_KIND[input.state],
-        // The act's own word, beside the property it wrote. `to` is the stored
-        // kind so it pairs with `from`; `state` is what the caller said, and it
-        // is what decides whether `because` is a handle or a sentence.
-        state: input.state,
-        because: input.because,
-      });
-      return { decision: ref("decision", written.decision.natural_id), events };
+        }),
+      );
+      // **`confirmed` writes exactly what `promote` writes.** The two are one
+      // act spelled two ways, so they must leave one record; a reader able to
+      // tell which verb was typed is the leak the single grammar exists to
+      // close. `undecided` has no act-specific edge and takes `GRADES`.
+      if (input.state === "confirmed") {
+        unitOfWork.edge(decision, "PROMOTES", input.claim);
+      } else {
+        unitOfWork.edge(decision, "GRADES", input.claim);
+        unitOfWork.edge(decision, "BASED_ON", input.because);
+      }
+      unitOfWork.set(input.claim, { kind: STORED_KIND[input.state] });
+
+      return {
+        subject: input.claim,
+        result: { decision },
+      };
     });
   }
 
@@ -288,85 +275,82 @@ export class Revising extends Shared {
      */
     operation: "keep" | "replaceAnalysis",
   ): Promise<ReplacementReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle(operation, input, async (unitOfWork) => {
       const at = this.clock.now();
-      const {
-        analysis: replacement,
-        decision,
-        superseded,
-      } = await this.graph.inTransaction(async () => {
-        await this.assertReviewOf(input.because, input.supersedes);
 
-        // The superseded output is not invalidated. A flag on the artefact
-        // would summarise the standing of every finding it carries, and
-        // standing is per finding.
-        const output = await this.outputArtefactOf(input.supersedes);
-        await this.graph.createEdge(output, "INVALIDATED_BY", input.because);
+      await this.assertReviewOf(input.because, input.supersedes);
+      const output = await this.outputArtefactOf(input.supersedes);
+      const inherited = await this.inputsOf(input.supersedes);
+      const enquiry = (await this.enquiryOf(input.supersedes)) as EnquiryRef;
+      const before = await this.conclusionsOf(input.supersedes);
 
-        // Add-only: the successor reads what its predecessor read, plus
-        // whatever this call names.
-        const inherited = await this.inputsOf(input.supersedes);
-        const { analysis } = await this.recorded({
-          enquiry: (await this.enquiryOf(input.supersedes)) as EnquiryRef,
-          method: input.method,
-          from: [...inherited, ...(input.from ?? [])],
-        });
+      // **A finding falls once.** One already withdrawn by another act --
+      // narrowed by a reinterpretation, superseded by an earlier revision --
+      // cannot fall again here: two decisions would stand instead of one
+      // claim, each naming a different successor, and no reader can say
+      // which holds.
+      const kept = new Set<string>(input.keeping);
+      for (const c of before) {
+        if (kept.has(c.claim)) continue;
+        const gone = await this.supersessionOf(c.claim);
+        if (gone !== undefined)
+          throw new Error(
+            `${c.claim} "${c.proposition}" has already been withdrawn by ${gone}, so this ` +
+              `revision cannot supersede it as well and a finding falls once; keep it, ` +
+              `since it no longer stands on its own account`,
+          );
+      }
 
-        // **One decision carries the whole act**: this analysis stands in
-        // place of that one, on this review, superseding these findings and
-        // keeping those. A reader of the decision sees all of it.
-        const decision = await this.graph.createNode("Decision", {
+      // The superseded output is not invalidated. A flag on the artefact
+      // would summarise the standing of every finding it carries, and
+      // standing is per finding.
+      unitOfWork.edge(output, "INVALIDATED_BY", input.because);
+
+      // Add-only: the successor reads what its predecessor read, plus
+      // whatever this call names.
+      const { analysis: replacement } = await this.recorded(
+        { enquiry, method: input.method, from: [...inherited, ...(input.from ?? [])] },
+        unitOfWork,
+      );
+
+      // **One decision carries the whole act**: this analysis stands in
+      // place of that one, on this review, superseding these findings and
+      // keeping those. A reader of the decision sees all of it.
+      const decision = ref(
+        "decision",
+        await unitOfWork.node("Decision", {
           decided_at: at,
           reason: `superseded by a re-run: ${input.method}`,
           invalidation_check: "evidence that the superseded analysis was sound after all",
-        });
-        await this.graph.createEdge(decision.natural_id, "SUPERSEDES", input.supersedes);
-        await this.graph.createEdge(decision.natural_id, "MOTIVATES", analysis);
-        await this.graph.createEdge(decision.natural_id, "INVALIDATED_BY", input.because);
+        }),
+      );
+      unitOfWork.edge(decision, "SUPERSEDES", input.supersedes);
+      unitOfWork.edge(decision, "MOTIVATES", replacement);
+      unitOfWork.edge(decision, "INVALIDATED_BY", input.because);
 
-        // Every conclusion not kept falls now. A kept one is **not
-        // re-parented**: it keeps the evidence that produced it, so asking
-        // why it holds still answers with the run that produced the number.
-        const kept = new Set<string>(input.keeping);
-        const before = await this.conclusionsOf(input.supersedes);
-        const superseded: ConcludedClaim[] = [];
-        for (const c of before) {
-          if (kept.has(c.claim)) {
-            await this.graph.createEdge(decision.natural_id, "KEEPS", c.claim);
-            continue;
-          }
-          // **A finding falls once.** One already withdrawn by another act --
-          // narrowed by a reinterpretation, superseded by an earlier revision --
-          // cannot fall again here: two decisions would stand instead of one
-          // claim, each naming a different successor, and no reader can say
-          // which holds.
-          const gone = await this.supersessionOf(c.claim);
-          if (gone !== undefined)
-            throw new Error(
-              `${c.claim} "${c.proposition}" has already been withdrawn by ${gone}, so this ` +
-                `revision cannot supersede it as well and a finding falls once; keep it, ` +
-                `since it no longer stands on its own account`,
-            );
-          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", c.claim);
-          superseded.push({ claim: c.claim, asserts: c.proposition });
+      // Every conclusion not kept falls now. A kept one is **not
+      // re-parented**: it keeps the evidence that produced it, so asking
+      // why it holds still answers with the run that produced the number.
+      const superseded: ConcludedClaim[] = [];
+      for (const c of before) {
+        if (kept.has(c.claim)) {
+          unitOfWork.edge(decision, "KEEPS", c.claim);
+          continue;
         }
+        unitOfWork.edge(decision, "SUPERSEDES", c.claim);
+        superseded.push({ claim: c.claim, asserts: c.proposition });
+      }
 
-        return { analysis, decision: ref("decision", decision.natural_id), superseded };
-      });
-
-      const events = await this.emit(operation, replacement, {
-        supersedes: input.supersedes,
-        because: input.because,
-        keeping: input.keeping,
-      });
       return {
-        at,
-        replacement,
-        decision,
-        supersedes: input.supersedes,
-        kept: input.keeping,
-        superseded,
-        events,
+        subject: replacement,
+        result: {
+          at,
+          replacement,
+          decision,
+          supersedes: input.supersedes,
+          kept: input.keeping,
+          superseded,
+        },
       };
     });
   }
@@ -380,7 +364,7 @@ export class Revising extends Shared {
    * the numbers were right and only the sentence about them was wrong.
    */
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("reinterpret", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       // A reinterpretation narrows a READING, not one node: two analyses in one
@@ -412,79 +396,61 @@ export class Revising extends Shared {
           `no claim ${input.of} to reinterpret; a claim exists once an analysis concludes it`,
         );
 
-      // Atomic. Interrupted between withdrawing the original and carrying its
-      // evidence across, this retracts a finding and puts nothing in its place.
-      // Demonstrated in tests/domain-session.test.ts, which is where the harm is
-      // reachable -- "does this roll back?" is not a researcher's question, so it
-      // is not a scenario. See TenantGraph.inTransaction.
-      const { narrower, carried } = await this.graph.inTransaction(async () => {
-        const review = await this.graph.createNode("Review", {
-          verdict: input.because,
-        });
-        const narrower = await this.graph.createNode("Claim", {
-          name: input.as,
-          kind: "exploratory",
-        });
-        // The review records that someone objected; the decision records that the
-        // objection was acted on. Reviews also confirm, so a review alone cannot
-        // mean "withdrawn" without reading its prose.
-        const decision = await this.graph.createNode("Decision", {
-          decided_at: this.clock.now(),
-          reason: input.because,
-          invalidation_check: "evidence that the original reading was right after all",
-        });
-        await this.graph.createEdge(decision.natural_id, "MOTIVATES", narrower.natural_id);
-
-        // Keyed by id. The query below selects natural_id AND statement and only
-        // the statement was kept, so two findings phrased alike merged -- in the
-        // field whose whole job is showing the findings survived unchanged.
-        const carried = new Map<EvidenceRef, CitedFinding>();
-        const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
-        for (const id of withdrawnIds) {
-          await this.graph.createEdge(review.natural_id, "EVALUATES", id);
-          await this.graph.createEdge(decision.natural_id, "CHANGES", id);
-        }
-        // One query for every withdrawn claim's evidence, not one per claim.
-        // Deduplicated by the Map below, as before: the query selects
-        // `natural_id` AND `statement` and keying on the statement merged two
-        // findings phrased alike -- in the field whose whole job is showing the
-        // findings survived unchanged.
-        const evidence = await this.graph.query(
-          `MATCH (e:Evidence)-[:SUPPORTS]->(c:Claim) WHERE c.natural_id IN $ids RETURN e`,
-          { e: vertexProps<{ natural_id: string; statement: string }>() },
-          { ids: withdrawnIds },
-        );
-        for (const row of evidence) {
-          await this.graph.createEdge(row.e.natural_id, "SUPPORTS", narrower.natural_id);
-          const evidence = ref("evidence", row.e.natural_id);
-          carried.set(evidence, { evidence, states: row.e.statement });
-        }
-
-        return { narrower, carried, review, decision };
-      });
-
+      const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
+      // One query for every withdrawn claim's evidence, not one per claim.
+      // Deduplicated by the Map below: the query selects `natural_id` AND
+      // `statement` and keying on the statement merged two findings phrased
+      // alike -- in the field whose whole job is showing the findings survived
+      // unchanged.
+      const evidence = await this.graph.query(
+        `MATCH (e:Evidence)-[:SUPPORTS]->(c:Claim) WHERE c.natural_id IN $ids RETURN e`,
+        { e: vertexProps<{ natural_id: string; statement: string }>() },
+        { ids: withdrawnIds },
+      );
       const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
-      const events = await this.emit("reinterpret", ref("claim", narrower.natural_id), {
-        previously,
-        because: input.because,
+      const review = await unitOfWork.node("Review", { verdict: input.because });
+      const narrower = ref(
+        "claim",
+        await unitOfWork.node("Claim", { name: input.as, kind: "exploratory" }),
+      );
+      // The review records that someone objected; the decision records that the
+      // objection was acted on. Reviews also confirm, so a review alone cannot
+      // mean "withdrawn" without reading its prose.
+      const decision = await unitOfWork.node("Decision", {
+        decided_at: this.clock.now(),
+        reason: input.because,
+        invalidation_check: "evidence that the original reading was right after all",
       });
+      unitOfWork.edge(decision, "MOTIVATES", narrower);
+
+      for (const id of withdrawnIds) {
+        unitOfWork.edge(review, "EVALUATES", id);
+        unitOfWork.edge(decision, "CHANGES", id);
+      }
+
+      // Keyed by id: keying on the statement merged two findings phrased alike.
+      const carried = new Map<EvidenceRef, CitedFinding>();
+      for (const row of evidence) {
+        unitOfWork.edge(row.e.natural_id, "SUPPORTS", narrower);
+        const finding = ref("evidence", row.e.natural_id);
+        carried.set(finding, { evidence: finding, states: row.e.statement });
+      }
 
       return {
-        at,
-        previously: withdrawn,
-        // The act records what it produced: without this a caller has to go
-        // back through `claimsAsserting` to name what this very call created.
-        nowClaims: {
-          claim: ref("claim", narrower.natural_id),
-          asserts: input.as,
+        subject: narrower,
+        result: {
+          at,
+          previously: withdrawn,
+          // The act records what it produced: without this a caller has to go
+          // back through `claimsAsserting` to name what this very call created.
+          nowClaims: { claim: narrower, asserts: input.as },
+          evidenceStanding: [...carried.values()].sort((a, b) =>
+            a.evidence.localeCompare(b.evidence),
+          ),
+          restingOnTheOldReading,
+          requiresRecomputation: false,
         },
-        evidenceStanding: [...carried.values()].sort((a, b) =>
-          a.evidence.localeCompare(b.evidence),
-        ),
-        restingOnTheOldReading,
-        requiresRecomputation: false,
-        events,
       };
     });
   }

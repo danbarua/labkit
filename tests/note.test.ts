@@ -42,7 +42,9 @@ test("a bare note needs only its text, and search finds it afterward", async () 
 });
 
 test("--on attaches to a real record, and search still finds the note by its own text", async () => {
-  const { question } = await session.pose("does the pruning schedule move convergence?");
+  const { question } = await session.pose({
+    question: "does the pruning schedule move convergence?",
+  });
   const { note } = await session.note({
     text: "worth checking before ripping the schedule out",
     on: question,

@@ -22,7 +22,7 @@
  */
 
 import { labelForNaturalId } from "../src/db/domain";
-import type { EventSink, DomainEvent, MintedEdge } from "../src/domain";
+import type { Command, EdgeCreated, EventSink, DomainEvent } from "../src/domain";
 import type { DerivedSnapshot, StepProvenance } from "./derive";
 
 /**
@@ -54,8 +54,9 @@ export interface TraceStep {
    * second thing to go stale.
    */
   created: { handle: string; label: string }[];
-  edges: MintedEdge[];
-  detail: Record<string, unknown>;
+  edges: EdgeCreated[];
+  /** The command the caller issued, verbatim. */
+  issued: Command;
   /** For display. See the file header — not a runnable command. */
   command: string;
   /** Which `fragments/index.ts` move produced this step, if any composition was tagged (`fragments/tagged.ts`). */
@@ -94,15 +95,14 @@ export interface Trace {
 }
 
 /**
- * A command line for a reader, assembled from the operation and its detail.
+ * A command line for a reader, assembled from the operation and the command.
  *
- * Deliberately loose. `detail` is hand-written per verb and carries what a
- * later query would need, not what the CLI takes — so this shows the shape of
- * the act rather than a line to paste. Verbs whose detail is thin render as
- * just the verb, which is honest.
+ * Deliberately loose: the flag names are the command's field names, which is
+ * the shape of the act rather than a line to paste — the CLI spells some of
+ * them differently.
  */
 export function commandOf(e: DomainEvent): string {
-  const d = e.detail ?? {};
+  const d = e.command as Record<string, unknown>;
   const quote = (v: unknown) => (typeof v === "string" ? `"${v}"` : JSON.stringify(v));
   const args = Object.entries(d)
     .filter(([, v]) => v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0))
@@ -141,12 +141,11 @@ export async function traceOf(
         at: e.at,
         operation: e.operation,
         subject: e.subject,
-        created: e.created.map((handle) => ({
-          handle,
-          label: labelForNaturalId(handle),
-        })),
-        edges: [...e.edges],
-        detail: e.detail ?? {},
+        created: e.changes.flatMap((c) =>
+          c.change === "NodeCreated" ? [{ handle: c.id, label: c.label as string }] : [],
+        ),
+        edges: e.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : [])),
+        issued: e.command,
         command: commandOf(e),
         fragment: provenance?.get(seq)?.fragment,
         derived,
@@ -189,10 +188,10 @@ function diffDerived(previous: DerivedSnapshot, next: DerivedSnapshot): DerivedI
  */
 export function graphOf(trace: Trace): {
   nodes: { handle: string; label: string }[];
-  edges: MintedEdge[];
+  edges: EdgeCreated[];
 } {
   const nodes = new Map<string, { handle: string; label: string }>();
-  const edges: MintedEdge[] = [];
+  const edges: EdgeCreated[] = [];
   for (const step of trace.steps) {
     for (const n of step.created) nodes.set(n.handle, n);
     edges.push(...step.edges);

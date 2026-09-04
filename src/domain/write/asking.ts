@@ -14,15 +14,16 @@ import type {
   SharpenedQuestion,
 } from "../report";
 import { ref } from "../report";
-import type { NoteCommand, PursueCommand, SharpenCommand } from "../commands";
+import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
+import type { Handle } from "./index";
+import type { UnitOfWork } from "../projection";
 
 export class Asking extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -39,11 +40,10 @@ export class Asking extends SessionCore {
    * twice gives two questions, because two people can ask the same thing for
    * different reasons and only the asker knows whether they meant one.
    */
-  async pose(question: Prose): Promise<Posed> {
-    return this.graph.inTransaction(async () => {
-      const asked = await this.posed(question);
-      const events = await this.emit("pose", asked, { question });
-      return { question: asked, events };
+  async pose(input: PoseCommand): Promise<Posed> {
+    return this.handle("pose", input, async (unitOfWork) => {
+      const asked = ref("question", await this.posed(input.question, unitOfWork));
+      return { subject: asked, result: { question: asked } };
     });
   }
 
@@ -59,14 +59,10 @@ export class Asking extends SessionCore {
    * which is the whole point.
    */
   async note(input: NoteCommand): Promise<Noted> {
-    return this.graph.inTransaction(async () => {
-      const noted = await this.graph.createNode("Note", { text: input.text });
-      if (input.on) await this.graph.createEdge(noted.natural_id, "CONCERNS", input.on);
-      const events = await this.emit("note", ref("note", noted.natural_id), {
-        text: input.text,
-        ...(input.on ? { on: input.on } : {}),
-      });
-      return { note: ref("note", noted.natural_id), events };
+    return this.handle("note", input, async (unitOfWork) => {
+      const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
+      if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
+      return { subject: noted, result: { note: noted } };
     });
   }
 
@@ -76,12 +72,11 @@ export class Asking extends SessionCore {
    * event stream is a record of research actions, and a researcher who opened
    * an enquiry did one thing, not three.
    */
-  private async posed(question: Prose): Promise<QuestionRef> {
-    const asked = await this.graph.createNode("Question", {
-      name: question,
-      posed_at: this.clock.now(),
-    });
-    return ref("question", asked.natural_id);
+  private async posed(question: Prose, unitOfWork: UnitOfWork): Promise<QuestionRef> {
+    return ref(
+      "question",
+      await unitOfWork.node("Question", { name: question, posed_at: this.clock.now() }),
+    );
   }
 
   /**
@@ -93,23 +88,17 @@ export class Asking extends SessionCore {
    * either way.
    */
   async pursue(input: PursueCommand): Promise<Pursued> {
-    return this.graph.inTransaction(async () => {
-      const enquiry = await this.pursued(input);
-      const events = await this.emit("pursue", enquiry, {
-        question: input.question,
-        approach: input.approach,
-      });
-      return { enquiry, events };
+    return this.handle("pursue", input, async (unitOfWork) => {
+      const enquiry = await this.pursued(input, unitOfWork);
+      return { subject: enquiry, result: { enquiry } };
     });
   }
 
   /** The write, without the event — see `posed`. */
-  private async pursued(input: PursueCommand): Promise<EnquiryRef> {
-    const enquiry = await this.graph.createNode("LineOfEnquiry", {
-      name: input.approach,
-    });
-    await this.graph.createEdge(input.question, "MOTIVATES", enquiry.natural_id);
-    return ref("enquiry", enquiry.natural_id);
+  private async pursued(input: PursueCommand, unitOfWork: UnitOfWork): Promise<EnquiryRef> {
+    const enquiry = await unitOfWork.node("LineOfEnquiry", { name: input.approach });
+    unitOfWork.edge(input.question, "MOTIVATES", enquiry);
+    return ref("enquiry", enquiry);
   }
 
   /**
@@ -121,14 +110,10 @@ export class Asking extends SessionCore {
    * the question, and a closed enquiry goes on reporting itself open.
    */
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
-    return this.graph.inTransaction(async () => {
-      const asked = await this.posed(question);
-      const enquiry = await this.pursued({
-        question: asked,
-        approach: question,
-      });
-      const events = await this.emit("openEnquiry", enquiry, { question, asked: asked });
-      return { enquiry, question: asked, events };
+    return this.handle("openEnquiry", { question }, async (unitOfWork) => {
+      const asked = await this.posed(question, unitOfWork);
+      const enquiry = await this.pursued({ question: asked, approach: question }, unitOfWork);
+      return { subject: enquiry, result: { enquiry, question: asked } };
     });
   }
 
@@ -151,7 +136,7 @@ export class Asking extends SessionCore {
    * which is what makes the freezing load-bearing.
    */
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("sharpen", input, async (unitOfWork) => {
       const original = await this.graph.query(
         `MATCH (q:Question {natural_id: $id}) RETURN q`,
         { q: vertexProps<{ name: string }>() },
@@ -162,25 +147,23 @@ export class Asking extends SessionCore {
           `no question ${input.from} to sharpen; pose it first, or name a question already on the record`,
         );
 
-      const decision = await this.graph.createNode("Decision", {
+      const standing = await this.standingFindings();
+
+      const decision = await unitOfWork.node("Decision", {
         decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: "evidence that the sharper question was the wrong one to ask",
       });
-      await this.graph.createEdge(decision.natural_id, "NARROWS", input.from);
+      unitOfWork.edge(decision, "NARROWS", input.from);
+      for (const finding of standing) unitOfWork.edge(decision, "BASED_ON", finding);
 
-      for (const finding of await this.standingFindings()) {
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", finding);
-      }
+      const sharper = await this.posed(input.into, unitOfWork);
+      unitOfWork.edge(decision, "MOTIVATES", sharper);
 
-      const sharper = await this.posed(input.into);
-      await this.graph.createEdge(decision.natural_id, "MOTIVATES", sharper);
-      const events = await this.emit("sharpen", sharper, {
-        from: input.from,
-        because: input.because,
-        via: decision.natural_id,
-      });
-      return { question: sharper, decision: ref("decision", decision.natural_id), events };
+      return {
+        subject: sharper,
+        result: { question: sharper, decision: ref("decision", decision) },
+      };
     });
   }
 

@@ -344,7 +344,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
     // An unrelated decision elsewhere in the programme, to show what this can
     // and cannot order.
-    const { question: aside } = await session.pose("should the sweep width be capped at all?");
+    const { question: aside } = await session.pose({
+      question: "should the sweep width be capped at all?",
+    });
     await session.sharpen({
       from: aside,
       into: "does sweep width interact with convergence?",

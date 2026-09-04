@@ -90,7 +90,7 @@ export async function multiPursuit(
   w: W,
   input: { question: string; approaches: readonly [string, string, ...string[]] },
 ): Promise<{ question: QuestionRef; enquiries: EnquiryRef[] }> {
-  const { question } = await w.pose(input.question);
+  const { question } = await w.pose({ question: input.question });
   const enquiries: EnquiryRef[] = [];
   for (const approach of input.approaches) {
     const { enquiry } = await w.pursue({ question, approach });

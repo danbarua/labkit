@@ -24,7 +24,7 @@
  * relational half of the same seam. See `src/db/orm.ts`.
  */
 
-import { and, arrayContains, asc, eq, gt, or } from "drizzle-orm";
+import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import type { LabKitDB } from "../db/backend";
 import { ormOver, unwrapped } from "../db/orm";
 import { labkitEvents } from "../db/schema";
@@ -53,13 +53,8 @@ const toEvent = (r: EventRow): DomainEvent => {
     attribution,
     operation: r.operation,
     subject: r.subject,
-    created: r.created,
-    // `null` only ever meant "written before this column existed" (2026-08-28),
-    // and this repo's one durable record postdates it -- see `domainEvent`'s
-    // doc comment. `?? []` is the whole of what a genuine legacy row would
-    // still need, with no sentinel required to tell it apart from anything.
-    edges: (r.edges as DomainEvent["edges"] | null) ?? [],
-    ...(r.detail === null ? {} : { detail: r.detail as Record<string, unknown> }),
+    changes: r.changes as DomainEvent["changes"],
+    command: r.command as DomainEvent["command"],
   };
 };
 
@@ -83,15 +78,16 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
       if (filter.by !== undefined) conditions.push(eq(labkitEvents.attribution_id, filter.by));
       if (filter.operation !== undefined)
         conditions.push(eq(labkitEvents.operation, filter.operation));
-      // Subject *or* minted. "What happened to this record" has to include the
+      // Subject *or* created. "What happened to this record" has to include the
       // act that brought it into existence, and for most verbs that act names
-      // something else as its subject. `arrayContains` is the `@>` this needs, so
-      // the GIN index on `created` is still the one doing the work.
+      // something else as its subject. jsonb containment is the `@>` this needs,
+      // so the GIN index on `changes` is the one doing the work.
       if (filter.touching !== undefined) {
         const touching = filter.touching;
+        const created = JSON.stringify([{ change: "NodeCreated", id: touching }]);
         const clause = or(
           eq(labkitEvents.subject, touching),
-          arrayContains(labkitEvents.created, [touching]),
+          sql`${labkitEvents.changes} @> ${created}::jsonb`,
         );
         if (clause) conditions.push(clause);
       }
@@ -119,12 +115,9 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
             at: event.at,
             operation: event.operation,
             subject: event.subject,
-            // Copied: `DomainEvent.created`/`.edges` are `readonly` and
-            // drizzle's insert type is not. Always a real array -- see
-            // `domainEvent`'s doc comment for why nothing here defaults to
-            // `null` any more.
-            created: [...event.created],
-            edges: [...event.edges],
+            // Copied: `DomainEvent.changes` is `readonly` and drizzle's insert
+            // type is not.
+            changes: [...event.changes],
             attribution_label: event.attribution.attribution_label,
             attribution_id: event.attribution.attribution_id,
             attribution_how: event.attribution.attribution_how,
@@ -132,7 +125,7 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
             // `jsonb` takes the value, not a string: the driver serialises it.
             // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
             // payload is the classic way that goes wrong.
-            detail: event.detail ?? null,
+            command: event.command,
           })
           .returning({ seq: labkitEvents.seq });
         // `seq` is the one field the caller could not have supplied -- the

@@ -50,7 +50,7 @@ describe("enumerating gates and work", () => {
    * broken.
    */
   async function fixture(s: ResearchSession) {
-    const { question } = await s.pose("does the enumeration hold?");
+    const { question } = await s.pose({ question: "does the enumeration hold?" });
     const { enquiry } = await s.pursue({ question, approach: "build one of each" });
 
     // 1. never-evaluated: a criterion nobody has checked.
@@ -243,7 +243,7 @@ describe("enumerating gates and work", () => {
         protecting: [workB],
       });
 
-      const { question } = await s.pose("does the scope hold?");
+      const { question } = await s.pose({ question: "does the scope hold?" });
       const { enquiry } = await s.pursue({ question, approach: "evaluate one side" });
       const { observations: readings } = await s.recordObservations({
         enquiry,
@@ -309,7 +309,7 @@ describe("enumerating gates and work", () => {
         protecting: [work],
       });
 
-      const { question } = await s.pose("does precedence hold?");
+      const { question } = await s.pose({ question: "does precedence hold?" });
       const { enquiry } = await s.pursue({ question, approach: "do the work, fail the check" });
       const { observations: readings } = await s.recordObservations({
         enquiry,

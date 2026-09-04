@@ -13,9 +13,7 @@
  * field belongs with the field, and `bun run check:doc-comments` enforces
  * that. Structural typing means no call site changed; `tsc` proves it.
  *
- * The verbs taking a single scalar — `pose`, `openEnquiry`, `stateCriterion` —
- * are deliberately absent. A named type wrapping one `string` is ceremony, and
- * the argument is already named by the parameter.
+ * Every operation is a command.
  */
 
 import type {
@@ -33,6 +31,21 @@ import type {
   EvidenceRef,
 } from "./report";
 import type { Prose } from "../db/domain";
+
+/** `pose` — put a question on the record, unpursued. */
+export interface PoseCommand {
+  question: Prose;
+}
+
+/** `openEnquiry` — pose a question and pursue it, as one act. */
+export interface OpenEnquiryCommand {
+  question: Prose;
+}
+
+/** `stateCriterion` — state a condition a result will be held to. */
+export interface StateCriterionCommand {
+  proposition: Prose;
+}
 
 /** `pursue` — open a line of enquiry against a question already on the record. */
 export interface PursueCommand {
@@ -361,3 +374,28 @@ export type ClaimState = "undecided" | "confirmed";
 export type IsCommand =
   | { claim: ClaimRef; state: "undecided"; because: EvidenceRef }
   | { claim: ClaimRef; state: "confirmed"; because: Prose };
+
+/** Every command the write surface takes. What an act was asked to do. */
+export type Command =
+  | AcceptAsUnresolvedCommand
+  | AmendDesignCommand
+  | CloseEnquiryCommand
+  | ConcludeCommand
+  | DeclareGateCommand
+  | EvaluateCriterionCommand
+  | IsCommand
+  | KeepCommand
+  | NoteCommand
+  | OpenEnquiryCommand
+  | PlanWorkCommand
+  | PoseCommand
+  | PromoteCommand
+  | PursueCommand
+  | RecordAnalysisCommand
+  | RecordObservationsCommand
+  | RecordReviewCommand
+  | ReinterpretCommand
+  | ReplaceAnalysisCommand
+  | ReverifyCommand
+  | SharpenCommand
+  | StateCriterionCommand;

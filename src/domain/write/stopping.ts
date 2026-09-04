@@ -12,14 +12,15 @@ import type {
 import { ref } from "../report";
 import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
+import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 export class Stopping extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -32,7 +33,7 @@ export class Stopping extends SessionCore {
    * not read alike.
    */
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("closeEnquiry", input, async (unitOfWork) => {
       // Everything is validated before anything is written. A rejected close
       // must leave no Decision behind, and an analysis from some other enquiry
       // must not become the stated basis for resolving this question.
@@ -106,39 +107,23 @@ export class Stopping extends SessionCore {
         answeredProposition = found.asserts;
       }
 
-      // Transactional, demonstrated — `docs/consumer-contract/043`.
-      //
-      // `RESOLVES` is written before `BASED_ON`, so an interrupted close leaves a
-      // resolving decision with nothing cited. That is *indistinguishable from a
-      // deliberate close without a cited result*, which is a legitimate call — and
-      // that shape-level similarity is exactly what made it look safe.
-      //
-      // What it is not safe from is the retry. The caller saw a throw and closes
-      // again; two decisions then resolve one question, `enquiryStatus` picks
-      // between them with `.find()` over unordered rows, and the orphan can win.
-      // The question then reports `closure: "abandoned"`, `answer: null` for a
-      // question that was answered "no" on cited evidence. The answer is not
-      // inverted, it is erased -- and "abandoned" is a positive classification
-      // rather than an empty result.
-      const decision = await this.graph.inTransaction(async () => {
-        const decision = await this.graph.createNode("Decision", {
+      const decided = ref(
+        "decision",
+        await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: answeredProposition
             ? `answered on "${answeredProposition}"`
             : "closed without a cited result",
           invalidation_check: "new evidence bearing on the question",
-        });
-        await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
-        if (answerBearing)
-          await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
-        return decision;
-      });
+        }),
+      );
+      unitOfWork.edge(decided, "RESOLVES", question);
+      if (answerBearing) unitOfWork.edge(decided, "BASED_ON", answerBearing);
 
-      const events = await this.emit("closeEnquiry", input.enquiry, {
-        answeredBy: input.answeredBy ?? null,
-        proposition: answeredProposition ?? null,
-      });
-      return { decision: ref("decision", decision.natural_id), events };
+      return {
+        subject: input.enquiry,
+        result: { decision: decided },
+      };
     });
   }
 
@@ -170,37 +155,36 @@ export class Stopping extends SessionCore {
    * a survey can report it, is ceremony.
    */
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
-    return this.graph.inTransaction(async () => {
+    return this.handle("acceptAsUnresolved", input, async (unitOfWork) => {
       const at = this.clock.now();
-      const decision = await this.graph.inTransaction(async () => {
-        const question = await this.questionBehind(input.enquiry);
-        if (!question)
-          throw new Error(
-            `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
-          );
 
-        const found = await this.findingOn(input.inLightOf);
-        if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
-        const basis = found.evidence;
+      const question = await this.questionBehind(input.enquiry);
+      if (!question)
+        throw new Error(
+          `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
+        );
 
-        const decision = await this.graph.createNode("Decision", {
-          decided_at: this.clock.now(),
+      const found = await this.findingOn(input.inLightOf);
+      if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
+      const basis = found.evidence;
+
+      const decision = ref(
+        "decision",
+        await unitOfWork.node("Decision", {
+          decided_at: at,
           reason: input.because,
           invalidation_check: input.until,
-        });
-        await this.graph.createEdge(decision.natural_id, "DEFERS", question);
-        // What was known when the call was made, which is what makes
-        // `evidence` answerable afterwards rather than only now.
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
-        return decision;
-      });
+        }),
+      );
+      unitOfWork.edge(decision, "DEFERS", question);
+      // What was known when the call was made, which is what makes
+      // `evidence` answerable afterwards rather than only now.
+      unitOfWork.edge(decision, "BASED_ON", basis);
 
-      const events = await this.emit("acceptAsUnresolved", input.enquiry, {
-        because: input.because,
-        until: input.until,
-        at,
-      });
-      return { decision: ref("decision", decision.natural_id), events };
+      return {
+        subject: input.enquiry,
+        result: { decision },
+      };
     });
   }
 }

@@ -131,7 +131,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
   test("closing one pursuit no longer reports the other as having produced it", async () => {
     const s = await session();
     try {
-      const { question } = await s.pose("does depth move convergence?");
+      const { question } = await s.pose({ question: "does depth move convergence?" });
       const { enquiry: anasSweep } = await s.pursue({ question, approach: "seed sweep" });
       const { enquiry: brunosAblation } = await s.pursue({ question, approach: "ablation" });
 
@@ -193,7 +193,7 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
     // enquiry's name in a way that would make it look like the enquiry's own.
     const s = await session();
     try {
-      const { question } = await s.pose("does width matter?");
+      const { question } = await s.pose({ question: "does width matter?" });
       const { enquiry: worked } = await s.pursue({ question, approach: "width sweep" });
       const { enquiry: untouched } = await s.pursue({
         question,
@@ -343,7 +343,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
   async function programme() {
     const s = await session();
-    const { question } = await s.pose("does depth move convergence?");
+    const { question } = await s.pose({ question: "does depth move convergence?" });
     const { enquiry } = await s.pursue({ question, approach: "seed sweep" });
     const { criterion } = await s.stateCriterion("holds at five seeds");
     const { work } = await s.planWork({

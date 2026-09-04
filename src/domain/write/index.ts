@@ -68,9 +68,11 @@ import type {
   VerificationReport,
 } from "../report";
 import type {
+  Command,
   AcceptAsUnresolvedCommand,
   AmendDesignCommand,
   CloseEnquiryCommand,
+  PoseCommand,
   ConcludeCommand,
   DeclareGateCommand,
   EvaluateCriterionCommand,
@@ -89,6 +91,7 @@ import type {
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
 import type { DomainEvent } from "../events";
+import { applyDelta, UnitOfWork } from "../projection";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
@@ -147,12 +150,22 @@ export type Operation = Methods<WriteSurface>;
  */
 export type RetiredOperation = "promote";
 
-/** What `emit` looks like from inside a group module — see the file header. */
-export type Emit = (
+/** What a verb's body returns: what the act was about, and what it produced. */
+export interface Act<R> {
+  subject: Ref<string>;
+  result: R;
+}
+
+/**
+ * The pipeline, as a group module sees it: open the transaction, run the
+ * verb against a fresh unit of work, record one event carrying its changes,
+ * project that event into the graph, commit.
+ */
+export type Handle = <R extends object>(
   operation: Operation,
-  subject: Ref<string>,
-  detail?: Record<string, unknown>,
-) => Promise<DomainEvent[]>;
+  command: Command,
+  work: (unitOfWork: UnitOfWork) => Promise<Act<R>>,
+) => Promise<R & { events: DomainEvent[] }>;
 
 export class WriteSurface extends SessionCore {
   private readonly asking: Asking;
@@ -163,16 +176,16 @@ export class WriteSurface extends SessionCore {
 
   constructor(graph: TenantGraph, options: ResearchSessionOptions = {}) {
     super(graph, options);
-    const emit: Emit = (operation, subject, detail) => this.emit(operation, subject, detail);
-    this.asking = new Asking(graph, options, emit);
-    this.work = new Work(graph, options, emit);
-    this.counting = new Counting(graph, options, emit);
-    this.revising = new Revising(graph, options, emit);
-    this.stopping = new Stopping(graph, options, emit);
+    const handle: Handle = (operation, command, work) => this.handling(operation, command, work);
+    this.asking = new Asking(graph, options, handle);
+    this.work = new Work(graph, options, handle);
+    this.counting = new Counting(graph, options, handle);
+    this.revising = new Revising(graph, options, handle);
+    this.stopping = new Stopping(graph, options, handle);
   }
 
-  async pose(question: Prose): Promise<Posed> {
-    return this.asking.pose(question);
+  async pose(input: PoseCommand): Promise<Posed> {
+    return this.asking.pose(input);
   }
 
   async note(input: NoteCommand): Promise<Noted> {
@@ -256,39 +269,29 @@ export class WriteSurface extends SessionCore {
   }
 
   /**
-   * The single choke point. Every state-changing verb reaches the sink through
-   * here, so a field added to this one `record` call is stamped on every event
-   * the domain will ever emit — which is why `attribution` needed no verb to
-   * change and no signature to move.
-   *
-   * Both context fields are read at the moment of the emit, not captured at
-   * construction, so a surface built per command reports that command's clock
-   * and that command's attribution.
-   *
-   * Returns an array, always -- one entry per event `emit` recorded, which
-   * today is always exactly one. The uniform shape is for the caller: every
-   * write verb hands its own `events` field straight through from here, so a
-   * `--json` renderer needs no new plumbing if a verb ever records more.
+   * One command: a transaction, a unit of work, one event, and the graph
+   * projected from it. The verb queries and enforces and stages; nothing else
+   * about a write is its business.
    */
-  private async emit(
+  private async handling<R extends object>(
     operation: Operation,
-    subject: Ref<string>,
-    detail?: Record<string, unknown>,
-  ): Promise<DomainEvent[]> {
-    const recorded = await this.events.record({
-      at: this.clock.now(),
-      attribution: this.attribution,
-      operation,
-      subject,
-      // Drained, not listed. Every id `TenantGraph` minted since the last
-      // event, which is the set this act brought into existence -- and the
-      // question `subject` cannot answer, since most verbs are *about*
-      // something other than what they created.
-      created: this.graph.drainMinted(),
-      // The other half of the same collection. See `DomainEvent.edges`.
-      edges: this.graph.drainMintedEdges(),
-      detail,
+    command: Command,
+    work: (unitOfWork: UnitOfWork) => Promise<Act<R>>,
+  ): Promise<R & { events: DomainEvent[] }> {
+    return this.graph.inTransaction(async () => {
+      const unitOfWork = new UnitOfWork(this.graph);
+      const act = await work(unitOfWork);
+      const recorded = await this.events.record({
+        at: this.clock.now(),
+        attribution: this.attribution,
+        operation,
+        subject: act.subject,
+        command,
+        changes: unitOfWork.delta(),
+      });
+      await applyDelta(this.graph, recorded);
+      await this.events.projected?.(recorded);
+      return { ...act.result, events: [recorded] };
     });
-    return [recorded];
   }
 }

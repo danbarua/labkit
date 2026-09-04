@@ -169,41 +169,17 @@ export const labkitEvents = p
        */
       subject: p.text().notNull(),
       /**
-       * Every handle this act minted.
+       * Every change this act made to the graph, in the order it made them —
+       * `NodeCreated`, `EdgeCreated` and `PropsChanged` records.
        *
-       * `subject` answers *what was this about*; this answers *what came into
-       * existence*, and they are different for most verbs. Without it, asking
-       * "which act created this record?" would silently miss four of the six
-       * verbs that mint a Decision.
-       *
-       * A real array, GIN-indexed, so the question is `created @> ARRAY[$id]` —
-       * one indexed predicate on one table, no join. Native agtype/Postgres
-       * arrays are used elsewhere for the same reason (`Task.mayRead`,
-       * `CONSUMES.positions`).
+       * **`jsonb`, and GIN-indexed for containment.** "Which act created this
+       * record?" is the one question the log is asked by handle, and
+       * `changes @> '[{"change":"NodeCreated","id":"Q_1"}]'` answers it on the
+       * index. `subject` answers *what was this about*; this answers *what
+       * happened*, and they differ for most verbs — six mint a `Decision` and
+       * one names it as its subject.
        */
-      created: p.text().array().notNull().default([]),
-      /**
-       * Every edge the act created — `{from, label, to}` triples.
-       *
-       * **`jsonb` where {@link created} is `text[]`, and the shapes differ
-       * because the values do.** A handle is one string; an edge is three, and
-       * the alternative is encoding it as `"Q_1|ADDRESSES|LOE_1"`, which puts
-       * a parser in the read path and a delimiter in a namespace that has no
-       * rule against one.
-       *
-       * **Nullable, like `attribution_how` and for the same reason.** A row
-       * written before 2026-08-28 has edges nobody recorded, and `[]` would
-       * assert the act connected nothing — false for almost every verb.
-       * `null` means *recorded before LabKit collected them*; the migration
-       * itself produces that value, which is what keeps it from being a state
-       * nobody can explain.
-       *
-       * Not indexed. `created` has a GIN index because "which act created this
-       * record" is a question the log is asked; nothing yet asks "which act
-       * created this edge", and an index with no reader is the shape this repo
-       * removes.
-       */
-      edges: p.jsonb(),
+      changes: p.jsonb().notNull().default([]),
       attribution_label: p.text().notNull(),
       attribution_id: p.text().notNull(),
       /**
@@ -226,7 +202,13 @@ export const labkitEvents = p
        */
       attribution_how: p.text(),
       git_hash: p.text().notNull(),
-      detail: p.jsonb(),
+      /**
+       * The command the caller issued, verbatim.
+       *
+       * Not a summary of it: a hand-picked subset is a subset somebody chose by
+       * typing, and every field left out is one a later reader cannot recover.
+       */
+      command: p.jsonb().notNull(),
     },
     (t) => [
       // The stream, per tenant. Every read is tenant-scoped, so every index is.

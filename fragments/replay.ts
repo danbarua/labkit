@@ -34,7 +34,7 @@ import { TenantGraph } from "../src/db/graph";
 import { labelForNaturalId } from "../src/db/domain";
 import { vertexProps } from "../src/db/cypher";
 import { WriteSurface, inMemoryEventLog, systemClock } from "../src/domain";
-import type { DomainEvent, MintedEdge, Operation, RetiredOperation } from "../src/domain";
+import type { DomainEvent, GraphChange, Operation, RetiredOperation } from "../src/domain";
 import { withProvenance, type StepProvenance } from "./derive";
 import { currentFragment } from "./provenance";
 import { DECODERS, type DecodeContext } from "./decode";
@@ -50,60 +50,11 @@ export interface ReplayResult {
   refusedAt?: ReplayRefusal;
 }
 
-/**
- * Every created node's own properties, read once from the live record —
- * `nodeProp` in `decode.ts` needs it for a value nothing edges to (an
- * evidence unit's `statement`, a claim's `kind`, a task's `acceptance`).
- * One query per label rather than per node, since a handle's label is known
- * from its own prefix (`labelForNaturalId`) before any query runs.
- */
-export async function fetchNodeProps(
-  graph: TenantGraph,
-  history: readonly DomainEvent[],
-): Promise<Map<string, Record<string, unknown>>> {
-  const byLabel = new Map<string, string[]>();
-  for (const event of history) {
-    for (const handle of event.created) {
-      const label = labelForNaturalId(handle);
-      const list = byLabel.get(label);
-      if (list) list.push(handle);
-      else byLabel.set(label, [handle]);
-    }
-  }
-  const props = new Map<string, Record<string, unknown>>();
-  for (const [label, ids] of byLabel) {
-    const rows = await graph.query(
-      `MATCH (n:${label}) WHERE n.natural_id IN $ids RETURN n`,
-      { n: vertexProps<Record<string, unknown> & { natural_id: string }>() },
-      { ids },
-    );
-    for (const row of rows) props.set(row.n.natural_id, row.n);
-  }
-  return props;
-}
-
-/** Which claim a piece of evidence supports or challenges, from every such edge in the whole history. */
-function buildClaimIndex(history: readonly DomainEvent[]): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const event of history) {
-    for (const edge of event.edges) {
-      if (edge.label === "SUPPORTS" || edge.label === "CHALLENGES") index.set(edge.from, edge.to);
-    }
-  }
-  return index;
-}
-
-async function consumesOf(graph: TenantGraph, analysis: string): Promise<string[]> {
-  const rows = await graph.query(
-    `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,
-    { a: vertexProps<{ natural_id: string }>() },
-    { id: analysis },
-  );
-  return rows.map((r) => r.a.natural_id);
-}
-
-function edgeKey(e: MintedEdge): string {
-  return `${e.from}|${e.label}|${e.to}`;
+/** One change, as a string, so two steps' changes compare as sorted lists. */
+function changeKey(c: GraphChange): string {
+  return c.change === "EdgeCreated"
+    ? `${c.change}|${c.from}|${c.label}|${c.to}`
+    : `${c.change}|${c.id}`;
 }
 
 /**
@@ -125,14 +76,10 @@ function diverges(original: DomainEvent, replayed: DomainEvent): string | undefi
     return `operation "${replayed.operation}" (expected "${expected}")`;
   if (replayed.subject !== original.subject)
     return `subject "${replayed.subject}" (expected "${original.subject}")`;
-  const wantCreated = [...original.created].sort();
-  const gotCreated = [...replayed.created].sort();
-  if (JSON.stringify(gotCreated) !== JSON.stringify(wantCreated))
-    return `created ${JSON.stringify(gotCreated)} (expected ${JSON.stringify(wantCreated)})`;
-  const wantEdges = original.edges.map(edgeKey).sort();
-  const gotEdges = replayed.edges.map(edgeKey).sort();
-  if (JSON.stringify(gotEdges) !== JSON.stringify(wantEdges))
-    return `edges ${JSON.stringify(gotEdges)} (expected ${JSON.stringify(wantEdges)})`;
+  const want = original.changes.map(changeKey).sort();
+  const got = replayed.changes.map(changeKey).sort();
+  if (JSON.stringify(got) !== JSON.stringify(want))
+    return `changes ${JSON.stringify(got)} (expected ${JSON.stringify(want)})`;
   return undefined;
 }
 
@@ -145,15 +92,11 @@ function diverges(original: DomainEvent, replayed: DomainEvent): string | undefi
  * Hermetic: `dir` is created and removed here, never the caller's own project
  * directory, and `connectScratch` is what makes that true of the *database*
  * as well as of the path — `connectDb` would hand the whole replay to
- * `LABKIT_DB_URL` whenever it is set. `nodeProps` must come from the live record — see
- * {@link fetchNodeProps} — read and handed in before this opens anything,
- * so the live connection need not stay open for the replay's duration.
+ * `LABKIT_DB_URL` whenever it is set. The history is the whole input: each
+ * event carries the command that produced it, so nothing has to be read back
+ * off the live record and its connection need not stay open.
  */
-export async function replayIntoScratch(
-  history: readonly DomainEvent[],
-  nodeProps: ReadonlyMap<string, Record<string, unknown>>,
-): Promise<ReplayResult> {
-  const claimIndex = buildClaimIndex(history);
+export async function replayIntoScratch(history: readonly DomainEvent[]): Promise<ReplayResult> {
   const dir = mkdtempSync(join(tmpdir(), "labkit-replay-"));
   try {
     const connection = await connectScratch(dir);
@@ -165,12 +108,7 @@ export async function replayIntoScratch(
       const { events, provenance } = withProvenance(graph, baseEvents);
       const writes = new WriteSurface(graph, { clock: systemClock, events });
 
-      const ctx: DecodeContext = {
-        writes,
-        nodeProp: (handle, key) => nodeProps.get(handle)?.[key],
-        claimFor: (evidence) => claimIndex.get(evidence),
-        consumesOf: (analysis) => consumesOf(graph, analysis),
-      };
+      const ctx: DecodeContext = { writes };
 
       for (const original of history) {
         const decoder = DECODERS[original.operation as Operation] as
