@@ -158,12 +158,19 @@ export type EdgeLabel = (typeof EDGE_LABELS)[number];
  */
 export type GraphChange = NodeCreated | EdgeCreated | PropsChanged;
 
-export interface NodeCreated {
-  change: "NodeCreated";
-  id: string;
-  label: NodeLabel;
-  props: Record<string, unknown>;
-}
+/**
+ * Distributed over the labels, so `label` picks the property shape exactly as
+ * `createNode` does. A `Claim` staged with an `Artefact`'s properties is a
+ * compile error rather than a row.
+ */
+export type NodeCreated = {
+  [L in NodeLabel]: {
+    change: "NodeCreated";
+    id: string;
+    label: L;
+    props: NodePropsByLabel[L];
+  };
+}[NodeLabel];
 
 export interface EdgeCreated {
   change: "EdgeCreated";

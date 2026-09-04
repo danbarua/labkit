@@ -91,8 +91,7 @@ import type {
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
 import type { DomainEvent } from "../events";
-import { applyDelta } from "../projection";
-import { UnitOfWork } from "./shared";
+import { applyDelta, UnitOfWork } from "../projection";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
@@ -151,13 +150,10 @@ export type Operation = Methods<WriteSurface>;
  */
 export type RetiredOperation = "promote";
 
-/**
- * What a verb's body returns: what the act was about, and the report minus the
- * events the pipeline adds.
- */
-export interface Act<T> {
+/** What a verb's body returns: what the act was about, and what it produced. */
+export interface Act<R> {
   subject: Ref<string>;
-  result: Omit<T, "events">;
+  result: R;
 }
 
 /**
@@ -165,11 +161,11 @@ export interface Act<T> {
  * verb against a fresh unit of work, record one event carrying its changes,
  * project that event into the graph, commit.
  */
-export type Handle = <T extends { events: DomainEvent[] }>(
+export type Handle = <R extends object>(
   operation: Operation,
   command: Command,
-  work: (unitOfWork: UnitOfWork) => Promise<Act<T>>,
-) => Promise<T>;
+  work: (unitOfWork: UnitOfWork) => Promise<Act<R>>,
+) => Promise<R & { events: DomainEvent[] }>;
 
 export class WriteSurface extends SessionCore {
   private readonly asking: Asking;
@@ -277,11 +273,11 @@ export class WriteSurface extends SessionCore {
    * projected from it. The verb queries and enforces and stages; nothing else
    * about a write is its business.
    */
-  private async handling<T extends { events: DomainEvent[] }>(
+  private async handling<R extends object>(
     operation: Operation,
     command: Command,
-    work: (unitOfWork: UnitOfWork) => Promise<Act<T>>,
-  ): Promise<T> {
+    work: (unitOfWork: UnitOfWork) => Promise<Act<R>>,
+  ): Promise<R & { events: DomainEvent[] }> {
     return this.graph.inTransaction(async () => {
       const unitOfWork = new UnitOfWork(this.graph);
       const act = await work(unitOfWork);
@@ -294,7 +290,7 @@ export class WriteSurface extends SessionCore {
         changes: unitOfWork.delta(),
       });
       await applyDelta(this.graph, recorded);
-      return { ...act.result, events: [recorded] } as T;
+      return { ...act.result, events: [recorded] };
     });
   }
 }

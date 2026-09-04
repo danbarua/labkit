@@ -28,7 +28,8 @@ import type {
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
-import { asConcludedClaim, Shared, UnitOfWork } from "./shared";
+import { asConcludedClaim, Shared } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 /**
  * The `Claim.kind` each state is stored as.
@@ -76,7 +77,7 @@ export class Revising extends Shared {
    * One event, not two: a researcher who re-verified a result did one thing.
    */
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    return this.handle<VerificationReport>("reverify", input, async (unitOfWork) => {
+    return this.handle("reverify", input, async (unitOfWork) => {
       const at = this.clock.now();
       // **One hop, inferred rather than restated.** The analysis being
       // re-checked knows the enquiry it was recorded under, so a caller who
@@ -151,7 +152,7 @@ export class Revising extends Shared {
    * rests under the claim.
    */
   async is(input: IsCommand): Promise<Restated> {
-    return this.handle<Restated>("is", input, async (unitOfWork) => {
+    return this.handle("is", input, async (unitOfWork) => {
       // Read before the delta is stated, so the event can say what the state
       // moved from -- the act overwrites `kind` in place, and afterwards
       // nothing holds the value it replaced.
@@ -274,7 +275,7 @@ export class Revising extends Shared {
      */
     operation: "keep" | "replaceAnalysis",
   ): Promise<ReplacementReport> {
-    return this.handle<ReplacementReport>(operation, input, async (unitOfWork) => {
+    return this.handle(operation, input, async (unitOfWork) => {
       const at = this.clock.now();
 
       await this.assertReviewOf(input.because, input.supersedes);
@@ -363,7 +364,7 @@ export class Revising extends Shared {
    * the numbers were right and only the sentence about them was wrong.
    */
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
-    return this.handle<ReinterpretationReport>("reinterpret", input, async (unitOfWork) => {
+    return this.handle("reinterpret", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       // A reinterpretation narrows a READING, not one node: two analyses in one

@@ -13,7 +13,8 @@ import { ref } from "../report";
 import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
-import { noFindingBearsOn, UnitOfWork } from "./shared";
+import { noFindingBearsOn } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 export class Stopping extends SessionCore {
   constructor(
@@ -32,7 +33,7 @@ export class Stopping extends SessionCore {
    * not read alike.
    */
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
-    return this.handle<ClosedEnquiry>("closeEnquiry", input, async (unitOfWork) => {
+    return this.handle("closeEnquiry", input, async (unitOfWork) => {
       // Everything is validated before anything is written. A rejected close
       // must leave no Decision behind, and an analysis from some other enquiry
       // must not become the stated basis for resolving this question.
@@ -154,7 +155,7 @@ export class Stopping extends SessionCore {
    * a survey can report it, is ceremony.
    */
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
-    return this.handle<AcceptedAsUnresolved>("acceptAsUnresolved", input, async (unitOfWork) => {
+    return this.handle("acceptAsUnresolved", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       const question = await this.questionBehind(input.enquiry);

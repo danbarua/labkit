@@ -11,7 +11,8 @@ import type {
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
-import { asConcludedClaim, Shared, UnitOfWork } from "./shared";
+import { asConcludedClaim, Shared } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 export class Work extends Shared {
   constructor(
@@ -49,7 +50,7 @@ export class Work extends Shared {
    * neither of, or through a required `USES -> Computation`.
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
-    return this.handle<RecordedObservations>("recordObservations", input, async (unitOfWork) => {
+    return this.handle("recordObservations", input, async (unitOfWork) => {
       const artefact = await unitOfWork.node("Artefact", {
         kind: "observations",
         logical_name: input.name,
@@ -92,7 +93,7 @@ export class Work extends Shared {
    * EDGE_SCHEMA.CONSUMES.
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
-    return this.handle<RecordedAnalysis>("recordAnalysis", input, async (unitOfWork) => {
+    return this.handle("recordAnalysis", input, async (unitOfWork) => {
       const { analysis } = await this.recorded(input, unitOfWork);
       // An analysis with no conclusions yet emits exactly one event and is a
       // real state: `enquiry` prints "has produced nothing yet" and `known`
@@ -134,7 +135,7 @@ export class Work extends Shared {
   }
 
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.handle<RecordedAnalysis>("conclude", input, async (unitOfWork) => {
+    return this.handle("conclude", input, async (unitOfWork) => {
       const concluded = await this.concluding(input, unitOfWork);
 
       return {
@@ -152,7 +153,7 @@ export class Work extends Shared {
    * nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.handle<RecordedReview>("recordReview", input, async (unitOfWork) => {
+    return this.handle("recordReview", input, async (unitOfWork) => {
       const unit = await this.unitOf(input.of);
 
       const review = ref("review", await unitOfWork.node("Review", { verdict: input.verdict }));

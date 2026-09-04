@@ -23,7 +23,8 @@ import type {
 } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
-import { noFindingBearsOn, UnitOfWork } from "./shared";
+import { noFindingBearsOn } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 export class Counting extends SessionCore {
   constructor(
@@ -36,7 +37,7 @@ export class Counting extends SessionCore {
 
   /** Records a piece of work whose start a gate may protect. */
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
-    return this.handle<PlannedWork>("planWork", input, async (unitOfWork) => {
+    return this.handle("planWork", input, async (unitOfWork) => {
       const work = ref(
         "work",
         await unitOfWork.node("Task", {
@@ -57,7 +58,7 @@ export class Counting extends SessionCore {
 
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
-    return this.handle<StatedCriterion>("stateCriterion", { proposition }, async (unitOfWork) => {
+    return this.handle("stateCriterion", { proposition }, async (unitOfWork) => {
       const criterion = ref("criterion", await unitOfWork.node("Criterion", { proposition }));
 
       return {
@@ -72,7 +73,7 @@ export class Counting extends SessionCore {
    * work. **Declaring a gate must not make it satisfied.**
    */
   async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
-    return this.handle<DeclaredGate>("declareGate", input, async (unitOfWork) => {
+    return this.handle("declareGate", input, async (unitOfWork) => {
       if (input.governedBy.length === 0)
         throw new Error(
           "a gate needs at least one criterion to govern it: a gate enforces a condition, and one " +
@@ -118,7 +119,7 @@ export class Counting extends SessionCore {
    * anything is written so a rejected command leaves no partial state.
    */
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
-    return this.handle<EvaluatedCriterion>("evaluateCriterion", input, async (unitOfWork) => {
+    return this.handle("evaluateCriterion", input, async (unitOfWork) => {
       if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
       // Same invariant class as `assertCriterionGovernsGate`, for the other job
       // a criterion can do: an evaluation that neither triggers a gate nor bears
@@ -174,7 +175,7 @@ export class Counting extends SessionCore {
    * remembering to pass the right handle is not an ordering.
    */
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
-    return this.handle<AmendmentReport>("amendDesign", input, async (unitOfWork) => {
+    return this.handle("amendDesign", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       // Everything validated before anything is written -- a rejected amendment

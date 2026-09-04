@@ -46,6 +46,7 @@ import { ref } from "../report";
 import type { ConcludeCommand, RecordAnalysisCommand } from "../commands";
 import { SessionCore } from "../core";
 import type { TenantGraph } from "../../db/graph";
+import type { UnitOfWork } from "../projection";
 import type { DomainEvent } from "../events";
 
 /**
@@ -519,36 +520,5 @@ export class Shared extends SessionCore {
       // reader has to infer it from whether a `promote` happens to follow.
       standing: c.standing,
     }));
-  }
-}
-
-/** One command's changes, accumulated in the order the command made them. */
-export class UnitOfWork {
-  readonly changes: GraphChange[] = [];
-
-  constructor(private readonly graph: TenantGraph) {}
-
-  /** Reserves an id and records the node under it. */
-  async node<L extends NodeLabel>(label: L, props: NodePropsByLabel[L]): Promise<string> {
-    const id = await this.graph.reserveId(label);
-    this.changes.push({
-      change: "NodeCreated",
-      id,
-      label,
-      props: { ...props } as Record<string, unknown>,
-    });
-    return id;
-  }
-
-  edge(from: string, label: EdgeLabel, to: string, props?: EdgeProps): void {
-    this.changes.push({ change: "EdgeCreated", from, label, to, ...(props ? { props } : {}) });
-  }
-
-  set(id: string, props: Record<string, unknown>): void {
-    this.changes.push({ change: "PropsChanged", id, props });
-  }
-
-  delta(): GraphChange[] {
-    return this.changes;
   }
 }

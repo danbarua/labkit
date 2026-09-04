@@ -17,7 +17,7 @@ import { ref } from "../report";
 import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
-import type { UnitOfWork } from "./shared";
+import type { UnitOfWork } from "../projection";
 
 export class Asking extends SessionCore {
   constructor(
@@ -41,7 +41,7 @@ export class Asking extends SessionCore {
    * different reasons and only the asker knows whether they meant one.
    */
   async pose(input: PoseCommand): Promise<Posed> {
-    return this.handle<Posed>("pose", input, async (unitOfWork) => {
+    return this.handle("pose", input, async (unitOfWork) => {
       const asked = ref("question", await this.posed(input.question, unitOfWork));
       return { subject: asked, result: { question: asked } };
     });
@@ -59,7 +59,7 @@ export class Asking extends SessionCore {
    * which is the whole point.
    */
   async note(input: NoteCommand): Promise<Noted> {
-    return this.handle<Noted>("note", input, async (unitOfWork) => {
+    return this.handle("note", input, async (unitOfWork) => {
       const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
       return { subject: noted, result: { note: noted } };
@@ -88,7 +88,7 @@ export class Asking extends SessionCore {
    * either way.
    */
   async pursue(input: PursueCommand): Promise<Pursued> {
-    return this.handle<Pursued>("pursue", input, async (unitOfWork) => {
+    return this.handle("pursue", input, async (unitOfWork) => {
       const enquiry = await this.pursued(input, unitOfWork);
       return { subject: enquiry, result: { enquiry } };
     });
@@ -110,7 +110,7 @@ export class Asking extends SessionCore {
    * the question, and a closed enquiry goes on reporting itself open.
    */
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
-    return this.handle<OpenedEnquiry>("openEnquiry", { question }, async (unitOfWork) => {
+    return this.handle("openEnquiry", { question }, async (unitOfWork) => {
       const asked = await this.posed(question, unitOfWork);
       const enquiry = await this.pursued({ question: asked, approach: question }, unitOfWork);
       return { subject: enquiry, result: { enquiry, question: asked } };
@@ -136,7 +136,7 @@ export class Asking extends SessionCore {
    * which is what makes the freezing load-bearing.
    */
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.handle<SharpenedQuestion>("sharpen", input, async (unitOfWork) => {
+    return this.handle("sharpen", input, async (unitOfWork) => {
       const original = await this.graph.query(
         `MATCH (q:Question {natural_id: $id}) RETURN q`,
         { q: vertexProps<{ name: string }>() },
