@@ -16,15 +16,14 @@ import type {
 import { ref } from "../report";
 import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { EmitDelta } from "./index";
-import { applyDelta } from "../projection";
-import { UnitOfWork } from "./shared";
+import type { Handle } from "./index";
+import type { UnitOfWork } from "./shared";
 
 export class Asking extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emitDelta: EmitDelta,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -42,16 +41,9 @@ export class Asking extends SessionCore {
    * different reasons and only the asker knows whether they meant one.
    */
   async pose(input: PoseCommand): Promise<Posed> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<Posed>("pose", input, async (unitOfWork) => {
       const asked = ref("question", await this.posed(input.question, unitOfWork));
-
-      const events = await this.emitDelta("pose", asked, unitOfWork.delta(), {
-        question: input.question,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { question: asked, events };
+      return { subject: asked, detail: { question: input.question }, result: { question: asked } };
     });
   }
 
@@ -67,18 +59,14 @@ export class Asking extends SessionCore {
    * which is the whole point.
    */
   async note(input: NoteCommand): Promise<Noted> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<Noted>("note", input, async (unitOfWork) => {
       const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
-
-      const events = await this.emitDelta("note", noted, unitOfWork.delta(), {
-        text: input.text,
-        ...(input.on ? { on: input.on } : {}),
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { note: noted, events };
+      return {
+        subject: noted,
+        detail: { text: input.text, ...(input.on ? { on: input.on } : {}) },
+        result: { note: noted },
+      };
     });
   }
 
@@ -104,17 +92,13 @@ export class Asking extends SessionCore {
    * either way.
    */
   async pursue(input: PursueCommand): Promise<Pursued> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<Pursued>("pursue", input, async (unitOfWork) => {
       const enquiry = await this.pursued(input, unitOfWork);
-
-      const events = await this.emitDelta("pursue", enquiry, unitOfWork.delta(), {
-        question: input.question,
-        approach: input.approach,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { enquiry, events };
+      return {
+        subject: enquiry,
+        detail: { question: input.question, approach: input.approach },
+        result: { enquiry },
+      };
     });
   }
 
@@ -134,18 +118,14 @@ export class Asking extends SessionCore {
    * the question, and a closed enquiry goes on reporting itself open.
    */
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<OpenedEnquiry>("openEnquiry", { question }, async (unitOfWork) => {
       const asked = await this.posed(question, unitOfWork);
       const enquiry = await this.pursued({ question: asked, approach: question }, unitOfWork);
-
-      const events = await this.emitDelta("openEnquiry", enquiry, unitOfWork.delta(), {
-        question,
-        asked,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { enquiry, question: asked, events };
+      return {
+        subject: enquiry,
+        detail: { question, asked },
+        result: { enquiry, question: asked },
+      };
     });
   }
 
@@ -168,7 +148,7 @@ export class Asking extends SessionCore {
    * which is what makes the freezing load-bearing.
    */
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<SharpenedQuestion>("sharpen", input, async (unitOfWork) => {
       const original = await this.graph.query(
         `MATCH (q:Question {natural_id: $id}) RETURN q`,
         { q: vertexProps<{ name: string }>() },
@@ -181,7 +161,6 @@ export class Asking extends SessionCore {
 
       const standing = await this.standingFindings();
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const decision = await unitOfWork.node("Decision", {
         decided_at: this.clock.now(),
         reason: input.because,
@@ -193,14 +172,11 @@ export class Asking extends SessionCore {
       const sharper = await this.posed(input.into, unitOfWork);
       unitOfWork.edge(decision, "MOTIVATES", sharper);
 
-      const events = await this.emitDelta("sharpen", sharper, unitOfWork.delta(), {
-        from: input.from,
-        because: input.because,
-        via: decision,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { question: sharper, decision: ref("decision", decision), events };
+      return {
+        subject: sharper,
+        detail: { from: input.from, because: input.because, via: decision },
+        result: { question: sharper, decision: ref("decision", decision) },
+      };
     });
   }
 

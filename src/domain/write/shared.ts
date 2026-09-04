@@ -343,7 +343,7 @@ export class Shared extends SessionCore {
      */
     staging?: { unit: UnitRef; output: ObservationsRef; enquiry?: EnquiryRef },
   ): Promise<ConcludedWithStanding> {
-    return this.graph.inTransaction(async () => {
+    {
       const at = this.clock.now();
       {
         const unit = staging?.unit ?? (await this.unitOf(input.analysis));
@@ -504,7 +504,7 @@ export class Shared extends SessionCore {
           standing: input.standing ?? "exploratory",
         };
       }
-    });
+    }
   }
 
   /** `{claim, finding, proposition}` per conclusion — the event's own record of the pairing, independent of the typed report. */

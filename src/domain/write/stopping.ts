@@ -12,15 +12,14 @@ import type {
 import { ref } from "../report";
 import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { EmitDelta } from "./index";
-import { applyDelta } from "../projection";
+import type { Handle } from "./index";
 import { noFindingBearsOn, UnitOfWork } from "./shared";
 
 export class Stopping extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emitDelta: EmitDelta,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -33,7 +32,7 @@ export class Stopping extends SessionCore {
    * not read alike.
    */
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<ClosedEnquiry>("closeEnquiry", input, async (unitOfWork) => {
       // Everything is validated before anything is written. A rejected close
       // must leave no Decision behind, and an analysis from some other enquiry
       // must not become the stated basis for resolving this question.
@@ -107,7 +106,6 @@ export class Stopping extends SessionCore {
         answeredProposition = found.asserts;
       }
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const decided = ref(
         "decision",
         await unitOfWork.node("Decision", {
@@ -121,13 +119,11 @@ export class Stopping extends SessionCore {
       unitOfWork.edge(decided, "RESOLVES", question);
       if (answerBearing) unitOfWork.edge(decided, "BASED_ON", answerBearing);
 
-      const events = await this.emitDelta("closeEnquiry", input.enquiry, unitOfWork.delta(), {
-        answeredBy: input.answeredBy ?? null,
-        proposition: answeredProposition ?? null,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { decision: decided, events };
+      return {
+        subject: input.enquiry,
+        detail: { answeredBy: input.answeredBy ?? null, proposition: answeredProposition ?? null },
+        result: { decision: decided },
+      };
     });
   }
 
@@ -159,7 +155,7 @@ export class Stopping extends SessionCore {
    * a survey can report it, is ceremony.
    */
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<AcceptedAsUnresolved>("acceptAsUnresolved", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       const question = await this.questionBehind(input.enquiry);
@@ -172,7 +168,6 @@ export class Stopping extends SessionCore {
       if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
       const basis = found.evidence;
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const decision = ref(
         "decision",
         await unitOfWork.node("Decision", {
@@ -186,14 +181,11 @@ export class Stopping extends SessionCore {
       // `evidence` answerable afterwards rather than only now.
       unitOfWork.edge(decision, "BASED_ON", basis);
 
-      const events = await this.emitDelta("acceptAsUnresolved", input.enquiry, unitOfWork.delta(), {
-        because: input.because,
-        until: input.until,
-        at,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { decision, events };
+      return {
+        subject: input.enquiry,
+        detail: { because: input.because, until: input.until, at },
+        result: { decision },
+      };
     });
   }
 }

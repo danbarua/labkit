@@ -27,8 +27,7 @@ import type {
   ReverifyCommand,
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
-import type { EmitDelta } from "./index";
-import { applyDelta } from "../projection";
+import type { Handle } from "./index";
 import { asConcludedClaim, Shared, UnitOfWork } from "./shared";
 
 /**
@@ -55,7 +54,7 @@ export class Revising extends Shared {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emitDelta: EmitDelta,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -77,11 +76,8 @@ export class Revising extends Shared {
    * One event, not two: a researcher who re-verified a result did one thing.
    */
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<VerificationReport>("reverify", input, async (unitOfWork) => {
       const at = this.clock.now();
-      // Atomic: without the second write the durable state is a second
-      // independent support standing where a re-verification was meant. See
-      // TenantGraph.inTransaction.
       // **One hop, inferred rather than restated.** The analysis being
       // re-checked knows the enquiry it was recorded under, so a caller who
       // named the analysis has already said which one. An explicit `enquiry`
@@ -101,7 +97,6 @@ export class Revising extends Shared {
         );
       }
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const { analysis, unit, output } = await this.recorded(
         { enquiry, method: input.method, from: input.under },
         unitOfWork,
@@ -127,20 +122,19 @@ export class Revising extends Shared {
       // claims about two different acts; see `conclude`'s header.
       unitOfWork.edge(concluded.finding, "REVERIFIES", original);
 
-      const events = await this.emitDelta("reverify", analysis, unitOfWork.delta(), {
-        of: input.historical,
-        proposition: input.concludes.proposition,
-        conclusions: this.conclusionEvents([concluded]),
-      });
-
-      await applyDelta(this.graph, events[0]!);
-
       return {
-        at,
-        verification: analysis,
-        of: input.historical,
-        claims: [asConcludedClaim(concluded)],
-        events,
+        subject: analysis,
+        detail: {
+          of: input.historical,
+          proposition: input.concludes.proposition,
+          conclusions: this.conclusionEvents([concluded]),
+        },
+        result: {
+          at,
+          verification: analysis,
+          of: input.historical,
+          claims: [asConcludedClaim(concluded)],
+        },
       };
     });
   }
@@ -162,7 +156,7 @@ export class Revising extends Shared {
    * rests under the claim.
    */
   async is(input: IsCommand): Promise<Restated> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<Restated>("is", input, async (unitOfWork) => {
       // Read before the delta is stated, so the event can say what the state
       // moved from -- the act overwrites `kind` in place, and afterwards
       // nothing holds the value it replaced.
@@ -174,7 +168,6 @@ export class Revising extends Shared {
       const was = existing?.c.kind ?? "exploratory";
       const proposition = await this.assertedBy(input.claim);
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const decision = ref(
         "decision",
         await unitOfWork.node("Decision", {
@@ -195,19 +188,20 @@ export class Revising extends Shared {
       }
       unitOfWork.set(input.claim, { kind: STORED_KIND[input.state] });
 
-      const events = await this.emitDelta("is", input.claim, unitOfWork.delta(), {
-        proposition,
-        from: was,
-        to: STORED_KIND[input.state],
-        // The act's own word, beside the property it wrote. `to` is the stored
-        // kind so it pairs with `from`; `state` is what the caller said, and it
-        // is what decides whether `because` is a handle or a sentence.
-        state: input.state,
-        because: input.because,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { decision, events };
+      return {
+        subject: input.claim,
+        detail: {
+          proposition,
+          from: was,
+          to: STORED_KIND[input.state],
+          // The act's own word, beside the property it wrote. `to` is the stored
+          // kind so it pairs with `from`; `state` is what the caller said, and it
+          // is what decides whether `because` is a handle or a sentence.
+          state: input.state,
+          because: input.because,
+        },
+        result: { decision },
+      };
     });
   }
 
@@ -295,7 +289,7 @@ export class Revising extends Shared {
      */
     operation: "keep" | "replaceAnalysis",
   ): Promise<ReplacementReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<ReplacementReport>(operation, input, async (unitOfWork) => {
       const at = this.clock.now();
 
       await this.assertReviewOf(input.because, input.supersedes);
@@ -321,7 +315,6 @@ export class Revising extends Shared {
           );
       }
 
-      const unitOfWork = new UnitOfWork(this.graph);
       // The superseded output is not invalidated. A flag on the artefact
       // would summarise the standing of every finding it carries, and
       // standing is per finding.
@@ -362,21 +355,21 @@ export class Revising extends Shared {
         superseded.push({ claim: c.claim, asserts: c.proposition });
       }
 
-      const events = await this.emitDelta(operation, replacement, unitOfWork.delta(), {
-        supersedes: input.supersedes,
-        because: input.because,
-        keeping: input.keeping,
-      });
-
-      await applyDelta(this.graph, events[0]!);
       return {
-        at,
-        replacement,
-        decision,
-        supersedes: input.supersedes,
-        kept: input.keeping,
-        superseded,
-        events,
+        subject: replacement,
+        detail: {
+          supersedes: input.supersedes,
+          because: input.because,
+          keeping: input.keeping,
+        },
+        result: {
+          at,
+          replacement,
+          decision,
+          supersedes: input.supersedes,
+          kept: input.keeping,
+          superseded,
+        },
       };
     });
   }
@@ -390,7 +383,7 @@ export class Revising extends Shared {
    * the numbers were right and only the sentence about them was wrong.
    */
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<ReinterpretationReport>("reinterpret", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       // A reinterpretation narrows a READING, not one node: two analyses in one
@@ -422,11 +415,6 @@ export class Revising extends Shared {
           `no claim ${input.of} to reinterpret; a claim exists once an analysis concludes it`,
         );
 
-      // Atomic. Interrupted between withdrawing the original and carrying its
-      // evidence across, this retracts a finding and puts nothing in its place.
-      // Demonstrated in tests/domain-session.test.ts, which is where the harm is
-      // reachable -- "does this roll back?" is not a researcher's question, so it
-      // is not a scenario. See TenantGraph.inTransaction.
       const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
       // One query for every withdrawn claim's evidence, not one per claim.
       // Deduplicated by the Map below: the query selects `natural_id` AND
@@ -440,7 +428,6 @@ export class Revising extends Shared {
       );
       const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const review = await unitOfWork.node("Review", { verdict: input.because });
       const narrower = ref(
         "claim",
@@ -469,25 +456,21 @@ export class Revising extends Shared {
         carried.set(finding, { evidence: finding, states: row.e.statement });
       }
 
-      const events = await this.emitDelta("reinterpret", narrower, unitOfWork.delta(), {
-        previously,
-        because: input.because,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-
       return {
-        at,
-        previously: withdrawn,
-        // The act records what it produced: without this a caller has to go
-        // back through `claimsAsserting` to name what this very call created.
-        nowClaims: { claim: narrower, asserts: input.as },
-        evidenceStanding: [...carried.values()].sort((a, b) =>
-          a.evidence.localeCompare(b.evidence),
-        ),
-        restingOnTheOldReading,
-        requiresRecomputation: false,
-        events,
+        subject: narrower,
+        detail: { previously, because: input.because },
+        result: {
+          at,
+          previously: withdrawn,
+          // The act records what it produced: without this a caller has to go
+          // back through `claimsAsserting` to name what this very call created.
+          nowClaims: { claim: narrower, asserts: input.as },
+          evidenceStanding: [...carried.values()].sort((a, b) =>
+            a.evidence.localeCompare(b.evidence),
+          ),
+          restingOnTheOldReading,
+          requiresRecomputation: false,
+        },
       };
     });
   }

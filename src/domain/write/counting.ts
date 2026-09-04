@@ -22,23 +22,21 @@ import type {
   PlanWorkCommand,
 } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { EmitDelta } from "./index";
-import { applyDelta } from "../projection";
+import type { Handle } from "./index";
 import { noFindingBearsOn, UnitOfWork } from "./shared";
 
 export class Counting extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emitDelta: EmitDelta,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
 
   /** Records a piece of work whose start a gate may protect. */
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<PlannedWork>("planWork", input, async (unitOfWork) => {
       const work = ref(
         "work",
         await unitOfWork.node("Task", {
@@ -50,27 +48,24 @@ export class Counting extends SessionCore {
       );
       if (input.addressing) unitOfWork.edge(work, "ADDRESSES", input.addressing);
 
-      const events = await this.emitDelta("planWork", work, unitOfWork.delta(), {
-        objective: input.objective,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { work, events };
+      return {
+        subject: work,
+        detail: { objective: input.objective },
+        result: { work },
+      };
     });
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<StatedCriterion>("stateCriterion", proposition, async (unitOfWork) => {
       const criterion = ref("criterion", await unitOfWork.node("Criterion", { proposition }));
 
-      const events = await this.emitDelta("stateCriterion", criterion, unitOfWork.delta(), {
-        proposition,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { criterion, events };
+      return {
+        subject: criterion,
+        detail: { proposition },
+        result: { criterion },
+      };
     });
   }
 
@@ -79,7 +74,7 @@ export class Counting extends SessionCore {
    * work. **Declaring a gate must not make it satisfied.**
    */
   async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<DeclaredGate>("declareGate", input, async (unitOfWork) => {
       if (input.governedBy.length === 0)
         throw new Error(
           "a gate needs at least one criterion to govern it: a gate enforces a condition, and one " +
@@ -97,18 +92,18 @@ export class Counting extends SessionCore {
             "— name it in protecting, or hold the analysis to the criterion instead if nothing " +
             "downstream depends on it",
         );
-      const unitOfWork = new UnitOfWork(this.graph);
       const gate = ref("gate", await unitOfWork.node("Gate", { consequence: input.consequence }));
       for (const criterion of input.governedBy) unitOfWork.edge(criterion, "GOVERNS", gate);
       for (const work of input.protecting) unitOfWork.edge(gate, "GATES", work);
 
-      const events = await this.emitDelta("declareGate", gate, unitOfWork.delta(), {
-        governedBy: input.governedBy.map((c) => c),
-        protecting: input.protecting.map((w) => w),
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { gate, events };
+      return {
+        subject: gate,
+        detail: {
+          governedBy: input.governedBy.map((c) => c),
+          protecting: input.protecting.map((w) => w),
+        },
+        result: { gate },
+      };
     });
   }
 
@@ -129,7 +124,7 @@ export class Counting extends SessionCore {
    * anything is written so a rejected command leaves no partial state.
    */
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<EvaluatedCriterion>("evaluateCriterion", input, async (unitOfWork) => {
       if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
       // Same invariant class as `assertCriterionGovernsGate`, for the other job
       // a criterion can do: an evaluation that neither triggers a gate nor bears
@@ -143,7 +138,6 @@ export class Counting extends SessionCore {
       }
       const at = this.clock.now();
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const evaluation = ref(
         "evaluation",
         await unitOfWork.node("CriterionEvaluation", {
@@ -159,14 +153,15 @@ export class Counting extends SessionCore {
       // identical records.
       if (basis) unitOfWork.edge(evaluation, "BASED_ON", basis);
 
-      const events = await this.emitDelta("evaluateCriterion", evaluation, unitOfWork.delta(), {
-        criterion: input.criterion,
-        ...(input.gate ? { gate: input.gate } : {}),
-        outcome: input.outcome,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { evaluation, events };
+      return {
+        subject: evaluation,
+        detail: {
+          criterion: input.criterion,
+          ...(input.gate ? { gate: input.gate } : {}),
+          outcome: input.outcome,
+        },
+        result: { evaluation },
+      };
     });
   }
 
@@ -190,7 +185,7 @@ export class Counting extends SessionCore {
    * remembering to pass the right handle is not an ordering.
    */
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<AmendmentReport>("amendDesign", input, async (unitOfWork) => {
       const at = this.clock.now();
 
       // Everything validated before anything is written -- a rejected amendment
@@ -238,7 +233,6 @@ export class Counting extends SessionCore {
       const rerun = await this.workGatedBy(gates);
       const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const replacement = ref(
         "criterion",
         await unitOfWork.node("Criterion", { proposition: input.nowRequires }),
@@ -257,31 +251,30 @@ export class Counting extends SessionCore {
       unitOfWork.edge(decision, "BASED_ON", diagnosis);
       if (prior) unitOfWork.edge(decision, "SUPERSEDES", prior);
 
-      const events = await this.emitDelta("amendDesign", decision, unitOfWork.delta(), {
-        criterion: input.criterion,
-        replaced,
-        nowRequires: input.nowRequires,
-        supersedes: prior ?? null,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-
       return {
-        at,
-        amendment: decision,
-        // `void replacement;` stood here: the amended criterion was created and
-        // its handle thrown away, so the report named both conditions by wording
-        // and a caller could reach neither.
-        replaced: { criterion: input.criterion, requires: replaced ?? "" },
-        nowRequires: { criterion: replacement, requires: input.nowRequires },
-        rerun,
-        confirmatoryAffected,
-        // Derived, never declared. An amendment is scientific exactly when
-        // something the confirmatory boundary rests on is in its blast radius --
-        // which is the difference between repairing a solver and moving the
-        // goalposts, and is not a thing the person amending gets to assert.
-        nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
-        events,
+        subject: decision,
+        detail: {
+          criterion: input.criterion,
+          replaced,
+          nowRequires: input.nowRequires,
+          supersedes: prior ?? null,
+        },
+        result: {
+          at,
+          amendment: decision,
+          // `void replacement;` stood here: the amended criterion was created and
+          // its handle thrown away, so the report named both conditions by wording
+          // and a caller could reach neither.
+          replaced: { criterion: input.criterion, requires: replaced ?? "" },
+          nowRequires: { criterion: replacement, requires: input.nowRequires },
+          rerun,
+          confirmatoryAffected,
+          // Derived, never declared. An amendment is scientific exactly when
+          // something the confirmatory boundary rests on is in its blast radius --
+          // which is the difference between repairing a solver and moving the
+          // goalposts, and is not a thing the person amending gets to assert.
+          nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
+        },
       };
     });
   }

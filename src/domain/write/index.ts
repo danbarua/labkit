@@ -90,6 +90,8 @@ import type {
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
 import type { DomainEvent } from "../events";
+import { applyDelta } from "../projection";
+import { UnitOfWork } from "./shared";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
@@ -148,22 +150,32 @@ export type Operation = Methods<WriteSurface>;
  */
 export type RetiredOperation = "promote";
 
-/** The delta a verb states before it writes anything. */
-export type Delta = DomainEvent["changes"];
-
 /** A command in flight: the operation, and what the caller passed. */
 export interface Handled {
   operation: Operation;
   input: unknown;
 }
 
-/** `emit`, for a verb that authors its delta rather than having it drained. */
-export type EmitDelta = (
+/**
+ * What a verb's body returns: what the act was about, what the event should
+ * carry beside its changes, and the report minus the events the pipeline adds.
+ */
+export interface Act<T> {
+  subject: Ref<string>;
+  detail?: Record<string, unknown>;
+  result: Omit<T, "events">;
+}
+
+/**
+ * The pipeline, as a group module sees it: open the transaction, run the
+ * verb against a fresh unit of work, record one event carrying its changes,
+ * project that event into the graph, commit.
+ */
+export type Handle = <T extends { events: DomainEvent[] }>(
   operation: Operation,
-  subject: Ref<string>,
-  delta: Delta,
-  detail?: Record<string, unknown>,
-) => Promise<DomainEvent[]>;
+  input: unknown,
+  work: (unitOfWork: UnitOfWork) => Promise<Act<T>>,
+) => Promise<T>;
 
 export class WriteSurface extends SessionCore {
   private readonly asking: Asking;
@@ -174,150 +186,130 @@ export class WriteSurface extends SessionCore {
 
   constructor(graph: TenantGraph, options: ResearchSessionOptions = {}) {
     super(graph, options);
-    const emitDelta: EmitDelta = (operation, subject, delta, detail) =>
-      this.emitDelta(operation, subject, delta, detail);
-    this.asking = new Asking(graph, options, emitDelta);
-    this.work = new Work(graph, options, emitDelta);
-    this.counting = new Counting(graph, options, emitDelta);
-    this.revising = new Revising(graph, options, emitDelta);
-    this.stopping = new Stopping(graph, options, emitDelta);
+    const handle: Handle = (operation, input, work) => this.handling(operation, input, work);
+    this.asking = new Asking(graph, options, handle);
+    this.work = new Work(graph, options, handle);
+    this.counting = new Counting(graph, options, handle);
+    this.revising = new Revising(graph, options, handle);
+    this.stopping = new Stopping(graph, options, handle);
   }
 
   async pose(input: PoseCommand): Promise<Posed> {
-    return this.handling({ operation: "pose", input }, () => this.asking.pose(input));
+    return this.asking.pose(input);
   }
 
   async note(input: NoteCommand): Promise<Noted> {
-    return this.handling({ operation: "note", input }, () => this.asking.note(input));
+    return this.asking.note(input);
   }
 
   async pursue(input: PursueCommand): Promise<Pursued> {
-    return this.handling({ operation: "pursue", input }, () => this.asking.pursue(input));
+    return this.asking.pursue(input);
   }
 
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
-    return this.handling({ operation: "openEnquiry", input: question }, () =>
-      this.asking.openEnquiry(question),
-    );
+    return this.asking.openEnquiry(question);
   }
 
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.handling({ operation: "sharpen", input }, () => this.asking.sharpen(input));
+    return this.asking.sharpen(input);
   }
 
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
-    return this.handling({ operation: "recordObservations", input }, () =>
-      this.work.recordObservations(input),
-    );
+    return this.work.recordObservations(input);
   }
 
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
-    return this.handling({ operation: "recordAnalysis", input }, () =>
-      this.work.recordAnalysis(input),
-    );
+    return this.work.recordAnalysis(input);
   }
 
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.handling({ operation: "conclude", input }, () => this.work.conclude(input));
+    return this.work.conclude(input);
   }
 
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.handling({ operation: "recordReview", input }, () => this.work.recordReview(input));
+    return this.work.recordReview(input);
   }
 
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
-    return this.handling({ operation: "closeEnquiry", input }, () =>
-      this.stopping.closeEnquiry(input),
-    );
+    return this.stopping.closeEnquiry(input);
   }
 
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
-    return this.handling({ operation: "acceptAsUnresolved", input }, () =>
-      this.stopping.acceptAsUnresolved(input),
-    );
+    return this.stopping.acceptAsUnresolved(input);
   }
 
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
-    return this.handling({ operation: "planWork", input }, () => this.counting.planWork(input));
+    return this.counting.planWork(input);
   }
 
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
-    return this.handling({ operation: "stateCriterion", input: proposition }, () =>
-      this.counting.stateCriterion(proposition),
-    );
+    return this.counting.stateCriterion(proposition);
   }
 
   async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
-    return this.handling({ operation: "declareGate", input }, () =>
-      this.counting.declareGate(input),
-    );
+    return this.counting.declareGate(input);
   }
 
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
-    return this.handling({ operation: "evaluateCriterion", input }, () =>
-      this.counting.evaluateCriterion(input),
-    );
+    return this.counting.evaluateCriterion(input);
   }
 
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
-    return this.handling({ operation: "amendDesign", input }, () =>
-      this.counting.amendDesign(input),
-    );
+    return this.counting.amendDesign(input);
   }
 
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    return this.handling({ operation: "reverify", input }, () => this.revising.reverify(input));
+    return this.revising.reverify(input);
   }
 
   async is(input: IsCommand): Promise<Restated> {
-    return this.handling({ operation: "is", input }, () => this.revising.is(input));
+    return this.revising.is(input);
   }
 
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
-    return this.handling({ operation: "replaceAnalysis", input }, () =>
-      this.revising.replaceAnalysis(input),
-    );
+    return this.revising.replaceAnalysis(input);
   }
 
   async keep(input: KeepCommand): Promise<ReplacementReport> {
-    return this.handling({ operation: "keep", input }, () => this.revising.keep(input));
+    return this.revising.keep(input);
   }
 
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
-    return this.handling({ operation: "reinterpret", input }, () =>
-      this.revising.reinterpret(input),
-    );
+    return this.revising.reinterpret(input);
   }
 
   /** The command being handled, for the duration of one call. */
   private handled?: Handled;
 
-  /** Runs one command, with the command in scope for the whole call. */
-  private async handling<T>(command: Handled, work: () => Promise<T>): Promise<T> {
+  /**
+   * One command: a transaction, a unit of work, one event, and the graph
+   * projected from it. The verb queries and enforces and stages; nothing else
+   * about a write is its business.
+   */
+  private async handling<T extends { events: DomainEvent[] }>(
+    operation: Operation,
+    input: unknown,
+    work: (unitOfWork: UnitOfWork) => Promise<Act<T>>,
+  ): Promise<T> {
     const outer = this.handled;
-    this.handled = command;
+    this.handled = { operation, input };
     try {
-      return await work();
+      return await this.graph.inTransaction(async () => {
+        const unitOfWork = new UnitOfWork(this.graph);
+        const act = await work(unitOfWork);
+        const recorded = await this.events.record({
+          at: this.clock.now(),
+          attribution: this.attribution,
+          operation,
+          subject: act.subject,
+          changes: unitOfWork.delta(),
+          ...(act.detail === undefined ? {} : { detail: act.detail }),
+        });
+        await applyDelta(this.graph, recorded);
+        return { ...act.result, events: [recorded] } as T;
+      });
     } finally {
       this.handled = outer;
     }
-  }
-
-  /** Records what a verb is about to do, before it does it. */
-  private async emitDelta(
-    operation: Operation,
-    subject: Ref<string>,
-    delta: Delta,
-    detail?: Record<string, unknown>,
-  ): Promise<DomainEvent[]> {
-    const recorded = await this.events.record({
-      at: this.clock.now(),
-      attribution: this.attribution,
-      operation,
-      subject,
-      changes: delta,
-      detail,
-    });
-    return [recorded];
   }
 }

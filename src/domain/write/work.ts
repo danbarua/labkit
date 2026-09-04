@@ -10,15 +10,14 @@ import type {
   RecordReviewCommand,
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
-import type { EmitDelta } from "./index";
-import { applyDelta } from "../projection";
+import type { Handle } from "./index";
 import { asConcludedClaim, Shared, UnitOfWork } from "./shared";
 
 export class Work extends Shared {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emitDelta: EmitDelta,
+    private readonly handle: Handle,
   ) {
     super(graph, options);
   }
@@ -50,8 +49,7 @@ export class Work extends Shared {
    * neither of, or through a required `USES -> Computation`.
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<RecordedObservations>("recordObservations", input, async (unitOfWork) => {
       const artefact = await unitOfWork.node("Artefact", {
         kind: "observations",
         logical_name: input.name,
@@ -76,12 +74,11 @@ export class Work extends Shared {
       unitOfWork.edge(input.enquiry, "REQUIRES", evidence);
 
       const observations = ref("observations", artefact);
-      const events = await this.emitDelta("recordObservations", observations, unitOfWork.delta(), {
-        name: input.name,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { observations, events };
+      return {
+        subject: observations,
+        detail: { name: input.name },
+        result: { observations },
+      };
     });
   }
 
@@ -96,19 +93,16 @@ export class Work extends Shared {
    * EDGE_SCHEMA.CONSUMES.
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<RecordedAnalysis>("recordAnalysis", input, async (unitOfWork) => {
       const { analysis } = await this.recorded(input, unitOfWork);
       // An analysis with no conclusions yet emits exactly one event and is a
       // real state: `enquiry` prints "has produced nothing yet" and `known`
       // buckets it as worked-on-no-answer.
-      const events = await this.emitDelta("recordAnalysis", analysis, unitOfWork.delta(), {
-        enquiry: input.enquiry,
-        method: input.method,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { analysis, claims: [], events };
+      return {
+        subject: analysis,
+        detail: { enquiry: input.enquiry, method: input.method },
+        result: { analysis, claims: [] },
+      };
     });
   }
 
@@ -142,17 +136,17 @@ export class Work extends Shared {
   }
 
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+    return this.handle<RecordedAnalysis>("conclude", input, async (unitOfWork) => {
       const concluded = await this.concluding(input, unitOfWork);
 
-      const events = await this.emitDelta("conclude", input.analysis, unitOfWork.delta(), {
-        conclusions: this.conclusionEvents([concluded]),
-        ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { analysis: input.analysis, claims: [asConcludedClaim(concluded)], events };
+      return {
+        subject: input.analysis,
+        detail: {
+          conclusions: this.conclusionEvents([concluded]),
+          ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
+        },
+        result: { analysis: input.analysis, claims: [asConcludedClaim(concluded)] },
+      };
     });
   }
 
@@ -164,20 +158,17 @@ export class Work extends Shared {
    * nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.graph.inTransaction(async () => {
+    return this.handle<RecordedReview>("recordReview", input, async (unitOfWork) => {
       const unit = await this.unitOf(input.of);
 
-      const unitOfWork = new UnitOfWork(this.graph);
       const review = ref("review", await unitOfWork.node("Review", { verdict: input.verdict }));
       unitOfWork.edge(review, "EVALUATES", unit);
 
-      const events = await this.emitDelta("recordReview", review, unitOfWork.delta(), {
-        of: input.of,
-        verdict: input.verdict,
-      });
-
-      await applyDelta(this.graph, events[0]!);
-      return { review, events };
+      return {
+        subject: review,
+        detail: { of: input.of, verdict: input.verdict },
+        result: { review },
+      };
     });
   }
 }
