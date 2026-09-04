@@ -71,6 +71,7 @@ import type {
   AcceptAsUnresolvedCommand,
   AmendDesignCommand,
   CloseEnquiryCommand,
+  PoseCommand,
   ConcludeCommand,
   DeclareGateCommand,
   EvaluateCriterionCommand,
@@ -154,6 +155,28 @@ export type Emit = (
   detail?: Record<string, unknown>,
 ) => Promise<DomainEvent[]>;
 
+/**
+ * The delta a verb states before it writes anything.
+ *
+ * `emit` drains what the graph already did; this takes what the graph is
+ * *about* to do, so the event exists before the record does.
+ */
+export type Delta = Partial<Pick<DomainEvent, "created" | "edges" | "sets">>;
+
+/** A command in flight: the operation, and what the caller passed. */
+export interface Handled {
+  operation: Operation;
+  input: unknown;
+}
+
+/** `emit`, for a verb that authors its delta rather than having it drained. */
+export type EmitDelta = (
+  operation: Operation,
+  subject: Ref<string>,
+  delta: Delta,
+  detail?: Record<string, unknown>,
+) => Promise<DomainEvent[]>;
+
 export class WriteSurface extends SessionCore {
   private readonly asking: Asking;
   private readonly work: Work;
@@ -164,15 +187,17 @@ export class WriteSurface extends SessionCore {
   constructor(graph: TenantGraph, options: ResearchSessionOptions = {}) {
     super(graph, options);
     const emit: Emit = (operation, subject, detail) => this.emit(operation, subject, detail);
-    this.asking = new Asking(graph, options, emit);
+    const emitDelta: EmitDelta = (operation, subject, delta, detail) =>
+      this.emitDelta(operation, subject, delta, detail);
+    this.asking = new Asking(graph, options, emit, emitDelta);
     this.work = new Work(graph, options, emit);
     this.counting = new Counting(graph, options, emit);
     this.revising = new Revising(graph, options, emit);
-    this.stopping = new Stopping(graph, options, emit);
+    this.stopping = new Stopping(graph, options, emit, emitDelta);
   }
 
-  async pose(question: Prose): Promise<Posed> {
-    return this.asking.pose(question);
+  async pose(input: PoseCommand): Promise<Posed> {
+    return this.handling({ operation: "pose", input }, () => this.asking.pose(input));
   }
 
   async note(input: NoteCommand): Promise<Noted> {
@@ -208,7 +233,9 @@ export class WriteSurface extends SessionCore {
   }
 
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
-    return this.stopping.closeEnquiry(input);
+    return this.handling({ operation: "closeEnquiry", input }, () =>
+      this.stopping.closeEnquiry(input),
+    );
   }
 
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
@@ -270,6 +297,61 @@ export class WriteSurface extends SessionCore {
    * write verb hands its own `events` field straight through from here, so a
    * `--json` renderer needs no new plumbing if a verb ever records more.
    */
+  /**
+   * The command being handled, for the duration of one call.
+   *
+   * Per call rather than on {@link CommandContext}: that is captured at
+   * construction, and `fragments/replay.ts`, `fragments/run.ts` and two test
+   * files each build one surface and drive many commands through it.
+   */
+  private handled?: Handled;
+
+  /**
+   * Runs one command, with the command itself in scope for whatever the call
+   * flows through.
+   *
+   * TypeScript erases the type, so the operation is stated once here rather
+   * than restated as a string literal at the emit site. `revising.ts` already
+   * had to thread it by hand for `keep`/`replaceAnalysis`, which share one
+   * command shape and are two different acts.
+   */
+  private async handling<T>(command: Handled, work: () => Promise<T>): Promise<T> {
+    const outer = this.handled;
+    this.handled = command;
+    try {
+      return await work();
+    } finally {
+      this.handled = outer;
+    }
+  }
+
+  /**
+   * Records what a verb is about to do, before it does it.
+   *
+   * The delta is stated by the caller rather than drained from the graph, so
+   * the event exists first and the graph is what the event produces. Inside
+   * the verb's own transaction, as `emit` is: the event and the writes it
+   * describes still commit together or neither does.
+   */
+  private async emitDelta(
+    operation: Operation,
+    subject: Ref<string>,
+    delta: Delta,
+    detail?: Record<string, unknown>,
+  ): Promise<DomainEvent[]> {
+    const recorded = await this.events.record({
+      at: this.clock.now(),
+      attribution: this.attribution,
+      operation,
+      subject,
+      created: delta.created ?? [],
+      edges: delta.edges ?? [],
+      sets: delta.sets ?? [],
+      detail,
+    });
+    return [recorded];
+  }
+
   private async emit(
     operation: Operation,
     subject: Ref<string>,
@@ -287,6 +369,9 @@ export class WriteSurface extends SessionCore {
       created: this.graph.drainMinted(),
       // The other half of the same collection. See `DomainEvent.edges`.
       edges: this.graph.drainMintedEdges(),
+      // Nothing drains a property set: the nineteen verbs that still write
+      // first have no collector for one. See `applyDelta` in ./shared.ts.
+      sets: [],
       detail,
     });
     return [recorded];

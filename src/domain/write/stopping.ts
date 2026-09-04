@@ -12,7 +12,8 @@ import type {
 import { ref } from "../report";
 import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
+import type { Emit, EmitDelta } from "./index";
+import { applyDelta } from "./shared";
 import { noFindingBearsOn } from "./shared";
 
 export class Stopping extends SessionCore {
@@ -20,6 +21,7 @@ export class Stopping extends SessionCore {
     graph: TenantGraph,
     options: ResearchSessionOptions,
     private readonly emit: Emit,
+    private readonly emitDelta: EmitDelta,
   ) {
     super(graph, options);
   }
@@ -106,39 +108,44 @@ export class Stopping extends SessionCore {
         answeredProposition = found.asserts;
       }
 
-      // Transactional, demonstrated — `docs/consumer-contract/043`.
-      //
-      // `RESOLVES` is written before `BASED_ON`, so an interrupted close leaves a
-      // resolving decision with nothing cited. That is *indistinguishable from a
-      // deliberate close without a cited result*, which is a legitimate call — and
-      // that shape-level similarity is exactly what made it look safe.
-      //
-      // What it is not safe from is the retry. The caller saw a throw and closes
-      // again; two decisions then resolve one question, `enquiryStatus` picks
-      // between them with `.find()` over unordered rows, and the orphan can win.
-      // The question then reports `closure: "abandoned"`, `answer: null` for a
-      // question that was answered "no" on cited evidence. The answer is not
-      // inverted, it is erased -- and "abandoned" is a positive classification
-      // rather than an empty result.
-      const decision = await this.graph.inTransaction(async () => {
-        const decision = await this.graph.createNode("Decision", {
-          decided_at: this.clock.now(),
-          reason: answeredProposition
-            ? `answered on "${answeredProposition}"`
-            : "closed without a cited result",
-          invalidation_check: "new evidence bearing on the question",
-        });
-        await this.graph.createEdge(decision.natural_id, "RESOLVES", question);
-        if (answerBearing)
-          await this.graph.createEdge(decision.natural_id, "BASED_ON", answerBearing);
-        return decision;
-      });
+      // Every refusal above has fired before anything is booked or written, so
+      // a rejected close leaves no decision behind — which is what the
+      // interleaved version had to argue for and this one gets structurally.
+      const id = await this.graph.bookId("Decision");
+      const decided = ref("decision", id);
 
-      const events = await this.emit("closeEnquiry", input.enquiry, {
-        answeredBy: input.answeredBy ?? null,
-        proposition: answeredProposition ?? null,
-      });
-      return { decision: ref("decision", decision.natural_id), events };
+      const events = await this.emitDelta(
+        "closeEnquiry",
+        input.enquiry,
+        {
+          created: [
+            {
+              id,
+              label: "Decision",
+              props: {
+                decided_at: this.clock.now(),
+                reason: answeredProposition
+                  ? `answered on "${answeredProposition}"`
+                  : "closed without a cited result",
+                invalidation_check: "new evidence bearing on the question",
+              },
+            },
+          ],
+          edges: [
+            { from: id, label: "RESOLVES", to: question },
+            ...(answerBearing
+              ? [{ from: id, label: "BASED_ON" as const, to: answerBearing as string }]
+              : []),
+          ],
+        },
+        {
+          answeredBy: input.answeredBy ?? null,
+          proposition: answeredProposition ?? null,
+        },
+      );
+
+      await applyDelta(this.graph, events[0]!);
+      return { decision: decided, events };
     });
   }
 

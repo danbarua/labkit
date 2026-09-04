@@ -341,7 +341,7 @@ function touchedHandles(events: readonly DomainEvent[]): Set<string> {
   const touched = new Set<string>();
   for (const e of events) {
     touched.add(e.subject);
-    for (const id of e.created) touched.add(id);
+    for (const node of e.created) touched.add(node.id);
     for (const edge of e.edges) {
       touched.add(edge.from);
       touched.add(edge.to);

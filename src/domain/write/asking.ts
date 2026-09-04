@@ -14,15 +14,17 @@ import type {
   SharpenedQuestion,
 } from "../report";
 import { ref } from "../report";
-import type { NoteCommand, PursueCommand, SharpenCommand } from "../commands";
+import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
+import type { Emit, EmitDelta } from "./index";
+import { applyDelta } from "./shared";
 
 export class Asking extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
     private readonly emit: Emit,
+    private readonly emitDelta: EmitDelta,
   ) {
     super(graph, options);
   }
@@ -39,10 +41,29 @@ export class Asking extends SessionCore {
    * twice gives two questions, because two people can ask the same thing for
    * different reasons and only the asker knows whether they meant one.
    */
-  async pose(question: Prose): Promise<Posed> {
+  async pose(input: PoseCommand): Promise<Posed> {
     return this.graph.inTransaction(async () => {
-      const asked = await this.posed(question);
-      const events = await this.emit("pose", asked, { question });
+      // Book the id, state what the act does, then do it. Nothing is queried
+      // because nothing constrains posing a question.
+      const id = await this.graph.bookId("Question");
+      const asked = ref("question", id);
+
+      const events = await this.emitDelta(
+        "pose",
+        asked,
+        {
+          created: [
+            {
+              id,
+              label: "Question",
+              props: { name: input.question, posed_at: this.clock.now() },
+            },
+          ],
+        },
+        { question: input.question },
+      );
+
+      await applyDelta(this.graph, events[0]!);
       return { question: asked, events };
     });
   }

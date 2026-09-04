@@ -30,6 +30,7 @@ import {
   type NodePropsByLabel,
   type PublicNode,
   type MintedEdge,
+  type MintedNode,
 } from "./domain";
 import type { LabKitDB } from "./backend";
 import type { Transactor } from "./transactor";
@@ -44,7 +45,8 @@ import type { TenantContext } from "./tenant";
 export class TenantGraph {
   private readonly runner: CypherRunner;
   /**
-   * Natural ids minted since the last {@link drainMinted}.
+   * Nodes created since the last {@link drainMinted}, each carrying what it
+   * would take to create it again.
    *
    * **Collected here rather than listed by callers**, because a caller that
    * mints three nodes and remembers two is a state nobody could see. A verb
@@ -55,7 +57,7 @@ export class TenantGraph {
    * — so a verb that throws before draining cannot leave its ids to be claimed
    * by the next one.
    */
-  private minted: string[] = [];
+  private minted: MintedNode[] = [];
 
   /**
    * Edges created since the last {@link drainMintedEdges}.
@@ -82,7 +84,7 @@ export class TenantGraph {
    */
   constructor(
     private readonly ctx: TenantContext,
-    db: LabKitDB,
+    private readonly db: LabKitDB,
     private readonly tx: Transactor,
   ) {
     // CypherRunner validates ctx.graphName once, in its own constructor —
@@ -180,7 +182,7 @@ export class TenantGraph {
    * new records. See {@link inMintScope} for what "since the last call" means
    * when one emitting verb is called by another.
    */
-  drainMinted(): string[] {
+  drainMinted(): MintedNode[] {
     return this.minted.splice(0);
   }
 
@@ -223,26 +225,68 @@ export class TenantGraph {
    * resolve a `(text, text)` function overload against `agtype` arguments —
    * confirmed empirically against pglite-age before this was written this way.
    */
+  /**
+   * Takes the next natural id for a label without creating anything.
+   *
+   * The generator is a plain SQL function over one sequence per label, so an
+   * id can be had before the node exists — which is what lets a verb state
+   * what it is about to create before it creates it.
+   *
+   * `nextval` does not roll back: an id booked by an act that then refuses is
+   * spent. Already true of one that creates and throws.
+   */
+  async bookId(label: NodeLabel): Promise<string> {
+    const { rows } = await this.db.query<{ id: string }>(
+      `SELECT ${LABKIT_SCHEMA}.labkit_next_natural_id($1::text, $2::text) AS id`,
+      [label.toLowerCase(), NODE_TYPES[label].prefix],
+    );
+    const booked = rows[0];
+    if (!booked) throw new Error(`booking an id for ${label} returned no rows`);
+    return booked.id;
+  }
+
+  /**
+   * Creates a single node. `label` selects the property shape
+   * (`NodePropsByLabel`), so passing another label's props is a compile error.
+   *
+   * `id` is a natural id already taken from {@link bookId}. Without one the
+   * node takes a fresh id in the same round trip, as it always has.
+   *
+   * `label` is one of NODE_LABELS, never caller-controlled input — the
+   * generator call's `label`/`prefix` arguments are template-interpolated
+   * literals for that reason, never passed through `props`/`$`-params.
+   *
+   * The `::text` casts on those two literals are required, not decorative:
+   * AGE types bare Cypher string literals as `agtype`, and Postgres won't
+   * resolve a `(text, text)` function overload against `agtype` arguments.
+   */
   async createNode<L extends NodeLabel>(
     label: L,
     props: NodePropsByLabel[L],
+    id?: string,
   ): Promise<PublicNode<L>> {
     const nodeType = NODE_TYPES[label];
     const validated = nodeType.validate ? nodeType.validate(props) : props;
-    const naturalIdClause = `natural_id: ${LABKIT_SCHEMA}.labkit_next_natural_id('${label.toLowerCase()}'::text, '${nodeType.prefix}'::text)`;
+    const naturalIdClause =
+      id === undefined
+        ? `natural_id: ${LABKIT_SCHEMA}.labkit_next_natural_id('${label.toLowerCase()}'::text, '${nodeType.prefix}'::text)`
+        : `natural_id: $__booked_id`;
     const propsClause = buildPropertyClause(validated as unknown as Record<string, unknown>);
     const clause = propsClause ? `${propsClause}, ${naturalIdClause}` : naturalIdClause;
 
     const rows = await this.query(
       `CREATE (n:${label} {${clause}}) RETURN n`,
       { n: vertexColumn<NodePropsByLabel[L] & { natural_id: string }>() },
-      validated as unknown as Record<string, unknown>,
+      {
+        ...(validated as unknown as Record<string, unknown>),
+        ...(id === undefined ? {} : { __booked_id: id }),
+      },
     );
     const created = rows[0];
     if (!created) throw new Error(`CREATE (n:${label}) returned no rows`);
 
     const { natural_id, ...properties } = created.n.properties;
-    this.minted.push(natural_id);
+    this.minted.push({ id: natural_id, label, props: { ...properties } });
     return {
       natural_id,
       label,

@@ -37,6 +37,8 @@ import type {
 import { ref } from "../report";
 import type { ConcludeCommand, RecordAnalysisCommand } from "../commands";
 import { SessionCore } from "../core";
+import type { TenantGraph } from "../../db/graph";
+import type { DomainEvent } from "../events";
 
 /**
  * A conclusion as this file records it — the public shape plus the standing the
@@ -539,4 +541,27 @@ export class Shared extends SessionCore {
       standing: c.standing,
     }));
   }
+}
+
+/**
+ * Writes an event's delta into the graph: what it created, then what it
+ * connected, then what it set in place.
+ *
+ * Nodes before edges because `createEdge` matches both endpoints and throws
+ * when either is missing.
+ *
+ * **Crude on purpose.** The spike asks whether the delta is complete enough to
+ * apply, not what an applier should look like. If this ever needs an argument
+ * beyond the graph and the event, the delta is incomplete and that is the
+ * finding.
+ */
+export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {
+  for (const node of event.created)
+    await graph.createNode(node.label, node.props as never, node.id);
+  for (const edge of event.edges) await graph.createEdge(edge.from, edge.label, edge.to);
+  // Not implemented, deliberately: neither of the spike's two verbs sets a
+  // property in place. `is` does, and it is out of scope -- so this refuses
+  // rather than pretending the delta was applied.
+  if (event.sets.length > 0)
+    throw new Error(`the spike does not apply property sets (${event.operation})`);
 }

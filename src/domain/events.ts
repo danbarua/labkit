@@ -18,9 +18,9 @@
  * `AttributionContext` below.
  */
 
-import type { MintedEdge } from "../db/domain";
+import type { MintedEdge, MintedNode, PropertySet } from "../db/domain";
 
-export type { MintedEdge };
+export type { MintedEdge, MintedNode, PropertySet };
 
 /** Injected so scenario tests can assert on exact timestamps instead of racing the wall clock. */
 export interface Clock {
@@ -198,53 +198,35 @@ export interface DomainEvent {
   operation: string;
   subject: string;
   /**
-   * Every handle this act minted. Always an array, empty if the act minted
-   * nothing — never absent. See {@link domainEvent}, the one place that
-   * default is applied, for why nothing downstream needs a null check.
+   * Every node this act created, with everything needed to create it again.
    *
    * `subject` says what the act was *about*; this says what came into
-   * existence, and for most verbs they differ. Six verbs mint a `Decision` and
-   * only `amendDesign` names that decision as its subject — the others name the
-   * enquiry or the claim, because that is what the researcher was doing. So
-   * "which act created this record?" is answerable from here and not from
-   * `subject`.
+   * existence, and for most verbs they differ.
    */
-  created: readonly string[];
-  /**
-   * Every edge this act created. Always an array, for the same reason as
-   * {@link created} — see {@link domainEvent}.
-   *
-   * The other half of {@link created}. Without it an act's nodes are visible
-   * and what connected them is not.
-   *
-   * **Unreconstructable from the graph**, which is why it is recorded rather
-   * than derived: the graph holds the edge and not the act that made it, and
-   * unlike a node there is no `created` to fall back on.
-   */
+  created: readonly MintedNode[];
+  /** Every edge this act created. */
   edges: readonly MintedEdge[];
+  /**
+   * Every property this act set in place, on a node it did not create.
+   *
+   * `is` sets `Claim.kind` and writes no node and no edge, so without this the
+   * delta cannot reproduce a record in which anything was ever confirmed.
+   */
+  sets: readonly PropertySet[];
   detail?: Record<string, unknown>;
 }
 
-/**
- * Builds a `DomainEvent`, defaulting `created`/`edges` to `[]` so a caller
- * building one by hand never states "this minted nothing" twice.
- *
- * **Not the type's own job.** Optional fields make a consumer three call-sites
- * away know that "absent" means "empty" — a `?? []` at every read, and a `null`
- * sentinel in the store to tell "empty" apart from "nobody was collecting yet".
- * That distinction only earns its keep for rows written before the column
- * existed, and the one durable record this repo has is script-derived:
- * `probe-bonsai-replay.sh` regenerates it byte for byte, so no data anywhere
- * could be stranded by a schema change.
- *
- * `WriteSurface.emit` already supplies both fields unconditionally, from
- * `TenantGraph`'s drain calls — this constructor is for the other caller, a
- * fixture built by hand in a test that never went through `emit` at all.
- */
+/** Builds a `DomainEvent`, defaulting the three delta lists to empty. */
 export function domainEvent(
-  fields: Omit<DomainEvent, "created" | "edges"> & Partial<Pick<DomainEvent, "created" | "edges">>,
+  fields: Omit<DomainEvent, "created" | "edges" | "sets"> &
+    Partial<Pick<DomainEvent, "created" | "edges" | "sets">>,
 ): DomainEvent {
-  return { ...fields, created: fields.created ?? [], edges: fields.edges ?? [] };
+  return {
+    ...fields,
+    created: fields.created ?? [],
+    edges: fields.edges ?? [],
+    sets: fields.sets ?? [],
+  };
 }
 
 /**
@@ -309,7 +291,9 @@ export function inMemoryEventLog(): EventSink {
     (f.since === undefined || (e.seq ?? 0) > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
-    (f.touching === undefined || e.subject === f.touching || e.created.includes(f.touching));
+    (f.touching === undefined ||
+      e.subject === f.touching ||
+      e.created.some((n) => n.id === f.touching));
   return {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is

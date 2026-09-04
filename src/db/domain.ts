@@ -163,6 +163,25 @@ export interface MintedEdge {
 }
 
 /**
+ * A node an act created: everything needed to create it again.
+ *
+ * Beside {@link MintedEdge} and for the same reason — the collector is
+ * `TenantGraph.createNode`, and `src/db` may not import `src/domain`.
+ */
+export interface MintedNode {
+  id: string;
+  label: NodeLabel;
+  props: Record<string, unknown>;
+}
+
+/** A property an act set in place, on a node it did not create. */
+export interface PropertySet {
+  id: string;
+  key: string;
+  value: unknown;
+}
+
+/**
  * Single authoritative source of truth for legal edge shapes. `createEdge`
  * validates the resolved `(fromLabel, toLabel)` pair against this table and
  * throws before issuing any Cypher if the pair is not listed.
