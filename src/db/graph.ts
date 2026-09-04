@@ -101,21 +101,18 @@ export class TenantGraph {
   }
 
   /**
-   * Creates a single node and stamps it with a fresh natural id, in one
-   * round trip. `label` selects the property shape (`NodePropsByLabel`), so
-   * passing another label's props is a compile error.
+   * Reserves the next natural id for a label, creating nothing.
    *
    * `label` is one of NODE_LABELS, never caller-controlled input — the
    * generator call's `label`/`prefix` arguments are template-interpolated
    * literals for that reason (`labkit_next_natural_id` in
-   * drizzle/0002_natural_ids.sql), never passed through `props`/`$`-params.
+   * drizzle/0002_natural_ids.sql), never passed through `$`-params.
    *
    * The `::text` casts on those two literals are required, not decorative:
    * AGE types bare Cypher string literals as `agtype`, and Postgres won't
    * resolve a `(text, text)` function overload against `agtype` arguments —
    * confirmed empirically against pglite-age before this was written this way.
    */
-  /** Reserves the next natural id for a label, creating nothing. */
   async reserveId(label: NodeLabel): Promise<string> {
     const { rows } = await this.db.query<{ id: string }>(
       `SELECT ${LABKIT_SCHEMA}.labkit_next_natural_id($1::text, $2::text) AS id`,
