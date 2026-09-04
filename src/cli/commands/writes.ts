@@ -50,7 +50,7 @@ import { ref } from "../../domain/report";
  * having to know which case it is.
  */
 const mintedHandles = (events: readonly DomainEvent[]): readonly string[] =>
-  events.flatMap((e) => e.created);
+  events.flatMap((e) => e.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : [])));
 
 /**
  * Uncoloured on purpose — see {@link asHandles}. The whole of stdout here is
