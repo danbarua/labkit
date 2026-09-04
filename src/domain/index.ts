@@ -21,7 +21,14 @@ export {
   type OperatingGroup,
   type VerbGroup,
 } from "./groups";
-export { systemClock, inMemoryEventLog, domainEvent, UNATTRIBUTED } from "./events";
+export {
+  systemClock,
+  inMemoryEventLog,
+  domainEvent,
+  createdIn,
+  edgesIn,
+  UNATTRIBUTED,
+} from "./events";
 export type {
   Clock,
   AttributionContext,

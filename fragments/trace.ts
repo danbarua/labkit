@@ -21,6 +21,7 @@
  * `scripts/smoke-cli.sh` does.
  */
 
+import { createdIn, edgesIn } from "../src/domain";
 import { labelForNaturalId } from "../src/db/domain";
 import type { Command, EdgeCreated, EventSink, DomainEvent } from "../src/domain";
 import type { DerivedSnapshot, StepProvenance } from "./derive";
@@ -141,10 +142,8 @@ export async function traceOf(
         at: e.at,
         operation: e.operation,
         subject: e.subject,
-        created: e.changes.flatMap((c) =>
-          c.change === "NodeCreated" ? [{ handle: c.id, label: c.label as string }] : [],
-        ),
-        edges: e.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : [])),
+        created: createdIn(e).map((handle) => ({ handle, label: labelForNaturalId(handle) })),
+        edges: edgesIn(e),
         issued: e.command,
         command: commandOf(e),
         fragment: provenance?.get(seq)?.fragment,

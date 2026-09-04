@@ -26,6 +26,7 @@
  * greps this directory for exactly that.
  */
 
+import { createdIn } from "../../domain";
 import type { Command } from "commander";
 import {
   anyRef,
@@ -50,7 +51,7 @@ import { ref } from "../../domain/report";
  * having to know which case it is.
  */
 const mintedHandles = (events: readonly DomainEvent[]): readonly string[] =>
-  events.flatMap((e) => e.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : [])));
+  events.flatMap(createdIn);
 
 /**
  * Uncoloured on purpose — see {@link asHandles}. The whole of stdout here is

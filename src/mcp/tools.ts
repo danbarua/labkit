@@ -28,6 +28,7 @@
  * them.
  */
 
+import { createdIn } from "../domain";
 import { z } from "zod";
 import type { ReadGroup, ReadSurface, WriteGroup, WriteSurface } from "../domain";
 import type { SessionRegistry } from "../attribution";
@@ -572,7 +573,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         at: e.at,
         operation: e.operation,
         subject: e.subject,
-        created: e.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : [])),
+        created: createdIn(e),
         attribution_label: e.attribution.attribution_label,
         attribution_id: e.attribution.attribution_id,
         attribution_how: e.attribution.attribution_how,

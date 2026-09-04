@@ -47,7 +47,7 @@ import { TenantGraph } from "../src/db/graph";
 import { pgEventLog } from "../src/domain/event-store";
 import type { DomainEvent, EventFilter, EventSink } from "../src/domain";
 import { traceOf, type Trace } from "../fragments/trace";
-import { fetchNodeProps, replayIntoScratch } from "../fragments/replay";
+import { replayIntoScratch } from "../fragments/replay";
 
 /** A fixed list of already-read events, for `traceOf` after the live connection has closed. */
 function historySink(history: readonly DomainEvent[]): EventSink {
@@ -69,7 +69,6 @@ function historySink(history: readonly DomainEvent[]): EventSink {
  */
 export async function readDbTrace(dir: string, name: string, tenant = "labkit"): Promise<Trace> {
   let history: DomainEvent[];
-  let nodeProps: Map<string, Record<string, unknown>>;
   const connection = await connectDb(dir);
   try {
     const ctx = await resolveTenantContext(connection.db, connection.tx, tenant);
@@ -77,12 +76,11 @@ export async function readDbTrace(dir: string, name: string, tenant = "labkit"):
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
     const events = pgEventLog(connection.db, ctx.tenantId);
     history = [...(await events.all())].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
-    nodeProps = await fetchNodeProps(graph, history);
   } finally {
     await connection.close();
   }
 
-  const { provenance, refusedAt } = await replayIntoScratch(history, nodeProps);
+  const { provenance, refusedAt } = await replayIntoScratch(history);
   const trace = await traceOf(name, historySink(history), provenance);
   return {
     ...trace,

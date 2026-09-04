@@ -11,7 +11,8 @@
  * research question.
  */
 
-import type { DomainEvent, EdgeCreated, GraphChange } from "../src/domain/events";
+import { createdIn, edgesIn } from "../src/domain/events";
+import type { DomainEvent, GraphChange } from "../src/domain/events";
 import type { PoseCommand } from "../src/domain/commands";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
@@ -53,14 +54,6 @@ const surfaceFor = async (slug: string) => {
     }),
   };
 };
-
-/** The handles an act created, from its changes. */
-const createdIn = (e: DomainEvent): string[] =>
-  e.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : []));
-
-/** The edges an act created, from its changes. */
-const edgesIn = (e: DomainEvent): EdgeCreated[] =>
-  e.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : []));
 
 describe("the event log outlives the process that wrote it", () => {
   /**

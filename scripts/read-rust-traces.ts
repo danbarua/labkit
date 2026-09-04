@@ -21,14 +21,24 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 
-import type { MintedEdge } from "../src/domain";
+import type { Command } from "../src/domain";
+import type { EdgeLabel } from "../src/db/domain";
 import type { Trace, TraceStep } from "../fragments/trace";
 
+/**
+ * One line as the Rust port writes it.
+ *
+ * **Still the pre-delta shape**, because the port writes it and the port has
+ * not been migrated: `edges` are bare triples with no `change` tag, and the
+ * act's arguments arrive under `detail`. Adapting them is this reader's job —
+ * see `parseNdjson` — and the day the port emits `changes` this interface is
+ * what says so.
+ */
 interface RustTraceLine {
   operation: string;
   subject: string;
   created: { handle: string; label: string }[];
-  edges: MintedEdge[];
+  edges: { from: string; label: EdgeLabel; to: string }[];
   detail: Record<string, unknown>;
   command: string;
   fragment?: string | null;
@@ -48,8 +58,8 @@ function parseNdjson(name: string, text: string): Trace {
       operation: parsed.operation,
       subject: parsed.subject,
       created: parsed.created,
-      edges: parsed.edges,
-      detail: parsed.detail,
+      edges: parsed.edges.map((e) => ({ change: "EdgeCreated" as const, ...e })),
+      issued: parsed.detail as Command,
       command: parsed.command,
       fragment: parsed.fragment ?? undefined,
       // No analogue on this side yet: emit_trace() doesn't compute

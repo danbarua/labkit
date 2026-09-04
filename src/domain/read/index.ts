@@ -5,6 +5,7 @@
  * `SessionCore`, so that is enforced by construction rather than by review.
  */
 
+import { createdIn, edgesIn } from "../events";
 import type { IdentityString, IndexedString, Prose, Timestamp } from "../../db/domain";
 import type { ClaimRef, EnquiryRef, GateRef, WorkRef } from "../report";
 import type {
@@ -341,13 +342,10 @@ function touchedHandles(events: readonly DomainEvent[]): Set<string> {
   const touched = new Set<string>();
   for (const e of events) {
     touched.add(e.subject);
-    for (const change of e.changes) {
-      if (change.change === "EdgeCreated") {
-        touched.add(change.from);
-        touched.add(change.to);
-      } else {
-        touched.add(change.id);
-      }
+    for (const handle of createdIn(e)) touched.add(handle);
+    for (const edge of edgesIn(e)) {
+      touched.add(edge.from);
+      touched.add(edge.to);
     }
   }
   return touched;
