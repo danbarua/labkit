@@ -17,7 +17,8 @@ import { ref } from "../report";
 import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { EmitDelta } from "./index";
-import { applyDelta, Staging } from "./shared";
+import { applyDelta } from "../projection";
+import { UnitOfWork } from "./shared";
 
 export class Asking extends SessionCore {
   constructor(
@@ -42,10 +43,10 @@ export class Asking extends SessionCore {
    */
   async pose(input: PoseCommand): Promise<Posed> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const asked = ref("question", await this.posed(input.question, staged));
+      const unitOfWork = new UnitOfWork(this.graph);
+      const asked = ref("question", await this.posed(input.question, unitOfWork));
 
-      const events = await this.emitDelta("pose", asked, staged.delta(), {
+      const events = await this.emitDelta("pose", asked, unitOfWork.delta(), {
         question: input.question,
       });
 
@@ -67,11 +68,11 @@ export class Asking extends SessionCore {
    */
   async note(input: NoteCommand): Promise<Noted> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const noted = ref("note", await staged.node("Note", { text: input.text }));
-      if (input.on) staged.edge(noted, "CONCERNS", input.on);
+      const unitOfWork = new UnitOfWork(this.graph);
+      const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
+      if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
 
-      const events = await this.emitDelta("note", noted, staged.delta(), {
+      const events = await this.emitDelta("note", noted, unitOfWork.delta(), {
         text: input.text,
         ...(input.on ? { on: input.on } : {}),
       });
@@ -87,10 +88,10 @@ export class Asking extends SessionCore {
    * event stream is a record of research actions, and a researcher who opened
    * an enquiry did one thing, not three.
    */
-  private async posed(question: Prose, staged: Staging): Promise<QuestionRef> {
+  private async posed(question: Prose, unitOfWork: UnitOfWork): Promise<QuestionRef> {
     return ref(
       "question",
-      await staged.node("Question", { name: question, posed_at: this.clock.now() }),
+      await unitOfWork.node("Question", { name: question, posed_at: this.clock.now() }),
     );
   }
 
@@ -104,10 +105,10 @@ export class Asking extends SessionCore {
    */
   async pursue(input: PursueCommand): Promise<Pursued> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const enquiry = await this.pursued(input, staged);
+      const unitOfWork = new UnitOfWork(this.graph);
+      const enquiry = await this.pursued(input, unitOfWork);
 
-      const events = await this.emitDelta("pursue", enquiry, staged.delta(), {
+      const events = await this.emitDelta("pursue", enquiry, unitOfWork.delta(), {
         question: input.question,
         approach: input.approach,
       });
@@ -118,9 +119,9 @@ export class Asking extends SessionCore {
   }
 
   /** The write, without the event — see `posed`. */
-  private async pursued(input: PursueCommand, staged: Staging): Promise<EnquiryRef> {
-    const enquiry = await staged.node("LineOfEnquiry", { name: input.approach });
-    staged.edge(input.question, "MOTIVATES", enquiry);
+  private async pursued(input: PursueCommand, unitOfWork: UnitOfWork): Promise<EnquiryRef> {
+    const enquiry = await unitOfWork.node("LineOfEnquiry", { name: input.approach });
+    unitOfWork.edge(input.question, "MOTIVATES", enquiry);
     return ref("enquiry", enquiry);
   }
 
@@ -134,11 +135,11 @@ export class Asking extends SessionCore {
    */
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const asked = await this.posed(question, staged);
-      const enquiry = await this.pursued({ question: asked, approach: question }, staged);
+      const unitOfWork = new UnitOfWork(this.graph);
+      const asked = await this.posed(question, unitOfWork);
+      const enquiry = await this.pursued({ question: asked, approach: question }, unitOfWork);
 
-      const events = await this.emitDelta("openEnquiry", enquiry, staged.delta(), {
+      const events = await this.emitDelta("openEnquiry", enquiry, unitOfWork.delta(), {
         question,
         asked,
       });
@@ -180,19 +181,19 @@ export class Asking extends SessionCore {
 
       const standing = await this.standingFindings();
 
-      const staged = new Staging(this.graph);
-      const decision = await staged.node("Decision", {
+      const unitOfWork = new UnitOfWork(this.graph);
+      const decision = await unitOfWork.node("Decision", {
         decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: "evidence that the sharper question was the wrong one to ask",
       });
-      staged.edge(decision, "NARROWS", input.from);
-      for (const finding of standing) staged.edge(decision, "BASED_ON", finding);
+      unitOfWork.edge(decision, "NARROWS", input.from);
+      for (const finding of standing) unitOfWork.edge(decision, "BASED_ON", finding);
 
-      const sharper = await this.posed(input.into, staged);
-      staged.edge(decision, "MOTIVATES", sharper);
+      const sharper = await this.posed(input.into, unitOfWork);
+      unitOfWork.edge(decision, "MOTIVATES", sharper);
 
-      const events = await this.emitDelta("sharpen", sharper, staged.delta(), {
+      const events = await this.emitDelta("sharpen", sharper, unitOfWork.delta(), {
         from: input.from,
         because: input.because,
         via: decision,

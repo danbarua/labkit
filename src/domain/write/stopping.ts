@@ -13,7 +13,8 @@ import { ref } from "../report";
 import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { EmitDelta } from "./index";
-import { applyDelta, noFindingBearsOn, Staging } from "./shared";
+import { applyDelta } from "../projection";
+import { noFindingBearsOn, UnitOfWork } from "./shared";
 
 export class Stopping extends SessionCore {
   constructor(
@@ -106,10 +107,10 @@ export class Stopping extends SessionCore {
         answeredProposition = found.asserts;
       }
 
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       const decided = ref(
         "decision",
-        await staged.node("Decision", {
+        await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: answeredProposition
             ? `answered on "${answeredProposition}"`
@@ -117,18 +118,13 @@ export class Stopping extends SessionCore {
           invalidation_check: "new evidence bearing on the question",
         }),
       );
-      staged.edge(decided, "RESOLVES", question);
-      if (answerBearing) staged.edge(decided, "BASED_ON", answerBearing);
+      unitOfWork.edge(decided, "RESOLVES", question);
+      if (answerBearing) unitOfWork.edge(decided, "BASED_ON", answerBearing);
 
-      const events = await this.emitDelta(
-        "closeEnquiry",
-        input.enquiry,
-        staged.delta(),
-        {
-          answeredBy: input.answeredBy ?? null,
-          proposition: answeredProposition ?? null,
-        },
-      );
+      const events = await this.emitDelta("closeEnquiry", input.enquiry, unitOfWork.delta(), {
+        answeredBy: input.answeredBy ?? null,
+        proposition: answeredProposition ?? null,
+      });
 
       await applyDelta(this.graph, events[0]!);
       return { decision: decided, events };
@@ -176,26 +172,25 @@ export class Stopping extends SessionCore {
       if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
       const basis = found.evidence;
 
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       const decision = ref(
         "decision",
-        await staged.node("Decision", {
+        await unitOfWork.node("Decision", {
           decided_at: at,
           reason: input.because,
           invalidation_check: input.until,
         }),
       );
-      staged.edge(decision, "DEFERS", question);
+      unitOfWork.edge(decision, "DEFERS", question);
       // What was known when the call was made, which is what makes
       // `evidence` answerable afterwards rather than only now.
-      staged.edge(decision, "BASED_ON", basis);
+      unitOfWork.edge(decision, "BASED_ON", basis);
 
-      const events = await this.emitDelta(
-        "acceptAsUnresolved",
-        input.enquiry,
-        staged.delta(),
-        { because: input.because, until: input.until, at },
-      );
+      const events = await this.emitDelta("acceptAsUnresolved", input.enquiry, unitOfWork.delta(), {
+        because: input.because,
+        until: input.until,
+        at,
+      });
 
       await applyDelta(this.graph, events[0]!);
       return { decision, events };

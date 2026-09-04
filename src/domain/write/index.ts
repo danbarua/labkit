@@ -192,9 +192,7 @@ export class WriteSurface extends SessionCore {
   }
 
   async pursue(input: PursueCommand): Promise<Pursued> {
-    return this.handling({ operation: "pursue", input }, () =>
-      this.asking.pursue(input),
-    );
+    return this.handling({ operation: "pursue", input }, () => this.asking.pursue(input));
   }
 
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
@@ -204,9 +202,7 @@ export class WriteSurface extends SessionCore {
   }
 
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.handling({ operation: "sharpen", input }, () =>
-      this.asking.sharpen(input),
-    );
+    return this.handling({ operation: "sharpen", input }, () => this.asking.sharpen(input));
   }
 
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
@@ -222,15 +218,11 @@ export class WriteSurface extends SessionCore {
   }
 
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.handling({ operation: "conclude", input }, () =>
-      this.work.conclude(input),
-    );
+    return this.handling({ operation: "conclude", input }, () => this.work.conclude(input));
   }
 
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.handling({ operation: "recordReview", input }, () =>
-      this.work.recordReview(input),
-    );
+    return this.handling({ operation: "recordReview", input }, () => this.work.recordReview(input));
   }
 
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
@@ -246,9 +238,7 @@ export class WriteSurface extends SessionCore {
   }
 
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
-    return this.handling({ operation: "planWork", input }, () =>
-      this.counting.planWork(input),
-    );
+    return this.handling({ operation: "planWork", input }, () => this.counting.planWork(input));
   }
 
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
@@ -276,15 +266,11 @@ export class WriteSurface extends SessionCore {
   }
 
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    return this.handling({ operation: "reverify", input }, () =>
-      this.revising.reverify(input),
-    );
+    return this.handling({ operation: "reverify", input }, () => this.revising.reverify(input));
   }
 
   async is(input: IsCommand): Promise<Restated> {
-    return this.handling({ operation: "is", input }, () =>
-      this.revising.is(input),
-    );
+    return this.handling({ operation: "is", input }, () => this.revising.is(input));
   }
 
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
@@ -294,9 +280,7 @@ export class WriteSurface extends SessionCore {
   }
 
   async keep(input: KeepCommand): Promise<ReplacementReport> {
-    return this.handling({ operation: "keep", input }, () =>
-      this.revising.keep(input),
-    );
+    return this.handling({ operation: "keep", input }, () => this.revising.keep(input));
   }
 
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {

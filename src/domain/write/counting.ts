@@ -23,7 +23,8 @@ import type {
 } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { EmitDelta } from "./index";
-import { applyDelta, noFindingBearsOn, Staging } from "./shared";
+import { applyDelta } from "../projection";
+import { noFindingBearsOn, UnitOfWork } from "./shared";
 
 export class Counting extends SessionCore {
   constructor(
@@ -37,19 +38,19 @@ export class Counting extends SessionCore {
   /** Records a piece of work whose start a gate may protect. */
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       const work = ref(
         "work",
-        await staged.node("Task", {
+        await unitOfWork.node("Task", {
           objective: input.objective,
           mayRead: input.mayRead ?? [],
           outputs: "",
           acceptance: input.acceptance,
         }),
       );
-      if (input.addressing) staged.edge(work, "ADDRESSES", input.addressing);
+      if (input.addressing) unitOfWork.edge(work, "ADDRESSES", input.addressing);
 
-      const events = await this.emitDelta("planWork", work, staged.delta(), {
+      const events = await this.emitDelta("planWork", work, unitOfWork.delta(), {
         objective: input.objective,
       });
 
@@ -61,10 +62,10 @@ export class Counting extends SessionCore {
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const criterion = ref("criterion", await staged.node("Criterion", { proposition }));
+      const unitOfWork = new UnitOfWork(this.graph);
+      const criterion = ref("criterion", await unitOfWork.node("Criterion", { proposition }));
 
-      const events = await this.emitDelta("stateCriterion", criterion, staged.delta(), {
+      const events = await this.emitDelta("stateCriterion", criterion, unitOfWork.delta(), {
         proposition,
       });
 
@@ -96,12 +97,12 @@ export class Counting extends SessionCore {
             "— name it in protecting, or hold the analysis to the criterion instead if nothing " +
             "downstream depends on it",
         );
-      const staged = new Staging(this.graph);
-      const gate = ref("gate", await staged.node("Gate", { consequence: input.consequence }));
-      for (const criterion of input.governedBy) staged.edge(criterion, "GOVERNS", gate);
-      for (const work of input.protecting) staged.edge(gate, "GATES", work);
+      const unitOfWork = new UnitOfWork(this.graph);
+      const gate = ref("gate", await unitOfWork.node("Gate", { consequence: input.consequence }));
+      for (const criterion of input.governedBy) unitOfWork.edge(criterion, "GOVERNS", gate);
+      for (const work of input.protecting) unitOfWork.edge(gate, "GATES", work);
 
-      const events = await this.emitDelta("declareGate", gate, staged.delta(), {
+      const events = await this.emitDelta("declareGate", gate, unitOfWork.delta(), {
         governedBy: input.governedBy.map((c) => c),
         protecting: input.protecting.map((w) => w),
       });
@@ -142,23 +143,23 @@ export class Counting extends SessionCore {
       }
       const at = this.clock.now();
 
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       const evaluation = ref(
         "evaluation",
-        await staged.node("CriterionEvaluation", {
+        await unitOfWork.node("CriterionEvaluation", {
           value: input.value,
           outcome: input.outcome,
           evaluated_at: at,
         }),
       );
-      staged.edge(input.criterion, "EVALUATED_AS", evaluation);
-      if (input.gate) staged.edge(evaluation, "TRIGGERS", input.gate);
+      unitOfWork.edge(input.criterion, "EVALUATED_AS", evaluation);
+      if (input.gate) unitOfWork.edge(evaluation, "TRIGGERS", input.gate);
       // What the verdict was reached against. Without it, a condition
       // established by measurement and one asserted by an agent return
       // identical records.
-      if (basis) staged.edge(evaluation, "BASED_ON", basis);
+      if (basis) unitOfWork.edge(evaluation, "BASED_ON", basis);
 
-      const events = await this.emitDelta("evaluateCriterion", evaluation, staged.delta(), {
+      const events = await this.emitDelta("evaluateCriterion", evaluation, unitOfWork.delta(), {
         criterion: input.criterion,
         ...(input.gate ? { gate: input.gate } : {}),
         outcome: input.outcome,
@@ -237,26 +238,26 @@ export class Counting extends SessionCore {
       const rerun = await this.workGatedBy(gates);
       const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
 
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       const replacement = ref(
         "criterion",
-        await staged.node("Criterion", { proposition: input.nowRequires }),
+        await unitOfWork.node("Criterion", { proposition: input.nowRequires }),
       );
-      for (const gate of gates) staged.edge(replacement, "GOVERNS", gate);
+      for (const gate of gates) unitOfWork.edge(replacement, "GOVERNS", gate);
 
       const decision = ref(
         "decision",
-        await staged.node("Decision", {
+        await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check: "evidence that the amended setting was not the constraint after all",
         }),
       );
-      staged.edge(decision, "CHANGES", input.criterion);
-      staged.edge(decision, "BASED_ON", diagnosis);
-      if (prior) staged.edge(decision, "SUPERSEDES", prior);
+      unitOfWork.edge(decision, "CHANGES", input.criterion);
+      unitOfWork.edge(decision, "BASED_ON", diagnosis);
+      if (prior) unitOfWork.edge(decision, "SUPERSEDES", prior);
 
-      const events = await this.emitDelta("amendDesign", decision, staged.delta(), {
+      const events = await this.emitDelta("amendDesign", decision, unitOfWork.delta(), {
         criterion: input.criterion,
         replaced,
         nowRequires: input.nowRequires,

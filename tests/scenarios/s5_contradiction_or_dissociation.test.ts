@@ -424,7 +424,9 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
     const solo = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
 
-    const { question: enquiryOnly } = await session.pose({ question: "does the encoding respond nonlinearly?" });
+    const { question: enquiryOnly } = await session.pose({
+      question: "does the encoding respond nonlinearly?",
+    });
     const { enquiry: work } = await session.pursue({
       question: enquiryOnly,
       approach: "curvature sweep",

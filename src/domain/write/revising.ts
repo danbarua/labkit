@@ -28,7 +28,8 @@ import type {
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
 import type { EmitDelta } from "./index";
-import { applyDelta, asConcludedClaim, Shared, Staging } from "./shared";
+import { applyDelta } from "../projection";
+import { asConcludedClaim, Shared, UnitOfWork } from "./shared";
 
 /**
  * The `Claim.kind` each state is stored as.
@@ -100,10 +101,10 @@ export class Revising extends Shared {
         );
       }
 
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       const { analysis, unit, output } = await this.recorded(
         { enquiry, method: input.method, from: input.under },
-        staged,
+        unitOfWork,
       );
 
       // The analysis this conclusion hangs off is in the same delta, so its
@@ -116,7 +117,7 @@ export class Revising extends Shared {
           ...(input.concludes.bearing === undefined ? {} : { bearing: input.concludes.bearing }),
           ...(input.concludes.standing === undefined ? {} : { standing: input.concludes.standing }),
         },
-        staged,
+        unitOfWork,
         { unit, output, enquiry },
       );
 
@@ -124,9 +125,9 @@ export class Revising extends Shared {
       // checked again -- deliberately NOT the supersession `conclude
       // --replacing` writes, which says a finding was replaced. Two different
       // claims about two different acts; see `conclude`'s header.
-      staged.edge(concluded.finding, "REVERIFIES", original);
+      unitOfWork.edge(concluded.finding, "REVERIFIES", original);
 
-      const events = await this.emitDelta("reverify", analysis, staged.delta(), {
+      const events = await this.emitDelta("reverify", analysis, unitOfWork.delta(), {
         of: input.historical,
         proposition: input.concludes.proposition,
         conclusions: this.conclusionEvents([concluded]),
@@ -173,10 +174,10 @@ export class Revising extends Shared {
       const was = existing?.c.kind ?? "exploratory";
       const proposition = await this.assertedBy(input.claim);
 
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       const decision = ref(
         "decision",
-        await staged.node("Decision", {
+        await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: input.state === "confirmed" ? input.because : `recorded as ${input.state}`,
           invalidation_check: INVALIDATION_CHECK[input.state],
@@ -187,14 +188,14 @@ export class Revising extends Shared {
       // tell which verb was typed is the leak the single grammar exists to
       // close. `undecided` has no act-specific edge and takes `GRADES`.
       if (input.state === "confirmed") {
-        staged.edge(decision, "PROMOTES", input.claim);
+        unitOfWork.edge(decision, "PROMOTES", input.claim);
       } else {
-        staged.edge(decision, "GRADES", input.claim);
-        staged.edge(decision, "BASED_ON", input.because);
+        unitOfWork.edge(decision, "GRADES", input.claim);
+        unitOfWork.edge(decision, "BASED_ON", input.because);
       }
-      staged.set(input.claim, { kind: STORED_KIND[input.state] });
+      unitOfWork.set(input.claim, { kind: STORED_KIND[input.state] });
 
-      const events = await this.emitDelta("is", input.claim, staged.delta(), {
+      const events = await this.emitDelta("is", input.claim, unitOfWork.delta(), {
         proposition,
         from: was,
         to: STORED_KIND[input.state],
@@ -320,17 +321,17 @@ export class Revising extends Shared {
           );
       }
 
-      const staged = new Staging(this.graph);
+      const unitOfWork = new UnitOfWork(this.graph);
       // The superseded output is not invalidated. A flag on the artefact
       // would summarise the standing of every finding it carries, and
       // standing is per finding.
-      staged.edge(output, "INVALIDATED_BY", input.because);
+      unitOfWork.edge(output, "INVALIDATED_BY", input.because);
 
       // Add-only: the successor reads what its predecessor read, plus
       // whatever this call names.
       const { analysis: replacement } = await this.recorded(
         { enquiry, method: input.method, from: [...inherited, ...(input.from ?? [])] },
-        staged,
+        unitOfWork,
       );
 
       // **One decision carries the whole act**: this analysis stands in
@@ -338,15 +339,15 @@ export class Revising extends Shared {
       // keeping those. A reader of the decision sees all of it.
       const decision = ref(
         "decision",
-        await staged.node("Decision", {
+        await unitOfWork.node("Decision", {
           decided_at: at,
           reason: `superseded by a re-run: ${input.method}`,
           invalidation_check: "evidence that the superseded analysis was sound after all",
         }),
       );
-      staged.edge(decision, "SUPERSEDES", input.supersedes);
-      staged.edge(decision, "MOTIVATES", replacement);
-      staged.edge(decision, "INVALIDATED_BY", input.because);
+      unitOfWork.edge(decision, "SUPERSEDES", input.supersedes);
+      unitOfWork.edge(decision, "MOTIVATES", replacement);
+      unitOfWork.edge(decision, "INVALIDATED_BY", input.because);
 
       // Every conclusion not kept falls now. A kept one is **not
       // re-parented**: it keeps the evidence that produced it, so asking
@@ -354,14 +355,14 @@ export class Revising extends Shared {
       const superseded: ConcludedClaim[] = [];
       for (const c of before) {
         if (kept.has(c.claim)) {
-          staged.edge(decision, "KEEPS", c.claim);
+          unitOfWork.edge(decision, "KEEPS", c.claim);
           continue;
         }
-        staged.edge(decision, "SUPERSEDES", c.claim);
+        unitOfWork.edge(decision, "SUPERSEDES", c.claim);
         superseded.push({ claim: c.claim, asserts: c.proposition });
       }
 
-      const events = await this.emitDelta(operation, replacement, staged.delta(), {
+      const events = await this.emitDelta(operation, replacement, unitOfWork.delta(), {
         supersedes: input.supersedes,
         because: input.because,
         keeping: input.keeping,
@@ -439,36 +440,36 @@ export class Revising extends Shared {
       );
       const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
-      const staged = new Staging(this.graph);
-      const review = await staged.node("Review", { verdict: input.because });
+      const unitOfWork = new UnitOfWork(this.graph);
+      const review = await unitOfWork.node("Review", { verdict: input.because });
       const narrower = ref(
         "claim",
-        await staged.node("Claim", { name: input.as, kind: "exploratory" }),
+        await unitOfWork.node("Claim", { name: input.as, kind: "exploratory" }),
       );
       // The review records that someone objected; the decision records that the
       // objection was acted on. Reviews also confirm, so a review alone cannot
       // mean "withdrawn" without reading its prose.
-      const decision = await staged.node("Decision", {
+      const decision = await unitOfWork.node("Decision", {
         decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: "evidence that the original reading was right after all",
       });
-      staged.edge(decision, "MOTIVATES", narrower);
+      unitOfWork.edge(decision, "MOTIVATES", narrower);
 
       for (const id of withdrawnIds) {
-        staged.edge(review, "EVALUATES", id);
-        staged.edge(decision, "CHANGES", id);
+        unitOfWork.edge(review, "EVALUATES", id);
+        unitOfWork.edge(decision, "CHANGES", id);
       }
 
       // Keyed by id: keying on the statement merged two findings phrased alike.
       const carried = new Map<EvidenceRef, CitedFinding>();
       for (const row of evidence) {
-        staged.edge(row.e.natural_id, "SUPPORTS", narrower);
+        unitOfWork.edge(row.e.natural_id, "SUPPORTS", narrower);
         const finding = ref("evidence", row.e.natural_id);
         carried.set(finding, { evidence: finding, states: row.e.statement });
       }
 
-      const events = await this.emitDelta("reinterpret", narrower, staged.delta(), {
+      const events = await this.emitDelta("reinterpret", narrower, unitOfWork.delta(), {
         previously,
         because: input.because,
       });

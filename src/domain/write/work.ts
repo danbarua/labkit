@@ -11,7 +11,8 @@ import type {
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
 import type { EmitDelta } from "./index";
-import { applyDelta, asConcludedClaim, Shared, Staging } from "./shared";
+import { applyDelta } from "../projection";
+import { asConcludedClaim, Shared, UnitOfWork } from "./shared";
 
 export class Work extends Shared {
   constructor(
@@ -50,32 +51,32 @@ export class Work extends Shared {
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const artefact = await staged.node("Artefact", {
+      const unitOfWork = new UnitOfWork(this.graph);
+      const artefact = await unitOfWork.node("Artefact", {
         kind: "observations",
         logical_name: input.name,
         ...(input.contentHash ? { content_hash: input.contentHash } : {}),
       });
-      const evidence = await staged.node("Evidence", { statement: input.finding });
+      const evidence = await unitOfWork.node("Evidence", { statement: input.finding });
       // `role` is recorded because the property is not optional, not because
       // anything reads it: `EvidenceUnitRole` has one writer and no readers
       // anywhere in `src/`. `experiment` is the nearest existing value for a
       // measurement taken rather than inferred, and it is a placeholder until
       // something reads the field.
-      const unit = await staged.node("EvidenceUnit", { role: "experiment" });
-      staged.edge(evidence, "RECORDED_IN", artefact);
-      staged.edge(unit, "PRODUCES", evidence);
-      staged.edge(unit, "ADDRESSES", input.enquiry);
+      const unit = await unitOfWork.node("EvidenceUnit", { role: "experiment" });
+      unitOfWork.edge(evidence, "RECORDED_IN", artefact);
+      unitOfWork.edge(unit, "PRODUCES", evidence);
+      unitOfWork.edge(unit, "ADDRESSES", input.enquiry);
       // The enquiry requires these observations -- a statement about the
       // enquiry, not about any analysis. What a given analysis actually read is
       // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
       // it. REQUIRES says the enquiry depends on this evidence, ADDRESSES says
       // this work was done towards the enquiry, and `whatDependsOn()` reads the
       // first.
-      staged.edge(input.enquiry, "REQUIRES", evidence);
+      unitOfWork.edge(input.enquiry, "REQUIRES", evidence);
 
       const observations = ref("observations", artefact);
-      const events = await this.emitDelta("recordObservations", observations, staged.delta(), {
+      const events = await this.emitDelta("recordObservations", observations, unitOfWork.delta(), {
         name: input.name,
       });
 
@@ -96,12 +97,12 @@ export class Work extends Shared {
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const { analysis } = await this.recorded(input, staged);
+      const unitOfWork = new UnitOfWork(this.graph);
+      const { analysis } = await this.recorded(input, unitOfWork);
       // An analysis with no conclusions yet emits exactly one event and is a
       // real state: `enquiry` prints "has produced nothing yet" and `known`
       // buckets it as worked-on-no-answer.
-      const events = await this.emitDelta("recordAnalysis", analysis, staged.delta(), {
+      const events = await this.emitDelta("recordAnalysis", analysis, unitOfWork.delta(), {
         enquiry: input.enquiry,
         method: input.method,
       });
@@ -142,10 +143,10 @@ export class Work extends Shared {
 
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
-      const staged = new Staging(this.graph);
-      const concluded = await this.concluding(input, staged);
+      const unitOfWork = new UnitOfWork(this.graph);
+      const concluded = await this.concluding(input, unitOfWork);
 
-      const events = await this.emitDelta("conclude", input.analysis, staged.delta(), {
+      const events = await this.emitDelta("conclude", input.analysis, unitOfWork.delta(), {
         conclusions: this.conclusionEvents([concluded]),
         ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
       });
@@ -166,11 +167,11 @@ export class Work extends Shared {
     return this.graph.inTransaction(async () => {
       const unit = await this.unitOf(input.of);
 
-      const staged = new Staging(this.graph);
-      const review = ref("review", await staged.node("Review", { verdict: input.verdict }));
-      staged.edge(review, "EVALUATES", unit);
+      const unitOfWork = new UnitOfWork(this.graph);
+      const review = ref("review", await unitOfWork.node("Review", { verdict: input.verdict }));
+      unitOfWork.edge(review, "EVALUATES", unit);
 
-      const events = await this.emitDelta("recordReview", review, staged.delta(), {
+      const events = await this.emitDelta("recordReview", review, unitOfWork.delta(), {
         of: input.of,
         verdict: input.verdict,
       });

@@ -13,7 +13,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { ResearchSession, WriteSurface, inMemoryEventLog, UNATTRIBUTED } from "../src/domain";
 import type { DomainEvent, EventSink } from "../src/domain";
-import { applyDelta } from "../src/domain/write/shared";
+import { applyDelta } from "../src/domain/projection";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { TenantGraph } from "../src/db/graph";
 import { resolveTenantContext } from "../src/db/tenant";

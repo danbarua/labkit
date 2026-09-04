@@ -267,7 +267,7 @@ export class Shared extends SessionCore {
   }
 
   /**
-   * The write half of `recordAnalysis`, staged rather than written.
+   * The write half of `recordAnalysis`, unitOfWork rather than written.
    *
    * Composed verbs call this. A researcher who re-verified a result did one
    * thing, and a log that also records the analysis underneath it describes the
@@ -275,23 +275,23 @@ export class Shared extends SessionCore {
    */
   protected async recorded(
     input: Omit<RecordAnalysisCommand, "concludes">,
-    staged: Staging,
+    unitOfWork: UnitOfWork,
   ): Promise<{ analysis: AnalysisRef; unit: UnitRef; output: ObservationsRef }> {
-    const computation = await staged.node("Computation", {
+    const computation = await unitOfWork.node("Computation", {
       kind: input.method,
       status: "completed",
     });
-    const unit = await staged.node("EvidenceUnit", { role: "analysis" });
-    const output = await staged.node("Artefact", {
+    const unit = await unitOfWork.node("EvidenceUnit", { role: "analysis" });
+    const output = await unitOfWork.node("Artefact", {
       kind: "analysis-output",
       logical_name: `${input.method} output`,
     });
 
-    staged.edge(unit, "USES", computation);
-    staged.edge(unit, "ADDRESSES", input.enquiry);
-    if (input.implementing) staged.edge(input.implementing, "IMPLEMENTS", unit);
+    unitOfWork.edge(unit, "USES", computation);
+    unitOfWork.edge(unit, "ADDRESSES", input.enquiry);
+    if (input.implementing) unitOfWork.edge(input.implementing, "IMPLEMENTS", unit);
     for (const criterion of input.heldTo ?? []) {
-      staged.edge(criterion, "QUALIFIES", unit);
+      unitOfWork.edge(criterion, "QUALIFIES", unit);
     }
     // Both levels of provenance, deliberately: the evidence unit produced
     // this scientific output; the computation produced this concrete
@@ -303,8 +303,8 @@ export class Shared extends SessionCore {
     // Artefact`. Kept under the no-cull policy -- an endpoint pair is a claim
     // about the domain the same way a label is -- and named here so it is a
     // computable map rather than an oversight.
-    staged.edge(unit, "PRODUCES", output);
-    staged.edge(computation, "PRODUCES", output);
+    unitOfWork.edge(unit, "PRODUCES", output);
+    unitOfWork.edge(computation, "PRODUCES", output);
     // Every position at which each artefact was read, collected before staging.
     //
     // `positions` and not `position`, and one edge per distinct artefact rather
@@ -324,7 +324,7 @@ export class Shared extends SessionCore {
       else positionsFor.set(artefact, [position]);
     }
     for (const [artefact, positions] of positionsFor) {
-      staged.edge(computation, "CONSUMES", artefact, { positions });
+      unitOfWork.edge(computation, "CONSUMES", artefact, { positions });
     }
 
     return {
@@ -336,9 +336,9 @@ export class Shared extends SessionCore {
 
   protected async concluding(
     input: ConcludeCommand,
-    staged: Staging,
+    unitOfWork: UnitOfWork,
     /**
-     * The unit, output and enquiry of an analysis staged by this same act, and
+     * The unit, output and enquiry of an analysis unitOfWork by this same act, and
      * therefore not yet on the record to be queried for.
      */
     staging?: { unit: UnitRef; output: ObservationsRef; enquiry?: EnquiryRef },
@@ -472,29 +472,29 @@ export class Shared extends SessionCore {
             );
         }
 
-        const evidence = await staged.node("Evidence", { statement: input.finding });
-        const claim = await staged.node("Claim", {
+        const evidence = await unitOfWork.node("Evidence", { statement: input.finding });
+        const claim = await unitOfWork.node("Claim", {
           name: proposition,
           kind: input.standing ?? "exploratory",
         });
-        staged.edge(unit, "PRODUCES", evidence);
-        staged.edge(evidence, "RECORDED_IN", output);
-        staged.edge(evidence, bearing === "challenges" ? "CHALLENGES" : "SUPPORTS", claim);
+        unitOfWork.edge(unit, "PRODUCES", evidence);
+        unitOfWork.edge(evidence, "RECORDED_IN", output);
+        unitOfWork.edge(evidence, bearing === "challenges" ? "CHALLENGES" : "SUPPORTS", claim);
 
         // Per-finding supersession, on the edges the model already has.
         if (superseded) {
-          const decision = await staged.node("Decision", {
+          const decision = await unitOfWork.node("Decision", {
             decided_at: at,
             reason: `superseded by "${input.finding}"`,
             invalidation_check: "evidence that the superseded finding was right after all",
           });
-          staged.edge(decision, "SUPERSEDES", superseded.claim);
-          staged.edge(decision, "MOTIVATES", claim);
+          unitOfWork.edge(decision, "SUPERSEDES", superseded.claim);
+          unitOfWork.edge(decision, "MOTIVATES", claim);
           // The review the revision rested on, carried down from the lineage
           // decision so a reader asking why THIS finding fell gets the verdict
           // that caused it rather than any review of the same unit.
           if (revision?.because !== undefined)
-            staged.edge(decision, "INVALIDATED_BY", revision.because);
+            unitOfWork.edge(decision, "INVALIDATED_BY", revision.because);
         }
 
         return {
@@ -522,13 +522,13 @@ export class Shared extends SessionCore {
   }
 }
 
-/** What a verb stages: the changes its event will carry, in the order it made them. */
-export class Staging {
+/** One command's changes, accumulated in the order the command made them. */
+export class UnitOfWork {
   readonly changes: GraphChange[] = [];
 
   constructor(private readonly graph: TenantGraph) {}
 
-  /** Reserves an id and stages the node under it. */
+  /** Reserves an id and records the node under it. */
   async node<L extends NodeLabel>(label: L, props: NodePropsByLabel[L]): Promise<string> {
     const id = await this.graph.reserveId(label);
     this.changes.push({
@@ -550,23 +550,5 @@ export class Staging {
 
   delta(): GraphChange[] {
     return this.changes;
-  }
-}
-
-/** Writes an event's changes into the graph, in the order the act made them. */
-export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {
-  for (const change of event.changes) {
-    switch (change.change) {
-      case "NodeCreated":
-        await graph.createNode(change.label, change.props as never, change.id);
-        break;
-      case "EdgeCreated":
-        await graph.createEdge(change.from, change.label, change.to, change.props);
-        break;
-      case "PropsChanged":
-        for (const [key, value] of Object.entries(change.props))
-          await graph.setNodeProperty(change.id, key, value);
-        break;
-    }
   }
 }
