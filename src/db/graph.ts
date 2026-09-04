@@ -226,30 +226,27 @@ export class TenantGraph {
    * confirmed empirically against pglite-age before this was written this way.
    */
   /**
-   * Takes the next natural id for a label without creating anything.
+   * Reserves the next natural id for a label, creating nothing.
    *
    * The generator is a plain SQL function over one sequence per label, so an
    * id can be had before the node exists — which is what lets a verb state
    * what it is about to create before it creates it.
-   *
-   * `nextval` does not roll back: an id booked by an act that then refuses is
-   * spent. Already true of one that creates and throws.
    */
-  async bookId(label: NodeLabel): Promise<string> {
+  async reserveId(label: NodeLabel): Promise<string> {
     const { rows } = await this.db.query<{ id: string }>(
       `SELECT ${LABKIT_SCHEMA}.labkit_next_natural_id($1::text, $2::text) AS id`,
       [label.toLowerCase(), NODE_TYPES[label].prefix],
     );
-    const booked = rows[0];
-    if (!booked) throw new Error(`booking an id for ${label} returned no rows`);
-    return booked.id;
+    const reserved = rows[0];
+    if (!reserved) throw new Error(`reserving an id for ${label} returned no rows`);
+    return reserved.id;
   }
 
   /**
    * Creates a single node. `label` selects the property shape
    * (`NodePropsByLabel`), so passing another label's props is a compile error.
    *
-   * `id` is a natural id already taken from {@link bookId}. Without one the
+   * `id` is a natural id already taken from {@link reserveId}. Without one the
    * node takes a fresh id in the same round trip, as it always has.
    *
    * `label` is one of NODE_LABELS, never caller-controlled input — the
@@ -270,7 +267,7 @@ export class TenantGraph {
     const naturalIdClause =
       id === undefined
         ? `natural_id: ${LABKIT_SCHEMA}.labkit_next_natural_id('${label.toLowerCase()}'::text, '${nodeType.prefix}'::text)`
-        : `natural_id: $__booked_id`;
+        : `natural_id: $__reserved_id`;
     const propsClause = buildPropertyClause(validated as unknown as Record<string, unknown>);
     const clause = propsClause ? `${propsClause}, ${naturalIdClause}` : naturalIdClause;
 
@@ -279,7 +276,7 @@ export class TenantGraph {
       { n: vertexColumn<NodePropsByLabel[L] & { natural_id: string }>() },
       {
         ...(validated as unknown as Record<string, unknown>),
-        ...(id === undefined ? {} : { __booked_id: id }),
+        ...(id === undefined ? {} : { __reserved_id: id }),
       },
     );
     const created = rows[0];
