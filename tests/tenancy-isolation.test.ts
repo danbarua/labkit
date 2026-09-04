@@ -65,7 +65,10 @@ const anEvent = (subject: string): DomainEvent =>
     at: "2026-01-01T00:00:00.000Z",
     operation: "pose",
     subject,
-    created: [subject],
+    command: { question: "does it hold?" },
+    changes: [
+      { change: "NodeCreated", id: subject, label: "Question", props: { name: "does it hold?" } },
+    ],
     attribution: {
       attribution_label: "rls-probe",
       attribution_id: "rls",

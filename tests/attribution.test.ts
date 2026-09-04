@@ -12,6 +12,7 @@
  * a research question and does not belong in a research conversation.
  */
 
+import type { PoseCommand } from "../src/domain/commands";
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, test } from "bun:test";
 import {
   ResearchSession,
@@ -139,7 +140,7 @@ describe("an event says who caused it", () => {
     await new WriteSurface(graph, { ...ctx, events }).pose({ question: "first question" });
     await new WriteSurface(graph, { ...ctx, events }).pose({ question: "second question" });
 
-    expect((await events.all()).map((e) => e.detail?.question)).toEqual([
+    expect((await events.all()).map((e) => (e.command as PoseCommand).question)).toEqual([
       "first question",
       "second question",
     ]);
