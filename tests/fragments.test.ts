@@ -16,6 +16,7 @@
  * stop being an independent probe.
  */
 
+import type { PursueCommand } from "../src/domain/commands";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import {
@@ -64,6 +65,10 @@ afterAll(async () => {
 });
 
 const operations = (stream: readonly DomainEvent[]) => stream.map((e) => e.operation);
+
+/** The edge labels an act created, from its changes. */
+const edgeLabels = (e: DomainEvent): string[] =>
+  e.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c.label as string] : []));
 
 describe("a composition writes the record its moves describe", () => {
   /**
@@ -132,9 +137,9 @@ describe("a composition writes the record its moves describe", () => {
     // invent. **Both events**: what the run read is on the run, and what the
     // finding bears on is on the conclusion.
     const analysis = (await events.select({ operation: "recordAnalysis" }))[0]!;
-    expect((analysis.edges ?? []).map((e) => e.label)).toContain("CONSUMES");
+    expect(edgeLabels(analysis)).toContain("CONSUMES");
     const drawn = (await events.select({ operation: "conclude" }))[0]!;
-    expect((drawn.edges ?? []).map((e) => e.label)).toContain("SUPPORTS");
+    expect(edgeLabels(drawn)).toContain("SUPPORTS");
   });
 
   /**
@@ -155,8 +160,8 @@ describe("a composition writes the record its moves describe", () => {
     // Both pursuits name the same question — the property that makes S-5's
     // "same wording, different claim" case expressible at all.
     const [, first, second] = await events.all();
-    expect(first!.detail!.question).toBe(question);
-    expect(second!.detail!.question).toBe(question);
+    expect((first!.command as PursueCommand).question).toBe(question);
+    expect((second!.command as PursueCommand).question).toBe(question);
   });
 
   /**
@@ -181,8 +186,8 @@ describe("a composition writes the record its moves describe", () => {
           operation: "pose",
           subject: "Q_9",
           created: [],
-          edges: [{ from: "Q_9", label: "MOTIVATES", to: "LOE_9" }],
-          detail: {},
+          edges: [{ change: "EdgeCreated", from: "Q_9", label: "MOTIVATES", to: "LOE_9" }],
+          issued: { question: "does it hold?" },
           command: "labkit pose",
           derived: [],
         },
@@ -209,7 +214,7 @@ describe("a composition writes the record its moves describe", () => {
     // On the `conclude` event: the bearing belongs to the finding, and the
     // finding is its own act. The run beneath it has no bearing to lose.
     const drawn = (await events.select({ operation: "conclude" }))[0]!;
-    const labels = (drawn.edges ?? []).map((e) => e.label);
+    const labels = edgeLabels(drawn);
     // CHALLENGES, not SUPPORTS. A fragment that lost the bearing would still
     // produce a claim and a closed question, and only this distinguishes them.
     expect(labels).toContain("CHALLENGES");

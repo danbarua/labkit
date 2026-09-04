@@ -290,6 +290,7 @@ export class WriteSurface extends SessionCore {
         changes: unitOfWork.delta(),
       });
       await applyDelta(this.graph, recorded);
+      await this.events.projected?.(recorded);
       return { ...act.result, events: [recorded] };
     });
   }

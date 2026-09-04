@@ -66,11 +66,14 @@ export function withProvenance(
   const gateHandles: string[] = [];
 
   const events: EventSink = {
-    record: async (event) => {
-      const stamped = await base.record(event);
-      for (const handle of stamped.created) {
-        if (labelForNaturalId(handle) === "LineOfEnquiry") enquiryHandles.push(handle);
-        if (labelForNaturalId(handle) === "Gate") gateHandles.push(handle);
+    record: (event) => base.record(event),
+    // After the projection, not inside `record`: these reads ask the graph
+    // what the act did, and inside `record` the graph has not been told yet.
+    projected: async (stamped) => {
+      for (const change of stamped.changes) {
+        if (change.change !== "NodeCreated") continue;
+        if (change.label === "LineOfEnquiry") enquiryHandles.push(change.id);
+        if (change.label === "Gate") gateHandles.push(change.id);
       }
       const enquiries = await Promise.all(
         enquiryHandles.map(async (handle): Promise<EnquirySnapshot> => {
@@ -93,7 +96,6 @@ export function withProvenance(
         fragment: currentFragment.name,
         derived: { enquiries, gates },
       });
-      return stamped;
     },
     all: () => base.all(),
     select: (filter: EventFilter) => base.select(filter),

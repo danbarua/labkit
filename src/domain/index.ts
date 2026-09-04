@@ -105,6 +105,7 @@ export type {
 // these are what an act takes. Exported so an adapter can hold one -- which is
 // what an MCP write tool will need and what inline anonymous shapes prevented.
 export type {
+  Command,
   PursueCommand,
   NoteCommand,
   SharpenCommand,

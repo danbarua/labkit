@@ -27,7 +27,7 @@ import { resolveTenantContext } from "../src/db/tenant";
 import { scopeToTenant } from "../src/db/scoped";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, inMemoryEventLog, systemClock, type DomainEvent } from "../src/domain";
-import { fetchNodeProps, replayIntoScratch } from "../fragments/replay";
+import { replayIntoScratch } from "../fragments/replay";
 
 const home = mkdtempSync(join(tmpdir(), "labkit-replay-test-"));
 afterAll(() => rmSync(home, { recursive: true, force: true }));
@@ -62,9 +62,8 @@ afterAll(async () => {
 test("a genuine history replays clean, with no refusal", async () => {
   const { graph, history, connection } = await realHistory();
   connections.push(connection);
-  const nodeProps = await fetchNodeProps(graph, history);
 
-  const result = await replayIntoScratch(history, nodeProps);
+  const result = await replayIntoScratch(history);
 
   expect(result.refusedAt).toBeUndefined();
   expect(result.provenance.size).toBe(history.length);
@@ -73,17 +72,21 @@ test("a genuine history replays clean, with no refusal", async () => {
 test("a corrupted edge is refused, not silently accepted", async () => {
   const { graph, history, connection } = await realHistory();
   connections.push(connection);
-  const nodeProps = await fetchNodeProps(graph, history);
 
   // The real `pursue` event's `MOTIVATES` edge, pointed at a question that
   // was never posed. `replayIntoScratch` calls the very same decoder either
   // way — what differs is the comparison this event is checked against.
   const pursueEvent = history[1]!;
   const corrupted: DomainEvent[] = history.map((e, i) =>
-    i === 1 ? { ...e, edges: [{ ...pursueEvent.edges[0]!, from: "Q_999" }] } : e,
+    i === 1
+      ? {
+          ...e,
+          changes: e.changes.map((c) => (c.change === "EdgeCreated" ? { ...c, from: "Q_999" } : c)),
+        }
+      : e,
   );
 
-  const result = await replayIntoScratch(corrupted, nodeProps);
+  const result = await replayIntoScratch(corrupted);
 
   expect(result.refusedAt).toBeDefined();
   expect(result.refusedAt?.operation).toBe("pursue");
@@ -96,13 +99,12 @@ test("a corrupted edge is refused, not silently accepted", async () => {
 test("an operation with no decoder is refused by name", async () => {
   const { graph, history, connection } = await realHistory();
   connections.push(connection);
-  const nodeProps = await fetchNodeProps(graph, history);
 
   const unknown: DomainEvent[] = [
     { ...history[0]!, operation: "notAnOperation" as DomainEvent["operation"] },
   ];
 
-  const result = await replayIntoScratch(unknown, nodeProps);
+  const result = await replayIntoScratch(unknown);
 
   expect(result.refusedAt?.reason).toContain("no decoder");
 });
