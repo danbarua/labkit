@@ -550,18 +550,12 @@ export class Shared extends SessionCore {
  * Nodes before edges because `createEdge` matches both endpoints and throws
  * when either is missing.
  *
- * **Crude on purpose.** The spike asks whether the delta is complete enough to
- * apply, not what an applier should look like. If this ever needs an argument
- * beyond the graph and the event, the delta is incomplete and that is the
- * finding.
+ * It takes the graph and the event and nothing else. If it ever needs a third
+ * argument, the delta is incomplete.
  */
 export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {
   for (const node of event.created)
     await graph.createNode(node.label, node.props as never, node.id);
   for (const edge of event.edges) await graph.createEdge(edge.from, edge.label, edge.to);
-  // Not implemented, deliberately: neither of the spike's two verbs sets a
-  // property in place. `is` does, and it is out of scope -- so this refuses
-  // rather than pretending the delta was applied.
-  if (event.sets.length > 0)
-    throw new Error(`the spike does not apply property sets (${event.operation})`);
+  for (const set of event.sets) await graph.setNodeProperty(set.id, set.key, set.value);
 }

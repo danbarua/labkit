@@ -292,6 +292,23 @@ export class TenantGraph {
   }
 
   /**
+   * Sets one property on an existing node.
+   *
+   * The label comes from the id's prefix, as `createEdge` resolves its
+   * endpoints, so a caller names the node and the property and nothing else.
+   */
+  async setNodeProperty(id: string, key: string, value: unknown): Promise<void> {
+    const label = labelForNaturalId(id);
+    validateIdentifier(key, "property name");
+    const rows = await this.query(
+      `MATCH (n:${label} {natural_id: $id}) SET n.${key} = $value RETURN n`,
+      { n: vertexColumn<{ natural_id: string }>() },
+      { id, value },
+    );
+    if (rows.length === 0) throw new Error(`no ${label} ${id} to set ${key} on`);
+  }
+
+  /**
    * Creates a directed edge identified by natural IDs — never AGE's
    * internal graphid, never an arbitrary property-map match that could
    * silently address more than one node. The label of each

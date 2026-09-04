@@ -11,7 +11,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
-import { ResearchSession, WriteSurface, inMemoryEventLog } from "../src/domain";
+import { ResearchSession, WriteSurface, inMemoryEventLog, UNATTRIBUTED } from "../src/domain";
 import type { DomainEvent, EventSink } from "../src/domain";
 import { applyDelta } from "../src/domain/write/shared";
 import { openScenario, type Scenario } from "./helpers/scenario";
@@ -114,6 +114,32 @@ test("the delta applied to an empty graph rebuilds the node, properties and all"
   expect(rebuilt).toHaveLength(1);
   expect(rebuilt[0]!.n.name).toBe("does it hold?");
   expect(rebuilt[0]!.n.posed_at).toBeTruthy();
+});
+
+test("a property set in place is carried by the delta and applied from it", async () => {
+  const { question } = await session.pose({ question: "does it hold?" });
+  const history = await events.all();
+
+  const fresh = await emptyGraph();
+  for (const event of history) await applyDelta(fresh, event as DomainEvent);
+
+  // A `sets` entry applied from nothing but the event.
+  await applyDelta(fresh, {
+    at: new Date().toISOString(),
+    attribution: UNATTRIBUTED,
+    operation: "pose",
+    subject: question,
+    created: [],
+    edges: [],
+    sets: [{ id: question, key: "name", value: "and now it says this" }],
+  });
+
+  const after = await fresh.query(
+    `MATCH (n:Question {natural_id: $id}) RETURN n`,
+    { n: vertexProps<Identified & { name: string }>() },
+    { id: question },
+  );
+  expect(after[0]!.n.name).toBe("and now it says this");
 });
 
 test("a refused close writes nothing, because nothing was written before the refusal", async () => {
