@@ -424,7 +424,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     expect(replacement[0]!.at).toBe(FIXED_NOW);
     // Nothing kept: this replacement supersedes every conclusion of the
     // analysis it revises, which is what `replace` means.
-    expect(replacement[0]!.detail).toMatchObject({ supersedes: analysis, keeping: [] });
+    expect(replacement[0]!.command).toMatchObject({ supersedes: analysis, keeping: [] });
 
     // Every research action left a trace, in order — one per action, not one
     // per write.

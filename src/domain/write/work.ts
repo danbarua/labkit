@@ -76,7 +76,6 @@ export class Work extends Shared {
       const observations = ref("observations", artefact);
       return {
         subject: observations,
-        detail: { name: input.name },
         result: { observations },
       };
     });
@@ -100,7 +99,6 @@ export class Work extends Shared {
       // buckets it as worked-on-no-answer.
       return {
         subject: analysis,
-        detail: { enquiry: input.enquiry, method: input.method },
         result: { analysis, claims: [] },
       };
     });
@@ -141,10 +139,6 @@ export class Work extends Shared {
 
       return {
         subject: input.analysis,
-        detail: {
-          conclusions: this.conclusionEvents([concluded]),
-          ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
-        },
         result: { analysis: input.analysis, claims: [asConcludedClaim(concluded)] },
       };
     });
@@ -166,7 +160,6 @@ export class Work extends Shared {
 
       return {
         subject: review,
-        detail: { of: input.of, verdict: input.verdict },
         result: { review },
       };
     });

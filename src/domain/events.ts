@@ -19,6 +19,7 @@
  */
 
 import type { EdgeCreated, GraphChange, NodeCreated, PropsChanged } from "../db/domain";
+import type { Command } from "./commands";
 
 export type { EdgeCreated, GraphChange, NodeCreated, PropsChanged };
 
@@ -148,9 +149,9 @@ export const UNATTRIBUTED: AttributionContext = {
 };
 
 /**
- * One recorded domain operation. `subject` is the natural id of whatever the
- * operation was primarily about; `detail` carries the operation-specific
- * payload a later query would need to reconstruct what happened.
+ * One recorded domain operation: the command that was issued, and every change
+ * it made. `subject` is the natural id of whatever the operation was primarily
+ * about.
  */
 export interface DomainEvent {
   /**
@@ -199,7 +200,13 @@ export interface DomainEvent {
   subject: string;
   /** Every change this act made to the graph, in the order it made them. */
   changes: readonly GraphChange[];
-  detail?: Record<string, unknown>;
+  /**
+   * What the caller asked for, verbatim.
+   *
+   * Not a summary of it: a hand-built subset is a subset somebody chose by
+   * typing, and every field left out is one a later reader cannot recover.
+   */
+  command: Command;
 }
 
 /** Builds a `DomainEvent`, defaulting `changes` to empty. */

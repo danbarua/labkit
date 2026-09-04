@@ -43,7 +43,7 @@ export class Asking extends SessionCore {
   async pose(input: PoseCommand): Promise<Posed> {
     return this.handle<Posed>("pose", input, async (unitOfWork) => {
       const asked = ref("question", await this.posed(input.question, unitOfWork));
-      return { subject: asked, detail: { question: input.question }, result: { question: asked } };
+      return { subject: asked, result: { question: asked } };
     });
   }
 
@@ -62,11 +62,7 @@ export class Asking extends SessionCore {
     return this.handle<Noted>("note", input, async (unitOfWork) => {
       const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
-      return {
-        subject: noted,
-        detail: { text: input.text, ...(input.on ? { on: input.on } : {}) },
-        result: { note: noted },
-      };
+      return { subject: noted, result: { note: noted } };
     });
   }
 
@@ -94,11 +90,7 @@ export class Asking extends SessionCore {
   async pursue(input: PursueCommand): Promise<Pursued> {
     return this.handle<Pursued>("pursue", input, async (unitOfWork) => {
       const enquiry = await this.pursued(input, unitOfWork);
-      return {
-        subject: enquiry,
-        detail: { question: input.question, approach: input.approach },
-        result: { enquiry },
-      };
+      return { subject: enquiry, result: { enquiry } };
     });
   }
 
@@ -121,11 +113,7 @@ export class Asking extends SessionCore {
     return this.handle<OpenedEnquiry>("openEnquiry", { question }, async (unitOfWork) => {
       const asked = await this.posed(question, unitOfWork);
       const enquiry = await this.pursued({ question: asked, approach: question }, unitOfWork);
-      return {
-        subject: enquiry,
-        detail: { question, asked },
-        result: { enquiry, question: asked },
-      };
+      return { subject: enquiry, result: { enquiry, question: asked } };
     });
   }
 
@@ -174,7 +162,6 @@ export class Asking extends SessionCore {
 
       return {
         subject: sharper,
-        detail: { from: input.from, because: input.because, via: decision },
         result: { question: sharper, decision: ref("decision", decision) },
       };
     });

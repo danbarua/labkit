@@ -374,3 +374,28 @@ export type ClaimState = "undecided" | "confirmed";
 export type IsCommand =
   | { claim: ClaimRef; state: "undecided"; because: EvidenceRef }
   | { claim: ClaimRef; state: "confirmed"; because: Prose };
+
+/** Every command the write surface takes. What an act was asked to do. */
+export type Command =
+  | AcceptAsUnresolvedCommand
+  | AmendDesignCommand
+  | CloseEnquiryCommand
+  | ConcludeCommand
+  | DeclareGateCommand
+  | EvaluateCriterionCommand
+  | IsCommand
+  | KeepCommand
+  | NoteCommand
+  | OpenEnquiryCommand
+  | PlanWorkCommand
+  | PoseCommand
+  | PromoteCommand
+  | PursueCommand
+  | RecordAnalysisCommand
+  | RecordObservationsCommand
+  | RecordReviewCommand
+  | ReinterpretCommand
+  | ReplaceAnalysisCommand
+  | ReverifyCommand
+  | SharpenCommand
+  | StateCriterionCommand;

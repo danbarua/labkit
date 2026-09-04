@@ -50,7 +50,6 @@ export class Counting extends SessionCore {
 
       return {
         subject: work,
-        detail: { objective: input.objective },
         result: { work },
       };
     });
@@ -58,12 +57,11 @@ export class Counting extends SessionCore {
 
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
-    return this.handle<StatedCriterion>("stateCriterion", proposition, async (unitOfWork) => {
+    return this.handle<StatedCriterion>("stateCriterion", { proposition }, async (unitOfWork) => {
       const criterion = ref("criterion", await unitOfWork.node("Criterion", { proposition }));
 
       return {
         subject: criterion,
-        detail: { proposition },
         result: { criterion },
       };
     });
@@ -98,10 +96,6 @@ export class Counting extends SessionCore {
 
       return {
         subject: gate,
-        detail: {
-          governedBy: input.governedBy.map((c) => c),
-          protecting: input.protecting.map((w) => w),
-        },
         result: { gate },
       };
     });
@@ -155,11 +149,6 @@ export class Counting extends SessionCore {
 
       return {
         subject: evaluation,
-        detail: {
-          criterion: input.criterion,
-          ...(input.gate ? { gate: input.gate } : {}),
-          outcome: input.outcome,
-        },
         result: { evaluation },
       };
     });
@@ -253,12 +242,6 @@ export class Counting extends SessionCore {
 
       return {
         subject: decision,
-        detail: {
-          criterion: input.criterion,
-          replaced,
-          nowRequires: input.nowRequires,
-          supersedes: prior ?? null,
-        },
         result: {
           at,
           amendment: decision,

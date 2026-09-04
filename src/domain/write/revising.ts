@@ -124,11 +124,6 @@ export class Revising extends Shared {
 
       return {
         subject: analysis,
-        detail: {
-          of: input.historical,
-          proposition: input.concludes.proposition,
-          conclusions: this.conclusionEvents([concluded]),
-        },
         result: {
           at,
           verification: analysis,
@@ -190,16 +185,6 @@ export class Revising extends Shared {
 
       return {
         subject: input.claim,
-        detail: {
-          proposition,
-          from: was,
-          to: STORED_KIND[input.state],
-          // The act's own word, beside the property it wrote. `to` is the stored
-          // kind so it pairs with `from`; `state` is what the caller said, and it
-          // is what decides whether `because` is a handle or a sentence.
-          state: input.state,
-          because: input.because,
-        },
         result: { decision },
       };
     });
@@ -357,11 +342,6 @@ export class Revising extends Shared {
 
       return {
         subject: replacement,
-        detail: {
-          supersedes: input.supersedes,
-          because: input.because,
-          keeping: input.keeping,
-        },
         result: {
           at,
           replacement,
@@ -458,7 +438,6 @@ export class Revising extends Shared {
 
       return {
         subject: narrower,
-        detail: { previously, because: input.because },
         result: {
           at,
           previously: withdrawn,

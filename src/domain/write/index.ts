@@ -68,6 +68,7 @@ import type {
   VerificationReport,
 } from "../report";
 import type {
+  Command,
   AcceptAsUnresolvedCommand,
   AmendDesignCommand,
   CloseEnquiryCommand,
@@ -150,19 +151,12 @@ export type Operation = Methods<WriteSurface>;
  */
 export type RetiredOperation = "promote";
 
-/** A command in flight: the operation, and what the caller passed. */
-export interface Handled {
-  operation: Operation;
-  input: unknown;
-}
-
 /**
- * What a verb's body returns: what the act was about, what the event should
- * carry beside its changes, and the report minus the events the pipeline adds.
+ * What a verb's body returns: what the act was about, and the report minus the
+ * events the pipeline adds.
  */
 export interface Act<T> {
   subject: Ref<string>;
-  detail?: Record<string, unknown>;
   result: Omit<T, "events">;
 }
 
@@ -173,7 +167,7 @@ export interface Act<T> {
  */
 export type Handle = <T extends { events: DomainEvent[] }>(
   operation: Operation,
-  input: unknown,
+  command: Command,
   work: (unitOfWork: UnitOfWork) => Promise<Act<T>>,
 ) => Promise<T>;
 
@@ -186,7 +180,7 @@ export class WriteSurface extends SessionCore {
 
   constructor(graph: TenantGraph, options: ResearchSessionOptions = {}) {
     super(graph, options);
-    const handle: Handle = (operation, input, work) => this.handling(operation, input, work);
+    const handle: Handle = (operation, command, work) => this.handling(operation, command, work);
     this.asking = new Asking(graph, options, handle);
     this.work = new Work(graph, options, handle);
     this.counting = new Counting(graph, options, handle);
@@ -278,9 +272,6 @@ export class WriteSurface extends SessionCore {
     return this.revising.reinterpret(input);
   }
 
-  /** The command being handled, for the duration of one call. */
-  private handled?: Handled;
-
   /**
    * One command: a transaction, a unit of work, one event, and the graph
    * projected from it. The verb queries and enforces and stages; nothing else
@@ -288,28 +279,22 @@ export class WriteSurface extends SessionCore {
    */
   private async handling<T extends { events: DomainEvent[] }>(
     operation: Operation,
-    input: unknown,
+    command: Command,
     work: (unitOfWork: UnitOfWork) => Promise<Act<T>>,
   ): Promise<T> {
-    const outer = this.handled;
-    this.handled = { operation, input };
-    try {
-      return await this.graph.inTransaction(async () => {
-        const unitOfWork = new UnitOfWork(this.graph);
-        const act = await work(unitOfWork);
-        const recorded = await this.events.record({
-          at: this.clock.now(),
-          attribution: this.attribution,
-          operation,
-          subject: act.subject,
-          changes: unitOfWork.delta(),
-          ...(act.detail === undefined ? {} : { detail: act.detail }),
-        });
-        await applyDelta(this.graph, recorded);
-        return { ...act.result, events: [recorded] } as T;
+    return this.graph.inTransaction(async () => {
+      const unitOfWork = new UnitOfWork(this.graph);
+      const act = await work(unitOfWork);
+      const recorded = await this.events.record({
+        at: this.clock.now(),
+        attribution: this.attribution,
+        operation,
+        subject: act.subject,
+        command,
+        changes: unitOfWork.delta(),
       });
-    } finally {
-      this.handled = outer;
-    }
+      await applyDelta(this.graph, recorded);
+      return { ...act.result, events: [recorded] } as T;
+    });
   }
 }

@@ -121,7 +121,6 @@ export class Stopping extends SessionCore {
 
       return {
         subject: input.enquiry,
-        detail: { answeredBy: input.answeredBy ?? null, proposition: answeredProposition ?? null },
         result: { decision: decided },
       };
     });
@@ -183,7 +182,6 @@ export class Stopping extends SessionCore {
 
       return {
         subject: input.enquiry,
-        detail: { because: input.because, until: input.until, at },
         result: { decision },
       };
     });
