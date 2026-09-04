@@ -95,7 +95,8 @@ import type {
   Explanation,
 } from "../domain/report";
 import type { Ref } from "../domain/report";
-import type { DomainEvent, MintedEdge } from "../domain/events";
+import type { DomainEvent, GraphChange } from "../domain/events";
+import type { Command } from "../domain/commands";
 import type { EdgeLabel } from "../db/domain";
 
 /**
@@ -185,7 +186,7 @@ export const whatHappenedSchema = z.strictObject({
       // which is the exact shape this field exists to stop.
       attribution_how: z.enum(["observed", "claimed", "unattributed"]).nullable(),
       git_hash: z.string(),
-      detail: z.record(z.string(), z.unknown()).nullable(),
+      command: z.record(z.string(), z.unknown()),
     }),
   ),
 });
@@ -202,19 +203,44 @@ export const whatHappenedSchema = z.strictObject({
 const operation = z.string();
 const edgeLabel = z.string() as unknown as z.ZodType<EdgeLabel>;
 
-const mintedEdge = z.strictObject({
+// `NodeCreated` is distributed per-label with per-label props in the domain
+// type; an output schema mirrors the shape and casts, the same trick
+// `edgeLabel` above uses, rather than repeating that distribution here for a
+// value nothing here validates.
+const nodeCreated = z.strictObject({
+  change: z.literal("NodeCreated"),
+  id: z.string(),
+  label: z.string(),
+  props: z.record(z.string(), z.unknown()),
+});
+const edgeCreated = z.strictObject({
+  change: z.literal("EdgeCreated"),
   from: z.string(),
   label: edgeLabel,
   to: z.string(),
+  props: z.record(z.string(), z.unknown()).optional(),
 });
+const propsChanged = z.strictObject({
+  change: z.literal("PropsChanged"),
+  id: z.string(),
+  props: z.record(z.string(), z.unknown()),
+});
+const graphChange = z.union([
+  nodeCreated,
+  edgeCreated,
+  propsChanged,
+]) as unknown as z.ZodType<GraphChange>;
 
-// `readonly` casts: `DomainEvent.created`/`.edges` are `readonly`, and
-// `z.array()` infers a mutable array -- `Exact<>` treats the two as different
-// types (a mutable array is assignable to its readonly counterpart but not
-// back), so an uncast `z.array()` here would fail every schema that embeds
-// `events`, including this one.
-const createdList = z.array(z.string()) as unknown as z.ZodType<readonly string[]>;
-const mintedEdgeList = z.array(mintedEdge) as unknown as z.ZodType<readonly MintedEdge[]>;
+// `readonly` cast: `DomainEvent.changes` is `readonly`, and `z.array()`
+// infers a mutable array -- `Exact<>` treats the two as different types (a
+// mutable array is assignable to its readonly counterpart but not back), so
+// an uncast `z.array()` here would fail every schema that embeds `events`,
+// including this one.
+const changesList = z.array(graphChange) as unknown as z.ZodType<readonly GraphChange[]>;
+
+// The command a caller issued, echoed back verbatim -- already validated by
+// the tool's own input schema on the way in, so nothing here re-checks it.
+const command = z.record(z.string(), z.unknown()) as unknown as z.ZodType<Command>;
 
 const recordedAttribution = z.strictObject({
   attribution_label: z.string(),
@@ -229,9 +255,8 @@ export const domainEventSchema = z.strictObject({
   attribution: recordedAttribution,
   operation,
   subject: z.string(),
-  created: createdList,
-  edges: mintedEdgeList,
-  detail: z.record(z.string(), z.unknown()).optional(),
+  changes: changesList,
+  command,
 });
 
 const questionStanding = z.strictObject({
