@@ -62,7 +62,7 @@ const EXTERNAL = "does the graph construction matter for external classification
  * utility and ranked the constructions. Same sentence, different endpoints.
  */
 async function twoStages() {
-  const { question: internal } = await session.pose(INTERNAL);
+  const { question: internal } = await session.pose({ question: INTERNAL });
   const { enquiry: internalWork } = await session.pursue({
     question: internal,
     approach: "internal mapping-strength comparison",
@@ -84,7 +84,7 @@ async function twoStages() {
     ],
   });
 
-  const { question: external } = await session.pose(EXTERNAL);
+  const { question: external } = await session.pose({ question: EXTERNAL });
   const { enquiry: externalWork } = await session.pursue({
     question: external,
     approach: "downstream classification comparison",
@@ -270,9 +270,9 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
 
     // A third line of work asserting the same sentence, and settling on it.
-    const { question: alsoInternal } = await session.pose(
-      "does the graph construction matter for reconstruction error?",
-    );
+    const { question: alsoInternal } = await session.pose({
+      question: "does the graph construction matter for reconstruction error?",
+    });
     const { enquiry: work } = await session.pursue({
       question: alsoInternal,
       approach: "reconstruction-error comparison",
@@ -333,9 +333,9 @@ describe("S-5 — contradiction or dissociation?", () => {
       because: "immaterial overstates it",
     });
 
-    const { question: elsewhere } = await session.pose(
-      "does the graph construction matter for reconstruction error?",
-    );
+    const { question: elsewhere } = await session.pose({
+      question: "does the graph construction matter for reconstruction error?",
+    });
     const { enquiry: work } = await session.pursue({
       question: elsewhere,
       approach: "reconstruction-error comparison",
@@ -424,7 +424,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
     const solo = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
 
-    const { question: enquiryOnly } = await session.pose("does the encoding respond nonlinearly?");
+    const { question: enquiryOnly } = await session.pose({ question: "does the encoding respond nonlinearly?" });
     const { enquiry: work } = await session.pursue({
       question: enquiryOnly,
       approach: "curvature sweep",

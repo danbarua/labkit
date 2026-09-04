@@ -18,9 +18,9 @@
  * `AttributionContext` below.
  */
 
-import type { MintedEdge, MintedNode, PropertySet } from "../db/domain";
+import type { EdgeCreated, GraphChange, NodeCreated, PropsChanged } from "../db/domain";
 
-export type { MintedEdge, MintedNode, PropertySet };
+export type { EdgeCreated, GraphChange, NodeCreated, PropsChanged };
 
 /** Injected so scenario tests can assert on exact timestamps instead of racing the wall clock. */
 export interface Clock {
@@ -197,26 +197,16 @@ export interface DomainEvent {
    */
   operation: string;
   subject: string;
-  /** Every node this act created. */
-  created: readonly MintedNode[];
-  /** Every edge this act created. */
-  edges: readonly MintedEdge[];
-  /** Every property this act set in place, on a node it did not create. */
-  sets: readonly PropertySet[];
+  /** Every change this act made to the graph, in the order it made them. */
+  changes: readonly GraphChange[];
   detail?: Record<string, unknown>;
 }
 
-/** Builds a `DomainEvent`, defaulting the three delta lists to empty. */
+/** Builds a `DomainEvent`, defaulting `changes` to empty. */
 export function domainEvent(
-  fields: Omit<DomainEvent, "created" | "edges" | "sets"> &
-    Partial<Pick<DomainEvent, "created" | "edges" | "sets">>,
+  fields: Omit<DomainEvent, "changes"> & Partial<Pick<DomainEvent, "changes">>,
 ): DomainEvent {
-  return {
-    ...fields,
-    created: fields.created ?? [],
-    edges: fields.edges ?? [],
-    sets: fields.sets ?? [],
-  };
+  return { ...fields, changes: fields.changes ?? [] };
 }
 
 /**
@@ -283,7 +273,7 @@ export function inMemoryEventLog(): EventSink {
     (f.operation === undefined || e.operation === f.operation) &&
     (f.touching === undefined ||
       e.subject === f.touching ||
-      e.created.some((n) => n.id === f.touching));
+      e.changes.some((c) => c.change === "NodeCreated" && c.id === f.touching));
   return {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is

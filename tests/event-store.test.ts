@@ -61,7 +61,7 @@ describe("the event log outlives the process that wrote it", () => {
    */
   test("an event written through one connection is readable through another", async () => {
     const { write } = await surfaceFor("labkit");
-    const { question } = await write.pose("does the coating hold?");
+    const { question } = await write.pose({ question: "does the coating hold?" });
 
     const other = await testDb.openClient();
     try {
@@ -86,8 +86,8 @@ describe("the event log outlives the process that wrote it", () => {
   test("two tenants do not see each other's events", async () => {
     const a = await surfaceFor("tenant-a");
     const b = await surfaceFor("tenant-b");
-    await a.write.pose("is A's question recorded?");
-    await b.write.pose("is B's question recorded?");
+    await a.write.pose({ question: "is A's question recorded?" });
+    await b.write.pose({ question: "is B's question recorded?" });
 
     const seenByA = await pgEventLog(db, a.ctx.tenantId).all();
     const seenByB = await pgEventLog(db, b.ctx.tenantId).all();
@@ -144,7 +144,7 @@ describe("an event commits with the writes it describes, or not at all", () => {
     await expect(write.openEnquiry("the one that fails")).rejects.toThrow(/injected/);
     graph.createEdge = realCreateEdge;
 
-    const { question } = await write.pose("the one that succeeds");
+    const { question } = await write.pose({ question: "the one that succeeds" });
     const [event] = await log.all();
     expect(event!.created).toEqual([question]);
   });
@@ -188,7 +188,7 @@ describe("an event commits with the writes it describes, or not at all", () => {
 
     // `pose` connects nothing, so the only way this is non-empty is residue
     // from the six edges the failed analysis had already written.
-    await write.pose("the one that succeeds");
+    await write.pose({ question: "the one that succeeds" });
     const events = await log.select({ operation: "pose" });
     expect(events.at(-1)!.edges).toEqual([]);
   });
@@ -396,7 +396,7 @@ describe("an event records the edges the act created", () => {
   test("an act that connects nothing records an empty list, not an absent one", async () => {
     const { ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);
-    await write.pose("does the coating hold?");
+    await write.pose({ question: "does the coating hold?" });
 
     const [event] = await log.all();
     expect(event!.edges).toEqual([]);
@@ -442,8 +442,8 @@ describe("the log answers what the graph cannot", () => {
   test("seq orders two events a frozen clock stamps identically", async () => {
     const { ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx.tenantId);
-    await write.pose("first");
-    await write.pose("second");
+    await write.pose({ question: "first" });
+    await write.pose({ question: "second" });
 
     const events = await log.all();
     expect(events.map((e) => e.at)).toEqual([clock.now(), clock.now()]); // indistinguishable...

@@ -101,7 +101,7 @@ test("a history containing a retired promote replays end to end, not just decode
     const events = inMemoryEventLog();
     const w = new Writes(graph, { clock: systemClock, events });
 
-    const { question } = await w.pose("does the speedup hold");
+    const { question } = await w.pose({ question: "does the speedup hold" });
     const { enquiry } = await w.pursue({ question, approach: "time it" });
     const { observations } = await w.recordObservations({
       enquiry,

@@ -615,7 +615,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "inconclusive result. Use `open_enquiry` instead to ask and start in one act.",
     inputSchema: { question: z.string().describe("the question, as asked") },
     outputSchema: posedSchema,
-    handler: (write, { question }) => write.pose(question),
+    handler: (write, { question }) => write.pose({ question }),
   }),
 
   writeTool({

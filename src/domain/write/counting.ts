@@ -22,14 +22,14 @@ import type {
   PlanWorkCommand,
 } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
-import { noFindingBearsOn } from "./shared";
+import type { EmitDelta } from "./index";
+import { applyDelta, noFindingBearsOn, Staging } from "./shared";
 
 export class Counting extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
+    private readonly emitDelta: EmitDelta,
   ) {
     super(graph, options);
   }
@@ -37,31 +37,39 @@ export class Counting extends SessionCore {
   /** Records a piece of work whose start a gate may protect. */
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
     return this.graph.inTransaction(async () => {
-      const task = await this.graph.createNode("Task", {
+      const staged = new Staging(this.graph);
+      const work = ref(
+        "work",
+        await staged.node("Task", {
+          objective: input.objective,
+          mayRead: input.mayRead ?? [],
+          outputs: "",
+          acceptance: input.acceptance,
+        }),
+      );
+      if (input.addressing) staged.edge(work, "ADDRESSES", input.addressing);
+
+      const events = await this.emitDelta("planWork", work, staged.delta(), {
         objective: input.objective,
-        mayRead: input.mayRead ?? [],
-        outputs: "",
-        acceptance: input.acceptance,
       });
-      if (input.addressing)
-        await this.graph.createEdge(task.natural_id, "ADDRESSES", input.addressing);
-      const events = await this.emit("planWork", ref("work", task.natural_id), {
-        objective: input.objective,
-      });
-      return { work: ref("work", task.natural_id), events };
+
+      await applyDelta(this.graph, events[0]!);
+      return { work, events };
     });
   }
 
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
     return this.graph.inTransaction(async () => {
-      const criterion = await this.graph.createNode("Criterion", {
+      const staged = new Staging(this.graph);
+      const criterion = ref("criterion", await staged.node("Criterion", { proposition }));
+
+      const events = await this.emitDelta("stateCriterion", criterion, staged.delta(), {
         proposition,
       });
-      const events = await this.emit("stateCriterion", ref("criterion", criterion.natural_id), {
-        proposition,
-      });
-      return { criterion: ref("criterion", criterion.natural_id), events };
+
+      await applyDelta(this.graph, events[0]!);
+      return { criterion, events };
     });
   }
 
@@ -88,20 +96,18 @@ export class Counting extends SessionCore {
             "— name it in protecting, or hold the analysis to the criterion instead if nothing " +
             "downstream depends on it",
         );
-      const gate = await this.graph.createNode("Gate", {
-        consequence: input.consequence,
-      });
-      for (const criterion of input.governedBy) {
-        await this.graph.createEdge(criterion, "GOVERNS", gate.natural_id);
-      }
-      for (const work of input.protecting) {
-        await this.graph.createEdge(gate.natural_id, "GATES", work);
-      }
-      const events = await this.emit("declareGate", ref("gate", gate.natural_id), {
+      const staged = new Staging(this.graph);
+      const gate = ref("gate", await staged.node("Gate", { consequence: input.consequence }));
+      for (const criterion of input.governedBy) staged.edge(criterion, "GOVERNS", gate);
+      for (const work of input.protecting) staged.edge(gate, "GATES", work);
+
+      const events = await this.emitDelta("declareGate", gate, staged.delta(), {
         governedBy: input.governedBy.map((c) => c),
         protecting: input.protecting.map((w) => w),
       });
-      return { gate: ref("gate", gate.natural_id), events };
+
+      await applyDelta(this.graph, events[0]!);
+      return { gate, events };
     });
   }
 
@@ -135,46 +141,31 @@ export class Counting extends SessionCore {
         basis = found.evidence;
       }
       const at = this.clock.now();
-      // Transactional, demonstrated rather than assumed — `docs/consumer-contract/041`.
-      //
-      // The docstring above argues against exactly one durable state, and guards
-      // it on the caller-error path only. Interruption is the other side of the
-      // same operation, and it was open: `EVALUATED_AS` is written *second*, so
-      // from that point the evaluation is reachable and the edges after it are
-      // the ones that say what it means.
-      //
-      // The window that earns this is `BASED_ON`. A verdict that lost it reads
-      // as reached against nothing — `basis: []`, which on its own is an
-      // absence rather than a wrong answer. But withdrawal is
-      // `cited > 0 && standing === 0`, so a verdict that cited nothing can never
-      // be withdrawn: retract the evidence it was actually reached against and
-      // the gate stays **blocked** by a `fail` the record insists still stands.
-      // That is positively false, which is what separates this verb from
-      // `sharpen`, whose partial states no reader can reach.
-      const evaluation = await this.graph.inTransaction(async () => {
-        const ev = await this.graph.createNode("CriterionEvaluation", {
+
+      const staged = new Staging(this.graph);
+      const evaluation = ref(
+        "evaluation",
+        await staged.node("CriterionEvaluation", {
           value: input.value,
           outcome: input.outcome,
           evaluated_at: at,
-        });
-        await this.graph.createEdge(input.criterion, "EVALUATED_AS", ev.natural_id);
-        if (input.gate) await this.graph.createEdge(ev.natural_id, "TRIGGERS", input.gate);
-        // What the verdict was reached against. Without it, a condition
-        // established by measurement and one asserted by an agent return
-        // identical records.
-        if (basis) await this.graph.createEdge(ev.natural_id, "BASED_ON", basis);
-        return ev;
-      });
-      const events = await this.emit(
-        "evaluateCriterion",
-        ref("evaluation", evaluation.natural_id),
-        {
-          criterion: input.criterion,
-          ...(input.gate ? { gate: input.gate } : {}),
-          outcome: input.outcome,
-        },
+        }),
       );
-      return { evaluation: ref("evaluation", evaluation.natural_id), events };
+      staged.edge(input.criterion, "EVALUATED_AS", evaluation);
+      if (input.gate) staged.edge(evaluation, "TRIGGERS", input.gate);
+      // What the verdict was reached against. Without it, a condition
+      // established by measurement and one asserted by an agent return
+      // identical records.
+      if (basis) staged.edge(evaluation, "BASED_ON", basis);
+
+      const events = await this.emitDelta("evaluateCriterion", evaluation, staged.delta(), {
+        criterion: input.criterion,
+        ...(input.gate ? { gate: input.gate } : {}),
+        outcome: input.outcome,
+      });
+
+      await applyDelta(this.graph, events[0]!);
+      return { evaluation, events };
     });
   }
 
@@ -243,49 +234,45 @@ export class Counting extends SessionCore {
 
       const prior = await this.latestAmendmentOn(gates);
 
-      // Atomic, for the same reason: interrupted after the replacement condition
-      // governs the gate but before the original is retired, the gate is governed
-      // by two conditions, one of which nobody agreed to. See
-      // TenantGraph.inTransaction.
-      const { replacement, decision } = await this.graph.inTransaction(async () => {
-        const replacement = await this.graph.createNode("Criterion", {
-          proposition: input.nowRequires,
-        });
-        for (const gate of gates)
-          await this.graph.createEdge(replacement.natural_id, "GOVERNS", gate);
-
-        const decision = await this.graph.createNode("Decision", {
-          decided_at: this.clock.now(),
-          reason: input.because,
-          invalidation_check: "evidence that the amended setting was not the constraint after all",
-        });
-        await this.graph.createEdge(decision.natural_id, "CHANGES", input.criterion);
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", diagnosis);
-        if (prior) await this.graph.createEdge(decision.natural_id, "SUPERSEDES", prior);
-        return { replacement, decision };
-      });
-
       const rerun = await this.workGatedBy(gates);
       const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
 
-      const events = await this.emit("amendDesign", ref("decision", decision.natural_id), {
+      const staged = new Staging(this.graph);
+      const replacement = ref(
+        "criterion",
+        await staged.node("Criterion", { proposition: input.nowRequires }),
+      );
+      for (const gate of gates) staged.edge(replacement, "GOVERNS", gate);
+
+      const decision = ref(
+        "decision",
+        await staged.node("Decision", {
+          decided_at: this.clock.now(),
+          reason: input.because,
+          invalidation_check: "evidence that the amended setting was not the constraint after all",
+        }),
+      );
+      staged.edge(decision, "CHANGES", input.criterion);
+      staged.edge(decision, "BASED_ON", diagnosis);
+      if (prior) staged.edge(decision, "SUPERSEDES", prior);
+
+      const events = await this.emitDelta("amendDesign", decision, staged.delta(), {
         criterion: input.criterion,
         replaced,
         nowRequires: input.nowRequires,
         supersedes: prior ?? null,
       });
 
+      await applyDelta(this.graph, events[0]!);
+
       return {
         at,
-        amendment: ref("decision", decision.natural_id),
+        amendment: decision,
         // `void replacement;` stood here: the amended criterion was created and
         // its handle thrown away, so the report named both conditions by wording
         // and a caller could reach neither.
         replaced: { criterion: input.criterion, requires: replaced ?? "" },
-        nowRequires: {
-          criterion: ref("criterion", replacement.natural_id),
-          requires: input.nowRequires,
-        },
+        nowRequires: { criterion: replacement, requires: input.nowRequires },
         rerun,
         confirmatoryAffected,
         // Derived, never declared. An amendment is scientific exactly when

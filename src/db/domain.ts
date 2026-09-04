@@ -146,35 +146,46 @@ export const EDGE_LABELS = [
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
 
 /**
- * One edge, as an act reports having created it.
+ * One change an act made to the graph.
  *
- * Endpoints are natural ids rather than `Ref`s: this is the persistence layer,
- * where a handle's brand does not exist and `labelForNaturalId` is how a label
- * is recovered. The domain re-reads them as handles on the way out.
+ * Endpoints and subjects are natural ids rather than `Ref`s: this is the
+ * persistence layer, where a handle's brand does not exist and
+ * `labelForNaturalId` is how a label is recovered. The domain re-reads them as
+ * handles on the way out.
  *
- * Declared here beside {@link EdgeLabel} rather than in `src/domain/events.ts`
- * because the collector is in `TenantGraph.createEdge`, and `src/db` may not
- * import `src/domain`.
+ * Declared here beside {@link NodeLabel} and {@link EdgeLabel} rather than in
+ * `src/domain/events.ts` because `src/db` may not import `src/domain`.
  */
-export interface MintedEdge {
-  from: string;
-  label: EdgeLabel;
-  to: string;
-}
+export type GraphChange = NodeCreated | EdgeCreated | PropsChanged;
 
-/** A node an act created. */
-export interface MintedNode {
+export interface NodeCreated {
+  change: "NodeCreated";
   id: string;
   label: NodeLabel;
   props: Record<string, unknown>;
 }
 
-/** A property an act set in place, on a node it did not create. */
-export interface PropertySet {
-  id: string;
-  key: string;
-  value: unknown;
+export interface EdgeCreated {
+  change: "EdgeCreated";
+  from: string;
+  label: EdgeLabel;
+  to: string;
+  props?: EdgeProps;
 }
+
+/**
+ * Properties set in place on something that already exists.
+ *
+ * `id` is a natural id, which does not say whether it denotes a node, an edge,
+ * a row or a blob — so one change record covers all of them.
+ */
+export interface PropsChanged {
+  change: "PropsChanged";
+  id: string;
+  props: Record<string, unknown>;
+}
+
+export type EdgeProps = Record<string, string | number | boolean | number[]>;
 
 /**
  * Single authoritative source of truth for legal edge shapes. `createEdge`

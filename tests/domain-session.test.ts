@@ -311,7 +311,7 @@ test("an interrupted sharpen leaves nothing at all", async () => {
       },
     ],
   });
-  const { question: original } = await session.pose("is the coating durable?");
+  const { question: original } = await session.pose({ question: "is the coating durable?" });
 
   // Fail on the second BASED_ON edge: the decision keeps one finding of three.
   const realCreateEdge = graph.createEdge.bind(graph);
@@ -645,7 +645,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
  * becomes reachable and `pursue` needs the transaction.
  */
 test("an interrupted pursue leaves no enquiry at all", async () => {
-  const { question } = await session.pose("does the coating hold at temperature?");
+  const { question } = await session.pose({ question: "does the coating hold at temperature?" });
 
   const realCreateEdge = graph.createEdge.bind(graph);
   graph.createEdge = (async (from: string, edge: string, to: string) => {

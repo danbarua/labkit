@@ -12,15 +12,13 @@ import type {
 import { ref } from "../report";
 import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit, EmitDelta } from "./index";
-import { applyDelta } from "./shared";
-import { noFindingBearsOn } from "./shared";
+import type { EmitDelta } from "./index";
+import { applyDelta, noFindingBearsOn, Staging } from "./shared";
 
 export class Stopping extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
     private readonly emitDelta: EmitDelta,
   ) {
     super(graph, options);
@@ -108,33 +106,24 @@ export class Stopping extends SessionCore {
         answeredProposition = found.asserts;
       }
 
-      const id = await this.graph.reserveId("Decision");
-      const decided = ref("decision", id);
+      const staged = new Staging(this.graph);
+      const decided = ref(
+        "decision",
+        await staged.node("Decision", {
+          decided_at: this.clock.now(),
+          reason: answeredProposition
+            ? `answered on "${answeredProposition}"`
+            : "closed without a cited result",
+          invalidation_check: "new evidence bearing on the question",
+        }),
+      );
+      staged.edge(decided, "RESOLVES", question);
+      if (answerBearing) staged.edge(decided, "BASED_ON", answerBearing);
 
       const events = await this.emitDelta(
         "closeEnquiry",
         input.enquiry,
-        {
-          created: [
-            {
-              id,
-              label: "Decision",
-              props: {
-                decided_at: this.clock.now(),
-                reason: answeredProposition
-                  ? `answered on "${answeredProposition}"`
-                  : "closed without a cited result",
-                invalidation_check: "new evidence bearing on the question",
-              },
-            },
-          ],
-          edges: [
-            { from: id, label: "RESOLVES", to: question },
-            ...(answerBearing
-              ? [{ from: id, label: "BASED_ON" as const, to: answerBearing as string }]
-              : []),
-          ],
-        },
+        staged.delta(),
         {
           answeredBy: input.answeredBy ?? null,
           proposition: answeredProposition ?? null,
@@ -176,35 +165,40 @@ export class Stopping extends SessionCore {
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
-      const decision = await this.graph.inTransaction(async () => {
-        const question = await this.questionBehind(input.enquiry);
-        if (!question)
-          throw new Error(
-            `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
-          );
 
-        const found = await this.findingOn(input.inLightOf);
-        if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
-        const basis = found.evidence;
+      const question = await this.questionBehind(input.enquiry);
+      if (!question)
+        throw new Error(
+          `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
+        );
 
-        const decision = await this.graph.createNode("Decision", {
-          decided_at: this.clock.now(),
+      const found = await this.findingOn(input.inLightOf);
+      if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
+      const basis = found.evidence;
+
+      const staged = new Staging(this.graph);
+      const decision = ref(
+        "decision",
+        await staged.node("Decision", {
+          decided_at: at,
           reason: input.because,
           invalidation_check: input.until,
-        });
-        await this.graph.createEdge(decision.natural_id, "DEFERS", question);
-        // What was known when the call was made, which is what makes
-        // `evidence` answerable afterwards rather than only now.
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", basis);
-        return decision;
-      });
+        }),
+      );
+      staged.edge(decision, "DEFERS", question);
+      // What was known when the call was made, which is what makes
+      // `evidence` answerable afterwards rather than only now.
+      staged.edge(decision, "BASED_ON", basis);
 
-      const events = await this.emit("acceptAsUnresolved", input.enquiry, {
-        because: input.because,
-        until: input.until,
-        at,
-      });
-      return { decision: ref("decision", decision.natural_id), events };
+      const events = await this.emitDelta(
+        "acceptAsUnresolved",
+        input.enquiry,
+        staged.delta(),
+        { because: input.because, until: input.until, at },
+      );
+
+      await applyDelta(this.graph, events[0]!);
+      return { decision, events };
     });
   }
 }

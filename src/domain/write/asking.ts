@@ -16,14 +16,13 @@ import type {
 import { ref } from "../report";
 import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
-import type { Emit, EmitDelta } from "./index";
-import { applyDelta } from "./shared";
+import type { EmitDelta } from "./index";
+import { applyDelta, Staging } from "./shared";
 
 export class Asking extends SessionCore {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
     private readonly emitDelta: EmitDelta,
   ) {
     super(graph, options);
@@ -43,23 +42,12 @@ export class Asking extends SessionCore {
    */
   async pose(input: PoseCommand): Promise<Posed> {
     return this.graph.inTransaction(async () => {
-      const id = await this.graph.reserveId("Question");
-      const asked = ref("question", id);
+      const staged = new Staging(this.graph);
+      const asked = ref("question", await this.posed(input.question, staged));
 
-      const events = await this.emitDelta(
-        "pose",
-        asked,
-        {
-          created: [
-            {
-              id,
-              label: "Question",
-              props: { name: input.question, posed_at: this.clock.now() },
-            },
-          ],
-        },
-        { question: input.question },
-      );
+      const events = await this.emitDelta("pose", asked, staged.delta(), {
+        question: input.question,
+      });
 
       await applyDelta(this.graph, events[0]!);
       return { question: asked, events };
@@ -79,13 +67,17 @@ export class Asking extends SessionCore {
    */
   async note(input: NoteCommand): Promise<Noted> {
     return this.graph.inTransaction(async () => {
-      const noted = await this.graph.createNode("Note", { text: input.text });
-      if (input.on) await this.graph.createEdge(noted.natural_id, "CONCERNS", input.on);
-      const events = await this.emit("note", ref("note", noted.natural_id), {
+      const staged = new Staging(this.graph);
+      const noted = ref("note", await staged.node("Note", { text: input.text }));
+      if (input.on) staged.edge(noted, "CONCERNS", input.on);
+
+      const events = await this.emitDelta("note", noted, staged.delta(), {
         text: input.text,
         ...(input.on ? { on: input.on } : {}),
       });
-      return { note: ref("note", noted.natural_id), events };
+
+      await applyDelta(this.graph, events[0]!);
+      return { note: noted, events };
     });
   }
 
@@ -95,12 +87,11 @@ export class Asking extends SessionCore {
    * event stream is a record of research actions, and a researcher who opened
    * an enquiry did one thing, not three.
    */
-  private async posed(question: Prose): Promise<QuestionRef> {
-    const asked = await this.graph.createNode("Question", {
-      name: question,
-      posed_at: this.clock.now(),
-    });
-    return ref("question", asked.natural_id);
+  private async posed(question: Prose, staged: Staging): Promise<QuestionRef> {
+    return ref(
+      "question",
+      await staged.node("Question", { name: question, posed_at: this.clock.now() }),
+    );
   }
 
   /**
@@ -113,22 +104,24 @@ export class Asking extends SessionCore {
    */
   async pursue(input: PursueCommand): Promise<Pursued> {
     return this.graph.inTransaction(async () => {
-      const enquiry = await this.pursued(input);
-      const events = await this.emit("pursue", enquiry, {
+      const staged = new Staging(this.graph);
+      const enquiry = await this.pursued(input, staged);
+
+      const events = await this.emitDelta("pursue", enquiry, staged.delta(), {
         question: input.question,
         approach: input.approach,
       });
+
+      await applyDelta(this.graph, events[0]!);
       return { enquiry, events };
     });
   }
 
   /** The write, without the event — see `posed`. */
-  private async pursued(input: PursueCommand): Promise<EnquiryRef> {
-    const enquiry = await this.graph.createNode("LineOfEnquiry", {
-      name: input.approach,
-    });
-    await this.graph.createEdge(input.question, "MOTIVATES", enquiry.natural_id);
-    return ref("enquiry", enquiry.natural_id);
+  private async pursued(input: PursueCommand, staged: Staging): Promise<EnquiryRef> {
+    const enquiry = await staged.node("LineOfEnquiry", { name: input.approach });
+    staged.edge(input.question, "MOTIVATES", enquiry);
+    return ref("enquiry", enquiry);
   }
 
   /**
@@ -141,12 +134,16 @@ export class Asking extends SessionCore {
    */
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
     return this.graph.inTransaction(async () => {
-      const asked = await this.posed(question);
-      const enquiry = await this.pursued({
-        question: asked,
-        approach: question,
+      const staged = new Staging(this.graph);
+      const asked = await this.posed(question, staged);
+      const enquiry = await this.pursued({ question: asked, approach: question }, staged);
+
+      const events = await this.emitDelta("openEnquiry", enquiry, staged.delta(), {
+        question,
+        asked,
       });
-      const events = await this.emit("openEnquiry", enquiry, { question, asked: asked });
+
+      await applyDelta(this.graph, events[0]!);
       return { enquiry, question: asked, events };
     });
   }
@@ -181,25 +178,28 @@ export class Asking extends SessionCore {
           `no question ${input.from} to sharpen; pose it first, or name a question already on the record`,
         );
 
-      const decision = await this.graph.createNode("Decision", {
+      const standing = await this.standingFindings();
+
+      const staged = new Staging(this.graph);
+      const decision = await staged.node("Decision", {
         decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: "evidence that the sharper question was the wrong one to ask",
       });
-      await this.graph.createEdge(decision.natural_id, "NARROWS", input.from);
+      staged.edge(decision, "NARROWS", input.from);
+      for (const finding of standing) staged.edge(decision, "BASED_ON", finding);
 
-      for (const finding of await this.standingFindings()) {
-        await this.graph.createEdge(decision.natural_id, "BASED_ON", finding);
-      }
+      const sharper = await this.posed(input.into, staged);
+      staged.edge(decision, "MOTIVATES", sharper);
 
-      const sharper = await this.posed(input.into);
-      await this.graph.createEdge(decision.natural_id, "MOTIVATES", sharper);
-      const events = await this.emit("sharpen", sharper, {
+      const events = await this.emitDelta("sharpen", sharper, staged.delta(), {
         from: input.from,
         because: input.because,
-        via: decision.natural_id,
+        via: decision,
       });
-      return { question: sharper, decision: ref("decision", decision.natural_id), events };
+
+      await applyDelta(this.graph, events[0]!);
+      return { question: sharper, decision: ref("decision", decision), events };
     });
   }
 

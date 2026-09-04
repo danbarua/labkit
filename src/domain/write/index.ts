@@ -148,15 +148,8 @@ export type Operation = Methods<WriteSurface>;
  */
 export type RetiredOperation = "promote";
 
-/** What `emit` looks like from inside a group module — see the file header. */
-export type Emit = (
-  operation: Operation,
-  subject: Ref<string>,
-  detail?: Record<string, unknown>,
-) => Promise<DomainEvent[]>;
-
 /** The delta a verb states before it writes anything. */
-export type Delta = Partial<Pick<DomainEvent, "created" | "edges" | "sets">>;
+export type Delta = DomainEvent["changes"];
 
 /** A command in flight: the operation, and what the caller passed. */
 export interface Handled {
@@ -181,14 +174,13 @@ export class WriteSurface extends SessionCore {
 
   constructor(graph: TenantGraph, options: ResearchSessionOptions = {}) {
     super(graph, options);
-    const emit: Emit = (operation, subject, detail) => this.emit(operation, subject, detail);
     const emitDelta: EmitDelta = (operation, subject, delta, detail) =>
       this.emitDelta(operation, subject, delta, detail);
-    this.asking = new Asking(graph, options, emit, emitDelta);
-    this.work = new Work(graph, options, emit);
-    this.counting = new Counting(graph, options, emit);
-    this.revising = new Revising(graph, options, emit);
-    this.stopping = new Stopping(graph, options, emit, emitDelta);
+    this.asking = new Asking(graph, options, emitDelta);
+    this.work = new Work(graph, options, emitDelta);
+    this.counting = new Counting(graph, options, emitDelta);
+    this.revising = new Revising(graph, options, emitDelta);
+    this.stopping = new Stopping(graph, options, emitDelta);
   }
 
   async pose(input: PoseCommand): Promise<Posed> {
@@ -196,35 +188,49 @@ export class WriteSurface extends SessionCore {
   }
 
   async note(input: NoteCommand): Promise<Noted> {
-    return this.asking.note(input);
+    return this.handling({ operation: "note", input }, () => this.asking.note(input));
   }
 
   async pursue(input: PursueCommand): Promise<Pursued> {
-    return this.asking.pursue(input);
+    return this.handling({ operation: "pursue", input }, () =>
+      this.asking.pursue(input),
+    );
   }
 
   async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
-    return this.asking.openEnquiry(question);
+    return this.handling({ operation: "openEnquiry", input: question }, () =>
+      this.asking.openEnquiry(question),
+    );
   }
 
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.asking.sharpen(input);
+    return this.handling({ operation: "sharpen", input }, () =>
+      this.asking.sharpen(input),
+    );
   }
 
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
-    return this.work.recordObservations(input);
+    return this.handling({ operation: "recordObservations", input }, () =>
+      this.work.recordObservations(input),
+    );
   }
 
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
-    return this.work.recordAnalysis(input);
+    return this.handling({ operation: "recordAnalysis", input }, () =>
+      this.work.recordAnalysis(input),
+    );
   }
 
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.work.conclude(input);
+    return this.handling({ operation: "conclude", input }, () =>
+      this.work.conclude(input),
+    );
   }
 
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.work.recordReview(input);
+    return this.handling({ operation: "recordReview", input }, () =>
+      this.work.recordReview(input),
+    );
   }
 
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
@@ -234,64 +240,71 @@ export class WriteSurface extends SessionCore {
   }
 
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
-    return this.stopping.acceptAsUnresolved(input);
+    return this.handling({ operation: "acceptAsUnresolved", input }, () =>
+      this.stopping.acceptAsUnresolved(input),
+    );
   }
 
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
-    return this.counting.planWork(input);
+    return this.handling({ operation: "planWork", input }, () =>
+      this.counting.planWork(input),
+    );
   }
 
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
-    return this.counting.stateCriterion(proposition);
+    return this.handling({ operation: "stateCriterion", input: proposition }, () =>
+      this.counting.stateCriterion(proposition),
+    );
   }
 
   async declareGate(input: DeclareGateCommand): Promise<DeclaredGate> {
-    return this.counting.declareGate(input);
+    return this.handling({ operation: "declareGate", input }, () =>
+      this.counting.declareGate(input),
+    );
   }
 
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
-    return this.counting.evaluateCriterion(input);
+    return this.handling({ operation: "evaluateCriterion", input }, () =>
+      this.counting.evaluateCriterion(input),
+    );
   }
 
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
-    return this.counting.amendDesign(input);
+    return this.handling({ operation: "amendDesign", input }, () =>
+      this.counting.amendDesign(input),
+    );
   }
 
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    return this.revising.reverify(input);
+    return this.handling({ operation: "reverify", input }, () =>
+      this.revising.reverify(input),
+    );
   }
 
   async is(input: IsCommand): Promise<Restated> {
-    return this.revising.is(input);
+    return this.handling({ operation: "is", input }, () =>
+      this.revising.is(input),
+    );
   }
 
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
-    return this.revising.replaceAnalysis(input);
+    return this.handling({ operation: "replaceAnalysis", input }, () =>
+      this.revising.replaceAnalysis(input),
+    );
   }
 
   async keep(input: KeepCommand): Promise<ReplacementReport> {
-    return this.revising.keep(input);
+    return this.handling({ operation: "keep", input }, () =>
+      this.revising.keep(input),
+    );
   }
 
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
-    return this.revising.reinterpret(input);
+    return this.handling({ operation: "reinterpret", input }, () =>
+      this.revising.reinterpret(input),
+    );
   }
 
-  /**
-   * The single choke point. Every state-changing verb reaches the sink through
-   * here, so a field added to this one `record` call is stamped on every event
-   * the domain will ever emit — which is why `attribution` needed no verb to
-   * change and no signature to move.
-   *
-   * Both context fields are read at the moment of the emit, not captured at
-   * construction, so a surface built per command reports that command's clock
-   * and that command's attribution.
-   *
-   * Returns an array, always -- one entry per event `emit` recorded, which
-   * today is always exactly one. The uniform shape is for the caller: every
-   * write verb hands its own `events` field straight through from here, so a
-   * `--json` renderer needs no new plumbing if a verb ever records more.
-   */
   /** The command being handled, for the duration of one call. */
   private handled?: Handled;
 
@@ -318,32 +331,7 @@ export class WriteSurface extends SessionCore {
       attribution: this.attribution,
       operation,
       subject,
-      created: delta.created ?? [],
-      edges: delta.edges ?? [],
-      sets: delta.sets ?? [],
-      detail,
-    });
-    return [recorded];
-  }
-
-  private async emit(
-    operation: Operation,
-    subject: Ref<string>,
-    detail?: Record<string, unknown>,
-  ): Promise<DomainEvent[]> {
-    const recorded = await this.events.record({
-      at: this.clock.now(),
-      attribution: this.attribution,
-      operation,
-      subject,
-      // Drained, not listed. Every id `TenantGraph` minted since the last
-      // event, which is the set this act brought into existence -- and the
-      // question `subject` cannot answer, since most verbs are *about*
-      // something other than what they created.
-      created: this.graph.drainMinted(),
-      // The other half of the same collection. See `DomainEvent.edges`.
-      edges: this.graph.drainMintedEdges(),
-      sets: [],
+      changes: delta,
       detail,
     });
     return [recorded];

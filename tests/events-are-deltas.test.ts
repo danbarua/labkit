@@ -79,9 +79,14 @@ test("pose books its id and names it in the event before the node exists", async
   });
 
   const posed = recorded[0]!;
-  expect(posed.created.map((n) => n.id)).toEqual([question]);
-  expect(posed.created[0]!.label).toBe("Question");
-  expect(posed.created[0]!.props.name).toBe("does the pruning schedule move convergence?");
+  expect(posed.changes).toEqual([
+    {
+      change: "NodeCreated",
+      id: question,
+      label: "Question",
+      props: { name: "does the pruning schedule move convergence?", posed_at: expect.any(String) },
+    },
+  ]);
 });
 
 test("closeEnquiry states the decision and both its edges", async () => {
@@ -89,9 +94,14 @@ test("closeEnquiry states the decision and both its edges", async () => {
   const { decision, events: recorded } = await session.closeEnquiry({ enquiry });
 
   const closed = recorded[0]!;
-  expect(closed.created.map((n) => n.id)).toEqual([decision]);
-  expect(closed.created[0]!.label).toBe("Decision");
-  expect(closed.edges).toEqual([{ from: decision, label: "RESOLVES", to: question }]);
+  expect(closed.changes.map((c) => c.change)).toEqual(["NodeCreated", "EdgeCreated"]);
+  expect(closed.changes[0]).toMatchObject({ id: decision, label: "Decision" });
+  expect(closed.changes[1]).toEqual({
+    change: "EdgeCreated",
+    from: decision,
+    label: "RESOLVES",
+    to: question,
+  });
 });
 
 test("the delta applied to an empty graph rebuilds the node, properties and all", async () => {
@@ -123,15 +133,13 @@ test("a property set in place is carried by the delta and applied from it", asyn
   const fresh = await emptyGraph();
   for (const event of history) await applyDelta(fresh, event as DomainEvent);
 
-  // A `sets` entry applied from nothing but the event.
+  // A property change applied from nothing but the event.
   await applyDelta(fresh, {
     at: new Date().toISOString(),
     attribution: UNATTRIBUTED,
     operation: "pose",
     subject: question,
-    created: [],
-    edges: [],
-    sets: [{ id: question, key: "name", value: "and now it says this" }],
+    changes: [{ change: "PropsChanged", id: question, props: { name: "and now it says this" } }],
   });
 
   const after = await fresh.query(
@@ -158,7 +166,9 @@ test("a verb that refuses leaves no delta for the next event to claim", async ()
   await expect(session.closeEnquiry({ enquiry })).rejects.toThrow();
 
   const { question, events: recorded } = await session.pose({ question: "and this one?" });
-  expect(recorded[0]!.created.map((n) => n.id)).toEqual([question]);
+  expect(recorded[0]!.changes.map((c) => (c.change === "NodeCreated" ? c.id : ""))).toEqual([
+    question,
+  ]);
 });
 
 test("an emitted event carries the operation the caller invoked", async () => {

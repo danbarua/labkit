@@ -70,7 +70,7 @@ export function registerWrites(program: Command, run: Run): void {
     .description("A question, without starting work on it. `open` does both at once.")
     .argument("<question>", "the question, as worded")
     .action(async (question: string) =>
-      run(async ({ write }) => answer(await write.pose(question), mintedView())),
+      run(async ({ write }) => answer(await write.pose({ question }), mintedView())),
     );
   program
     .command("open")

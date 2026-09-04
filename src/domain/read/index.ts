@@ -334,17 +334,20 @@ export class ReadSurface extends SessionCore {
 
 /**
  * Every handle a batch of events created or touched — `now({since})`'s only
- * new machinery, and it reads three fields `DomainEvent` already carries
- * (`subject`, `created`, `edges`), adding no query of its own.
+ * new machinery, and it reads what `DomainEvent` already carries (`subject`
+ * and `changes`), adding no query of its own.
  */
 function touchedHandles(events: readonly DomainEvent[]): Set<string> {
   const touched = new Set<string>();
   for (const e of events) {
     touched.add(e.subject);
-    for (const node of e.created) touched.add(node.id);
-    for (const edge of e.edges) {
-      touched.add(edge.from);
-      touched.add(edge.to);
+    for (const change of e.changes) {
+      if (change.change === "EdgeCreated") {
+        touched.add(change.from);
+        touched.add(change.to);
+      } else {
+        touched.add(change.id);
+      }
     }
   }
   return touched;

@@ -45,7 +45,7 @@ async function realHistory(): Promise<{
   const graph = new TenantGraph(ctx, connection.db, connection.tx);
   const events = inMemoryEventLog();
   const w = new WriteSurface(graph, { clock: systemClock, events });
-  const { question } = await w.pose("does the mechanism work");
+  const { question } = await w.pose({ question: "does the mechanism work" });
   await w.pursue({ question, approach: "check it end to end" });
   const history = [...(await events.all())].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   return { graph, history, connection };

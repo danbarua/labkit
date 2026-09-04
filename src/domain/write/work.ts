@@ -10,14 +10,14 @@ import type {
   RecordReviewCommand,
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
-import type { Emit } from "./index";
-import { asConcludedClaim, Shared } from "./shared";
+import type { EmitDelta } from "./index";
+import { applyDelta, asConcludedClaim, Shared, Staging } from "./shared";
 
 export class Work extends Shared {
   constructor(
     graph: TenantGraph,
     options: ResearchSessionOptions,
-    private readonly emit: Emit,
+    private readonly emitDelta: EmitDelta,
   ) {
     super(graph, options);
   }
@@ -50,52 +50,37 @@ export class Work extends Shared {
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
     return this.graph.inTransaction(async () => {
-      // Atomic. A failure between the evidence and its unit writes *precisely*
-      // the invariant this verb exists to prevent --
-      // durably, and looking exactly like the eighteen scenarios of records that
-      // predate the fix. See TenantGraph.inTransaction.
-      const { artefact } = await this.graph.inTransaction(async () => {
-        const artefact = await this.graph.createNode("Artefact", {
-          kind: "observations",
-          logical_name: input.name,
-          ...(input.contentHash ? { content_hash: input.contentHash } : {}),
-        });
-        const evidence = await this.graph.createNode("Evidence", {
-          statement: input.finding,
-        });
-        // `role` is recorded because the property is not optional, not because
-        // anything reads it: `EvidenceUnitRole` has one writer and no readers
-        // anywhere in `src/`. An "observation" value was declined -- adding
-        // vocabulary to a union nothing consumes is dead shape, and the no-cull
-        // policy covers labels and edges, which are claims about the domain,
-        // not property values. `experiment` is
-        // the nearest existing value for a measurement taken rather than
-        // inferred, and it is a placeholder until something reads the field.
-        const unit = await this.graph.createNode("EvidenceUnit", {
-          role: "experiment",
-        });
-        await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", artefact.natural_id);
-        await this.graph.createEdge(unit.natural_id, "PRODUCES", evidence.natural_id);
-        await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry);
-        // The enquiry requires these observations -- a statement about the
-        // enquiry, not about any analysis. What a given analysis actually read is
-        // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
-        // it. Kept alongside ADDRESSES rather than replaced by it: REQUIRES says
-        // the enquiry depends on this evidence, ADDRESSES says this work was done
-        // towards the enquiry, and `whatDependsOn()` reads the first.
-        await this.graph.createEdge(input.enquiry, "REQUIRES", evidence.natural_id);
-        return { artefact, evidence };
+      const staged = new Staging(this.graph);
+      const artefact = await staged.node("Artefact", {
+        kind: "observations",
+        logical_name: input.name,
+        ...(input.contentHash ? { content_hash: input.contentHash } : {}),
+      });
+      const evidence = await staged.node("Evidence", { statement: input.finding });
+      // `role` is recorded because the property is not optional, not because
+      // anything reads it: `EvidenceUnitRole` has one writer and no readers
+      // anywhere in `src/`. `experiment` is the nearest existing value for a
+      // measurement taken rather than inferred, and it is a placeholder until
+      // something reads the field.
+      const unit = await staged.node("EvidenceUnit", { role: "experiment" });
+      staged.edge(evidence, "RECORDED_IN", artefact);
+      staged.edge(unit, "PRODUCES", evidence);
+      staged.edge(unit, "ADDRESSES", input.enquiry);
+      // The enquiry requires these observations -- a statement about the
+      // enquiry, not about any analysis. What a given analysis actually read is
+      // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
+      // it. REQUIRES says the enquiry depends on this evidence, ADDRESSES says
+      // this work was done towards the enquiry, and `whatDependsOn()` reads the
+      // first.
+      staged.edge(input.enquiry, "REQUIRES", evidence);
+
+      const observations = ref("observations", artefact);
+      const events = await this.emitDelta("recordObservations", observations, staged.delta(), {
+        name: input.name,
       });
 
-      const events = await this.emit(
-        "recordObservations",
-        ref("observations", artefact.natural_id),
-        { name: input.name },
-      );
-      return {
-        observations: ref("observations", artefact.natural_id),
-        events,
-      };
+      await applyDelta(this.graph, events[0]!);
+      return { observations, events };
     });
   }
 
@@ -111,14 +96,17 @@ export class Work extends Shared {
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.graph.inTransaction(async () => {
-      const { analysis } = await this.graph.inTransaction(() => this.recorded(input));
+      const staged = new Staging(this.graph);
+      const { analysis } = await this.recorded(input, staged);
       // An analysis with no conclusions yet emits exactly one event and is a
       // real state: `enquiry` prints "has produced nothing yet" and `known`
       // buckets it as worked-on-no-answer.
-      const events = await this.emit("recordAnalysis", analysis, {
+      const events = await this.emitDelta("recordAnalysis", analysis, staged.delta(), {
         enquiry: input.enquiry,
         method: input.method,
       });
+
+      await applyDelta(this.graph, events[0]!);
       return { analysis, claims: [], events };
     });
   }
@@ -152,26 +140,19 @@ export class Work extends Shared {
     return this.concludeOne(input);
   }
 
-  /**
-   * `conclude`'s work in its own mint scope. **The compounds call this one.**
-   */
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
-    return this.graph.inTransaction(async () =>
-      // **Its own mint scope, so a composition calling this keeps its own.**
-      // `emit` drains what has been minted since the last event, and without a
-      // scope that meant everything the enclosing verb had minted too — the
-      // parent's edges carried off into the child's event. See
-      // `TenantGraph.inMintScope`, which also records why suppressing the inner
-      // event was the wrong fix.
-      this.graph.inMintScope(async () => {
-        const concluded = await this.concluding(input);
-        const events = await this.emit("conclude", input.analysis, {
-          conclusions: this.conclusionEvents([concluded]),
-          ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
-        });
-        return { analysis: input.analysis, claims: [asConcludedClaim(concluded)], events };
-      }),
-    );
+    return this.graph.inTransaction(async () => {
+      const staged = new Staging(this.graph);
+      const concluded = await this.concluding(input, staged);
+
+      const events = await this.emitDelta("conclude", input.analysis, staged.delta(), {
+        conclusions: this.conclusionEvents([concluded]),
+        ...(input.replacing === undefined ? {} : { replacing: input.replacing }),
+      });
+
+      await applyDelta(this.graph, events[0]!);
+      return { analysis: input.analysis, claims: [asConcludedClaim(concluded)], events };
+    });
   }
 
   /**
@@ -183,19 +164,19 @@ export class Work extends Shared {
    */
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
     return this.graph.inTransaction(async () => {
-      const review = await this.graph.createNode("Review", {
-        verdict: input.verdict,
-      });
-      await this.graph.createEdge(
-        review.natural_id,
-        "EVALUATES",
-        await this.unitOf(input.of).then((u) => u),
-      );
-      const events = await this.emit("recordReview", ref("review", review.natural_id), {
+      const unit = await this.unitOf(input.of);
+
+      const staged = new Staging(this.graph);
+      const review = ref("review", await staged.node("Review", { verdict: input.verdict }));
+      staged.edge(review, "EVALUATES", unit);
+
+      const events = await this.emitDelta("recordReview", review, staged.delta(), {
         of: input.of,
         verdict: input.verdict,
       });
-      return { review: ref("review", review.natural_id), events };
+
+      await applyDelta(this.graph, events[0]!);
+      return { review, events };
     });
   }
 }

@@ -36,7 +36,7 @@ test("--date stamps a write's event with that instant, and it reads back durably
     () => ({ db: dir, date: BACKFILLED }) as Globals,
     () => {},
   )(async ({ write }) => {
-    const result = await write.pose("does the backfilled question hold?");
+    const result = await write.pose({ question: "does the backfilled question hold?" });
     capturedAt = result.events[0]?.at;
     return answer(result, () => "");
   });
@@ -63,7 +63,7 @@ test("without --date, a write is stamped with the real time, not any prior --dat
     () => ({ db: dir }) as Globals,
     () => {},
   )(async ({ write }) => {
-    const result = await write.pose("a live question, asked without backfilling");
+    const result = await write.pose({ question: "a live question, asked without backfilling" });
     capturedAt = result.events[0]?.at;
     return answer(result, () => "");
   });

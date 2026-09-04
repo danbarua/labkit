@@ -68,9 +68,9 @@ const SMEAR = "the internal response is more than a nonlinear smear";
  *   - external task utility: written down and never pursued at all.
  */
 async function priorState() {
-  const { question: nonlinearity } = await session.pose(
-    "does the encoding respond nonlinearly at all?",
-  );
+  const { question: nonlinearity } = await session.pose({
+    question: "does the encoding respond nonlinearly at all?",
+  });
   const { enquiry: nlEnquiry } = await session.pursue({
     question: nonlinearity,
     approach: "response curvature sweep",
@@ -103,9 +103,9 @@ async function priorState() {
     answeredBy: claimOf(nlAnalysisClaims, NONLINEAR),
   });
 
-  const { question: smear } = await session.pose(
-    "does the encoding do anything beyond a nonlinear smear?",
-  );
+  const { question: smear } = await session.pose({
+    question: "does the encoding do anything beyond a nonlinear smear?",
+  });
   const { enquiry: smearEnquiry } = await session.pursue({
     question: smear,
     approach: "response-map inspection",
@@ -130,9 +130,9 @@ async function priorState() {
   // Written down and never pursued. This is what makes "untested" a state of
   // the record rather than something the reader invents: the question is on
   // the books, nothing has ever addressed it.
-  const { question: utility } = await session.pose(
-    "does the learned topology help on an external task?",
-  );
+  const { question: utility } = await session.pose({
+    question: "does the learned topology help on an external task?",
+  });
 
   return { nonlinearity, smear, smearEnquiry, utility };
 }
@@ -143,9 +143,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
     // Researcher: the learned topology seems to be doing something
     //             computationally interesting.
-    const { question: hunch } = await session.pose(
-      "is the learned topology doing something computationally interesting?",
-    );
+    const { question: hunch } = await session.pose({
+      question: "is the learned topology doing something computationally interesting?",
+    });
 
     // Agent:      what do we already know?
     // LabKit:     nonlinearity is established; the smear question is
@@ -234,9 +234,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
    * been closed by an act that only said "narrow".
    */
   test("the sharper question is traceable to the hunch, which is neither rewritten nor closed", async () => {
-    const { question: hunch } = await session.pose(
-      "is the learned topology doing something computationally interesting?",
-    );
+    const { question: hunch } = await session.pose({
+      question: "is the learned topology doing something computationally interesting?",
+    });
     const { question: sharper } = await session.sharpen({
       from: hunch,
       into: "do different inputs map to reproducibly different internal responses?",
@@ -276,9 +276,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
    */
   test("the knowledge behind a sharpening is the knowledge that existed then", async () => {
     const prior = await priorState();
-    const { question: hunch } = await session.pose(
-      "is the learned topology doing something computationally interesting?",
-    );
+    const { question: hunch } = await session.pose({
+      question: "is the learned topology doing something computationally interesting?",
+    });
 
     const { question: first } = await session.sharpen({
       from: hunch,
@@ -383,9 +383,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
    * the handle the caller holds, never the text.
    */
   test("a second pursuit of one question does not mint a second question", async () => {
-    const { question } = await session.pose(
-      "do different inputs map to reproducibly different internal responses?",
-    );
+    const { question } = await session.pose({
+      question: "do different inputs map to reproducibly different internal responses?",
+    });
     const { enquiry: byMapping } = await session.pursue({
       question,
       approach: "response-map separation",
@@ -409,8 +409,8 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
   test("two questions worded identically are two questions", async () => {
     const wording = "does the learned topology help on an external task?";
-    const { question: first } = await session.pose(wording);
-    const { question: second } = await session.pose(wording);
+    const { question: first } = await session.pose({ question: wording });
+    const { question: second } = await session.pose({ question: wording });
 
     expect(second).not.toBe(first);
 

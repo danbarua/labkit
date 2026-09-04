@@ -29,8 +29,7 @@ import {
   type NodeLabel,
   type NodePropsByLabel,
   type PublicNode,
-  type MintedEdge,
-  type MintedNode,
+  type EdgeProps,
 } from "./domain";
 import type { LabKitDB } from "./backend";
 import type { Transactor } from "./transactor";
@@ -44,36 +43,6 @@ import type { TenantContext } from "./tenant";
  */
 export class TenantGraph {
   private readonly runner: CypherRunner;
-  /**
-   * Nodes created since the last {@link drainMinted}.
-   *
-   * **Collected here rather than listed by callers**, because a caller that
-   * mints three nodes and remembers two is a state nobody could see. A verb
-   * writes an event saying what it created; that list has to come from the
-   * thing doing the creating.
-   *
-   * Cleared when the outermost transaction settles — see {@link inTransaction}
-   * — so a verb that throws before draining cannot leave its ids to be claimed
-   * by the next one.
-   */
-  private minted: MintedNode[] = [];
-
-  /**
-   * Edges created since the last {@link drainMintedEdges}.
-   *
-   * The same argument as {@link minted}, made for the other half of a write:
-   * without it an act's edges are a state nobody can see, so a verb writing
-   * eight of them has an event log reporting none.
-   *
-   * **Pushed only where a row came back**, which is one of `createEdge`'s three
-   * exits and the only one that created anything. The duplicate check and the
-   * `23505` race both end at an edge that exists and that *this* act did not
-   * make; recording those would have two events claiming one edge. Same
-   * semantics as `minted`: what this act brought into existence, not what it
-   * found true afterwards.
-   */
-  private mintedEdges: MintedEdge[] = [];
-
   /**
    * `tx` is required and never defaulted. Two graphs over one connection must
    * share one boundary — `tests/helpers/scenario.ts`'s `current()` and
@@ -108,91 +77,13 @@ export class TenantGraph {
    *
    * **The boundary itself is not this class's any more** — see
    * `./transactor.ts` for why it moved and what it would cost to move back.
-   * What stays here is the one consequence of settling that only a graph knows
-   * about: clearing {@link minted}. A verb that threw never reached its `emit`,
-   * so its ids are still in the list, and clearing them when the *outermost*
-   * transaction settles is what stops the next verb's event claiming to have
-   * created records that were rolled back. On the success path `emit` has
-   * already drained and it is a no-op.
    *
    * Note this is a *transaction* boundary, not a raw-string escape hatch: no
    * caller gains the ability to issue Cypher this class would not otherwise
    * run. See the file header.
    */
   async inTransaction<T>(work: () => Promise<T>): Promise<T> {
-    // Asked **before** entering, and this is the whole subtlety. Inside the
-    // transactor's `work` the depth is 1 for an outermost call *and* for one
-    // nested inside it — a nested call joins rather than incrementing — so
-    // testing it there makes an inner `inTransaction` clear the list before the
-    // outer verb's `emit` has drained it, and the outer event then reports
-    // creating nothing. Caught by `tests/event-store.test.ts`'s
-    // "an act is found by what it created", which is exactly the case: three
-    // verbs deep, one event.
-    const outermost = this.tx.depth === 0;
-    return this.tx.inTransaction(async () => {
-      try {
-        return await work();
-      } finally {
-        if (outermost) {
-          this.minted.length = 0;
-          this.mintedEdges.length = 0;
-        }
-      }
-    });
-  }
-
-  /**
-   * Runs `work` with its own mint list, so an `emit` inside it claims only what
-   * `work` minted, and the enclosing act keeps its own.
-   *
-   * **{@link drainMinted} splices the whole list**, so without a scope a nested
-   * event does not merely add an event — it takes the parent's ids and edges
-   * with it, and the parent's event then reports having created almost nothing.
-   *
-   * What a scope does not claim is **handed back up**, not dropped: a verb that
-   * mints something and emits nothing has still brought it into existence, and
-   * the enclosing act is what recorded that.
-   *
-   * Scope, rather than suppressing the inner event: the event grain must not
-   * depend on which caller wrote the record. A composition and a person making
-   * the same calls one at a time have to leave the same log, or a trace built
-   * from one disagrees with a record built from the other about identical work.
-   */
-  async inMintScope<T>(work: () => Promise<T>): Promise<T> {
-    const outer = this.minted;
-    const outerEdges = this.mintedEdges;
-    this.minted = [];
-    this.mintedEdges = [];
-    try {
-      return await work();
-    } finally {
-      outer.push(...this.minted);
-      outerEdges.push(...this.mintedEdges);
-      this.minted = outer;
-      this.mintedEdges = outerEdges;
-    }
-  }
-
-  /**
-   * The natural ids minted since the last call, and clears them.
-   *
-   * Read once per event, by `WriteSurface.emit`. Draining rather than reading
-   * is deliberate: two events in one transaction must not both claim the same
-   * new records. See {@link inMintScope} for what "since the last call" means
-   * when one emitting verb is called by another.
-   */
-  drainMinted(): MintedNode[] {
-    return this.minted.splice(0);
-  }
-
-  /**
-   * The edges created since the last call, and clears them.
-   *
-   * Drained per event alongside {@link drainMinted}, and for the same reason:
-   * two events in one transaction must not both claim the same new edges.
-   */
-  drainMintedEdges(): MintedEdge[] {
-    return this.mintedEdges.splice(0);
+    return this.tx.inTransaction(work);
   }
 
   /**
@@ -276,7 +167,6 @@ export class TenantGraph {
     if (!created) throw new Error(`CREATE (n:${label}) returned no rows`);
 
     const { natural_id, ...properties } = created.n.properties;
-    this.minted.push({ id: natural_id, label, props: { ...properties } });
     return {
       natural_id,
       label,
@@ -444,7 +334,6 @@ export class TenantGraph {
       throw err;
     }
     if (created.length > 0) {
-      this.mintedEdges.push({ from: fromId, label: edge, to: toId });
       return;
     }
 

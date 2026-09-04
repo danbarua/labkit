@@ -21,7 +21,15 @@
  */
 
 import { optional, vertexProps } from "../../db/cypher";
-import type { ArtefactProps, ClaimProps } from "../../db/domain";
+import type {
+  ArtefactProps,
+  ClaimProps,
+  EdgeLabel,
+  EdgeProps,
+  GraphChange,
+  NodeLabel,
+  NodePropsByLabel,
+} from "../../db/domain";
 import { labelForNaturalId } from "../../db/domain";
 import type {
   AnalysisRef,
@@ -259,7 +267,7 @@ export class Shared extends SessionCore {
   }
 
   /**
-   * The write half of `recordAnalysis`, without the event.
+   * The write half of `recordAnalysis`, staged rather than written.
    *
    * Composed verbs call this. A researcher who re-verified a result did one
    * thing, and a log that also records the analysis underneath it describes the
@@ -267,25 +275,23 @@ export class Shared extends SessionCore {
    */
   protected async recorded(
     input: Omit<RecordAnalysisCommand, "concludes">,
-  ): Promise<{ analysis: AnalysisRef }> {
-    const computation = await this.graph.createNode("Computation", {
+    staged: Staging,
+  ): Promise<{ analysis: AnalysisRef; unit: UnitRef; output: ObservationsRef }> {
+    const computation = await staged.node("Computation", {
       kind: input.method,
       status: "completed",
     });
-    const unit = await this.graph.createNode("EvidenceUnit", {
-      role: "analysis",
-    });
-    const output = await this.graph.createNode("Artefact", {
+    const unit = await staged.node("EvidenceUnit", { role: "analysis" });
+    const output = await staged.node("Artefact", {
       kind: "analysis-output",
       logical_name: `${input.method} output`,
     });
 
-    await this.graph.createEdge(unit.natural_id, "USES", computation.natural_id);
-    await this.graph.createEdge(unit.natural_id, "ADDRESSES", input.enquiry);
-    if (input.implementing)
-      await this.graph.createEdge(input.implementing, "IMPLEMENTS", unit.natural_id);
+    staged.edge(unit, "USES", computation);
+    staged.edge(unit, "ADDRESSES", input.enquiry);
+    if (input.implementing) staged.edge(input.implementing, "IMPLEMENTS", unit);
     for (const criterion of input.heldTo ?? []) {
-      await this.graph.createEdge(criterion, "QUALIFIES", unit.natural_id);
+      staged.edge(criterion, "QUALIFIES", unit);
     }
     // Both levels of provenance, deliberately: the evidence unit produced
     // this scientific output; the computation produced this concrete
@@ -294,33 +300,21 @@ export class Shared extends SessionCore {
     // it produce" still needed a detour through the unit.
     //
     // The FIRST of the two is unwalked: nothing reads `EvidenceUnit -PRODUCES->
-    // Artefact`. Every PRODUCES traversal in src/ ends at an Evidence except
-    // `outputArtefactOf`, which starts at the Computation. Kept under the
-    // no-cull policy -- an endpoint pair is a claim about the domain the same
-    // way a label is -- and named here so it is a computable map rather than an
-    // oversight. Found by review of row AD, when `recordObservations()`
-    // deliberately did NOT write the matching edge; see consumer-contract/030.
-    await this.graph.createEdge(unit.natural_id, "PRODUCES", output.natural_id);
-    await this.graph.createEdge(computation.natural_id, "PRODUCES", output.natural_id);
-    // Every position at which each artefact was read, collected before writing.
+    // Artefact`. Kept under the no-cull policy -- an endpoint pair is a claim
+    // about the domain the same way a label is -- and named here so it is a
+    // computable map rather than an oversight.
+    staged.edge(unit, "PRODUCES", output);
+    staged.edge(computation, "PRODUCES", output);
+    // Every position at which each artefact was read, collected before staging.
     //
     // `positions` and not `position`, and one edge per distinct artefact rather
     // than one per occurrence: `createEdge` treats `(from, label, to)` as
-    // identity and a repeat as a no-op, backed by a real
-    // `UNIQUE (start_id, end_id)` index -- so `from: [A, B, A]` cannot be three
-    // edges, and writing it as two silently drops the second A.
-    //
-    // The caller said the run read three things. Storing two is losing what the
-    // caller said, in the store whose job is not to. Refusing `[A, A]` was the
-    // other available answer and is worse: a null test compares a series against
-    // itself, which is an ordinary thing to record, and declining it would be
-    // LabKit deciding a legitimate run is not recordable.
+    // identity and a repeat is a no-op, so `from: [A, B, A]` cannot be three
+    // edges and writing it as two silently drops the second A.
     const positionsFor = new Map<ObservationsRef, number[]>();
     for (const [position, source] of input.from.entries()) {
       // An analysis is named by its computation; what it *read* is that
       // computation's output artefact, which is what CONSUMES points at.
-      // Which kind of input this is, from the id's own prefix -- the one place
-      // carrying that fact, and what `createEdge` consults too.
       const artefact =
         labelForNaturalId(source) === "Computation"
           ? await this.outputArtefactOf(source as AnalysisRef)
@@ -330,39 +324,30 @@ export class Shared extends SessionCore {
       else positionsFor.set(artefact, [position]);
     }
     for (const [artefact, positions] of positionsFor) {
-      // No verdict rests on any of this: `reproductionOf` reports both runs'
-      // lists in order and adjudicates nothing.
-      await this.graph.createEdge(computation.natural_id, "CONSUMES", artefact, {
-        positions,
-      });
+      staged.edge(computation, "CONSUMES", artefact, { positions });
     }
 
-    return { analysis: ref("analysis", computation.natural_id) };
+    return {
+      analysis: ref("analysis", computation),
+      unit: ref("unit", unit),
+      output: ref("observations", output),
+    };
   }
 
-  /**
-   * `conclude`'s work, without the event. Called directly by `Work`'s
-   * `concludeOne` and by `Revising`'s `reverify`.
-   *
-   * `emit` DRAINS the ids and edges `TenantGraph` has minted since the last
-   * event, which is what lets an act report what it brought into existence
-   * without listing it. A nested emit therefore does not merely add an event —
-   * it takes the parent's edges away. `recordAnalysis`'s event lost `PRODUCES`,
-   * `RECORDED_IN` and `SUPPORTS` to the `conclude` events underneath it, and
-   * `tests/event-store.test.ts` is what noticed.
-   *
-   * So the split is not tidiness. **A verb that composes others records one
-   * event, not one per step** — `openEnquiry` is `pose` + `pursue` and emits
-   * only `openEnquiry`, and this is that rule at a second call site. The event
-   * stream is a record of research actions; five events for one call describes
-   * the implementation.
-   */
-  protected async concluding(input: ConcludeCommand): Promise<ConcludedWithStanding> {
+  protected async concluding(
+    input: ConcludeCommand,
+    staged: Staging,
+    /**
+     * The unit, output and enquiry of an analysis staged by this same act, and
+     * therefore not yet on the record to be queried for.
+     */
+    staging?: { unit: UnitRef; output: ObservationsRef; enquiry?: EnquiryRef },
+  ): Promise<ConcludedWithStanding> {
     return this.graph.inTransaction(async () => {
       const at = this.clock.now();
       {
-        const unit = await this.unitOf(input.analysis);
-        const output = await this.outputArtefactOf(input.analysis);
+        const unit = staging?.unit ?? (await this.unitOf(input.analysis));
+        const output = staging?.output ?? (await this.outputArtefactOf(input.analysis));
 
         // Superseded analyses take no new conclusions. Adding one would put a
         // fresh finding on a record the caller has already declared spent, and
@@ -475,7 +460,7 @@ export class Shared extends SessionCore {
         // whether this analysis happens to be a successor at all.
         if (superseded === undefined) {
           if (revision === undefined) revision = await this.revisedBy(input.analysis);
-          const enquiry = await this.enquiryOf(input.analysis);
+          const enquiry = staging?.enquiry ?? (await this.enquiryOf(input.analysis));
           const { withdrawn, by, replacedBy } = await this.withdrawalOf({
             proposition,
             ...(enquiry === undefined ? {} : { enquiry }),
@@ -487,41 +472,35 @@ export class Shared extends SessionCore {
             );
         }
 
-        const evidence = await this.graph.createNode("Evidence", { statement: input.finding });
-        const claim = await this.graph.createNode("Claim", {
+        const evidence = await staged.node("Evidence", { statement: input.finding });
+        const claim = await staged.node("Claim", {
           name: proposition,
           kind: input.standing ?? "exploratory",
         });
-        await this.graph.createEdge(unit, "PRODUCES", evidence.natural_id, undefined, true);
-        await this.graph.createEdge(evidence.natural_id, "RECORDED_IN", output, undefined, true);
-        await this.graph.createEdge(
-          evidence.natural_id,
-          bearing === "challenges" ? "CHALLENGES" : "SUPPORTS",
-          claim.natural_id,
-          undefined,
-          true,
-        );
+        staged.edge(unit, "PRODUCES", evidence);
+        staged.edge(evidence, "RECORDED_IN", output);
+        staged.edge(evidence, bearing === "challenges" ? "CHALLENGES" : "SUPPORTS", claim);
 
         // Per-finding supersession, on the edges the model already has.
         if (superseded) {
-          const decision = await this.graph.createNode("Decision", {
+          const decision = await staged.node("Decision", {
             decided_at: at,
             reason: `superseded by "${input.finding}"`,
             invalidation_check: "evidence that the superseded finding was right after all",
           });
-          await this.graph.createEdge(decision.natural_id, "SUPERSEDES", superseded.claim);
-          await this.graph.createEdge(decision.natural_id, "MOTIVATES", claim.natural_id);
+          staged.edge(decision, "SUPERSEDES", superseded.claim);
+          staged.edge(decision, "MOTIVATES", claim);
           // The review the revision rested on, carried down from the lineage
           // decision so a reader asking why THIS finding fell gets the verdict
           // that caused it rather than any review of the same unit.
           if (revision?.because !== undefined)
-            await this.graph.createEdge(decision.natural_id, "INVALIDATED_BY", revision.because);
+            staged.edge(decision, "INVALIDATED_BY", revision.because);
         }
 
         return {
-          claim: ref("claim", claim.natural_id),
+          claim: ref("claim", claim),
           asserts: proposition,
-          finding: ref("evidence", evidence.natural_id),
+          finding: ref("evidence", evidence),
           standing: input.standing ?? "exploratory",
         };
       }
@@ -543,10 +522,51 @@ export class Shared extends SessionCore {
   }
 }
 
-/** Writes an event's delta into the graph: nodes, then edges, then sets. */
+/** What a verb stages: the changes its event will carry, in the order it made them. */
+export class Staging {
+  readonly changes: GraphChange[] = [];
+
+  constructor(private readonly graph: TenantGraph) {}
+
+  /** Reserves an id and stages the node under it. */
+  async node<L extends NodeLabel>(label: L, props: NodePropsByLabel[L]): Promise<string> {
+    const id = await this.graph.reserveId(label);
+    this.changes.push({
+      change: "NodeCreated",
+      id,
+      label,
+      props: { ...props } as Record<string, unknown>,
+    });
+    return id;
+  }
+
+  edge(from: string, label: EdgeLabel, to: string, props?: EdgeProps): void {
+    this.changes.push({ change: "EdgeCreated", from, label, to, ...(props ? { props } : {}) });
+  }
+
+  set(id: string, props: Record<string, unknown>): void {
+    this.changes.push({ change: "PropsChanged", id, props });
+  }
+
+  delta(): GraphChange[] {
+    return this.changes;
+  }
+}
+
+/** Writes an event's changes into the graph, in the order the act made them. */
 export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {
-  for (const node of event.created)
-    await graph.createNode(node.label, node.props as never, node.id);
-  for (const edge of event.edges) await graph.createEdge(edge.from, edge.label, edge.to);
-  for (const set of event.sets) await graph.setNodeProperty(set.id, set.key, set.value);
+  for (const change of event.changes) {
+    switch (change.change) {
+      case "NodeCreated":
+        await graph.createNode(change.label, change.props as never, change.id);
+        break;
+      case "EdgeCreated":
+        await graph.createEdge(change.from, change.label, change.to, change.props);
+        break;
+      case "PropsChanged":
+        for (const [key, value] of Object.entries(change.props))
+          await graph.setNodeProperty(change.id, key, value);
+        break;
+    }
+  }
 }
