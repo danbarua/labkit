@@ -216,6 +216,14 @@ export function domainEvent(
   return { ...fields, changes: fields.changes ?? [] };
 }
 
+/** Every handle an act created. */
+export const createdIn = (event: DomainEvent): string[] =>
+  event.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : []));
+
+/** Every edge an act created. */
+export const edgesIn = (event: DomainEvent): EdgeCreated[] =>
+  event.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : []));
+
 /**
  * What a caller wants out of the stream.
  *
@@ -287,9 +295,7 @@ export function inMemoryEventLog(): EventSink {
     (f.since === undefined || (e.seq ?? 0) > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
-    (f.touching === undefined ||
-      e.subject === f.touching ||
-      e.changes.some((c) => c.change === "NodeCreated" && c.id === f.touching));
+    (f.touching === undefined || e.subject === f.touching || createdIn(e).includes(f.touching));
   return {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is

@@ -10,6 +10,7 @@
  * out of the spike.
  */
 
+import { createdIn } from "../src/domain";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { ResearchSession, WriteSurface, inMemoryEventLog, UNATTRIBUTED } from "../src/domain";
 import type { DomainEvent, EventSink } from "../src/domain";
@@ -167,9 +168,7 @@ test("a verb that refuses leaves no delta for the next event to claim", async ()
   await expect(session.closeEnquiry({ enquiry })).rejects.toThrow();
 
   const { question, events: recorded } = await session.pose({ question: "and this one?" });
-  expect(recorded[0]!.changes.map((c) => (c.change === "NodeCreated" ? c.id : ""))).toEqual([
-    question,
-  ]);
+  expect(createdIn(recorded[0]!)).toEqual([question]);
 });
 
 test("an emitted event carries the operation the caller invoked", async () => {

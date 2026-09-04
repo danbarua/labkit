@@ -19,6 +19,7 @@
  * exactly the state that event left it.
  */
 
+import { createdIn } from "../src/domain";
 import { labelForNaturalId } from "../src/db/domain";
 import type { TenantGraph } from "../src/db/graph";
 import type { EventFilter, EventSink } from "../src/domain";
@@ -70,10 +71,9 @@ export function withProvenance(
     // After the projection, not inside `record`: these reads ask the graph
     // what the act did, and inside `record` the graph has not been told yet.
     projected: async (stamped) => {
-      for (const change of stamped.changes) {
-        if (change.change !== "NodeCreated") continue;
-        if (change.label === "LineOfEnquiry") enquiryHandles.push(change.id);
-        if (change.label === "Gate") gateHandles.push(change.id);
+      for (const handle of createdIn(stamped)) {
+        if (labelForNaturalId(handle) === "LineOfEnquiry") enquiryHandles.push(handle);
+        if (labelForNaturalId(handle) === "Gate") gateHandles.push(handle);
       }
       const enquiries = await Promise.all(
         enquiryHandles.map(async (handle): Promise<EnquirySnapshot> => {

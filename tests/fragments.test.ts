@@ -16,6 +16,7 @@
  * stop being an independent probe.
  */
 
+import { edgesIn } from "../src/domain";
 import type { PursueCommand } from "../src/domain/commands";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { openScenario, type Scenario } from "./helpers/scenario";
@@ -66,9 +67,8 @@ afterAll(async () => {
 
 const operations = (stream: readonly DomainEvent[]) => stream.map((e) => e.operation);
 
-/** The edge labels an act created, from its changes. */
-const edgeLabels = (e: DomainEvent): string[] =>
-  e.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c.label as string] : []));
+/** The edge labels an act created. */
+const edgeLabels = (e: DomainEvent): string[] => edgesIn(e).map((x) => x.label as string);
 
 describe("a composition writes the record its moves describe", () => {
   /**
