@@ -36,6 +36,21 @@ import { checkStatus, checksAnchor } from "../survey-facts";
 import { blockedBy } from "./blocked";
 import { dedupeById, type Identified } from "./shared";
 
+/**
+ * What a deferral says, carried onto whatever the question's standing turns
+ * out to be.
+ *
+ * A question left open on a stated condition and later answered has both facts
+ * true at once, and they are both about now. Reporting only the answer leaves
+ * a reader unable to ask the question that matters — is this the condition
+ * being met, or something unrelated that arrived first — from anything but the
+ * researcher's memory.
+ */
+const deferral = (
+  accepting: { reason: string; invalidation_check: string } | null,
+): { acceptedBecause: string; reopensIf: string } | Record<string, never> =>
+  accepting ? { acceptedBecause: accepting.reason, reopensIf: accepting.invalidation_check } : {};
+
 export class StoryGroup extends SessionCore {
   /** Is this enquiry open, and if not, how did it close? */
   async enquiryStatus(enquiry: EnquiryRef): Promise<EnquiryStatus> {
@@ -179,6 +194,7 @@ export class StoryGroup extends SessionCore {
           closure: "abandoned",
           answer: null,
           evidence: [],
+          ...deferral(accepting),
         },
       };
     }
@@ -227,6 +243,7 @@ export class StoryGroup extends SessionCore {
         restsOn: promoted.some((r) => (r.sc ?? r.cc)?.kind === "confirmatory")
           ? "confirmatory"
           : "exploratory",
+        ...deferral(accepting),
       },
     };
   }

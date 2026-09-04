@@ -211,10 +211,28 @@ export class StandingGroup extends SessionCore {
       // to nothing is vacuously met, so promoted work under no standard stays
       // `established`.
       const answer: "yes" | "no" = answeringBearing.get(question) === "CHALLENGES" ? "no" : "yes";
+      // Carried onto the answer when there was one: a question answered after
+      // being deliberately parked is answered, and it is also a question
+      // somebody parked on a stated condition. Dropping the second the moment
+      // the first arrives makes the pairing unreconstructable.
+      const deferral =
+        entry.acceptedBecause === undefined
+          ? {}
+          : { acceptedBecause: entry.acceptedBecause, reopensIf: entry.reopensIf! };
       if (claim && claim.kind === "confirmatory" && met.get(claim.natural_id) !== false)
-        survey.established.push({ ...standing, claim: ref("claim", claim.natural_id), answer });
+        survey.established.push({
+          ...standing,
+          claim: ref("claim", claim.natural_id),
+          answer,
+          ...deferral,
+        });
       else if (claim)
-        survey.provisional.push({ ...standing, claim: ref("claim", claim.natural_id), answer });
+        survey.provisional.push({
+          ...standing,
+          claim: ref("claim", claim.natural_id),
+          answer,
+          ...deferral,
+        });
       else if (entry.accepted)
         survey.accepted.push({
           ...standing,
