@@ -459,7 +459,11 @@ test("an empty event log does not read as an empty record", () => {
       },
       operation: "recordAnalysis",
       subject: "COMP_1",
-      created: ["CLM_1", "EV_1"],
+      command: { enquiry: ref("enquiry", "LOE_1"), method: "tensile test", from: [] },
+      changes: [
+        { change: "NodeCreated", id: "CLM_1", label: "Claim", props: { name: "it cracks" } },
+        { change: "NodeCreated", id: "EV_1", label: "Evidence", props: { statement: "40MPa" } },
+      ],
     }),
   ];
   const out = renderHappened(events, PLAIN);
