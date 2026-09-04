@@ -155,12 +155,7 @@ export type Emit = (
   detail?: Record<string, unknown>,
 ) => Promise<DomainEvent[]>;
 
-/**
- * The delta a verb states before it writes anything.
- *
- * `emit` drains what the graph already did; this takes what the graph is
- * *about* to do, so the event exists before the record does.
- */
+/** The delta a verb states before it writes anything. */
 export type Delta = Partial<Pick<DomainEvent, "created" | "edges" | "sets">>;
 
 /** A command in flight: the operation, and what the caller passed. */
@@ -297,24 +292,10 @@ export class WriteSurface extends SessionCore {
    * write verb hands its own `events` field straight through from here, so a
    * `--json` renderer needs no new plumbing if a verb ever records more.
    */
-  /**
-   * The command being handled, for the duration of one call.
-   *
-   * Per call rather than on {@link CommandContext}: that is captured at
-   * construction, and `fragments/replay.ts`, `fragments/run.ts` and two test
-   * files each build one surface and drive many commands through it.
-   */
+  /** The command being handled, for the duration of one call. */
   private handled?: Handled;
 
-  /**
-   * Runs one command, with the command itself in scope for whatever the call
-   * flows through.
-   *
-   * TypeScript erases the type, so the operation is stated once here rather
-   * than restated as a string literal at the emit site. `revising.ts` already
-   * had to thread it by hand for `keep`/`replaceAnalysis`, which share one
-   * command shape and are two different acts.
-   */
+  /** Runs one command, with the command in scope for the whole call. */
   private async handling<T>(command: Handled, work: () => Promise<T>): Promise<T> {
     const outer = this.handled;
     this.handled = command;
@@ -325,14 +306,7 @@ export class WriteSurface extends SessionCore {
     }
   }
 
-  /**
-   * Records what a verb is about to do, before it does it.
-   *
-   * The delta is stated by the caller rather than drained from the graph, so
-   * the event exists first and the graph is what the event produces. Inside
-   * the verb's own transaction, as `emit` is: the event and the writes it
-   * describes still commit together or neither does.
-   */
+  /** Records what a verb is about to do, before it does it. */
   private async emitDelta(
     operation: Operation,
     subject: Ref<string>,
@@ -369,8 +343,6 @@ export class WriteSurface extends SessionCore {
       created: this.graph.drainMinted(),
       // The other half of the same collection. See `DomainEvent.edges`.
       edges: this.graph.drainMintedEdges(),
-      // Nothing drains a property set: the nineteen verbs that still write
-      // first have no collector for one. See `applyDelta` in ./shared.ts.
       sets: [],
       detail,
     });

@@ -543,16 +543,7 @@ export class Shared extends SessionCore {
   }
 }
 
-/**
- * Writes an event's delta into the graph: what it created, then what it
- * connected, then what it set in place.
- *
- * Nodes before edges because `createEdge` matches both endpoints and throws
- * when either is missing.
- *
- * It takes the graph and the event and nothing else. If it ever needs a third
- * argument, the delta is incomplete.
- */
+/** Writes an event's delta into the graph: nodes, then edges, then sets. */
 export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {
   for (const node of event.created)
     await graph.createNode(node.label, node.props as never, node.id);

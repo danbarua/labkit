@@ -43,8 +43,6 @@ export class Asking extends SessionCore {
    */
   async pose(input: PoseCommand): Promise<Posed> {
     return this.graph.inTransaction(async () => {
-      // Reserve the id, state what the act does, then do it. Nothing is
-      // queried because nothing constrains posing a question.
       const id = await this.graph.reserveId("Question");
       const asked = ref("question", id);
 

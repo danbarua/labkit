@@ -45,8 +45,7 @@ import type { TenantContext } from "./tenant";
 export class TenantGraph {
   private readonly runner: CypherRunner;
   /**
-   * Nodes created since the last {@link drainMinted}, each carrying what it
-   * would take to create it again.
+   * Nodes created since the last {@link drainMinted}.
    *
    * **Collected here rather than listed by callers**, because a caller that
    * mints three nodes and remembers two is a state nobody could see. A verb
@@ -225,13 +224,7 @@ export class TenantGraph {
    * resolve a `(text, text)` function overload against `agtype` arguments —
    * confirmed empirically against pglite-age before this was written this way.
    */
-  /**
-   * Reserves the next natural id for a label, creating nothing.
-   *
-   * The generator is a plain SQL function over one sequence per label, so an
-   * id can be had before the node exists — which is what lets a verb state
-   * what it is about to create before it creates it.
-   */
+  /** Reserves the next natural id for a label, creating nothing. */
   async reserveId(label: NodeLabel): Promise<string> {
     const { rows } = await this.db.query<{ id: string }>(
       `SELECT ${LABKIT_SCHEMA}.labkit_next_natural_id($1::text, $2::text) AS id`,
@@ -246,8 +239,8 @@ export class TenantGraph {
    * Creates a single node. `label` selects the property shape
    * (`NodePropsByLabel`), so passing another label's props is a compile error.
    *
-   * `id` is a natural id already taken from {@link reserveId}. Without one the
-   * node takes a fresh id in the same round trip, as it always has.
+   * `id` is a natural id already taken from {@link reserveId}; without one the
+   * node takes a fresh id in the same round trip.
    *
    * `label` is one of NODE_LABELS, never caller-controlled input — the
    * generator call's `label`/`prefix` arguments are template-interpolated
@@ -291,12 +284,7 @@ export class TenantGraph {
     };
   }
 
-  /**
-   * Sets one property on an existing node.
-   *
-   * The label comes from the id's prefix, as `createEdge` resolves its
-   * endpoints, so a caller names the node and the property and nothing else.
-   */
+  /** Sets one property on an existing node. */
   async setNodeProperty(id: string, key: string, value: unknown): Promise<void> {
     const label = labelForNaturalId(id);
     validateIdentifier(key, "property name");

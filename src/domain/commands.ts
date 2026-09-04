@@ -13,9 +13,7 @@
  * field belongs with the field, and `bun run check:doc-comments` enforces
  * that. Structural typing means no call site changed; `tsc` proves it.
  *
- * **Every operation is a command.** The three taking a single scalar are here
- * too: a pipeline stage that takes commands cannot take three of them as loose
- * strings.
+ * Every operation is a command.
  */
 
 import type {

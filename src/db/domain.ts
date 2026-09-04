@@ -162,12 +162,7 @@ export interface MintedEdge {
   to: string;
 }
 
-/**
- * A node an act created: everything needed to create it again.
- *
- * Beside {@link MintedEdge} and for the same reason — the collector is
- * `TenantGraph.createNode`, and `src/db` may not import `src/domain`.
- */
+/** A node an act created. */
 export interface MintedNode {
   id: string;
   label: NodeLabel;

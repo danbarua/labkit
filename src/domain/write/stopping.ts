@@ -108,9 +108,6 @@ export class Stopping extends SessionCore {
         answeredProposition = found.asserts;
       }
 
-      // Every refusal above has fired before anything is reserved or written, so
-      // a rejected close leaves no decision behind — which is what the
-      // interleaved version had to argue for and this one gets structurally.
       const id = await this.graph.reserveId("Decision");
       const decided = ref("decision", id);
 

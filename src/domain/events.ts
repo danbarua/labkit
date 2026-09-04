@@ -197,21 +197,11 @@ export interface DomainEvent {
    */
   operation: string;
   subject: string;
-  /**
-   * Every node this act created, with everything needed to create it again.
-   *
-   * `subject` says what the act was *about*; this says what came into
-   * existence, and for most verbs they differ.
-   */
+  /** Every node this act created. */
   created: readonly MintedNode[];
   /** Every edge this act created. */
   edges: readonly MintedEdge[];
-  /**
-   * Every property this act set in place, on a node it did not create.
-   *
-   * `is` sets `Claim.kind` and writes no node and no edge, so without this the
-   * delta cannot reproduce a record in which anything was ever confirmed.
-   */
+  /** Every property this act set in place, on a node it did not create. */
   sets: readonly PropertySet[];
   detail?: Record<string, unknown>;
 }
