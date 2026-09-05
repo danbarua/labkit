@@ -500,6 +500,18 @@ Four consequences, since each was checked rather than reasoned about:
 - **The row survives.** An admin connection still sees it, so this hides rather
   than destroys.
 
+**How strong the hiding is, exactly**: as strong as the step-down, which is a
+*safety* boundary and not a security one — see "What the step-down is worth"
+above, and #60. The probe ran as `labkit_app` through `SET ROLE`, and reached
+the retracted row again by `RESET ROLE`, which any code in the process can do.
+So a policy stops a traversal that should not see a retracted record; it does
+not stop a caller who means to. For soft-delete that is the wanted behaviour —
+an operator has to be able to read what was retracted — but it is a guardrail,
+and calling it more would be the mistake #60 names about the step-down itself.
+A login role, which cannot `RESET ROLE`, would make the same policy a real
+boundary; that is #60's deferred work and it is per-backend, since PGlite has
+one superuser session and no preload.
+
 **What this does not establish**: that a *property change* can retract an edge.
 `PropsChanged` is applied by `TenantGraph.setNodeProperty`, which addresses a
 node by `natural_id`; edges have none and are addressed by their
