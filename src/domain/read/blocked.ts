@@ -426,7 +426,10 @@ export class BlockedGroup extends SessionCore {
       { crit: vertexProps<{ natural_id: string; proposition: string }>() },
     );
     const rows = (await this.graph.query(cypher, decoders, { id: gate })) as unknown as Row[];
-    const checks = [...per(checkStatusForGate, rows).values()];
+    // Flattened: a criterion yields one check per finding it was judged
+    // about, so a rule held against four controls is four conditions on this
+    // gate rather than one line folding them together (#293).
+    const checks = [...per(checkStatusForGate, rows).values()].flat();
     // Every state present, zero included -- see `GateStatus.counts`.
     const counts: GateStatus["counts"] = {
       passed: 0,
@@ -544,7 +547,7 @@ export class BlockedGroup extends SessionCore {
       .map(([id, { consequence, rows: forGate }]) => ({
         gate: ref("gate", id),
         consequence,
-        state: gateStateFrom([...per(checkStatusForGate, forGate).values()]),
+        state: gateStateFrom([...per(checkStatusForGate, forGate).values()].flat()),
       }))
       .sort((a, b) => a.gate.localeCompare(b.gate));
 

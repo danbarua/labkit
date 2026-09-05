@@ -123,20 +123,15 @@ reverification_task=$(lab --date "$STAGE1A_V1_DESIGN" plan --objective "re-verif
   --acceptance "consistent across primary mean-Wilcoxon, median aggregation, exact sign-flip test, and small within-class MCSE relative to the class-level difference" \
   --may-read stage1a_all_classes)
 
-# Four criteria, not one -- the workaround for finding 1 (labkit#133). Bonsai's
-# DESIGN.md states the decision rule once, generically, but applies it
-# separately per comparison; giving each comparison its own criterion means
-# each has exactly one evaluation, so `why`'s criterion-scoped "Held to" read
-# is correct for each -- there is nothing else evaluating the same criterion
-# to conflict with it.
-rule="the null (no T-vs-control difference) is robust only if primary mean-aggregated Wilcoxon, median aggregation, exact sign-flip test, and within-class MCSE (small relative to |d|) all agree"
-historical_random_criterion=$(lab --date "$STAGE1A_V1_DESIGN" criterion "T vs historical half-edge random: $rule")
-current_random_criterion=$(lab --date "$STAGE1A_V1_DESIGN" criterion "T vs current edge-count-matched random: $rule")
-rewiring_criterion=$(lab --date "$STAGE1A_V1_DESIGN" criterion "T vs degree-preserving rewiring: $rule")
-lattice_criterion=$(lab --date "$STAGE1A_V1_DESIGN" criterion "T vs lattice: $rule")
+# **One rule, judged per comparison** (labkit#133, fixed). Bonsai's DESIGN.md
+# states the decision rule once, generically, and applies it separately per
+# comparison — which is what it is. Until `evaluate --about` existed, four
+# verdicts meant four criteria carrying one rule, so `why` on any of them read
+# correctly only because nothing else evaluated the same criterion.
+robustness_criterion=$(lab --date "$STAGE1A_V1_DESIGN" criterion "the null (no T-vs-control difference) is robust only if primary mean-aggregated Wilcoxon, median aggregation, exact sign-flip test, and within-class MCSE (small relative to |d|) all agree")
 
 robustness_gate=$(lab --date "$STAGE1A_V1_DESIGN" declare \
-  --governed-by "$historical_random_criterion" --governed-by "$current_random_criterion" --governed-by "$rewiring_criterion" --governed-by "$lattice_criterion" \
+  --governed-by "$robustness_criterion" \
   --consequence "the affected comparison's robustness cannot be confirmed either way; a further design iteration or an honest 'inconclusive' verdict is required" \
   --protecting "$reverification_task")
 
@@ -151,7 +146,7 @@ reverification_observations=$(lab --date "$STAGE1A_V1_RESULTS" observe "$reverif
 reverification_v1_analysis=$(lab --date "$STAGE1A_V1_RESULTS" analyse "$reverification_enquiry" \
   --method "mean-aggregated paired Wilcoxon signed-rank across 10 class-level differences, 25 seeds per class per stochastic control, Holm-corrected across 4 comparisons (raw AUC scale, as DESIGN.md specifies)" \
   --from "$reverification_observations" --implementing "$reverification_task" \
-  --held-to "$historical_random_criterion" --held-to "$current_random_criterion" --held-to "$rewiring_criterion" --held-to "$lattice_criterion" \
+  --held-to "$robustness_criterion" \
   | grep '^COMP_')
 historical_random_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
   --proposition "T vs historical half-edge random is distinguishable" \
@@ -170,10 +165,10 @@ lattice_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_an
   --finding "not significant (p_holm=0.13086); the one comparison with no seed axis, so no mean/median/MCSE ambiguity is possible; reproduces the original Stage 1A conclusion cleanly" \
   --bearing challenges | grep '^CLM_')
 
-lab --date "$STAGE1A_V1_RESULTS" evaluate "$historical_random_criterion" --gate "$robustness_gate" --value "primary p=0.00195 vs median p=0.92188; MCSE exceeds |d| in class 6 (93.5 vs 58.9)" --outcome fail --citing "$historical_random_claim" >/dev/null
-lab --date "$STAGE1A_V1_RESULTS" evaluate "$current_random_criterion"    --gate "$robustness_gate" --value "primary p=0.02734 vs median p=0.49219; MCSE exceeds |d| in 1/10 classes" --outcome fail --citing "$current_random_claim" >/dev/null
-lab --date "$STAGE1A_V1_RESULTS" evaluate "$rewiring_criterion"  --gate "$robustness_gate" --value "primary p=0.01367 vs median p=0.19336" --outcome fail --citing "$rewiring_claim" >/dev/null
-lab --date "$STAGE1A_V1_RESULTS" evaluate "$lattice_criterion" --gate "$robustness_gate" --value "primary, sign-flip, bootstrap all agree non-significant; no seed axis" --outcome pass --citing "$lattice_claim" >/dev/null
+lab --date "$STAGE1A_V1_RESULTS" evaluate "$robustness_criterion" --about "$historical_random_claim" --gate "$robustness_gate" --value "primary p=0.00195 vs median p=0.92188; MCSE exceeds |d| in class 6 (93.5 vs 58.9)" --outcome fail --citing "$historical_random_claim" >/dev/null
+lab --date "$STAGE1A_V1_RESULTS" evaluate "$robustness_criterion" --about "$current_random_claim" --gate "$robustness_gate" --value "primary p=0.02734 vs median p=0.49219; MCSE exceeds |d| in 1/10 classes" --outcome fail --citing "$current_random_claim" >/dev/null
+lab --date "$STAGE1A_V1_RESULTS" evaluate "$robustness_criterion" --about "$rewiring_claim" --gate "$robustness_gate" --value "primary p=0.01367 vs median p=0.19336" --outcome fail --citing "$rewiring_claim" >/dev/null
+lab --date "$STAGE1A_V1_RESULTS" evaluate "$robustness_criterion" --about "$lattice_claim" --gate "$robustness_gate" --value "primary, sign-flip, bootstrap all agree non-significant; no seed axis" --outcome pass --citing "$lattice_claim" >/dev/null
 
 say "re-verification v2: log-scale re-analysis of the SAME data"
 
@@ -234,12 +229,12 @@ rewiring_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_
 # #189: the two comparisons v2 actually resolved get a fresh evaluation
 # citing the new claim -- their v1 evaluation is now `no-standing-verdict`
 # (correctly: what it cited was superseded), and without this GATE_1 would
-# read as though nobody had ever re-checked them. `rewiring_criterion` gets
+# read as though nobody had ever re-checked them. the rewiring comparison gets
 # none: v2's own finding is genuinely inconclusive (see above), and an
 # honest "no verdict yet" is the correct read, not a forced pass or fail.
-# `lattice_criterion`'s v1 evaluation is untouched -- it was never named.
-lab --date "$STAGE1A_V2_RESULTS" evaluate "$historical_random_criterion" --gate "$robustness_gate" --value "log-scale: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322)" --outcome pass --citing "$historical_random_resolved_claim" >/dev/null
-lab --date "$STAGE1A_V2_RESULTS" evaluate "$current_random_criterion"    --gate "$robustness_gate" --value "log-scale: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320)" --outcome pass --citing "$current_random_resolved_claim" >/dev/null
+# The lattice comparison's v1 verdict is untouched -- it was never re-run.
+lab --date "$STAGE1A_V2_RESULTS" evaluate "$robustness_criterion" --about "$historical_random_resolved_claim" --gate "$robustness_gate" --value "log-scale: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322)" --outcome pass --citing "$historical_random_resolved_claim" >/dev/null
+lab --date "$STAGE1A_V2_RESULTS" evaluate "$robustness_criterion" --about "$current_random_resolved_claim" --gate "$robustness_gate" --value "log-scale: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320)" --outcome pass --citing "$current_random_resolved_claim" >/dev/null
 
 lab --date "$STAGE1A_V2_RESULTS" close "$reverification_enquiry" --answered-by "$historical_random_resolved_claim" >/dev/null
 

@@ -663,6 +663,17 @@ export interface GateStatus {
 export interface CheckStatus {
   /** Stable identity. Two criteria worded identically are two criteria. */
   criterion: CriterionRef;
+  /**
+   * The finding this check judges, when one criterion is applied to several.
+   *
+   * **A rule held against four controls is four conditions, not one.** Folding
+   * them into a single state reported `passed` for a gate where three
+   * comparisons passed and the fourth had no standing verdict at all —
+   * measured on Bonsai's Stage 1A (#293). Absent when the verdicts named no
+   * subject, which is the ordinary case and every caller before
+   * `evaluate --about`.
+   */
+  about?: ClaimRef;
   /** Display text. Not an identity — see `criterion`. */
   proposition: string;
   /**

@@ -141,14 +141,23 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
     // silent: `[:SUPPORTS|CHALLENGES]` is a syntax error, and a verdict
     // resting on a challenging finding would simply never match. The fold
     // below reads both.
+    // **The subject is resolved through supersession, because the graph says
+    // so.** A finding re-concluded after being superseded is the same subject
+    // judged twice, not two conditions: `conclude --replacing` writes
+    // `Decision -SUPERSEDES-> old` and `-MOTIVATES-> new`, so the successor is
+    // one hop away. Grouping on the raw handle reported a replaced comparison
+    // as an unresolved condition of its own — measured on Bonsai's Stage 1A,
+    // three phantom conditions where one was genuinely unresolved (#293).
     clause: `${evaluationClause}
            OPTIONAL MATCH (ev)-[:ABOUT]->(judged:Claim)
+           OPTIONAL MATCH (judged)<-[:SUPERSEDES]-(:Decision)-[:MOTIVATES]->(instead:Claim)
            OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
            OPTIONAL MATCH (basis)-[:SUPPORTS]->(supported:Claim)<-[:SUPERSEDES]-(:Decision)
            OPTIONAL MATCH (basis)-[:CHALLENGES]->(challenged:Claim)<-[:SUPERSEDES]-(:Decision)`,
     yields: {
       ev: optional(vertexProps<EvaluationNode>()),
       judged: optional(vertexProps<Node>()),
+      instead: optional(vertexProps<Node>()),
       basis: optional(vertexProps<Node>()),
       supported: optional(vertexProps<Node>()),
       challenged: optional(vertexProps<Node>()),
@@ -156,7 +165,8 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
     empty: () => ({ cited: 0, standing: 0, outcome: null, at: "", value: "", basis: [] }),
     fold: (verdict, row) => {
       const evaluation = row.ev as EvaluationNode | null;
-      const judged = row.judged as Node | null;
+      // The subject as it now stands: the successor when one exists.
+      const judged = (row.instead as Node | null) ?? (row.judged as Node | null);
       const seen: Verdict = evaluation
         ? {
             ...verdict,
@@ -220,16 +230,58 @@ const retracted = (v: Verdict): boolean => v.cited > 0 && v.standing === 0;
  * one, because a check nobody performed must be distinguishable from one that
  * failed.
  */
+/**
+ * The state of one subject's verdicts — today's rule, applied to a group.
+ *
+ * A criterion is a rule, and a rule may be judged once per subject. This is
+ * what a *check* means; {@link checkStateOver} is what the criterion as a whole
+ * means, which is the worst of them.
+ */
+function stateOf(group: Verdict[]): CheckState {
+  const standing = group.filter((v) => !retracted(v));
+  if (standing.length === 0) return group.length > 0 ? "no-standing-verdict" : "never-run";
+  return standing.some((v) => v.outcome === "fail") ? "failed" : "passed";
+}
+
+/**
+ * A criterion's verdicts, grouped by the finding each judged.
+ *
+ * One group keyed `""` when nothing was named, which is the ordinary case and
+ * every caller before `evaluate --about`. A criterion with no verdicts at all
+ * yields one empty group, so `never-run` still has somewhere to come from.
+ */
+function bySubject(found: Map<string, Verdict>): Map<string, Verdict[]> {
+  const groups = new Map<string, Verdict[]>();
+  for (const v of found.values()) {
+    const key = v.about ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), v]);
+  }
+  return groups.size > 0 ? groups : new Map([["", []]]);
+}
+
+/**
+ * A criterion's state across every subject it was judged for.
+ *
+ * **The worst group wins, and that is the fix for a real wrong answer.** Folding
+ * every verdict into one list said `passed` for a rule held against four
+ * controls where three passed and the fourth had no standing verdict at all —
+ * measured on `scripts/probe-bonsai-1a.sh`, where the gate went from
+ * `incomplete` to `passed` while one comparison had never been re-checked
+ * (#293). A rule that must hold for each of four holds when each of four holds.
+ */
 export function checkStateOver(verdicts: Leaf<Verdict>): Derived<CheckState> {
   return {
     name: "checkState",
     grain: byCriterion,
     needs: [verdicts],
     from: (needs) => {
-      const all = [...(needs[verdicts.name] as Map<string, Verdict>).values()];
-      const standing = all.filter((v) => !retracted(v));
-      if (standing.length === 0) return all.length > 0 ? "no-standing-verdict" : "never-run";
-      return standing.some((v) => v.outcome === "fail") ? "failed" : "passed";
+      const states = [...bySubject(needs[verdicts.name] as Map<string, Verdict>).values()].map(
+        stateOf,
+      );
+      if (states.includes("failed")) return "failed";
+      if (states.includes("no-standing-verdict")) return "no-standing-verdict";
+      if (states.includes("never-run")) return "never-run";
+      return "passed";
     },
   };
 }
@@ -364,12 +416,11 @@ export function evaluationsOver(verdicts: Leaf<Verdict>): Derived<EvaluationReco
  * ordering**, and without it *which* verdict is reported as "the" value of a
  * check is not a stable contract between runs.
  */
-export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus> {
-  const state = checkStateOver(verdicts);
+export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus[]> {
   return {
     name: "checkStatus",
     grain: byCriterion,
-    needs: [verdicts, state, criterionProps],
+    needs: [verdicts, criterionProps],
     from: (needs) => {
       const found = needs[verdicts.name] as Map<string, Verdict>;
       const criterion = needs.criterionProps as CriterionNode;
@@ -377,27 +428,43 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus> {
         .map(([evaluation, v]) => ({ evaluation, ...v }))
         .sort((a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation));
       const records = recordsOf(ordered, criterion.natural_id);
-      const standing = ordered.filter((v) => !retracted(v));
-      const decisive = standing.find((v) => v.outcome === "fail") ?? standing[0];
-      const decided = decisive && records.find((r) => r.evaluation === decisive.evaluation);
-      return {
-        criterion: ref("criterion", criterion.natural_id),
-        proposition: criterion.proposition,
-        state: needs[state.name] as CheckState,
-        // **The verdict's sentence is not carried here** -- see
-        // `DecidingEvaluation`. A gate governing many criteria is asked what
-        // state everything is in, and the sentences are the whole of its size.
-        ...(decided
-          ? {
-              decidedBy: {
-                evaluation: decided.evaluation,
-                outcome: decided.outcome,
-                at: decided.at,
-                ...(decided.about ? { about: decided.about } : {}),
-              },
-            }
-          : {}),
-      } as CheckStatus;
+
+      // **One check per subject, not per criterion.** A rule judged against
+      // four controls is four conditions on a gate: three passing and one
+      // never re-checked is `incomplete`, and folding them into one line said
+      // `passed` (#293). Grouped here rather than at a coarser grain because
+      // every verdict for the criterion is already in hand.
+      const groups = new Map<string, typeof ordered>();
+      for (const v of ordered) {
+        const key = v.about ?? "";
+        groups.set(key, [...(groups.get(key) ?? []), v]);
+      }
+      if (groups.size === 0) groups.set("", []);
+
+      return [...groups].map(([subject, group]) => {
+        const standing = group.filter((v) => !retracted(v));
+        const decisive = standing.find((v) => v.outcome === "fail") ?? standing[0];
+        const decided = decisive && records.find((r) => r.evaluation === decisive.evaluation);
+        return {
+          criterion: ref("criterion", criterion.natural_id),
+          proposition: criterion.proposition,
+          state: stateOf(group),
+          ...(subject ? { about: ref("claim", subject) } : {}),
+          // **The verdict's sentence is not carried here** -- see
+          // `DecidingEvaluation`. A gate governing many criteria is asked what
+          // state everything is in, and the sentences are the whole of its size.
+          ...(decided
+            ? {
+                decidedBy: {
+                  evaluation: decided.evaluation,
+                  outcome: decided.outcome,
+                  at: decided.at,
+                  ...(decided.about ? { about: decided.about } : {}),
+                },
+              }
+            : {}),
+        } as CheckStatus;
+      });
     },
   };
 }
