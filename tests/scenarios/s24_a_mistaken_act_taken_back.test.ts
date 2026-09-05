@@ -84,7 +84,9 @@ describe("S-24 — a mistaken act taken back", () => {
   });
 
   test("refuses to undo an act something else already rests on", async () => {
-    const { question, events } = await session.pose({ question: "does pruning depth matter at all?" });
+    const { question, events } = await session.pose({
+      question: "does pruning depth matter at all?",
+    });
     const poseSeq = events[0]!.seq!;
 
     // The enquiry rests on the question via MOTIVATES -- an external node

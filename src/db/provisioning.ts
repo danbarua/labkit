@@ -327,10 +327,19 @@ class TenantGraphProvisioner {
    */
   private async ensureRetractionPolicy(label: NodeLabel, existing: Set<string>): Promise<void> {
     const policyName = `${label.toLowerCase()}_hide_retracted`;
-    await this.db.query(
-      `ALTER TABLE "${this.graphName}"."${label}" ENABLE ROW LEVEL SECURITY`,
-    );
+    // Both statements guarded on the one check: `ensureRetractionPolicy` is
+    // the only writer of this policy and always enables RLS in the same call
+    // that creates it, so the policy's presence already answers both
+    // questions. An unconditional `ALTER TABLE` here was the mistake this
+    // file's whole existence-check design exists to avoid -- see
+    // `ensurePropertyIndexes`'s doc comment, docs/project-journal/
+    // 005_provisioning_reconciliation.md, and the query-count history in
+    // CLAUDE.md's "Two costs the old sentence never named" section: this
+    // reconciler is asked once per tenant resolution, so an unconditional
+    // statement per label here is not one query but one on every read and
+    // write for the life of the tenant.
     if (existing.has(policyName)) return;
+    await this.db.query(`ALTER TABLE "${this.graphName}"."${label}" ENABLE ROW LEVEL SECURITY`);
     await this.db.query(
       `CREATE POLICY "${policyName}" ON "${this.graphName}"."${label}" FOR ALL TO ${APP_ROLE}
        USING (ag_catalog.agtype_access_operator(properties, '"retracted"'::agtype)

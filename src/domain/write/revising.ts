@@ -289,7 +289,9 @@ export class Revising extends Shared {
       const dependents = [...into, ...outOf];
       if (dependents.length > 0) {
         const named = dependents
-          .map((d) => `${anyRef(d.origin.natural_id)} -[${d.via}]-> ${anyRef(d.reaches.natural_id)}`)
+          .map(
+            (d) => `${anyRef(d.origin.natural_id)} -[${d.via}]-> ${anyRef(d.reaches.natural_id)}`,
+          )
           .join(", ");
         throw new Error(
           `event ${input.event} (${found.operation}) cannot be undone: ${named} rests on what ` +
