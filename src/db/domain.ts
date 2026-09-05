@@ -51,6 +51,7 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
   Decision: ["decided_at"],
   CriterionEvaluation: ["evaluated_at"],
   Artefact: ["logical_name"],
+  Computation: ["method"],
   // Written by nothing today, and indexed anyway — `check:prop-classes` found
   // them missing on its first run, which is the rule working. An index over a
   // property that is always absent costs almost nothing in Postgres, and it is
@@ -70,9 +71,10 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
  * **This table has no hand-written exclusions, and that is the point.** It is
  * derived from the taxonomy: a property is here when its written annotation is
  * `Prose` or `IndexedString` — the two classes that hold text a person typed.
- * `Computation.method` is absent because it is annotated `ReadOnlyString`,
- * which its own doc comment says is probably wrong; that is a type bug left as
- * one rather than compensated for here.
+ * `Computation.method` was absent until 2026-09-05 because it was annotated
+ * `ReadOnlyString` while holding a researcher's free text — the taxonomy
+ * reporting a type bug rather than compensating for it, and the bug is fixed
+ * rather than the table hand-edited.
  *
  * **`IndexedString` was excluded until 2026-09-03**, on the argument that
  * `claimsAsserting()` is already the exact-match search for a claim's wording
@@ -89,6 +91,7 @@ export const SEARCHABLE_TEXT: { readonly [L in NodeLabel]?: readonly string[] } 
   LineOfEnquiry: ["name"],
   Claim: ["name"],
   Artefact: ["logical_name"],
+  Computation: ["method"],
   Evidence: ["statement"],
   Decision: ["reason", "invalidation_check"],
   Criterion: ["proposition"],
@@ -815,12 +818,14 @@ export interface ComputationProps {
    * named it `method` without being told to, and Bonsai's transcripts pass
    * paragraphs into `--method`; the name was the only thing disagreeing (#64).
    *
-   * Still `ReadOnlyString` rather than `Prose`, which is a separate question:
-   * making it `Prose` would put it in `SEARCHABLE_TEXT` by the taxonomy's own
-   * rule, so `search "paired comparison"` would find the analysis. That is
-   * probably right and is not this change.
+   * `Prose`, so `search` scans it: a researcher looking for *"paired
+   * comparison"* is looking for the runs that did one, and until 2026-09-05
+   * the record answered that nothing contained the text. That is #155's defect
+   * exactly — what a string is *for* internally and whether a person might
+   * search for it are different questions, and only the second decides
+   * {@link SEARCHABLE_TEXT}.
    */
-  method: ReadOnlyString;
+  method: Prose;
   /** Hardcoded `"completed"` by the only writer. A running or failed computation has nowhere to say so yet. */
   status: ReadOnlyString;
   backend?: IdentityString;

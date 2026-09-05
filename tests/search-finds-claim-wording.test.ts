@@ -58,7 +58,7 @@ async function aRecordedFinding() {
       },
     ],
   });
-  return { artefact: observations, claim: claims[0]!.claim };
+  return { artefact: observations, claim: claims[0]!.claim, analysis: claims[0]!.claim };
 }
 
 test("a phrase from a claim's proposition finds the claim", async () => {
@@ -84,6 +84,24 @@ test("claimsAsserting still needs the whole sentence, which is why search had to
   expect((await session.claimsAsserting(PROPOSITION)).map((c) => c.claim)).toEqual([claim]);
   // A phrase does not, and nobody retypes the sentence above.
   expect(await session.claimsAsserting("unique winner")).toEqual([]);
+});
+
+/**
+ * The third property that was excluded for the same wrong reason.
+ *
+ * `Computation.method` held the researcher's own description of how a run was
+ * carried out and was annotated `ReadOnlyString`, so the taxonomy kept it out
+ * of `search` — and *"which runs did a paired comparison?"* answered that
+ * nothing on the record contained the text, about a record whose analysis says
+ * exactly that. Same defect as the claim and the artefact above, found by
+ * renaming the property rather than by anyone searching for it.
+ */
+test("a phrase from an analysis's method finds the computation", async () => {
+  await aRecordedFinding();
+
+  const groups = await session.search("unpruned baseline");
+  const found = groups.find((g) => g.label === "Computation");
+  expect(found?.matches).toHaveLength(1);
 });
 
 test("an empty answer is empty because nothing matched, not because nothing was scanned", async () => {
