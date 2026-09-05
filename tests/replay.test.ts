@@ -74,8 +74,11 @@ test("a corrupted edge is refused, not silently accepted", async () => {
   connections.push(connection);
 
   // The real `pursue` event's `MOTIVATES` edge, pointed at a question that
-  // was never posed. `replayIntoScratch` calls the very same decoder either
-  // way — what differs is the comparison this event is checked against.
+  // was never posed. Nothing compares this event to anything: the projection
+  // simply cannot apply it, because `createEdge` matches both endpoints and
+  // one is not there. That is the whole of what a replay can refuse now, and
+  // it is a stronger check than the old comparison — a corrupted change fails
+  // where a corrupted *command* might merely have produced something else.
   const pursueEvent = history[1]!;
   const corrupted: DomainEvent[] = history.map((e, i) =>
     i === 1
@@ -96,15 +99,26 @@ test("a corrupted edge is refused, not silently accepted", async () => {
   expect(result.provenance.has(pursueEvent.seq!)).toBe(false);
 });
 
-test("an operation with no decoder is refused by name", async () => {
-  const { graph, history, connection } = await realHistory();
+/**
+ * **The property that replaced "no decoder for this operation".**
+ *
+ * Replay applies each event's changes rather than reissuing its command, so it
+ * never dispatches on the operation at all. A verb added tomorrow replays with
+ * no replay support written for it, and a *retired* one replays without a rule
+ * saying what it became — which is what `fragments/decode.ts` and its
+ * `RetiredOperation` table existed to provide.
+ */
+test("an operation nothing knows about replays on its changes alone", async () => {
+  const { history, connection } = await realHistory();
   connections.push(connection);
 
-  const unknown: DomainEvent[] = [
-    { ...history[0]!, operation: "notAnOperation" as DomainEvent["operation"] },
-  ];
+  const unknown: DomainEvent[] = history.map((e) => ({
+    ...e,
+    operation: "aVerbFromTheFuture" as DomainEvent["operation"],
+  }));
 
   const result = await replayIntoScratch(unknown);
 
-  expect(result.refusedAt?.reason).toContain("no decoder");
+  expect(result.refusedAt).toBeUndefined();
+  expect(result.provenance.size).toBe(history.length);
 });

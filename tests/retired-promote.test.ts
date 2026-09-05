@@ -30,7 +30,6 @@ import {
   type DomainEvent,
   type WriteSurface,
 } from "../src/domain";
-import { DECODERS, type DecodeContext } from "../fragments/decode";
 import { replayIntoScratch } from "../fragments/replay";
 
 const home = mkdtempSync(join(tmpdir(), "labkit-retired-promote-"));
@@ -43,46 +42,6 @@ const attribution = {
   git_hash: "0".repeat(40),
 };
 
-test("a recorded promote event decodes into `is confirmed`, carrying its reason", async () => {
-  const calls: Record<string, unknown>[] = [];
-  const writes = {
-    is: async (cmd: Record<string, unknown>) => {
-      calls.push(cmd);
-      return { decision: "DEC_1", events: [] };
-    },
-  } as unknown as WriteSurface;
-
-  const event: DomainEvent = {
-    seq: 7,
-    at: "2026-08-28T09:00:00.000Z",
-    attribution,
-    operation: "promote",
-    subject: "CLM_4",
-    // The command as `promote` recorded it. Its reason used to live only on
-    // the Decision it minted, and the decoder read it back off that node.
-    command: { claim: "CLM_4", because: "re-timed on a quiet machine" },
-    changes: [
-      {
-        change: "NodeCreated",
-        id: "DEC_1",
-        label: "Decision",
-        props: { decided_at: "2026-08-28T09:00:00.000Z", reason: "re-timed on a quiet machine" },
-      },
-      { change: "EdgeCreated", from: "DEC_1", label: "PROMOTES", to: "CLM_4" },
-    ],
-  } as unknown as DomainEvent;
-
-  const ctx: DecodeContext = { writes };
-
-  await DECODERS.promote(ctx, event);
-
-  expect(calls[0]).toEqual({
-    claim: "CLM_4",
-    state: "confirmed",
-    because: "re-timed on a quiet machine",
-  });
-});
-
 /**
  * The decoder alone is not enough, and this is the test that says so.
  *
@@ -92,7 +51,7 @@ test("a recorded promote event decodes into `is confirmed`, carrying its reason"
  * on passing, because forwarding is exactly what it asserts. Found by running
  * the live record, not by the suite.
  */
-test("a history containing a retired promote replays end to end, not just decodes", async () => {
+test("a history containing a retired promote replays end to end", async () => {
   const dir = mkdtempSync(join(home, "run-"));
   const connection = await connectScratch(dir);
   try {
