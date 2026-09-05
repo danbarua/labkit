@@ -113,6 +113,49 @@ describe("S-21: a finding drawn across findings", () => {
     expect(status.question!.evidence).toHaveLength(4);
   });
 
+  /**
+   * The bearing half, which is what a negative result looks like.
+   *
+   * `closeEnquiry` reached a synthesis's parts through `SUPPORTS` alone, so a
+   * headline drawn across findings that all *challenge* their propositions —
+   * Bonsai's Stage 1D exactly — read as a claim nothing bears on and the
+   * closure was refused. AGE has no edge alternation, so naming one bearing is
+   * silent: the rows are absent rather than wrong. Shipped in #276 and found
+   * by running the transcript, not by review.
+   */
+  test("a synthesis over challenging findings can close its enquiry too", async () => {
+    const { enquiry } = await session.openEnquiry("does T beat the controls?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "paired runs",
+      finding: "matched scores",
+    });
+    const { claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "paired comparison",
+      from: [observations],
+      concludes: CONTROLS.map(([name, proposition]) => ({
+        proposition,
+        finding: `difference within noise, ${name}`,
+        // Every one of them cuts against its proposition.
+        bearing: "challenges" as const,
+      })),
+    });
+    const { claim } = await session.synthesise({
+      proposition: HEADLINE,
+      restingOn: CONTROLS.map(([, proposition]) => claimOf(claims, proposition)),
+    });
+
+    await session.closeEnquiry({ enquiry, answeredBy: claim });
+
+    const status = await (await afterwards()).enquiryStatus(enquiry);
+    expect(status.question!.closure).toBe("answered");
+    // Answered "no", and resting on all four — the polarity comes from which
+    // way the findings underneath it cut.
+    expect(status.question!.answer).toBe("no");
+    expect(status.question!.evidence).toHaveLength(4);
+  });
+
   test("resting on a claim nobody has concluded is refused, and nothing is written", async () => {
     await fourComparisons();
 

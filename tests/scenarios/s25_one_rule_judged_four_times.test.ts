@@ -119,13 +119,19 @@ describe("S-25: one rule judged four times", () => {
     const status = await (await afterwards()).gateStatus(gate);
     expect(status.state).toBe("blocked");
 
-    // One criterion is one line on a gate's page, so the line has to say what
-    // failed it — the answer to "which control did we not clear?", which is
-    // the question a blocked gate raises and could not answer.
-    const [check] = status.checks;
-    expect(check!.state).toBe("failed");
-    const failed = judged.filter((j) => j.outcome === "fail").map((j) => j.claim);
-    expect(failed.map(String)).toContain(String(check!.decidedBy!.about));
+    // **One condition per comparison, not one per criterion.** A rule held
+    // against four controls is four conditions on this gate, so the two that
+    // failed are two failed checks naming which comparison — the answer to
+    // "which control did we not clear?", which is the question a blocked gate
+    // raises. Folding them into one line reported a single state for four
+    // different answers (#293).
+    expect(status.checks).toHaveLength(4);
+    const failed = judged.filter((j) => j.outcome === "fail").map((j) => String(j.claim));
+    const reportedFailed = status.checks
+      .filter((c) => c.state === "failed")
+      .map((c) => String(c.about))
+      .sort();
+    expect(reportedFailed).toEqual(failed.sort());
   });
 
   test("a verdict on the criterion as a whole names nothing, and still counts", async () => {

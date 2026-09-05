@@ -763,14 +763,17 @@ export class StoryGroup extends SessionCore {
       ...new Set(resting.map((r) => ref("observations", r.a.natural_id))),
     ]);
 
-    const byCriterion = new Map<CriterionRef, CheckStatus>();
+    const byCriterion = new Map<string, CheckStatus>();
     for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
       const { cypher, decoders } = compose(checksAnchor(bearing), checkStatus, {
         crit: vertexProps<{ natural_id: string; proposition: string }>(),
       });
       const rows = (await this.graph.query(cypher, decoders, { claim })) as unknown as Row[];
-      for (const [criterion, check] of per(checkStatus, rows)) {
-        byCriterion.set(ref("criterion", criterion), check);
+      for (const [criterion, checks] of per(checkStatus, rows)) {
+        // Keyed by criterion **and subject**: a rule judged against four
+        // findings is four checks a claim is held to, and keying by criterion
+        // alone would keep the last one seen (#293).
+        for (const check of checks) byCriterion.set(`${criterion}|${check.about ?? ""}`, check);
       }
     }
     const standard = [...byCriterion.values()];

@@ -44,24 +44,22 @@
 # instances in this transcript (item 1 via LOE_4/LOE_7, item 2 via
 # LOE_3/LOE_5); a third predicted for Stage 2A, which establishes Q_6.
 #
-# **The same criterion-scoped verdict gap as #133, a second time.**
-# Stage 1D's own reporting groups T-vs-lattice (Part 1) with T-vs-three-
-# stochastic-controls (Part 2) into one 4-way Holm-corrected family --
-# the same "one decision rule instantiated per comparison" shape #133
-# names. Worked around the same way: four criteria, not one. Commented on
-# #133 with this second, independent repro rather than filing a
-# duplicate.
+# **#133 is fixed, and this transcript is what it was fixed for.** Stage
+# 1D's reporting groups T-vs-lattice (Part 1) with T-vs-three-stochastic-
+# controls (Part 2) into one 4-way Holm-corrected family, and the workaround
+# was three criteria carrying one rule. `evaluate --about <claim>` now says
+# which comparison a verdict judged, so the confirmatory standard is stated
+# once and judged three times. The lattice standard stays its own criterion
+# because it is a different rule -- see the note where it is evaluated.
 #
-# **No verb for a pure narrative synthesis.** Stage 1D's headline
-# ("T shows no detectable advantage over ANY of the four tested controls")
-# rests on four already-recorded claims (Part 1's lattice result, Part 2's
-# three) -- it computes nothing new. `analyse` implies a fresh computation;
-# using it for a synthesis with no new method would misrepresent one.
-# `close`'s `--answered-by` takes exactly one claim, so the enquiry closes
-# on the single cleanest comparison (lattice, Part 1's own dedicated
-# result) rather than a synthesized headline that has nowhere to live.
-# Filed as #146 -- same shape as #134's "no verb corrects a mis-entered
-# claim", an absence rather than a wrong answer.
+# **#146 is fixed, and this transcript is what it was fixed for.** Stage
+# 1D's headline ("T shows no detectable advantage over ANY of the four
+# tested controls") rests on four already-recorded claims and computes
+# nothing new, so `analyse` would mint a run that never happened. The
+# enquiry used to close on the single cleanest comparison, naming one
+# control's result as the answer to a question about four. `synthesise`
+# records the headline as a claim resting on the four, and the closure
+# cites it.
 #
 # **1B.2's promoted claim needed no narrowing.** Checked, not assumed:
 # `why` on 1B.2's "Level 2 established, locally" claim after Stage 1D
@@ -234,9 +232,19 @@ hist_random_refit_claim=$(lab --date "$STAGE1D_HIST_REFIT" reverify "$pilot_allo
 # 2026-08-02T21:00:08+01:00 / 21:01:50+01:00.
 STAGE1D_CONFIRM_LOCK=2026-08-02T20:00:08.000Z
 
-confirmatory_rewired_criterion=$(lab --date "$STAGE1D_CONFIRM_LOCK" criterion "T vs rewired: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
-confirmatory_hist_random_criterion=$(lab --date "$STAGE1D_CONFIRM_LOCK" criterion "T vs historical-random: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences (conditional on fixed-coordinate evaluability) must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
-confirmatory_curr_random_criterion=$(lab --date "$STAGE1D_CONFIRM_LOCK" criterion "T vs current-random: agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
+# **One rule, locked once, judged three times** (#133). The three controls
+# share a single prespecified agreement standard -- same four methods, same
+# Holm bound, and the criterion text itself says "FWER 0.05 across the 4-way
+# fixed-coordinate family", which is one family or it is nothing. Until
+# `evaluate --about` existed the only way to record three verdicts was three
+# criteria whose text differed by the control's name, so the rule stood on the
+# record three times with nothing joining the copies.
+#
+# hist_random's estimand is conditional on fixed-coordinate evaluability. That
+# qualifies the data the rule is applied to rather than the rule, and it is on
+# the record either way: its claim's finding text opens "conditional on
+# evaluability" and discloses the 21.9% unevaluable rate separately.
+confirmatory_agreement_criterion=$(lab --date "$STAGE1D_CONFIRM_LOCK" criterion "confirmatory agreement standard -- the primary t-test, exact sign-flip, Wilcoxon signed-rank, and studentised bootstrap CI on the realization-level mean differences must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
 
 # "Stage 1D: confirmatory run -- T vs. rewired/hist_random/curr_random",
 # 2026-08-02T21:44:21+01:00.
@@ -247,7 +255,7 @@ confirmatory_observations=$(lab --date "$STAGE1D_CONFIRM_RESULTS" observe "$topo
   --hash sha256:75d8ca29 | grep '^ART_')
 confirmatory_analysis=$(lab --date "$STAGE1D_CONFIRM_RESULTS" analyse "$topology_specificity_enquiry" \
   --method "two-sided one-sample t-test on realization-level mean differences (primary), studentized bootstrap / Wilcoxon / exact sign-flip (robustness), Holm-corrected across rewired/hist_random/curr_random/lattice" \
-  --from "$confirmatory_observations" --held-to "$confirmatory_rewired_criterion" --held-to "$confirmatory_hist_random_criterion" --held-to "$confirmatory_curr_random_criterion" \
+  --from "$confirmatory_observations" --held-to "$confirmatory_agreement_criterion" \
   | grep '^COMP_')
 confirmatory_rewired_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude "$confirmatory_analysis" \
   --proposition "T shows a Delta_map advantage over rewired" \
@@ -266,14 +274,15 @@ confirmatory_curr_random_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude 
 # the four methods agree, not which way the science came out. All four
 # methods agree on non-rejection at 0.0125 for each control (Holm-adjusted
 # p saturates at 1.0000 for all three), so each criterion is satisfied.
-lab --date "$STAGE1D_CONFIRM_RESULTS" evaluate "$confirmatory_rewired_criterion" --value "t(24)=-0.812 p=0.4246, sign-flip p=0.4215, Wilcoxon p=0.4418, bootstrap CI [-0.0103,0.0061], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$confirmatory_rewired_claim" >/dev/null
-lab --date "$STAGE1D_CONFIRM_RESULTS" evaluate "$confirmatory_hist_random_criterion"    --value "t(24)=-0.824 p=0.4179, sign-flip p=0.4217, Wilcoxon p=0.2521, bootstrap CI [-0.0109,0.0060], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$confirmatory_hist_random_claim" >/dev/null
-lab --date "$STAGE1D_CONFIRM_RESULTS" evaluate "$confirmatory_curr_random_criterion"    --value "t(24)=-0.132 p=0.8958, sign-flip p=0.8950, Wilcoxon p=0.8119, bootstrap CI [-0.0096,0.0084], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$confirmatory_curr_random_claim" >/dev/null
-# lattice_agreement_criterion already evaluated in Part 1 -- the 4-way Holm
-# family DESIGN.md and FINDINGS.md report together spans both parts, but
-# no new structural criterion is minted for that grouping (see the module
-# note on #133, above); it stays descriptive, in the finding text and
-# this comment.
+lab --date "$STAGE1D_CONFIRM_RESULTS" evaluate "$confirmatory_agreement_criterion" --about "$confirmatory_rewired_claim"     --value "t(24)=-0.812 p=0.4246, sign-flip p=0.4215, Wilcoxon p=0.4418, bootstrap CI [-0.0103,0.0061], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$confirmatory_rewired_claim" >/dev/null
+lab --date "$STAGE1D_CONFIRM_RESULTS" evaluate "$confirmatory_agreement_criterion" --about "$confirmatory_hist_random_claim" --value "t(24)=-0.824 p=0.4179, sign-flip p=0.4217, Wilcoxon p=0.2521, bootstrap CI [-0.0109,0.0060], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$confirmatory_hist_random_claim" >/dev/null
+lab --date "$STAGE1D_CONFIRM_RESULTS" evaluate "$confirmatory_agreement_criterion" --about "$confirmatory_curr_random_claim" --value "t(24)=-0.132 p=0.8958, sign-flip p=0.8950, Wilcoxon p=0.8119, bootstrap CI [-0.0096,0.0084], Holm-adjusted 1.0000 -- all four agree: no rejection at 0.0125" --outcome pass --citing "$confirmatory_curr_random_claim" >/dev/null
+# lattice_agreement_criterion stays its own criterion and is evaluated in
+# Part 1. It is a different rule, not the same rule applied to a fourth
+# control: three methods on 10 matched d_k values, where the confirmatory
+# standard above is four methods on realization-level differences. What the
+# two share is the Holm bound and the family, which is the finding text's
+# business rather than the criterion's.
 
 say "the GPU bug: a clean, total-supersession replace"
 
@@ -326,7 +335,20 @@ lab --date "$STAGE1D_GPU_FIX" conclude "$gpu_fix_replacement" --replacing "$gpu_
 
 say "closing item 2, and checking whether item 1's promoted claim needed narrowing"
 
-lab --date "$STAGE1D_CONFIRM_RESULTS" close "$topology_specificity_enquiry" --answered-by "$lattice_comparison_claim" >/dev/null
+# **The headline, drawn across all four** (#146). Stage 1D's reported result
+# is "T shows no detectable advantage over ANY of the four tested controls",
+# which rests on four already-recorded claims and computes nothing new.
+# `analyse` would mint a run that never happened, so until `synthesise`
+# existed this enquiry closed on the lattice comparison alone -- naming one
+# control's result as the answer to a question about four.
+stage1d_headline=$(lab --date "$STAGE1D_CONFIRM_RESULTS" synthesise \
+  "T shows no detectable advantage over any of the four tested controls" \
+  --resting-on "$lattice_comparison_claim" \
+  --resting-on "$confirmatory_rewired_claim" \
+  --resting-on "$confirmatory_hist_random_claim" \
+  --resting-on "$confirmatory_curr_random_claim" | grep '^CLM_')
+
+lab --date "$STAGE1D_CONFIRM_RESULTS" close "$topology_specificity_enquiry" --answered-by "$stage1d_headline" >/dev/null
 
 say "checking the reopening hesitation a second time, same method"
 ask enquiry "$topology_specificity_enquiry"
