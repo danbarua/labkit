@@ -161,6 +161,57 @@ test("withdrawn, challenged and never-examined render apart", () => {
 });
 
 /**
+ * A synthesis measured nothing, so it reaches the last branch of the verdict
+ * — the one whose words are "nothing has examined this". Findings did examine
+ * it; what nobody recorded is whether they bear the sentence out or against
+ * it, because a synthesis may assert what its parts say or the negation of
+ * it. Bonsai's Stage 1D headline is the second kind, drawn across four claims
+ * and asserting that none of them holds.
+ */
+test("a synthesis declines the verdict and names its basis", () => {
+  const base: SupportExplanation = {
+    claim: ref("claim", "CLM_22"),
+    proposition: "T shows no detectable advantage over any of the four tested controls",
+    drawnAcross: [
+      { claim: ref("claim", "CLM_12"), asserts: "T shows an advantage over lattice" },
+      { claim: ref("claim", "CLM_17"), asserts: "T shows an advantage over rewired" },
+    ],
+    supported: false,
+    standing: "exploratory",
+    support: [],
+    reverifiedBy: [],
+    standard: [],
+    unmet: [],
+    restingOn: [],
+    superseded: [],
+    challenged: false,
+    against: [],
+    withdrawn: false,
+  };
+
+  const synthesis = renderWhy(base, PLAIN);
+  expect(synthesis).toContain("drawn across 2 findings");
+  expect(synthesis).not.toContain("NOT supported");
+  expect(synthesis).toContain("T shows an advantage over lattice");
+  // And not `Supported by / no supporting findings` one line under it, which
+  // is the same wrong answer in a different place.
+  expect(synthesis).not.toContain("no supporting findings");
+
+  // The same page with nothing drawn across is the never-examined case, and
+  // still says so — the branch is chosen by the basis, not by the absence of
+  // evidence, which both of these share.
+  const untouched = renderWhy({ ...base, drawnAcross: [] }, PLAIN);
+  expect(untouched).toContain("NOT supported");
+  expect(untouched).not.toContain("drawn across");
+
+  // A synthesis someone later withdrew, or challenged with its own evidence,
+  // keeps the state that says so: the new branch is the fall-through's, not a
+  // blanket rule about claims with a basis.
+  expect(renderWhy({ ...base, withdrawn: true }, PLAIN)).toContain("withdrawn");
+  expect(renderWhy({ ...base, challenged: true }, PLAIN)).toContain("challenged by evidence");
+});
+
+/**
  * The page that misled a reader into filing a defect against a correct record.
  *
  * A challenged claim has no supporting findings by definition, so whatever

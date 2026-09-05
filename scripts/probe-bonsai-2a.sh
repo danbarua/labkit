@@ -57,21 +57,43 @@
 # Stage 2A ran to completion. Fixed here, in the same pass as the rest of
 # #173's rewrite.
 #
-# **A second instance of #146, not a `reinterpret`.** Stage 2A's own
-# FINDINGS.md originally claimed "the four [evolved] graphs are not
-# equivalent [in task utility]" from eyeballing four non-overlapping
-# confidence intervals against a shared baseline -- external review found
+# **#146 is fixed, and this is the second transcript it was fixed for.**
+# Stage 2A's FINDINGS.md originally claimed "the four [evolved] graphs are
+# not equivalent [in task utility]" from eyeballing four non-overlapping
+# confidence intervals against a shared baseline; external review found
 # this overclaimed what separate CIs against one baseline can support, and
-# it was narrowed to "each graph individually beats pre-evolution" (the
-# four secondary conclusions transcribed below). Checked whether
-# `reinterpret` fits: it narrows an existing CLAIM's reading, and the
-# overclaim was never its own recorded conclusion in this transcription --
-# it was freehand synthesis over the four already-recorded claims, exactly
-# #146's shape ("no verb for a claim that synthesizes others without a new
-# computation"). Minting a claim just to reinterpret it would manufacture
-# the very thing #146 already names as missing (PJ-019: a refusal, and by
-# the same logic a correction, needs something real to act on). Commented
-# on #146 instead.
+# narrowed it to "each graph individually beats pre-evolution". That
+# narrowed sentence is what the four conclusions below say together -- no
+# new method, no new input, no output of its own -- so `analyse` would mint
+# a run that never happened, and until `synthesise` existed it had nowhere
+# to live at all. It is recorded below, resting on the four.
+#
+# The overclaim itself is still not minted. `reinterpret` narrows an
+# existing claim's reading, and the overclaim was never a recorded
+# conclusion here; minting one so that it could be corrected would
+# manufacture the very thing being corrected.
+#
+# **#150 is fixed, and the go/no-go gate is what it was about.** The
+# ladder's verdict is a measured pipeline-health check -- 240,000
+# evolutions, 276 classifier fits -- and its numbers came out of a real
+# observations record with a real content hash. `evaluate --citing` used to
+# take a claim and nothing else, so a check with no scientific claim behind
+# it recorded as asserted: the observation was written, captured into a
+# variable, and never referenced by the verdict it decided. It is cited
+# below.
+#
+# **The standing was simply wrong, and no fix was needed to correct it.**
+# `conclude --standing` has always taken it and this transcript never passed
+# it, so Stage 2A's locked, pre-registered primary comparison sat on the
+# record as `exploratory` -- the default, meaning scratch captured before
+# anyone knew it mattered. Both designs were locked before their runs
+# (`STAGE2A_DESIGN_LOCK` and `STAGE2A_COST_DESIGN_LOCK` precede their
+# results), so all five conclusions are prespecified and now say so.
+#
+# Prespecified is not promoted: `--standing confirmatory` is what the design
+# locked, `is <claim> confirmed` is what the result earned, and only the
+# primary comparison gets the second. #63 is where that distinction is
+# argued.
 #
 # **Yes, LabKit has somewhere to put an infrastructure/compute-cost
 # finding -- it needed no new structure, just its own line of enquiry.**
@@ -136,7 +158,7 @@ STAGE2A_LADDER_GO=2026-08-03T18:06:35.000Z
 go_no_go_observations=$(lab --date "$STAGE2A_LADDER_GO" observe "$external_task_enquiry" --name stage2a_go_no_go \
   --finding "0/240,000 (image,topology) evolutions failed; 0 non-finite features in any condition, any topology; 270/270 fold/C fits converged, 6/6 final refits converged" \
   --hash sha256:9da6b908 | grep '^ART_')
-lab --date "$STAGE2A_LADDER_GO" evaluate "$go_no_go_criterion" --value "0/240,000 solver failures, 0 non-finite features, 270/270 + 6/6 classifier fits converged -- OVERALL: GO" --outcome pass --gate "$go_no_go_gate" >/dev/null
+lab --date "$STAGE2A_LADDER_GO" evaluate "$go_no_go_criterion" --value "0/240,000 solver failures, 0 non-finite features, 270/270 + 6/6 classifier fits converged -- OVERALL: GO" --outcome pass --gate "$go_no_go_gate" --citing "$go_no_go_observations" >/dev/null
 ask gate "$go_no_go_gate"
 
 say "#98, checked directly: does the ladder's own task know why it exists?"
@@ -160,31 +182,52 @@ classification_confirmatory_analysis=$(lab --date "$STAGE2A_CONFIRMATORY" analys
   --from "$classification_confirmatory_observations" --implementing "$feasibility_ladder_task" \
   | grep '^COMP_')
 primary_classification_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
-  --proposition "runtime graph evolution on T improves classification over the already dynamically-encoded pre-evolution state" \
+  --proposition "runtime graph evolution on T improves classification over the already dynamically-encoded pre-evolution state" --standing confirmatory \
   --finding "mean d_i=-0.2491, 95% CI [-0.2721,-0.2266], entirely below zero; McNemar p=6.68e-104 (1,234 test images correct only under evolved_T vs 384 only under pre-evolution)" \
   --bearing supports | grep '^CLM_')
 lattice_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
-  --proposition "runtime graph evolution on the matched lattice control improves classification over pre-evolution" \
+  --proposition "runtime graph evolution on the matched lattice control improves classification over pre-evolution" --standing confirmatory \
   --finding "mean d_i=-0.1743, 95% CI [-0.1930,-0.1557], entirely below zero, McNemar p=1.55e-56" \
   --bearing supports | grep '^CLM_')
 rewired_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
-  --proposition "runtime graph evolution on the canonical rewired control improves classification over pre-evolution" \
+  --proposition "runtime graph evolution on the canonical rewired control improves classification over pre-evolution" --standing confirmatory \
   --finding "mean d_i=-0.2819, 95% CI [-0.3074,-0.2570], entirely below zero, McNemar p=9.76e-133" \
   --bearing supports | grep '^CLM_')
 curr_random_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
-  --proposition "runtime graph evolution on the canonical current-random control improves classification over pre-evolution" \
+  --proposition "runtime graph evolution on the canonical current-random control improves classification over pre-evolution" --standing confirmatory \
   --finding "mean d_i=-0.3049, 95% CI [-0.3303,-0.2797], entirely below zero, McNemar p=8.42e-138" \
   --bearing supports | grep '^CLM_')
 
 # Promoted: this is the primary, locked, sole confirmatory comparison
 # (DESIGN.md) and the strongest positive Level 3 result this project has
-# produced. The three secondary claims stay unpromoted -- descriptive
-# context per DESIGN.md's own primary/secondary hierarchy, same treatment
-# Stage 1D's four non-promoted "challenges" claims got, mirrored here for
-# "supports" claims that are real but not the locked primary.
+# produced. All four are `--standing confirmatory` above, because all four
+# were prespecified; only this one is promoted. The three secondaries stay
+# unpromoted -- descriptive context per DESIGN.md's own primary/secondary
+# hierarchy, same treatment Stage 1D's four non-promoted "challenges"
+# claims got, mirrored here for "supports" claims that are real but not the
+# locked primary.
 lab --date "$STAGE2A_CONFIRMATORY" is "$primary_classification_claim" confirmed --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, confirmed by an independent McNemar test on the same disagreement" >/dev/null
 
+# **The narrowed headline, drawn across all four** (#146). FINDINGS.md's
+# first version claimed the four evolved graphs are not equivalent in task
+# utility, which four separate CIs against one shared baseline cannot
+# support; review narrowed it to what those four CIs do say. That sentence
+# computes nothing new -- it is the four conclusions above, together -- so
+# `analyse` would mint a run that never happened and there was nowhere else
+# to put it.
+four_graphs_headline=$(lab --date "$STAGE2A_CONFIRMATORY" synthesise \
+  "each of the four tested graphs individually improves classification over the dynamically-encoded pre-evolution state" \
+  --resting-on "$primary_classification_claim" \
+  --resting-on "$lattice_secondary_claim" \
+  --resting-on "$rewired_secondary_claim" \
+  --resting-on "$curr_random_secondary_claim" | grep '^CLM_')
+ask why "$four_graphs_headline"
+
 say "closing the externally-defined-task question, and checking the reopening hesitation a third time"
+# Closed on the primary, not the synthesis: the question asked whether the
+# mapping links to an externally defined task, and T's locked comparison is
+# what answers it. The synthesis is the wider statement about the controls
+# as well, which is context rather than the answer.
 lab --date "$STAGE2A_CONFIRMATORY" close "$external_task_enquiry" --answered-by "$primary_classification_claim" >/dev/null
 ask enquiry "$external_task_enquiry"
 ask known
@@ -212,7 +255,7 @@ compute_cost_analysis=$(lab --date "$STAGE2A_COST_RESULTS" analyse "$compute_cos
   --method "closed-form per-image cost model (Train_readout + N*Infer_readout vs Train_MLP + N*Infer_MLP), solved algebraically for the break-even N at every topology/baseline pair" \
   --from "$compute_cost_observations" | grep '^COMP_')
 compute_cost_claim=$(lab --date "$STAGE2A_COST_RESULTS" conclude "$compute_cost_analysis" \
-  --proposition "the oscillator readout becomes cheaper than an MLP baseline at some deployment scale" \
+  --proposition "the oscillator readout becomes cheaper than an MLP baseline at some deployment scale" --standing confirmatory \
   --finding "no crossover exists at any plausible deployment scale -- the oscillator is strictly more expensive than either MLP baseline from N=1 to N=100,000,000, and the gap widens with scale rather than narrowing" \
   --bearing challenges | grep '^CLM_')
 lab --date "$STAGE2A_COST_RESULTS" close "$compute_cost_enquiry" --answered-by "$compute_cost_claim" >/dev/null

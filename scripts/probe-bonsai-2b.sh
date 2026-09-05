@@ -11,6 +11,17 @@
 # **Rewritten for #173** (`conclude` is the primitive; `analyse` no longer
 # takes `--concludes` JSON). Variables are named for what the handle IS.
 #
+# **The standing was simply wrong, and no fix was needed to correct it.**
+# `conclude --standing` has always taken it and this transcript never passed
+# it, so a locked stage-4 confirmatory result sat on the record as
+# `exploratory`. The design was locked on 2026-08-05
+# (`STAGE2B_DESIGN_LOCK`) and the run is four days later, so both
+# conclusions below are prespecified and now say so.
+#
+# Prespecified is not promoted: `--standing confirmatory` is what the design
+# locked, `is <claim> confirmed` is what the result earned, and only the
+# primary gets the second. #63 is where that distinction is argued.
+#
 # Stage 2B's own scientific question (does runtime graph evolution improve
 # single-step active-support denoising, the Stage-2A-shaped question for
 # reconstruction instead of classification), compressed feasibility ladder,
@@ -65,11 +76,11 @@ stage4_confirmatory_analysis=$(lab --date "$STAGE2B_STAGE4" analyse "$denoising_
   --method "primary paired class-stratified bootstrap (d_i = MSE_i(T) - MSE_i(pre_evolution), 20,000 resamples, seed=42, two-sided 95% percentile interval); denoising gate (T vs identity) evaluated only because the primary succeeded, never rescuing a failed primary; two Holm-corrected families (3-way controls-vs-pre, 6-way pairwise among the four evolved graphs) with a 100,000-flip sign-flip robustness check on family 2" \
   --from "$stage4_confirmatory_observations" | grep '^COMP_')
 primary_denoising_claim=$(lab --date "$STAGE2B_STAGE4" conclude "$stage4_confirmatory_analysis" \
-  --proposition "runtime graph evolution on T improves single-step active-support reconstruction over the already dynamically-encoded pre-evolution state" \
+  --proposition "runtime graph evolution on T improves single-step active-support reconstruction over the already dynamically-encoded pre-evolution state" --standing confirmatory \
   --finding "primary: mean d_i=-0.0044509, 95% CI [-0.0046028,-0.0043002], entirely below zero; denoising gate (T vs identity) also entirely below zero, CI [-0.1335739,-0.1328960] -- the actual-denoising claim is added to the primary reconstruction claim, not just the weaker relative one" \
   --bearing supports | grep '^CLM_')
 unique_winner_claim=$(lab --date "$STAGE2B_STAGE4" conclude "$stage4_confirmatory_analysis" \
-  --proposition "T is the unique winner among the four tested evolved graphs on this task" \
+  --proposition "T is the unique winner among the four tested evolved graphs on this task" --standing confirmatory \
   --finding "all three controls beat pre_evolution (Family 1, Holm-rejected); T beats each of the other three evolved graphs after Family-2 Holm correction (vs lattice t=-8.74 p=2.73e-18; vs rewired t=-38.10; vs curr_random t=-26.85), all six pairwise Holm-rejected, sign-flip robustness agreeing in direction and significance on all six; not established that T beats the CNN overall -- a separate model class outside both statistics families, mean clipped MSE 0.063069 vs T's 0.065623, reported descriptively per DESIGN.md's own framing" \
   --bearing supports | grep '^CLM_')
 

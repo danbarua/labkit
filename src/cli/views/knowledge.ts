@@ -111,6 +111,10 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
  */
 export function renderWhy(why: SupportExplanation, p: Palette): string {
   const undecided = why.standing === "undecided";
+  // A claim drawn across others and carrying no evidence of its own: what
+  // `synthesise` writes, and the case several branches below have to decline
+  // rather than answer.
+  const synthesis = why.drawnAcross.length > 0 && why.support.length === 0;
   // Four ways to be unsupported, and they are different states the page says
   // in words: settles-nothing, withdrawn, challenged, and nothing found yet.
   const verdict = why.supported
@@ -121,7 +125,17 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
         ? p.provisional("NOT supported — withdrawn; the record no longer asserts this wording")
         : why.challenged
           ? p.contested("NOT supported — challenged by evidence bearing against it")
-          : p.untested("NOT supported");
+          : // A synthesis measured nothing, so it has no evidence of its own and
+            // falls to the last branch, whose words are "nothing has examined
+            // this". Four findings did. Whether they bear the sentence out is not
+            // something the record can work out: a synthesis may assert what its
+            // parts say or the negation of it — Bonsai's Stage 1D headline rests
+            // on four claims and asserts that none of them holds — and nothing
+            // records which. So this declines the verdict and names the basis
+            // rather than picking the wrong one.
+            synthesis
+            ? p.quiet(`drawn across ${why.drawnAcross.length} findings`)
+            : p.untested("NOT supported");
   return [
     p.heading(`"${why.proposition}"`),
     `  ${verdict}, ${why.standing}`,
@@ -140,17 +154,22 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
     // direction that state has overridden, under a heading that picks a side
     // directly below a verdict line saying nobody has. Merged rather than
     // hidden: each line still carries how the finding was recorded.
-    p.heading(undecided ? "Findings" : "Supported by"),
-    bullets(
-      (undecided ? [...why.support, ...why.against] : why.support).map(
-        (s) =>
-          `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${p.handle(s.analysis)}${p.quiet(")")}` +
-          (undecided && why.against.includes(s as (typeof why.against)[number])
-            ? `  ${p.quiet("recorded as bearing against")}`
-            : ""),
-      ),
-      undecided ? "no findings" : "no supporting findings",
-    ),
+    // A synthesis has no findings of its own, and `Supported by / no supporting
+    // findings` directly under a verdict line reading "drawn across 4 findings"
+    // is the same wrong answer one line lower. Its basis is `Drawn across`.
+    synthesis ? "" : p.heading(undecided ? "Findings" : "Supported by"),
+    synthesis
+      ? ""
+      : bullets(
+          (undecided ? [...why.support, ...why.against] : why.support).map(
+            (s) =>
+              `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${p.handle(s.analysis)}${p.quiet(")")}` +
+              (undecided && why.against.includes(s as (typeof why.against)[number])
+                ? `  ${p.quiet("recorded as bearing against")}`
+                : ""),
+          ),
+          undecided ? "no findings" : "no supporting findings",
+        ),
     !undecided && why.against.length
       ? `\nBearing against\n${bullets(
           why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis})`),
