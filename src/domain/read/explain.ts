@@ -530,6 +530,10 @@ async function explainCriterion(self: ReadSurface, subject: string): Promise<Cri
     // the two alike would make a judgement read as a reading.
     wording:
       `${e.outcome === "pass" ? "passed" : "failed"}: ${e.value}` +
+      // Which finding this verdict judged, when one rule was applied to
+      // several. Without it four verdicts under one criterion are four
+      // lines a reader cannot tell apart.
+      `${e.about ? ` about ${e.about}` : ""}` +
       `${e.withdrawn ? " (withdrawn)" : ""}` +
       (e.basis.length === 0
         ? " — asserted"

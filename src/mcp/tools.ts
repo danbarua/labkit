@@ -952,15 +952,23 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           `ids of what decided the verdict: a claim (${CLAIM_PREFIX}4), an observations ` +
             `record (${OBSERVATIONS_PREFIX}7), or a finding (${EVIDENCE_PREFIX}2)`,
         ),
+      about: z
+        .string()
+        .optional()
+        .describe(
+          `id of the finding this verdict judges, when one criterion is applied to several — ` +
+            `e.g. ${CLAIM_PREFIX}12. Omit when the check is evaluated as a whole.`,
+        ),
     },
     outputSchema: evaluatedCriterionSchema,
-    handler: (write, { criterion, value, outcome, gate, citing }) =>
+    handler: (write, { criterion, value, outcome, gate, citing, about }) =>
       write.evaluateCriterion({
         criterion: ref("criterion", criterion),
         value,
         outcome: outcome as "pass" | "fail",
         ...(gate === undefined ? {} : { gate: ref("gate", gate) }),
         // Prefix, never `typeof`: all three arms are "string" at runtime.
+        ...(about === undefined ? {} : { about: ref("claim", about) }),
         ...(citing === undefined
           ? {}
           : {

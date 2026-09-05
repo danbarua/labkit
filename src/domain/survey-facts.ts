@@ -10,7 +10,7 @@
 
 import { optional, vertexProps } from "../db/cypher";
 import { ref } from "./report";
-import type { CheckStatus, EvaluationRecord, EvidenceRef } from "./report";
+import type { CheckStatus, ClaimRef, EvaluationRecord, EvidenceRef } from "./report";
 import type { Derived, Leaf, Row } from "./facts";
 
 /** Shapes the folds below assert. A row is decoded, not typed, at the seam. */
@@ -142,11 +142,13 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
     // resting on a challenging finding would simply never match. The fold
     // below reads both.
     clause: `${evaluationClause}
+           OPTIONAL MATCH (ev)-[:ABOUT]->(judged:Claim)
            OPTIONAL MATCH (ev)-[:BASED_ON]->(basis:Evidence)
            OPTIONAL MATCH (basis)-[:SUPPORTS]->(supported:Claim)<-[:SUPERSEDES]-(:Decision)
            OPTIONAL MATCH (basis)-[:CHALLENGES]->(challenged:Claim)<-[:SUPERSEDES]-(:Decision)`,
     yields: {
       ev: optional(vertexProps<EvaluationNode>()),
+      judged: optional(vertexProps<Node>()),
       basis: optional(vertexProps<Node>()),
       supported: optional(vertexProps<Node>()),
       challenged: optional(vertexProps<Node>()),
@@ -154,12 +156,17 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
     empty: () => ({ cited: 0, standing: 0, outcome: null, at: "", value: "", basis: [] }),
     fold: (verdict, row) => {
       const evaluation = row.ev as EvaluationNode | null;
+      const judged = row.judged as Node | null;
       const seen: Verdict = evaluation
         ? {
             ...verdict,
             outcome: evaluation.outcome,
             at: evaluation.evaluated_at,
             value: evaluation.value,
+            // Present only when the act named one. Absent is the ordinary
+            // case — a criterion evaluated as a whole — and must stay
+            // absent rather than becoming a placeholder.
+            ...(judged ? { about: ref("claim", judged.natural_id) } : {}),
           }
         : verdict;
       const basis = row.basis as BasisNode | null;
@@ -194,6 +201,8 @@ export interface Verdict {
   value: string;
   /** The findings it was reached against, deduplicated by handle. */
   basis: { evidence: EvidenceRef; states: string }[];
+  /** The finding it judged, when one criterion is applied to several (#133). */
+  about?: ClaimRef;
 }
 
 /** The four states a prespecified condition can be in. */
@@ -314,6 +323,7 @@ function recordsOf(
     outcome: (v.outcome ?? "pass") as "pass" | "fail",
     at: v.at,
     basis: v.basis,
+    ...(v.about ? { about: v.about } : {}),
     ...(retracted(v) ? { withdrawn: true as const } : {}),
   }));
 }
@@ -383,6 +393,7 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus> {
                 evaluation: decided.evaluation,
                 outcome: decided.outcome,
                 at: decided.at,
+                ...(decided.about ? { about: decided.about } : {}),
               },
             }
           : {}),
