@@ -253,15 +253,6 @@ export interface EventFilter {
 export interface EventSink {
   /** Returns the stored event, `seq` included -- the caller built one without it. */
   record(event: DomainEvent): Promise<DomainEvent>;
-  /**
-   * Called once the event has been projected into the graph.
-   *
-   * The graph is a projection of the stream, so anything that reads the graph
-   * in response to an event has to run after that projection, not inside
-   * `record` — which happens first, by design, and sees the record as it stood
-   * *before* the act.
-   */
-  projected?(event: DomainEvent): Promise<void>;
   /** Everything recorded so far, oldest first. */
   all(): Promise<readonly DomainEvent[]>;
   /** The subset a caller asked for, oldest first. */

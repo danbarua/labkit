@@ -1,4 +1,13 @@
-/** The graph as a projection of the event stream. */
+/**
+ * The graph as a projection of the event stream, and the seam that makes it
+ * one consumer rather than the privileged one.
+ *
+ * `GraphChange` is a write-ahead record for a graph store — a node created, an
+ * edge created, properties changed — so anything fed the same stream in the
+ * same order builds the same state. {@link graphProjector} is what does that
+ * for AGE; a second store would be a second {@link Projector} and no change to
+ * a verb.
+ */
 
 import type {
   EdgeLabel,
@@ -26,15 +35,33 @@ function nodeCreated<L extends NodeLabel>(
   return { change: "NodeCreated", id, label, props } as Extract<NodeCreated, { label: L }>;
 }
 
+/**
+ * Where a new record's id comes from.
+ *
+ * The one thing staging needs from a store, named so that it is the *only*
+ * thing: a `UnitOfWork` used to hold a whole `TenantGraph` to reach
+ * `reserveId`, which put the graph on the command side of the pipeline for a
+ * counter's worth of reason. A counter is a valid implementation, which is
+ * what makes the staging half testable with no database at all.
+ */
+export interface IdSource {
+  reserve(label: NodeLabel): Promise<string>;
+}
+
+/** The natural-id sequences, which are the record's own id source. */
+export const naturalIds = (graph: TenantGraph): IdSource => ({
+  reserve: (label) => graph.reserveId(label),
+});
+
 /** One command's changes, accumulated in the order the command made them. */
 export class UnitOfWork {
   readonly changes: GraphChange[] = [];
 
-  constructor(private readonly graph: TenantGraph) {}
+  constructor(private readonly ids: IdSource) {}
 
   /** Reserves an id and records the node under it. */
   async node<L extends NodeLabel>(label: L, props: NodePropsByLabel[L]): Promise<string> {
-    const id = await this.graph.reserveId(label);
+    const id = await this.ids.reserve(label);
     this.changes.push(nodeCreated(id, label, { ...props }));
     return id;
   }
@@ -51,6 +78,26 @@ export class UnitOfWork {
     return this.changes;
   }
 }
+
+/**
+ * Something that builds state from the stream.
+ *
+ * **Runs inside the act's transaction**, on the same connection, so a
+ * projection failure rolls the act back with it. That is deliberate and is the
+ * whole of what this seam currently promises: an out-of-process consumer reads
+ * the committed log on its own terms, and is not one of these.
+ *
+ * Order is the caller's list order and is load-bearing — a projector that
+ * *reads* the graph must come after the one that *writes* it.
+ */
+export interface Projector {
+  apply(event: DomainEvent): Promise<void>;
+}
+
+/** The AGE graph, as one consumer of the stream. */
+export const graphProjector = (graph: TenantGraph): Projector => ({
+  apply: (event) => applyDelta(graph, event),
+});
 
 /** Writes an event's changes into the graph, in the order the act made them. */
 export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {

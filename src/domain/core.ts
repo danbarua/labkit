@@ -31,6 +31,7 @@ import {
   inMemoryEventLog,
   systemClock,
 } from "./events";
+import { graphProjector, type Projector } from "./projection";
 import type {
   ClaimRef,
   AnalysisRef,
@@ -65,6 +66,16 @@ import { ref } from "./report";
  */
 export interface ResearchSessionOptions extends Partial<CommandContext> {
   events?: EventSink;
+  /**
+   * What builds state from this session's events, in order.
+   *
+   * Defaults to the graph alone, which is what every caller wants and why no
+   * composition root passes this. A second entry is how a consumer joins the
+   * stream without a verb changing — `fragments/run.ts` adds the provenance
+   * projector that way, after the graph, because it reads what the graph was
+   * just told.
+   */
+  projectors?: Projector[];
 }
 
 /**
@@ -99,6 +110,7 @@ export class SessionCore {
    */
   protected readonly attribution: AttributionContext;
   readonly events: EventSink;
+  protected readonly projectors: Projector[];
 
   constructor(
     protected readonly graph: TenantGraph,
@@ -107,6 +119,7 @@ export class SessionCore {
     this.clock = options.clock ?? systemClock;
     this.attribution = options.attribution ?? UNATTRIBUTED;
     this.events = options.events ?? inMemoryEventLog();
+    this.projectors = options.projectors ?? [graphProjector(graph)];
   }
 
   /**
