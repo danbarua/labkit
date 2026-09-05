@@ -24,6 +24,7 @@
  * under `<cwd>/.labkit` and a test must not write into the repo.
  */
 
+import pkg from "../package.json" with { type: "json" };
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -89,6 +90,24 @@ afterAll(async () => {
   await client.close().catch(() => {});
   rmSync(workdir, { recursive: true, force: true });
 });
+
+/**
+ * **Over the wire, not off the constructor.** `serverInfo.version` reaches a
+ * client through the `initialize` response, and asserting the value handed to
+ * `new McpServer` would pass while the wire said something else.
+ *
+ * It said `0.0.1` from before the first release until 2026-09-05 (#282) while
+ * `labkit --version` was right — one binary, two surfaces, disagreeing about
+ * what they were. A client that displays the field faithfully showed a wrong
+ * answer that reads as sourced, which is worse than an absent one.
+ */
+test(
+  "the launched server tells a client the version the package says",
+  async () => {
+    expect(client.getServerVersion()).toMatchObject({ name: "labkit", version: pkg.version });
+  },
+  COLD_START,
+);
 
 test(
   "the launched server lists its tools",

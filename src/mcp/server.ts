@@ -34,6 +34,7 @@
  * src/db/trace.ts) writes to stderr, which is why it can be left on here.
  */
 
+import pkg from "../../package.json" with { type: "json" };
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "../request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -134,7 +135,17 @@ export function buildServer(
   session: SessionRegistry,
   { readOnly = false }: { readOnly?: boolean } = {},
 ): McpServer {
-  const server = new McpServer({ name: "labkit", version: "0.0.1" });
+  // The package's version, not a constant: `serverInfo.version` is what the
+  // MCP spec has for "which build am I talking to", and a client displaying a
+  // hardcoded one reads as sourced while being wrong. It said `0.0.1` from
+  // before the first release until 2026-09-05, while `labkit --version` was
+  // right — one binary, two surfaces, disagreeing about what they were.
+  //
+  // The same bundled import the CLI uses (`src/cli/program.ts`), so a compiled
+  // binary carries the value inlined rather than reading a file that is not
+  // there — `import ... with { type: "json" }` is resolved at build time, which
+  // is why this needs none of `src/db/migrations.ts`'s asset handover.
+  const server = new McpServer({ name: "labkit", version: pkg.version });
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
   // loop below registers. A resource rather than a tool because it takes no
