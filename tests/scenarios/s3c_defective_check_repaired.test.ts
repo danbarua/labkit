@@ -143,7 +143,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: claimOf(firstRunClaims, DISAGREES),
+      citing: [claimOf(firstRunClaims, DISAGREES)],
     });
 
     // Same check, run again, unchanged. Nobody found anything wrong with the
@@ -161,7 +161,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: claimOf(secondRunClaims, AGREES),
+      citing: [claimOf(secondRunClaims, AGREES)],
     });
 
     const why = await session.whySupported(claimOf(analysisClaims, PROPOSITION));
@@ -208,7 +208,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: claimOf(defectiveClaims, DISAGREES),
+      citing: [claimOf(defectiveClaims, DISAGREES)],
     });
     expect((await session.whySupported(claimOf(analysisClaims, PROPOSITION))).supported).toBe(
       false,
@@ -241,7 +241,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: await claimNamed(session, AGREES),
+      citing: [await claimNamed(session, AGREES)],
     });
 
     const why = await session.whySupported(claimOf(analysisClaims, PROPOSITION));
@@ -292,7 +292,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       gate,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: claimOf(defectiveClaims, DISAGREES),
+      citing: [claimOf(defectiveClaims, DISAGREES)],
     });
     expect((await session.gateStatus(gate)).state).toBe("blocked");
 
@@ -321,7 +321,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       gate,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: await claimNamed(session, AGREES),
+      citing: [await claimNamed(session, AGREES)],
     });
 
     const status = await (await afterwards()).gateStatus(gate);
@@ -355,7 +355,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: claimOf(failedClaims, DISAGREES),
+      citing: [claimOf(failedClaims, DISAGREES)],
     });
     const { claims: rerunClaims } = await theCheckIsRun(
       enquiry,
@@ -370,7 +370,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: claimOf(rerunClaims, AGREES),
+      citing: [claimOf(rerunClaims, AGREES)],
     });
 
     const reader = await afterwards();
@@ -471,7 +471,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: claimOf(defectiveClaims, DISAGREES),
+      citing: [claimOf(defectiveClaims, DISAGREES)],
     });
 
     // The check is found faulty and retired. Nobody has re-run it yet.
@@ -538,7 +538,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
-      citing: claimOf(defectiveClaims, DISAGREES),
+      citing: [claimOf(defectiveClaims, DISAGREES)],
     });
 
     // Retire the proposition the replacement is going to try to re-assert, so
@@ -609,7 +609,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       gate,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: claimOf(passingClaims, AGREES),
+      citing: [claimOf(passingClaims, AGREES)],
     });
     expect((await session.gateStatus(gate)).state).toBe("satisfied");
 

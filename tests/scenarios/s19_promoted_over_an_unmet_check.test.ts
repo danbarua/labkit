@@ -156,7 +156,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
       criterion: check,
       outcome: "pass",
       value: "loss 3.6 vs 3.8 baseline",
-      citing: claim,
+      citing: [claim],
     });
 
     const later = await afterwards();
@@ -205,7 +205,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
       criterion: check,
       outcome: "pass",
       value: "loss 3.6 vs 3.8 baseline",
-      citing: claim,
+      citing: [claim],
     });
     await session.is({ claim, state: "confirmed", because: "the answer is no, and we checked" });
     await session.closeEnquiry({ enquiry, answeredBy: claim });

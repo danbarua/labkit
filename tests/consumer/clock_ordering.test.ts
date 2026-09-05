@@ -89,7 +89,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
         criterion: check,
         value: "spread 0.4 steps",
         outcome: "pass",
-        citing: claimOf(analysisClaims, CONVERGES),
+        citing: [claimOf(analysisClaims, CONVERGES)],
       });
 
       // A month later the question is closed -- a Decision, and the act that
@@ -247,7 +247,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         criterion: check,
         value: "within tolerance",
         outcome: "pass",
-        citing: claimOf(analysisClaims, prop),
+        citing: [claimOf(analysisClaims, prop)],
       });
       return { enquiry, analysis, analysisClaims, prop };
     };

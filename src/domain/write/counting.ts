@@ -1,10 +1,11 @@
 /** The conditions a result will be held to, agreed before it exists. */
 
 import { optional, scalar, vertexProps } from "../../db/cypher";
-import type { Prose } from "../../db/domain";
+import { labelForNaturalId, type Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import type {
   AmendmentReport,
+  ClaimRef,
   CriterionRef,
   DeclaredGate,
   DecisionRef,
@@ -17,6 +18,7 @@ import type {
 import { ref } from "../report";
 import type {
   AmendDesignCommand,
+  CitedBasis,
   DeclareGateCommand,
   EvaluateCriterionCommand,
   PlanWorkCommand,
@@ -125,12 +127,8 @@ export class Counting extends SessionCore {
       // a criterion can do: an evaluation that neither triggers a gate nor bears
       // on a finding held to it is durable nonsense no reader would ever surface.
       else await this.assertCriterionQualifiesSomething(input.criterion);
-      let basis: EvidenceRef | undefined;
-      if (input.citing) {
-        const found = await this.findingOn(input.citing);
-        if (!found) throw new Error(noFindingBearsOn(input.citing));
-        basis = found.evidence;
-      }
+      const basis: EvidenceRef[] = [];
+      for (const cited of input.citing ?? []) basis.push(await this.evidenceFor(cited));
       const at = this.clock.now();
 
       const evaluation = ref(
@@ -146,7 +144,7 @@ export class Counting extends SessionCore {
       // What the verdict was reached against. Without it, a condition
       // established by measurement and one asserted by an agent return
       // identical records.
-      if (basis) unitOfWork.edge(evaluation, "BASED_ON", basis);
+      for (const on of new Set(basis)) unitOfWork.edge(evaluation, "BASED_ON", on);
 
       return {
         subject: evaluation,
@@ -290,6 +288,36 @@ export class Counting extends SessionCore {
       if (latest) return ref("decision", latest);
     }
     return undefined;
+  }
+
+  /**
+   * The evidence a citation names, by whichever route the caller held.
+   *
+   * One hop, inferred rather than restated: a claim knows the finding that
+   * bears on it and an observations record knows the finding recorded in it,
+   * so a caller who named either has already said which evidence. An evidence
+   * handle is already the answer.
+   */
+  private async evidenceFor(cited: CitedBasis): Promise<EvidenceRef> {
+    const label = labelForNaturalId(cited);
+    if (label === "Evidence") return cited as EvidenceRef;
+    if (label === "Claim") {
+      const found = await this.findingOn(cited as ClaimRef);
+      if (!found) throw new Error(noFindingBearsOn(cited as ClaimRef));
+      return found.evidence;
+    }
+    const rows = await this.graph.query(
+      `MATCH (e:Evidence)-[:RECORDED_IN]->(:Artefact {natural_id: $id}) RETURN e`,
+      { e: vertexProps<{ natural_id: string }>() },
+      { id: cited },
+    );
+    const found = rows[0];
+    if (!found)
+      throw new Error(
+        `no finding is recorded in ${cited}; a verdict rests on evidence, and observations ` +
+          `produce it when they are recorded — cite the observations a check actually read`,
+      );
+    return ref("evidence", found.e.natural_id);
   }
 
   private async assertCriterionGovernsGate(criterion: CriterionRef, gate: GateRef): Promise<void> {

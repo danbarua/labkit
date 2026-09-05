@@ -196,7 +196,7 @@ describe("every tool answers when an agent actually calls it", () => {
         value: "1.4",
         outcome: "pass",
         gate: id(gate),
-        citing: claim,
+        citing: [claim],
       });
       const status = await call(c, "gate_status", { gate: id(gate) });
       expect(status.state).toBe("satisfied");

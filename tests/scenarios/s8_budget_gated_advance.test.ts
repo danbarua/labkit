@@ -145,7 +145,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: claimOf(measuredClaims, THROUGHPUT),
+      citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
 
     const status = await session.gateStatus(programme.advancement);
@@ -169,7 +169,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: claimOf(measuredClaims, THROUGHPUT),
+      citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
 
     const status = await session.gateStatus(programme.advancement);
@@ -215,7 +215,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: claimOf(measuredClaims, THROUGHPUT),
+      citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
     // The same verdict, asserted rather than measured.
     await session.evaluateCriterion({
@@ -303,7 +303,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       gate: programme.advancement,
       value: "44 images per second",
       outcome: "pass",
-      citing: claimOf(measuredClaims, THROUGHPUT),
+      citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
 
     const later = await afterwards();
@@ -327,7 +327,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
         gate: programme.advancement,
         value: "44 images per second",
         outcome: "pass",
-        citing: ref("claim", "CLM_99999"),
+        citing: [ref("claim", "CLM_99999")],
       }),
     ).rejects.toThrow(/no finding bears on claim CLM_99999/);
 

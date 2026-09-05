@@ -379,7 +379,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       gate,
       value: "5/5 seeds",
       outcome: "pass",
-      citing: claimOf(analysisClaims, MOVES),
+      citing: [claimOf(analysisClaims, MOVES)],
     });
     await s.closeEnquiry({
       enquiry,

@@ -409,7 +409,7 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
         gate,
         value: "9e-9",
         outcome: "fail",
-        citing: claimOf(analysisClaims, "the solver converges"),
+        citing: [claimOf(analysisClaims, "the solver converges")],
       }),
     ).rejects.toThrow(/injected/);
     graph.createEdge = realCreateEdge;
@@ -499,7 +499,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
     gate,
     value: "9e-9",
     outcome: "fail",
-    citing: claimOf(analysisClaims, "the solver converges"),
+    citing: [claimOf(analysisClaims, "the solver converges")],
   });
   const before = await session.gateStatus(gate);
   expect((await evaluationsOf(session, before.checks[0]!))[0]?.basis?.map((b) => b.states)).toEqual(

@@ -381,7 +381,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
         criterion: w.criterion,
         value: "raw scale",
         outcome: "fail",
-        citing: cites === "revisited" ? w.revisited : w.stands,
+        citing: [cites === "revisited" ? w.revisited : w.stands],
       });
       await theLogScaleReAnalysis(w);
       const why = await (await afterwards()).whySupported(w.stands);

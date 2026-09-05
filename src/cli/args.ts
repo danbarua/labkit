@@ -20,6 +20,7 @@ import { InvalidArgumentError } from "commander";
 import { z } from "zod";
 import { ref, kindOf } from "../domain/report";
 import type { AnyRef } from "../domain/report";
+import type { CitedBasis } from "../domain/commands";
 import type {
   AnalysisRef,
   ClaimRef,
@@ -123,6 +124,25 @@ export function supersededRef(raw: string): ClaimRef | EvidenceRef {
   throw new InvalidArgumentError(
     `\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…); ` +
       `both come back from the act that recorded them, and 'why' names them for a claim already on the record`,
+  );
+}
+
+/**
+ * What a verdict may be cited as resting on: a claim, an observations record,
+ * or a finding.
+ *
+ * Three prefixes hand-listed, like `supersededRef` above and for the same
+ * reason — this verb reads one of three specific things, not anything on the
+ * record. The domain resolves whichever is given to the `Evidence` underneath
+ * it.
+ */
+export function citedBasis(raw: string): CitedBasis {
+  if (raw.startsWith("CLM_")) return handle("claim")(raw);
+  if (raw.startsWith("ART_")) return handle("observations")(raw);
+  if (raw.startsWith("EV_")) return handle("evidence")(raw);
+  throw new InvalidArgumentError(
+    `\`${raw}\` is not a claim (CLM_…), an observations record (ART_…) or a finding (EV_…); ` +
+      `a verdict rests on evidence, and each of those names some`,
   );
 }
 

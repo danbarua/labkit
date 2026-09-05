@@ -103,7 +103,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       criterion: primary,
       value: "p = 0.002",
       outcome: "pass",
-      citing: claimOf(analysisClaims, PROPOSITION),
+      citing: [claimOf(analysisClaims, PROPOSITION)],
     });
     await session.evaluateCriterion({
       criterion: median,
@@ -138,7 +138,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       criterion: primary,
       value: "p = 0.002",
       outcome: "pass",
-      citing: claimOf(analysisClaims, PROPOSITION),
+      citing: [claimOf(analysisClaims, PROPOSITION)],
     });
     await session.evaluateCriterion({
       criterion: median,
@@ -202,7 +202,7 @@ describe("S-3b: the same design with nothing downstream", () => {
         criterion,
         value: "agrees",
         outcome: "pass",
-        citing: claimOf(analysisClaims, PROPOSITION),
+        citing: [claimOf(analysisClaims, PROPOSITION)],
       });
     }
 
@@ -309,7 +309,7 @@ describe("S-3b: the same design with nothing downstream", () => {
       criterion: primary,
       value: "p = 0.002",
       outcome: "pass",
-      citing: claimOf(analysisClaims, PROPOSITION),
+      citing: [claimOf(analysisClaims, PROPOSITION)],
     });
     await session.evaluateCriterion({
       criterion: median,

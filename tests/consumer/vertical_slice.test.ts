@@ -125,7 +125,7 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
             ? "spread 0.4 steps across five seeds"
             : "spread 11 steps across five seeds",
         outcome,
-        citing: claimOf(analysisClaims, CONVERGES),
+        citing: [claimOf(analysisClaims, CONVERGES)],
       });
       return s.whySupported(claimOf(analysisClaims, CONVERGES));
     };
