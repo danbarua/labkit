@@ -59,8 +59,13 @@ export function renderGate(status: GateStatus, p: Palette): string {
   const check = (c: CheckStatus): string => {
     // The verdict's own sentence is not here -- see `DecidingEvaluation`. The
     // handle is, so a reader can reach it.
+    // **What the verdict judged, when one rule is applied to several.** A gate
+    // shows one line per criterion, so without this a reader is told a check
+    // failed and cannot be told which comparison failed it — which is the
+    // question a blocked gate raises (#133).
+    const about = c.decidedBy?.about ? ` about ${p.handle(c.decidedBy.about)}` : "";
     const decided = c.decidedBy
-      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")} ${p.quiet(c.decidedBy.at)} ${p.handle(`(${c.decidedBy.evaluation})`)}`
+      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")}${about} ${p.quiet(c.decidedBy.at)} ${p.handle(`(${c.decidedBy.evaluation})`)}`
       : "";
     // Padded before colouring: an escape sequence has length and would throw
     // the column off by exactly the bytes nobody can see.
