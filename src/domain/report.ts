@@ -696,6 +696,15 @@ export interface DecidingEvaluation {
   evaluation: EvaluationRef;
   outcome: "pass" | "fail";
   at: string;
+  /**
+   * The finding this verdict judged, when one criterion is applied to several.
+   *
+   * What makes a blocked gate answerable: *which* comparison did not clear the
+   * rule. One criterion with four verdicts is one `CheckStatus` line, so
+   * without this the gate says a check failed and cannot say what failed it
+   * (#133).
+   */
+  about?: ClaimRef;
 }
 
 export interface EvaluationRecord {
@@ -722,6 +731,18 @@ export interface EvaluationRecord {
    * reads exactly as it did before this distinction existed.
    */
   withdrawn?: true;
+  /**
+   * The finding this verdict judged, when one criterion is applied to several.
+   *
+   * A criterion is a rule, and a rule gets applied more than once. Absent for
+   * the ordinary case — a check evaluated as a whole — and present when four
+   * verdicts under one rule would otherwise be four indistinguishable lines
+   * (#133).
+   *
+   * Not {@link EvaluationRecord.basis}, a field away and a different question:
+   * that is what the verdict *rested on*, this is what it is *about*.
+   */
+  about?: ClaimRef;
   /**
    * The findings this evaluation was carried out against.
    *

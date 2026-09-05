@@ -208,6 +208,20 @@ export interface EvaluateCriterionCommand {
    * measurements and citing one of them would name an arbitrary part.
    */
   citing?: CitedBasis[];
+  /**
+   * The finding this verdict is about, when one rule is applied to several.
+   *
+   * **A criterion is a rule, and a rule gets applied more than once.** Bonsai's
+   * Stage 1D holds one decision rule against four comparisons; without this,
+   * the only way to record four verdicts is to state the criterion four times
+   * with identical wording, so the rule exists once in the researcher's head
+   * and four times on the record with nothing connecting the copies (#133).
+   *
+   * Omitted when the criterion is evaluated as a whole, which is the ordinary
+   * case and every existing caller. Given, `gateStatus` itemises one line per
+   * finding judged rather than one per criterion.
+   */
+  about?: ClaimRef;
 }
 
 /**

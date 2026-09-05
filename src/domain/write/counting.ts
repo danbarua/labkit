@@ -145,6 +145,9 @@ export class Counting extends SessionCore {
       // established by measurement and one asserted by an agent return
       // identical records.
       for (const on of new Set(basis)) unitOfWork.edge(evaluation, "BASED_ON", on);
+      // What this verdict judged, when the rule is applied to more than one
+      // finding. `BASED_ON` says what it rested on; this says what it is about.
+      if (input.about) unitOfWork.edge(evaluation, "ABOUT", input.about);
 
       return {
         subject: evaluation,

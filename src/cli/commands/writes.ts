@@ -337,6 +337,11 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .option("--gate <gate-id>", "the gate this verdict is reached for", handle("gate"))
     .option(
+      "--about <claim-id>",
+      "the finding this verdict judges, when one criterion is applied to several",
+      handle("claim"),
+    )
+    .option(
       "--citing <id>",
       "what decided it — a CLM_… claim, an ART_… observations record, or an EV_… finding (repeatable)",
       collect(citedBasis),
@@ -348,6 +353,7 @@ export function registerWrites(program: Command, run: Run): void {
           value: string;
           outcome: "pass" | "fail";
           gate?: GateRef;
+          about?: ClaimRef;
           citing?: CitedBasis[];
         },
       ) =>
@@ -358,6 +364,7 @@ export function registerWrites(program: Command, run: Run): void {
               value: opts.value,
               outcome: opts.outcome,
               ...(opts.gate === undefined ? {} : { gate: opts.gate }),
+              ...(opts.about === undefined ? {} : { about: opts.about }),
               ...(opts.citing === undefined ? {} : { citing: opts.citing }),
             }),
             mintedView(),

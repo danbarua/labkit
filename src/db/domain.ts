@@ -51,7 +51,6 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
   Decision: ["decided_at"],
   CriterionEvaluation: ["evaluated_at"],
   Artefact: ["logical_name"],
-  Computation: ["method"],
   // Written by nothing today, and indexed anyway — `check:prop-classes` found
   // them missing on its first run, which is the rule working. An index over a
   // property that is always absent costs almost nothing in Postgres, and it is
@@ -125,6 +124,7 @@ export const EDGE_LABELS = [
   "REVERIFIES", // Evidence -> Evidence
   "PROMOTES", // Decision -> Claim
   "GRADES", // Decision -> Claim
+  "ABOUT", // CriterionEvaluation -> Claim (which finding this verdict judged)
   "KEEPS", // Decision -> Claim (a conclusion a revision carried forward)
   "USES", // EvidenceUnit -> Computation
   "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
@@ -383,6 +383,19 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * does not — the closed set lives in `ClaimProps.kind`, not in the labels.
    */
   GRADES: [["Decision", "Claim"]],
+  /**
+   * Which finding a verdict judged, when one criterion is applied to several.
+   *
+   * A criterion is a rule and a rule gets applied more than once — one decision
+   * rule against four comparisons is four verdicts, not four rules. Without
+   * this the only way to record them was four criteria carrying identical
+   * wording, and nothing joining the copies (#133).
+   *
+   * Distinct from `BASED_ON`, which says what a verdict *rested on*: evidence
+   * somebody measured. This says what it was *about*. A check can be measured
+   * against one finding and judge another.
+   */
+  ABOUT: [["CriterionEvaluation", "Claim"]],
   /**
    * A conclusion a revision carried forward unchanged.
    *

@@ -295,6 +295,7 @@ const evaluationRecord = z.strictObject({
   outcome: z.enum(["pass", "fail"]),
   at: z.string(),
   withdrawn: z.literal(true).optional(),
+  about: ref("claim").optional(),
   basis: z.array(citedFinding),
 });
 
