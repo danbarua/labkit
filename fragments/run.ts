@@ -11,13 +11,14 @@
  * record inside it. Nothing here reads or writes the project's own `.labkit/`.
  */
 
+import { graphProjector } from "../src/domain/projection";
 import { connectDb } from "../src/db/connect";
 import { resolveTenantContext } from "../src/db/tenant";
 import { scopeToTenant } from "../src/db/scoped";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, inMemoryEventLog, systemClock } from "../src/domain";
 import type { Composition } from "./compositions";
-import { withProvenance } from "./derive";
+import { provenanceProjector } from "./derive";
 import { traceOf, type Trace } from "./trace";
 
 /**
@@ -33,10 +34,18 @@ export async function runComposition(composition: Composition, dir: string): Pro
     const ctx = await resolveTenantContext(connection.db, connection.tx, "labkit");
     await scopeToTenant(connection.db, ctx);
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
-    const baseEvents = inMemoryEventLog();
-    const { events, provenance } = withProvenance(graph, baseEvents);
-    await composition.run(new WriteSurface(graph, { clock: systemClock, events }));
-    return await traceOf(composition.name, baseEvents, provenance);
+    const events = inMemoryEventLog();
+    // The graph first, then the snapshot: the second reads what the first
+    // wrote, so the list order is the dependency.
+    const { projector, provenance } = provenanceProjector(graph, events);
+    await composition.run(
+      new WriteSurface(graph, {
+        clock: systemClock,
+        events,
+        projectors: [graphProjector(graph), projector],
+      }),
+    );
+    return await traceOf(composition.name, events, provenance);
   } finally {
     await connection.close();
   }

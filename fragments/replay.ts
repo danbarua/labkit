@@ -24,6 +24,7 @@
  * gap is visible rather than merely missing.
  */
 
+import { graphProjector } from "../src/domain/projection";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +36,7 @@ import { labelForNaturalId } from "../src/db/domain";
 import { vertexProps } from "../src/db/cypher";
 import { WriteSurface, inMemoryEventLog, systemClock } from "../src/domain";
 import type { DomainEvent, GraphChange, Operation, RetiredOperation } from "../src/domain";
-import { withProvenance, type StepProvenance } from "./derive";
+import { provenanceProjector, type StepProvenance } from "./derive";
 import { currentFragment } from "./provenance";
 import { DECODERS, type DecodeContext } from "./decode";
 
@@ -105,8 +106,13 @@ export async function replayIntoScratch(history: readonly DomainEvent[]): Promis
       await scopeToTenant(connection.db, tenantCtx);
       const graph = new TenantGraph(tenantCtx, connection.db, connection.tx);
       const baseEvents = inMemoryEventLog();
-      const { events, provenance } = withProvenance(graph, baseEvents);
-      const writes = new WriteSurface(graph, { clock: systemClock, events });
+      // The graph first, then the snapshot -- see `fragments/run.ts`.
+      const { projector, provenance } = provenanceProjector(graph, baseEvents);
+      const writes = new WriteSurface(graph, {
+        clock: systemClock,
+        events: baseEvents,
+        projectors: [graphProjector(graph), projector],
+      });
 
       const ctx: DecodeContext = { writes };
 

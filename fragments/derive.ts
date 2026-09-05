@@ -22,7 +22,8 @@
 import { createdIn } from "../src/domain";
 import { labelForNaturalId } from "../src/db/domain";
 import type { TenantGraph } from "../src/db/graph";
-import type { EventFilter, EventSink } from "../src/domain";
+import type { EventSink } from "../src/domain";
+import type { Projector } from "../src/domain/projection";
 import { ReadSurface, systemClock } from "../src/domain";
 import { ref } from "../src/domain/report";
 import { currentFragment } from "./provenance";
@@ -50,27 +51,28 @@ export interface StepProvenance {
 }
 
 /**
- * Wraps an event sink so every `record` also captures which fragment was
- * running and a derived-state snapshot, keyed by the event's `seq`.
+ * A projector that captures which fragment was running and a derived-state
+ * snapshot, keyed by the event's `seq`.
  *
- * The wrapper is the whole mechanism: neither the surface nor a fragment
- * needs to know this exists, so nothing here can go stale from a fragment
- * forgetting to report itself.
+ * A second consumer of the same stream, which is the whole mechanism: neither
+ * the surface nor a fragment needs to know it exists, so nothing here can go
+ * stale from a fragment forgetting to report itself.
  */
-export function withProvenance(
+export function provenanceProjector(
   graph: TenantGraph,
-  base: EventSink,
-): { events: EventSink; provenance: Map<number, StepProvenance> } {
-  const reads = new ReadSurface(graph, { clock: systemClock, events: base });
+  events: EventSink,
+): { projector: Projector; provenance: Map<number, StepProvenance> } {
+  const reads = new ReadSurface(graph, { clock: systemClock, events });
   const provenance = new Map<number, StepProvenance>();
   const enquiryHandles: string[] = [];
   const gateHandles: string[] = [];
 
-  const events: EventSink = {
-    record: (event) => base.record(event),
-    // After the projection, not inside `record`: these reads ask the graph
-    // what the act did, and inside `record` the graph has not been told yet.
-    projected: async (stamped) => {
+  const projector: Projector = {
+    // **Second, after the graph projector.** These reads ask the graph what
+    // the act did, so a list that put this first would snapshot the record as
+    // it stood before the act — every snapshot one step stale, and nothing
+    // failing to say so.
+    apply: async (stamped) => {
       for (const handle of createdIn(stamped)) {
         if (labelForNaturalId(handle) === "LineOfEnquiry") enquiryHandles.push(handle);
         if (labelForNaturalId(handle) === "Gate") gateHandles.push(handle);
@@ -97,9 +99,7 @@ export function withProvenance(
         derived: { enquiries, gates },
       });
     },
-    all: () => base.all(),
-    select: (filter: EventFilter) => base.select(filter),
   };
 
-  return { events, provenance };
+  return { projector, provenance };
 }

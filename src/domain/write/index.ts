@@ -95,7 +95,7 @@ import type {
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
 import type { DomainEvent } from "../events";
-import { applyDelta, UnitOfWork } from "../projection";
+import { naturalIds, UnitOfWork } from "../projection";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
@@ -291,7 +291,7 @@ export class WriteSurface extends SessionCore {
     work: (unitOfWork: UnitOfWork) => Promise<Act<R>>,
   ): Promise<R & { events: DomainEvent[] }> {
     return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(this.graph);
+      const unitOfWork = new UnitOfWork(naturalIds(this.graph));
       const act = await work(unitOfWork);
       const recorded = await this.events.record({
         at: this.clock.now(),
@@ -301,8 +301,10 @@ export class WriteSurface extends SessionCore {
         command,
         changes: unitOfWork.delta(),
       });
-      await applyDelta(this.graph, recorded);
-      await this.events.projected?.(recorded);
+      // The graph is one of these, not the step this used to be. Ordered:
+      // a projector that reads the graph must come after the one that writes
+      // it, which is why `fragments/run.ts` lists them the way it does.
+      for (const projector of this.projectors) await projector.apply(recorded);
       return { ...act.result, events: [recorded] };
     });
   }
