@@ -222,20 +222,17 @@ export type CheckState = "passed" | "failed" | "never-run" | "no-standing-verdic
 const retracted = (v: Verdict): boolean => v.cited > 0 && v.standing === 0;
 
 /**
- * A criterion's state, over whichever verdicts the caller chose.
+ * One subject's state, over whichever verdicts the caller chose.
  *
  * A failure **sticks** among verdicts that still stand, so re-running until
  * green is not evidence. A wholly-retracted verdict is a retraction and not a
  * failure. And `never-run` is a first-class value rather than the absence of
  * one, because a check nobody performed must be distinguishable from one that
  * failed.
- */
-/**
- * The state of one subject's verdicts — today's rule, applied to a group.
  *
- * A criterion is a rule, and a rule may be judged once per subject. This is
- * what a *check* means; {@link checkStateOver} is what the criterion as a whole
- * means, which is the worst of them.
+ * A criterion is a rule, and a rule may be judged once per subject, so this is
+ * what one *check* means. {@link checkStateOver} is what the criterion as a
+ * whole means, which is the worst of these.
  */
 function stateOf(group: Verdict[]): CheckState {
   const standing = group.filter((v) => !retracted(v));
