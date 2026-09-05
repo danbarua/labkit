@@ -32,6 +32,18 @@ import type {
 } from "./report";
 import type { Prose } from "../db/domain";
 
+/**
+ * `synthesise` — one finding drawn across others, running nothing new.
+ *
+ * `restingOn` is what it is drawn from, and it is the whole of what makes the
+ * claim: a synthesis has no method, no input and no output, so there is
+ * nothing else for a reader to reach it by.
+ */
+export interface SynthesiseCommand {
+  proposition: Prose;
+  restingOn: ClaimRef[];
+}
+
 /** `pose` — put a question on the record, unpursued. */
 export interface PoseCommand {
   question: Prose;
@@ -398,4 +410,5 @@ export type Command =
   | ReplaceAnalysisCommand
   | ReverifyCommand
   | SharpenCommand
-  | StateCriterionCommand;
+  | StateCriterionCommand
+  | SynthesiseCommand;

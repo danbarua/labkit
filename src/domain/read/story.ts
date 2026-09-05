@@ -820,11 +820,25 @@ export class StoryGroup extends SessionCore {
     const undecided = promotion.some((r) => r.c.kind === "undecided");
     const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
 
+    // What a synthesis was drawn across. By handle, from the claim itself:
+    // `synthesise` writes `RESTS_ON` at the moment the act names the findings,
+    // so this is a read of what the caller said rather than a match on wording.
+    const drawnAcross = (
+      await this.graph.query(
+        // `part`, not `on`: a RETURN name that is a SQL reserved word breaks
+        // the AS clause AGE builds, and `on` is one.
+        `MATCH (:Claim {natural_id: $claim})-[:RESTS_ON]->(part:Claim) RETURN part`,
+        { part: vertexProps<ClaimProps & { natural_id: string }>() },
+        { claim },
+      )
+    ).map((r) => ({ claim: ref("claim", r.part.natural_id), asserts: r.part.name }));
+
     return {
       // The handle the caller asked with, echoed so the answer names its own
       // subject once it is stored or sent.
       claim,
       proposition,
+      drawnAcross,
       // Four ways to not be supported, and they are different states: no
       // evidence at all, the interpretation withdrawn, evidence that exists
       // and fails the standard set for it, and evidence that settles the

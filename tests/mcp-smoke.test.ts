@@ -471,6 +471,19 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(verdict.conflict).toBe(false);
       expect(verdict.relation).toBe("dissociation");
 
+      // The headline across both, running nothing: two instance sets, one
+      // sentence about the pair. `why_supported` reaches it by what it was
+      // drawn across, since a synthesis has no finding of its own.
+      const across = await call(c, "synthesise", {
+        proposition: "the speedup depends on instance density",
+        resting_on: [claimIn(sparseConcl, HOLDS), claimIn(denseConcl, HOLDS)],
+      });
+      const why = await call(c, "why_supported", { claim: id(across) });
+      expect((why.drawnAcross as Json[]).map((d) => id(d)).sort()).toEqual(
+        [claimIn(sparseConcl, HOLDS), claimIn(denseConcl, HOLDS)].sort(),
+      );
+      expect(why.support).toEqual([]);
+
       // `keep` — the other half of the same act: name what survives, and
       // everything else the analysis concluded falls with it.
       const twoFindings = await call(c, "record_analysis", {

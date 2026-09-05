@@ -52,6 +52,7 @@ import {
   recordedObservationsSchema,
   sharpenedQuestionSchema,
   recordedReviewSchema,
+  synthesisedSchema,
   closedEnquirySchema,
   plannedWorkSchema,
   statedCriterionSchema,
@@ -806,6 +807,29 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
             }),
         ...(bearing === undefined ? {} : { bearing: bearing as "supports" | "challenges" }),
         ...(standing === undefined ? {} : { standing: standing as "exploratory" | "confirmatory" }),
+      }),
+  }),
+
+  writeTool({
+    name: "synthesise",
+    title: "Draw one finding across findings already on the record",
+    group: "Doing the work",
+    description:
+      "One claim across several, running nothing. Use when the finding you want to state is what " +
+      "other findings say together — it has no method, no input and no output of its own. " +
+      "`resting_on` names the claims it is drawn from and is what a reader reaches it by. " +
+      "Recording it with `record_analysis` instead would mint a run that never happened.",
+    inputSchema: {
+      proposition: z.string().describe("the claim, as a sentence"),
+      resting_on: z
+        .array(z.string())
+        .describe(`ids of the claims this is drawn across, e.g. ${CLAIM_PREFIX}12`),
+    },
+    outputSchema: synthesisedSchema,
+    handler: (write, { proposition, resting_on }) =>
+      write.synthesise({
+        proposition,
+        restingOn: (resting_on as string[]).map((c) => ref("claim", c)),
       }),
   }),
 

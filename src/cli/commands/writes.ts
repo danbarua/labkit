@@ -215,6 +215,27 @@ export function registerWrites(program: Command, run: Run): void {
       ),
     );
   program
+    .command("synthesise")
+    .helpGroup("Doing the work")
+    .summary("draw one finding across findings already on the record")
+    .description(
+      "For the finding that is what other findings say together: no method, no input, no " +
+        "output of its own. The claims it rests on are what a reader reaches it by, and what " +
+        "`labkit why` reports. Recording it with `labkit analyse` instead mints a run that " +
+        "never happened.",
+    )
+    .argument("<proposition>", "the claim, as a sentence")
+    .requiredOption(
+      "--resting-on <claim-id>",
+      "a finding it is drawn across (repeatable)",
+      collect(handle("claim")),
+    )
+    .action(async (proposition, opts) =>
+      run(async ({ write }) =>
+        answer(await write.synthesise({ proposition, restingOn: opts.restingOn }), mintedView()),
+      ),
+    );
+  program
     .command("review")
     .helpGroup("Doing the work")
     .summary("record a verdict on an analysis")

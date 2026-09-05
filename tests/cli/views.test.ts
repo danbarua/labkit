@@ -96,6 +96,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
   const base: SupportExplanation = {
     claim: ref("claim", "CLM_9"),
     proposition: "the schedule moves convergence",
+    drawnAcross: [],
     supported: false,
     standing: "exploratory",
     support: [
@@ -171,6 +172,7 @@ test("a challenged claim says it has no supporting findings, not that it rests o
   const challenged: SupportExplanation = {
     claim: ref("claim", "CLM_6"),
     proposition: "T vs lattice is distinguishable",
+    drawnAcross: [],
     supported: false,
     standing: "exploratory",
     // Empty by definition: every finding bears against it.
@@ -663,6 +665,7 @@ test("an undecided claim's findings are one list, and no heading picks a side", 
   const base: SupportExplanation = {
     claim: ref("claim", "CLM_7"),
     proposition: "T vs rewiring is distinguishable",
+    drawnAcross: [],
     supported: false,
     standing: "undecided",
     support: [],

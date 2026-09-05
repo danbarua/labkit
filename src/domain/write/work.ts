@@ -1,10 +1,17 @@
 /** Measuring, analysing, concluding, reviewing. */
 
+import { vertexProps } from "../../db/cypher";
 import type { TenantGraph } from "../../db/graph";
-import type { RecordedAnalysis, RecordedObservations, RecordedReview } from "../report";
+import type {
+  RecordedAnalysis,
+  RecordedObservations,
+  RecordedReview,
+  Synthesised,
+} from "../report";
 import { ref } from "../report";
 import type {
   ConcludeCommand,
+  SynthesiseCommand,
   RecordAnalysisCommand,
   RecordObservationsCommand,
   RecordReviewCommand,
@@ -132,6 +139,57 @@ export class Work extends Shared {
    */
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.concludeOne(input);
+  }
+
+  /**
+   * Draws one finding across findings already on the record, running nothing.
+   *
+   * **No computation, no evidence unit, no evidence.** A synthesis takes
+   * findings that exist and states what they say together; it measures
+   * nothing, so there is nothing for `SUPPORTS` to come from. What the claim
+   * rests on is the claims themselves, written as `RESTS_ON` at the moment the
+   * act names them — `whySupported` reads them back.
+   *
+   * Recording it as an analysis was the alternative and it is worse: it mints
+   * a `Computation` that never ran and `CONSUMES` edges to artefacts it never
+   * read, which is a run the record would then report as reproducible.
+   *
+   * Under no line of enquiry, deliberately: the findings a synthesis draws
+   * across need not share one. Bonsai's Stage 1D drew across four comparisons
+   * recorded under two.
+   */
+  async synthesise(input: SynthesiseCommand): Promise<Synthesised> {
+    return this.handle("synthesise", input, async (unitOfWork) => {
+      if (input.restingOn.length === 0)
+        throw new Error(
+          "a synthesis needs at least one finding to rest on and was given none; " +
+            "a claim that rests on nothing is one an analysis should conclude",
+        );
+
+      // Every cited claim, before anything is staged. A synthesis naming a
+      // claim that does not exist would otherwise mint the claim and fail at
+      // the edge, leaving a finding resting on less than it says.
+      const found = await this.graph.query(
+        `MATCH (c:Claim) WHERE c.natural_id IN $ids RETURN c`,
+        { c: vertexProps<{ natural_id: string }>() },
+        { ids: input.restingOn },
+      );
+      const present = new Set(found.map((r) => r.c.natural_id));
+      const missing = input.restingOn.filter((c) => !present.has(c));
+      if (missing.length > 0)
+        throw new Error(
+          `no claim ${missing.join(", ")} to rest on; a claim exists once an analysis has ` +
+            `concluded it, and 'search' finds one by its wording`,
+        );
+
+      const claim = ref(
+        "claim",
+        await unitOfWork.node("Claim", { name: input.proposition, kind: "exploratory" }),
+      );
+      for (const on of new Set(input.restingOn)) unitOfWork.edge(claim, "RESTS_ON", on);
+
+      return { subject: claim, result: { claim } };
+    });
   }
 
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {

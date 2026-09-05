@@ -61,6 +61,7 @@ import type {
   RecordedAnalysis,
   RecordedObservations,
   RecordedReview,
+  Synthesised,
   ReplacementReport,
   Restated,
   SharpenedQuestion,
@@ -88,6 +89,7 @@ import type {
   ReplaceAnalysisCommand,
   ReverifyCommand,
   SharpenCommand,
+  SynthesiseCommand,
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
 import type { DomainEvent } from "../events";
@@ -214,6 +216,10 @@ export class WriteSurface extends SessionCore {
 
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.work.conclude(input);
+  }
+
+  async synthesise(input: SynthesiseCommand): Promise<Synthesised> {
+    return this.work.synthesise(input);
   }
 
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {

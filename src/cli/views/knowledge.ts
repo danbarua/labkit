@@ -157,6 +157,15 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
           "",
         )}`
       : "",
+    // A synthesis, above the standards and the inputs: it is what the claim
+    // *is*, not something it was checked against. `Supported by` reads "no
+    // supporting findings" for one, which is true — it measured nothing.
+    why.drawnAcross.length
+      ? `\nDrawn across\n${bullets(
+          why.drawnAcross.map((c) => `${c.asserts}  ${p.handle(`(${c.claim})`)}`),
+          "",
+        )}`
+      : "",
     why.reverifiedBy.length
       ? `\nRe-checked by\n${bullets(
           why.reverifiedBy.map((r) => `${r.method}  (${r.analysis})`),

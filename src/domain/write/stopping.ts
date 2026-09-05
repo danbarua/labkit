@@ -76,7 +76,7 @@ export class Stopping extends SessionCore {
         );
       }
 
-      let answerBearing: EvidenceRef | undefined;
+      let answerBearing: EvidenceRef[] = [];
       let answeredProposition: string | undefined;
       if (input.answeredBy) {
         // The claim identifies itself; what still has to be checked is that it
@@ -96,15 +96,49 @@ export class Stopping extends SessionCore {
             )),
           );
         }
+        // A synthesis belongs to the enquiry its parts belong to. It has no
+        // evidence of its own -- that is what makes it a synthesis -- so the
+        // walk above finds nothing, and one hop through `RESTS_ON` is what the
+        // caller already said when they named the findings.
+        if (addresses.length === 0) {
+          for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+            addresses.push(
+              ...(await this.graph.query(
+                `MATCH (:Claim {natural_id: $claim})-[:RESTS_ON]->(:Claim)<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
+                 RETURN 1`,
+                { ok: scalar<number>() },
+                { claim: input.answeredBy, enquiry: input.enquiry },
+              )),
+            );
+          }
+        }
         if (addresses.length === 0) {
           throw new Error(
             `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question — cite a claim this enquiry concluded, or close the enquiry that concluded this one`,
           );
         }
         const found = await this.findingOn(input.answeredBy);
-        if (!found) throw new Error(noFindingBearsOn(input.answeredBy));
-        answerBearing = found.evidence;
-        answeredProposition = found.asserts;
+        if (found) {
+          answerBearing = [found.evidence];
+          answeredProposition = found.asserts;
+        } else {
+          // A synthesis rests on findings rather than producing one, so the
+          // closure rests on the findings underneath it — all of them. Citing
+          // one would name an arbitrary part as the answer to a question the
+          // whole was drawn to settle.
+          const parts = await this.graph.query(
+            `MATCH (c:Claim {natural_id: $claim})-[:RESTS_ON]->(:Claim)<-[:SUPPORTS]-(e:Evidence)
+             RETURN c, e`,
+            {
+              c: vertexProps<{ name: string }>(),
+              e: vertexProps<{ natural_id: string }>(),
+            },
+            { claim: input.answeredBy },
+          );
+          if (parts.length === 0) throw new Error(noFindingBearsOn(input.answeredBy));
+          answerBearing = [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))];
+          answeredProposition = parts[0]!.c.name;
+        }
       }
 
       const decided = ref(
@@ -118,7 +152,7 @@ export class Stopping extends SessionCore {
         }),
       );
       unitOfWork.edge(decided, "RESOLVES", question);
-      if (answerBearing) unitOfWork.edge(decided, "BASED_ON", answerBearing);
+      for (const basis of answerBearing) unitOfWork.edge(decided, "BASED_ON", basis);
 
       return {
         subject: input.enquiry,
