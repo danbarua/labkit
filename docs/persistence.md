@@ -390,12 +390,15 @@ database exists, that stops being true and this note should be updated.
 
 ---
 
-## Dated probe findings, 2026-08-17/18
+## Dated probe findings
 
-Confirmed facts about Apache AGE under `pglite-age`, established while the
-persistence layer was being built. **A dated record**: each item says when it
-was checked, so it cannot go stale — read it for what was true then, and
+Confirmed facts about Apache AGE, most of them established on 2026-08-17/18
+while the persistence layer was being built. **A dated record**: each item says
+when it was checked, so it cannot go stale — read it for what was true then, and
 re-check before relying on it.
+
+The heading carried the 2026-08-17/18 range until 2026-09-05, when a later
+finding was added under it. The dates belong on the items, which have them.
 
 Read it before changing tenancy, natural ids or provisioning.
 `.claude/skills/postgres-age/SKILL.md` is the working reference for AGE; this is
@@ -460,6 +463,50 @@ on 2026-08-19 — see CLAUDE.md's "No relational read side".
   tenant (`resolveTenantContext()`, the real production path, not an
   internal function called directly) restores a label that was dropped out
   from under it.
+
+### Row-level security reaches Cypher, 2026-09-05
+
+**A policy on a label table filters `MATCH`, on both backends.** Every AGE
+label is a real Postgres table, and `ag_catalog.cypher()` executes as the
+calling role rather than an elevated one — so a `CREATE POLICY` on
+`"<graph>"."MOTIVATES"` hides rows from a traversal without any query knowing
+about it.
+
+Measured against a Question/LineOfEnquiry/MOTIVATES triple, with a policy
+excluding rows whose `properties` carry `retracted`, read back through the
+ordinary domain query as `labkit_app`:
+
+| | |
+| --- | --- |
+| edges visible before the policy | 1 |
+| edges visible after it, as `labkit_app` | 0 |
+| rows as superuser | 1 |
+| **node** labels, same policy, as `labkit_app` | 0 |
+| writing an edge to a hidden node | refused: `target LOE_1 not found in tenant labkit_t1` |
+
+Identical on PGlite and on `apache/age:release_PG18_1.7.0` with a genuine role
+boundary — the two backends agree, which is what that arm exists to establish.
+
+Four consequences, since each was checked rather than reasoned about:
+
+- **Node labels and edge labels behave the same way.** Both are ordinary
+  tables.
+- **No read changes.** Not one `MATCH` was touched in either run. That is the
+  difference between one policy per label and every clause in `src/domain/read/`
+  growing a filter — the shape that reached six copies with
+  `SUPPORTS`/`CHALLENGES`.
+- **Writes fail safe.** Attaching to a hidden node is refused by the endpoint
+  diagnosis `createEdge` already performs, with the message it already has.
+- **The row survives.** An admin connection still sees it, so this hides rather
+  than destroys.
+
+**What this does not establish**: that a *property change* can retract an edge.
+`PropsChanged` is applied by `TenantGraph.setNodeProperty`, which addresses a
+node by `natural_id`; edges have none and are addressed by their
+`(from, label, to)` triple. Retracting a node is expressible today and
+retracting an edge is not. Probed because #134 (`labkit undo`) proposed
+soft-delete over deletion; whether node-only retraction is sufficient — every
+pattern binding a hidden node already fails to match — was **not** measured.
 
 ### Not yet probed
 
