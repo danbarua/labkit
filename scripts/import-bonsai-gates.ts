@@ -134,8 +134,11 @@ const ENQUIRY_APPROACH =
 const SEMANTIC_REVIEW_PROPOSITION =
   "requirement 4's inventory mechanism, as a whole, is complete and its dispositions are honest -- the Reviewer's own sign-off judgement, not a machine-checkable predicate";
 
-if (labSearchJson(TASK_OBJECTIVE).length > 0) {
-  console.error("refusing: a criterion or task from this import already exists on the record.");
+// Both, because the question is now posed before the task is planned: a run
+// that dies between the two leaves the question behind, and a guard that only
+// knew the task would let a re-run pose a second one.
+if (labSearchJson(TASK_OBJECTIVE).length > 0 || labSearchJson(ENQUIRY_QUESTION).length > 0) {
+  console.error("refusing: a question, criterion or task from this import already exists.");
   process.exit(2);
 }
 

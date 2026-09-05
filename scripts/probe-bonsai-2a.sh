@@ -82,12 +82,18 @@
 # variable, and never referenced by the verdict it decided. It is cited
 # below.
 #
-# **Standing is recorded, not left to default.** Stage 2A's design was
-# locked before either run (`STAGE2A_DESIGN_LOCK` and
-# `STAGE2A_COST_DESIGN_LOCK` both precede their results), so its
-# conclusions are prespecified and `conclude --standing confirmatory` says
-# so. That is a different fact from promotion, which is what `is <claim>
-# confirmed` records and which only the primary comparison gets (#63).
+# **The standing was simply wrong, and no fix was needed to correct it.**
+# `conclude --standing` has always taken it and this transcript never passed
+# it, so Stage 2A's locked, pre-registered primary comparison sat on the
+# record as `exploratory` -- the default, meaning scratch captured before
+# anyone knew it mattered. Both designs were locked before their runs
+# (`STAGE2A_DESIGN_LOCK` and `STAGE2A_COST_DESIGN_LOCK` precede their
+# results), so all five conclusions are prespecified and now say so.
+#
+# Prespecified is not promoted: `--standing confirmatory` is what the design
+# locked, `is <claim> confirmed` is what the result earned, and only the
+# primary comparison gets the second. #63 is where that distinction is
+# argued.
 #
 # **Yes, LabKit has somewhere to put an infrastructure/compute-cost
 # finding -- it needed no new structure, just its own line of enquiry.**

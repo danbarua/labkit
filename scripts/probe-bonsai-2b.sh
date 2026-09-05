@@ -11,12 +11,16 @@
 # **Rewritten for #173** (`conclude` is the primitive; `analyse` no longer
 # takes `--concludes` JSON). Variables are named for what the handle IS.
 #
-# **Standing is recorded, not left to default** (#63). Stage 2B's design was
-# locked on 2026-08-05 (`STAGE2B_DESIGN_LOCK`) and the confirmatory run is
-# four days later, so both conclusions below are prespecified and say so.
-# That is a different fact from promotion: `--standing confirmatory` is what
-# the design locked, `is <claim> confirmed` is what the result earned, and
-# only the primary gets the second.
+# **The standing was simply wrong, and no fix was needed to correct it.**
+# `conclude --standing` has always taken it and this transcript never passed
+# it, so a locked stage-4 confirmatory result sat on the record as
+# `exploratory`. The design was locked on 2026-08-05
+# (`STAGE2B_DESIGN_LOCK`) and the run is four days later, so both
+# conclusions below are prespecified and now say so.
+#
+# Prespecified is not promoted: `--standing confirmatory` is what the design
+# locked, `is <claim> confirmed` is what the result earned, and only the
+# primary gets the second. #63 is where that distinction is argued.
 #
 # Stage 2B's own scientific question (does runtime graph evolution improve
 # single-step active-support denoising, the Stage-2A-shaped question for
