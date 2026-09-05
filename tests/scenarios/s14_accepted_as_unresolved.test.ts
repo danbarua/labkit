@@ -243,6 +243,25 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(status.question!.open).toBe(false);
     expect(status.question!.closure).toBe("answered");
     expect(status.question!.answer).toBe("yes");
+
+    // **And the deferral survives the answer.** The question was left open on
+    // a stated condition, and a reader meeting the answer has to be able to
+    // ask whether that is the condition being met or something unrelated that
+    // arrived first. Both facts are durable and both are about now; dropping
+    // one the moment the other appears makes the pairing unreconstructable
+    // from anything but the researcher's memory.
+    expect(status.question!.acceptedBecause).toBe(
+      "the confirmatory dataset is spent and there is no larger held-out sample",
+    );
+    expect(status.question!.reopensIf).toBe(CONDITION);
+
+    // And in the survey, where the question has moved out of `accepted` and
+    // into an answered bucket -- which is correct, and is exactly where the
+    // pairing used to be lost.
+    const known = await (await afterwards()).whatIsKnown();
+    expect(known.accepted).toEqual([]);
+    const answered = [...known.established, ...known.provisional].find((q) => q.asks === MARGINAL);
+    expect(answered!.reopensIf).toBe(CONDITION);
   });
 
   /**

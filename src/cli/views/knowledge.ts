@@ -41,9 +41,16 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
  * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was
  * answered. Without the polarity, reading only `asks` for an established
  * question cannot tell a confirmed "no" apart from a "yes".
+ *
+ * A question that had been parked keeps saying so. The condition it was parked
+ * on is what a reader checks the answer against — whether this is the thing
+ * that was being waited for, or something else that arrived first.
  */
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
-  return qs.map((q) => `${q.asks}  ${p.handle(`(${q.question})`)}  — ${q.answer}`);
+  return qs.map((q) => {
+    const parked = q.reopensIf ? p.quiet(`  (was parked until: ${q.reopensIf})`) : "";
+    return `${q.asks}  ${p.handle(`(${q.question})`)}  — ${q.answer}${parked}`;
+  });
 }
 
 export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {

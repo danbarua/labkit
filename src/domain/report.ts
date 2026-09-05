@@ -1218,6 +1218,18 @@ export interface AcceptedQuestion extends QuestionStanding {
 export interface AnsweredQuestion extends QuestionStanding {
   claim: ClaimRef;
   answer: "yes" | "no";
+  /**
+   * Present when this question had been left open on purpose before it was
+   * answered — the same pair `AcceptedQuestion` carries, from the same
+   * `DEFERS` decision.
+   *
+   * A reader meeting the answer has to be able to ask whether it is the
+   * stated condition being met or something unrelated that arrived first, and
+   * the answer alone cannot say. Both facts are about now, so reporting only
+   * the newer one is a choice, not a consequence of the model.
+   */
+  acceptedBecause?: string;
+  reopensIf?: string;
 }
 
 /**
