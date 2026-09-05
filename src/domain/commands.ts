@@ -29,6 +29,7 @@ import type {
   WorkRef,
   ClaimRef,
   EvidenceRef,
+  ObservationsRef,
 } from "./report";
 import type { Prose } from "../db/domain";
 
@@ -190,9 +191,33 @@ export interface EvaluateCriterionCommand {
   gate?: GateRef;
   value: string;
   outcome: "pass" | "fail";
-  /** The finding this verdict was reached against, if it was reached against one. */
-  citing?: ClaimRef;
+  /**
+   * What this verdict was reached against — the evidence, by whichever route
+   * the caller holds.
+   *
+   * **A verdict rests on evidence, and a claim is one way to name it.** Taking
+   * only a claim made a *measured* check unrecordable: a pipeline-health count
+   * produces observations and no scientific claim, so the verdict came out with
+   * an empty basis — which the record reads as `asserted`, the opposite of what
+   * happened. Bonsai's Stage 2A go/no-go was recorded that way (#150).
+   *
+   * Each entry is normalised to the `Evidence` it identifies before anything is
+   * written: a claim resolves through the finding that bears on it, an
+   * observations handle through the finding recorded in it, and an evidence
+   * handle is already there. Repeatable, because a check may rest on several
+   * measurements and citing one of them would name an arbitrary part.
+   */
+  citing?: CitedBasis[];
 }
+
+/**
+ * A route to the evidence a verdict rests on.
+ *
+ * Three handles, one target. Which kind it is comes from the id's own prefix,
+ * the way `ref()` and `createEdge` already decide it — never from `typeof`,
+ * which is `"string"` for all three.
+ */
+export type CitedBasis = ClaimRef | ObservationsRef | EvidenceRef;
 
 /** `reverify` — re-run a historical analysis under current observations. Not reproduction (S-10). */
 export interface ReverifyCommand {

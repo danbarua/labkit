@@ -936,18 +936,21 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Record a check's outcome",
     group: "Saying in advance what counts",
     description:
-      "Record that a prespecified condition was checked and what it gave. Cite the analysis " +
-      "and proposition the verdict rests on where there is one; a verdict citing nothing is " +
-      "recorded as such rather than as resting on something unnamed.",
+      "Record that a prespecified condition was checked and what it gave. Cite what decided " +
+      "it — the claim, the observations, or the finding — and a verdict citing nothing is " +
+      "recorded as asserted rather than as resting on something unnamed.",
     inputSchema: {
       criterion: z.string().describe(`criterion id, e.g. ${CRITERION_PREFIX}1`),
       value: z.string().describe("what the check gave, in the checker's words"),
       outcome: z.enum(["pass", "fail"]).describe("whether the condition was met"),
       gate: z.string().optional().describe(`gate id this evaluation is for, e.g. ${GATE_PREFIX}1`),
       citing: z
-        .string()
+        .array(z.string())
         .optional()
-        .describe(`id of the claim the verdict rests on, e.g. ${CLAIM_PREFIX}4`),
+        .describe(
+          `ids of what decided the verdict: a claim (${CLAIM_PREFIX}4), an observations ` +
+            `record (${OBSERVATIONS_PREFIX}7), or a finding (${EVIDENCE_PREFIX}2)`,
+        ),
     },
     outputSchema: evaluatedCriterionSchema,
     handler: (write, { criterion, value, outcome, gate, citing }) =>
@@ -956,7 +959,18 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         value,
         outcome: outcome as "pass" | "fail",
         ...(gate === undefined ? {} : { gate: ref("gate", gate) }),
-        ...(citing === undefined ? {} : { citing: ref("claim", citing) }),
+        // Prefix, never `typeof`: all three arms are "string" at runtime.
+        ...(citing === undefined
+          ? {}
+          : {
+              citing: (citing as string[]).map((id) =>
+                id.startsWith(CLAIM_PREFIX)
+                  ? ref("claim", id)
+                  : id.startsWith(OBSERVATIONS_PREFIX)
+                    ? ref("observations", id)
+                    : ref("evidence", id),
+              ),
+            }),
       }),
   }),
 

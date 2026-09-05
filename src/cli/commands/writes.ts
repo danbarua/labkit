@@ -32,6 +32,7 @@ import {
   anyRef,
   bearing,
   claimState,
+  citedBasis,
   collect,
   handle,
   inputRef,
@@ -42,6 +43,7 @@ import { answer, asHandles } from "../output";
 import type { Run } from "../session";
 import type { ClaimRef, ClaimState, DomainEvent, EnquiryRef, GateRef } from "../../domain";
 import { ref } from "../../domain/report";
+import type { CitedBasis } from "../../domain/commands";
 
 /**
  * Every handle an act minted, across however many events it recorded — in
@@ -333,7 +335,11 @@ export function registerWrites(program: Command, run: Run): void {
         .makeOptionMandatory(),
     )
     .option("--gate <gate-id>", "the gate this verdict is reached for", handle("gate"))
-    .option("--citing <claim-id>", "the finding that decided it", handle("claim"))
+    .option(
+      "--citing <id>",
+      "what decided it — a CLM_… claim, an ART_… observations record, or an EV_… finding (repeatable)",
+      collect(citedBasis),
+    )
     .action(
       async (
         criterion,
@@ -341,7 +347,7 @@ export function registerWrites(program: Command, run: Run): void {
           value: string;
           outcome: "pass" | "fail";
           gate?: GateRef;
-          citing?: ClaimRef;
+          citing?: CitedBasis[];
         },
       ) =>
         run(async ({ write }) =>

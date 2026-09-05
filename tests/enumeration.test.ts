@@ -91,7 +91,7 @@ describe("enumerating gates and work", () => {
       value: "no",
       outcome: "fail",
       gate: blockedGate,
-      citing: claimOf(claims, HOLDS),
+      citing: [claimOf(claims, HOLDS)],
     });
 
     // 3. satisfied: a criterion evaluated and passed, with work implementing it.
@@ -118,7 +118,7 @@ describe("enumerating gates and work", () => {
       value: "yes",
       outcome: "pass",
       gate: okGate,
-      citing: claimOf(more, ALSO),
+      citing: [claimOf(more, ALSO)],
     });
 
     // 4. incomplete: two criteria, one checked and one not.
@@ -145,7 +145,7 @@ describe("enumerating gates and work", () => {
       value: "yes",
       outcome: "pass",
       gate: partialGate,
-      citing: claimOf(third, PARTLY),
+      citing: [claimOf(third, PARTLY)],
     });
 
     return { neverGate, blockedGate, okGate, partialGate, readyWork, blockedWork, doneWork };
@@ -262,7 +262,7 @@ describe("enumerating gates and work", () => {
         value: "no",
         outcome: "fail",
         gate: gateA,
-        citing: claimOf(claims, HOLDS),
+        citing: [claimOf(claims, HOLDS)],
       });
 
       const states = new Map((await s.gateList()).map((g) => [g.gate as string, g.state]));
@@ -329,7 +329,7 @@ describe("enumerating gates and work", () => {
         value: "no",
         outcome: "fail",
         gate,
-        citing: claimOf(claims, HOLDS),
+        citing: [claimOf(claims, HOLDS)],
       });
 
       const states = new Map((await s.workList()).map((w) => [w.work as string, w.state]));

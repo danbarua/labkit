@@ -266,7 +266,7 @@ export async function failedCheck(
     ...(input.gate === undefined ? {} : { gate: input.gate }),
     value: input.value,
     outcome: "fail",
-    ...(input.citing === undefined ? {} : { citing: input.citing }),
+    ...(input.citing === undefined ? {} : { citing: [input.citing] }),
   });
 }
 
@@ -287,7 +287,7 @@ export async function rerunCheck(
     ...(input.gate === undefined ? {} : { gate: input.gate }),
     value: input.value,
     outcome: "pass",
-    ...(input.citing === undefined ? {} : { citing: input.citing }),
+    ...(input.citing === undefined ? {} : { citing: [input.citing] }),
   });
 }
 

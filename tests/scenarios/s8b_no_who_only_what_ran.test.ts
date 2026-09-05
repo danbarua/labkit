@@ -172,7 +172,7 @@ describe("S-8b: there is no who, only what ran", () => {
         criterion: budget,
         value: "31 GPU-hours",
         outcome: "pass",
-        citing: claimOf(analysisClaims, "the scale-up fits the budget"),
+        citing: [claimOf(analysisClaims, "the scale-up fits the budget")],
       });
       await s.closeEnquiry({
         enquiry,

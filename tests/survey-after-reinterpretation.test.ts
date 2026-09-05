@@ -74,7 +74,7 @@ test("a reinterpretation does not move the question between buckets", async () =
   // promoted and its check failed -> `provisional`. The narrowed claim has
   // no criteria at all -> vacuously met -> `established`. With a passing check
   // both readings agree and the probe cannot fail.
-  await s.evaluateCriterion({ criterion: crit, value: "0.071", outcome: "fail", citing: claim });
+  await s.evaluateCriterion({ criterion: crit, value: "0.071", outcome: "fail", citing: [claim] });
   // Promoted, so the two candidate answering claims give DIFFERENT buckets:
   // the original is promoted and its check is met -> established; the narrowed
   // one is neither -> provisional. Without this the probe cannot fail.
