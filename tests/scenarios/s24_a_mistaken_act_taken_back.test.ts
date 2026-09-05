@@ -98,6 +98,70 @@ describe("S-24 — a mistaken act taken back", () => {
     ).rejects.toThrow(/rests on what it created/);
   });
 
+  /**
+   * The case #134 was filed for, and the one no test above could catch: the
+   * dependents check first read every edge into or out of what is being
+   * retracted, and `conclude` writes two of its own -- `unit PRODUCES
+   * evidence`, `evidence RECORDED_IN output` -- to nodes the analysis already
+   * had. Both read as "external" until the check also excludes edges the
+   * event being undone wrote itself, which is what these two prove: the
+   * undo succeeds on its own, and only starts refusing once a genuinely
+   * separate act -- a criterion evaluated against the claim -- rests on it.
+   */
+  test("an act's own edges to pre-existing nodes are not dependents of it", async () => {
+    const { enquiry } = await session.openEnquiry("does depth move convergence?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "depth sweep results",
+      finding: "depth 4 vs depth 8",
+    });
+    const { claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "paired comparison",
+      from: [observations],
+      concludes: [{ proposition: "depth 8 converges faster", finding: "moves by ~3 steps" }],
+    });
+    const claim = claims[0]!.claim;
+
+    const all = await session.events.all();
+    const concludeSeq = all.find((e) => e.operation === "conclude")!.seq!;
+
+    const undone = await session.undo({ event: concludeSeq, because: "this claim was wrong" });
+    expect(undone.retracted).toContain(claim);
+  });
+
+  test("refuses once a separate act rests on what conclude produced", async () => {
+    const { criterion } = await session.stateCriterion("depth 8 converges faster, held up");
+    const { enquiry } = await session.openEnquiry("does depth move convergence?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "depth sweep results",
+      finding: "depth 4 vs depth 8",
+    });
+    const { claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "paired comparison",
+      from: [observations],
+      heldTo: [criterion],
+      concludes: [{ proposition: "depth 8 converges faster", finding: "moves by ~3 steps" }],
+    });
+    const claim = claims[0]!.claim;
+    const all = await session.events.all();
+    const concludeSeq = all.find((e) => e.operation === "conclude")!.seq!;
+
+    // A genuinely separate act, resting on the claim's own evidence.
+    await session.evaluateCriterion({
+      criterion,
+      value: "yes",
+      outcome: "pass",
+      citing: [claim],
+    });
+
+    await expect(
+      session.undo({ event: concludeSeq, because: "this claim was wrong after all" }),
+    ).rejects.toThrow(/rests on what it created/);
+  });
+
   test("refuses a seq nothing on the record has", async () => {
     await expect(
       session.undo({ event: 999_999, because: "there is nothing at this seq" }),

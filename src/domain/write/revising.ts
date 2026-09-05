@@ -3,7 +3,7 @@
 import { scalar, vertexProps } from "../../db/cypher";
 import type { ClaimProps } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
-import { createdIn } from "../events";
+import { createdIn, edgesIn } from "../events";
 import type {
   AnalysisRef,
   CitedFinding,
@@ -286,7 +286,17 @@ export class Revising extends Shared {
         },
         { ids: retracting },
       );
-      const dependents = [...into, ...outOf];
+      // An edge THIS event wrote is the act's own wiring even when one of its
+      // two endpoints already existed -- `conclude` staging `unit PRODUCES
+      // evidence` reaches a pre-existing unit, and that unit is not a
+      // dependent of the evidence it produced. Keyed on the same triple
+      // `edgesIn` reports the event minted, since that is the one thing that
+      // tells an act's own edge apart from an identical-looking one somebody
+      // else wrote.
+      const ownEdges = new Set(edgesIn(found).map((e) => `${e.from}|${e.label}|${e.to}`));
+      const dependents = [...into, ...outOf].filter(
+        (d) => !ownEdges.has(`${d.origin.natural_id}|${d.via}|${d.reaches.natural_id}`),
+      );
       if (dependents.length > 0) {
         const named = dependents
           .map(
