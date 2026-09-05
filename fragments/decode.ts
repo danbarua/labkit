@@ -25,6 +25,7 @@ import type {
   DeclareGateCommand,
   EvaluateCriterionCommand,
   IsCommand,
+  UndoCommand,
   KeepCommand,
   NoteCommand,
   OpenEnquiryCommand,
@@ -132,6 +133,10 @@ export const DECODERS = {
 
   is: async (ctx, e) => {
     await ctx.writes.is(as<IsCommand>(e));
+  },
+
+  undo: async (ctx, e) => {
+    await ctx.writes.undo(as<UndoCommand>(e));
   },
 
   amendDesign: async (ctx, e) => {

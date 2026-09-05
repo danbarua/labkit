@@ -38,6 +38,7 @@ import {
   inputRef,
   standing,
   supersededRef,
+  whole,
 } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
@@ -414,6 +415,27 @@ export function registerWrites(program: Command, run: Run): void {
               : { claim, state, because: ref("evidence", because) },
           ),
           mintedView(),
+        ),
+      ),
+    );
+  program
+    .command("undo")
+    .helpGroup("Revising")
+    .summary("take back a mistaken act")
+    .description(
+      "Hides every handle that act minted from the ordinary read and write surface -- what it " +
+        "connected goes with it, since an edge naming a hidden node cannot be traversed. Nothing " +
+        "is deleted: the record keeps the mistake and stops reaching it, which is what makes this " +
+        "a compensating act rather than an erasure, and why an operator can still recover it. " +
+        "Refuses rather than cascades: an act that set a property in place, or that something " +
+        "else already rests on, is refused with the reason.",
+    )
+    .argument("<event>", "the act's seq, from 'labkit happened'", whole)
+    .requiredOption("--because <text>", "why this is being taken back")
+    .action(async (event: number, opts: { because: string }) =>
+      run(async ({ write }) =>
+        answer(await write.undo({ event, because: opts.because }), (r, p) =>
+          asHandles(r.retracted, p),
         ),
       ),
     );

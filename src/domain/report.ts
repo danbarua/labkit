@@ -321,6 +321,13 @@ export interface Restated {
   events: DomainEvent[];
 }
 
+/** What `undo` retracted — every handle the undone act created, now hidden from the ordinary read surface. */
+export interface Undone {
+  event: number;
+  retracted: Ref<Kind>[];
+  events: DomainEvent[];
+}
+
 /**
  * The inverse of {@link LABEL_BY_KIND} — a label's research-concept kind,
  * where one exists. Not every label has one (`EvidenceUnit` and `Computation`

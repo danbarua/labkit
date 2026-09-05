@@ -50,6 +50,7 @@ import type {
   EvaluatedCriterion,
   AcceptedAsUnresolved,
   Restated,
+  Undone,
   QuestionClosure,
   ConflictSide,
   ConflictVerdict,
@@ -784,6 +785,13 @@ export const restatedSchema = z.strictObject({
   events: z.array(domainEventSchema),
 });
 
+/** What `undo` returns — every handle the undone act created, now hidden from the ordinary read surface. */
+export const undoneSchema = z.strictObject({
+  event: z.number(),
+  retracted: z.array(z.string() as unknown as z.ZodType<Ref<Kind>>),
+  events: z.array(domainEventSchema),
+});
+
 const changedConclusion = z.strictObject({
   proposition: z.string(),
   was: ref("claim"),
@@ -980,6 +988,7 @@ export type _AcceptedAsUnresolved = Assert<
   Exact<z.infer<typeof acceptedAsUnresolvedSchema>, AcceptedAsUnresolved>
 >;
 export type _Restated = Assert<Exact<z.infer<typeof restatedSchema>, Restated>>;
+export type _Undone = Assert<Exact<z.infer<typeof undoneSchema>, Undone>>;
 
 /**
  * What `register_session` recorded.

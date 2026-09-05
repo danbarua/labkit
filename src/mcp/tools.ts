@@ -60,6 +60,7 @@ import {
   evaluatedCriterionSchema,
   acceptedAsUnresolvedSchema,
   restatedSchema,
+  undoneSchema,
   reinterpretationReportSchema,
   replacementReportSchema,
   verificationReportSchema,
@@ -1029,6 +1030,24 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           ? { claim: ref("claim", claim), state, because }
           : { claim: ref("claim", claim), state, because: ref("evidence", because) },
       ),
+  }),
+
+  writeTool({
+    name: "undo",
+    title: "Take back a mistaken act",
+    group: "Revising",
+    description:
+      "Hides every handle that act minted from the ordinary read and write surface — what it " +
+      "connected goes with it, since an edge naming a hidden node cannot be traversed. Nothing " +
+      "is deleted: the record keeps the mistake and stops reaching it. Refuses rather than " +
+      "cascades: an act that set a property in place, or that something else already rests on, " +
+      "is refused with the reason.",
+    inputSchema: {
+      event: z.number().describe("the act's seq, from `what_happened`"),
+      because: z.string().describe("why this is being taken back"),
+    },
+    outputSchema: undoneSchema,
+    handler: (write, { event, because }) => write.undo({ event, because }),
   }),
 
   writeTool({

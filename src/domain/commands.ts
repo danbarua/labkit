@@ -412,6 +412,18 @@ export type IsCommand =
   | { claim: ClaimRef; state: "undecided"; because: EvidenceRef }
   | { claim: ClaimRef; state: "confirmed"; because: Prose };
 
+/**
+ * `undo` — takes back a mistaken act by naming the event it recorded.
+ *
+ * `event` is a `seq`, not a handle: it names the act, not any one thing the
+ * act touched, and `seq` is already the vocabulary `labkit happened` shows a
+ * caller for exactly this — the cursor `--since` takes back.
+ */
+export interface UndoCommand {
+  event: number;
+  because: Prose;
+}
+
 /** Every command the write surface takes. What an act was asked to do. */
 export type Command =
   | AcceptAsUnresolvedCommand
@@ -436,4 +448,5 @@ export type Command =
   | ReverifyCommand
   | SharpenCommand
   | StateCriterionCommand
-  | SynthesiseCommand;
+  | SynthesiseCommand
+  | UndoCommand;

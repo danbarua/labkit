@@ -84,6 +84,7 @@ export class ResearchSession {
   readonly acceptAsUnresolved: WriteSurface["acceptAsUnresolved"] = (...args) =>
     this.writes.acceptAsUnresolved(...args);
   readonly is: WriteSurface["is"] = (...args) => this.writes.is(...args);
+  readonly undo: WriteSurface["undo"] = (...args) => this.writes.undo(...args);
   readonly amendDesign: WriteSurface["amendDesign"] = (...args) => this.writes.amendDesign(...args);
   readonly designHistory: ReadSurface["designHistory"] = (...args) =>
     this.reads.designHistory(...args);

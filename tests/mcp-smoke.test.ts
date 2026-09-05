@@ -547,6 +547,16 @@ describe("every tool answers when an agent actually calls it", () => {
       });
       const left = await call(c, "enquiry_status", { enquiry: id(dense) });
       expect((left.question as Json).closure).toBe("accepted-as-unresolved");
+
+      // `undo` — a throwaway act, nothing else here depends on it.
+      const mistake = await call(c, "pose", { question: "does undo work?" });
+      const mistakeSeq = (mistake.events as Array<{ seq: number }>)[0]!.seq;
+      const undone = await call(c, "undo", {
+        event: mistakeSeq,
+        because: "recorded to test the tool, not a real question",
+      });
+      expect(undone.retracted as string[]).toContain(id(mistake));
+
       await c.close();
     } finally {
       await scenario.end();
