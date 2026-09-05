@@ -316,7 +316,7 @@ export class StoryGroup extends SessionCore {
       {
         new: vertexProps<{ natural_id: string }>(),
         old: vertexProps<{ natural_id: string }>(),
-        oldcomp: vertexProps<{ natural_id: string; kind: string }>(),
+        oldcomp: vertexProps<{ natural_id: string; method: string }>(),
       },
       { id: verification },
     );
@@ -328,7 +328,7 @@ export class StoryGroup extends SessionCore {
 
     const method = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
-      { c: vertexProps<{ kind: string }>() },
+      { c: vertexProps<{ method: string }>() },
       { id: verification },
     );
 
@@ -436,9 +436,9 @@ export class StoryGroup extends SessionCore {
       // Identity and wording both. Method text alone leaves two runs of one
       // method indistinguishable.
       verification,
-      verificationMethod: method[0]!.c.kind,
+      verificationMethod: method[0]!.c.method,
       of: ref("analysis", found.oldcomp.natural_id),
-      ofMethod: found.oldcomp.kind,
+      ofMethod: found.oldcomp.method,
       conclusion: agrees ? "agrees" : "disagrees",
       // Both lists, in order, and no verdict over them. Whether the same
       // records read in a different order is the same execution depends on what
@@ -678,7 +678,7 @@ export class StoryGroup extends SessionCore {
         const entry = {
           finding: row.e.statement,
           evidence: ref("evidence", row.e.natural_id),
-          method: row.comp.kind,
+          method: row.comp.method,
           analysis: ref("analysis", row.comp.natural_id),
         };
         // **Per claim, not per artefact**: a decision that changed *this*
@@ -711,7 +711,7 @@ export class StoryGroup extends SessionCore {
           if (!reverifiedBy.some((r) => r.analysis === row.comp.natural_id))
             reverifiedBy.push({
               analysis: ref("analysis", row.comp.natural_id),
-              method: row.comp.kind,
+              method: row.comp.method,
             });
         } else {
           live.push(entry);
