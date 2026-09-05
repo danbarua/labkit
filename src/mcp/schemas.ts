@@ -388,6 +388,7 @@ export const supportExplanationSchema = z.strictObject({
   standing: z.enum(["exploratory", "confirmatory", "undecided"]),
   promotedBecause: z.string().optional(),
   support: z.array(bearingFinding),
+  drawnAcross: z.array(concludedClaim),
   reverifiedBy: z.array(z.strictObject({ analysis: ref("analysis"), method: z.string() })),
   standard: z.array(checkStatus),
   unmet: z.array(unmetCheck),
@@ -735,6 +736,11 @@ export const recordedObservationsSchema = z.strictObject({
 export const sharpenedQuestionSchema = z.strictObject({
   question: ref("question"),
   decision: ref("decision"),
+  events: z.array(domainEventSchema),
+});
+/** What `synthesise` returns — the claim drawn across the findings it rests on. */
+export const synthesisedSchema = z.strictObject({
+  claim: ref("claim"),
   events: z.array(domainEventSchema),
 });
 /** What `record_review` returns. */

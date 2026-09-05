@@ -39,6 +39,7 @@ import type {
   ReplaceAnalysisCommand,
   ReverifyCommand,
   SharpenCommand,
+  SynthesiseCommand,
   StateCriterionCommand,
 } from "../src/domain/commands";
 import { ref } from "../src/domain/report";
@@ -83,6 +84,10 @@ export const DECODERS = {
 
   conclude: async (ctx, e) => {
     await ctx.writes.conclude(as<ConcludeCommand>(e));
+  },
+
+  synthesise: async (ctx, e) => {
+    await ctx.writes.synthesise(as<SynthesiseCommand>(e));
   },
 
   recordReview: async (ctx, e) => {

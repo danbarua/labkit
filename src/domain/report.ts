@@ -310,6 +310,12 @@ export interface AcceptedAsUnresolved {
   decision: DecisionRef;
   events: DomainEvent[];
 }
+/** What `synthesise` produced: the claim drawn across the findings it rests on. */
+export interface Synthesised {
+  claim: ClaimRef;
+  events: DomainEvent[];
+}
+
 export interface Restated {
   decision: DecisionRef;
   events: DomainEvent[];
@@ -1079,6 +1085,20 @@ export interface SupportExplanation {
   promotedBecause?: string;
   /** Findings currently supporting the proposition, each with the analysis that produced it. */
   support: BearingFinding[];
+  /**
+   * The findings this claim was drawn across, when it is a synthesis
+   * (`synthesise`) — each by handle and wording.
+   *
+   * **Not {@link SupportExplanation.restingOn}**, a letter away and a different
+   * question: that is the artefacts an analysis *read*, this is the claims a
+   * synthesis was *drawn from*.
+   *
+   * Separate from `support`, which is evidence somebody measured. A synthesis
+   * runs nothing, so it has no evidence of its own; listing its parts under
+   * `support` would report four measurements where there are four *readings of*
+   * measurements. Empty for every claim an analysis concluded.
+   */
+  drawnAcross: ConfirmatoryResult[];
   /**
    * Analyses that re-checked a supporting finding without reproducing its
    * execution, by method.

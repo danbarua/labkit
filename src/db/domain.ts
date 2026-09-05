@@ -141,6 +141,7 @@ export const EDGE_LABELS = [
   "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
   "INVALIDATED_BY", // Artefact -> Review (which review the retraction rested on)
   "IMPLEMENTS", // Task -> EvidenceUnit
+  "RESTS_ON", // Claim -> Claim (a synthesis over findings it does not re-run)
   "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
 ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
@@ -513,6 +514,15 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Review"],
   ],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
+  /**
+   * A claim that synthesises others and computes nothing new.
+   *
+   * Claim to claim, not evidence to claim: a synthesis produces no finding of
+   * its own — that is what makes it a synthesis — so there is no `Evidence` for
+   * `SUPPORTS` to come from, and minting one would assert a measurement nobody
+   * took. What it rests on is the findings already on the record.
+   */
+  RESTS_ON: [["Claim", "Claim"]],
   /**
    * Every other pair in this table names two specific labels because the
    * relationship means something specific about both. `CONCERNS` is the one
