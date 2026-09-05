@@ -279,7 +279,7 @@ export class Shared extends SessionCore {
     unitOfWork: UnitOfWork,
   ): Promise<{ analysis: AnalysisRef; unit: UnitRef; output: ObservationsRef }> {
     const computation = await unitOfWork.node("Computation", {
-      kind: input.method,
+      method: input.method,
       status: "completed",
     });
     const unit = await unitOfWork.node("EvidenceUnit", { role: "analysis" });

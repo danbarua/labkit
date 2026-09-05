@@ -790,8 +790,8 @@ export interface ReviewProps {
 // verbatim property list from the journal's Artefact section
 export interface ArtefactProps {
   /**
-   * `"observations"` or `"analysis-output"` — a real kind, unlike
-   * {@link ComputationProps.kind}. Nothing reads it: `report.ts` notes that the
+   * `"observations"` or `"analysis-output"` — a real kind, which is what
+   * {@link ComputationProps.method} was renamed for not being. Nothing reads it: `report.ts` notes that the
    * `ART_` prefix cannot tell a raw input from an analysis output, and this
    * property could and does not. A promotion candidate for `IndexedString` if
    * a query ever wants it.
@@ -807,17 +807,20 @@ export interface ArtefactProps {
 // verbatim property list from the journal's Computation section
 export interface ComputationProps {
   /**
-   * **Classified `ReadOnlyString` alongside {@link ArtefactProps.kind}, and the
-   * classification exposes a mismatch rather than settling it.**
+   * How the analysis was carried out, in the researcher's own words.
    *
-   * Every writer passes `input.method` here — the researcher's free-text
-   * description of how an analysis was carried out, which is `Prose` by any
-   * reading. `Artefact.kind` holds actual kinds. So either this property is
-   * misnamed, or the writes are misusing it and `method` wants a `Prose`
-   * property of its own. Recorded here rather than guessed at; both are
-   * promotion candidates for `IndexedString` if a query ever wants them.
+   * **Named `kind` until 2026-09-05**, beside `Artefact.kind`, which holds
+   * actual kinds — while every writer passed `input.method` into this one and
+   * every reader called it `method` on the way out. The independent Rust port
+   * named it `method` without being told to, and Bonsai's transcripts pass
+   * paragraphs into `--method`; the name was the only thing disagreeing (#64).
+   *
+   * Still `ReadOnlyString` rather than `Prose`, which is a separate question:
+   * making it `Prose` would put it in `SEARCHABLE_TEXT` by the taxonomy's own
+   * rule, so `search "paired comparison"` would find the analysis. That is
+   * probably right and is not this change.
    */
-  kind: ReadOnlyString;
+  method: ReadOnlyString;
   /** Hardcoded `"completed"` by the only writer. A running or failed computation has nowhere to say so yet. */
   status: ReadOnlyString;
   backend?: IdentityString;

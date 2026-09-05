@@ -54,7 +54,7 @@ test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re
   // ...and the edge is actually usable, plus its uniqueness index is back.
   const graph = new TenantGraph(ctx, db, db.tx);
   const comp = await graph.createNode("Computation", {
-    kind: "k",
+    method: "k",
     status: "done",
   });
   const art = await graph.createNode("Artefact", {

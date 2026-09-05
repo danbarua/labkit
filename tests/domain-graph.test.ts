@@ -69,7 +69,7 @@ async function seedResearchThread() {
     role: "verification",
   });
   const computation = await graph.createNode("Computation", {
-    kind: "equivalence_check",
+    method: "equivalence_check",
     status: "completed",
     backend: "wandb",
     external_run_id: "run-42",
@@ -225,7 +225,7 @@ describe("failed/planned inquiry provenance", () => {
       role: "feasibility",
     });
     const computation = await graph.createNode("Computation", {
-      kind: "scaling_probe",
+      method: "scaling_probe",
       status: "failed",
     });
 
@@ -361,7 +361,7 @@ describe("Gate is reconnected to what it actually gates", () => {
       consequence: "accelerated ridge implementation may be promoted",
     });
     const computation = await graph.createNode("Computation", {
-      kind: "promotion_run",
+      method: "promotion_run",
       status: "pending",
     });
     const evidence = await graph.createNode("Evidence", {
@@ -382,7 +382,7 @@ describe("Gate is reconnected to what it actually gates", () => {
     );
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.comp).toMatchObject({ kind: "promotion_run" });
+    expect(rows[0]!.comp).toMatchObject({ method: "promotion_run" });
   });
 });
 
@@ -416,7 +416,7 @@ describe("all node labels", () => {
     Gate: { consequence: "c" },
     Review: { verdict: "v" },
     Artefact: { kind: "json", logical_name: "a" },
-    Computation: { kind: "k", status: "s" },
+    Computation: { method: "k", status: "s" },
     Task: { objective: "o", mayRead: ["a.csv"], outputs: "o", acceptance: "a" },
     Note: { text: "n" },
   };
