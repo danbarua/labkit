@@ -126,15 +126,27 @@ export class Stopping extends SessionCore {
           // closure rests on the findings underneath it — all of them. Citing
           // one would name an arbitrary part as the answer to a question the
           // whole was drawn to settle.
-          const parts = await this.graph.query(
-            `MATCH (c:Claim {natural_id: $claim})-[:RESTS_ON]->(:Claim)<-[:SUPPORTS]-(e:Evidence)
-             RETURN c, e`,
-            {
-              c: vertexProps<{ name: string }>(),
-              e: vertexProps<{ natural_id: string }>(),
-            },
-            { claim: input.answeredBy },
-          );
+          //
+          // **Both bearings, and AGE has no edge alternation.** Naming only
+          // `SUPPORTS` is silent: the rows are simply absent, and a synthesis
+          // drawn across findings that all *challenge* their propositions —
+          // which is what a negative result looks like, and what Bonsai's
+          // Stage 1D headline is — reads as a claim nothing bears on. Shipped
+          // that way in #276 and found by running the transcript.
+          const parts: { c: { name: string }; e: { natural_id: string } }[] = [];
+          for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+            parts.push(
+              ...(await this.graph.query(
+                `MATCH (c:Claim {natural_id: $claim})-[:RESTS_ON]->(:Claim)<-[:${bearing}]-(e:Evidence)
+                 RETURN c, e`,
+                {
+                  c: vertexProps<{ name: string }>(),
+                  e: vertexProps<{ natural_id: string }>(),
+                },
+                { claim: input.answeredBy },
+              )),
+            );
+          }
           if (parts.length === 0) throw new Error(noFindingBearsOn(input.answeredBy));
           answerBearing = [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))];
           answeredProposition = parts[0]!.c.name;
