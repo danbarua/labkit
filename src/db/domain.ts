@@ -51,7 +51,6 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
   Decision: ["decided_at"],
   CriterionEvaluation: ["evaluated_at"],
   Artefact: ["logical_name"],
-  Computation: ["method"],
   // Written by nothing today, and indexed anyway — `check:prop-classes` found
   // them missing on its first run, which is the rule working. An index over a
   // property that is always absent costs almost nothing in Postgres, and it is
