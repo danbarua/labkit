@@ -64,6 +64,7 @@ import type {
   Synthesised,
   ReplacementReport,
   Restated,
+  Undone,
   SharpenedQuestion,
   StatedCriterion,
   VerificationReport,
@@ -79,6 +80,7 @@ import type {
   EvaluateCriterionCommand,
   IsCommand,
   KeepCommand,
+  UndoCommand,
   NoteCommand,
   PlanWorkCommand,
   PursueCommand,
@@ -260,6 +262,10 @@ export class WriteSurface extends SessionCore {
 
   async is(input: IsCommand): Promise<Restated> {
     return this.revising.is(input);
+  }
+
+  async undo(input: UndoCommand): Promise<Undone> {
+    return this.revising.undo(input);
   }
 
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {

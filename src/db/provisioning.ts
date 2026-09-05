@@ -151,6 +151,8 @@ class TenantGraphProvisioner {
     for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label, indexes);
     for (const label of NODE_LABELS) await this.ensurePropertyIndexes(label, indexes);
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
+    const policies = await this.existingPolicies();
+    for (const label of NODE_LABELS) await this.ensureRetractionPolicy(label, policies);
     await this.ensureGrants();
   }
 
@@ -284,6 +286,56 @@ class TenantGraphProvisioner {
     if (existing.has(indexName)) return;
     await this.db.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${edge}" (start_id, end_id)`,
+    );
+  }
+
+  /** Every RLS policy already on this graph's tables, in one read. */
+  private async existingPolicies(): Promise<Set<string>> {
+    const rows = await this.db.query<{ policyname: string }>(
+      `SELECT policyname FROM pg_policies WHERE schemaname = $1`,
+      [this.graphName],
+    );
+    return new Set(rows.rows.map((r) => r.policyname));
+  }
+
+  /**
+   * Hides a retracted node from `labkit_app` — the compensating act `undo`
+   * writes stands in the record, and this is what stops it being traversed.
+   *
+   * **A node only.** An edge has no natural id (`createEdge` addresses one by
+   * its `(from, label, to)` triple, not a handle), so there is nothing here
+   * for `setNodeProperty` to target and no edge-level policy is written. That
+   * is not a gap in practice: AGE's `cypher()` respects RLS on the label
+   * tables it reads (every label is a real Postgres table), so a `MATCH`
+   * naming a retracted node as either endpoint fails to match at all, and
+   * every edge into or out of it is unreachable through the ordinary read
+   * surface without a policy of its own.
+   *
+   * `USING` is the read-time filter and is deliberately not mirrored into
+   * `WITH CHECK`: a `FOR ALL` policy defaults `WITH CHECK` to the same
+   * expression as `USING` when none is given, which would refuse the very
+   * write that retracts a node — the row being written no longer satisfies
+   * "not retracted". `WITH CHECK (true)` leaves writes ungated and lets the
+   * transition happen; `USING` is what a later read never sees past.
+   *
+   * `IS DISTINCT FROM` rather than `<> true`, because a property absent from
+   * `properties` (every ordinary node) makes `agtype_access_operator` return
+   * SQL `NULL`, and `NULL <> true` is `NULL` — a row Postgres treats as "don't
+   * know" and excludes from the policy along with everything actually
+   * retracted. `IS DISTINCT FROM` is false only when the value truly is
+   * `true`, so an absent property reads as "not retracted" the way it should.
+   */
+  private async ensureRetractionPolicy(label: NodeLabel, existing: Set<string>): Promise<void> {
+    const policyName = `${label.toLowerCase()}_hide_retracted`;
+    await this.db.query(
+      `ALTER TABLE "${this.graphName}"."${label}" ENABLE ROW LEVEL SECURITY`,
+    );
+    if (existing.has(policyName)) return;
+    await this.db.query(
+      `CREATE POLICY "${policyName}" ON "${this.graphName}"."${label}" FOR ALL TO ${APP_ROLE}
+       USING (ag_catalog.agtype_access_operator(properties, '"retracted"'::agtype)
+              IS DISTINCT FROM 'true'::agtype)
+       WITH CHECK (true)`,
     );
   }
 }

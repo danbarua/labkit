@@ -3,6 +3,7 @@
 import { scalar, vertexProps } from "../../db/cypher";
 import type { ClaimProps } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
+import { createdIn } from "../events";
 import type {
   AnalysisRef,
   CitedFinding,
@@ -10,14 +11,17 @@ import type {
   ConcludedClaim,
   EnquiryRef,
   EvidenceRef,
+  Kind,
   ObservationsRef,
+  Ref,
   ReinterpretationReport,
   ReplacementReport,
   Restated,
   ReviewRef,
+  Undone,
   VerificationReport,
 } from "../report";
-import { ref } from "../report";
+import { kindOf, ref } from "../report";
 import type {
   ClaimState,
   IsCommand,
@@ -25,11 +29,15 @@ import type {
   ReinterpretCommand,
   ReplaceAnalysisCommand,
   ReverifyCommand,
+  UndoCommand,
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import { asConcludedClaim, Shared } from "./shared";
 import type { UnitOfWork } from "../projection";
+
+/** A handle whose specific kind is not known in advance — any id this record minted. */
+const anyRef = (id: string): Ref<Kind> => ref((kindOf(id) ?? id) as Kind, id);
 
 /**
  * The `Claim.kind` each state is stored as.
@@ -187,6 +195,113 @@ export class Revising extends Shared {
       return {
         subject: input.claim,
         result: { decision },
+      };
+    });
+  }
+
+  /**
+   * Takes back a mistaken act, naming the event it recorded.
+   *
+   * **Retracts, does not delete.** Every handle the act minted is marked
+   * `retracted`, which an RLS policy per label (`ensureRetractionPolicy`,
+   * `src/db/provisioning.ts`) hides from `labkit_app` — the role every
+   * ordinary read and write runs as. An edge into or out of a retracted node
+   * is hidden the same way, for free: a Cypher `MATCH` naming a hidden node as
+   * either endpoint cannot match it, so nothing further is written to hide
+   * `EdgeCreated` changes on their own account. That is also this verb's
+   * present limit — an edge between two nodes **neither** of which this act
+   * created has no natural id of its own to mark, and stays visible; every
+   * verb on this surface mints at least one node for anything it connects,
+   * so this has not yet been a real case.
+   *
+   * **Hidden from the ordinary read surface, not made unreachable.** The
+   * `SET ROLE` every session steps down to can `RESET ROLE` back — a safety
+   * boundary against a query that forgot its tenant, not a security one — so
+   * an operator with cause can still read what this retracted. That is the
+   * compensating act this verb is: the record keeps the mistake and stops
+   * traversing it, rather than erasing that it happened.
+   *
+   * **Refuses rather than cascades.** An act whose `changes` include a
+   * `PropsChanged` set a property in place with nothing to retract it to —
+   * `is` is the one verb that does this today — and is refused outright,
+   * naming the reason. An act whose creations something else already rests
+   * on is also refused, naming what depends on it: retracting silently would
+   * turn a verdict measured against real evidence into one asserted against
+   * nothing, which is a wrong answer with no error to find it by.
+   */
+  async undo(input: UndoCommand): Promise<Undone> {
+    return this.handle("undo", input, async (unitOfWork) => {
+      // `since: event - 1, limit: 1` rather than an exact-seq filter: `seq` is
+      // per-tenant but the underlying sequence is shared across tenants (see
+      // `DomainEvent.seq`'s own doc comment), so a gap at this tenant's next
+      // number is a real, ordinary case and not a bug — checked explicitly
+      // rather than trusted, because a `since` filter finds the *next* event
+      // whether or not this one exists.
+      const [found] = await this.events.select({ since: input.event - 1, limit: 1 });
+      if (found?.seq !== input.event)
+        throw new Error(`no event ${input.event}; 'labkit happened' names the acts on the record`);
+
+      const retracting = createdIn(found);
+      if (retracting.length === 0)
+        throw new Error(
+          `event ${input.event} (${found.operation}) minted nothing to retract; there is no ` +
+            `node this verb can hide, and an edge alone has no natural id of its own to mark`,
+        );
+
+      const propsSet = found.changes.some((c) => c.change === "PropsChanged");
+      if (propsSet)
+        throw new Error(
+          `event ${input.event} (${found.operation}) set a property in place and has nothing ` +
+            `recorded to set it back to; this verb can retract what an act created, not undo ` +
+            `a value it overwrote`,
+        );
+
+      // What rests on any of this, from outside the act itself -- an edge
+      // between two things this same event created is the act's own wiring,
+      // not a dependent. Unlabeled on both sides deliberately: a dependent
+      // can be any kind of node, and naming one label would silently miss
+      // every other. Both directions, separately: `evidence -[:BASED_ON]->
+      // criterion-evaluation` and `question -[:MOTIVATES]-> enquiry` are
+      // both a hidden node breaking something external's own traversal, one
+      // pointing at what is retracted and one pointing away from it.
+      const into = await this.graph.query(
+        `MATCH (external)-[r]->(target)
+         WHERE target.natural_id IN $ids AND NOT external.natural_id IN $ids
+         RETURN external AS origin, type(r) AS via, target AS reaches`,
+        {
+          origin: vertexProps<{ natural_id: string }>(),
+          via: scalar<string>(),
+          reaches: vertexProps<{ natural_id: string }>(),
+        },
+        { ids: retracting },
+      );
+      const outOf = await this.graph.query(
+        `MATCH (source)-[r]->(external)
+         WHERE source.natural_id IN $ids AND NOT external.natural_id IN $ids
+         RETURN source AS origin, type(r) AS via, external AS reaches`,
+        {
+          origin: vertexProps<{ natural_id: string }>(),
+          via: scalar<string>(),
+          reaches: vertexProps<{ natural_id: string }>(),
+        },
+        { ids: retracting },
+      );
+      const dependents = [...into, ...outOf];
+      if (dependents.length > 0) {
+        const named = dependents
+          .map((d) => `${anyRef(d.origin.natural_id)} -[${d.via}]-> ${anyRef(d.reaches.natural_id)}`)
+          .join(", ");
+        throw new Error(
+          `event ${input.event} (${found.operation}) cannot be undone: ${named} rests on what ` +
+            `it created; retracting it would silently change what that depends on`,
+        );
+      }
+
+      for (const id of retracting) unitOfWork.set(id, { retracted: true });
+
+      return {
+        subject: anyRef(found.subject),
+        result: { event: input.event, retracted: retracting.map(anyRef) },
       };
     });
   }
