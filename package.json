@@ -53,7 +53,8 @@
 		"probe:dogfood": "bash scripts/probe-dogfood.sh",
 		"db:generate": "drizzle-kit generate",
 		"db:generate:custom": "drizzle-kit generate --custom",
-		"ports": "bash scripts/worktree-ports.sh"
+		"ports": "bash scripts/worktree-ports.sh",
+		"bonsai:record": "bash scripts/build-bonsai-record.sh"
 	},
 	"private": true,
 	"devDependencies": {
