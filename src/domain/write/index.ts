@@ -303,7 +303,7 @@ export class WriteSurface extends SessionCore {
       });
       // The graph is one of these, not the step this used to be. Ordered:
       // a projector that reads the graph must come after the one that writes
-      // it, which is why `fragments/run.ts` lists them the way it does.
+      // it -- see `ResearchSessionOptions.projectors`.
       for (const projector of this.projectors) await projector.apply(recorded);
       return { ...act.result, events: [recorded] };
     });

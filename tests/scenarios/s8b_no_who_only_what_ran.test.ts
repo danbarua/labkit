@@ -27,7 +27,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf, whyOf } from "../helpers/claims";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;

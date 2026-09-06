@@ -23,8 +23,8 @@
 
 import { createdIn, edgesIn } from "../src/domain";
 import { labelForNaturalId } from "../src/db/domain";
-import type { Command, EdgeCreated, EventSink, DomainEvent } from "../src/domain";
-import type { DerivedSnapshot, StepProvenance } from "./derive";
+import type { EdgeCreated, EventSink, DomainEvent } from "../src/domain";
+import type { DerivedSnapshot } from "./derive";
 
 /**
  * One entity's researcher-language state at a step, and whether this step
@@ -56,41 +56,21 @@ export interface TraceStep {
    */
   created: { handle: string; label: string }[];
   edges: EdgeCreated[];
-  /** The command the caller issued, verbatim. */
-  issued: Command;
   /** For display. See the file header — not a runnable command. */
   command: string;
-  /** Which `fragments/index.ts` move produced this step, if any composition was tagged (`fragments/tagged.ts`). */
-  fragment?: string;
   /** Every known enquiry and gate's state after this step, and which of them this step changed. */
   derived: DerivedItem[];
 }
 
 export interface Trace {
   name: string;
-  /**
-   * Which implementation, or which kind of record, produced this trace.
-   *
-   * `"labkit-ts"` and `"labkit-rust"` are two independent implementations of
-   * the same domain (#114) and diverge on real questions — edge direction,
-   * which node kinds an edge connects — that neither side has settled as
-   * "correct". `"labkit-db"` (#124/#126) is a different axis entirely: not a
-   * different implementation, but a real record built through the CLI or MCP
-   * server over real time, read back from its durable `pgEventLog` rather
-   * than run fresh in a temp directory. A composition is a rehearsal; this is
-   * the thing being rehearsed for. The Explorer must not present one as the
-   * other, for the same reason it tags the two implementations — a viewer
-   * needs to know whether they're looking at a scripted arc or somebody's
-   * actual research.
-   */
-  origin: "labkit-ts" | "labkit-rust" | "labkit-db";
   steps: TraceStep[];
   /**
-   * Set only when a `labkit-db` trace's replay (`fragments/replay.ts`)
-   * diverged from the record it was reproducing. Every step from the named
-   * `seq` onward reports empty `derived` and no `fragment`, the same as a
-   * trace with no provenance at all — this names where and why, rather than
-   * leaving the gap to look like nobody tried.
+   * Set only when a real record's replay (`fragments/replay.ts`) diverged
+   * from the record it was reproducing. Every step from the named `seq`
+   * onward reports empty `derived`, the same as a trace with no provenance at
+   * all — this names where and why, rather than leaving the gap to look like
+   * nobody tried.
    */
   derivedUnavailable?: string;
 }
@@ -118,23 +98,21 @@ export function commandOf(e: DomainEvent): string {
  * in-memory one left it undefined and this would have had only array order to
  * go on.
  *
- * `provenance` is optional so a caller with no derived-state tracking (a
- * fragment run directly against `./index` rather than `./tagged`) still gets
- * a trace — every step's `derived` is simply empty and `fragment` absent.
+ * `provenance` is optional so a caller with no derived-state tracking still
+ * gets a trace — every step's `derived` is simply empty.
  */
 export async function traceOf(
   name: string,
   events: EventSink,
-  provenance?: ReadonlyMap<number, StepProvenance>,
+  provenance?: ReadonlyMap<number, DerivedSnapshot>,
 ): Promise<Trace> {
   const stream = [...(await events.all())].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   let previous: DerivedSnapshot = { enquiries: [], gates: [] };
   return {
     name,
-    origin: "labkit-ts",
     steps: stream.map((e) => {
       const seq = e.seq ?? 0;
-      const snapshot = provenance?.get(seq)?.derived;
+      const snapshot = provenance?.get(seq);
       const derived = snapshot ? diffDerived(previous, snapshot) : [];
       if (snapshot) previous = snapshot;
       return {
@@ -144,9 +122,7 @@ export async function traceOf(
         subject: e.subject,
         created: createdIn(e).map((handle) => ({ handle, label: labelForNaturalId(handle) })),
         edges: edgesIn(e),
-        issued: e.command,
         command: commandOf(e),
-        fragment: provenance?.get(seq)?.fragment,
         derived,
       };
     }),
@@ -176,43 +152,4 @@ function diffDerived(previous: DerivedSnapshot, next: DerivedSnapshot): DerivedI
     items.push({ kind: "enquiry", handle: enquiry.handle, state, changed: from !== state, from });
   }
   return items;
-}
-
-/**
- * Every node and edge a trace brought into existence, folded across its steps.
- *
- * The graph as it stands at the end. A step-by-step renderer does not need
- * this — it accumulates as it goes — but a check that a trace is well formed
- * does, and so does anything asking "what did this scenario build".
- */
-export function graphOf(trace: Trace): {
-  nodes: { handle: string; label: string }[];
-  edges: EdgeCreated[];
-} {
-  const nodes = new Map<string, { handle: string; label: string }>();
-  const edges: EdgeCreated[] = [];
-  for (const step of trace.steps) {
-    for (const n of step.created) nodes.set(n.handle, n);
-    edges.push(...step.edges);
-  }
-  return { nodes: [...nodes.values()], edges };
-}
-
-/**
- * Every edge endpoint names a node the trace created.
- *
- * **The check the hand-written mockup could not have.** Its data was two lists
- * a person kept in step, and an edge to a node nobody created drew a line into
- * nothing. Here the two come from one run, so this can only fail if LabKit
- * itself connected something it did not make — which is worth knowing.
- */
-export function danglingEndpoints(trace: Trace): string[] {
-  const { nodes, edges } = graphOf(trace);
-  const known = new Set(nodes.map((n) => n.handle));
-  const bad = new Set<string>();
-  for (const e of edges) {
-    if (!known.has(e.from)) bad.add(e.from);
-    if (!known.has(e.to)) bad.add(e.to);
-  }
-  return [...bad].sort();
 }

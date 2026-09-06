@@ -31,7 +31,7 @@ import {
 } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { recordAnalysis, replaceAnalysis } from "../../fragments";
+import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
 import { decidedOn, evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;

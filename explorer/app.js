@@ -1,7 +1,6 @@
-// LabKit Explorer — a scenario is a command sequence; the graph falls out of
-// running it. Traces come from /api/traces, derived at server boot by
-// running fragments/compositions.ts through the real domain — nothing here
-// invents a node or an edge.
+// LabKit Explorer — a step-by-step render of the Bonsai record. The trace
+// comes from /api/traces, read straight off the real record on every
+// request — nothing here invents a node or an edge.
 //
 // Layout: nodes carry one simulated (x, y) position, shared by both views.
 // The 3D view doesn't re-simulate anything — it extrudes that same (x, y)
@@ -17,7 +16,6 @@ const derivedPanel = document.getElementById("derived-panel");
 const queueList = document.getElementById("queue-list");
 const popover = document.getElementById("popover");
 const hint = document.getElementById("hint");
-const scenarioSelect = document.getElementById("scenario");
 const progressBar = document.getElementById("progress");
 const progressFill = document.getElementById("progress-fill");
 const speedInput = document.getElementById("speed");
@@ -116,62 +114,28 @@ window.addEventListener("resize", resizeCanvas);
 
 // ---------------------------------------------------------------- data
 
-const ORIGIN_TAG = { "labkit-rust": "[rust] ", "labkit-db": "[db] " };
-const ORIGIN_LABEL = {
-  "labkit-rust": "rust/grafeo model",
-  "labkit-db": "real record",
-  "labkit-ts": "TS domain model",
-};
-
 async function loadTraces() {
   const res = await fetch("/api/traces");
   state.traces = await res.json();
-  scenarioSelect.innerHTML = "";
-  for (const [i, trace] of state.traces.entries()) {
-    const opt = document.createElement("option");
-    opt.value = String(i);
-    const badge = ORIGIN_TAG[trace.origin] ?? "";
-    opt.textContent = `${badge}${trace.name}  (${trace.steps.length} steps)`;
-    scenarioSelect.appendChild(opt);
-  }
   selectTrace(0);
-}
-
-// Three kinds of trace can be in this list -- the TS domain, the Rust/Grafeo
-// spike (labkit#119), and a real record read from a live .labkit/ (#124,
-// #126) -- and none of them is a correction of another: the first two are
-// independent implementations that don't always agree (edge direction), and
-// the third isn't a composition at all, just something that actually
-// happened. originBadge keeps which one is showing visible throughout the
-// run, not just in the picker.
-function originBadge() {
-  return document.getElementById("origin-badge");
 }
 
 function selectTrace(index) {
   state.current = state.traces[index];
-  scenarioSelect.value = String(index);
   // Fixed once per trace, from every step's own `at` -- not recomputed as
   // playback advances, so a node's z-position never shifts once it's placed.
   // A record built from one script run has almost no spread here (all `at`s
   // within the same second or so) and renders indistinguishably from the old
-  // seq-based depth; a `--db` trace with a backfilled `--date` import is
-  // exactly the case this exists for -- see the header on `zOf()`.
+  // seq-based depth; a trace with a backfilled `--date` import is exactly the
+  // case this exists for -- see the header on `zOf()`.
   const ats = (state.current?.steps ?? []).map((s) => Date.parse(s.at)).filter(Number.isFinite);
   state.timeRange = ats.length
     ? { min: Math.min(...ats), max: Math.max(...ats) }
     : null;
-  const badge = originBadge();
-  if (badge) {
-    const origin = state.current?.origin ?? "labkit-ts";
-    badge.textContent = ORIGIN_LABEL[origin] ?? origin;
-    badge.classList.toggle("rust", origin === "labkit-rust");
-    badge.classList.toggle("db", origin === "labkit-db");
-  }
-  // A `--db` trace whose replay diverged (fragments/replay.ts) still renders
-  // -- every step's own created/edges are real either way -- but `derived`
-  // and `fragment` go missing from the divergence onward, silently unless
-  // this says so. See scripts/read-db-trace.ts's `derivedUnavailable`.
+  // A trace whose replay diverged (fragments/replay.ts) still renders --
+  // every step's own created/edges are real either way -- but `derived` goes
+  // missing from the divergence onward, silently unless this says so. See
+  // scripts/read-db-trace.ts's `derivedUnavailable`.
   const warning = document.getElementById("derived-warning");
   if (warning) {
     const reason = state.current?.derivedUnavailable;
@@ -277,29 +241,17 @@ function next() {
 
 // ---------------------------------------------------------------- queue panel
 
-// Groups consecutive steps by which fragments/compositions.ts move produced
-// them (fragments/tagged.ts stamps this at record time). A step with no
-// fragment -- a composition run against ./index directly -- gets no header.
 function renderQueue() {
   queueList.innerHTML = "";
   if (!state.current) return;
-  let lastFragment;
   for (const [i, step] of state.current.steps.entries()) {
-    if (step.fragment && step.fragment !== lastFragment) {
-      const header = document.createElement("li");
-      header.className = "queue-group";
-      header.textContent = step.fragment;
-      queueList.appendChild(header);
-    }
-    lastFragment = step.fragment;
-
     const li = document.createElement("li");
     li.className = i < state.step ? "done" : i === state.step ? "current" : "";
     li.innerHTML = `<span class="n">${i + 1}</span>${formatCommand(step.command)}`;
     li.title = step.command;
     queueList.appendChild(li);
   }
-  const activeStepLi = [...queueList.querySelectorAll("li:not(.queue-group)")][
+  const activeStepLi = [...queueList.querySelectorAll("li")][
     Math.min(state.step, state.current.steps.length - 1)
   ];
   activeStepLi?.scrollIntoView({ block: "nearest" });
@@ -859,8 +811,6 @@ function setSpeed(speed) {
   speedInput.value = String(speed);
 }
 
-scenarioSelect.addEventListener("change", () => selectTrace(Number(scenarioSelect.value)));
-
 document.getElementById("next").addEventListener("click", stepForward);
 
 document.getElementById("reset").addEventListener("click", resetRun);
@@ -980,19 +930,6 @@ loadTraces();
 // method here calls the same function a click handler calls; nothing is
 // reimplemented, so this can never drift from what a real click does.
 window.__labkitExplorer = {
-  /** Every trace's index and name, so a session doesn't have to guess one. */
-  listScenarios: () => state.traces.map((t, i) => ({ index: i, name: t.name, origin: t.origin })),
-  /** Select by index (as the <select> does) or by a substring of the name. */
-  selectScenario: (indexOrName) => {
-    const index =
-      typeof indexOrName === "number"
-        ? indexOrName
-        : state.traces.findIndex((t) => t.name.includes(indexOrName));
-    if (index < 0 || index >= state.traces.length)
-      throw new Error(`no scenario matching ${JSON.stringify(indexOrName)}`);
-    selectTrace(index);
-    return state.current.name;
-  },
   reset: resetRun,
   next: stepForward,
   /** Steps forward from wherever the trace currently is -- never resets first,

@@ -477,7 +477,6 @@ bun run check:help-groups      # every CLI command is in a declared group, group
 bun run check:cypher-labels    # every label written in a Cypher string is one the schema declares
 bun run check:empty-population # every check fails on an empty tree instead of reporting success
 bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
-bun run check:compositions     # every fragments/ arc runs, and connects only what it created
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
 bun run bonsai:record          # rebuild .labkit-bonsai/ from the probe-bonsai-* scripts, replay-checked
@@ -491,9 +490,7 @@ labkit backup --path <f.tar.gz>  # the whole record in one file, before a releas
 bun run spike:web             # the same tools over HTTP in containers, against Postgres + AGE
 bun run spike:web:down        # stop it
 bun run ports                  # this worktree's host-port offset and the five ports it implies
-bun run explorer               # the LabKit Explorer, serving traces derived from fragments/ (explorer/README.md)
-bun run demo:rust-explorer     # builds the Rust port, generates one trace, serves it in the Explorer
-bun run demo:db-explorer       # builds a real record through the CLI and serves it in the Explorer
+bun run explorer               # the LabKit Explorer, serving the Bonsai record (explorer/README.md)
 ```
 
 Formatting and linting are both biome — `bun run format` writes,

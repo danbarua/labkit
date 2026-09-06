@@ -26,7 +26,6 @@ import type { EventSink } from "../src/domain";
 import type { Projector } from "../src/domain/projection";
 import { ReadSurface, systemClock } from "../src/domain";
 import { ref } from "../src/domain/report";
-import { currentFragment } from "./provenance";
 
 export interface EnquirySnapshot {
   handle: string;
@@ -45,25 +44,19 @@ export interface DerivedSnapshot {
   gates: GateSnapshot[];
 }
 
-export interface StepProvenance {
-  fragment: string | undefined;
-  derived: DerivedSnapshot;
-}
-
 /**
- * A projector that captures which fragment was running and a derived-state
- * snapshot, keyed by the event's `seq`.
+ * A projector that captures a derived-state snapshot after every event,
+ * keyed by the event's `seq`.
  *
- * A second consumer of the same stream, which is the whole mechanism: neither
- * the surface nor a fragment needs to know it exists, so nothing here can go
- * stale from a fragment forgetting to report itself.
+ * A second consumer of the same event stream, which is the whole mechanism:
+ * nothing that writes an event needs to know this exists.
  */
 export function provenanceProjector(
   graph: TenantGraph,
   events: EventSink,
-): { projector: Projector; provenance: Map<number, StepProvenance> } {
+): { projector: Projector; provenance: Map<number, DerivedSnapshot> } {
   const reads = new ReadSurface(graph, { clock: systemClock, events });
-  const provenance = new Map<number, StepProvenance>();
+  const provenance = new Map<number, DerivedSnapshot>();
   const enquiryHandles: string[] = [];
   const gateHandles: string[] = [];
 
@@ -94,10 +87,7 @@ export function provenanceProjector(
           return { handle, state: status.state };
         }),
       );
-      provenance.set(stamped.seq as number, {
-        fragment: currentFragment.name,
-        derived: { enquiries, gates },
-      });
+      provenance.set(stamped.seq as number, { enquiries, gates });
     },
   };
 

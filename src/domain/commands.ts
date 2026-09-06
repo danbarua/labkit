@@ -99,7 +99,7 @@ export interface RecordObservationsCommand {
  *
  * **It takes no conclusions.** A conclusion is its own act, recorded by
  * `conclude`. A run with its findings already on it, in one call, is
- * `fragments/index.ts`'s `recordAnalysis` — same name, surface first.
+ * `tests/helpers/analysis.ts`'s `recordAnalysis` — same name, surface first.
  */
 export interface RecordAnalysisCommand {
   enquiry: EnquiryRef;
@@ -367,7 +367,7 @@ export interface KeepCommand {
  * **It takes no conclusions.** The replacement's findings are recorded with
  * `conclude`, one at a time, each naming the finding it supersedes; one the
  * caller does not name goes on standing. A run with its findings already on it
- * is a fragment — see `fragments/index.ts`.
+ * in one call is `tests/helpers/analysis.ts`'s `replaceAnalysis`.
  */
 export interface ReplaceAnalysisCommand {
   supersedes: AnalysisRef;

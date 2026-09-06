@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ResearchSession } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimOf } from "./helpers/claims";
-import { recordAnalysis } from "../fragments";
+import { recordAnalysis } from "./helpers/analysis";
 
 let scenario: Scenario;
 beforeAll(async () => {

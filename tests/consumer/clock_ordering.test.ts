@@ -32,7 +32,7 @@ import type { ClaimRef } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, minutes, days } from "../helpers/clock";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;

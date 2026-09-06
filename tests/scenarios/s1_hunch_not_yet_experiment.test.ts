@@ -29,7 +29,7 @@ import {
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
 let session: ResearchSession;

@@ -17,7 +17,7 @@ import { ResearchSession, inMemoryEventLog } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, days } from "../helpers/clock";
 import { claimOf } from "../helpers/claims";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;

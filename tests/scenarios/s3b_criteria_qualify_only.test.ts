@@ -16,7 +16,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf, whyOf } from "../helpers/claims";
-import { recordAnalysis, replaceAnalysis } from "../../fragments";
+import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;

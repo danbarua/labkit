@@ -20,7 +20,7 @@ import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, UNATTRIBUTED, inMemoryEventLog, type Clock } from "../src/domain";
 import { pgEventLog } from "../src/domain/event-store";
-import { recordAnalysis } from "../fragments";
+import { recordAnalysis } from "./helpers/analysis";
 
 let testDb: TestDb;
 let db: TestClient;

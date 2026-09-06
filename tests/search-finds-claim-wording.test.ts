@@ -14,7 +14,7 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { ResearchSession } from "../src/domain";
-import { recordAnalysis } from "../fragments";
+import { recordAnalysis } from "./helpers/analysis";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import type { TenantGraph } from "../src/db/graph";
 

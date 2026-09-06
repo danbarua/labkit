@@ -71,9 +71,9 @@ export interface ResearchSessionOptions extends Partial<CommandContext> {
    *
    * Defaults to the graph alone, which is what every caller wants and why no
    * composition root passes this. A second entry is how a consumer joins the
-   * stream without a verb changing — `fragments/run.ts` adds the provenance
-   * projector that way, after the graph, because it reads what the graph was
-   * just told.
+   * stream without a verb changing — `fragments/derive.ts`'s
+   * `provenanceProjector` is one, added after the graph projector because it
+   * reads what the graph was just told.
    */
   projectors?: Projector[];
 }
