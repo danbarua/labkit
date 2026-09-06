@@ -71,6 +71,13 @@ if (strays > 0) {
   console.error(
     `\n   ${strays} comment${strays === 1 ? "" : "s"} to move back. Each belongs to some declaration; find it and put it there.`,
   );
+  console.error(
+    "\n   Moving one is a multi-line edit anchored on lines you have read. If a\n" +
+      "   Hashline Edit tool is available, use it: it patches by line anchor and\n" +
+      "   refuses a stale read, where a string replacement that spans a comment and\n" +
+      "   its declaration silently separates them — which is how most of these\n" +
+      "   arrive in the first place.",
+  );
   process.exit(1);
 }
 // A check that examined nothing reports the same OK: as one that examined
