@@ -40,6 +40,12 @@ export const byClaim: (row: Row) => string | null = (row) => id(row, "answering"
 export const byCriterion: (row: Row) => string | null = (row) => id(row, "crit");
 export const byEvaluation: (row: Row) => string | null = (row) => id(row, "ev");
 
+/** A question's answer, and whether any decision promoted it. */
+export interface AnsweringClaim {
+  claim: ClaimNode;
+  vouchedFor: boolean;
+}
+
 /**
  * The claim a closing decision rests on, **for one bearing**.
  *
@@ -60,19 +66,40 @@ export const byEvaluation: (row: Row) => string | null = (row) => id(row, "ev");
  * A promoted **negative** result is a first-class case: this is not an edge
  * condition, it is half the domain.
  */
-export function answeringClaimBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<ClaimNode | null> {
+export function answeringClaimBearing(
+  bearing: "SUPPORTS" | "CHALLENGES",
+): Leaf<AnsweringClaim | null> {
   return {
     name: "answeringClaim",
     grain: byQuestion,
+    // **One path, to the end.** Whether anyone vouched for the answer is the
+    // last hop of the same walk, not a second question asked afterwards: a
+    // promotion is `Decision -PROMOTES-> Claim` and nothing else. It was read
+    // off `Claim.kind` until 2026-09-06, which was a safe proxy only while `is
+    // <claim> confirmed` was the sole writer of that value —
+    // `conclude --standing confirmatory` writes it too, to say a finding was
+    // *prespecified*, which nobody vouched for. `known` then put Bonsai's
+    // compute-cost question in `established` while `known --at` did not, the
+    // latter having no choice but to walk the edge, `kind` carrying no time.
     clause: `OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(q)
            OPTIONAL MATCH (closing)-[:BASED_ON]->(cited:Evidence)
-           OPTIONAL MATCH (cited)-[:${bearing}]->(answering:Claim)`,
+           OPTIONAL MATCH (cited)-[:${bearing}]->(answering:Claim)
+           OPTIONAL MATCH (answering)<-[:PROMOTES]-(vouching:Decision)`,
     yields: {
       cited: optional(vertexProps<Node>()),
       answering: optional(vertexProps<ClaimNode>()),
+      vouching: optional(vertexProps<Node>()),
     },
     empty: () => null,
-    fold: (found, row) => found ?? (row.answering as ClaimNode | null),
+    // The claim is the first one found, as before. The vouch is an OR across
+    // rows: the same claim arrives once per promoting decision and once more
+    // with none, so `found ?? row` would keep whichever row came first and
+    // drop a real promotion on the strength of row order.
+    fold: (found, row) => {
+      const claim = found?.claim ?? (row.answering as ClaimNode | null);
+      if (!claim) return found;
+      return { claim, vouchedFor: (found?.vouchedFor ?? false) || row.vouching !== null };
+    },
   };
 }
 

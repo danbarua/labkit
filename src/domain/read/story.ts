@@ -212,14 +212,26 @@ export class StoryGroup extends SessionCore {
     // CHALLENGES the claim, so walking only SUPPORTS finds no claim at all and
     // a promoted negative result reports itself as resting on scratch. No edge
     // alternation in AGE, so it is two OPTIONAL MATCHes.
+    // **The `PROMOTES` edge, not `Claim.kind`.** Only `is <claim> confirmed`
+    // writes that edge, and `labkit is --help` says what it is for: a finding
+    // others may build on, which moves a question answered on it from
+    // provisional to established. `kind` cannot answer this, because
+    // `conclude --standing confirmatory` writes the same value to record that a
+    // finding was *prespecified* -- a different fact, and one nobody vouched
+    // for. Reading `kind` reported Bonsai's compute-cost question as resting on
+    // promoted work when nothing had promoted it.
     const promoted = await this.graph.query(
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
-       RETURN sc, cc`,
+       OPTIONAL MATCH (sc)<-[:PROMOTES]-(sp:Decision)
+       OPTIONAL MATCH (cc)<-[:PROMOTES]-(cp:Decision)
+       RETURN sc, cc, sp, cp`,
       {
         sc: optional(vertexProps<{ kind?: string }>()),
         cc: optional(vertexProps<{ kind?: string }>()),
+        sp: optional(vertexProps<{ reason?: string }>()),
+        cp: optional(vertexProps<{ reason?: string }>()),
       },
       { id: resolving!.natural_id },
     );
@@ -240,9 +252,7 @@ export class StoryGroup extends SessionCore {
           })),
           (f) => f.evidence,
         ),
-        restsOn: promoted.some((r) => (r.sc ?? r.cc)?.kind === "confirmatory")
-          ? "confirmatory"
-          : "exploratory",
+        restsOn: promoted.some((r) => (r.sp ?? r.cp) !== null) ? "confirmatory" : "exploratory",
         ...deferral(accepting),
       },
     };

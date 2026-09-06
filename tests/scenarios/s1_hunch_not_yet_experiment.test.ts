@@ -84,12 +84,11 @@ async function priorState() {
     enquiry: nlEnquiry,
     method: "curvature-fit",
     from: [nlObs],
-    // `standing` here is not a notation change: without it, "established" is
-    // ambiguous between a lunchtime notebook sweep and a confirmatory
-    // comparison. This fixture asserts `established` positively, so it has to
-    // say which one it is at creation, as prespecified work does — the
-    // alternative act, `promote()`, is for findings whose standing was not
-    // knowable when they were recorded, which is not this one.
+    // Prespecified, and separately vouched for below. Both, because they are
+    // two facts: `standing` says the design was locked before the run, and the
+    // `is <claim> confirmed` after this says somebody stands behind the result.
+    // `established` is the second — a promotion is an act, with a date, which
+    // is why `known --at` can answer it and cannot answer `standing`.
     concludes: [
       {
         proposition: NONLINEAR,
@@ -97,6 +96,12 @@ async function priorState() {
         standing: "confirmatory",
       },
     ],
+  });
+  await session.is({
+    claim: claimOf(nlAnalysisClaims, NONLINEAR),
+    state: "confirmed",
+    because:
+      "the locked curvature criterion was met and the departure is well outside the fit interval",
   });
   await session.closeEnquiry({
     enquiry: nlEnquiry,

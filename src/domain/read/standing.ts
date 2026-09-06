@@ -4,7 +4,13 @@ import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import type { HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
 import { ref } from "../report";
-import { BEARINGS, answeringClaimBearing, checksMetBearing, standingAsOf } from "../survey-facts";
+import {
+  type AnsweringClaim,
+  BEARINGS,
+  answeringClaimBearing,
+  checksMetBearing,
+  standingAsOf,
+} from "../survey-facts";
 
 export class StandingGroup extends SessionCore {
   /**
@@ -134,7 +140,7 @@ export class StandingGroup extends SessionCore {
        OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
        OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)`;
 
-    const answering = new Map<string, { natural_id: string; kind?: string }>();
+    const answering = new Map<string, AnsweringClaim>();
     // Which bearing supplied the answering claim -- CHALLENGES means the
     // question was answered "no", exactly as `enquiryStatus` derives polarity
     // from the same shape of query. Never both for one question in practice
@@ -165,9 +171,9 @@ export class StandingGroup extends SessionCore {
       });
       const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
 
-      for (const [question, claim] of per(claimFact, rows)) {
-        if (claim !== null) {
-          answering.set(question, claim);
+      for (const [question, answer] of per(claimFact, rows)) {
+        if (answer !== null) {
+          answering.set(question, answer);
           answeringBearing.set(question, bearing);
         }
       }
@@ -206,6 +212,9 @@ export class StandingGroup extends SessionCore {
       //
       // `established` is the strongest word this survey has and means the
       // answer rests on promoted work **that met the standard it was held to**.
+      // Promoted is the `PROMOTES` edge the walk to the answering claim already
+      // followed, not `Claim.kind`: `--standing confirmatory` writes that value
+      // to say a finding was prespecified, which is not a vouch.
       // Promotion alone is not enough: a prespecified check that failed, or
       // that nobody ran, counts against the finding it qualifies. A claim held
       // to nothing is vacuously met, so promoted work under no standard stays
@@ -219,17 +228,17 @@ export class StandingGroup extends SessionCore {
         entry.acceptedBecause === undefined
           ? {}
           : { acceptedBecause: entry.acceptedBecause, reopensIf: entry.reopensIf! };
-      if (claim && claim.kind === "confirmatory" && met.get(claim.natural_id) !== false)
+      if (claim && claim.vouchedFor && met.get(claim.claim.natural_id) !== false)
         survey.established.push({
           ...standing,
-          claim: ref("claim", claim.natural_id),
+          claim: ref("claim", claim.claim.natural_id),
           answer,
           ...deferral,
         });
       else if (claim)
         survey.provisional.push({
           ...standing,
-          claim: ref("claim", claim.natural_id),
+          claim: ref("claim", claim.claim.natural_id),
           answer,
           ...deferral,
         });
