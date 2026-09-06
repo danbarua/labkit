@@ -149,19 +149,19 @@ reverification_v1_analysis=$(lab --date "$STAGE1A_V1_RESULTS" analyse "$reverifi
   --held-to "$robustness_criterion" \
   | grep '^COMP_')
 historical_random_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
-  --proposition "T vs historical half-edge random is distinguishable" \
+  --proposition "T vs historical half-edge random is distinguishable" --standing confirmatory \
   --finding "nominally Holm-significant (p_holm=0.00781, 0/10 sign+) but median aggregation collapses it to non-significant (p=0.92188, 5/10 sign+); within-class MCSE exceeds |d| in 2/10 classes" \
   --bearing challenges | grep '^CLM_')
 current_random_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
-  --proposition "T vs current edge-count-matched random is distinguishable" \
+  --proposition "T vs current edge-count-matched random is distinguishable" --standing confirmatory \
   --finding "not Holm-significant (p_holm=0.05469); median aggregation also disagrees with primary (p=0.492 vs 0.027)" \
   --bearing challenges | grep '^CLM_')
 rewiring_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
-  --proposition "T vs degree-preserving rewiring is distinguishable" \
+  --proposition "T vs degree-preserving rewiring is distinguishable" --standing confirmatory \
   --finding "nominally Holm-significant (p_holm=0.04102, 1/10 sign+) but median aggregation collapses it (p=0.19336, 3/10 sign+)" \
   --bearing challenges | grep '^CLM_')
 lattice_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
-  --proposition "T vs lattice is distinguishable" \
+  --proposition "T vs lattice is distinguishable" --standing confirmatory \
   --finding "not significant (p_holm=0.13086); the one comparison with no seed axis, so no mean/median/MCSE ambiguity is possible; reproduces the original Stage 1A conclusion cleanly" \
   --bearing challenges | grep '^CLM_')
 
@@ -214,15 +214,15 @@ log_scale_replacement=$(lab --date "$STAGE1A_V2_RESULTS" keep "$lattice_claim" -
   --method "log-scale (geometric mean) re-aggregation of the same 770 raw AUC values from ART_4 -- no new simulation, no new seeds, only the aggregation function changes; pre-committed before running, decision rule not revised after seeing results" \
   | grep '^COMP_')
 historical_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$historical_random_claim" \
-  --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322); 95% CI on multiplicative scale x[0.280, 1.541] brackets 1.0" \
+  --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322); 95% CI on multiplicative scale x[0.280, 1.541] brackets 1.0" --standing confirmatory \
   --bearing challenges \
   | grep '^CLM_')
 current_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$current_random_claim" \
-  --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320); 95% CI x[0.146, 1.250] brackets 1.0" \
+  --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320); 95% CI x[0.146, 1.250] brackets 1.0" --standing confirmatory \
   --bearing challenges \
   | grep '^CLM_')
 rewiring_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$rewiring_claim" \
-  --finding "NOT resolved: primary (p=0.037) and sign-flip (p=0.041) still say significant, median (p=0.084) still says not -- narrowed from v1 but not closed; per pre-commitment, no further transformation attempted, reported as genuinely inconclusive at n=10/25 seeds. LabKit's bearing is binary (supports/challenges); there is no way to record \"inconclusive\", so the criterion below is left without a fresh evaluation rather than forced to one." \
+  --finding "NOT resolved: primary (p=0.037) and sign-flip (p=0.041) still say significant, median (p=0.084) still says not -- narrowed from v1 but not closed; per pre-commitment, no further transformation attempted, reported as genuinely inconclusive at n=10/25 seeds. LabKit's bearing is binary (supports/challenges); there is no way to record \" --standing confirmatoryinconclusive\", so the criterion below is left without a fresh evaluation rather than forced to one." \
   --bearing challenges \
   | grep '^CLM_')
 
