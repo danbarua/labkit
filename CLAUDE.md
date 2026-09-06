@@ -480,6 +480,7 @@ bun run check:orm-unwrapped    # every drizzle handle is used inside unwrapped()
 bun run check:compositions     # every fragments/ arc runs, and connects only what it created
 bun run db:generate            # drizzle-kit generate, after editing src/db/schema.ts
 bun run db:generate:custom --name=<name>   # empty hand-written migration (for AGE DDL drizzle-kit can't diff)
+bun run bonsai:record          # rebuild .labkit-bonsai/ from the probe-bonsai-* scripts, replay-checked
 bun run example               # examples/full-lifecycle.sh — a narrated lifecycle, for reading
 bun run example:bonsai        # examples/bonsai-arc.sh — a real programme's arc, compressed, for reading
 bun run check:cli             # scripts/smoke-cli.sh — the same path, asserted

@@ -60,8 +60,23 @@ set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 live="${1:-${LABKIT_HOME:-}}"
-[ -n "$live" ] || { echo "usage: LABKIT_HOME=<live-db-dir> $0, or $0 <live-db-dir>" >&2; exit 2; }
+[ -n "$live" ] || { echo "usage: LABKIT_HOME=<live-db-dir> $0, or $0 <live-db-dir> [<gates-source-dir>]" >&2; exit 2; }
 [ -d "$live/.labkit" ] || { echo "no .labkit record at $live" >&2; exit 2; }
+
+# Where `gates.toml` is read from, which used to be the record's own directory
+# and is not any more. The record is built into this repository now
+# (`scripts/build-bonsai-record.sh`) and the Bonsai checkout is read-only source
+# data, so the two are different paths and the second argument says so.
+# Defaulted to the record's directory for the case this script was written
+# against -- a record sitting inside the Bonsai checkout still replays with one
+# argument, exactly as before.
+gates_source="${2:-${BONSAI_SOURCE:-$live}}"
+gates_rel="experiments/stage2b_denoising/gates.toml"
+if [ ! -f "$gates_source/$gates_rel" ]; then
+  echo "ERROR: no $gates_rel under $gates_source; nothing was compared." >&2
+  echo "  pass the Bonsai checkout as the second argument, or set BONSAI_SOURCE." >&2
+  exit 2
+fi
 
 fresh="$(mktemp -d)"
 trap 'rm -rf "$fresh"' EXIT
@@ -70,9 +85,9 @@ echo "replaying the scripts into $fresh" >&2
 for script in probe-bonsai-1a.sh probe-bonsai-1b2-1d.sh probe-bonsai-2a.sh probe-bonsai-2b.sh probe-bonsai-3-gates.sh; do
   echo "  $script" >&2
   # probe-bonsai-3-gates.sh reads gates.toml from a real Bonsai checkout,
-  # which $fresh (a disposable temp dir) doesn't have -- $live is that
-  # checkout. Every other script ignores the second argument.
-  if ! bash "$root/scripts/$script" "$fresh" "$live" >/dev/null; then
+  # which $fresh (a disposable temp dir) doesn't have. Every other script
+  # ignores the second argument.
+  if ! bash "$root/scripts/$script" "$fresh" "$gates_source" >/dev/null; then
     echo "ERROR: $script failed replaying; the record was not compared." >&2
     exit 2
   fi
@@ -132,7 +147,7 @@ echo "FAILED: the live record has drifted from what the scripts produce." >&2
 [ "$happened_ok" = 0 ] && { echo "-- event stream (happened) --"; echo "$happened_diff"; }
 [ "$known_ok" = 0 ] && { echo "-- graph state (known) --"; echo "$known_diff"; }
 echo >&2
-echo "A handle name below is the usual cause -- probe-bonsai-2a.sh's hardcoded" >&2
-echo "q6=\"Q_6\" / loe6=\"LOE_6\" inheritance from probe-bonsai-1b2-1d.sh is the" >&2
-echo "known fragile point (guarded on write, not proven identical until now)." >&2
+echo "A handle name below is the usual cause: the later scripts find their" >&2
+echo "inherited handles with \`labkit search\`, so a wording change in an earlier" >&2
+echo "script moves what a later one resolves to." >&2
 exit 1
