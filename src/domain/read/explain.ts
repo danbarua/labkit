@@ -91,8 +91,8 @@ export class ExplainGroup extends SessionCore {
 
     return {
       criterion,
-      requires: detail.status.proposition,
-      state: detail.status.state,
+      requires: detail.proposition,
+      state: detail.state,
       evaluations: detail.evaluations,
       governs: [...byGate.values()],
     };

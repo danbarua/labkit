@@ -353,8 +353,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     group: "What is blocked",
     description:
       "A gate's state, itemised per condition: which checks passed, which failed, which were " +
-      "never run, and which have no standing verdict. **Computed, never stored** — there is " +
-      "no value anyone can set to `satisfied`, and `everFailed` survives a later pass, so a " +
+      "never run, and which have no standing verdict. `everFailed` survives a later pass, so a " +
       "gate that failed and was re-checked does not read as though it never failed.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
     outputSchema: gateStatusSchema,
@@ -902,8 +901,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     group: "Saying in advance what counts",
     description:
       "Declare that some work is gated on some criteria, and say what the gate is for. The " +
-      "gate's state is computed from its criteria's evaluations, never stored — there is no " +
-      "value anyone can set to `satisfied`.",
+      "gate's state follows from its criteria's evaluations.",
     inputSchema: {
       // **`.min(1)` because this refusal is agent-reachable only.** The CLI
       // declares both as `requiredOption`, so a person cannot send an empty

@@ -630,6 +630,7 @@ export type ReadOnlyString<T extends string = string> = T;
 export type Prose = string;
 
 export type EvidenceUnitRole =
+  | "observation"
   | "experiment"
   | "feasibility"
   | "verification"
@@ -679,13 +680,17 @@ export interface LineOfEnquiryProps {
 
 export interface EvidenceUnitProps {
   /**
-   * Written by two verbs, read by none.
+   * What kind of work produced the evidence. Written by two verbs, read by none.
    *
    * `ReadOnlyString<EvidenceUnitRole>` rather than a bare `ReadOnlyString`: the
-   * union is what stops a third writer inventing a tenth value, and widening it
-   * to `string` in the name of classifying it would trade real safety for a
-   * label. It is also where the no-cull policy stops: an unwalked *edge* is a
-   * claim about the domain and is protected, and a property value is not.
+   * union is what stops a writer inventing a value, and widening it to `string`
+   * in the name of classifying it would trade real safety for a label.
+   *
+   * **`observation` exists because the alternative was writing something
+   * false.** `recordObservations` wrote `experiment` — the nearest existing
+   * value — because a value naming what it actually is had been declined for
+   * having no reader. A measurement taken is not an experiment run, and the
+   * moment of the act does not come back.
    */
   role: ReadOnlyString<EvidenceUnitRole>;
 }

@@ -134,6 +134,24 @@ describe("S-25: one rule judged four times", () => {
     expect(reportedFailed).toEqual(failed.sort());
   });
 
+  test("the criterion's own state is a state, not `undefined`", async () => {
+    const { criterion, judged } = await fourComparisonsUnderOneRule();
+
+    // The whole criterion, not one subject: `checkStatus` is one entry per
+    // comparison and this asks about the rule. Two of the four failed, so the
+    // worst of them is what a reader gets.
+    const standing = await (await afterwards()).criterionStanding(criterion);
+    expect(standing.state).toBe("failed");
+    expect(standing.requires).toBe(RULE);
+
+    // Read the way `why` reads it, which is where the defect surfaced: the
+    // page printed `CRIT_2 is undefined` on a criterion with four verdicts,
+    // because a per-subject array was cast to one entry and `.state` came back
+    // absent. Neither the compiler nor any test saw it.
+    expect(String(standing.state)).not.toContain("undefined");
+    expect(judged).toHaveLength(4);
+  });
+
   test("a verdict on the criterion as a whole names nothing, and still counts", async () => {
     const { criterion, gate } = await fourComparisonsUnderOneRule();
 

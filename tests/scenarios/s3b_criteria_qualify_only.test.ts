@@ -241,21 +241,31 @@ describe("S-3b: the same design with nothing downstream", () => {
   });
 
   /**
-   * An evaluation that neither triggers a gate nor bears on a finding held to
-   * the criterion is durable nonsense: no reader would ever surface it, so it
-   * would sit in the graph looking like a check that had been performed. Same
-   * invariant class as evaluating a criterion against a gate it does not
-   * govern, and checked before anything is written.
+   * **Researcher:** I checked the pipeline was sane before I ran anything. It
+   * gates nothing and no finding is held to it — I just checked it.
+   *
+   * **Agent:** Recorded, and `why` on the condition says so.
+   *
+   * This was refused until 2026-09-06, on the grounds that an evaluation no
+   * reader could reach would sit in the graph looking like a check that had
+   * been performed. `why <criterion>` reads every verdict a criterion has,
+   * whatever gate it was reached for, so the reader the refusal said could not
+   * exist had existed since it shipped.
    */
-  test("a check that qualifies nothing and gates nothing cannot be evaluated", async () => {
-    const { criterion: orphan } = await session.stateCriterion("the pipeline was sane");
-    await expect(
-      session.evaluateCriterion({
-        criterion: orphan,
-        value: "looked fine",
-        outcome: "pass",
-      }),
-    ).rejects.toThrow(/qualifies no finding/);
+  test("a check that gates nothing is still recorded, and still reads back", async () => {
+    const { criterion: standalone } = await session.stateCriterion("the pipeline was sane");
+    const { evaluation } = await session.evaluateCriterion({
+      criterion: standalone,
+      value: "looked fine",
+      outcome: "pass",
+    });
+
+    const standing = await (await afterwards()).criterionStanding(standalone);
+    expect(standing.state).toBe("passed");
+    expect(standing.evaluations.map((e) => e.evaluation)).toEqual([evaluation]);
+    // It gates nothing, which is the whole case: the verdict is on the record
+    // and holds nothing up.
+    expect(standing.governs).toEqual([]);
   });
 
   /**
