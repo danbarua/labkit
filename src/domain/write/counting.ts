@@ -107,26 +107,20 @@ export class Counting extends SessionCore {
   /**
    * Records that a criterion was actually evaluated, and what came back.
    *
-   * A verdict is reached either *for a gate* or *about a finding held to the
-   * criterion*, and one of the two must be true. Named a gate, the criterion
-   * must already govern it: otherwise the evaluation attaches to an unrelated
-   * gate and `gateStatus()` mostly *hides* the result — its traversal starts
-   * from `GOVERNS`, so the malformed evaluation sits in the graph as durable
-   * nonsense without producing a visibly wrong report. Named no gate, the
-   * criterion must already qualify something (`recordAnalysis({ heldTo })`),
-   * for the same reason: an evaluation no reader can reach still looks like a
-   * check that was performed.
+   * **A gate is optional.** Named, the criterion must already govern it:
+   * otherwise the evaluation attaches to an unrelated gate and `gateStatus()`
+   * mostly *hides* the result — its traversal starts from `GOVERNS`, so a
+   * malformed evaluation sits in the graph without producing a visibly wrong
+   * report. That is a wrong handle, and it is refused before anything is
+   * written so a rejected command leaves no partial state.
    *
-   * Same invariant class as `assertReviewOf`, and both are checked before
-   * anything is written so a rejected command leaves no partial state.
+   * Named no gate, nothing is required. A researcher who checked a condition
+   * checked it, and `why <criterion>` reads every verdict a criterion has —
+   * `anyVerdict` puts no gate on the traversal.
    */
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
     return this.handle("evaluateCriterion", input, async (unitOfWork) => {
       if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
-      // Same invariant class as `assertCriterionGovernsGate`, for the other job
-      // a criterion can do: an evaluation that neither triggers a gate nor bears
-      // on a finding held to it is durable nonsense no reader would ever surface.
-      else await this.assertCriterionQualifiesSomething(input.criterion);
       const basis: EvidenceRef[] = [];
       for (const cited of input.citing ?? []) basis.push(await this.evidenceFor(cited));
       const at = this.clock.now();
@@ -332,19 +326,6 @@ export class Counting extends SessionCore {
     if (rows.length === 0) {
       throw new Error(
         `criterion ${criterion} does not govern gate ${gate}; it cannot be evaluated for it`,
-      );
-    }
-  }
-
-  private async assertCriterionQualifiesSomething(criterion: CriterionRef): Promise<void> {
-    const rows = await this.graph.query(
-      `MATCH (:Criterion {natural_id: $criterion})-[:QUALIFIES]->(:EvidenceUnit) RETURN 1`,
-      { ok: scalar<number>() },
-      { criterion: criterion },
-    );
-    if (rows.length === 0) {
-      throw new Error(
-        `criterion ${criterion} gates no work and qualifies no finding; name the gate it is being evaluated for`,
       );
     }
   }

@@ -96,8 +96,6 @@ export function renderGate(status: GateStatus, p: Palette): string {
           "",
         )}`
       : "",
-    "",
-    p.quiet("Computed, never stored. There is no value anyone can set to `satisfied`."),
   ]
     .filter(Boolean)
     .join("\n");

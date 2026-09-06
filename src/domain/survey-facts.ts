@@ -354,14 +354,23 @@ export const criterionEvaluations = evaluationsOver(anyVerdict);
  * exists to prevent, arrived at from the caller's side.
  */
 export const criterionDetail: Derived<{
-  status: CheckStatus;
+  state: CheckState;
+  proposition: string;
   evaluations: EvaluationRecord[];
 }> = {
   name: "criterionDetail",
   grain: byCriterion,
-  needs: [checkStatus, criterionEvaluations],
+  needs: [checkState, criterionProps, criterionEvaluations],
   from: (needs) => ({
-    status: needs[checkStatus.name] as CheckStatus,
+    // **`checkState`, not `checkStatus`.** The second is one entry per subject
+    // a rule was judged against, and `why <criterion>` asks about the criterion
+    // as a whole -- which is the worst of those, the fold `checkState` already
+    // is. It held a `CheckStatus` and read `.state` off it until 2026-09-06;
+    // once a check became one-per-subject that value was an array, the cast
+    // silenced the compiler, and every `why <criterion>` printed
+    // `is undefined`.
+    state: needs[checkState.name] as CheckState,
+    proposition: (needs.criterionProps as CriterionNode).proposition,
     evaluations: needs[criterionEvaluations.name] as EvaluationRecord[],
   }),
 };

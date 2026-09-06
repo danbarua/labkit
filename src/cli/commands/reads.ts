@@ -211,7 +211,7 @@ export function registerReads(program: Command, run: Run): void {
     .summary("is this gate satisfied, itemised per condition")
     .description(
       "Which checks passed, which failed, which were never run, and which have no standing " +
-        "verdict. Computed, never stored — there is no value anyone can set to `satisfied`.",
+        "verdict.",
     )
     .argument("<gate-id>", "e.g. GATE_1", handle("gate"))
     .action(async (gate) =>

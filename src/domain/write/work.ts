@@ -64,12 +64,11 @@ export class Work extends Shared {
         ...(input.contentHash ? { content_hash: input.contentHash } : {}),
       });
       const evidence = await unitOfWork.node("Evidence", { statement: input.finding });
-      // `role` is recorded because the property is not optional, not because
-      // anything reads it: `EvidenceUnitRole` has one writer and no readers
-      // anywhere in `src/`. `experiment` is the nearest existing value for a
-      // measurement taken rather than inferred, and it is a placeholder until
-      // something reads the field.
-      const unit = await unitOfWork.node("EvidenceUnit", { role: "experiment" });
+      // A measurement taken, not an experiment run. Nothing reads the field
+      // yet; what it says is true either way, and what a later reader finds
+      // depends on what was written at this moment rather than on when the
+      // reader arrived.
+      const unit = await unitOfWork.node("EvidenceUnit", { role: "observation" });
       unitOfWork.edge(evidence, "RECORDED_IN", artefact);
       unitOfWork.edge(unit, "PRODUCES", evidence);
       unitOfWork.edge(unit, "ADDRESSES", input.enquiry);
