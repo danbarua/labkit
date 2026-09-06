@@ -87,6 +87,7 @@ export type {
   ReproductionReport,
   ReproducibilityReport,
   SupportExplanation,
+  Verdict,
   GateStatus,
   ListedGate,
   ListedWork,

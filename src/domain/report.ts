@@ -857,7 +857,7 @@ export interface IdentifiedArtefact {
    * the consequence is *enumerable*, through `whatDependsOn`, rather than
    * automatic. That only holds while the reader can see the retraction —
    * without this field a conclusion whose sole input had been retracted reads
-   * `supported: true` and names the artefact with no hint of its state.
+   * as `supported` and names the artefact with no hint of its state.
    */
   invalidated?: true;
 }
@@ -1098,6 +1098,61 @@ export interface DependencyReport {
   complete: false;
 }
 
+/**
+ * Where a proposition stands on the evidence, as one word.
+ *
+ * The order is a priority order and the readers depend on it: a claim can be
+ * withdrawn *and* challenged, or challenged *and* held to a standard it does
+ * not meet, and the first arm that matches is the one reported. `supported`
+ * wins over `challenged`, because evidence bearing against a proposition that
+ * also has support is what `against` is for.
+ *
+ * `drawn-across` is a synthesis, which measured nothing and so has no evidence
+ * of its own. It is not a verdict declined for want of data: whether the
+ * findings under it bear the sentence out is not something the record can work
+ * out, since a synthesis may assert what its parts say or the negation of it
+ * (Bonsai's Stage 1D rests on four claims and asserts that none of them holds)
+ * and `synthesise` records no bearing. So the answer names the basis instead.
+ */
+export type Verdict =
+  | "supported"
+  | "undecided"
+  | "withdrawn"
+  | "challenged"
+  | "drawn-across"
+  | "standard-unmet"
+  | "unexamined";
+
+/**
+ * The one derivation of {@link Verdict}, from the fields that carry it.
+ *
+ * Beside the type rather than in the reader that calls it, because the reason
+ * it exists is that the derivation was not in one place: `supported: boolean`
+ * put four of these facts into one bit and every consumer rebuilt the rest
+ * from the fields next to it, differently.
+ */
+export function verdictOf(of: {
+  support: readonly unknown[];
+  withdrawn: boolean;
+  unmet: readonly unknown[];
+  undecided: boolean;
+  challenged: boolean;
+  drawnAcross: readonly unknown[];
+}): Verdict {
+  if (of.support.length > 0 && !of.withdrawn && of.unmet.length === 0 && !of.undecided)
+    return "supported";
+  if (of.undecided) return "undecided";
+  if (of.withdrawn) return "withdrawn";
+  if (of.challenged) return "challenged";
+  // A synthesis measured nothing, so it reaches here with no support of its
+  // own; a claim an analysis concluded has an empty `drawnAcross` and cannot.
+  if (of.drawnAcross.length > 0 && of.support.length === 0) return "drawn-across";
+  // The two the bit could not tell apart, and the CLI could not either: it
+  // printed a bare "NOT supported" for both. Evidence held to a standard it
+  // fails is not evidence nobody has looked for.
+  return of.unmet.length > 0 ? "standard-unmet" : "unexamined";
+}
+
 /** The answer to "why does this conclusion count as supported?" */
 export interface SupportExplanation {
   /**
@@ -1110,13 +1165,17 @@ export interface SupportExplanation {
   claim: ClaimRef;
   proposition: string;
   /**
-   * Whether the record currently stands behind this proposition: evidence
-   * supports it, nothing has withdrawn it, and it meets whatever standard it
-   * was held to. `support`, `withdrawn` and `unmet` say which of the three is
-   * missing when it is false; reporting those identically is the confusion this
-   * field exists to prevent.
+   * Where the proposition stands on the evidence, in one word.
+   *
+   * **Derived once, here, because two readers derived it twice and disagreed.**
+   * This was `supported: boolean` — evidence exists, nothing withdrew it, it
+   * meets its standard, and no finding leaves it undecided, all folded into one
+   * bit. Every reader that had to say anything true then rebuilt the state from
+   * the fields beside it, and the two that did built different state machines:
+   * the CLI page distinguished six cases and `explain` four, so a synthesis and
+   * an undecided claim both came back over MCP as "nothing has examined it".
    */
-  supported: boolean;
+  verdict: Verdict;
   /**
    * The claim's own standing: `confirmatory` if it was recorded as
    * prespecified **or** promoted afterwards, `exploratory` until one of those
@@ -1164,9 +1223,9 @@ export interface SupportExplanation {
    * itemised the same way a gate's are — `recordAnalysis({ heldTo })`.
    *
    * Empty means the finding was held to no agreed standard, which is a
-   * different state from meeting one and from failing one. Without it,
-   * `supported` means only "some evidence exists", and a finding whose own
-   * robustness checks failed reads as plainly supported.
+   * different state from meeting one and from failing one. Without it, a
+   * `supported` verdict would mean only "some evidence exists", and a finding
+   * whose own robustness checks failed would read as plainly supported.
    */
   standard: CheckStatus[];
   /**
@@ -1190,10 +1249,11 @@ export interface SupportExplanation {
   /**
    * Whether any finding bears *against* this proposition.
    *
-   * Distinct from `supported: false`, which is also true of a proposition
-   * nobody has ever examined. A claim refuted by a null result and a claim
-   * never investigated are different scientific states, and reporting them
-   * identically confuses absence of evidence with failure.
+   * Kept beside {@link SupportExplanation.verdict} rather than folded into
+   * it: a claim with support of its own may also carry evidence against, and
+   * the verdict reports the first arm that matches. A claim refuted by a null
+   * result and a claim never investigated are different scientific states,
+   * and reporting them identically confuses absence of evidence with failure.
    */
   challenged: boolean;
   against: BearingFinding[];
@@ -1204,7 +1264,7 @@ export interface SupportExplanation {
    * against the sentence; withdrawn means nobody is asserting the sentence any
    * more, usually because a narrower one replaced it. The findings underneath a
    * withdrawn interpretation are untouched — only the reading moved — so
-   * `support` stays populated while `supported` is false.
+   * `support` stays populated under a `withdrawn` verdict.
    */
   withdrawn: boolean;
   /** The interpretation that replaced it, if one did. */

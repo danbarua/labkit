@@ -21,6 +21,7 @@ import type {
   QuestionStanding,
   SearchGroup,
   SupportExplanation,
+  Verdict,
 } from "../../domain";
 import type { Palette } from "../palette";
 import { bullets, questionLines } from "./format";
@@ -99,43 +100,42 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
 }
 
 /**
+ * How each verdict reads on the page, and in which colour.
+ *
+ * A total map rather than a chain of ternaries: the compiler now says when a
+ * verdict has been added and this page has nothing to print for it, which is
+ * how the previous version came to have no words for a synthesis.
+ */
+const VERDICT_LINE: Record<Verdict, (why: SupportExplanation, p: Palette) => string> = {
+  supported: (_, p) => p.settled("supported"),
+  undecided: (_, p) => p.untested("NOT supported — the finding settles this neither way"),
+  withdrawn: (_, p) =>
+    p.provisional("NOT supported — withdrawn; the record no longer asserts this wording"),
+  challenged: (_, p) => p.contested("NOT supported — challenged by evidence bearing against it"),
+  // Not a verdict declined for want of data: whether four findings bear a
+  // sentence out is not something the record can work out, since a synthesis
+  // may assert what its parts say or the negation of it. So it names the basis.
+  "drawn-across": (why, p) => p.quiet(`drawn across ${why.drawnAcross.length} findings`),
+  "standard-unmet": (_, p) => p.untested("NOT supported — held to a standard it does not meet"),
+  unexamined: (_, p) => p.untested("NOT supported — nothing has examined it"),
+};
+
+/**
  * Why a proposition stands, or does not.
  *
- * The three ways `supported: false` can come about are printed apart, because
- * they are different scientific states and the domain went to some trouble to
- * keep them apart: nothing has examined it, evidence bears against it, or
- * nobody asserts the sentence any more. The first version of this renderer
- * collapsed all three into `NOT supported` above a list of perfectly good
- * findings — the distinction being lost at the transport
- * boundary, after the read surface had got it right.
+ * The ways a proposition can fail to be supported are printed apart, because
+ * they are different scientific states: nothing has examined it, evidence
+ * bears against it, it does not meet the standard it was held to, or nobody
+ * asserts the sentence any more. The first version of this renderer collapsed
+ * them into `NOT supported` above a list of perfectly good findings.
  */
 export function renderWhy(why: SupportExplanation, p: Palette): string {
   const undecided = why.standing === "undecided";
-  // A claim drawn across others and carrying no evidence of its own: what
-  // `synthesise` writes, and the case several branches below have to decline
-  // rather than answer.
-  const synthesis = why.drawnAcross.length > 0 && why.support.length === 0;
-  // Four ways to be unsupported, and they are different states the page says
-  // in words: settles-nothing, withdrawn, challenged, and nothing found yet.
-  const verdict = why.supported
-    ? p.settled("supported")
-    : why.standing === "undecided"
-      ? p.untested("NOT supported — the finding settles this neither way")
-      : why.withdrawn
-        ? p.provisional("NOT supported — withdrawn; the record no longer asserts this wording")
-        : why.challenged
-          ? p.contested("NOT supported — challenged by evidence bearing against it")
-          : // A synthesis measured nothing, so it has no evidence of its own and
-            // falls to the last branch, whose words are "nothing has examined
-            // this". Four findings did. Whether they bear the sentence out is not
-            // something the record can work out: a synthesis may assert what its
-            // parts say or the negation of it — Bonsai's Stage 1D headline rests
-            // on four claims and asserts that none of them holds — and nothing
-            // records which. So this declines the verdict and names the basis
-            // rather than picking the wrong one.
-            synthesis
-            ? p.quiet(`drawn across ${why.drawnAcross.length} findings`)
-            : p.untested("NOT supported");
+  // A synthesis measured nothing, so it has no evidence of its own, and the
+  // lists below say so rather than printing "no supporting findings" under a
+  // verdict line that just named four.
+  const synthesis = why.verdict === "drawn-across";
+  const verdict = VERDICT_LINE[why.verdict]!(why, p);
   return [
     p.heading(`"${why.proposition}"`),
     `  ${verdict}, ${why.standing}`,

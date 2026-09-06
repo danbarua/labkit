@@ -94,7 +94,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * missing.
    *
    * `QUALIFIES` gives a claim a path to the conditions it must satisfy, so
-   * `supported: true` means more than "some evidence exists" — it means the
+   * a `supported` verdict means more than "some evidence exists" — it means the
    * evidence holds up by the standard set for it.
    */
   test("Afterward 1: the finding does not stand, and the numbers are still good", async () => {
@@ -115,7 +115,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     const why = await session.whySupported(await claimNamed(session, PROPOSITION));
     expect(await whyOf(await afterwards(), PROPOSITION)).toEqual(why);
 
-    expect(why.supported).toBe(false);
+    expect(why.verdict).toBe("standard-unmet");
     // Not for want of evidence, and not because anything was withdrawn. The
     // finding is still there, still says what it said, and still supports the
     // proposition.
@@ -208,7 +208,7 @@ describe("S-3b: the same design with nothing downstream", () => {
 
     const why = await session.whySupported(await claimNamed(session, PROPOSITION));
     expect(await whyOf(await afterwards(), PROPOSITION)).toEqual(why);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
     expect(why.standard.map((c) => c.state)).toEqual(["passed", "passed", "passed"]);
   });
@@ -235,7 +235,7 @@ describe("S-3b: the same design with nothing downstream", () => {
 
     const why = await session.whySupported(await claimNamed(session, PROPOSITION));
     expect(await whyOf(await afterwards(), PROPOSITION)).toEqual(why);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.standard).toEqual([]);
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
   });
@@ -284,8 +284,8 @@ describe("S-3b: the same design with nothing downstream", () => {
       value: "median p = 0.21",
       outcome: "fail",
     });
-    expect((await session.whySupported(await claimNamed(session, PROPOSITION))).supported).toBe(
-      false,
+    expect((await session.whySupported(await claimNamed(session, PROPOSITION))).verdict).toBe(
+      "standard-unmet",
     );
 
     const { review } = await session.recordReview({
@@ -306,7 +306,7 @@ describe("S-3b: the same design with nothing downstream", () => {
     // the checks that failed against the analysis it replaced.
     expect(why.standard).toEqual([]);
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
   });
 
   /**
@@ -344,13 +344,13 @@ describe("S-3b: the same design with nothing downstream", () => {
 
     const reader = await afterwards();
     const here = await reader.whySupported(claimOf(analysisClaims, PROPOSITION));
-    expect(here.supported).toBe(false);
+    expect(here.verdict).toBe("standard-unmet");
     expect(here.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
 
     // The same sentence, a different run, held to nothing. The agreed checks
     // do not travel with the wording.
     const there = await reader.whySupported(claimOf(otherAnalysisClaims, PROPOSITION));
-    expect(there.supported).toBe(true);
+    expect(there.verdict).toBe("supported");
     expect(there.standard).toEqual([]);
   });
 });

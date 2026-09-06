@@ -162,7 +162,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     // means "withdrawn" to `withdrawalOf()`, so reusing it for promotion
     // makes a promoted finding report as no longer asserted.
     expect(why.withdrawn).toBe(false);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
   });
 
   /**
@@ -174,7 +174,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     const { analysisClaims } = await scratchExploration();
 
     const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.standing).toBe("exploratory");
     expect(why.promotedBecause).toBeUndefined();
     expect(why.challenged).toBe(false);

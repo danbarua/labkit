@@ -199,7 +199,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // posing a question mints nothing that could later be read as a finding
     // against it. It would hold for any string, and is here to stay holding.
     // Posing a question mints no claim, so there is nothing to ask about --
-    // which is the same statement the old assertion made (`supported: false`,
+    // which is the same statement the old assertion made (a verdict other than `supported`,
     // `against: []`) and a stronger one: no record exists at all.
     expect(
       await session.claimsAsserting("does the learned topology help on an external task?"),
@@ -221,7 +221,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const prior = await priorState();
 
     const nonlinear = await session.whySupported(await claimNamed(session, NONLINEAR));
-    expect(nonlinear.supported).toBe(true);
+    expect(nonlinear.verdict).toBe("supported");
 
     const stronger = await session.enquiryStatus(prior.smearEnquiry);
     expect(stronger.question!.open).toBe(true);

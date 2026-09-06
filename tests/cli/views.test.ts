@@ -97,7 +97,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
     claim: ref("claim", "CLM_9"),
     proposition: "the schedule moves convergence",
     drawnAcross: [],
-    supported: false,
+    verdict: "unexamined",
     standing: "exploratory",
     support: [
       {
@@ -127,6 +127,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
   const challenged = renderWhy(
     {
       ...base,
+      verdict: "challenged",
       challenged: true,
       against: [
         {
@@ -147,6 +148,7 @@ test("withdrawn, challenged and never-examined render apart", () => {
   const withdrawn = renderWhy(
     {
       ...base,
+      verdict: "withdrawn",
       withdrawn: true,
       replacedBy: {
         claim: ref("claim", "CLM_9"),
@@ -176,7 +178,7 @@ test("a synthesis declines the verdict and names its basis", () => {
       { claim: ref("claim", "CLM_12"), asserts: "T shows an advantage over lattice" },
       { claim: ref("claim", "CLM_17"), asserts: "T shows an advantage over rewired" },
     ],
-    supported: false,
+    verdict: "drawn-across",
     standing: "exploratory",
     support: [],
     reverifiedBy: [],
@@ -197,18 +199,21 @@ test("a synthesis declines the verdict and names its basis", () => {
   // is the same wrong answer in a different place.
   expect(synthesis).not.toContain("no supporting findings");
 
-  // The same page with nothing drawn across is the never-examined case, and
-  // still says so — the branch is chosen by the basis, not by the absence of
-  // evidence, which both of these share.
-  const untouched = renderWhy({ ...base, drawnAcross: [] }, PLAIN);
+  // The same page for a claim nobody examined, which shares the empty
+  // `support` and says something else entirely. Which of the two a claim is
+  // was settled upstream; this asserts only that the page keeps them apart.
+  const untouched = renderWhy({ ...base, verdict: "unexamined", drawnAcross: [] }, PLAIN);
   expect(untouched).toContain("NOT supported");
   expect(untouched).not.toContain("drawn across");
 
   // A synthesis someone later withdrew, or challenged with its own evidence,
-  // keeps the state that says so: the new branch is the fall-through's, not a
-  // blanket rule about claims with a basis.
-  expect(renderWhy({ ...base, withdrawn: true }, PLAIN)).toContain("withdrawn");
-  expect(renderWhy({ ...base, challenged: true }, PLAIN)).toContain("challenged by evidence");
+  // keeps the state that says so — a basis is not a blanket rule.
+  expect(renderWhy({ ...base, verdict: "withdrawn", withdrawn: true }, PLAIN)).toContain(
+    "withdrawn",
+  );
+  expect(renderWhy({ ...base, verdict: "challenged", challenged: true }, PLAIN)).toContain(
+    "challenged by evidence",
+  );
 });
 
 /**
@@ -224,7 +229,7 @@ test("a challenged claim says it has no supporting findings, not that it rests o
     claim: ref("claim", "CLM_6"),
     proposition: "T vs lattice is distinguishable",
     drawnAcross: [],
-    supported: false,
+    verdict: "challenged",
     standing: "exploratory",
     // Empty by definition: every finding bears against it.
     support: [],
@@ -717,7 +722,7 @@ test("an undecided claim's findings are one list, and no heading picks a side", 
     claim: ref("claim", "CLM_7"),
     proposition: "T vs rewiring is distinguishable",
     drawnAcross: [],
-    supported: false,
+    verdict: "undecided",
     standing: "undecided",
     support: [],
     against: [

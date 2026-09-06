@@ -252,7 +252,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     expect(
       await (await afterwards()).whySupported(claimOf(report.claims, "T beats rewired")),
     ).toEqual(why);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.method)).toEqual(["sign-flip-permutation"]);
     expect(why.support[0]!.finding).toBe("p = 0.049 (sign-flip permutation)");
   });
@@ -400,7 +400,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     expect(
       await (await afterwards()).whySupported(claimOf(targetClaims, "T beats rewired")),
     ).toEqual(why);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.superseded).toHaveLength(0);
   });
 

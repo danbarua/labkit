@@ -265,7 +265,7 @@ describe("every tool answers when an agent actually calls it", () => {
       expect((sinceNothing.known as Json).established).toEqual([]);
 
       const why = await call(c, "why_supported", { claim });
-      expect(why.supported).toBe(true);
+      expect(why.verdict).toBe("supported");
       const depends = await call(c, "what_depends_on", {
         artefact: "sparse timings",
       });
@@ -553,7 +553,7 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(stillOpen.standing).toBe("undecided");
       // Not supported, and the finding stays under it: an emptied report would
       // say the analysis produced nothing.
-      expect(stillOpen.supported).toBe(false);
+      expect(stillOpen.verdict).toBe("undecided");
       expect(stillOpen.support as unknown[]).toHaveLength(1);
 
       await call(c, "accept_as_unresolved", {

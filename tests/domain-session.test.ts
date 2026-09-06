@@ -117,7 +117,7 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
   const after = await session.whySupported(await claimNamed(session, "T beats rewired"));
   expect(after).toEqual(before);
   expect(after.withdrawn).toBe(false);
-  expect(after.supported).toBe(true);
+  expect(after.verdict).toBe("supported");
   // And no half-made revision is readable.
   const history = await session.interpretationHistory(await claimNamed(session, "T beats rewired"));
   expect(history.nowClaims.asserts).toBe("T beats rewired");
@@ -712,7 +712,7 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
 
   // The finding still stands: no review reaches it, so nothing retracts it.
   const why = await session.whySupported(await claimNamed(session, "it holds"));
-  expect(why.supported).toBe(true);
+  expect(why.verdict).toBe("supported");
   expect(why.withdrawn).toBe(false);
 });
 

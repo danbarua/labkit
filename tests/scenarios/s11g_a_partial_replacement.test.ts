@@ -121,7 +121,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
     // The claim Bonsai's own record calls final.
     expect(why.superseded).toEqual([]);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.finding)).toEqual(["p = 0.41 raw"]);
 
     // "Resting on nothing" was the visible half of the defect, and it is the
@@ -246,7 +246,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       bearing: "supports",
     });
     const why = await (await afterwards()).whySupported(fixed[0]!.claim);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
   });
 
   /**

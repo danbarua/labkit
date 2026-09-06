@@ -151,7 +151,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   test("the withdrawn interpretation stops standing, in full", async () => {
     const programme = await assertedTwice();
     const beforehand = await session.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
-    expect(beforehand.supported).toBe(true);
+    expect(beforehand.verdict).toBe("supported");
     expect(beforehand.support).toHaveLength(2);
 
     const narrowing = await session.reinterpret({
@@ -165,7 +165,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       events: inMemoryEventLog(),
     });
     const withdrawn = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
-    expect(withdrawn.supported).toBe(false);
+    expect(withdrawn.verdict).toBe("withdrawn");
 
     // Withdrawn is its own state. Nobody asserts the sentence any more, and
     // that is not the same as evidence bearing against it -- no measurement
@@ -210,7 +210,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       events: inMemoryEventLog(),
     });
     const now = await later.whySupported(await claimNamed(later, NARROWER));
-    expect(now.supported).toBe(true);
+    expect(now.verdict).toBe("supported");
     expect(now.support.map((s) => s.finding).sort()).toEqual([
       "discriminative amplitude ratio 0.79, non-discriminative 0.41",
       "discriminative amplitude ratio 0.81, non-discriminative 0.44",
@@ -343,7 +343,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     expect(standing.challenged).toBe(true);
     // Challenged, but nobody withdrew it -- the two states must not collapse.
     expect(standing.withdrawn).toBe(false);
-    expect(standing.supported).toBe(true);
+    expect(standing.verdict).toBe("supported");
     expect(standing.against).toHaveLength(1);
     // Challenged, but its own evidence is untouched -- two supporting findings
     // still stand, and nothing is superseded.
@@ -397,7 +397,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     const still = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
     expect(still.withdrawn).toBe(true);
     expect(still.replacedBy?.asserts).toBe(NARROWER);
-    expect(still.supported).toBe(false);
+    expect(still.verdict).toBe("withdrawn");
   });
 
   /** Reinterpreting something nobody claimed writes nothing. */

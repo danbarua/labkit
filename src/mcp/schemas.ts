@@ -387,7 +387,15 @@ export const historicalSurveySchema = z.strictObject({
 export const supportExplanationSchema = z.strictObject({
   claim: ref("claim"),
   proposition: z.string(),
-  supported: z.boolean(),
+  verdict: z.enum([
+    "supported",
+    "undecided",
+    "withdrawn",
+    "challenged",
+    "drawn-across",
+    "standard-unmet",
+    "unexamined",
+  ]),
   standing: z.enum(["exploratory", "confirmatory", "undecided"]),
   promotedBecause: z.string().optional(),
   support: z.array(bearingFinding),

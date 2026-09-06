@@ -169,7 +169,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       why,
     );
 
-    expect(why.supported).toBe(false);
+    expect(why.verdict).toBe("standard-unmet");
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("failed");
@@ -210,8 +210,8 @@ describe("S-3c: the check was wrong, not the result", () => {
       outcome: "fail",
       citing: [claimOf(defectiveClaims, DISAGREES)],
     });
-    expect((await session.whySupported(claimOf(analysisClaims, PROPOSITION))).supported).toBe(
-      false,
+    expect((await session.whySupported(claimOf(analysisClaims, PROPOSITION))).verdict).toBe(
+      "standard-unmet",
     );
 
     // The fault is found in the check, and the check is replaced -- the same
@@ -249,7 +249,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       why,
     );
 
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("passed");
@@ -374,7 +374,9 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     const reader = await afterwards();
-    expect((await reader.whySupported(claimOf(analysisClaims, PROPOSITION))).supported).toBe(false);
+    expect((await reader.whySupported(claimOf(analysisClaims, PROPOSITION))).verdict).toBe(
+      "standard-unmet",
+    );
 
     // Now, and only now, is the first run found to have been faulty. Nothing
     // else about the record changes -- no new evaluation, no new check.
@@ -400,8 +402,8 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     expect(
-      (await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).supported,
-    ).toBe(true);
+      (await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).verdict,
+    ).toBe("supported");
   });
 
   /**
@@ -441,7 +443,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
-    expect(why.supported).toBe(false);
+    expect(why.verdict).toBe("standard-unmet");
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
   });
 
@@ -505,7 +507,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect((await evaluationsOf(session, check!)).map((e) => e.outcome)).toEqual(["fail"]);
     expect((await evaluationsOf(session, check!))[0]?.withdrawn).toBe(true);
     // And the finding does not stand: nothing has met the agreed standard.
-    expect(why.supported).toBe(false);
+    expect(why.verdict).toBe("standard-unmet");
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
   });
 

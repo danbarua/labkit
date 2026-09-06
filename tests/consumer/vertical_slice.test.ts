@@ -132,9 +132,9 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
 
     const { a: passed, b: failed } = await inTwoWorlds(build("pass"), build("fail"));
 
-    expect(passed.supported).toBe(true);
+    expect(passed.verdict).toBe("supported");
     expect(passed.unmet.map((u) => u.requires)).toEqual([]);
-    expect(failed.supported).toBe(false);
+    expect(failed.verdict).toBe("standard-unmet");
     expect(failed.unmet.map((u) => u.requires)).toEqual(["stable across five seeds"]);
   });
 });

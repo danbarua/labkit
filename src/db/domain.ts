@@ -304,8 +304,8 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * gates.
    *
    * Without it, prespecified robustness checks can fail against the very
-   * analysis they were agreed about and `whySupported()` still reports
-   * `supported: true` — "some evidence exists" rather than "the evidence holds
+   * analysis they were agreed about and `whySupported()` still returns a
+   * `supported` verdict — "some evidence exists" rather than "the evidence holds
    * up by the standard set for it". Criteria reached only
    * `Gate`, so there was no path from a claim to the conditions it was
    * supposed to satisfy, and the answer was confidently wrong rather than

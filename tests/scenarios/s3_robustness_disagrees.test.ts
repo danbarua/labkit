@@ -292,7 +292,7 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     // See tests/scenarios/s3b_criteria_qualify_only.test.ts.
     const why = await session.whySupported(await claimNamed(session, "T differs from rewired"));
     expect(await whyOf(await afterwards(), "T differs from rewired")).toEqual(why);
-    expect(why.supported).toBe(false);
+    expect(why.verdict).toBe("standard-unmet");
     expect([...why.unmet.map((u) => u.requires)].sort()).toEqual([MEDIAN, SEED].sort());
     // Disqualified, not withdrawn: the numbers are exactly as they were.
     expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([

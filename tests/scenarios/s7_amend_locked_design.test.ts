@@ -235,7 +235,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // ...and the cited diagnosis is a finding with a chain behind it, not an
     // assertion attached to the amendment.
     const why = await later.whySupported(await claimNamed(later, MULTICOLLINEAR));
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.restingOn.map((a) => a.name)).toContain("non-convergence traces");
   });
 
@@ -268,7 +268,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       events: inMemoryEventLog(),
     });
     const standing = await later.whySupported(await claimNamed(later, BEATS_CONTROL));
-    expect(standing.supported).toBe(true);
+    expect(standing.verdict).toBe("supported");
     expect(standing.superseded).toEqual([]);
   });
 

@@ -241,10 +241,12 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     description:
       "Why a proposition counts as supported (or does not): the findings resting under it, " +
       "the findings bearing against it, the prespecified standard it is held to and which " +
-      "checks are unmet, what re-checked it, and what has been superseded. Three states " +
-      "share `supported: false` and the answer keeps them apart — nothing has examined it, " +
-      "evidence bears against it (`challenged`), or the record no longer asserts this " +
-      "wording (`withdrawn`, with `replacedBy`). Takes the claim's id, so there is nothing " +
+      "checks are unmet, what re-checked it, and what has been superseded. `verdict` is " +
+      "where it stands in one word — `supported`, `challenged`, `withdrawn` (with " +
+      "`replacedBy`), `undecided` where the findings settle it neither way, `drawn-across` " +
+      "where it is a synthesis carrying no evidence of its own, `standard-unmet` where the " +
+      "evidence fails its prespecified checks, or `unexamined` where nothing has looked. " +
+      "Takes the claim's id, so there is nothing " +
       "to disambiguate: two lines of enquiry asserting the same sentence are two claims and " +
       "this answers about one of them. `record_analysis` hands the id back; `claims_asserting` " +
       "finds one from text.",

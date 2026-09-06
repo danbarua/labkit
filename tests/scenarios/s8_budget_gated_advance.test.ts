@@ -277,7 +277,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
     const later = await afterwards();
     const why = await later.whySupported(claimOf(measuredClaims, COST));
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.finding)).toEqual([
       "9,100 GPU-hours projected from the measured rate",
     ]);

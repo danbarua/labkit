@@ -325,22 +325,25 @@ type Explainer = (self: ReadSurface, subject: string) => Promise<Explanation>;
 /** The `Claim` case: `whySupported`, plus the derived `{is, because}` envelope. */
 async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimExplanation> {
   const report = await self.whySupported(ref("claim", subject));
-  // Exhaustive over the same three-way split `renderWhy` prints, in the same
-  // priority order: supported first, since `supported` and
-  // `withdrawn`/`challenged` are not mutually exclusive fields on the type.
-  const state: "supported" | "withdrawn" | "challenged" | "unsupported" = report.supported
-    ? "supported"
-    : report.withdrawn
-      ? "withdrawn"
-      : report.challenged
-        ? "challenged"
-        : "unsupported";
+  // The read surface derived the state; this says it in words and names what
+  // it rests on. It used to rebuild the state here from `supported`,
+  // `withdrawn` and `challenged`, and had no arm for a synthesis or for a
+  // finding that settles nothing — both came back as "nothing has examined
+  // it", of claims analyses had been drawn across.
   let is: string;
   let because: Cause[];
-  switch (state) {
+  const findings = (of: typeof report.support): Cause[] =>
+    of.map((s) => ({ handle: s.evidence, wording: s.finding }));
+  switch (report.verdict) {
     case "supported":
       is = "supported";
-      because = report.support.map((s) => ({ handle: s.evidence, wording: s.finding }));
+      because = findings(report.support);
+      break;
+    case "undecided":
+      // The evidence is real and the claim keeps it; what is absent is a
+      // direction anyone will stand behind.
+      is = "undecided — the findings settle this neither way";
+      because = findings(report.support);
       break;
     case "withdrawn":
       is = "withdrawn";
@@ -350,14 +353,22 @@ async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimEx
       break;
     case "challenged":
       is = "challenged";
-      because = report.against.map((a) => ({ handle: a.evidence, wording: a.finding }));
+      because = findings(report.against);
       break;
-    case "unsupported":
+    case "drawn-across":
+      is = `drawn across ${report.drawnAcross.length} findings`;
+      because = report.drawnAcross.map((d) => ({ handle: d.claim, wording: d.asserts }));
+      break;
+    case "standard-unmet":
+      is = "unsupported — the prespecified standard is not met";
+      because = report.unmet.map((u) => ({ handle: u.criterion, wording: u.requires }));
+      break;
+    case "unexamined":
       is = "unsupported — nothing has examined it";
       because = [];
       break;
     default: {
-      const check: never = state;
+      const check: never = report.verdict;
       throw new Error(`unreached claim state: ${check}`);
     }
   }

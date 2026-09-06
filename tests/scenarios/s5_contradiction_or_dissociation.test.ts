@@ -314,7 +314,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     });
     const settledStill = await later.whySupported(claimOf(settledClaims, IMMATERIAL));
     expect(settledStill.withdrawn).toBe(false);
-    expect(settledStill.supported).toBe(true);
+    expect(settledStill.verdict).toBe("supported");
   });
 
   /**
@@ -365,7 +365,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     const there = await later.whySupported(claimOf(freshClaims, IMMATERIAL));
     expect(here.withdrawn).toBe(true);
     expect(there.withdrawn).toBe(false);
-    expect(there.supported).toBe(true);
+    expect(there.verdict).toBe("supported");
   });
 
   /** A citation must be one the cited analysis actually made. */
@@ -451,7 +451,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     const byText = await session.whySupported(
       await claimNamed(session, "the encoding responds nonlinearly"),
     );
-    expect(byText.supported).toBe(true);
-    expect(solo.supported).toBe(true);
+    expect(byText.verdict).toBe("supported");
+    expect(solo.verdict).toBe("supported");
   });
 });

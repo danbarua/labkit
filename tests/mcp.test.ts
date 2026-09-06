@@ -259,7 +259,7 @@ describe("an agent can track work through the tools alone", () => {
       const why = await call(c, "why_supported", {
         claim: await claimIdFor(c, PROP),
       });
-      expect(why.supported).toBe(true);
+      expect(why.verdict).toBe("supported");
 
       // **`provisional` before promotion, `established` after** — the whole of
       // capture-cheaply-then-promote, asserted on both sides of the one act

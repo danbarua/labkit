@@ -184,7 +184,7 @@ describe("S-8b: there is no who, only what ran", () => {
     // The approval is fully accounted for without anyone signing it: what was
     // concluded, on what evidence, against which prespecified condition, and
     // whether that condition was met.
-    expect(answer.supported).toBe(true);
+    expect(answer.verdict).toBe("supported");
     expect(answer.standard.map((c) => c.proposition)).toEqual([
       "projected cost under 40 GPU-hours",
     ]);
