@@ -21,7 +21,12 @@ import type {
   WorkRef,
   WorkState,
 } from "../report";
-import { checkStatusForGate, type CheckState } from "../survey-facts";
+import {
+  checkStatusForGate,
+  gateConditionsAnchor as anchorInForce,
+  inForce,
+  type CheckState,
+} from "../survey-facts";
 import { dedupeById, type Identified } from "./shared";
 
 /**
@@ -424,12 +429,17 @@ export class BlockedGroup extends SessionCore {
     // reached FOR this gate, where `anyVerdict` counts every evaluation of the
     // criterion. Collapsing the two made a gate nobody had evaluated report as
     // blocked because its criterion had failed somewhere else.
-    const { cypher, decoders } = compose(
-      `MATCH (crit:Criterion)-[:GOVERNS]->(g:Gate {natural_id: $id})`,
-      checkStatusForGate,
-      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
+    const { cypher, decoders } = compose(anchorInForce("one"), checkStatusForGate, {
+      crit: vertexProps<{ natural_id: string; proposition: string }>(),
+      amended: optional(vertexProps<{ natural_id: string }>()),
+    });
+    // Conditions an `amend` retired still `GOVERNS` this gate — that is what
+    // keeps the original readable — and they are not live conditions. Counting
+    // one made Bonsai's Stage 2B ladder read `blocked` after its amended gate
+    // passed and the stage ran to completion.
+    const rows = inForce(
+      (await this.graph.query(cypher, decoders, { id: gate })) as unknown as Row[],
     );
-    const rows = (await this.graph.query(cypher, decoders, { id: gate })) as unknown as Row[];
     // Flattened: a criterion yields one check per finding it was judged
     // about, so a rule held against four controls is four conditions on this
     // gate rather than one line folding them together (#293).
@@ -518,15 +528,13 @@ export class BlockedGroup extends SessionCore {
    * precedence chain is the defect shape this repo has now hit six times.
    */
   async gateList(state?: GateStatus["state"]): Promise<ListedGate[]> {
-    const { cypher, decoders } = compose(
-      `MATCH (crit:Criterion)-[:GOVERNS]->(g:Gate)`,
-      checkStatusForGate,
-      {
-        crit: vertexProps<{ natural_id: string; proposition: string }>(),
-        g: vertexProps<{ natural_id: string; consequence: string }>(),
-      },
-    );
-    const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
+    const { cypher, decoders } = compose(anchorInForce("every"), checkStatusForGate, {
+      crit: vertexProps<{ natural_id: string; proposition: string }>(),
+      g: vertexProps<{ natural_id: string; consequence: string }>(),
+      amended: optional(vertexProps<{ natural_id: string }>()),
+    });
+    // Same exclusion `gateStatus` makes, from the same named clause.
+    const rows = inForce((await this.graph.query(cypher, decoders, {})) as unknown as Row[]);
 
     // Bucketed on the gate the row was reached through, never on the criterion.
     const byGate = new Map<string, { consequence: string; rows: Row[] }>();
