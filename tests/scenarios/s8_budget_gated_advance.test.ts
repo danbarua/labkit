@@ -23,7 +23,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from ".
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { ref } from "../../src/domain/report";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;

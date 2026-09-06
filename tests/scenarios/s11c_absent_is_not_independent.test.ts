@@ -20,7 +20,7 @@ import {
   type DependencyReport,
 } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
 let session: ResearchSession;

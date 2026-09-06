@@ -17,7 +17,7 @@ import { openScenario, type Scenario } from "./helpers/scenario";
 import { vertexProps } from "../src/db/cypher";
 import type { TenantGraph } from "../src/db/graph";
 import { claimNamed, claimOf } from "./helpers/claims";
-import { recordAnalysis, replaceAnalysis } from "../fragments";
+import { recordAnalysis, replaceAnalysis } from "./helpers/analysis";
 import { evaluationsOf } from "./helpers/criteria";
 
 let scenario: Scenario;

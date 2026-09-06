@@ -27,7 +27,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { ref } from "../../src/domain/report";
-import { recordAnalysis } from "../../fragments";
+import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
 let session: ResearchSession;

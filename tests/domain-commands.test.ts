@@ -27,7 +27,7 @@ import {
 } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
-import { recordAnalysis } from "../fragments";
+import { recordAnalysis } from "./helpers/analysis";
 
 let scenario: Scenario;
 let graph: Awaited<ReturnType<Scenario["begin"]>>;

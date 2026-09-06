@@ -57,7 +57,7 @@ import {
   WRITE_SURFACE,
 } from "./helpers/surface-coverage";
 import { claimNamed, claimOf } from "./helpers/claims";
-import { recordAnalysis } from "../fragments";
+import { recordAnalysis } from "./helpers/analysis";
 
 /**
  * A handle out of a tool's reply.
