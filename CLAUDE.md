@@ -844,7 +844,7 @@ with the commit that added write commands, not worked around, and
 `tests/helpers/read-only.ts` went with them.
 
 **Every public verb on either surface has a command**, derived in
-`tests/cli/coverage.test.ts` from `src/domain/read.ts` and `src/domain/write.ts` the way
+`tests/cli/coverage.test.ts` from `src/domain/read/` and `src/domain/write/` the way
 `tests/mcp.test.ts` derives tool exposure — a verb without one must be listed in
 `NO_COMMAND_FOR` with a reason. Nothing is. `labkit --help` is the command list;
 this paragraph deliberately does not count them. What survives from the

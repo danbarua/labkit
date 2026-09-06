@@ -1118,10 +1118,18 @@ export interface SupportExplanation {
    */
   supported: boolean;
   /**
-   * Whether this finding has been promoted to confirmatory standing.
-   * `exploratory` until an act says otherwise — scratch is captured before
-   * anyone knows it matters, so the standing cannot always be declared at
-   * birth.
+   * The claim's own standing: `confirmatory` if it was recorded as
+   * prespecified **or** promoted afterwards, `exploratory` until one of those
+   * happens, `undecided` if a finding settles it neither way.
+   *
+   * **Not "has been promoted", which this said until 2026-09-06.** Two acts
+   * reach `confirmatory` — `conclude --standing confirmatory`, which says the
+   * design was locked before the run, and `is <claim> confirmed`, which says
+   * somebody vouched for the result. {@link promotedBecause} is the second and
+   * only the second; its absence beside a `confirmatory` standing is what
+   * tells them apart. `known`'s `established` bucket asks the promotion
+   * directly, by walking `PROMOTES`, because a standing carries no date and a
+   * historical survey has to ask an act.
    */
   standing: "exploratory" | "confirmatory" | "undecided";
   /** Why it was promoted. Present only when `standing` is `confirmatory`. */

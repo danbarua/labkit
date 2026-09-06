@@ -547,10 +547,11 @@ Things a stronger check would establish and nothing currently does. Beyond what
 - **Kill and restart the leader.** Start `scripts/smoke-cli.sh`, and while it's
   mid-run (or right after) start a second process connecting to the same
   `projectRoot` — confirm one becomes primary, the other secondary, and
-  both see the same data (this is what `tests/helloworld.test.ts` already
-  covers with a controlled 3-way race; trying it with real staggered
-  process starts is a stronger real-world check than a `Promise.all` in
-  one test file).
+  both see the same data. **Nothing covers this in the suite**, and that is
+  deliberate: `tests/connection-lock.test.ts` reaches each claim about the
+  lockfile deterministically, having replaced a three-way `Promise.all` race
+  that was the suite's flakiest file. Real staggered process starts are the
+  check that race was standing in for, and they are a thing to do by hand.
 **Real Postgres backend, via Docker — done (2026-08-18).**
   `docker-compose.yml` (repo root) runs `apache/age:release_PG18_1.7.0` —
   the exact AGE version/branch `pglite-age` itself is built from (see the
