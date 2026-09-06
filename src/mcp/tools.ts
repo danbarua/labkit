@@ -54,6 +54,7 @@ import {
   recordedReviewSchema,
   synthesisedSchema,
   closedEnquirySchema,
+  stoppedWorkSchema,
   plannedWorkSchema,
   statedCriterionSchema,
   declaredGateSchema,
@@ -1228,6 +1229,23 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         enquiry: ref("enquiry", enquiry),
         ...(answered_by === undefined ? {} : { answeredBy: ref("claim", answered_by) }),
       }),
+  }),
+  writeTool({
+    name: "stop_work",
+    title: "Stop a piece of planned work",
+    group: "Stopping",
+    description:
+      "Record that planned work is not being done. `because` is required and is the whole of " +
+      "what the act says: work dropped for a reason and work nobody got to are otherwise the " +
+      "same record. Stopped work leaves `now`'s ready-to-start list and reads `abandoned` " +
+      "whatever its gates say. Stopping work already stopped is refused rather than recorded " +
+      "twice.",
+    inputSchema: {
+      work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1 — from plan_work`),
+      because: z.string().describe("why it is not being done"),
+    },
+    outputSchema: stoppedWorkSchema,
+    handler: (write, { work, because }) => write.stopWork({ work: ref("work", work), because }),
   }),
 
   writeTool({

@@ -368,6 +368,21 @@ async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimEx
 async function explainWork(self: ReadSurface, subject: string): Promise<WorkExplanation> {
   const work = ref("work", subject);
   const report = await self.contractFor(work);
+
+  // Somebody decided not to do it, which is the answer to *why is this work in
+  // the state it's in* and displaces every other one: the question it serves
+  // is still true and no longer the reason. The reason `stopWork` recorded is
+  // on the decision, and this is what reads it.
+  const stopped = await self.stoppedWork(work);
+  if (stopped)
+    return {
+      kind: "work",
+      subject: work,
+      is: "abandoned",
+      because: [{ handle: stopped.decision, wording: stopped.because }],
+      report,
+    };
+
   if (!report.addressing) {
     return {
       kind: "work",

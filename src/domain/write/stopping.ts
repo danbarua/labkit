@@ -1,16 +1,17 @@
 /** Closing a question, or deliberately leaving it open. */
 
-import { scalar, vertexProps } from "../../db/cypher";
+import { optional, scalar, vertexProps } from "../../db/cypher";
 import type { TenantGraph } from "../../db/graph";
 import type {
   AcceptedAsUnresolved,
   ClosedEnquiry,
+  StoppedWork,
   EnquiryRef,
   EvidenceRef,
   QuestionRef,
 } from "../report";
 import { ref } from "../report";
-import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand } from "../commands";
+import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand, StopWorkCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
@@ -229,6 +230,61 @@ export class Stopping extends SessionCore {
 
       return {
         subject: input.enquiry,
+        result: { decision },
+      };
+    });
+  }
+
+  /**
+   * Planned work somebody decided not to do.
+   *
+   * **An act, not a flag.** `Task` has no stored open-flag — one existed, was
+   * written by `planWork` and read by nothing, and went. So the only thing
+   * that can say *we are not doing this* is a `Decision` with a reason, which
+   * is also the only form that keeps the reason.
+   *
+   * The same shape `closeEnquiry` writes, `RESOLVES` and all: a question
+   * closed and work dropped are both something settled, and a reader reaching
+   * one through the edge reaches the other the same way.
+   *
+   * **Refuses work already stopped**, as `closeEnquiry` refuses a closed
+   * question: two decisions would stand against one task, each with its own
+   * reason, and nothing says which holds.
+   */
+  async stopWork(input: StopWorkCommand): Promise<StoppedWork> {
+    return this.handle("stopWork", input, async (unitOfWork) => {
+      const [task] = await this.graph.query(
+        `MATCH (t:Task {natural_id: $id})
+         OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(t)
+         RETURN t, d`,
+        {
+          t: vertexProps<{ natural_id: string; objective: string }>(),
+          d: optional(vertexProps<{ reason: string }>()),
+        },
+        { id: input.work },
+      );
+      if (!task)
+        throw new Error(
+          `no work ${input.work}; a task exists once \`plan\` records one, and its handle comes back from that act`,
+        );
+      if (task.d)
+        throw new Error(
+          `work ${input.work} was already stopped, because "${task.d.reason}"; a piece of work is ` +
+            `stopped once, and nothing re-opens one yet`,
+        );
+
+      const decision = ref(
+        "decision",
+        await unitOfWork.node("Decision", {
+          decided_at: this.clock.now(),
+          reason: input.because,
+          invalidation_check: "a reason to do this work after all",
+        }),
+      );
+      unitOfWork.edge(decision, "RESOLVES", input.work);
+
+      return {
+        subject: input.work,
         result: { decision },
       };
     });

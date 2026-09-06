@@ -43,7 +43,8 @@ import {
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
 import type { ClaimRef, ClaimState, DomainEvent, EnquiryRef, GateRef } from "../../domain";
-import { ref } from "../../domain/report";
+import type { Prose } from "../../db/domain";
+import { isRefOfKind, ref } from "../../domain/report";
 import type { CitedBasis } from "../../domain/commands";
 
 /**
@@ -578,26 +579,52 @@ export function registerWrites(program: Command, run: Run): void {
   program
     .command("close")
     .helpGroup("Stopping")
-    .summary("close a line of enquiry — answered, or abandoned")
+    .summary("stop something — a line of enquiry, or a piece of planned work")
     .description(
-      "With --answered-by it closes as answered on that claim; without, as abandoned. The two " +
-        "are different closures and the absence is read, not defaulted. Closing a question that " +
-        "is already closed is refused rather than recorded.",
+      "Dispatches on the handle's own kind, as `why` does. A line of enquiry closes as " +
+        "answered with --answered-by, or as abandoned without; the two are different closures " +
+        "and the absence is read, not defaulted. A task closes as abandoned and takes " +
+        "--because, which is required: work dropped for a reason and work forgotten about " +
+        "are otherwise the same record. Closing something already closed is refused rather " +
+        "than recorded.",
     )
-    .argument("<enquiry-id>", "the line of enquiry", handle("enquiry"))
+    .argument("<enquiry-or-work-id>", "the line of enquiry, or the work")
     .option("--answered-by <claim-id>", "the claim that answers its question", handle("claim"))
+    .option("--because <text>", "why the work is not being done")
     // `answeredBy` arrives already coerced -- the option declares `handle("claim")`
-    // as its parser, so a wrong-kind id was refused before this ran.
-    .action(async (enquiry, { answeredBy }: { answeredBy?: ClaimRef }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.closeEnquiry({
-            enquiry,
-            ...(answeredBy === undefined ? {} : { answeredBy }),
-          }),
-          mintedView(),
-        ),
-      ),
+    // as its parser, so a wrong-kind id was refused before this ran. The
+    // subject cannot be, because it is one of two kinds.
+    .action(
+      async (
+        subject: string,
+        { answeredBy, because }: { answeredBy?: ClaimRef; because?: Prose },
+      ) =>
+        run(async ({ write }) => {
+          if (isRefOfKind("work", subject)) {
+            if (because === undefined)
+              throw new Error(
+                `closing work needs --because: ${subject} would otherwise be indistinguishable ` +
+                  `from work nobody got to, and the reason is the whole of what the act says`,
+              );
+            return answer(
+              await write.stopWork({ work: ref("work", subject), because }),
+              mintedView(),
+            );
+          }
+          const enquiry = handle("enquiry")(subject);
+          if (because !== undefined)
+            throw new Error(
+              `--because is for closing work; a line of enquiry closes as answered on a claim ` +
+                `(--answered-by) or as abandoned, and the absence is the reading`,
+            );
+          return answer(
+            await write.closeEnquiry({
+              enquiry,
+              ...(answeredBy === undefined ? {} : { answeredBy }),
+            }),
+            mintedView(),
+          );
+        }),
     );
   program
     .command("accept")

@@ -431,7 +431,19 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Evidence"],
     ["CriterionEvaluation", "Evidence"],
   ],
-  RESOLVES: [["Decision", "Question"]],
+  /**
+   * A decision that settles something: what a question was answered or
+   * abandoned on, and work somebody decided not to do.
+   *
+   * The second endpoint pair is what stops abandoned work reading as work
+   * nobody has started. A `Task` has no `is_open` flag and never had a lasting
+   * one, so the only thing that could say "we are not doing this" is an act,
+   * and an act is a `Decision` with a reason on it.
+   */
+  RESOLVES: [
+    ["Decision", "Question"],
+    ["Decision", "Task"],
+  ],
   NARROWS: [["Decision", "Question"]],
   DEFERS: [["Decision", "Question"]],
   /**

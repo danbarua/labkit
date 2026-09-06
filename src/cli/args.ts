@@ -232,4 +232,7 @@ export const gateState = oneOf(
 );
 
 /** `labkit work --state ...` */
-export const workState = oneOf(["planned", "blocked", "carried-out"] as const, "--state");
+export const workState = oneOf(
+  ["planned", "blocked", "carried-out", "abandoned"] as const,
+  "--state",
+);

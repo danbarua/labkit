@@ -167,4 +167,5 @@ export const NOT_EXPOSED: Readonly<Record<string, string>> = {
   // researcher asks for it — a tool of its own would be a second spelling of
   // one intent, which is what #182's closing rule refuses.
   criterionStanding: "reached only through `why`, as the Criterion case's body",
+  stoppedWork: "reached only through `why`, as the Task case's abandoned branch",
 };
