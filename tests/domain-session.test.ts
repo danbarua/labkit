@@ -39,42 +39,6 @@ afterEach(async () => {
 });
 
 /**
- * `Artefact.invalidated` is optional, so "not invalidated" has two spellings --
- * absent, and explicitly `false`. The db layer's own fixtures use the second
- * (tests/domain-graph.test.ts). Both branches of whySupported() must agree:
- * one partitions on JS truthiness (absent and false alike), and the other
- * filtered with a bare `IS NULL` (absent only). The mismatch made a claim
- * report supported-but-resting-on-nothing, with no error.
- */
-test("whySupported treats an explicit invalidated:false the same as an absent one", async () => {
-  const { enquiry } = await session.openEnquiry("q");
-  const { observations } = await session.recordObservations({
-    enquiry,
-    name: "obs",
-    finding: "raw",
-  });
-  await recordAnalysis(session, {
-    enquiry,
-    method: "m",
-    from: [observations],
-    concludes: [{ proposition: "P", finding: "f" }],
-  });
-
-  const absent = await session.whySupported(await claimNamed(session, "P"));
-  expect(absent.restingOn.map((a) => a.name)).toEqual(["obs"]);
-  expect(absent.supported).toBe(true);
-
-  await graph.query(
-    `MATCH (a:Artefact {kind: 'analysis-output'}) SET a.invalidated = false RETURN a`,
-    { a: vertexProps<{ kind: string }>() },
-  );
-
-  const explicit = await session.whySupported(await claimNamed(session, "P"));
-  expect(explicit.restingOn.map((a) => a.name)).toEqual(absent.restingOn.map((a) => a.name));
-  expect(explicit.supported).toBe(true);
-});
-
-/**
  * Compound verbs must be all-or-nothing.
  *
  * These live here rather than in tests/scenarios/ on purpose: "does this

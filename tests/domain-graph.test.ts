@@ -80,7 +80,6 @@ async function seedResearchThread() {
   const artefact = await graph.createNode("Artefact", {
     kind: "json",
     logical_name: "stage2b_confirmatory_results",
-    invalidated: false,
   });
   const claim = await graph.createNode("Claim", {
     name: "accelerated ridge is numerically equivalent to reference",

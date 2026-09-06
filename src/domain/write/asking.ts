@@ -170,14 +170,9 @@ export class Asking extends SessionCore {
   /** Every finding currently on the record — what "we knew at the time" means when an act is recorded. */
   private async standingFindings(): Promise<EvidenceRef[]> {
     const rows = await this.graph.query(
-      `MATCH (:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-       OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
-       RETURN e, a`,
-      {
-        e: vertexProps<{ natural_id: string }>(),
-        a: optional(vertexProps<{ invalidated?: boolean }>()),
-      },
+      `MATCH (:EvidenceUnit)-[:PRODUCES]->(e:Evidence) RETURN e`,
+      { e: vertexProps<{ natural_id: string }>() },
     );
-    return rows.filter((r) => !r.a?.invalidated).map((r) => ref("evidence", r.e.natural_id));
+    return rows.map((r) => ref("evidence", r.e.natural_id));
   }
 }

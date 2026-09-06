@@ -834,7 +834,6 @@ export interface ArtefactProps {
   content_hash?: IdentityString;
   uri?: IdentityString;
   external_ref?: IdentityString;
-  invalidated?: boolean;
 }
 
 // verbatim property list from the journal's Computation section

@@ -567,12 +567,14 @@ export function standingAsOf(
  * the fact existed, which is why the anchor is a function now and not a
  * template a caller fills in.
  *
- * Evidence recorded in an invalidated artefact is excluded: a superseded
- * analysis's checks are not this claim's standard any more.
+ * A superseded analysis's checks stop being this claim's standard through
+ * supersession, which `whySupported` filters on. There was a `WHERE
+ * out.invalidated` here as well until 2026-09-06, reading a property no verb
+ * has ever written — so it excluded nothing, and removing it changed no
+ * answer in the suite.
  */
 export function checksAnchor(bearing: "SUPPORTS" | "CHALLENGES"): string {
   return `MATCH (cl:Claim {natural_id: $claim})<-[:${bearing}]-(e:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        MATCH (e)-[:RECORDED_IN]->(out:Artefact)
-       WHERE out.invalidated IS NULL OR out.invalidated = false
        MATCH (crit:Criterion)-[:QUALIFIES]->(u)`;
 }

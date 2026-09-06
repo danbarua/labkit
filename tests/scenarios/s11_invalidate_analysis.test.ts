@@ -449,4 +449,51 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       ...concluded(SIGN_FLIP_CONCLUSIONS.length),
     ]);
   });
+  /**
+   * **Researcher:** I superseded that analysis. Then I noticed one more thing
+   * in its output and went to record it against it.
+   *
+   * **Agent:** Refused, naming the analysis that replaced it.
+   *
+   * A finding recorded on a spent analysis is indistinguishable downstream
+   * from one on a live analysis, which is why this is refused rather than
+   * flagged. It read `Artefact.invalidated` until 2026-09-06 — a property no
+   * verb has ever written — so the refusal never fired and the finding landed.
+   */
+  test("a superseded analysis takes no further conclusions", async () => {
+    const { enquiry, analysis, observations } = await bootstrapAnalysisAsShipped();
+    const { review } = await session.recordReview({
+      of: analysis,
+      verdict: "the bootstrap does not implement the intended null",
+    });
+    const report = await replaceAnalysis(session, {
+      supersedes: analysis,
+      because: review,
+      enquiry,
+      method: "sign-flip-permutation",
+      from: [observations],
+      concludes: SIGN_FLIP_CONCLUSIONS,
+    });
+
+    // Refused, and the message names where the finding belongs instead —
+    // a three-part refusal, not a bare no.
+    await expect(
+      session.conclude({
+        analysis,
+        proposition: "one more thing the old run showed",
+        finding: "noticed afterwards",
+      }),
+    ).rejects.toThrow(
+      new RegExp(`superseded and takes no further conclusions.*${report.replacement}`),
+    );
+
+    // The replacement still takes them, which is what makes the refusal about
+    // supersession rather than about analyses in general.
+    const { claims } = await session.conclude({
+      analysis: report.replacement,
+      proposition: "one more thing the new run showed",
+      finding: "noticed afterwards",
+    });
+    expect(claims).toHaveLength(1);
+  });
 });

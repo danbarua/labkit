@@ -353,15 +353,26 @@ export class Shared extends SessionCore {
         // Superseded analyses take no new conclusions. Adding one would put a
         // fresh finding on a record the caller has already declared spent, and
         // nothing downstream distinguishes it from a live one.
-        const [artefact] = await this.graph.query(
-          `MATCH (a:Artefact {natural_id: $id}) RETURN a`,
-          { a: vertexProps<ArtefactProps>() },
-          { id: output },
+        //
+        // **The `SUPERSEDES` edge, not a flag on the output artefact.** This
+        // read `Artefact.invalidated` until 2026-09-06 — a property no verb has
+        // ever written, so the refusal never fired and a finding did land on a
+        // spent analysis. Supersession is an act and the act is on the record;
+        // asking the edge is asking the thing that happened.
+        const [spent] = await this.graph.query(
+          `MATCH (:Computation {natural_id: $id})<-[:SUPERSEDES]-(d:Decision)
+           OPTIONAL MATCH (d)-[:MOTIVATES]->(instead:Computation)
+           RETURN d, instead`,
+          {
+            d: vertexProps<{ natural_id: string }>(),
+            instead: optional(vertexProps<{ natural_id: string }>()),
+          },
+          { id: input.analysis },
         );
-        if (artefact?.a.invalidated)
+        if (spent)
           throw new Error(
             `analysis ${input.analysis} has been superseded and takes no further conclusions; ` +
-              `record this on the analysis that replaced it`,
+              `record this on ${spent.instead ? spent.instead.natural_id : "the analysis that replaced it"}`,
           );
 
         // What is being superseded, if anything — matched on whichever handle
