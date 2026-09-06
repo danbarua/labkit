@@ -1381,13 +1381,6 @@ writes nothing"*. Those were controls for validating a domain model against a
 scenario corpus; that era closed with PJ-008b, and they were never product
 constraints. They are gone, along with the vocabulary that carried them.
 
-**Prefer structure in the query over structure in the stored model.** A gate's
-four states and its per-criterion itemisation are computed, so there is no
-`Gate.status` field to maintain and no value anyone can set to "passed".
-Stored shape is where change gets expensive; queries are free to be wrong and
-re-run. That is a different question from whether a *stated* relationship gets
-recorded — it always does.
-
 **Ask of every verb that mints something: does the act record what it
 produced, or only what it acted on?** Four unrelated regions have hit that one
 and needed four different remedies — a new edge, nothing, a new edge again,
