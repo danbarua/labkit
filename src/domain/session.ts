@@ -65,8 +65,10 @@ export class ResearchSession {
   readonly synthesise: WriteSurface["synthesise"] = (...args) => this.writes.synthesise(...args);
   readonly recordReview: WriteSurface["recordReview"] = (...args) =>
     this.writes.recordReview(...args);
+  readonly stoppedWork: ReadSurface["stoppedWork"] = (...args) => this.reads.stoppedWork(...args);
   readonly closeEnquiry: WriteSurface["closeEnquiry"] = (...args) =>
     this.writes.closeEnquiry(...args);
+  readonly stopWork: WriteSurface["stopWork"] = (...args) => this.writes.stopWork(...args);
   readonly enquiryStatus: ReadSurface["enquiryStatus"] = (...args) =>
     this.reads.enquiryStatus(...args);
   readonly planWork: WriteSurface["planWork"] = (...args) => this.writes.planWork(...args);

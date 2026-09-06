@@ -150,6 +150,20 @@ export interface CloseEnquiryCommand {
   answeredBy?: ClaimRef;
 }
 
+/**
+ * `stopWork` — planned work somebody decided not to do.
+ *
+ * **`because` is required, where closing an enquiry's is not.** An enquiry
+ * closed without a claim is abandoned and the absence is itself the reading;
+ * a task has no equivalent absence to read, so the reason is the whole of what
+ * the act says. Nothing else distinguishes work dropped for a good reason from
+ * work forgotten about.
+ */
+export interface StopWorkCommand {
+  work: WorkRef;
+  because: Prose;
+}
+
 /** `planWork` — state an objective and what would count as meeting it. */
 export interface PlanWorkCommand {
   objective: string;
@@ -456,6 +470,7 @@ export type Command =
   | PursueCommand
   | RecordAnalysisCommand
   | RecordObservationsCommand
+  | StopWorkCommand
   | RecordReviewCommand
   | ReinterpretCommand
   | ReplaceAnalysisCommand

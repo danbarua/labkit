@@ -35,6 +35,7 @@ import type {
   SearchGroup,
   Standing,
   SupportExplanation,
+  StoppedReason,
   TaskContract,
   WorkState,
 } from "../report";
@@ -136,6 +137,11 @@ export class ReadSurface extends SessionCore {
   /** What the programme knows: settled, unsettled, and never looked at. */
   async whatIsKnown(): Promise<KnowledgeSurvey> {
     return this.#standing.whatIsKnown();
+  }
+
+  /** Why a piece of work is not being done, if somebody said so. */
+  async stoppedWork(work: WorkRef): Promise<StoppedReason | undefined> {
+    return this.#blocked.stoppedWork(work);
   }
 
   /** What a planned task is permitted to touch, and whether anyone is enforcing it. */

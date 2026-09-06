@@ -17,6 +17,7 @@ import type {
   ListedGate,
   ListedWork,
   TaskContract,
+  StoppedReason,
   WorkRef,
   WorkState,
 } from "../report";
@@ -138,9 +139,12 @@ export function gateStateFrom(checks: readonly { state: CheckState }[]): GateSta
  * planned — a queue that can never be emptied, and is therefore never read.
  */
 export function workStateFrom(
-  task: { gates: Set<string>; implemented: boolean },
+  task: { gates: Set<string>; implemented: boolean; stopped: boolean },
   gateStates: ReadonlyMap<string, GateStatus["state"]>,
 ): WorkState {
+  // Somebody decided not to do it, so nothing else about it is what a reader
+  // wants: not the gate holding it up, not that nothing has touched it.
+  if (task.stopped) return "abandoned";
   const held = [...task.gates].some((g) => gateStates.get(g) === "blocked");
   if (held) return "blocked";
   return task.implemented ? "carried-out" : "planned";
@@ -558,6 +562,27 @@ export class BlockedGroup extends SessionCore {
   }
 
   /**
+   * The act that stopped a piece of work, if one did.
+   *
+   * `workList` reports the *state*; this reports the reason, which is the whole
+   * of what `stopWork` records and the only thing that tells work dropped for a
+   * reason from work nobody got to.
+   */
+  async stoppedWork(work: WorkRef): Promise<StoppedReason | undefined> {
+    const [row] = await this.graph.query(
+      `MATCH (d:Decision)-[:RESOLVES]->(:Task {natural_id: $id}) RETURN d`,
+      { d: vertexProps<{ natural_id: string; reason: string; decided_at: string }>() },
+      { id: work },
+    );
+    if (!row) return undefined;
+    return {
+      decision: ref("decision", row.d.natural_id),
+      because: row.d.reason,
+      at: row.d.decided_at,
+    };
+  }
+
+  /**
    * Every planned piece of work, with the state a reader is filtering on.
    *
    * The other half of what an agent needs to orient, and **not redundant with
@@ -565,33 +590,37 @@ export class BlockedGroup extends SessionCore {
    * `planWork` requires no gate. Work that is planned and ungated — the
    * commonest thing in a standup — is reachable from nowhere else.
    *
-   * **Three states, derived rather than chosen.** `Gate -[:GATES]-> Task` and
-   * `Task -[:IMPLEMENTS]-> EvidenceUnit` are everything the record holds about
-   * a task, so they are everything a state can be computed from. `observed` and
-   * `closed` were candidates and neither survived — see {@link WorkState},
-   * which carries the argument and the two that died.
+   * **Four states.** Three are derived from the two edge families that reach a
+   * Task, `Gate -[:GATES]-> Task` and `Task -[:IMPLEMENTS]-> EvidenceUnit`.
+   * `abandoned` is the one an act states: `Decision -RESOLVES-> Task`, written
+   * by `stopWork`, and it wins over the other three. See {@link WorkState},
+   * which carries the argument and the candidate that died.
    *
    * **Nothing is stored.** There is no `is_open` flag to set, because a stored
-   * flag is the first place a work queue rots.
+   * flag is the first place a work queue rots — and the reason a researcher
+   * could not once say a piece of work was over, which `stopWork` fixed by
+   * recording the act instead of setting a value.
    *
-   * **`OPTIONAL MATCH` twice, and both are load-bearing.** A task with no gate
-   * and no analysis is the *most* interesting row here — it is the ready work —
-   * so a plain `MATCH` on either edge would silently drop precisely what a
-   * standup is asking for.
+   * **`OPTIONAL MATCH` three times, and all are load-bearing.** A task with no
+   * gate, no analysis and no stopping decision is the *most* interesting row
+   * here — it is the ready work — so a plain `MATCH` on any of them would
+   * silently drop precisely what a standup is asking for.
    */
   async workList(state?: WorkState): Promise<ListedWork[]> {
     const rows = await this.graph.query(
       `MATCH (t:Task)
        OPTIONAL MATCH (g:Gate)-[:GATES]->(t)
        OPTIONAL MATCH (t)-[:IMPLEMENTS]->(u:EvidenceUnit)
-       RETURN t, g, u`,
+       OPTIONAL MATCH (stop:Decision)-[:RESOLVES]->(t)
+       RETURN t, g, u, stop`,
       {
         t: vertexProps<{ natural_id: string; objective: string }>(),
-        // Both wrapped, because both MATCHes are OPTIONAL and the row that
-        // matters most -- ungated, unimplemented, ready to start -- is exactly
-        // the one where both are NULL.
+        // All three wrapped, because every MATCH but the first is OPTIONAL and
+        // the row that matters most -- ungated, unimplemented, ready to start
+        // -- is exactly the one where they are all NULL.
         g: optional(vertexProps<{ natural_id: string }>()),
         u: optional(vertexProps<{ natural_id: string }>()),
+        stop: optional(vertexProps<{ natural_id: string }>()),
       },
       {},
     );
@@ -600,7 +629,7 @@ export class BlockedGroup extends SessionCore {
     // arrives twice. Collected before anything is decided.
     const tasks = new Map<
       string,
-      { objective: string; gates: Set<string>; implemented: boolean }
+      { objective: string; gates: Set<string>; implemented: boolean; stopped: boolean }
     >();
     for (const row of rows) {
       const id = row.t.natural_id;
@@ -608,7 +637,9 @@ export class BlockedGroup extends SessionCore {
         objective: row.t.objective ?? "",
         gates: new Set<string>(),
         implemented: false,
+        stopped: false,
       };
+      entry.stopped ||= row.stop !== null;
       if (row.g?.natural_id) entry.gates.add(row.g.natural_id);
       if (row.u?.natural_id) entry.implemented = true;
       tasks.set(id, entry);

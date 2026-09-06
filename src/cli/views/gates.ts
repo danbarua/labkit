@@ -227,7 +227,12 @@ export function renderWorkList(work: ListedWork[], p: Palette): string {
           ? p.settled(padded)
           : w.state === "blocked"
             ? p.contested(padded)
-            : p.untested(padded);
+            : // Abandoned work is not waiting on anything, so it reads like the
+              // rest of the record's settled-and-set-aside states rather than
+              // like something a reader still has to act on.
+              w.state === "abandoned"
+              ? p.quiet(padded)
+              : p.untested(padded);
       return `${state}  ${p.handle(w.work)}  ${w.objective}`;
     })
     .join("\n");

@@ -44,6 +44,7 @@ import type {
   Pursued,
   RecordedReview,
   ClosedEnquiry,
+  StoppedWork,
   PlannedWork,
   StatedCriterion,
   DeclaredGate,
@@ -755,6 +756,11 @@ export const closedEnquirySchema = z.strictObject({
   decision: ref("decision"),
   events: z.array(domainEventSchema),
 });
+/** What `stop_work` returns. */
+export const stoppedWorkSchema = z.strictObject({
+  decision: ref("decision"),
+  events: z.array(domainEventSchema),
+});
 /** What `plan_work` returns. */
 export const plannedWorkSchema = z.strictObject({
   work: ref("work"),
@@ -977,6 +983,7 @@ export type _SharpenedQuestion = Assert<
 >;
 export type _RecordedReview = Assert<Exact<z.infer<typeof recordedReviewSchema>, RecordedReview>>;
 export type _ClosedEnquiry = Assert<Exact<z.infer<typeof closedEnquirySchema>, ClosedEnquiry>>;
+export type _StoppedWork = Assert<Exact<z.infer<typeof stoppedWorkSchema>, StoppedWork>>;
 export type _PlannedWork = Assert<Exact<z.infer<typeof plannedWorkSchema>, PlannedWork>>;
 export type _StatedCriterion = Assert<
   Exact<z.infer<typeof statedCriterionSchema>, StatedCriterion>
@@ -1035,7 +1042,7 @@ export const gateListSchema = z.strictObject({
 const listedWork = z.strictObject({
   work: ref("work"),
   objective: z.string(),
-  state: z.enum(["planned", "blocked", "carried-out"]),
+  state: z.enum(["planned", "blocked", "carried-out", "abandoned"]),
   gates: z.array(ref("gate")),
 });
 

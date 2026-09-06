@@ -397,6 +397,23 @@ describe("every tool answers when an agent actually calls it", () => {
       const closed = await call(c, "enquiry_status", { enquiry: id(enquiry) });
       expect((closed.question as Json).closure).toBe("answered");
 
+      // Work nobody is going to do. It leaves `now`'s ready-to-start list and
+      // reads `abandoned` — the state an act writes rather than a traversal
+      // computes, and the one thing `work_list` could not say before.
+      const secondWork = await call(c, "plan_work", {
+        objective: "port the sampler to the GPU box",
+        acceptance: "matches the CPU path to 1e-6",
+        may_read: ["the sparse instance set"],
+      });
+      await call(c, "stop_work", {
+        work: id(secondWork),
+        because: "the GPU box went back and the CPU path is fast enough",
+      });
+      const stopped = (
+        (await call(c, "work_list", {})).work as Array<{ work: string; state: string }>
+      ).find((w) => w.work === id(secondWork));
+      expect(stopped?.state).toBe("abandoned");
+
       // `why`'s `LineOfEnquiry` case reports where this enquiry's own
       // question sits in the overall survey, one bucket rather than the
       // whole survey. Answered on `narrowedClaim`, which nothing here ever

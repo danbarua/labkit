@@ -290,6 +290,10 @@ export interface ClosedEnquiry {
   decision: DecisionRef;
   events: DomainEvent[];
 }
+export interface StoppedWork {
+  decision: DecisionRef;
+  events: DomainEvent[];
+}
 export interface PlannedWork {
   work: WorkRef;
   events: DomainEvent[];
@@ -1574,6 +1578,13 @@ export interface ListedGate {
   state: GateStatus["state"];
 }
 
+/** Why a piece of work is not being done, and the act that said so. */
+export interface StoppedReason {
+  decision: DecisionRef;
+  because: string;
+  at: string;
+}
+
 /**
  * What a task's state can be, computed from the graph and never stored.
  *
@@ -1587,18 +1598,24 @@ export interface ListedGate {
  *
  * - **`observed`** is not computable. `recordObservations` takes an *enquiry*;
  *   no edge connects observations to a Task at all.
- * - **`closed`** has no verb behind it. Nothing closes work. `Task.is_open`
- *   existed and was deleted the same day — written by `planWork`, read by
- *   nobody, the same flag `DecisionProps` lost on 2026-08-24.
+ * - **`observed`** is not computable. `recordObservations` takes an *enquiry*;
+ *   no edge connects observations to a Task at all.
  *
- * **`blocked` takes precedence over `carried-out`**, which is the one real
+ * **`abandoned` wins over everything**, and is the only one an act states
+ * rather than a traversal computing it: `stopWork` writes
+ * `Decision -RESOLVES-> Task`, the same edge a closed question carries. Work
+ * nobody is doing is not blocked and is not waiting to start, whatever its
+ * gates say — reporting it under either is the wrong answer this state exists
+ * to stop, and it is what `now` listed under `untouched` for ever.
+ *
+ * **`blocked` takes precedence over `carried-out`**, which is the other real
  * decision here and is the rule `GateStatus.state` already applies to
  * `blocked` over `incomplete`: a reader scanning for what needs attention must
  * see the blockage. The alternative reading — that work already carried out is
  * not *blocked* whatever its gate says — is genuine, and is why the overlap has
  * a test of its own rather than being left to fall out of the branch order.
  */
-export type WorkState = "planned" | "blocked" | "carried-out";
+export type WorkState = "planned" | "blocked" | "carried-out" | "abandoned";
 
 /**
  * One task in a list of them.
