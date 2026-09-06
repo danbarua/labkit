@@ -175,7 +175,7 @@ lattice_comparison_analysis=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" analyse "$
   --from "$trajectory_generalization_observations" --from "$lattice_trajectories_observations" --held-to "$lattice_agreement_criterion" \
   | grep '^COMP_')
 lattice_comparison_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$lattice_comparison_analysis" \
-  --proposition "T shows a Delta_map advantage over the matched lattice control" \
+  --proposition "T shows a Delta_map advantage over the matched lattice control" --standing confirmatory \
   --finding "mean d_k=-0.0085 (lattice nominally higher), paired t-test p=0.2815, sign-flip p=0.2871, Wilcoxon p=0.4316 -- all three agree, no detectable difference" \
   --bearing challenges | grep '^CLM_')
 # The criterion is a QUALITY BAR (do the methods agree?), not the
@@ -258,15 +258,15 @@ confirmatory_analysis=$(lab --date "$STAGE1D_CONFIRM_RESULTS" analyse "$topology
   --from "$confirmatory_observations" --held-to "$confirmatory_agreement_criterion" \
   | grep '^COMP_')
 confirmatory_rewired_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude "$confirmatory_analysis" \
-  --proposition "T shows a Delta_map advantage over rewired" \
+  --proposition "T shows a Delta_map advantage over rewired" --standing confirmatory \
   --finding "mean d_bar_gr=-0.0020, SD=0.0125, t(24)=-0.812, p=0.4246; sign-flip p=0.4215, Wilcoxon p=0.4418, bootstrap CI [-0.0103,0.0061]" \
   --bearing challenges | grep '^CLM_')
 confirmatory_hist_random_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude "$confirmatory_analysis" \
-  --proposition "T shows a Delta_map advantage over historical-random" \
+  --proposition "T shows a Delta_map advantage over historical-random" --standing confirmatory \
   --finding "conditional on evaluability: mean d_bar_gr=-0.0025, SD=0.0154, t(24)=-0.824, p=0.4179; sign-flip p=0.4217, Wilcoxon p=0.2521, bootstrap 95% CI [-0.0109,0.0060]; 21.9% of candidate realizations were unevaluable (95% CI 9.3-40.0%), disclosed separately, not folded into this estimate" \
   --bearing challenges | grep '^CLM_')
 confirmatory_curr_random_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude "$confirmatory_analysis" \
-  --proposition "T shows a Delta_map advantage over current-random" \
+  --proposition "T shows a Delta_map advantage over current-random" --standing confirmatory \
   --finding "mean d_bar_gr=-0.0004, SD=0.0158, t(24)=-0.132, p=0.8958; sign-flip p=0.8950, Wilcoxon p=0.8119, bootstrap 95% CI [-0.0096,0.0084]" \
   --bearing challenges | grep '^CLM_')
 
