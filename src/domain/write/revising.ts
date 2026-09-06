@@ -325,8 +325,8 @@ export class Revising extends Shared {
    * against the same observations, and returns what moved.
    *
    * The observations are deliberately untouched: only the artefact holding the
-   * old analysis's OUTPUT is invalidated. An inference can be wrong while the
-   * measurements it read remain fine.
+   * old analysis's OUTPUT gets the `INVALIDATED_BY` edge. An inference can be
+   * wrong while the measurements it read remain fine.
    */
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
     return this.revise({ ...input, keeping: [] }, "replaceAnalysis");
@@ -428,9 +428,9 @@ export class Revising extends Shared {
           );
       }
 
-      // The superseded output is not invalidated. A flag on the artefact
-      // would summarise the standing of every finding it carries, and
-      // standing is per finding.
+      // An edge to the review that found it wanting, not a flag on the
+      // artefact: a flag would summarise the standing of every finding the
+      // artefact carries, and standing is per finding.
       unitOfWork.edge(output, "INVALIDATED_BY", input.because);
 
       // Add-only: the successor reads what its predecessor read, plus

@@ -132,9 +132,11 @@ export class Work extends Shared {
    *
    * ## What is not written
    *
-   * **The output artefact's `invalidated` flag is untouched.** A flag over the
-   * whole artefact would summarise the standing of every finding it carries.
-   * Standing is per finding, and `whySupported` computes it.
+   * **Nothing is marked on the output artefact.** A flag over the whole
+   * artefact would summarise the standing of every finding it carries.
+   * Standing is per finding, and `whySupported` computes it. There was an
+   * `Artefact.invalidated` property saying exactly that, unwritten by any verb
+   * and read by three; it is gone.
    */
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.concludeOne(input);
