@@ -9,7 +9,7 @@ import type {
 } from "../../db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
-import { ref, isRefOfKind } from "../report";
+import { ref, isRefOfKind, verdictOf } from "../report";
 import type {
   AffectedClaim,
   AffectedEnquiry,
@@ -747,7 +747,7 @@ export class StoryGroup extends SessionCore {
     // The standard the finding was held to, if it was held to one. The criteria
     // a researcher agreed before the run are what "does this stand?" is
     // answered against; without them a finding whose own prespecified checks
-    // failed reads as `supported: true`.
+    // failed reads as a `supported` verdict.
     //
     // Same invalidation filter as `restingOn` above: a replaced analysis's
     // checks are as historical as its findings, and applying one filter and not
@@ -756,7 +756,7 @@ export class StoryGroup extends SessionCore {
     // **Boundary: only the SUPPORTING analyses' standards are read.** An
     // analysis recorded with `heldTo` whose findings CHALLENGE the proposition
     // reads as a live challenge even if its own checks failed, so `challenged`
-    // is not qualified the way `supported` is. What would settle it is a null
+    // is not qualified the way the supporting side is. What would settle it is a null
     // result whose robustness checks disagree, which nothing records yet.
     // The same fact the survey and a gate read, so "which checks does this
     // claim answer to" is one definition. Selected by handle: two analyses in
@@ -852,13 +852,20 @@ export class StoryGroup extends SessionCore {
       claim,
       proposition,
       drawnAcross,
-      // Four ways to not be supported, and they are different states: no
-      // evidence at all, the interpretation withdrawn, evidence that exists
-      // and fails the standard set for it, and evidence that settles the
-      // proposition neither way. `support`
-      // stays populated in the third case for the same reason it does in the
-      // second: the numbers are fine, and blanking them would say otherwise.
-      supported: support.length > 0 && !withdrawn && unmet.length === 0 && !undecided,
+      // Six ways not to be supported, and they are different states: the
+      // interpretation withdrawn, evidence bearing against it, a synthesis
+      // that measured nothing, evidence that fails the standard set for it,
+      // evidence that settles the proposition neither way, and nothing having
+      // examined it at all. `support` stays populated for all but the last:
+      // the numbers are fine, and blanking them would say otherwise.
+      verdict: verdictOf({
+        support,
+        withdrawn,
+        unmet,
+        undecided,
+        challenged: against.length > 0,
+        drawnAcross,
+      }),
       standing: undecided ? "undecided" : confirmed ? "confirmatory" : "exploratory",
       ...(confirmed && promotedBecause ? { promotedBecause } : {}),
       support,

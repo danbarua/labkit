@@ -93,16 +93,22 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
 
     const why = await (await afterwards()).whySupported(w.claim);
 
-    // The whole of #139: today this reads `supported: true`, because
+    // The whole of #139: today this reads a `supported` verdict, because
     // `conclude` defaults the bearing to supports and nothing can say
     // otherwise.
-    expect(why.supported).toBe(false);
+    expect(why.verdict).toBe("undecided");
     expect(why.standing).toBe("undecided");
 
     // Not supported, and the finding is still there — a blanked report would
     // say the analysis produced nothing, which is the opposite of what
     // happened.
     expect(why.support.map((s) => s.finding)).toEqual([INCONCLUSIVE]);
+
+    // The same answer through `why`, which is what an agent is handed over
+    // MCP. It had no undecided arm and said "nothing has examined it" of a
+    // claim carrying a finding.
+    const explained = await (await afterwards()).why(w.claim);
+    expect(explained.is).not.toMatch(/nothing has examined/);
   });
 
   test("the question is not counted as answered by a finding that settles nothing", async () => {

@@ -190,11 +190,11 @@ describe("S-4: a negative result that closes the question", () => {
     // Reconstructible from a fresh reader, not from a value we kept.
     const reader = new ResearchSession(await scenario.current(), { clock });
     const neighbour = await reader.whySupported(await claimNamed(reader, TRANSFORMATION));
-    expect(neighbour.supported).toBe(true);
+    expect(neighbour.verdict).toBe("supported");
     expect(neighbour.superseded).toEqual([]);
 
     const closed = await reader.whySupported(await claimNamed(reader, SPECIFICITY));
-    expect(closed.supported).toBe(false);
+    expect(closed.verdict).toBe("challenged");
   });
 
   test("Afterward 4: the null result is cited AS evidence, not as an absence of it", async () => {
@@ -270,7 +270,7 @@ describe("S-4: a negative result that closes the question", () => {
     // false flag.
     expect(await session.claimsAsserting("nobody has ever asked this")).toEqual([]);
 
-    expect(refuted.supported).toBe(false);
+    expect(refuted.verdict).toBe("challenged");
     expect(refuted.challenged).toBe(true);
     expect(refuted.against).toHaveLength(1);
     expect(refuted.against[0]!.finding).toContain("no separation detectable");

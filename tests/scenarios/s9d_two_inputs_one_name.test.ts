@@ -124,7 +124,7 @@ describe("S-9d: resting on one thing, or two?", () => {
     expect(why.restingOn).toHaveLength(2);
     expect(why.restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
     expect(why.restingOn.map((a) => a.name)).toEqual([NAME, NAME]);
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
   });
 
   /**

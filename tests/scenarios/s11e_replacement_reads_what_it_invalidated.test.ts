@@ -140,17 +140,17 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     });
     const why = await later.whySupported(report.claims[0]!.claim);
 
-    // `supported: true` stays, and that is the design rather than an oversight:
+    // a `supported` verdict stays, and that is the design rather than an oversight:
     // invalidating a record deliberately does not withdraw what rests on it --
     // the consequence is *enumerable* rather than automatic. What was missing
     // is the half that makes the doctrine honest — the reader
     // could not see, from this answer, that the sole input had been retracted.
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     expect(why.restingOn).toHaveLength(2);
     expect(why.restingOn.filter((r) => r.invalidated)).toHaveLength(1);
 
     // And the enumerable route actually reaches this claim, which is what
-    // "not automatic" is relying on. If it did not, `supported: true` would be
+    // "not automatic" is relying on. If it did not, a `supported` verdict would be
     // a wrong answer with no way to find out.
     const retracted = why.restingOn.find((r) => r.invalidated)!;
     const affected = await later.whatDependsOn(retracted.part);

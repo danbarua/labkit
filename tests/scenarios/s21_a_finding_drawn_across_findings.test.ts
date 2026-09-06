@@ -94,6 +94,23 @@ describe("S-21: a finding drawn across findings", () => {
     expect(why.support).toEqual([]);
   });
 
+  /**
+   * The second reader, which `why` answers over MCP.
+   *
+   * `renderWhy` declines the verdict and names the basis; `explain` had no
+   * branch for a synthesis at all, so it fell through to the arm whose words
+   * are "nothing has examined it" — of a sentence four analyses were drawn
+   * across. Measured on the Bonsai record's CLM_22 before the fix.
+   */
+  test("the synthesis reads the same way whichever reader is asked", async () => {
+    const { claims } = await fourComparisons();
+    const { claim } = await session.synthesise({ proposition: HEADLINE, restingOn: claims });
+
+    const explained = await (await afterwards()).why(claim);
+    expect(explained.is).not.toMatch(/nothing has examined/);
+    expect(explained.because.map((c) => c.handle).sort()).toEqual([...claims].sort());
+  });
+
   test("a synthesis can answer the question its parts were pursued under", async () => {
     const { enquiry, claims } = await fourComparisons();
     const { claim } = await session.synthesise({

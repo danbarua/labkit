@@ -114,7 +114,7 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));
-    expect(why.supported).toBe(true);
+    expect(why.verdict).toBe("supported");
     // Two findings, presented alike, with nothing saying one re-checked the
     // other or that their executions differ.
     expect(why.support).toHaveLength(2);
