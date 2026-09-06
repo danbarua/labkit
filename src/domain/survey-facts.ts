@@ -553,6 +553,36 @@ export function standingAsOf(
 }
 
 /**
+ * The conditions **in force** on a gate, with the amendment that retired each
+ * one bound beside it.
+ *
+ * A criterion an `amend` replaced still `GOVERNS` the gate — that is what
+ * keeps the original readable, and `designHistory` reports it. It is not a
+ * live condition, and counting it as one made Bonsai's Stage 2B ladder read
+ * `blocked` in `now` months after its amended gate passed and the stage ran to
+ * completion.
+ *
+ * **The filter is `inForce` below, not a `WHERE` here.** AGE has no
+ * `NOT (pattern)` predicate, so the amendment is bound and dropped on the way
+ * out. Two readers ask this — `gateStatus` and `gateList` — which is why the
+ * clause is named rather than written twice.
+ *
+ * `everFailed` deliberately does **not** use this: a gate that failed and was
+ * re-checked must not read as though it never failed, and that holds whether
+ * the re-check came from a re-run or from an amendment.
+ */
+export function gateConditionsAnchor(scope: "one" | "every"): string {
+  const gate = scope === "one" ? "(g:Gate {natural_id: $id})" : "(g:Gate)";
+  return `MATCH (crit:Criterion)-[:GOVERNS]->${gate}
+       OPTIONAL MATCH (amended:Decision)-[:CHANGES]->(crit)`;
+}
+
+/** The rows of {@link gateConditionsAnchor} whose condition nothing has amended away. */
+export function inForce(rows: Row[]): Row[] {
+  return rows.filter((r) => r.amended === null);
+}
+
+/**
  * The anchor for "the checks this claim answers to", **for one bearing**.
  *
  * Called once per bearing and the results merged, which is the idiom

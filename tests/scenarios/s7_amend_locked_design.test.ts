@@ -412,6 +412,66 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
    * accepting it and having the history throw at read time — writing state
    * that cannot be read back is the one outcome with nothing to recommend it.
    */
+  /**
+   * **Researcher:** The gate failed, I diagnosed why, I amended it in the open,
+   * and the amended condition passes. Am I still blocked?
+   *
+   * **Agent:** No. The gate is satisfied, and it says it failed once.
+   *
+   * A criterion an `amend` replaced still `GOVERNS` the gate — that is what
+   * keeps the original readable, and `design` reports it. Counting it as a
+   * live condition made Bonsai's Stage 2B ladder read `blocked` in `now`
+   * months after its amended encoder gate passed and the stage ran to
+   * completion.
+   */
+  test("an amended-away condition stops holding the gate, and everFailed does not", async () => {
+    const programme = await lockedProgramme();
+    const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
+
+    // The locked condition fails on its first real run.
+    await session.evaluateCriterion({
+      criterion: programme.iterationLimit,
+      gate: programme.feasibilityBoundary,
+      value: "the run needed more iterations than the locked limit allows",
+      outcome: "fail",
+    });
+    const held = await new ResearchSession(await scenario.current(), { clock }).gateStatus(
+      programme.feasibilityBoundary,
+    );
+    expect(held.state).toBe("blocked");
+
+    const report = await session.amendDesign({
+      criterion: programme.iterationLimit,
+      nowRequires: RAISED_LIMIT,
+      because: "the locked limit is unreachable",
+      citing: cites,
+    });
+    await session.evaluateCriterion({
+      criterion: report.nowRequires.criterion,
+      gate: programme.feasibilityBoundary,
+      value: "clears the raised limit",
+      outcome: "pass",
+    });
+
+    const after = await new ResearchSession(await scenario.current(), { clock }).gateStatus(
+      programme.feasibilityBoundary,
+    );
+    expect(after.state).toBe("satisfied");
+    // One live condition, not two: the retired one is gone from the count.
+    expect(after.checks).toHaveLength(1);
+    expect(after.counts.failed).toBe(0);
+    // **And it still says it failed.** A gate that failed and was re-checked
+    // must not read as though it never failed, whether the re-check came from
+    // a re-run or from an amendment.
+    expect(after.everFailed).toBe(true);
+
+    // The retired condition is still readable where it belongs.
+    const history = await new ResearchSession(await scenario.current(), { clock }).designHistory(
+      programme.feasibilityBoundary,
+    );
+    expect(history.originally.criterion).toBe(programme.iterationLimit);
+  });
+
   test("a setting that has already been amended cannot be amended again", async () => {
     const programme = await lockedProgramme();
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
