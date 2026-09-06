@@ -1,31 +1,25 @@
 #!/usr/bin/env bun
 /**
- * Reads a real LabKit record — built through the CLI or MCP server, not a
- * composition run in a temp directory — into the same `Trace` shape the
- * Explorer already renders. Phase 2 of labkit#124 (labkit#126); `derived` and
- * `fragment` are labkit#205.
+ * Reads a real LabKit record into the same `Trace` shape the Explorer
+ * renders — the only kind of trace the Explorer shows.
  *
  * **The bridge was already proven before this file existed** (2026-08-31,
  * against a record `scripts/probe-dogfood.sh <dir>` kept): `traceOf(name,
  * pgEventLog(db, tenantId))` over that `.labkit/` gave 15 steps, 21 nodes, 26
- * edges, zero `danglingEndpoints`. `pgEventLog` persists `created`, `edges`
- * and `detail` on the same connection a write's transaction commits through
- * (PJ-032), so nothing here is new machinery — it is `fragments/run.ts`'s
- * connect → resolve tenant → scope → read pattern, pointed at a durable
- * record instead of a fresh temporary one.
+ * edges. `pgEventLog` persists `created`, `edges` and `detail` on the same
+ * connection a write's transaction commits through (PJ-032), so nothing here
+ * is new machinery — it is connect → resolve tenant → scope → read, pointed
+ * at a durable record instead of a fresh temporary one.
  *
- * **`derived` and `fragment` come from `fragments/replay.ts`**, not from this
- * record's own connection: there is no way to ask a durable log what a query
- * would have answered at a past `seq` after the fact, so the history is
- * replayed — verb by verb, checked against itself — into a disposable scratch
- * database, and `fragments/derive.ts`'s live snapshots are taken there.
- * `fragment` is the event's own `attribution.attribution_label`, carried
- * through unchanged; a real record was not built by composing named moves,
- * so this is the closest thing to one, whatever a writer set it to.
+ * **`derived` comes from `fragments/replay.ts`**, not from this record's own
+ * connection: there is no way to ask a durable log what a query would have
+ * answered at a past `seq` after the fact, so the history is replayed — verb
+ * by verb, checked against itself — into a disposable scratch database, and
+ * `fragments/derive.ts`'s live snapshots are taken there.
  *
  * A divergence during replay is not swallowed: `derivedUnavailable` names the
- * `seq` and reason, and steps from there on report empty `derived` and no
- * `fragment`, same as a trace with no provenance at all.
+ * `seq` and reason, and steps from there on report empty `derived`, same as a
+ * trace with no provenance at all.
  *
  * **Read-only, and acquired-and-released per call, not held.** `connectDb`'s
  * PGlite backend takes a filesystem lock for the life of the connection
@@ -65,7 +59,7 @@ function historySink(history: readonly DomainEvent[]): EventSink {
  * Opens the record at `dir` (a project root — the directory whose `.labkit/`
  * subdirectory holds the database, same argument `connectDb` and the CLI's
  * `--db` take), reads its full event history for `tenant`, and returns one
- * `Trace`. `name` labels it for the Explorer's scenario picker.
+ * `Trace`. `name` labels it for the Explorer.
  */
 export async function readDbTrace(dir: string, name: string, tenant = "labkit"): Promise<Trace> {
   let history: DomainEvent[];
@@ -84,7 +78,6 @@ export async function readDbTrace(dir: string, name: string, tenant = "labkit"):
   const trace = await traceOf(name, historySink(history), provenance);
   return {
     ...trace,
-    origin: "labkit-db",
     ...(refusedAt
       ? {
           derivedUnavailable: `replay diverged at seq ${refusedAt.seq} (${refusedAt.operation}): ${refusedAt.reason}`,

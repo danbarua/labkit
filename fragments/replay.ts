@@ -37,8 +37,7 @@ import { labelForNaturalId } from "../src/db/domain";
 import { vertexProps } from "../src/db/cypher";
 import { inMemoryEventLog } from "../src/domain";
 import type { DomainEvent } from "../src/domain";
-import { provenanceProjector, type StepProvenance } from "./derive";
-import { currentFragment } from "./provenance";
+import { provenanceProjector, type DerivedSnapshot } from "./derive";
 
 export interface ReplayRefusal {
   seq: number;
@@ -47,15 +46,12 @@ export interface ReplayRefusal {
 }
 
 export interface ReplayResult {
-  provenance: Map<number, StepProvenance>;
+  provenance: Map<number, DerivedSnapshot>;
   refusedAt?: ReplayRefusal;
 }
 
 /**
- * Replays `history` in `seq` order into a fresh temporary database, tagging
- * each step with `attribution.attribution_label` the way `fragments/tagged.ts`
- * tags a composition's own moves — so a real record's `fragment` is exactly
- * the probe script (or reviewer) attribution already on the event, verbatim.
+ * Replays `history` in `seq` order into a fresh temporary database.
  *
  * Hermetic: `dir` is created and removed here, never the caller's own project
  * directory, and `connectScratch` is what makes that true of the *database*
@@ -73,17 +69,13 @@ export async function replayIntoScratch(history: readonly DomainEvent[]): Promis
       await scopeToTenant(connection.db, tenantCtx);
       const graph = new TenantGraph(tenantCtx, connection.db, connection.tx);
       const baseEvents = inMemoryEventLog();
-      // The graph first, then the snapshot -- see `fragments/run.ts`.
+      // The graph first, then the snapshot: the second reads what the first
+      // wrote, so the list order is the dependency.
       const { projector, provenance } = provenanceProjector(graph, baseEvents);
-      // No `WriteSurface` here any more: nothing issues a command. The two
-      // projectors are driven directly, in the order they run live.
+      // No `WriteSurface` here: nothing issues a command. The two projectors
+      // are driven directly, in the order they run live.
 
       for (const event of history) {
-        // The fragment a step belongs to is the attribution the act was
-        // recorded under, exactly as `fragments/tagged.ts` sets it for a
-        // composition — so a real record's steps group by whoever wrote them.
-        const previousFragment = currentFragment.name;
-        currentFragment.name = event.attribution.attribution_label;
         try {
           await graph.inTransaction(async () => {
             const stamped = await baseEvents.record(event);
@@ -99,8 +91,6 @@ export async function replayIntoScratch(history: readonly DomainEvent[]): Promis
               reason: err instanceof Error ? err.message : String(err),
             },
           };
-        } finally {
-          currentFragment.name = previousFragment;
         }
       }
       return { provenance };

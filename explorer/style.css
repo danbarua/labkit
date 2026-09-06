@@ -55,28 +55,6 @@ body {
 }
 .field span { text-transform: uppercase; letter-spacing: 0.05em; }
 
-.origin-badge {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 3px 8px;
-  border-radius: 3px;
-  color: var(--accent);
-  border: 1px solid var(--accent-dim);
-  background: var(--accent-dim);
-  white-space: nowrap;
-}
-.origin-badge.rust {
-  color: var(--amber);
-  border-color: color-mix(in srgb, var(--amber) 35%, transparent);
-  background: color-mix(in srgb, var(--amber) 12%, transparent);
-}
-.origin-badge.db {
-  color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
 .derived-warning {
   font-size: 10px;
   text-transform: uppercase;
@@ -326,14 +304,3 @@ main {
   background: var(--accent-dim);
 }
 #queue-list li.current .n::after { content: "▸"; }
-
-#queue-list li.queue-group {
-  padding: 10px 16px 4px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-  border-top: 1px solid var(--panel-border);
-  white-space: normal;
-}
-#queue-list li.queue-group:first-child { border-top: none; padding-top: 0; }

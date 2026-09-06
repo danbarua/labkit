@@ -70,6 +70,18 @@ The one rule that survived, under its own name rather than as a bar:
 | --- | --- | --- |
 | **the slot / the one-wrong-answer rule** | At most one demonstrated wrong answer ships green at a time, and clearing it is the next thing built. Its state is the board's P0 | CLAUDE.md, "One wrong answer at a time" |
 
+## Retired: composed scenarios
+
+The Explorer no longer runs scripted arcs against a fresh database — it
+serves one real record, re-read on every request. Listed **only so a reader
+meeting one of these in a dated entry knows what it meant**:
+
+| Term | Meant |
+| --- | --- |
+| **a move / a fragment** | One composable research action over `WriteSurface`, returning the handles the next move needed — `askAndPursue`, `gatedWork`, `replaceAnalysis`… |
+| **a composition / an arc** | A named sequence of moves run against a real database to produce a trace, distinct from an acceptance scenario |
+| **origin** (`labkit-ts` / `labkit-rust` / `labkit-db`) | Which producer a trace came from: the TypeScript domain run fresh, the Rust/Grafeo port, or a real record read back from its durable log |
+
 ## Retired: ledger status vocabulary
 
 `open` + owned / `open` + unowned / `demonstrated` / `resolved` /
@@ -91,7 +103,7 @@ Shorthand from the Bonsai work (#124) and the verbs it earned.
 | **minted / `created`** | What a write act brought into existence. *A verb that mints something returns what it minted* — every write returns its events, and `created` on the event is the drained list, so a return type cannot under-report | #161, `WriteSurface.emit` |
 | **measured vs asserted** (a verdict) | An evaluation resting on cited evidence versus one citing nothing. Empty `basis` means asserted. `gate` prints the difference since #151; a measured quality-bar check still records as asserted because a verdict can cite only a claim | S-8, `Verdict.basis`, #150 |
 | **observed vs claimed** (attribution) | Whether LabKit saw who acted or was told. `--author` is claimed. Time has the same split: `at` is the claimed instant (`--date` can set it), `seq` the observed order the store assigned | #81, #154 |
-| **standard vs hypothesis** (a criterion) | A criterion is the quality bar a result is *held to*, which passes or fails whichever way the science comes out — *primary, median and sign-flip agree at the locked bound*. It is not the hypothesis under test; direction lives in a conclusion's `bearing` | PR #147's review; `.claude/skills/compose-scenario` |
+| **standard vs hypothesis** (a criterion) | A criterion is the quality bar a result is *held to*, which passes or fails whichever way the science comes out — *primary, median and sign-flip agree at the locked bound*. It is not the hypothesis under test; direction lives in a conclusion's `bearing` | PR #147's review |
 | **a three-part refusal** | Every refusal names what was expected, what it got, and what would satisfy it, and may name a concept or a verb both surfaces spell the same — never a command | `ReadSurface` doc comment, `src/domain/read.ts`; #164, #169 |
 | **partial supersession** | A re-analysis that revisits some of a prior analysis's conclusions and says nothing about the rest. `replace` retracts all of them today (#132, the demonstrated wrong answer); the fix is #173 | #132, #173 |
 | **`conclude`** | The proposed primitive under `analyse`/`replace`/`reverify`: one conclusion per call, so a compound act is built by successive handle-carrying calls rather than described in a JSON blob | #173 |
@@ -100,10 +112,7 @@ Shorthand from the Bonsai work (#124) and the verbs it earned.
 
 | Term | Means | Defined in |
 | --- | --- | --- |
-| **a move / a fragment** | One composable research action over `WriteSurface`, returning the handles the next move needs — `askAndPursue`, `gatedWork`, `replaceAnalysis`… Adds no verbs and no ontology | `fragments/index.ts` |
-| **a composition / an arc** | A named sequence of moves run against a real database to produce a trace; not an acceptance scenario, and must not become one | `fragments/compositions.ts`, `.claude/skills/compose-scenario` |
 | **a trace** | The steps a picture is drawn from: per act, what it created, which edges, the derived state afterwards. Never hand-written; read off the event sink | `fragments/trace.ts` |
-| **origin** (`labkit-ts` / `labkit-rust` / `labkit-db`) | Which producer a trace came from: the TypeScript domain run fresh, the Rust/Grafeo port, or a real record read back from its durable log. The Explorer badges it so a rehearsal is never mistaken for someone's research | `Trace.origin`, `fragments/trace.ts` |
 | **derived state** | What LabKit's own reports say about an enquiry or gate after a step, as distinct from the nodes and edges the step wrote — the two can and do disagree in count | `fragments/derive.ts`, the Explorer's bottom panel |
 
 ## Method
