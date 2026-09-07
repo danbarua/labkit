@@ -116,8 +116,27 @@ window.addEventListener("resize", resizeCanvas);
 
 async function loadTraces() {
   const res = await fetch("/api/traces");
+  // The server answers a read failure with 500 and a plain-text reason. Read
+  // it rather than calling `.json()` on it, which throws a parse error naming
+  // nothing and loses what the server said.
+  if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).trim()}`);
   state.traces = await res.json();
   selectTrace(0);
+}
+
+/**
+ * Says on the page that the record could not be loaded.
+ *
+ * Without it `loadTraces()` rejected into nothing: an empty canvas, and the
+ * reason only in a console nobody has open. An empty record and an unreachable
+ * server render identically, which is the pair a viewer most needs kept apart.
+ */
+function reportLoadFailure(err) {
+  const banner = document.getElementById("derived-warning");
+  if (!banner) return;
+  const detail = err instanceof Error ? err.message : String(err);
+  banner.textContent = `could not load the record — ${detail}`;
+  banner.hidden = false;
 }
 
 function selectTrace(index) {
@@ -918,7 +937,7 @@ function showPopover(handle, clientX, clientY, rect) {
 
 resizeCanvas();
 requestAnimationFrame(loop);
-loadTraces();
+loadTraces().catch(reportLoadFailure);
 
 // ---------------------------------------------------------------- debug API
 //
