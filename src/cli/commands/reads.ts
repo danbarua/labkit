@@ -194,14 +194,15 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("What is blocked")
     .summary("every planned piece of work and whether anything has been done")
     .description(
-      "`--state planned` is what is ready to start: on the books, nothing blocking, no " +
-        "analysis against it yet. Not the same question as `gates` — a gate reaches only " +
-        "the work it protects, and work planned without one appears nowhere else. `why " +
-        "<task-id>` gives the line of enquiry (and question) a task exists to advance, " +
-        "where `planWork` was told one.",
+      "`--state planned` is what is ready to start: on the books, nothing done, nothing in " +
+        "its way. `waiting` is planned work behind a gate nobody has finished checking — not " +
+        "ready, not blocked; `blocked` is behind a gate with a failed condition. Not the same " +
+        "question as `gates` — a gate reaches only the work it protects, and work planned " +
+        "without one appears nowhere else. `why <task-id>` gives the line of enquiry (and " +
+        "question) a task exists to advance, where `plan` was told one.",
     )
     // Commander's parser, for the reason given on `gates` above.
-    .option("--state <state>", "planned | blocked | carried-out", workState)
+    .option("--state <state>", "planned | waiting | blocked | carried-out | abandoned", workState)
     .action(async (opts: { state?: ReturnType<typeof workState> }) =>
       run(async ({ read }) => answer(await read.workList(opts.state), renderWorkList)),
     );

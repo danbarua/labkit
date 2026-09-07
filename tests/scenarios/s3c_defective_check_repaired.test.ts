@@ -645,12 +645,13 @@ describe("S-3c: the check was wrong, not the result", () => {
     expect((await reader.gateList("incomplete")).some((g) => g.gate === gate)).toBe(true);
     expect((await reader.gateList("satisfied")).some((g) => g.gate === gate)).toBe(false);
 
-    // 3. work, via workStateFrom's gateStates map (src/domain/read.ts:2065).
+    // 3. work, via workStateFrom's gateStates map.
     // A retracted verdict is not a failure -- S-3c's own distinction -- so the
-    // task it protects is not blocked, only still short of satisfied.
+    // task it protects is not blocked; it is waiting on a gate short of
+    // satisfied, and not ready to start.
     const listedWork = await reader.workList();
     const ourWork = listedWork.find((w) => w.work === tertiary);
     expect(ourWork?.state).not.toBe("blocked");
-    expect(ourWork?.state).toBe("planned");
+    expect(ourWork?.state).toBe("waiting");
   });
 });

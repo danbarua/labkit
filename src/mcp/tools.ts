@@ -164,8 +164,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     title: "What am I blocked on right now, what are my priorities",
     group: "What stands",
     description:
-      "Gates currently blocking work and the work each " +
-      "protects, gates nobody has finished checking, planned work nothing has touched yet, " +
+      "Gates currently blocking work and the work each protects, gates nobody has finished " +
+      "checking and the work waiting behind them, work that is ready to start, " +
       "and where every question stands. Literally the composition of `gate_list`, " +
       "`work_list` and `known` -- no new query, and nothing here is stored. Give `since` (a " +
       "`seq` `now` returned before) to narrow every section to what changed: acts since " +
@@ -394,16 +394,16 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     title: "List the planned work",
     group: "What is blocked",
     description:
-      "Every piece of planned work, with whether anything has been done against it. " +
-      "`planned` is on the books with no analysis and nothing blocking — what is ready to " +
-      "start. `blocked` means a gate protecting it has a **failed** condition; a gate whose " +
-      "conditions are merely never-evaluated or incomplete does not hold work back, so such " +
-      "work still reads `planned`. `carried-out` means " +
-      "an analysis implements it. Not the same question as `gate_list`: a gate reaches only " +
-      "the work it protects, and work planned without one appears nowhere else.",
+      "Every piece of planned work and where it stands. `planned` is on the books with " +
+      "nothing done and nothing in its way — what is ready to start. `waiting` means a gate " +
+      "protecting it has conditions nobody has finished checking: not ready, not blocked. " +
+      "`blocked` means a gate protecting it has a **failed** condition. `carried-out` means " +
+      "an analysis implements it. `abandoned` means somebody recorded that it is not being " +
+      "done. Not the same question as `gate_list`: a gate reaches only the work it protects, " +
+      "and work planned without one appears nowhere else.",
     inputSchema: {
       state: z
-        .enum(["planned", "blocked", "carried-out"])
+        .enum(["planned", "waiting", "blocked", "carried-out", "abandoned"])
         .optional()
         .describe("only work in this state (default: all of it)"),
     },
@@ -616,8 +616,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     group: "Asking",
     description:
       "Put a question on the record without starting work on it. It appears in `known` as " +
-      "untested — on the books, never pursued, which is not a failure and not an " +
-      "inconclusive result. Use `open_enquiry` instead to ask and start in one act.",
+      "untested — nothing has been run against it, which is not a failure and not an " +
+      "inconclusive result; pursuing it does not change that, recording work under it does. " +
+      "Use `open_enquiry` instead to ask and start in one act.",
     inputSchema: { question: z.string().describe("the question, as asked") },
     outputSchema: posedSchema,
     handler: (write, { question }) => write.pose({ question }),
@@ -1322,9 +1323,9 @@ export const SESSION_TOOLS: readonly SessionToolDefinition<z.ZodRawShape>[] = [
       "is on the other end of this connection, so every write that follows is stamped " +
       "with it — an entry nobody signed is worse than no entry, because it looks " +
       "attributed and is not. LabKit does not check the id and cannot: " +
-      "it records what you tell it. Pass the session id your harness gives you (from " +
-      "`agent-bus whoami`, where there is one) so the same session is nameable in every " +
-      "tool that logs about it. Registering again replaces the previous answer.",
+      "it records what you tell it. Pass the session id your harness gives you, if it gives " +
+      "you one, so the same session is nameable in every tool that logs about it; otherwise " +
+      "choose a stable one and keep using it. Registering again replaces the previous answer.",
     inputSchema: {
       id: z
         .string()

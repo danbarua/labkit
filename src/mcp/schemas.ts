@@ -1050,7 +1050,7 @@ export const gateListSchema = z.strictObject({
 const listedWork = z.strictObject({
   work: ref("work"),
   objective: z.string(),
-  state: z.enum(["planned", "blocked", "carried-out", "abandoned"]),
+  state: z.enum(["planned", "waiting", "blocked", "carried-out", "abandoned"]),
   gates: z.array(ref("gate")),
 });
 
@@ -1072,7 +1072,7 @@ export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;
  */
 export const standingSchema = z.strictObject({
   blocked: z.strictObject({ gates: z.array(listedGate), work: z.array(listedWork) }),
-  unevaluated: z.array(listedGate),
+  unevaluated: z.strictObject({ gates: z.array(listedGate), work: z.array(listedWork) }),
   untouched: z.array(listedWork),
   known: knowledgeSurveySchema,
   seq: z.number(),

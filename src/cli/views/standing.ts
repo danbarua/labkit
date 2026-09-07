@@ -3,8 +3,9 @@
  *
  * Composes the same renderers `gates`, `work` and `known` already use: this
  * file adds no rendering logic of its own for a gate or a task, only the
- * section order. The top half (blocked gates, blocked work, incomplete
- * gates, untouched work) answers what is in the way; the bottom half (the
+ * section order. The top half (blocked gates and work, unchecked gates and
+ * the work waiting behind them, work ready to start) answers what is in the
+ * way; the bottom half (the
  * five buckets from `known`) answers what the record currently holds. No
  * heading marks the split — keep the two halves from interleaving rather
  * than labelling them.
@@ -28,7 +29,10 @@ export function renderStanding(standing: Standing, p: Palette): string {
     renderWorkList(standing.blocked.work, p),
     "",
     p.untested("Incomplete gates"),
-    renderGateList(standing.unevaluated, p),
+    renderGateList(standing.unevaluated.gates, p),
+    "",
+    p.provisional("Waiting work — behind a gate nobody has finished checking"),
+    renderWorkList(standing.unevaluated.work, p),
     "",
     p.untested("Untouched work — ready to start"),
     renderWorkList(standing.untouched, p),
