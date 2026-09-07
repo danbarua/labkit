@@ -80,15 +80,19 @@ describe("S-26: work nobody is doing", () => {
     expect(why.because.map((c) => c.wording)).toEqual([DROPPED]);
   });
 
-  test("Afterward 2: it leaves what is ready to start, and the rest does not", async () => {
+  test("Afterward 2: it leaves the standing, wherever it stood", async () => {
     const { work, other } = await twoPlannedThings();
 
+    // The gated port is waiting on a gate nobody has checked; the profiling is
+    // ready to start. Two lists, and the port is on the first.
     const before = await (await afterwards()).now();
-    expect(before.untouched.map((w) => w.work).sort()).toEqual([work, other].sort());
+    expect(before.unevaluated.work.map((w) => w.work)).toEqual([work]);
+    expect(before.untouched.map((w) => w.work)).toEqual([other]);
 
     await session.stopWork({ work, because: DROPPED });
 
     const after = await (await afterwards()).now();
+    expect(after.unevaluated.work).toEqual([]);
     expect(after.untouched.map((w) => w.work)).toEqual([other]);
   });
 

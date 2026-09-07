@@ -1383,9 +1383,13 @@ export interface KnowledgeSurvey {
    * `QuestionStanding` — see its own doc comment.
    */
   established: AnsweredQuestion[];
-  /** Worked on, not settled. */
+  /** Something has been run against it, and nothing settles it. */
   unresolved: QuestionStanding[];
-  /** On the books, never pursued. Not a failure and not an inconclusive result. */
+  /**
+   * Nothing has ever been run against it — pursued or not. Not a failure and
+   * not an inconclusive result. Opening a line of enquiry does not move a
+   * question out of here; recording observations or an analysis under one does.
+   */
   untested: QuestionStanding[];
   /**
    * Answered, but not on something to build on — **for either of two
@@ -1656,18 +1660,24 @@ export interface StoppedReason {
 /**
  * What a task's state can be, computed from the graph and never stored.
  *
- * **Derived from the two edge families that reach a Task**, not chosen from a
- * list of plausible words: `Gate -[:GATES]-> Task` and
- * `Task -[:IMPLEMENTS]-> EvidenceUnit` are everything the record holds about
- * one, so they are everything a state can be computed from.
+ * **Derived from the edges that reach a Task**: `Gate -[:GATES]-> Task`,
+ * `Task -[:IMPLEMENTS]-> EvidenceUnit` and `Decision -RESOLVES-> Task` are
+ * everything the record holds about one, so they are everything a state can be
+ * computed from.
  *
- * Two candidates died on inspection while this was being written, and both are
- * worth naming because they read as obvious:
+ * - **`planned`** — nothing done, nothing in the way: ready to start.
+ * - **`waiting`** — nothing done, and a gate protecting it has not been
+ *   satisfied: its conditions are unchecked or half-checked, none failed.
+ *   Work planned behind a gate is not ready on the day it was planned; the
+ *   record was asked *what should I do next* and answered *start Arc 2* about
+ *   work whose own gate said not to.
+ * - **`blocked`** — a gate protecting it has a failed condition.
+ * - **`carried-out`** — an analysis implements it.
+ * - **`abandoned`** — somebody recorded that it is not being done.
  *
- * - **`observed`** is not computable. `recordObservations` takes an *enquiry*;
- *   no edge connects observations to a Task at all.
- * - **`observed`** is not computable. `recordObservations` takes an *enquiry*;
- *   no edge connects observations to a Task at all.
+ * One candidate died on inspection and is worth naming because it reads as
+ * obvious: **`observed`** is not computable. `recordObservations` takes an
+ * *enquiry*; no edge connects observations to a Task at all.
  *
  * **`abandoned` wins over everything**, and is the only one an act states
  * rather than a traversal computing it: `stopWork` writes
@@ -1682,8 +1692,10 @@ export interface StoppedReason {
  * see the blockage. The alternative reading — that work already carried out is
  * not *blocked* whatever its gate says — is genuine, and is why the overlap has
  * a test of its own rather than being left to fall out of the branch order.
+ * `carried-out` in turn beats `waiting`: an unchecked gate is a fact about
+ * whether the result can be built on, not about whether the work happened.
  */
-export type WorkState = "planned" | "blocked" | "carried-out" | "abandoned";
+export type WorkState = "planned" | "waiting" | "blocked" | "carried-out" | "abandoned";
 
 /**
  * One task in a list of them.
@@ -1906,9 +1918,14 @@ export interface RevisedFinding {
 export interface Standing {
   /** Gates currently blocking work, and the work each protects — two reads, not a join. */
   blocked: { gates: ListedGate[]; work: ListedWork[] };
-  /** Gates nobody has finished checking: `never-evaluated` or `incomplete`. */
-  unevaluated: ListedGate[];
-  /** Planned work with nothing recorded against it yet — what is ready to start. */
+  /**
+   * Gates nobody has finished checking — `never-evaluated` or `incomplete` —
+   * and the work waiting behind them. Same shape as `blocked`: the work is
+   * not ready and is not blocked, and a list that dropped it under either
+   * would be wrong about it.
+   */
+  unevaluated: { gates: ListedGate[]; work: ListedWork[] };
+  /** Work with nothing recorded against it and nothing in its way — what is ready to start. */
   untouched: ListedWork[];
   /** Where every question currently stands. */
   known: KnowledgeSurvey;

@@ -279,7 +279,10 @@ export class ReadSurface extends SessionCore {
           gates: gates.filter((g) => g.state === "blocked"),
           work: work.filter((w) => w.state === "blocked"),
         },
-        unevaluated: gates.filter((g) => g.state === "never-evaluated" || g.state === "incomplete"),
+        unevaluated: {
+          gates: gates.filter((g) => g.state === "never-evaluated" || g.state === "incomplete"),
+          work: work.filter((w) => w.state === "waiting"),
+        },
         untouched: work.filter((w) => w.state === "planned"),
         known,
         seq,
@@ -297,9 +300,12 @@ export class ReadSurface extends SessionCore {
         gates: gates.filter((g) => g.state === "blocked" && touched.has(g.gate)),
         work: work.filter((w) => w.state === "blocked" && movedWork(w)),
       },
-      unevaluated: gates.filter(
-        (g) => (g.state === "never-evaluated" || g.state === "incomplete") && touched.has(g.gate),
-      ),
+      unevaluated: {
+        gates: gates.filter(
+          (g) => (g.state === "never-evaluated" || g.state === "incomplete") && touched.has(g.gate),
+        ),
+        work: work.filter((w) => w.state === "waiting" && movedWork(w)),
+      },
       untouched: work.filter((w) => w.state === "planned" && movedWork(w)),
       known: {
         established: known.established.filter(movedByIdOrClaim),

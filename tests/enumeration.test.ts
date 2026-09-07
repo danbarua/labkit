@@ -21,6 +21,7 @@ import { ResearchSession } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimOf } from "./helpers/claims";
 import { recordAnalysis } from "./helpers/analysis";
+import { workStateFrom } from "../src/domain/read/blocked";
 
 let scenario: Scenario;
 beforeAll(async () => {
@@ -53,16 +54,22 @@ describe("enumerating gates and work", () => {
     const { question } = await s.pose({ question: "does the enumeration hold?" });
     const { enquiry } = await s.pursue({ question, approach: "build one of each" });
 
-    // 1. never-evaluated: a criterion nobody has checked.
+    // 1. never-evaluated: a criterion nobody has checked, and work behind it.
     const { criterion: untouched } = await s.stateCriterion("nobody has looked at this");
-    const { work: readyWork } = await s.planWork({
-      objective: "ready to start",
+    const { work: waitingWork } = await s.planWork({
+      objective: "behind an unchecked gate",
       acceptance: "done",
     });
     const { gate: neverGate } = await s.declareGate({
       governedBy: [untouched],
       consequence: "unchecked",
-      protecting: [readyWork],
+      protecting: [waitingWork],
+    });
+
+    // Ungated and untouched: the only work here that is actually ready.
+    const { work: readyWork } = await s.planWork({
+      objective: "ready to start",
+      acceptance: "done",
     });
 
     // 2. blocked: a criterion evaluated and failed.
@@ -148,7 +155,17 @@ describe("enumerating gates and work", () => {
       citing: [claimOf(third, PARTLY)],
     });
 
-    return { neverGate, blockedGate, okGate, partialGate, readyWork, blockedWork, doneWork };
+    return {
+      neverGate,
+      blockedGate,
+      okGate,
+      partialGate,
+      readyWork,
+      waitingWork,
+      partialWork,
+      blockedWork,
+      doneWork,
+    };
   }
 
   test("the fixture really contains all four gate states", async () => {
@@ -276,22 +293,36 @@ describe("enumerating gates and work", () => {
     }
   });
 
-  test("work is planned, blocked or carried-out, and the fixture has all three", async () => {
+  test("work is planned, waiting, blocked or carried-out, and the fixture has all four", async () => {
     const s = await session();
     try {
       const built = await fixture(s);
       const states = new Map((await s.workList()).map((w) => [w.work as string, w.state]));
 
-      // `readyWork` is gated by a criterion nobody evaluated. Unevaluated is
-      // deliberately not blocking: a gate nobody has checked yet is a fact
-      // about the gate, and treating it as an obstruction would report every
-      // freshly gated task as blocked on the day it was planned.
+      // Ready means nothing done and nothing in the way. Work behind a gate
+      // nobody has finished checking — never evaluated, or half-checked with
+      // nothing failed — is waiting: not ready, and not blocked, since blocked
+      // is a failed condition somebody has to fix.
       expect(states.get(built.readyWork)).toBe("planned");
+      expect(states.get(built.waitingWork)).toBe("waiting");
+      expect(states.get(built.partialWork)).toBe("waiting");
       expect(states.get(built.blockedWork)).toBe("blocked");
       expect(states.get(built.doneWork)).toBe("carried-out");
     } finally {
       await scenario.end();
     }
+  });
+
+  test("a gate the list does not know about holds the work; it does not vanish", () => {
+    // `gateStates` comes from `gateList()`, which reaches gates through their
+    // criteria. A gate that contributed no rows is absent from the map, and
+    // absent must not read as ungated -- that is the exact answer this state
+    // exists to stop. Not reachable through the verbs today; pinned on the
+    // function so it stays true if `gateList`'s reach ever narrows.
+    const task = { gates: new Set(["GATE_9"]), implemented: false, stopped: false };
+    expect(workStateFrom(task, new Map())).toBe("waiting");
+    expect(workStateFrom(task, new Map([["GATE_9", "satisfied"]]))).toBe("planned");
+    expect(workStateFrom({ ...task, gates: new Set() }, new Map())).toBe("planned");
   });
 
   test("blocked beats carried-out when both hold", async () => {

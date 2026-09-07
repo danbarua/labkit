@@ -129,7 +129,7 @@ test("a bad --state names the values it would have accepted", async () => {
     "never-evaluated, incomplete, blocked, satisfied",
   );
   expect(await refusal(["work", "--state", "carriedout"])).toContain(
-    "planned, blocked, carried-out",
+    "planned, waiting, blocked, carried-out, abandoned",
   );
 });
 

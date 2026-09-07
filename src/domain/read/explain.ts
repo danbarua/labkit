@@ -398,7 +398,7 @@ async function explainWork(self: ReadSurface, subject: string): Promise<WorkExpl
     return {
       kind: "work",
       subject: work,
-      is: "planned with no question named -- plan --enquiry records one",
+      is: "planned with no question named -- planning work names the line of enquiry it advances",
       because: [],
       report,
     };

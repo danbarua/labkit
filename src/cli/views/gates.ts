@@ -215,6 +215,8 @@ export function renderGateList(gates: ListedGate[], p: Palette): string {
  * `planned` is deliberately the *untested* colour rather than a warning one:
  * work nobody has started is the ordinary state of a queue, not a problem, and
  * colouring it as one is how a list becomes something people stop reading.
+ * `waiting` is the *provisional* colour: nothing failed, and it is still not
+ * ready — the same "held, pending" reading a provisional answer has.
  */
 export function renderWorkList(work: ListedWork[], p: Palette): string {
   if (work.length === 0) return "nothing";
@@ -227,12 +229,14 @@ export function renderWorkList(work: ListedWork[], p: Palette): string {
           ? p.settled(padded)
           : w.state === "blocked"
             ? p.contested(padded)
-            : // Abandoned work is not waiting on anything, so it reads like the
-              // rest of the record's settled-and-set-aside states rather than
-              // like something a reader still has to act on.
-              w.state === "abandoned"
-              ? p.quiet(padded)
-              : p.untested(padded);
+            : w.state === "waiting"
+              ? p.provisional(padded)
+              : // Abandoned work is not waiting on anything, so it reads like the
+                // rest of the record's settled-and-set-aside states rather than
+                // like something a reader still has to act on.
+                w.state === "abandoned"
+                ? p.quiet(padded)
+                : p.untested(padded);
       return `${state}  ${p.handle(w.work)}  ${w.objective}`;
     })
     .join("\n");

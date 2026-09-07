@@ -137,11 +137,15 @@ export function gateStateFrom(checks: readonly { state: CheckState }[]): GateSta
  * The other reading is real and is why the overlap has a test of its own rather
  * than being left to fall out of the branch order below.
  *
- * **A gate that is merely unevaluated does not block.** Only `blocked` counts —
- * `never-evaluated` and `incomplete` mean nobody has finished checking, which is
- * a fact about the gate rather than an obstruction to the work. Treating them as
- * blocking would report every freshly gated task as blocked on the day it was
- * planned — a queue that can never be emptied, and is therefore never read.
+ * **A gate that is merely unevaluated does not block; it holds.** `blocked`
+ * is a failed condition — something to fix. `never-evaluated` and `incomplete`
+ * mean nobody has finished checking, and work behind such a gate is `waiting`:
+ * not ready to start, and not blocked either. Folding it into `planned` put
+ * gated work on the ready-to-start list the day it was planned; folding it
+ * into `blocked` would make a queue that can never be emptied. A gate that is
+ * `satisfied` holds nothing. A gate the map does not know about holds too:
+ * "no state for this gate" is not "no gate", and the direction to fail in is
+ * not-ready-until-something-says-so.
  */
 export function workStateFrom(
   task: { gates: Set<string>; implemented: boolean; stopped: boolean },
@@ -150,9 +154,10 @@ export function workStateFrom(
   // Somebody decided not to do it, so nothing else about it is what a reader
   // wants: not the gate holding it up, not that nothing has touched it.
   if (task.stopped) return "abandoned";
-  const held = [...task.gates].some((g) => gateStates.get(g) === "blocked");
-  if (held) return "blocked";
-  return task.implemented ? "carried-out" : "planned";
+  const states = [...task.gates].map((g) => gateStates.get(g));
+  if (states.includes("blocked")) return "blocked";
+  if (task.implemented) return "carried-out";
+  return states.every((s) => s === "satisfied") ? "planned" : "waiting";
 }
 
 export class BlockedGroup extends SessionCore {
@@ -598,11 +603,11 @@ export class BlockedGroup extends SessionCore {
    * `planWork` requires no gate. Work that is planned and ungated — the
    * commonest thing in a standup — is reachable from nowhere else.
    *
-   * **Four states.** Three are derived from the two edge families that reach a
-   * Task, `Gate -[:GATES]-> Task` and `Task -[:IMPLEMENTS]-> EvidenceUnit`.
-   * `abandoned` is the one an act states: `Decision -RESOLVES-> Task`, written
-   * by `stopWork`, and it wins over the other three. See {@link WorkState},
-   * which carries the argument and the candidate that died.
+   * **Five states.** Four are derived from the edges that reach a Task,
+   * `Gate -[:GATES]-> Task` and `Task -[:IMPLEMENTS]-> EvidenceUnit`, with the
+   * gates' own states. `abandoned` is the one an act states:
+   * `Decision -RESOLVES-> Task`, written by `stopWork`, and it wins over the
+   * other four. See {@link WorkState}, which carries the argument.
    *
    * **Nothing is stored.** There is no `is_open` flag to set, because a stored
    * flag is the first place a work queue rots — and the reason a researcher
