@@ -34,6 +34,8 @@ import {
 import { graphProjector, type Projector } from "./projection";
 import type {
   ClaimRef,
+  ClaimStanding,
+  ConcludedClaim,
   AnalysisRef,
   EnquiryRef,
   EvidenceRef,
@@ -264,6 +266,69 @@ export class SessionCore {
       }
     }
     return [...affected.values()].sort((a, b) => a.claim.localeCompare(b.claim));
+  }
+
+  /**
+   * Which of these claims still stand, and what replaced the ones that do not.
+   *
+   * Per claim, where {@link withdrawalOf} folds a whole proposition into one
+   * answer. A verb that acts on one reading needs the claim-level answer:
+   * whether *this* record still stands, not whether the sentence does.
+   *
+   * **Both predicates, and AGE has no edge alternation** — `[:CHANGES|SUPERSEDES]`
+   * is a syntax error, so this is two clauses. Naming only one is silent: the
+   * row is absent and the caller concludes the claim stands. A claim is
+   * withdrawn either way — its reading was narrowed (`CHANGES`) or its finding
+   * superseded (`SUPERSEDES`) — and the consequence for whether it still
+   * stands is the same.
+   */
+  protected async standingOf(claims: ClaimRef[]): Promise<Map<ClaimRef, ClaimStanding>> {
+    const state = new Map<ClaimRef, ClaimStanding>(
+      claims.map((c) => [c, { withdrawn: false, by: [], insteadOf: [] }]),
+    );
+    if (claims.length === 0) return state;
+    const rows = await this.graph.query(
+      `MATCH (c:Claim) WHERE c.natural_id IN $ids
+       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
+       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+       OPTIONAL MATCH (replaced)-[:MOTIVATES]->(successor:Claim)
+       RETURN c, narrowed, insteadof, replaced, successor`,
+      {
+        c: vertexProps<{ natural_id: string }>(),
+        narrowed: optional(vertexProps<{ natural_id: string }>()),
+        insteadof: optional(vertexProps<{ name: string; natural_id: string }>()),
+        replaced: optional(vertexProps<{ natural_id: string }>()),
+        successor: optional(vertexProps<{ name: string; natural_id: string }>()),
+      },
+      { ids: claims },
+    );
+    for (const row of rows) {
+      const claim = ref("claim", row.c.natural_id);
+      const entry = state.get(claim);
+      if (!entry) continue;
+      if (!row.narrowed && !row.replaced) continue;
+      entry.withdrawn = true;
+      for (const decision of [row.narrowed, row.replaced]) {
+        if (!decision) continue;
+        const acted = ref("decision", decision.natural_id);
+        if (!entry.by.includes(acted)) entry.by.push(acted);
+      }
+      // By handle: two successors phrased alike are two records, and this list
+      // is what a refusal names.
+      //
+      // **It can be empty on a withdrawn claim.** `replaceAnalysis` supersedes
+      // a claim and mints the replacement's conclusions without pairing them,
+      // so the decision `MOTIVATES` the new *analysis* and no new claim. A
+      // caller must say "no successor is recorded" rather than name none.
+      for (const next of [row.insteadof, row.successor]) {
+        if (!next) continue;
+        const successor = ref("claim", next.natural_id);
+        if (!entry.insteadOf.some((c) => c.claim === successor))
+          entry.insteadOf.push({ claim: successor, asserts: next.name });
+      }
+    }
+    return state;
   }
 
   /** Whether the record has stopped asserting a proposition, and what replaced it. */

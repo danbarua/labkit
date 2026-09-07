@@ -37,7 +37,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { recordAnalysis } from "../helpers/analysis";
+import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -297,5 +297,146 @@ describe("S-12b — a history that merges", () => {
     expect(history.revisions).toEqual([]);
     expect(history.originally).toEqual([]);
     expect(history.nowClaims.claim).toBe(claimOf(claims, LEFT));
+  });
+});
+
+/** One reading, narrowed; then the same sentence concluded afresh. */
+const ONCE = "the sampler stalls";
+const NARROWED_ONCE = "the sampler stalls at the batch boundary under load";
+const NARROWED_AGAIN = "the sampler stalls at the batch boundary above eight workers";
+
+describe("S-12b — a reading is narrowed once", () => {
+  /**
+   * **Researcher:** I narrowed that reading last week and forgot. What happens
+   * if I narrow it again?
+   *
+   * **Agent:** Refused, with the reading that stands in its place. Two
+   * narrowings of one reading would put two successors on it with nothing
+   * saying which the record now asserts.
+   */
+  test("a reading that has already been narrowed is refused, naming what stands instead", async () => {
+    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "stall traces",
+      finding: "measured",
+    });
+    const { claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "fit",
+      from: [observations],
+      concludes: [{ proposition: ONCE, finding: `${ONCE}, on the fit` }],
+    });
+    const original = claimOf(claims, ONCE);
+    const narrowed = await session.reinterpret({
+      of: original,
+      as: NARROWED_ONCE,
+      because: "the fit only covers the boundary",
+    });
+
+    await expect(
+      session.reinterpret({
+        of: original,
+        as: NARROWED_AGAIN,
+        because: "and only above eight workers",
+      }),
+    ).rejects.toThrow(new RegExp(`no longer stands[\\s\\S]*${narrowed.nowClaims.claim}`));
+
+    // Nothing was written: the reading still has exactly one successor.
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
+    const history = await later.interpretationHistory(narrowed.nowClaims.claim);
+    expect(history.revisions).toHaveLength(1);
+    expect(history.originally.map((c) => c.claim)).toEqual([original]);
+  });
+
+  /**
+   * Why only the named claim is checked, and not every claim the wording match
+   * returns.
+   *
+   * A reading is withdrawn in full — `reinterpret` takes every claim in scope
+   * asserting it — and `recordAnalysis` refuses to put the sentence back. So
+   * within one scope the claims asserting a reading are standing together or
+   * withdrawn together, and a withdrawn one cannot sit in the match beside a
+   * standing one. Without this, the guard above would need a filter over the
+   * whole match, and that filter would be one nothing could make fire.
+   */
+  test("a withdrawn reading cannot be put back, so the match never mixes the two", async () => {
+    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "stall traces",
+      finding: "measured",
+    });
+    const { claims: first } = await recordAnalysis(session, {
+      enquiry,
+      method: "fit",
+      from: [observations],
+      concludes: [{ proposition: ONCE, finding: `${ONCE}, on the first fit` }],
+    });
+    const narrowed = await session.reinterpret({
+      of: claimOf(first, ONCE),
+      as: NARROWED_ONCE,
+      because: "the fit only covers the boundary",
+    });
+
+    await expect(
+      recordAnalysis(session, {
+        enquiry,
+        method: "refit",
+        from: [observations],
+        concludes: [{ proposition: ONCE, finding: `${ONCE}, on the refit` }],
+      }),
+    ).rejects.toThrow(
+      new RegExp(`was withdrawn in favour of "${NARROWED_ONCE}" \\(${narrowed.nowClaims.claim}\\)`),
+    );
+  });
+
+  /**
+   * A finding can stop standing without its reading ever being narrowed:
+   * replacing the analysis supersedes the claim instead. Both acts leave a
+   * reading nobody should narrow, and AGE has no edge alternation, so the two
+   * predicates are two clauses and reading one is silent.
+   */
+  test("a reading whose finding was superseded is refused too, not only a narrowed one", async () => {
+    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "stall traces",
+      finding: "measured",
+    });
+    const { analysis, claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "fit",
+      from: [observations],
+      concludes: [{ proposition: ONCE, finding: `${ONCE}, on the fit` }],
+    });
+    const { review } = await session.recordReview({
+      of: analysis,
+      verdict: "the fit was taken over the wrong window",
+    });
+    const replacement = await replaceAnalysis(session, {
+      supersedes: analysis,
+      because: review,
+      enquiry,
+      method: "refit over the right window",
+      from: [observations],
+      concludes: [{ proposition: ONCE, finding: `${ONCE}, on the refit` }],
+    });
+
+    await expect(
+      session.reinterpret({
+        of: claimOf(claims, ONCE),
+        as: NARROWED_ONCE,
+        because: "narrowing a finding that no longer stands",
+      }),
+      // No successor is recorded: `replaceAnalysis` supersedes the claim and
+      // mints the replacement's conclusions without pairing the two, so the
+      // record knows the claim fell and not what stands instead. Saying so is
+      // the honest answer; naming nothing after "reinterpret" would not be.
+    ).rejects.toThrow(/does not say which claim stands in its place/);
+    void replacement;
   });
 });

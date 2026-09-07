@@ -479,7 +479,7 @@ export class Shared extends SessionCore {
           });
           if (withdrawn && by !== revision?.decision)
             throw new Error(
-              `"${proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy}"` : ""}; ` +
+              `"${proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy.asserts}" (${replacedBy.claim})` : ""}; ` +
                 `it cannot be re-asserted by recording another analysis`,
             );
         }
