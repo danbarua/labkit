@@ -70,8 +70,8 @@ export async function recordAnalysis(
  * their own.
  *
  * `replacing` on each conclusion names the finding it stands in for; one the
- * caller does not name is not superseded. Omitting it falls back to matching by
- * proposition, which refuses an ambiguous match rather than picking.
+ * caller does not name is not superseded, and nothing recovers the pairing
+ * afterwards.
  *
  * Distinct from `reviewAndReplace`, which mints the review as well — this
  * takes one already on the record, as the verb does.
