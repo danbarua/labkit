@@ -96,7 +96,7 @@ import type {
   Cause,
   Explanation,
 } from "../domain/report";
-import type { Ref } from "../domain/report";
+import type { AnyRef, Ref } from "../domain/report";
 import type { DomainEvent, GraphChange } from "../domain/events";
 import type { Command } from "../domain/commands";
 import type { EdgeLabel } from "../db/domain";
@@ -118,6 +118,9 @@ import type { EdgeLabel } from "../db/domain";
  * message.
  */
 const ref = <K extends string>(_kind: K) => z.string() as unknown as z.ZodType<Ref<K>>;
+
+/** A handle of any kind — `why`'s subject, which is whatever the caller named. */
+const anyRef = () => z.string() as unknown as z.ZodType<AnyRef>;
 
 /** `{claim, asserts}` — the report convention's pair for a claim, in one place. */
 const concludedClaim = z.strictObject({
@@ -591,11 +594,9 @@ const analysisRevisionSchema = z.strictObject({
  * fields: `report` differs by kind (`SupportExplanation` for a claim,
  * `TaskContract` for work, `EnquiryInContext` for a line of enquiry,
  * `GateStatus` for a gate), and a caller narrowing on `kind` gets the right
- * one without a cast. Only the kinds `src/domain/read.ts`'s `EXPLAINED` table
- * has a case for are members here -- see `Explanation`'s own doc comment in
- * `src/domain/report.ts` for why a kind `why` does not yet explain has no
- * member and no schema: it never reaches `structuredContent` at all, because
- * the domain throws before returning one.
+ * one without a cast. Every kind is a member: the six answered by walking the
+ * record carry `is` and `because` and no `report`, since what those kinds are
+ * is their edges.
  */
 const gateGoverned = z.strictObject({
   gate: ref("gate"),
@@ -613,6 +614,58 @@ export const criterionStandingSchema = z.strictObject({
 });
 
 export const explanationSchema = z.discriminatedUnion("kind", [
+  // The kinds answered by walking the record, which carry no `report`: what
+  // these kinds are is their edges, and a report type per kind would be an
+  // envelope around one hop, invented to satisfy this union rather than to
+  // answer a reader.
+  z.strictObject({
+    kind: z.literal("question"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
+  z.strictObject({
+    kind: z.literal("unit"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
+  z.strictObject({
+    kind: z.literal("evidence"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
+  z.strictObject({
+    kind: z.literal("decision"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
+  z.strictObject({
+    kind: z.literal("evaluation"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
+  z.strictObject({
+    kind: z.literal("review"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
+  z.strictObject({
+    kind: z.literal("observations"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
+  z.strictObject({
+    kind: z.literal("note"),
+    subject: anyRef(),
+    is: z.string(),
+    because: z.array(explanationCause),
+  }),
   z.strictObject({
     kind: z.literal("claim"),
     subject: ref("claim"),

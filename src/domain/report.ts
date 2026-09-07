@@ -1747,9 +1747,10 @@ export interface Cause {
  *
  * A discriminated union, not one interface with optional fields: `report`'s
  * type differs by `kind`, and a caller narrowing on `kind` gets the right one
- * without a cast. Only the kinds `read.ts`'s `EXPLAINED` table has a case for
- * are members; a kind `why` does not explain never constructs one of these, it
- * throws instead.
+ * without a cast. **Every kind is a member.** The six that have no report of
+ * their own are {@link WalkExplanation}, which carries `is` and `because` and
+ * nothing else — see there for why inventing a report per kind would be worse
+ * than having none.
  */
 export interface ClaimExplanation {
   kind: "claim";
@@ -1826,7 +1827,44 @@ export interface CriterionExplanation {
   report: CriterionStanding;
 }
 
+/**
+ * The kinds `why` answers from the graph itself rather than from a report.
+ *
+ * Six of the record's fourteen node kinds have no report of their own, and for
+ * a long time `why` refused them on the grounds that nobody had asked for one.
+ * They are not thin: `Decision` carries fourteen edge types — the most of any
+ * kind, and the only node holding a human-written reason for an act — and was
+ * refused by the verb whose whole job is *why*. What these kinds **are** is
+ * their edges, so that is what is walked.
+ */
+export type WalkedKind =
+  | "question"
+  | "unit"
+  | "evidence"
+  | "decision"
+  | "evaluation"
+  | "review"
+  | "observations"
+  | "note";
+
+/**
+ * `why` over a kind the record answers structurally.
+ *
+ * **No `report`, and that is the design rather than a gap.** Every other arm
+ * embeds its kind's existing report; inventing one per kind here would wrap a
+ * single hop of edges in an envelope, which is the flattening this codebase
+ * keeps deleting. `is` and `because` are the whole contract, and `because` is
+ * the record's own connections put into a researcher's words.
+ */
+export interface WalkExplanation {
+  kind: WalkedKind;
+  subject: AnyRef;
+  is: string;
+  because: Cause[];
+}
+
 export type Explanation =
+  | WalkExplanation
   | ClaimExplanation
   | CriterionExplanation
   | WorkExplanation

@@ -1,7 +1,8 @@
-import { optional, vertexProps } from "../../db/cypher";
-import type { Prose } from "../../db/domain";
+import { optional, scalar, vertexProps } from "../../db/cypher";
+import type { EdgeLabel, Prose } from "../../db/domain";
+import { SEARCHABLE_TEXT, labelForNaturalId } from "../../db/domain";
 import { SessionCore } from "../core";
-import { ref } from "../report";
+import { kindOf, ref } from "../report";
 import type {
   AnalysisExplanation,
   AnalysisRef,
@@ -21,11 +22,14 @@ import type {
   GateExplanation,
   GateGoverned,
   GatedWork,
+  AnyRef,
   Kind,
   QuestionBucket,
   QuestionStanding,
   Ref,
   RevisedFinding,
+  WalkExplanation,
+  WalkedKind,
   WorkExplanation,
 } from "../report";
 import { compose, per, type Row } from "../facts";
@@ -34,6 +38,77 @@ import type { ReadSurface } from "./index";
 import type { Identified } from "./shared";
 
 export class ExplainGroup extends SessionCore {
+  /**
+   * A record's own text, whatever kind it is — the properties `search` scans.
+   *
+   * Read from {@link SEARCHABLE_TEXT} rather than a second map of label to
+   * property: those are the same question ("what did a person type here"),
+   * and a second copy is a second thing to go stale. `EvidenceUnit` is absent
+   * from it and is the one kind holding no prose at all.
+   */
+  async proseFor(subject: AnyRef): Promise<string | null> {
+    const props = SEARCHABLE_TEXT[labelForNaturalId(subject)] ?? [];
+    if (props.length === 0) return null;
+    const [row] = await this.graph.query(
+      `MATCH (n {natural_id: $id}) RETURN n`,
+      { n: vertexProps<Record<string, unknown>>() },
+      { id: subject },
+    );
+    if (!row) return null;
+    for (const prop of props) {
+      const value = row.n[prop];
+      if (typeof value === "string" && value.length > 0) return value;
+    }
+    return null;
+  }
+
+  /**
+   * One record's neighbours: everything joined to it, both directions, with
+   * the edge each was reached by and the other end's own prose.
+   *
+   * **Reached only through `why`** — a researcher asks *why is this here*, not
+   * *list this node's edges*. See `NO_COMMAND_FOR` in
+   * tests/cli/coverage.test.ts.
+   *
+   * Untyped `-[r]->` with `type(r)`, the shape `retractedDependents` already
+   * uses. AGE has no edge alternation, so naming the edges would mean one
+   * clause per type and a silent absence for any forgotten — the defect
+   * `src/domain/facts.ts` exists for, which an untyped match cannot have.
+   */
+  async neighboursOf(subject: AnyRef): Promise<Neighbour[]> {
+    const decoders = {
+      other: vertexProps<Record<string, unknown> & { natural_id: string }>(),
+      via: scalar<string>(),
+    };
+    const [out, into] = await Promise.all([
+      this.graph.query(
+        `MATCH (n {natural_id: $id})-[r]->(other) RETURN other, type(r) AS via`,
+        decoders,
+        { id: subject },
+      ),
+      this.graph.query(
+        `MATCH (other)-[r]->(n {natural_id: $id}) RETURN other, type(r) AS via`,
+        decoders,
+        { id: subject },
+      ),
+    ]);
+    const seen = (rows: typeof out, direction: "out" | "in"): Neighbour[] =>
+      rows.map((r) => {
+        const label = labelForNaturalId(r.other.natural_id);
+        const props = SEARCHABLE_TEXT[label] ?? [];
+        const text = props
+          .map((prop) => r.other[prop])
+          .find((v): v is string => typeof v === "string" && v.length > 0);
+        return {
+          handle: ref(kindOf(r.other.natural_id) as Kind, r.other.natural_id),
+          via: r.via as EdgeLabel,
+          direction,
+          wording: text ?? null,
+        };
+      });
+    return [...seen(out, "out"), ...seen(into, "in")];
+  }
+
   /**
    * `why <criterion>` — what a condition requires, what has been said about it,
    * and what it holds up.
@@ -632,50 +707,140 @@ const EXPLAINED = {
 
 const EXPLAINED_KINDS = Object.keys(EXPLAINED) as Kind[];
 
-/** Every kind `EXPLAINED` does not already have a case for. */
-type UnexplainedKind = Exclude<Kind, keyof typeof EXPLAINED>;
+/** One record joined to another, and the edge it was reached by. */
+export interface Neighbour {
+  handle: AnyRef;
+  via: EdgeLabel;
+  direction: "out" | "in";
+  wording: string | null;
+}
 
 /**
- * The refusal every kind outside {@link EXPLAINED} gets — two parts, per the
- * discipline this file states above `ReadSurface`: **what was asked** (the
- * kind) and **what `why` explains instead**. There is deliberately no third
- * part naming where else to look: the domain does not know which surface is
- * calling, so it cannot name a command (that comment's own rule) — and a
- * blanket "this record has no other verb for it yet either" is false for most
- * of these: `gate`/`criteria`/`design` all read a gate, `origin`/`pursuits` a
- * question, `reproducibility` an analysis. Naming a false absence is what the
- * refusal discipline above exists to prevent, so this says only what is true.
+ * What one record is connected to, in a researcher's words rather than the
+ * schema's.
+ *
+ * Total over the edge schema, so a new edge is a compile error rather than a
+ * page printing `SUPERSEDES` at somebody. The rule that a researcher never
+ * says a label out loud applies to what `why` prints as much as to a
+ * scenario's dialogue.
  */
-function refuseToExplain(kind: UnexplainedKind): Explainer {
-  return async () => {
-    throw new Error(
-      `why does not yet explain a ${kind}; it explains ${EXPLAINED_KINDS.join(", ")}`,
-    );
+const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
+  MOTIVATES: { out: "led to", in: "was prompted by" },
+  REQUIRES: { out: "needs", in: "is needed by" },
+  ADDRESSES: { out: "works on", in: "is worked on by" },
+  SUPPORTS: { out: "supports", in: "is supported by" },
+  CHALLENGES: { out: "bears against", in: "is challenged by" },
+  USES: { out: "uses", in: "is used by" },
+  CONSUMES: { out: "reads", in: "was read by" },
+  PRODUCES: { out: "produced", in: "was produced by" },
+  RECORDED_IN: { out: "is recorded in", in: "records" },
+  GOVERNS: { out: "governs", in: "is governed by" },
+  QUALIFIES: { out: "qualifies", in: "is qualified by" },
+  EVALUATED_AS: { out: "was evaluated as", in: "is a verdict on" },
+  TRIGGERS: { out: "was judged against", in: "was judged by" },
+  GATES: { out: "holds up", in: "is held up by" },
+  REVERIFIES: { out: "re-checks", in: "was re-checked by" },
+  PROMOTES: { out: "confirmed", in: "was confirmed by" },
+  GRADES: { out: "graded", in: "was graded by" },
+  ABOUT: { out: "is about", in: "is the subject of" },
+  KEEPS: { out: "kept", in: "was kept by" },
+  CHANGES: { out: "changed", in: "was changed by" },
+  BASED_ON: { out: "rests on", in: "was cited by" },
+  RESOLVES: { out: "settled", in: "was settled by" },
+  NARROWS: { out: "sharpened", in: "was sharpened by" },
+  DEFERS: { out: "deferred", in: "was deferred by" },
+  SUPERSEDES: { out: "replaced", in: "was replaced by" },
+  EVALUATES: { out: "judged", in: "was judged by" },
+  INVALIDATED_BY: { out: "was retracted by", in: "retracted" },
+  IMPLEMENTS: { out: "carried out", in: "was carried out by" },
+  RESTS_ON: { out: "is drawn from", in: "was drawn on by" },
+  CONCERNS: { out: "concerns", in: "has a note on it" },
+};
+
+/**
+ * What a record is, for the one case with no words of its own.
+ *
+ * `EvidenceUnit` is the only kind absent from `SEARCHABLE_TEXT` — nothing a
+ * person typed is stored on it — so it is the only kind this is reached for
+ * as a subject. As a *neighbour* any kind can be wordless, since a record may
+ * be created before its prose is set.
+ */
+function describe(handle: AnyRef): string {
+  const kind = kindOf(handle);
+  return kind && kind in SAYS ? SAYS[kind as WalkedKind] : "a record";
+}
+
+/** How a walked kind describes itself when it has nothing else to say. */
+const SAYS: Record<WalkedKind, string> = {
+  question: "a question on the record",
+  unit: "one unit of work that was run",
+  evidence: "a finding",
+  decision: "a decision",
+  evaluation: "a verdict on one condition",
+  review: "a review",
+  observations: "what was observed",
+  note: "a note",
+};
+
+/**
+ * The one query behind every walked kind: the node, and everything joined to
+ * it, both directions.
+ *
+ * Untyped `-[r]->` with `type(r)`, the shape `retractedDependents` already
+ * uses — AGE has no edge alternation, so naming edges here would mean one
+ * clause per type and a silent absence for any that was forgotten. That is
+ * the defect `src/domain/facts.ts` exists for, and an untyped match cannot
+ * have it.
+ */
+function walked(kind: WalkedKind): Explainer {
+  return async (self, subject) => {
+    const handle = ref(kind, subject);
+    const neighbours = await self.neighboursOf(handle);
+    const own = await self.proseFor(handle);
+    return {
+      kind,
+      subject: handle,
+      // The record's own words where it has any, and what it is where it does
+      // not. An `EvidenceUnit` is the one kind holding no prose at all.
+      is: own ?? SAYS[kind],
+      because: neighbours.map((n: Neighbour) => ({
+        handle: n.handle,
+        // The other end's own words, or what it is when it has none. Falling
+        // back to the handle printed it twice, the `Cause` carrying it
+        // already: `was produced by EU_2 (EU_2)`.
+        wording: `${PHRASE[n.via][n.direction]} ${n.wording ?? describe(n.handle)}`,
+      })),
+    };
   };
 }
 
 /**
- * One refusal per {@link UnexplainedKind} — still a literal object, so
- * `satisfies` checks it totally over exactly the kinds `EXPLAINED` has not
- * claimed. That cuts both ways: moving a kind into `EXPLAINED` drops it from
- * `UnexplainedKind`, and this object's entry for it becomes an *excess*
- * property `satisfies` refuses — the compiler forces its removal rather than
- * leaving a dead refusal nobody's dispatch can reach.
+ * Every kind `why` answers by walking, rather than from a report of its own.
+ *
+ * `satisfies Record<WalkedKind, Explainer>` keeps it total, so a kind moved
+ * into {@link EXPLAINED} must leave here — the compiler refuses the excess
+ * property rather than leaving a case nothing can reach.
  */
-const REFUSED = {
-  question: refuseToExplain("question"),
-  unit: refuseToExplain("unit"),
-  evidence: refuseToExplain("evidence"),
-  decision: refuseToExplain("decision"),
-  evaluation: refuseToExplain("evaluation"),
-  review: refuseToExplain("review"),
-  observations: refuseToExplain("observations"),
-  note: refuseToExplain("note"),
-} satisfies Record<UnexplainedKind, Explainer>;
+const WALKED = {
+  question: walked("question"),
+  unit: walked("unit"),
+  evidence: walked("evidence"),
+  decision: walked("decision"),
+  evaluation: walked("evaluation"),
+  review: walked("review"),
+  observations: walked("observations"),
+  note: walked("note"),
+} satisfies Record<WalkedKind, Explainer>;
 
 /**
- * The total table `why` dispatches through — one entry per {@link Kind}, so
- * a kind added to `LABEL_BY_KIND` without a matching entry in `EXPLAINED` or
- * `REFUSED` is a `tsc` failure, not a runtime "unknown kind".
+ * The total table `why` dispatches through — one entry per {@link Kind}, so a
+ * kind added to `LABEL_BY_KIND` with no case is a `tsc` failure.
+ *
+ * **There is no refusal arm.** Six kinds used to get one, on the stated
+ * grounds that a case would be added "when someone asks and gets the
+ * refusal". Nobody had to ask: every one of them has edges, `Decision` has
+ * more than any other kind on the record, and a verb named `why` declining to
+ * explain the node that carries a person's reason for an act was never
+ * something the record could not answer.
  */
-export const EXPLAINERS = { ...EXPLAINED, ...REFUSED } satisfies Record<Kind, Explainer>;
+export const EXPLAINERS = { ...EXPLAINED, ...WALKED } satisfies Record<Kind, Explainer>;

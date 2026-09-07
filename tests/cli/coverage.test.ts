@@ -67,6 +67,8 @@ const NO_COMMAND_FOR: Readonly<Record<string, string>> = {
   analysisRevision: "reached only through `why`, as the Computation case's body",
   criterionStanding: "reached only through `why`, as the Criterion case's body",
   stoppedWork: "reached only through `why`, as the Task case's abandoned branch",
+  neighboursOf: "reached only through `why`, as the walked kinds' body",
+  proseFor: "reached only through `why`, as the walked kinds' body",
 };
 
 test("the command modules were found at all", () => {
