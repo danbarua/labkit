@@ -35,6 +35,25 @@ import { historicalSurveySchema, knowledgeSurveySchema } from "./schemas";
 /** The URI this document is served at. */
 export const DOCS_URI = "labkit://docs/tools";
 
+/**
+ * The same document as a tool.
+ *
+ * Not every client implements resources. One that reaches tools and nothing
+ * else sees `labkit://docs/tools` in no list, and its first move is to search
+ * the record for the documentation — which is the one place it cannot be. So
+ * the document has two routes in, both rendering the same declarations; a
+ * caller takes whichever its client can reach.
+ */
+export const DOCS_TOOL = {
+  name: "docs",
+  title: "How to use this server",
+  description:
+    "What this server is for and how every tool fits: which to call first, what each one " +
+    "records or answers, what it takes and what it returns. Read it before choosing a tool. " +
+    "Takes no arguments and touches no record; the same page is also served as the " +
+    `resource \`${DOCS_URI}\` for a client that reads resources.`,
+} as const;
+
 type JsonSchema = {
   type?: string | string[];
   description?: string;
@@ -213,7 +232,8 @@ export function renderToolDocs(
     "# LabKit — the tools",
     "",
     "Generated from the server's own tool declarations on every read, so it",
-    "cannot disagree with the tools. Served at `labkit://docs/tools`.",
+    `cannot disagree with the tools. Served as the resource \`${DOCS_URI}\` and as the`,
+    `\`${DOCS_TOOL.name}\` tool, for a client that reaches tools only.`,
     "",
     "LabKit records **why** a piece of research was done and what rests on it:",
     "questions, the lines of enquiry pursuing them, what was measured, what was",

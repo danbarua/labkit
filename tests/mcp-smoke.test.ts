@@ -32,6 +32,7 @@ import {
 } from "../src/attribution";
 import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
+import { DOCS_TOOL } from "../src/mcp/docs";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
@@ -91,9 +92,11 @@ async function client(): Promise<{ client: Client; events: EventSink }> {
   const events = await connectServer(graph, serverSide);
   const c = new Client({ name: "smoke", version: "0" });
   await c.connect(clientSide);
-  // The first thing an agent does, and the first thing this file does. Every
-  // write below would be refused without it, so a broken handshake fails these
-  // tests loudly rather than leaving one assertion red somewhere else.
+  // The first two things an agent does, and the first two this file does: read
+  // what the server is for, then say who it is. Every write below would be
+  // refused without the second, so a broken handshake fails these tests loudly
+  // rather than leaving one assertion red somewhere else.
+  await call(c, DOCS_TOOL.name, {});
   await call(c, "register_session", { id: "smoke-agent-0", label: "smoke agent" });
   return { client: c, events };
 }
@@ -587,7 +590,7 @@ describe("every tool answers when an agent actually calls it", () => {
    * three descriptions came to describe signatures that no longer existed.
    */
   test("no tool goes unexercised", () => {
-    const all = [...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort();
+    const all = [DOCS_TOOL, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort();
     expect([...called].sort()).toEqual(all);
   });
 

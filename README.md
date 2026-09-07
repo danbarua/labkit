@@ -157,10 +157,11 @@ shared record across projects, say so deliberately: a fixed `LABKIT_HOME`, and a
 `LABKIT_TENANT` per programme.
 
 The server reads and writes. Nothing is exposed that the domain layer does not
-already offer, and every tool is listed — with its arguments and its answer — at
-`labkit://docs/tools`, which a client can fetch without leaving the session. It
-is rendered from the tool declarations on each read and stored nowhere, so it
-cannot disagree with the server.
+already offer, and every tool is listed — with its arguments and its answer — in
+one page a client can fetch without leaving the session: the resource
+`labkit://docs/tools`, or the `docs` tool for a client that implements tools
+and not resources. It is rendered from the tool declarations on each read and
+stored nowhere, so it cannot disagree with the server.
 
 ### Where to start, as an agent
 
