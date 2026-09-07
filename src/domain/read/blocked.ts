@@ -143,7 +143,9 @@ export function gateStateFrom(checks: readonly { state: CheckState }[]): GateSta
  * not ready to start, and not blocked either. Folding it into `planned` put
  * gated work on the ready-to-start list the day it was planned; folding it
  * into `blocked` would make a queue that can never be emptied. A gate that is
- * `satisfied` holds nothing.
+ * `satisfied` holds nothing. A gate the map does not know about holds too:
+ * "no state for this gate" is not "no gate", and the direction to fail in is
+ * not-ready-until-something-says-so.
  */
 export function workStateFrom(
   task: { gates: Set<string>; implemented: boolean; stopped: boolean },
@@ -155,7 +157,7 @@ export function workStateFrom(
   const states = [...task.gates].map((g) => gateStates.get(g));
   if (states.includes("blocked")) return "blocked";
   if (task.implemented) return "carried-out";
-  return states.some((s) => s !== undefined && s !== "satisfied") ? "waiting" : "planned";
+  return states.every((s) => s === "satisfied") ? "planned" : "waiting";
 }
 
 export class BlockedGroup extends SessionCore {

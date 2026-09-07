@@ -21,6 +21,7 @@ import { ResearchSession } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimOf } from "./helpers/claims";
 import { recordAnalysis } from "./helpers/analysis";
+import { workStateFrom } from "../src/domain/read/blocked";
 
 let scenario: Scenario;
 beforeAll(async () => {
@@ -310,6 +311,18 @@ describe("enumerating gates and work", () => {
     } finally {
       await scenario.end();
     }
+  });
+
+  test("a gate the list does not know about holds the work; it does not vanish", () => {
+    // `gateStates` comes from `gateList()`, which reaches gates through their
+    // criteria. A gate that contributed no rows is absent from the map, and
+    // absent must not read as ungated -- that is the exact answer this state
+    // exists to stop. Not reachable through the verbs today; pinned on the
+    // function so it stays true if `gateList`'s reach ever narrows.
+    const task = { gates: new Set(["GATE_9"]), implemented: false, stopped: false };
+    expect(workStateFrom(task, new Map())).toBe("waiting");
+    expect(workStateFrom(task, new Map([["GATE_9", "satisfied"]]))).toBe("planned");
+    expect(workStateFrom({ ...task, gates: new Set() }, new Map())).toBe("planned");
   });
 
   test("blocked beats carried-out when both hold", async () => {
