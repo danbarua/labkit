@@ -52,7 +52,7 @@ import {
   type SessionRegistry,
 } from "../attribution";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "./tools";
-import { DOCS_URI, renderToolDocs } from "./docs";
+import { DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "./docs";
 
 /**
  * Everything a tool call needs, for the duration of that call and no longer.
@@ -145,23 +145,33 @@ export function buildServer(
   // binary carries the value inlined rather than reading a file that is not
   // there — `import ... with { type: "json" }` is resolved at build time, which
   // is why this needs none of `src/db/migrations.ts`'s asset handover.
-  const server = new McpServer({ name: "labkit", version: pkg.version });
+  //
+  // `instructions` rides on the `initialize` result: every client gets it in
+  // the handshake, before `tools/list` and whether or not it implements
+  // resources. It is the protocol's own slot for "how to use this server", and
+  // the one route to the documentation that needs no choice by the agent.
+  const server = new McpServer(
+    { name: "labkit", version: pkg.version },
+    { instructions: INSTRUCTIONS },
+  );
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
-  // loop below registers. A resource rather than a tool because it takes no
-  // arguments and answers nothing about the record -- it describes the server,
-  // and a caller should be able to read it before deciding which tool to call.
+  // loops below register. Served twice — as a resource, and as a tool — because
+  // not every client implements resources, and one that does not sees the
+  // resource in no list. Both routes take no arguments and answer nothing about
+  // the record: they describe the server, and a caller should be able to read
+  // them before deciding which tool to call.
   //
-  // It holds no `read`: a client can fetch this against a server whose database
-  // is unreachable, which is when an agent most needs to know what it is
-  // talking to.
+  // Neither holds a `read`: a client can fetch this against a server whose
+  // database is unreachable, which is when an agent most needs to know what it
+  // is talking to.
   server.registerResource(
     "tool-docs",
     DOCS_URI,
     {
       title: "LabKit tools",
       description:
-        "Human-readable documentation of every tool this server exposes -- what each " +
+        "Human-readable documentation of every tool that touches the record -- what each " +
         "answers, what it takes and what it returns -- generated from the tool " +
         "declarations themselves, so it cannot fall behind them.",
       mimeType: "text/markdown",
@@ -171,14 +181,27 @@ export function buildServer(
     }),
   );
 
-  // **First in the list, deliberately.** `tools/list` is served in
-  // registration order, and this is the only tool whose absence makes every
-  // write refuse — an agent scanning the list meets it before the verbs it
-  // gates rather than two thirds of the way down.
-  // **Registered before the reads, because `tools/list` is served in
-  // registration order** and this is the only tool whose absence makes every
-  // write refuse — an agent scanning the list meets it before the verbs it
-  // gates rather than two thirds of the way down.
+  // **First in the list, deliberately.** `tools/list` is served in registration
+  // order; a client that cannot see resources meets the documentation before
+  // the tools it documents. On every server, read-only included, because it
+  // describes whichever list this one serves.
+  for (const definition of META_TOOLS) {
+    server.registerTool(
+      definition.name,
+      {
+        title: definition.title,
+        description: definition.description,
+        annotations: { readOnlyHint: true },
+      },
+      async () => ({
+        content: [{ type: "text" as const, text: definition.handler() }],
+      }),
+    );
+  }
+
+  // **Second, before the reads.** This is the only tool whose absence makes
+  // every write refuse — an agent scanning the list meets it before the verbs
+  // it gates rather than two thirds of the way down.
   //
   // Still behind the read-only check: a server with no write tools has nothing
   // for a session to sign, and offering to register one would promise a
