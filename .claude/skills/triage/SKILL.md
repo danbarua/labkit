@@ -29,9 +29,11 @@ Status says whether it can be picked up. Priority says what to look at first.
 | P0 | clear it next. A **demonstrated wrong answer shipping green**, or something that loses work. CLAUDE.md permits at most one of the first kind at a time and requires that clearing it be the next thing built, so P0 is normally one issue and never many. This column is where that lives, and nowhere else. |
 | P1 | real, unblocked, and it slides if nobody ranks it |
 | P2 | everything else — Blocked and Parked included. The honest value for a thing nobody should be looking at. |
+| P100 | Dan's, and it means *not important to the user, something an AI got hand-wringy about*. Below P2 rather than beside it. It is a real rank and not an untriaged item; leave it where it is unless he says otherwise. |
 
 Every item gets both. An issue with neither is untriaged, and untriaged is the
-state this skill exists to refuse.
+state this skill exists to refuse. A rank you do not recognise is not the same
+as a missing one — check this table before reporting a board item as unranked.
 
 Two conventions live beside these, from CLAUDE.md: a `not-doing` issue is
 **closed as not planned**; a `deferred` issue names the issue that would unpark
