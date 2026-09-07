@@ -5,7 +5,7 @@
  * There was no shortcut: `bun run` does not glob, so `bun run check:*` was ten
  * invocations typed by hand or, more often, the three or four somebody
  * remembered. CLAUDE.md's own instruction — *"run `bun test`, `bun run
- * typecheck` and `bunx depcruise`; add `check:migrations` if you touched
+ * typecheck` and `bunx --bun depcruise`; add `check:migrations` if you touched
  * `drizzle/`, `check:tests-assert` if you touched tests, …"* — is a list of
  * conditionals held in a person's head, which is the shape that gets skipped.
  *
@@ -82,8 +82,15 @@ const steps: Step[] = [
     says: "The types agree.",
   },
   {
+    // **`--bun`, or this runs under whatever `node` is on the caller's PATH.**
+    // `depcruise` and `tsc` both carry a `#!/usr/bin/env node` shebang, so
+    // plain `bunx` hands them to ambient node — and dependency-cruiser refuses
+    // to start on a node outside `^22||^24||>=26`. The sweep then reports the
+    // layering rules broken on one machine and green on another, from the same
+    // commit. `typecheck` takes the flag in `package.json`, where its command
+    // lives.
     name: "depcruise",
-    argv: ["bunx", "depcruise", "src", "tests", "--output-type", "err"],
+    argv: ["bunx", "--bun", "depcruise", "src", "tests", "--output-type", "err"],
     says: "The layering rules hold, and nothing imports in a circle.",
   },
   ...Object.keys(scripts)

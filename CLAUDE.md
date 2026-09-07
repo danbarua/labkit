@@ -158,7 +158,7 @@ bun install
 
 **Nothing else in this file works until that runs, and the failure does not name
 its cause.** A worktree starts with no `node_modules`, so `bun run typecheck`
-and `bunx depcruise src tests --output-type err` — two of the three gates — fail
+and `bunx --bun depcruise src tests --output-type err` — two of the three gates — fail
 with `TS2688: Cannot find type definition file for 'bun'`, which reads like a
 TypeScript configuration problem and is not one. `bun run check:doc-comments`
 passes throughout, being a plain script with no dependencies, so a green check
@@ -305,10 +305,10 @@ that being noise rather than to make it useful. The SVG went for its own reasons
 — 1,444 generated lines in which a moved edge is invisible, against 3KB of
 mermaid that renders on GitHub and diffs line by line. PJ-007 records a design
 change prompted by *reading* the SVG, which is the case for having had one; it is
-not a case for regenerating it forever. `bunx depcruise-fmt -T dot` over the
+not a case for regenerating it forever. `bunx --bun depcruise-fmt -T dot` over the
 cruise JSON recovers one if a person wants it.
 
-It is **not a gate** and never was: `bunx depcruise src tests --output-type err`
+It is **not a gate** and never was: `bunx --bun depcruise src tests --output-type err`
 is. Generation lives in `scripts/update-dependency-graph.sh` rather than a
 `package.json` one-liner because the one-liner was a pipeline, and `$?` after a
 pipeline reports the last command's status — a crashed `depcruise` used to yield
@@ -456,7 +456,7 @@ bun run test:migration-safety --snapshot <path>  # restore a snapshot, migrate f
 bun run snapshot:record --db <dir> --name <slug>  # dump a real record's PGlite data dir to a dated gzip tarball
 bun test tests/domain-graph.test.ts   # run one test file
 bun test tests/scenarios/       # run the PJ-008 acceptance scenarios
-bunx depcruise src tests --output-type err   # layering rules (errors) + cycles
+bunx --bun depcruise src tests --output-type err   # layering rules (errors) + cycles
 bun run dev:dependency-cruiser  # regenerate docs/diagrams/dependency-graph.mmd
 bun run typecheck              # tsc --noEmit
 bun run check                  # test + typecheck + depcruise + every check:* — the pre-commit sweep
@@ -470,6 +470,7 @@ bun run check:test-ceiling     # nothing runs the suite as a bare `bun test`
 bun run check:test-teardown    # a test file that opens a scenario must also reset the database
 bun run check:stdout          # nothing under src/ writes to stdout except the CLI
 bun run check:no-tracked-symlinks  # fails if a symlink is tracked in git
+bun run check:bunx-bun        # every bunx of a node-shebanged binary passes --bun
 bun run check:prop-classes     # INDEXED_PROPS must name exactly the IndexedString/Timestamp props
 bun run check:no-stringly-typed  # no bare `string` in a core/read/write signature
 bun run check:facts            # a fact's grain is named and its clause dependencies declared
@@ -1330,7 +1331,7 @@ freezes the findings it was taken in light of onto the decision, and
 ### The two layering rules
 
 Two layering rules are enforced as `dependency-cruiser` **errors**, not
-conventions — `bunx depcruise src tests --output-type err`:
+conventions — `bunx --bun depcruise src tests --output-type err`:
 
 - `tests/scenarios/` may not import `src/db`. A scenario asserts a
   researcher's intent can be carried out through research verbs alone, so

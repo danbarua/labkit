@@ -7,7 +7,7 @@
 # layer and no domain-level suites to lean on. With those in place, the test
 # wiring buried the application structure the graph exists to show — a reader
 # wants src's layering, and the layering rules over tests/ are the gate's job
-# (`bunx depcruise src tests --output-type err`), which still covers both.
+# (`bunx --bun depcruise src tests --output-type err`), which still covers both.
 #
 # **Run by hand, when you want it.** There was a pre-commit hook that regenerated
 # on every commit touching src/ or tests/ and staged the result; it was removed
@@ -22,12 +22,12 @@
 # it. Mermaid renders on GitHub, diffs line by line, and is what an agent reads.
 # PJ-007 records a design change prompted by *reading* the SVG, which is the case
 # for having had one; it is not a case for regenerating it forever. Recover it
-# with `bunx depcruise-fmt -T dot` over the JSON below if a person wants one.
+# with `bunx --bun depcruise-fmt -T dot` over the JSON below if a person wants one.
 #
 # It exists as a script rather than a package.json one-liner because the
 # one-liner was a pipeline:
 #
-#     bunx depcruise tests --output-type dot | dot -T svg > docs/dependency-graph.svg
+#     bunx --bun depcruise tests --output-type dot | dot -T svg > docs/dependency-graph.svg
 #
 # `$?` after a pipeline reports the *last* command's status, so a crashed
 # depcruise left `dot` reading empty input, writing a valid-but-empty SVG, and
@@ -46,7 +46,7 @@ mmd_out="docs/diagrams/dependency-graph.mmd"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-if ! bunx depcruise src --output-type json > "$tmp/cruise.json" 2> "$tmp/err.txt"; then
+if ! bunx --bun depcruise src --output-type json > "$tmp/cruise.json" 2> "$tmp/err.txt"; then
   echo "update-dependency-graph: depcruise failed; graphs left unchanged." >&2
   sed 's/^/  /' "$tmp/err.txt" >&2
   exit 1
@@ -56,7 +56,7 @@ if [ ! -s "$tmp/cruise.json" ]; then
   exit 1
 fi
 
-if ! bunx depcruise-fmt -T mermaid "$tmp/cruise.json" > "$tmp/graph.mmd" 2> "$tmp/err.txt"; then
+if ! bunx --bun depcruise-fmt -T mermaid "$tmp/cruise.json" > "$tmp/graph.mmd" 2> "$tmp/err.txt"; then
   echo "update-dependency-graph: mermaid formatting failed; graphs left unchanged." >&2
   sed 's/^/  /' "$tmp/err.txt" >&2
   exit 1
