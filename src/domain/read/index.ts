@@ -40,6 +40,7 @@ import type {
   WorkState,
 } from "../report";
 import { kindOf } from "../report";
+import type { Neighbour } from "./explain";
 import { SessionCore, type Methods } from "../core";
 import type { DomainEvent, EventFilter } from "../events";
 import { HappenedGroup } from "./happened";
@@ -215,6 +216,16 @@ export class ReadSurface extends SessionCore {
   /** One condition: what it requires, what has been said about it, and what it holds up. */
   async criterionStanding(criterion: CriterionRef): Promise<CriterionStanding> {
     return this.#explain.criterionStanding(criterion);
+  }
+
+  /** What one record is joined to, both directions — reached only through `why`. */
+  async neighboursOf(subject: AnyRef): Promise<Neighbour[]> {
+    return this.#explain.neighboursOf(subject);
+  }
+
+  /** A record's own text, whatever kind it is — reached only through `why`. */
+  async proseFor(subject: AnyRef): Promise<string | null> {
+    return this.#explain.proseFor(subject);
   }
 
   /** What an analysis revised, and which findings moved. */

@@ -168,4 +168,11 @@ export const NOT_EXPOSED: Readonly<Record<string, string>> = {
   // one intent, which is what #182's closing rule refuses.
   criterionStanding: "reached only through `why`, as the Criterion case's body",
   stoppedWork: "reached only through `why`, as the Task case's abandoned branch",
+  // The two behind every kind `why` answers by walking the record rather than
+  // from a report. Same shape as the four above: module-level `Explainer`
+  // functions are their only callers, so they are public rather than
+  // `private`. Neither is a question a researcher would ask — "list this
+  // record's edges" is the storage shape, and `why` is the intent.
+  neighboursOf: "reached only through `why`, as the walked kinds' body",
+  proseFor: "reached only through `why`, as the walked kinds' body",
 };

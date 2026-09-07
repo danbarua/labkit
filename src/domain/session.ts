@@ -93,6 +93,9 @@ export class ResearchSession {
   readonly gateStatus: ReadSurface["gateStatus"] = (...args) => this.reads.gateStatus(...args);
   readonly criterionStanding: ReadSurface["criterionStanding"] = (...args) =>
     this.reads.criterionStanding(...args);
+  readonly neighboursOf: ReadSurface["neighboursOf"] = (...args) =>
+    this.reads.neighboursOf(...args);
+  readonly proseFor: ReadSurface["proseFor"] = (...args) => this.reads.proseFor(...args);
   readonly gateList: ReadSurface["gateList"] = (...args) => this.reads.gateList(...args);
   readonly workList: ReadSurface["workList"] = (...args) => this.reads.workList(...args);
   readonly replaceAnalysis: WriteSurface["replaceAnalysis"] = (...args) =>

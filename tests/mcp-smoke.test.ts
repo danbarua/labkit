@@ -428,12 +428,19 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(enquiryWhy.because as unknown[]).toHaveLength(1);
       expect((enquiryWhy.because as Json[])[0]!.wording as string).toContain("provisional");
 
-      // The refusal case: `why` does not yet explain a review (Gate is
-      // done, Review is not). Names what it explains instead rather than
-      // going quiet or guessing.
-      await expect(call(c, "why", { subject: id(review) })).rejects.toThrow(
-        /claim, work, enquiry, gate/,
-      );
+      // A review, which has no report of its own and is answered by walking
+      // the record instead. It used to be refused, on the grounds that a case
+      // would be added when somebody asked; a review has edges like anything
+      // else, and the verdict it recorded is its own words.
+      const reviewWhy = await call(c, "why", { subject: id(review) });
+      expect(reviewWhy.kind).toBe("review");
+      // No `report`: what this kind is, is its edges.
+      expect(reviewWhy.report).toBeUndefined();
+      expect(reviewWhy.because as unknown[]).not.toHaveLength(0);
+      // Each cause says how it is joined, in words rather than an edge label.
+      for (const cause of reviewWhy.because as Json[]) {
+        expect(cause.wording as string).not.toMatch(/[A-Z]{4,}/);
+      }
       await c.close();
     } finally {
       await scenario.end();

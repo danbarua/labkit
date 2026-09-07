@@ -283,6 +283,17 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
     // verdict text and its handle — which is the generic page's shape, so it
     // needs no branch of its own.
     case "criterion":
+    // Every kind answered by walking the record rather than from a report of
+    // its own: `is` and `because` are the whole of the answer, which is what
+    // the generic page renders.
+    case "question":
+    case "unit":
+    case "evidence":
+    case "decision":
+    case "evaluation":
+    case "review":
+    case "observations":
+    case "note":
       return renderExplanation(explanation, p);
     default: {
       const check: never = explanation;
