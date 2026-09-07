@@ -462,12 +462,16 @@ export const enquiryInContextSchema = z.strictObject({
     .nullable(),
 });
 
-export const designHistorySchema = z.strictObject({
-  gate: ref("gate"),
+const conditionHistory = z.strictObject({
   originally: condition,
   nowRequires: condition,
   criterion: ref("criterion"),
   amendments: z.array(amendmentRecord),
+});
+
+export const designHistorySchema = z.strictObject({
+  gate: ref("gate"),
+  conditions: z.array(conditionHistory),
 });
 
 export const interpretationHistorySchema = z.strictObject({

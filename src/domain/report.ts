@@ -1481,21 +1481,32 @@ export interface AmendmentRecord {
 }
 
 /**
- * A locked design and everything that has happened to it.
+ * One locked condition and everything that has happened to it.
  *
- * `amendments` is ordered oldest-first, reconstructed from the supersession
- * chain alone — no timestamp on any decision, and nothing read from the event
- * log. It orders the amendments relative to each other and says nothing about
- * when any of them happened.
+ * The unit is the **condition**, not the gate: an amendment supersedes one
+ * condition, and a gate governed by five of them has five histories that do
+ * not interleave. There is no ordering between two conditions' amendments and
+ * none is invented here.
+ *
+ * `amendments` is ordered oldest-first, reconstructed by walking back from the
+ * condition in force through the decisions that introduced and withdrew each
+ * step — no timestamp on any decision, and nothing read from the event log. It
+ * orders one condition's amendments relative to each other and says nothing
+ * about when any of them happened.
  */
-export interface DesignHistory {
-  gate: GateRef;
-  /** What the design said before anyone amended it. */
+export interface ConditionHistory {
+  /** What this condition said before anyone amended it. */
   originally: Condition;
   nowRequires: Condition;
   /** The condition currently in force, for amending again. */
   criterion: CriterionRef;
   amendments: AmendmentRecord[];
+}
+
+/** A gate's locked design: one entry per condition it is governed by. */
+export interface DesignHistory {
+  gate: GateRef;
+  conditions: ConditionHistory[];
 }
 
 /**

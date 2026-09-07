@@ -292,7 +292,9 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(amendment.nature).toBe("scientific");
       expect((amendment.confirmatoryAffected as unknown[]).length).toBeGreaterThan(0);
       const history = await call(c, "design_history", { gate: id(gate) });
-      expect(history.amendments as unknown[]).toHaveLength(1);
+      const conditions = history.conditions as Array<{ amendments: unknown[] }>;
+      expect(conditions).toHaveLength(1);
+      expect(conditions[0]!.amendments).toHaveLength(1);
 
       // Attribution over the full MCP path, not just a direct surface call.
       // The server builds a fresh `WriteSurface` per tool call, so this also

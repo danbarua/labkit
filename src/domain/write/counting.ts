@@ -165,9 +165,15 @@ export class Counting extends SessionCore {
    * rationale the researcher never had. `BASED_ON` carries both senses, and
    * this is the boundary between them.
    *
-   * `SUPERSEDES` chains this amendment to the previous one on the same design,
-   * found rather than supplied: an ordering that depends on the caller
-   * remembering to pass the right handle is not an ordering.
+   * `SUPERSEDES` chains this amendment to the previous one on **the same
+   * condition**, found rather than supplied: an ordering that depends on the
+   * caller remembering to pass the right handle is not an ordering. Per
+   * condition and not per gate — a gate governs several settings, and a chain
+   * across them says one setting was replaced by a change to another.
+   *
+   * `MOTIVATES` records the condition the amendment put in force, which is
+   * what makes that chain findable in one hop and what a reader walks back
+   * along to reconstruct the design's history.
    */
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
     return this.handle("amendDesign", input, async (unitOfWork) => {
@@ -197,11 +203,10 @@ export class Counting extends SessionCore {
         );
       }
 
-      // Amending a setting that has already been amended forks the design, and
-      // the fork is not readable: two conditions end up in force at once and
-      // `designHistory()` can no longer say what the design requires. Rejected
-      // at the write rather than thrown at the read -- state that cannot be read
-      // back is worse than a command that refuses.
+      // A condition that has already been amended is not the one in force, and
+      // amending it forks the design: two replacements stand for one setting
+      // with nothing saying which the gate now requires. The message names the
+      // condition to amend instead.
       const alreadyAmended = await this.graph.query(
         `MATCH (:Decision)-[:CHANGES]->(c:Criterion {natural_id: $id}) RETURN c`,
         { c: vertexProps<{ natural_id: string }>() },
@@ -213,7 +218,7 @@ export class Counting extends SessionCore {
         );
       }
 
-      const prior = await this.latestAmendmentOn(gates);
+      const prior = await this.amendmentThatIntroduced(input.criterion);
 
       const rerun = await this.workGatedBy(gates);
       const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
@@ -233,6 +238,7 @@ export class Counting extends SessionCore {
         }),
       );
       unitOfWork.edge(decision, "CHANGES", input.criterion);
+      unitOfWork.edge(decision, "MOTIVATES", replacement);
       unitOfWork.edge(decision, "BASED_ON", diagnosis);
       if (prior) unitOfWork.edge(decision, "SUPERSEDES", prior);
 
@@ -267,24 +273,22 @@ export class Counting extends SessionCore {
     return [...new Set(rows.map((r) => r.g.natural_id))].map((id) => ref("gate", id));
   }
 
-  /** The most recent amendment to this design — the one nothing has superseded yet. */
-  private async latestAmendmentOn(gates: GateRef[]): Promise<DecisionRef | undefined> {
-    for (const gate of gates) {
-      const rows = await this.graph.query(
-        `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
-         OPTIONAL MATCH (newer:Decision)-[:SUPERSEDES]->(d)
-         RETURN d, newer`,
-        {
-          d: vertexProps<{ natural_id: string }>(),
-          newer: optional(vertexProps<{ natural_id: string }>()),
-        },
-        { id: gate },
-      );
-      const superseded = new Set(rows.filter((r) => r.newer).map((r) => r.d.natural_id));
-      const latest = rows.map((r) => r.d.natural_id).find((d) => !superseded.has(d));
-      if (latest) return ref("decision", latest);
-    }
-    return undefined;
+  /**
+   * The amendment that put this condition in force, if an amendment did.
+   *
+   * One hop along `MOTIVATES`, which the amendment writes to the condition it
+   * introduced. Walking a gate instead reaches every amendment to every
+   * condition it governs, and a chain built from that says one setting was
+   * replaced by a change to a different one.
+   */
+  private async amendmentThatIntroduced(criterion: CriterionRef): Promise<DecisionRef | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (d:Decision)-[:MOTIVATES]->(:Criterion {natural_id: $id}) RETURN d`,
+      { d: vertexProps<{ natural_id: string }>() },
+      { id: criterion },
+    );
+    const row = rows[0];
+    return row ? ref("decision", row.d.natural_id) : undefined;
   }
 
   /**

@@ -17,7 +17,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { ref } from "../../src/domain/report";
+import { ref, type DesignHistory } from "../../src/domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
@@ -46,6 +46,8 @@ const LOCKED_LIMIT = "the solver converges within 2,000 iterations";
 const RAISED_LIMIT = "the solver converges within 10,000 iterations";
 const PRESPECIFIED = "the primary comparison is run once, on held-out data";
 const BEATS_CONTROL = "the evolved condition beats the rewired control";
+const LOCKED_TOLERANCE = "the residual tolerance is 1e-9";
+const RELAXED_TOLERANCE = "the residual tolerance is 1e-6";
 const MULTICOLLINEAR =
   "non-convergence is driven by feature multicollinearity, not by the effect under test";
 
@@ -147,6 +149,16 @@ async function diagnose(
   };
 }
 
+/**
+ * The one condition on a single-condition gate. Every scenario below but the
+ * last locks exactly one setting; asserting that here keeps the reads that
+ * follow about the amendment rather than about which condition they picked.
+ */
+function theCondition(history: DesignHistory) {
+  expect(history.conditions).toHaveLength(1);
+  return history.conditions[0]!;
+}
+
 describe("S-7 — locked design, then feasibility finds a mechanical defect", () => {
   test("the conversation runs end to end through research verbs alone", async () => {
     const programme = await lockedProgramme();
@@ -193,16 +205,16 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
 
     const history = await session.designHistory(programme.feasibilityBoundary);
-    expect(history.originally.requires).toBe(LOCKED_LIMIT);
-    expect(history.nowRequires.requires).toBe(RAISED_LIMIT);
+    expect(theCondition(history).originally.requires).toBe(LOCKED_LIMIT);
+    expect(theCondition(history).nowRequires.requires).toBe(RAISED_LIMIT);
 
     const later = new ResearchSession(await scenario.current(), {
       clock,
       events: inMemoryEventLog(),
     });
     const durable = await later.designHistory(programme.feasibilityBoundary);
-    expect(durable.originally.requires).toBe(LOCKED_LIMIT);
-    expect(durable.nowRequires.requires).toBe(RAISED_LIMIT);
+    expect(theCondition(durable).originally.requires).toBe(LOCKED_LIMIT);
+    expect(theCondition(durable).nowRequires.requires).toBe(RAISED_LIMIT);
   });
 
   /**
@@ -226,9 +238,11 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       events: inMemoryEventLog(),
     });
     const history = await later.designHistory(programme.feasibilityBoundary);
-    expect(history.amendments).toHaveLength(1);
-    expect(history.amendments[0]!.reason).toContain("unrelated to the effect under test");
-    expect(history.amendments[0]!.citing.map((f) => f.states)).toEqual([
+    expect(theCondition(history).amendments).toHaveLength(1);
+    expect(theCondition(history).amendments[0]!.reason).toContain(
+      "unrelated to the effect under test",
+    );
+    expect(theCondition(history).amendments[0]!.citing.map((f) => f.states)).toEqual([
       "condition number rises with feature count; enlarging the sample does not reduce it",
     ]);
 
@@ -309,8 +323,8 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
     const feasibility = await later.designHistory(programme.feasibilityBoundary);
     const confirmatory = await later.designHistory(programme.confirmatoryBoundary);
-    expect(feasibility.amendments[0]!.nature).toBe("mechanical");
-    expect(confirmatory.amendments[0]!.nature).toBe("scientific");
+    expect(theCondition(feasibility).amendments[0]!.nature).toBe("mechanical");
+    expect(theCondition(confirmatory).amendments[0]!.nature).toBe("scientific");
   });
 
   /**
@@ -332,11 +346,11 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
 
     const current = await session.designHistory(programme.feasibilityBoundary);
-    const raised = current.nowRequires.requires;
+    const raised = theCondition(current).nowRequires.requires;
     expect(raised).toBe(RAISED_LIMIT);
 
     await session.amendDesign({
-      criterion: current.criterion,
+      criterion: theCondition(current).criterion,
       nowRequires: "the solver converges within 50,000 iterations",
       because: "10,000 still caps on the widest sweeps",
       citing: cites,
@@ -360,16 +374,24 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     expect(await later.events.all()).toHaveLength(0);
 
     const history = await later.designHistory(programme.feasibilityBoundary);
-    expect(history.originally.requires).toBe(LOCKED_LIMIT);
-    expect(history.nowRequires.requires).toBe("the solver converges within 50,000 iterations");
-    expect(history.amendments.map((a) => a.nowRequires.requires)).toEqual([
+    expect(theCondition(history).originally.requires).toBe(LOCKED_LIMIT);
+    expect(theCondition(history).nowRequires.requires).toBe(
+      "the solver converges within 50,000 iterations",
+    );
+    expect(theCondition(history).amendments.map((a) => a.nowRequires.requires)).toEqual([
       RAISED_LIMIT,
       "the solver converges within 50,000 iterations",
     ]);
-    expect(history.amendments.map((a) => a.replaced.requires)).toEqual([
+    expect(theCondition(history).amendments.map((a) => a.replaced.requires)).toEqual([
       LOCKED_LIMIT,
       RAISED_LIMIT,
     ]);
+
+    // The second amendment stands instead of the first, and says so on the
+    // record rather than only in the order this report happens to render.
+    const [first, second] = theCondition(history).amendments;
+    const stands = await later.why(second!.amendment);
+    expect(stands.because.map((c) => c.handle)).toContain(first!.amendment);
   });
 
   /**
@@ -399,7 +421,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       events: inMemoryEventLog(),
     });
     const history = await later.designHistory(programme.feasibilityBoundary);
-    expect(history.amendments[0]!.rerun.map((w) => w.objective)).toEqual([
+    expect(theCondition(history).amendments[0]!.rerun.map((w) => w.objective)).toEqual([
       "feasibility sweep of the evolved condition",
     ]);
   });
@@ -469,7 +491,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     const history = await new ResearchSession(await scenario.current(), { clock }).designHistory(
       programme.feasibilityBoundary,
     );
-    expect(history.originally.criterion).toBe(programme.iterationLimit);
+    expect(theCondition(history).originally.criterion).toBe(programme.iterationLimit);
   });
 
   test("a setting that has already been amended cannot be amended again", async () => {
@@ -521,5 +543,71 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       events: inMemoryEventLog(),
     });
     expect(await later.designHistory(programme.feasibilityBoundary)).toEqual(before);
+  });
+
+  /**
+   * **Researcher:** The feasibility boundary has two conditions on it — the
+   * iteration cap and a tolerance. I raised the cap last week; today the
+   * tolerance moved too. Show me what happened to my design.
+   *
+   * **Agent:** Two histories, one per condition. Neither amendment stands
+   * instead of the other — they are separate settings that moved for separate
+   * reasons, and putting them on one line would say the tolerance change
+   * replaced the cap change.
+   */
+  test("a gate with two conditions has one history per condition, and they do not interleave", async () => {
+    const programme = await lockedProgramme();
+    const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
+
+    const { work } = await session.planWork({
+      objective: "the widest feasibility sweep",
+      acceptance: "it converges inside both locked settings",
+    });
+    const { criterion: cap } = await session.stateCriterion(LOCKED_LIMIT);
+    const { criterion: tolerance } = await session.stateCriterion(LOCKED_TOLERANCE);
+    const { gate } = await session.declareGate({
+      governedBy: [cap, tolerance],
+      consequence: "the sweep's results may be relied on",
+      protecting: [work],
+    });
+
+    await session.amendDesign({
+      criterion: cap,
+      nowRequires: RAISED_LIMIT,
+      because: "the locked limit is unreachable",
+      citing: cites,
+    });
+    await session.amendDesign({
+      criterion: tolerance,
+      nowRequires: RELAXED_TOLERANCE,
+      because: "the locked tolerance is below the solver's own noise floor",
+      citing: cites,
+    });
+
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
+    const history = await later.designHistory(gate);
+
+    const byOriginal = new Map(history.conditions.map((c) => [c.originally.requires, c]));
+    expect([...byOriginal.keys()].sort()).toEqual([LOCKED_LIMIT, LOCKED_TOLERANCE].sort());
+
+    const capHistory = byOriginal.get(LOCKED_LIMIT)!;
+    expect(capHistory.nowRequires.requires).toBe(RAISED_LIMIT);
+    expect(capHistory.amendments.map((a) => a.nowRequires.requires)).toEqual([RAISED_LIMIT]);
+
+    const tol = byOriginal.get(LOCKED_TOLERANCE)!;
+    expect(tol.nowRequires.requires).toBe(RELAXED_TOLERANCE);
+    expect(tol.amendments.map((a) => a.nowRequires.requires)).toEqual([RELAXED_TOLERANCE]);
+
+    // The two amendments are unrelated acts. If the tolerance amendment
+    // superseded the cap amendment, this record would say one setting was
+    // replaced by a change to a different setting.
+    expect(capHistory.amendments[0]!.amendment).not.toBe(tol.amendments[0]!.amendment);
+    const withdrawal = await later.why(tol.amendments[0]!.amendment);
+    expect(withdrawal.because.map((c) => c.handle)).not.toContain(
+      capHistory.amendments[0]!.amendment,
+    );
   });
 });

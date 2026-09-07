@@ -7,6 +7,7 @@
 
 import type {
   AmendmentRecord,
+  ConditionHistory,
   CheckStatus,
   CriterionRef,
   DesignHistory,
@@ -135,15 +136,28 @@ export function renderDesign(history: DesignHistory, p: Palette): string {
     ]
       .filter(Boolean)
       .join("\n");
+  const condition = (c: ConditionHistory): string =>
+    [
+      `${p.handle(c.criterion)}`,
+      `  originally: ${c.originally.requires}`,
+      `  now requires: ${c.nowRequires.requires}`,
+      "",
+      c.amendments.length
+        ? c.amendments
+            .map((a) =>
+              amendment(a)
+                .split("\n")
+                .map((line) => `  ${line}`)
+                .join("\n"),
+            )
+            .join("\n\n")
+        : `  ${p.untested("not amended — the condition still reads as it was first stated")}`,
+    ].join("\n");
   return [
-    `${p.handle(history.gate)}, on ${p.handle(history.criterion)}`,
-    `  originally: ${history.originally.requires}`,
-    `  now requires: ${history.nowRequires.requires}`,
+    p.handle(history.gate),
     "",
-    p.heading("Amendments"),
-    history.amendments.length
-      ? history.amendments.map(amendment).join("\n\n")
-      : `  ${p.untested("none — the condition still reads as it was first stated")}`,
+    p.heading("Conditions"),
+    history.conditions.map(condition).join("\n\n"),
     "",
     p.quiet("Ordered from the record itself, not from timestamps."),
   ].join("\n");

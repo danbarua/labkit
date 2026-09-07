@@ -224,16 +224,17 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * from" but not "what did we know when we asked it", since the reason and the
    * frozen evidence set live on the decision.
    *
-   * **`Decision -> Claim`**: `CHANGES` records which interpretation was
-   * withdrawn; this records which one replaced it. A gate contains its design
-   * conditions, so the current one is derivable as the unchanged member — an
-   * interpretation has no container, and without this there is no route from a
-   * narrowed claim back to the act that narrowed it.
+   * **`Decision -> Claim`** and **`Decision -> Criterion`**: `CHANGES` records
+   * which reading or condition was withdrawn; this records which one replaced
+   * it. Without it the successor is only reachable by elimination — the member
+   * of the gate that nothing changed — which is an answer at all only for a
+   * gate governed by one condition, and every real gate declares several.
    */
   MOTIVATES: [
     ["Question", "LineOfEnquiry"],
     ["Decision", "Question"],
     ["Decision", "Claim"],
+    ["Decision", "Criterion"],
     // The revision an act produced, at analysis grain — the half that pairs
     // with `SUPERSEDES -> Computation`. `MOTIVATES` names what an act put in
     // place; `SUPERSEDES` names what it stands instead of.
