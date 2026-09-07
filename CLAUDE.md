@@ -1207,10 +1207,10 @@ back up to the caller. One verb may write many nodes and edges:
 `recordAnalysis()` writes a computation, an evidence unit, an output artefact,
 and one evidence plus one claim per conclusion.
 
-**Verbs are added when a consumer needs them, not in anticipation.** A real
-user or agent asked and the record could not answer — `search` (#155) and
-`why <criterion>` (#245, from a live agent session) are the precedents.
-`labkit --help` is the current set; this file does not list it.
+**A verb is earned the way anything is: someone needs it.** `search` (#155)
+and `why <criterion>` (#245, from a live agent session) both came from an
+agent asking and the record having no answer, which is the ordinary way, not a
+bar to clear. `labkit --help` is the current set; this file does not list it.
 
 **A return type is what the caller needs to name next.** If a caller cannot
 carry on without describing a record back to the API, the type is wrong — that
@@ -1274,13 +1274,12 @@ the engine, which makes it a different kind of trap from the ones under
 "AGE-specific gotchas" — and someone will reach for it precisely because it
 parses.
 
-**Where the line falls.** A fact earns its place when **more than one reader has
-to reach the same answer about the same subject**. That is what predicts the
-defect — it is *written once and forgotten the second time*, which requires a
-second time — and a single-reader query cannot have it whatever it computes.
-Queries with one reader stay raw until a second appears — not as a rule about
-what may be built, but because the defect a fact prevents cannot occur with one
-reader. Compose one anyway if it reads better; nothing is lost.
+**What a fact is for.** The defect it prevents needs **more than one reader
+reaching the same answer about the same subject** — it is *written once and
+forgotten the second time*, which requires a second time. So a single-reader
+query cannot have that defect, whatever it computes. That is a description of
+the failure mode, not a rule about what may be composed: compose one whenever
+it reads better.
 
 ### The execution-context seam
 
@@ -1358,19 +1357,20 @@ does not come back. Throwing the handle away and recovering the fact by
 matching prose is how a read side ends up guessing.
 
 **The tell is a string comparison.** If a query is comparing wording to work
-out which record is which, the edge it needed existed at write time and was
-not written. `conclude --replacing CLM_3` validates the handle it is given,
-puts it in the event, and writes no edge — so `designHistory` pairs superseded
-findings to their successors by matching propositions, and gives up when an
-analysis asserts the same sentence twice. That is not a query that needs
-sharpening; it is a fact that was thrown away.
+out which record is which, either the edge it needed was not written, or it is
+inventing a relationship nobody asserted — and the second is the one that
+reads as innocent. `why <analysis>` paired superseded findings to their
+successors by matching propositions when `conclude --replacing` had not named
+one, and reported the guess in the same field as a stated pairing. Nothing had
+been thrown away there: the caller never said. Recording it anyway is worse
+than an empty answer, in a report about provenance. Both halves went in #332.
 
 **The real world drives requirements, and requirements drive code changes.**
-A new label or edge is earned by someone needing it: a real user or agent
-asked, and the record could not answer. `search` (#155) is the precedent. The
-question to put to a proposed read is whether it saves the user the pain of
-doing this in Markdown + Git — a read that saves one command and zero reading
-does not.
+`search` (#155) is the precedent: an agent asked and the record could not
+answer. The question to put to a proposed **read** is whether it saves the user
+the pain of doing this in Markdown + Git — one that saves one command and zero
+reading does not. That question is about reads. An edge is settled by the rule
+above: if the act names a relationship, it is written.
 
 **No hypothetical scenario gates shipping something the real world needs, and
 nothing gates applying an ordinary engineering judgement.** There used to be a
@@ -1383,11 +1383,12 @@ scenario corpus; that era closed with PJ-008b, and they were never product
 constraints. They are gone, along with the vocabulary that carried them.
 
 **Ask of every verb that mints something: does the act record what it
-produced, or only what it acted on?** Four unrelated regions have hit that one
-and needed four different remedies — a new edge, nothing, a new edge again,
-and a field on a return type — so it stays a question you ask rather than a
-rule. Ask it of the return type too: a verb that writes the right thing and
-withholds the reference leaves the caller unable to name what it just made.
+produced, or only what it acted on?** Unrelated regions keep hitting it and
+keep needing different remedies — a new edge, nothing, a new edge again, a
+field on a return type, a read that had to stop inferring — so it stays a
+question you ask rather than a rule. Ask it of the return type too: a verb
+that writes the right thing and withholds the reference leaves the caller
+unable to name what it just made.
 
 **Ask also when a relationship is written, not only what it connects.** A
 prespecified check nobody ran must still count against the finding it
