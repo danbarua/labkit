@@ -37,7 +37,6 @@
 import { connectDb } from "../src/db/connect";
 import { resolveTenantContext } from "../src/db/tenant";
 import { scopeToTenant } from "../src/db/scoped";
-import { TenantGraph } from "../src/db/graph";
 import { pgEventLog } from "../src/domain/event-store";
 import type { DomainEvent, EventFilter, EventSink } from "../src/domain";
 import { traceOf, type Trace } from "../fragments/trace";
@@ -58,22 +57,39 @@ function historySink(history: readonly DomainEvent[]): EventSink {
 /**
  * Opens the record at `dir` (a project root — the directory whose `.labkit/`
  * subdirectory holds the database, same argument `connectDb` and the CLI's
- * `--db` take), reads its full event history for `tenant`, and returns one
- * `Trace`. `name` labels it for the Explorer.
+ * `--db` take) and reads its full event history for `tenant`, in `seq` order.
+ *
+ * Opens and closes within the call, holding the PGlite lock for neither longer
+ * — see this file's header for why that matters to a record someone is still
+ * writing to.
  */
-export async function readDbTrace(dir: string, name: string, tenant = "labkit"): Promise<Trace> {
-  let history: DomainEvent[];
+export async function readDbHistory(dir: string, tenant = "labkit"): Promise<DomainEvent[]> {
   const connection = await connectDb(dir);
   try {
     const ctx = await resolveTenantContext(connection.db, connection.tx, tenant);
     await scopeToTenant(connection.db, ctx);
-    const graph = new TenantGraph(ctx, connection.db, connection.tx);
     const events = pgEventLog(connection.db, ctx.tenantId);
-    history = [...(await events.all())].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+    return [...(await events.all())].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   } finally {
     await connection.close();
   }
+}
 
+/**
+ * Turns a history into the `Trace` the Explorer renders, replaying it for the
+ * `derived` snapshots.
+ *
+ * **Separate from {@link readDbHistory} because the two costs are three orders
+ * of magnitude apart**, and only one of them has to be paid again when a
+ * caller asks twice. Measured 2026-09-07 on the Bonsai record, 405 events:
+ * reading the history is 252ms and this is 16,661ms. A viewer that re-read the
+ * record per request and replayed it per request spent 98.5% of every request
+ * recomputing something that had not changed.
+ */
+export async function traceFromHistory(
+  name: string,
+  history: readonly DomainEvent[],
+): Promise<Trace> {
   const { provenance, refusedAt } = await replayIntoScratch(history);
   const trace = await traceOf(name, historySink(history), provenance);
   return {
