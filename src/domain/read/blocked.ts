@@ -8,8 +8,9 @@ import type {
   AmendmentRecord,
   BlockedWork,
   CitedFinding,
+  Condition,
+  ConditionHistory,
   CriterionRef,
-  DecisionRef,
   DesignHistory,
   EvidenceRef,
   GateRef,
@@ -233,167 +234,107 @@ export class BlockedGroup extends SessionCore {
   /**
    * A locked design and everything that has happened to it, oldest first.
    *
-   * The order comes from the supersession chain alone — no decision carries a
-   * timestamp, nothing is read from the event log, and natural-id allocation
-   * order is never consulted. It does **not** order two amendments to different
-   * designs relative to each other.
+   * One history per condition the gate is governed by. The order within a
+   * condition comes from walking its own lineage — `MOTIVATES` back to the
+   * decision that introduced each step, `CHANGES` back to what that step
+   * replaced. No decision carries a timestamp, nothing is read from the event
+   * log, and natural-id allocation order is never consulted. Two conditions'
+   * amendments are not ordered relative to each other, and no gate-wide
+   * ordering is invented.
    */
   async designHistory(gate: GateRef): Promise<DesignHistory> {
-    const conditions = await this.graph.query(
-      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
-       OPTIONAL MATCH (d:Decision)-[:CHANGES]->(c)
-       RETURN c, d`,
+    const governing = await this.graph.query(
+      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
       {
         c: vertexProps<{ natural_id: string; proposition: string }>(),
-        d: optional(vertexProps<{ natural_id: string }>()),
       },
       { id: gate },
     );
-    if (conditions.length === 0)
+    if (governing.length === 0)
       throw new Error(
         `gate ${gate} is governed by no condition; a design history is the record of its conditions being amended, and this gate has none to amend`,
       );
 
-    const changedBy = new Map<DecisionRef, CriterionRef>();
-    const propositionOf = new Map<CriterionRef, Prose>();
-    const current: CriterionRef[] = [];
-    for (const row of conditions) {
-      propositionOf.set(ref("criterion", row.c.natural_id), row.c.proposition);
-      if (row.d)
-        changedBy.set(ref("decision", row.d.natural_id), ref("criterion", row.c.natural_id));
-      else current.push(ref("criterion", row.c.natural_id));
-    }
+    // A condition an amendment withdrew still `GOVERNS` the gate -- that is how
+    // the original stays readable. What is in force is what nothing changed.
+    const withdrawn = await this.graph.query(
+      `MATCH (:Decision)-[:CHANGES]->(c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { id: gate },
+    );
+    const gone = new Set(withdrawn.map((r) => r.c.natural_id));
 
-    // A design history needs one condition in force. A gate governed by
-    // several unamended conditions is a different shape, and guessing which one
-    // is "the design" would be a confidently wrong answer.
-    const inForce = [...new Set(current)];
-    if (inForce.length !== 1) {
-      throw new Error(
-        `gate ${gate} has ${inForce.length} conditions in force; a design history needs exactly one`,
-      );
-    }
-
-    const chain = await this.amendmentChain(gate);
     const rerun = await this.workGatedBy([gate]);
     const confirmatory = await this.confirmatoryResultsBehind([gate]);
     const nature = confirmatory.length > 0 ? ("scientific" as const) : ("mechanical" as const);
 
-    const amendments: AmendmentRecord[] = chain.map((step, i) => {
-      const wasCriterion = changedBy.get(step.decision);
-      const nextCriterion =
-        i + 1 < chain.length ? changedBy.get(chain[i + 1]!.decision) : inForce[0];
-      return {
-        amendment: step.decision,
-        replaced: {
-          criterion: ref("criterion", wasCriterion ?? ""),
-          requires: (wasCriterion && propositionOf.get(wasCriterion)) ?? "",
-        },
-        nowRequires: {
-          criterion: ref("criterion", nextCriterion ?? ""),
-          requires: (nextCriterion && propositionOf.get(nextCriterion)) ?? "",
-        },
-        reason: step.reason,
-        citing: step.citing,
-        rerun,
-        nature,
-      };
-    });
-
-    const firstReplaced = amendments[0]?.replaced;
-    return {
-      gate,
-      originally: firstReplaced ?? {
-        criterion: ref("criterion", inForce[0]!),
-        requires: propositionOf.get(inForce[0]!)!,
-      },
-      nowRequires: {
-        criterion: ref("criterion", inForce[0]!),
-        requires: propositionOf.get(inForce[0]!)!,
-      },
-      criterion: ref("criterion", inForce[0]!),
-      amendments,
-    };
+    const conditions: ConditionHistory[] = [];
+    for (const row of governing) {
+      if (gone.has(row.c.natural_id)) continue;
+      const criterion = ref("criterion", row.c.natural_id);
+      const inForce: Condition = { criterion, requires: row.c.proposition };
+      const chain = await this.amendmentChain(inForce);
+      conditions.push({
+        originally: chain[0]?.replaced ?? inForce,
+        nowRequires: inForce,
+        criterion,
+        amendments: chain.map((step) => ({ ...step, rerun, nature })),
+      });
+    }
+    return { gate, conditions };
   }
 
-  /** Amendments to one design, ordered oldest-first by following supersession back to its root. */
+  /**
+   * The amendments that led to one condition, oldest first.
+   *
+   * Walked backwards from what is in force: each step is the decision that
+   * `MOTIVATES` the condition reached so far, and the condition it `CHANGES`
+   * is the step before it. A condition may be amended once -- `amendDesign`
+   * refuses a second -- so the walk is a line by construction and has nothing
+   * to reconcile.
+   */
   private async amendmentChain(
-    gate: GateRef,
-  ): Promise<Array<{ decision: DecisionRef; reason: Prose; citing: CitedFinding[] }>> {
-    const rows = await this.graph.query(
-      `MATCH (d:Decision)-[:CHANGES]->(:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id})
-       OPTIONAL MATCH (d)-[:SUPERSEDES]->(older:Decision)
-       OPTIONAL MATCH (d)-[:BASED_ON]->(e:Evidence)
-       RETURN d, older, e`,
-      {
-        d: vertexProps<{ natural_id: string; reason: string }>(),
-        older: optional(vertexProps<{ natural_id: string }>()),
-        e: optional(vertexProps<{ statement: string } & Identified>()),
-      },
-      { id: gate },
-    );
-
-    // Handles are minted once, at the row, and everything downstream carries
-    // them. Minting at each use instead put four `ref("decision", …)` calls in
-    // this loop for one decision, which is the shape that says a conversion is
-    // happening in the wrong place.
-    const nodes = new Map<
-      DecisionRef,
-      {
-        reason: Prose;
-        older: DecisionRef | null;
-        citing: Map<EvidenceRef, CitedFinding>;
-      }
-    >();
-    for (const row of rows) {
-      const decision = ref("decision", row.d.natural_id);
-      const node = nodes.get(decision) ?? {
-        reason: row.d.reason,
-        older: null,
-        citing: new Map<EvidenceRef, CitedFinding>(),
-      };
-      if (row.older) node.older = ref("decision", row.older.natural_id);
-      // By id: two citations can say the same sentence and be two findings.
-      if (row.e) {
-        const evidence = ref("evidence", row.e.natural_id);
-        node.citing.set(evidence, { evidence, states: row.e.statement });
-      }
-      nodes.set(decision, node);
-    }
-
-    const followedBy = new Map<DecisionRef, DecisionRef>();
-    let root: DecisionRef | undefined;
-    for (const [decision, node] of nodes) {
-      if (node.older === null) root = decision;
-      else followedBy.set(node.older, decision);
-    }
-
-    const ordered: Array<{
-      decision: DecisionRef;
-      reason: Prose;
-      citing: CitedFinding[];
-    }> = [];
-    let cursor = root;
-    while (cursor) {
-      const node = nodes.get(cursor)!;
-      ordered.push({
-        decision: cursor,
-        reason: node.reason,
-        citing: [...node.citing.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
-      });
-      cursor = followedBy.get(cursor);
-    }
-
-    // Every amendment must appear. A second chain root, or a break partway,
-    // would otherwise drop amendments out of the history with no error at all
-    // -- and an audit trail that quietly omits an entry is worse than one that
-    // refuses to render.
-    if (ordered.length !== nodes.size) {
-      throw new Error(
-        `gate ${gate} has ${nodes.size} amendments but only ${ordered.length} form a chain; its history is not a single line`,
+    condition: Condition,
+  ): Promise<Array<Omit<AmendmentRecord, "rerun" | "nature">>> {
+    const steps: Array<Omit<AmendmentRecord, "rerun" | "nature">> = [];
+    let nowRequires = condition;
+    for (;;) {
+      const rows = await this.graph.query(
+        `MATCH (d:Decision)-[:MOTIVATES]->(:Criterion {natural_id: $id})
+         MATCH (d)-[:CHANGES]->(was:Criterion)
+         OPTIONAL MATCH (d)-[:BASED_ON]->(e:Evidence)
+         RETURN d, was, e`,
+        {
+          d: vertexProps<{ natural_id: string; reason: string }>(),
+          was: vertexProps<{ natural_id: string; proposition: string }>(),
+          e: optional(vertexProps<{ statement: string } & Identified>()),
+        },
+        { id: nowRequires.criterion },
       );
+      const first = rows[0];
+      if (!first) break;
+
+      // By id: two citations can say the same sentence and be two findings.
+      const citing = new Map<EvidenceRef, CitedFinding>();
+      for (const row of rows) {
+        if (!row.e) continue;
+        const evidence = ref("evidence", row.e.natural_id);
+        citing.set(evidence, { evidence, states: row.e.statement });
+      }
+      const replaced: Condition = {
+        criterion: ref("criterion", first.was.natural_id),
+        requires: first.was.proposition,
+      };
+      steps.push({
+        amendment: ref("decision", first.d.natural_id),
+        replaced,
+        nowRequires,
+        reason: first.d.reason,
+        citing: [...citing.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
+      });
+      nowRequires = replaced;
     }
-    return ordered;
+    return steps.reverse();
   }
 
   /**

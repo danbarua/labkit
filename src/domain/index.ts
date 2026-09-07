@@ -59,6 +59,7 @@ export type {
   QuestionOrigin,
   AmendmentReport,
   AmendmentRecord,
+  ConditionHistory,
   DesignHistory,
   ReinterpretationReport,
   Revision,
