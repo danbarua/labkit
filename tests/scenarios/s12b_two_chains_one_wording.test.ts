@@ -68,6 +68,12 @@ const A3 = "the effect holds under condition X in subgroup Y";
 const B1 = "the instrument drifts";
 const B3 = "the instrument drifts above 40 degrees";
 
+/** One enquiry, two readings that turn out to be the same, then narrowed once more. */
+const LEFT = "the input queue fills";
+const RIGHT = "the writer holds the lock";
+const MET = "the sampler stalls at the batch boundary";
+const NARROWER = "the sampler stalls at the batch boundary above eight workers";
+
 /**
  * Two chains, three claims each, meeting only at their middle wording.
  *
@@ -137,5 +143,159 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
     expect(historyB.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, B3]);
     expect(historyB.originally.map((c) => c.claim)).toEqual([b.first]);
     expect(historyB.revisions[1]!.previously.map((c) => c.claim)).toEqual([b.middle.claim]);
+  });
+});
+
+/**
+ * Two readings inside **one** enquiry that were separately narrowed to the
+ * same sentence, and then narrowed again together.
+ *
+ * `reinterpret` withdraws every claim in scope asserting the reading it
+ * replaces, so the last act takes both branches at once and the history
+ * behind it is a merge rather than a line.
+ */
+async function twoBranchesThatMeet() {
+  const { enquiry } = await session.openEnquiry("why does the sampler stall?");
+  const { observations } = await session.recordObservations({
+    enquiry,
+    name: "stall traces",
+    finding: "measured",
+  });
+  const { claims } = await recordAnalysis(session, {
+    enquiry,
+    method: "fit",
+    from: [observations],
+    concludes: [
+      { proposition: LEFT, finding: `${LEFT}, on the fit` },
+      { proposition: RIGHT, finding: `${RIGHT}, on the fit` },
+    ],
+  });
+  const viaLeft = await session.reinterpret({
+    of: claimOf(claims, LEFT),
+    as: MET,
+    because: "the queue only fills at the boundary",
+  });
+  const viaRight = await session.reinterpret({
+    of: claimOf(claims, RIGHT),
+    as: MET,
+    because: "the lock is only held at the boundary",
+  });
+  const after = await session.reinterpret({
+    of: viaLeft.nowClaims.claim,
+    as: NARROWER,
+    because: "and only above eight workers",
+  });
+  return {
+    left: claimOf(claims, LEFT),
+    right: claimOf(claims, RIGHT),
+    viaLeft: viaLeft.nowClaims,
+    viaRight: viaRight.nowClaims,
+    after: after.nowClaims,
+  };
+}
+
+describe("S-12b — a history that merges", () => {
+  /**
+   * **Researcher:** Two separate readings turned out to be the same thing, and
+   * I narrowed that once more. Show me how I got here.
+   *
+   * **Agent:** Both branches, and the act that joined them. Neither branch is
+   * older than the other and I do not pretend one is.
+   */
+  test("a merge is answered with both branches, not refused", async () => {
+    const { left, right, viaLeft, viaRight, after } = await twoBranchesThatMeet();
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
+
+    const history = await later.interpretationHistory(after.claim);
+
+    // The last act withdrew both branches at once, which is what makes this a
+    // merge rather than two histories.
+    const joining = history.revisions.find((r) => r.nowClaims.claim === after.claim)!;
+    expect(joining.previously.map((c) => c.claim).sort()).toEqual(
+      [viaLeft.claim, viaRight.claim].sort(),
+    );
+
+    // Both first readings are where this started. Reporting one would name a
+    // branch the record does not rank.
+    expect(history.originally.map((c) => c.claim).sort()).toEqual([left, right].sort());
+    expect(history.revisions).toHaveLength(3);
+  });
+
+  /**
+   * The same shape one act shorter, which does **not** throw today and answers
+   * wrong: one branch is a claim nobody narrowed, so the walk finds no decision
+   * for it and drops it out of `originally` without saying so.
+   */
+  test("a branch that was never narrowed is still where the reading started", async () => {
+    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "stall traces",
+      finding: "measured",
+    });
+    const { claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "fit",
+      from: [observations],
+      concludes: [
+        { proposition: LEFT, finding: `${LEFT}, on the fit` },
+        { proposition: MET, finding: `${MET}, read straight off the fit` },
+      ],
+    });
+    const narrowed = await session.reinterpret({
+      of: claimOf(claims, LEFT),
+      as: MET,
+      because: "the queue only fills at the boundary",
+    });
+    const after = await session.reinterpret({
+      of: narrowed.nowClaims.claim,
+      as: NARROWER,
+      because: "and only above eight workers",
+    });
+
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
+    const history = await later.interpretationHistory(after.nowClaims.claim);
+
+    // Two readings were withdrawn together: the one this chain narrowed to, and
+    // one an analysis concluded outright. The second was never narrowed, so no
+    // decision leads back from it -- and it is still a reading this history
+    // started from.
+    expect(history.originally.map((c) => c.claim).sort()).toEqual(
+      [claimOf(claims, LEFT), claimOf(claims, MET)].sort(),
+    );
+  });
+
+  /**
+   * The degenerate case the merge rule has to keep right: a claim nobody
+   * narrowed started from nothing, because nothing was withdrawn to reach it.
+   */
+  test("a claim nobody narrowed has no revisions and nothing behind it", async () => {
+    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "stall traces",
+      finding: "measured",
+    });
+    const { claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "fit",
+      from: [observations],
+      concludes: [{ proposition: LEFT, finding: `${LEFT}, on the fit` }],
+    });
+
+    const later = new ResearchSession(await scenario.current(), {
+      clock,
+      events: inMemoryEventLog(),
+    });
+    const history = await later.interpretationHistory(claimOf(claims, LEFT));
+    expect(history.revisions).toEqual([]);
+    expect(history.originally).toEqual([]);
+    expect(history.nowClaims.claim).toBe(claimOf(claims, LEFT));
   });
 });

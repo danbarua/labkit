@@ -1555,11 +1555,15 @@ export interface Revision {
 /**
  * An interpretation and everything it has been through, oldest first.
  *
- * Ordered from the supersession chain alone, exactly as `DesignHistory` is —
- * no timestamps, nothing read from the event log.
+ * Ordered by walking back from the claim asked about — no timestamps, nothing
+ * read from the event log. `revisions` is flat and may describe a graph rather
+ * than a line: one act can withdraw two separately-narrowed readings at once,
+ * and the merge is readable as two revisions whose `nowClaims` both appear in
+ * a later revision's `previously`. Two branches are not ordered against each
+ * other.
  */
 export interface InterpretationHistory {
-  /** The earliest reading, as the records that asserted it — the first revision's `previously`. */
+  /** Every reading this history started from: the claims the walk reached that no revision produced. */
   originally: ConcludedClaim[];
   /** The claim asked about. */
   nowClaims: ConcludedClaim;
