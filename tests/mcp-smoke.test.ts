@@ -32,7 +32,7 @@ import {
 } from "../src/attribution";
 import type { TenantGraph } from "../src/db/graph";
 import { buildServer } from "../src/mcp/server";
-import { DOCS_TOOL } from "../src/mcp/docs";
+import { DOCS_TOOL, META_TOOLS } from "../src/mcp/docs";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
@@ -590,7 +590,9 @@ describe("every tool answers when an agent actually calls it", () => {
    * three descriptions came to describe signatures that no longer existed.
    */
   test("no tool goes unexercised", () => {
-    const all = [DOCS_TOOL, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort();
+    const all = [...META_TOOLS, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS]
+      .map((t) => t.name)
+      .sort();
     expect([...called].sort()).toEqual(all);
   });
 

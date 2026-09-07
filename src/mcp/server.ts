@@ -52,7 +52,7 @@ import {
   type SessionRegistry,
 } from "../attribution";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "./tools";
-import { DOCS_TOOL, DOCS_URI, renderToolDocs } from "./docs";
+import { DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "./docs";
 
 /**
  * Everything a tool call needs, for the duration of that call and no longer.
@@ -145,7 +145,15 @@ export function buildServer(
   // binary carries the value inlined rather than reading a file that is not
   // there — `import ... with { type: "json" }` is resolved at build time, which
   // is why this needs none of `src/db/migrations.ts`'s asset handover.
-  const server = new McpServer({ name: "labkit", version: pkg.version });
+  //
+  // `instructions` rides on the `initialize` result: every client gets it in
+  // the handshake, before `tools/list` and whether or not it implements
+  // resources. It is the protocol's own slot for "how to use this server", and
+  // the one route to the documentation that needs no choice by the agent.
+  const server = new McpServer(
+    { name: "labkit", version: pkg.version },
+    { instructions: INSTRUCTIONS },
+  );
 
   // The tool surface as prose, rendered on each read from the same `TOOLS` the
   // loops below register. Served twice — as a resource, and as a tool — because
@@ -163,7 +171,7 @@ export function buildServer(
     {
       title: "LabKit tools",
       description:
-        "Human-readable documentation of every tool this server exposes -- what each " +
+        "Human-readable documentation of every tool that touches the record -- what each " +
         "answers, what it takes and what it returns -- generated from the tool " +
         "declarations themselves, so it cannot fall behind them.",
       mimeType: "text/markdown",
@@ -177,17 +185,19 @@ export function buildServer(
   // order; a client that cannot see resources meets the documentation before
   // the tools it documents. On every server, read-only included, because it
   // describes whichever list this one serves.
-  server.registerTool(
-    DOCS_TOOL.name,
-    {
-      title: DOCS_TOOL.title,
-      description: DOCS_TOOL.description,
-      annotations: { readOnlyHint: true },
-    },
-    async () => ({
-      content: [{ type: "text" as const, text: renderToolDocs() }],
-    }),
-  );
+  for (const definition of META_TOOLS) {
+    server.registerTool(
+      definition.name,
+      {
+        title: definition.title,
+        description: definition.description,
+        annotations: { readOnlyHint: true },
+      },
+      async () => ({
+        content: [{ type: "text" as const, text: renderToolDocs() }],
+      }),
+    );
+  }
 
   // **Second, before the reads.** This is the only tool whose absence makes
   // every write refuse — an agent scanning the list meets it before the verbs

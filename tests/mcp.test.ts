@@ -46,7 +46,7 @@ import {
   historicalSurveySchema,
   knowledgeSurveySchema,
 } from "../src/mcp/schemas";
-import { DOCS_TOOL, DOCS_URI, renderToolDocs } from "../src/mcp/docs";
+import { DOCS_TOOL, DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import {
@@ -162,12 +162,12 @@ describe("structure", () => {
 
       const { tools } = await client.listTools();
       expect(tools.map((t) => t.name).sort()).toEqual(
-        [DOCS_TOOL, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort(),
+        [...META_TOOLS, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort(),
       );
 
       // Derived from which list a tool is in, not from a list of names here.
-      // `docs` reads nothing from the record and is read-only all the same.
-      const readNames = new Set([DOCS_TOOL, ...TOOLS].map((t) => t.name));
+      // Meta tools read nothing from the record and are read-only all the same.
+      const readNames = new Set([...META_TOOLS, ...TOOLS].map((t) => t.name));
       for (const t of tools) {
         expect(t.annotations?.readOnlyHint ?? false).toBe(readNames.has(t.name));
       }
@@ -626,6 +626,12 @@ describe("the tool documentation resource", () => {
       // First, so a client scanning the list meets it before what it documents.
       expect(tools[0]?.name).toBe(DOCS_TOOL.name);
 
+      // And the handshake already said where to look, before any list was
+      // fetched: the one route that needs no choice by the agent.
+      expect(client.getInstructions()).toBe(INSTRUCTIONS);
+      expect(INSTRUCTIONS).toContain(`\`${DOCS_TOOL.name}\``);
+      expect(INSTRUCTIONS).toContain("register_session");
+
       const result = await client.callTool({ name: DOCS_TOOL.name, arguments: {} });
       const { contents } = await client.readResource({ uri: DOCS_URI });
       const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
@@ -1042,7 +1048,7 @@ describe("read-only", () => {
       // Derived from the declarations, never a hand-written list of names: a
       // write tool added later must be absent here without anyone remembering
       // to come and say so.
-      expect(names).toEqual([DOCS_TOOL, ...TOOLS].map((t) => t.name).sort());
+      expect(names).toEqual([...META_TOOLS, ...TOOLS].map((t) => t.name).sort());
 
       for (const write of WRITE_TOOLS) expect(names).not.toContain(write.name);
     } finally {
@@ -1071,7 +1077,7 @@ describe("read-only", () => {
       // withheld them.
       const names = await listToolsFrom(graph, false);
       expect(names).toEqual(
-        [DOCS_TOOL, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort(),
+        [...META_TOOLS, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort(),
       );
     } finally {
       await scenario.end();

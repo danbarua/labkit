@@ -43,6 +43,10 @@ export const DOCS_URI = "labkit://docs/tools";
  * the record for the documentation — which is the one place it cannot be. So
  * the document has two routes in, both rendering the same declarations; a
  * caller takes whichever its client can reach.
+ *
+ * Not a `ToolDefinition`: it has no input, no output schema and no surface to
+ * hand a handler. It is the one tool that describes the server rather than
+ * touching the record, which is why it has a list of its own.
  */
 export const DOCS_TOOL = {
   name: "docs",
@@ -53,6 +57,22 @@ export const DOCS_TOOL = {
     "Takes no arguments and touches no record; the same page is also served as the " +
     `resource \`${DOCS_URI}\` for a client that reads resources.`,
 } as const;
+
+/** Tools about the server itself, not the record. Registered first, on every server. */
+export const META_TOOLS = [DOCS_TOOL] as const;
+
+/**
+ * What every client is told in the `initialize` handshake — before `tools/list`,
+ * before any call, whether or not it implements resources. A paragraph, not the
+ * page: enough to know what this is and where the rest is.
+ */
+export const INSTRUCTIONS =
+  "LabKit is a research record: questions, the lines of enquiry pursuing them, what was " +
+  "measured, what was concluded, the conditions results are held to, and what any of it is " +
+  "holding up. Call `now` to see what stands. Every write tool refuses until " +
+  "`register_session` has said who you are. The full surface — every tool, what it takes and " +
+  `what it returns — is the \`${DOCS_TOOL.name}\` tool, or the resource \`${DOCS_URI}\`; read it ` +
+  "before choosing a tool.";
 
 type JsonSchema = {
   type?: string | string[];
