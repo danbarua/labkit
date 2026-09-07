@@ -194,7 +194,7 @@ export function buildServer(
         annotations: { readOnlyHint: true },
       },
       async () => ({
-        content: [{ type: "text" as const, text: renderToolDocs() }],
+        content: [{ type: "text" as const, text: definition.handler() }],
       }),
     );
   }

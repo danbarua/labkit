@@ -46,9 +46,19 @@ export const DOCS_URI = "labkit://docs/tools";
  *
  * Not a `ToolDefinition`: it has no input, no output schema and no surface to
  * hand a handler. It is the one tool that describes the server rather than
- * touching the record, which is why it has a list of its own.
+ * touching the record, which is why it has a list of its own — and, like the
+ * other lists, the entry carries what it does, so a second meta tool would
+ * not silently serve this page.
  */
-export const DOCS_TOOL = {
+export interface MetaToolDefinition {
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  /** The text the tool returns. No surface, no arguments. */
+  readonly handler: () => string;
+}
+
+export const DOCS_TOOL: MetaToolDefinition = {
   name: "docs",
   title: "How to use this server",
   description:
@@ -56,10 +66,11 @@ export const DOCS_TOOL = {
     "records or answers, what it takes and what it returns. Read it before choosing a tool. " +
     "Takes no arguments and touches no record; the same page is also served as the " +
     `resource \`${DOCS_URI}\` for a client that reads resources.`,
-} as const;
+  handler: () => renderToolDocs(),
+};
 
 /** Tools about the server itself, not the record. Registered first, on every server. */
-export const META_TOOLS = [DOCS_TOOL] as const;
+export const META_TOOLS: readonly MetaToolDefinition[] = [DOCS_TOOL];
 
 /**
  * What every client is told in the `initialize` handshake — before `tools/list`,
