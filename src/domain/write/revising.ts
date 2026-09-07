@@ -511,19 +511,41 @@ export class Revising extends Shared {
           ...this.scopeParams(scope),
         },
       );
-      // Every record this act withdraws, by handle. The reading is one sentence
-      // and the records asserting it are several -- reporting the sentence alone
-      // left a caller unable to name which claims stopped standing, and reporting
-      // one handle would have picked between them arbitrarily.
-      const withdrawn: ConcludedClaim[] = [...new Set(claims.map((c) => c.c.natural_id))].map(
-        (id) => ({ claim: ref("claim", id), asserts: previously }),
-      );
       if (claims.length === 0)
         throw new Error(
           `no claim ${input.of} to reinterpret; a claim exists once an analysis concludes it`,
         );
 
-      const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))];
+      // Every record this act withdraws, by handle. The reading is one sentence
+      // and the records asserting it are several -- reporting the sentence alone
+      // left a caller unable to name which claims stopped standing, and reporting
+      // one handle would have picked between them arbitrarily.
+      const withdrawnIds = [...new Set(claims.map((c) => c.c.natural_id))].map((id) =>
+        ref("claim", id),
+      );
+      const withdrawn: ConcludedClaim[] = withdrawnIds.map((claim) => ({
+        claim,
+        asserts: previously,
+      }));
+
+      // **The match above is on wording, and wording does not say whether a
+      // claim still stands.** A reading narrowed weeks ago carries its name and
+      // its evidence unchanged, so it matches again -- and narrowing it a second
+      // time puts two successors on one reading with nothing saying which the
+      // record asserts. The same act-level incoherence `amendDesign` refuses.
+      //
+      // Only the named claim is checked: a reading is withdrawn in full, and
+      // `recordAnalysis` refuses to re-assert a withdrawn one, so a withdrawn
+      // claim cannot sit in this match beside a standing one.
+      const named = (await this.standingOf([input.of])).get(input.of);
+      if (named?.withdrawn)
+        throw new Error(
+          `claim ${input.of} no longer stands: ${named.by.join(" and ")} withdrew it. ` +
+            (named.insteadOf.length > 0
+              ? `Reinterpret ${named.insteadOf.map((c) => c.claim).join(" or ")}, which stands in its place`
+              : `The record does not say which claim stands in its place; ` +
+                `'labkit why ${named.by[0]}' says what the act was`),
+        );
       // One query for every withdrawn claim's evidence, not one per claim.
       // Deduplicated by the Map below: the query selects `natural_id` AND
       // `statement` and keying on the statement merged two findings phrased

@@ -992,6 +992,20 @@ export interface ReplacementClaim {
   asserts: string;
 }
 
+/**
+ * Whether one claim still stands, and what the record puts in its place.
+ *
+ * `insteadOf` is empty on a claim whose analysis was replaced: that act
+ * supersedes the claim and does not pair it with one of the replacement's
+ * conclusions, so the record knows the claim fell and not what succeeded it.
+ * `by` names the acts, which is what remains answerable.
+ */
+export interface ClaimStanding {
+  withdrawn: boolean;
+  by: DecisionRef[];
+  insteadOf: ConcludedClaim[];
+}
+
 /** An unmet check: the criterion's handle, and what it requires. */
 export interface UnmetCheck {
   criterion: CriterionRef;
