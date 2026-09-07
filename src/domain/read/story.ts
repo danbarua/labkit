@@ -6,6 +6,7 @@ import type {
   EvidenceProps,
   IdentityString,
   IndexedString,
+  Prose,
 } from "../../db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
@@ -20,6 +21,7 @@ import type {
   ConflictSide,
   ConflictVerdict,
   CriterionRef,
+  DecisionRef,
   DependencyReport,
   EnquiryRef,
   EnquiryStatus,
@@ -468,11 +470,15 @@ export class StoryGroup extends SessionCore {
    * An interpretation and every narrowing behind it, oldest first.
    *
    * The chain walks claim-to-claim through the decisions that made it: each
-   * revision `CHANGES` the reading it withdrew and `MOTIVATES` the one that
-   * replaced it. No timestamps, nothing from the event log, and — unlike
-   * `designHistory` — no `SUPERSEDES` edge, because with both halves of each
-   * step recorded the order is already implied and a supersession edge would
-   * be a writer with no reader.
+   * revision `CHANGES` the readings it withdrew and `MOTIVATES` the one that
+   * replaced them. No timestamps and nothing from the event log.
+   *
+   * **A history is a graph, not a line.** `reinterpret` withdraws every claim
+   * in scope asserting the reading it replaces, so one act can take two
+   * separately-narrowed branches at once. Branches are not ordered against
+   * each other and no ordering between them is invented; `originally` is every
+   * reading the walk reached that nothing narrowed, which on a merge is more
+   * than one.
    */
   async interpretationHistory(claim: ClaimRef): Promise<InterpretationHistory> {
     // **Walked by id.** `reinterpret` writes `Decision -MOTIVATES-> narrower`
@@ -481,21 +487,24 @@ export class StoryGroup extends SessionCore {
     //
     // Matching by NAME instead breaks on two independent chains passing through
     // one sentence: the match finds the other chain's claim and its decision,
-    // and a legitimate history throws `is not a single line`. Same text is not
-    // same claim.
+    // and a legitimate history reports the wrong one. Same text is not same
+    // claim.
     const proposition = await this.assertedBy(claim);
     if (proposition === undefined)
       throw new Error(
         `no claim ${claim}; a claim exists once an analysis concludes it, and its handle comes back from that act or from looking up the exact proposition it asserts`,
       );
-    const steps: Revision[] = [];
-    let current: ConcludedClaim[] = [{ claim, asserts: proposition }];
 
-    // Seeded with the entry claim, which is what catches a self-loop on the
-    // first step rather than the second.
-    const seen = new Set<ClaimRef>([claim]);
+    // Depth from the claim asked about, so the deepest revisions are the
+    // oldest. A claim reached by two paths of different lengths keeps the
+    // longer one, which is what puts every revision behind it deeper still.
+    const steps: Array<{ depth: number; revision: Revision }> = [];
+    const narrowed = new Set<ClaimRef>();
+    const walked = new Set<DecisionRef>();
+    let frontier: ConcludedClaim[] = [{ claim, asserts: proposition }];
+    const reached = new Map<ClaimRef, ConcludedClaim>([[claim, frontier[0]!]]);
 
-    for (;;) {
+    for (let depth = 1; frontier.length > 0; depth++) {
       const rows = await this.graph.query(
         // `nxt` bound and matched by id. Lower-case RETURN names throughout: a
         // camelCase one decodes as null. See `buildAsClause`.
@@ -508,62 +517,73 @@ export class StoryGroup extends SessionCore {
           was: vertexProps<{ name: string } & Identified>(),
           nxt: vertexProps<{ name: string } & Identified>(),
         },
-        { ids: current.map((c) => c.claim) },
+        { ids: frontier.map((c) => c.claim) },
       );
-      // One decision per step. This is now a real structural statement -- the
-      // history is a line rather than a merge -- where the old `replaced.size`
-      // guard was about wording and fired on chains that never met.
-      const decisions = new Set(rows.map((r) => r.d.natural_id));
-      if (decisions.size > 1) {
-        throw new Error(
-          `interpretation history for "${proposition}" is not a single line at "${current.map((c) => c.asserts).join('", "')}"`,
-        );
-      }
-      const step = rows[0];
-      if (!step) break;
 
-      // Every record the decision withdrew, not the one that came back first.
-      // One decision withdraws every claim asserting the reading it replaced,
-      // so this is plural by construction: two analyses reaching one reading are
-      // withdrawn together.
-      const withdrew: ConcludedClaim[] = [
-        ...new Map(rows.map((r) => [r.was.natural_id, r.was] as const)).values(),
-      ].map((was) => ({
-        claim: ref("claim", was.natural_id),
-        asserts: was.name,
-      }));
-
-      for (const w of withdrew) {
-        if (seen.has(w.claim))
-          throw new Error(
-            `interpretation history for "${proposition}" loops at "${w.asserts}"; a narrowing chain must not revisit a claim, so this history cannot be walked`,
-          );
-        seen.add(w.claim);
+      // One entry per decision. A decision that withdrew several readings comes
+      // back as one row per withdrawn claim, and every one of them is a step
+      // backwards from the same act.
+      const byDecision = new Map<
+        DecisionRef,
+        { reason: Prose; nxt: ConcludedClaim; was: Map<ClaimRef, ConcludedClaim> }
+      >();
+      for (const row of rows) {
+        const decision = ref("decision", row.d.natural_id);
+        const entry = byDecision.get(decision) ?? {
+          reason: row.d.reason,
+          nxt: { claim: ref("claim", row.nxt.natural_id), asserts: row.nxt.name },
+          was: new Map<ClaimRef, ConcludedClaim>(),
+        };
+        const was = ref("claim", row.was.natural_id);
+        entry.was.set(was, { claim: was, asserts: row.was.name });
+        byDecision.set(decision, entry);
       }
 
-      steps.unshift({
-        revision: ref("decision", step.d.natural_id),
-        previously: withdrew,
-        nowClaims: {
-          claim: ref("claim", step.nxt.natural_id),
-          asserts: step.nxt.name,
-        },
-        reason: step.d.reason,
-        // Scoped to the withdrawn claim's own line of enquiry. The bare
-        // proposition would ask "what was decided on the strength of this
-        // SENTENCE", which reaches another chain's decisions.
-        restingOnTheOldReading: await this.decidedOnTheStrengthOf(
-          await this.scopeOf(withdrew[0]!.claim),
-        ),
-      });
-      current = withdrew;
+      const next = new Map<ClaimRef, ConcludedClaim>();
+      for (const [decision, entry] of byDecision) {
+        // A claim reached by two paths yields the same decision twice. The
+        // revision is one act and is reported once, at the greater depth.
+        if (walked.has(decision)) continue;
+        walked.add(decision);
+        narrowed.add(entry.nxt.claim);
+        const withdrew = [...entry.was.values()];
+        steps.push({
+          depth,
+          revision: {
+            revision: decision,
+            previously: withdrew,
+            nowClaims: entry.nxt,
+            reason: entry.reason,
+            // Scoped to the withdrawn claim's own line of enquiry. The bare
+            // proposition would ask "what was decided on the strength of this
+            // SENTENCE", which reaches another chain's decisions.
+            restingOnTheOldReading: await this.decidedOnTheStrengthOf(
+              await this.scopeOf(withdrew[0]!.claim),
+            ),
+          },
+        });
+        for (const was of withdrew) {
+          reached.set(was.claim, was);
+          next.set(was.claim, was);
+        }
+      }
+      frontier = [...next.values()];
     }
 
+    // Oldest first: deepest first, and by decision within a depth so two
+    // branches come back in a stable order rather than the graph's.
+    steps.sort(
+      (a, b) => b.depth - a.depth || a.revision.revision.localeCompare(b.revision.revision),
+    );
+
     return {
-      originally: steps[0]?.previously ?? [{ claim, asserts: proposition }],
+      // Every reading the walk reached that no revision produced. On a line
+      // that is the first claim; on a merge it is one per branch, including a
+      // branch an analysis concluded outright and nobody narrowed.
+      originally: [...reached.values()].filter((c) => c.claim !== claim && !narrowed.has(c.claim)),
       // The handle the caller asked about, not one re-found by its wording.
       nowClaims: { claim, asserts: proposition },
-      revisions: steps,
+      revisions: steps.map((s) => s.revision),
     };
   }
 
