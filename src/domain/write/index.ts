@@ -12,6 +12,7 @@ import type {
   DeclaredGate,
   EvaluatedCriterion,
   Noted,
+  NoteRef,
   OpenedEnquiry,
   PlannedWork,
   Posed,
@@ -124,8 +125,8 @@ export class WriteSurface extends SessionCore {
     return this.asking.pursue(input);
   }
 
-  async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
-    return this.asking.openEnquiry(question);
+  async openEnquiry(question: Prose, from?: NoteRef): Promise<OpenedEnquiry> {
+    return this.asking.openEnquiry(question, from);
   }
 
   async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {

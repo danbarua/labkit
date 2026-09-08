@@ -8,6 +8,7 @@ import type {
   EvidenceRef,
   OpenedEnquiry,
   Noted,
+  NoteRef,
   Posed,
   Pursued,
   QuestionRef,
@@ -33,9 +34,28 @@ export class Asking extends SessionCore {
    */
   async pose(input: PoseCommand): Promise<Posed> {
     return this.handle("pose", input, async (unitOfWork) => {
+      if (input.from) await this.noteExists(input.from);
       const asked = ref("question", await this.posed(input.question, unitOfWork));
+      if (input.from) unitOfWork.edge(input.from, "MOTIVATES", asked);
       return { subject: asked, result: { question: asked } };
     });
+  }
+
+  /**
+   * Refuses a note nobody wrote. `UnitOfWork.edge` stages a `CREATE` that returns zero rows and
+   * no error for a missing endpoint, so without this the question is minted with its origin
+   * silently absent.
+   */
+  private async noteExists(note: NoteRef): Promise<void> {
+    const rows = await this.graph.query(
+      `MATCH (n:Note {natural_id: $id}) RETURN n`,
+      { n: vertexProps<{ text: string }>() },
+      { id: note },
+    );
+    if (rows.length === 0)
+      throw new Error(
+        `no note ${note} for this question to come out of; write it with 'note' first, or pose the question without one`,
+      );
   }
 
   /**
@@ -83,12 +103,18 @@ export class Asking extends SessionCore {
   /**
    * Poses a question and immediately pursues it — the common case.
    */
-  async openEnquiry(question: Prose): Promise<OpenedEnquiry> {
-    return this.handle("openEnquiry", { question }, async (unitOfWork) => {
-      const asked = await this.posed(question, unitOfWork);
-      const enquiry = await this.pursued({ question: asked, approach: question }, unitOfWork);
-      return { subject: enquiry, result: { enquiry, question: asked } };
-    });
+  async openEnquiry(question: Prose, from?: NoteRef): Promise<OpenedEnquiry> {
+    return this.handle(
+      "openEnquiry",
+      { question, ...(from ? { from } : {}) },
+      async (unitOfWork) => {
+        if (from) await this.noteExists(from);
+        const asked = await this.posed(question, unitOfWork);
+        if (from) unitOfWork.edge(from, "MOTIVATES", asked);
+        const enquiry = await this.pursued({ question: asked, approach: question }, unitOfWork);
+        return { subject: enquiry, result: { enquiry, question: asked } };
+      },
+    );
   }
 
   /**

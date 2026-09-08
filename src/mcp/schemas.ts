@@ -29,6 +29,7 @@ import type {
   GateStatus,
   CriterionStanding,
   QuestionOrigin,
+  NoteRef,
   ReproducibilityReport,
   TaskContract,
   AmendmentReport,
@@ -443,9 +444,12 @@ export const reproductionReportSchema = z.strictObject({
  * says "asked outright" rather than "no answer available".
  */
 export const questionOriginSchema = z.strictObject({
-  from: ref("question"),
-  fromAsks: z.string(),
-  reason: z.string(),
+  /** Which origin was found. `reason` and `knownAtTheTime` are the sharpened arm's, and empty
+   *  on the other — a note records no reason and cites nothing. */
+  kind: z.enum(["sharpened", "noted"]),
+  from: z.string() as unknown as z.ZodType<QuestionRef | NoteRef>,
+  said: z.string(),
+  reason: z.string().nullable(),
   knownAtTheTime: z.array(citedFinding),
 });
 export const originOfSchema = z.strictObject({

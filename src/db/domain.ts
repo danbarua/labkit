@@ -143,11 +143,12 @@ export type EdgeProps = Record<string, string | number | boolean | number[]>;
 export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, NodeLabel]>> = {
   /**
    * "Gave rise to." A question gives rise to a line of enquiry; a decision gives rise to a
-   * question.
+   * question; a note gives rise to the question somebody eventually sharpened out of it.
    */
   MOTIVATES: [
     ["Question", "LineOfEnquiry"],
     ["Decision", "Question"],
+    ["Note", "Question"],
     ["Decision", "Claim"],
     ["Decision", "Criterion"],
     // The revision an act produced, at analysis grain — the half that pairs

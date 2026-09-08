@@ -109,7 +109,28 @@ describe("every tool answers when an agent actually calls it", () => {
         because: "faster overall hides which instances moved",
       });
       const origin = await call(c, "origin_of", { question: id(sharp) });
-      expect(origin.origin as Json | null).not.toBeNull();
+      expect((origin.origin as { kind: string }).kind).toBe("sharpened");
+
+      // A question posed out of a note, over the wire. `origin_of`'s output
+      // schema is a strictObject, so an arm the schema does not declare fails
+      // the call rather than returning a wrong answer.
+      const hunch = await call(c, "note", {
+        text: "something about how the edge is handled matters — I keep seeing it",
+      });
+      const fromHunch = await call(c, "pose", {
+        question: "does the edge padding change the reconstruction error?",
+        from: id(hunch),
+      });
+      const noted = (await call(c, "origin_of", { question: id(fromHunch) })).origin as {
+        kind: string;
+        from: string;
+        said: string;
+        reason: string | null;
+      };
+      expect(noted.kind).toBe("noted");
+      expect(noted.from).toBe(id(hunch));
+      expect(noted.said).toContain("how the edge is handled");
+      expect(noted.reason).toBeNull();
 
       await call(c, "note", {
         text: "worth checking the sparse generator is deterministic before trusting a paired run",

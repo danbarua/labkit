@@ -49,6 +49,7 @@ export type {
   AnalysisRef,
   ReviewRef,
   EnquiryRef,
+  NoteRef,
   QuestionRef,
   QuestionStanding,
   AcceptedQuestion,

@@ -28,6 +28,25 @@ export class FindingGroup extends SessionCore {
    * Where a question came from, if it came from sharpening an earlier one.
    */
   async originOf(question: QuestionRef): Promise<QuestionOrigin | null> {
+    // Its own MATCH, because AGE has no edge alternation and the two origins do
+    // not share a shape: a note gave rise to the question directly, a sharpening
+    // did it through the decision that recorded why.
+    const noted = await this.graph.query(
+      `MATCH (n:Note)-[:MOTIVATES]->(:Question {natural_id: $id}) RETURN n`,
+      { n: vertexProps<{ natural_id: string; text: string }>() },
+      { id: question },
+    );
+    if (noted.length > 0) {
+      const note = noted[0]!.n;
+      return {
+        kind: "noted",
+        from: ref("note", note.natural_id),
+        said: note.text,
+        reason: null,
+        knownAtTheTime: [],
+      };
+    }
+
     const rows = await this.graph.query(
       `MATCH (d:Decision)-[:MOTIVATES]->(:Question {natural_id: $id})
        MATCH (d)-[:NARROWS]->(from:Question)
@@ -48,8 +67,9 @@ export class FindingGroup extends SessionCore {
     );
 
     return {
+      kind: "sharpened",
       from: ref("question", row.origin.natural_id),
-      fromAsks: row.origin.name,
+      said: row.origin.name,
       reason: row.d.reason,
       knownAtTheTime: dedupeById(
         knew.map((r) => ({
