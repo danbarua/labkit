@@ -432,11 +432,9 @@ describe("S-12b — a reading is narrowed once", () => {
         as: NARROWED_ONCE,
         because: "narrowing a finding that no longer stands",
       }),
-      // No successor is recorded: `replaceAnalysis` supersedes the claim and
-      // mints the replacement's conclusions without pairing the two, so the
-      // record knows the claim fell and not what stands instead. Saying so is
-      // the honest answer; naming nothing after "reinterpret" would not be.
-    ).rejects.toThrow(/does not say which claim stands in its place/);
-    void replacement;
+      // The successor is named: `conclude` recorded the replacement standing
+      // in place of the finding it re-answered, so the refusal can say where
+      // to go instead of only that the claim fell.
+    ).rejects.toThrow(new RegExp(`no longer stands[\\s\\S]*${claimOf(replacement.claims, ONCE)}`));
   });
 });

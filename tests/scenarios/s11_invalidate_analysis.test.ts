@@ -22,7 +22,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import type { ConcludedClaim } from "../../src/domain/report";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
@@ -96,23 +95,8 @@ async function bootstrapAnalysisAsShipped() {
   return { enquiry, observations, analysis, analysisClaims };
 }
 
-/**
- * The replacement: same observations, correct null test, one conclusion weakens.
- *
- * Each names the finding it stands in place of. The researcher re-ran six
- * comparisons and knows which old result each new one answers; that pairing is
- * on the record only because the act states it.
- */
-const signFlipConclusions = (was: ConcludedClaim[]) => [
-  { ...SIGN_FLIP[0]!, replacing: claimOf(was, "T beats lattice") },
-  { ...SIGN_FLIP[1]!, replacing: claimOf(was, "T beats rewired") },
-  { ...SIGN_FLIP[2]!, replacing: claimOf(was, "T beats curr_random") },
-  { ...SIGN_FLIP[3]!, replacing: claimOf(was, "lattice beats curr_random") },
-  { ...SIGN_FLIP[4]!, replacing: claimOf(was, "rewired beats curr_random") },
-  { ...SIGN_FLIP[5]!, replacing: claimOf(was, "T beats static") },
-];
-
-const SIGN_FLIP = [
+/** The replacement: same observations, correct null test, one conclusion weakens. */
+const SIGN_FLIP_CONCLUSIONS = [
   { proposition: "T beats lattice", finding: "p = 0.001 (bootstrap)" },
   {
     proposition: "T beats rewired",
@@ -132,7 +116,7 @@ const SIGN_FLIP = [
 
 describe("S-11: the analysis was wrong; the observations were fine", () => {
   test("the conversation runs end to end through research verbs alone", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
 
     // Reviewer: your bootstrap is centred on the observed effect. It isn't a null test.
     const { review } = await session.recordReview({
@@ -149,7 +133,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     // The act answers with what it minted: the replacement and the decision
@@ -187,7 +171,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -199,7 +183,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     // Every finding the replacement superseded, read from the record. Matched
@@ -220,7 +204,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -232,7 +216,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     // The observations are not superseded by this act: it revises an analysis,
@@ -250,7 +234,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 4: the replacement conclusion is supported via a different inference", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -261,7 +245,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     const why = await session.whySupported(claimOf(report.claims, "T beats rewired"));
@@ -274,7 +258,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("Afterward 5: what the superseded inference claimed is still readable", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -285,7 +269,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     const why = await session.whySupported(claimOf(report.claims, "T beats rewired"));
@@ -344,7 +328,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("why support was withdrawn is answerable from the graph, not just the event log", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const { review } = await session.recordReview({
       of: analysis,
       verdict:
@@ -356,7 +340,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     // A fresh session over the same graph -- nothing carried in memory.
@@ -421,7 +405,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   test("the temporal seam records the invalidation, with its time and what it moved", async () => {
-    const { enquiry, observations, analysis, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
     const { review } = await session.recordReview({
       of: analysis,
       verdict: "not a null test",
@@ -432,7 +416,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     const replacement = (await events.all()).filter((e) => e.operation === "replaceAnalysis");
@@ -457,12 +441,12 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       "openEnquiry",
       "recordObservations",
       "recordAnalysis",
-      ...concluded(SIGN_FLIP.length),
+      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
       "recordReview",
       // The revision first, then its findings: superseding happens when the
       // successor is recorded, and each new conclusion is an act after it.
       "replaceAnalysis",
-      ...concluded(SIGN_FLIP.length),
+      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
     ]);
   });
   /**
@@ -477,7 +461,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    * verb has ever written — so the refusal never fired and the finding landed.
    */
   test("a superseded analysis takes no further conclusions", async () => {
-    const { enquiry, analysis, observations, analysisClaims } = await bootstrapAnalysisAsShipped();
+    const { enquiry, analysis, observations } = await bootstrapAnalysisAsShipped();
     const { review } = await session.recordReview({
       of: analysis,
       verdict: "the bootstrap does not implement the intended null",
@@ -488,7 +472,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       enquiry,
       method: "sign-flip-permutation",
       from: [observations],
-      concludes: signFlipConclusions(analysisClaims),
+      concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
     // Refused, and the message names where the finding belongs instead —

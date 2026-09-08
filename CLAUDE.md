@@ -1356,14 +1356,11 @@ not asked for it yet; queries are cheap to add later and the moment of the act
 does not come back. Throwing the handle away and recovering the fact by
 matching prose is how a read side ends up guessing.
 
-**The tell is a string comparison.** If a query is comparing wording to work
-out which record is which, either the edge it needed was not written, or it is
-inventing a relationship nobody asserted — and the second is the one that
-reads as innocent. `why <analysis>` paired superseded findings to their
-successors by matching propositions when `conclude --replacing` had not named
-one, and reported the guess in the same field as a stated pairing. Nothing had
-been thrown away there: the caller never said. Recording it anyway is worse
-than an empty answer, in a report about provenance. Both halves went in #332.
+**The tell is a string comparison in a read.** A read matching wording is
+guessing, and its answer is indistinguishable from a recorded one. The same
+comparison in the *act* is not a guess: `conclude` on a replacement records
+which fallen finding it re-answers, and refuses to pick when two answer the
+same proposition — the ambiguity is visible there and nowhere later.
 
 **The real world drives requirements, and requirements drive code changes.**
 `search` (#155) is the precedent: an agent asked and the record could not

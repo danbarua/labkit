@@ -22,6 +22,7 @@
 
 import { optional, vertexProps } from "../../db/cypher";
 import type {
+  IndexedString,
   ArtefactProps,
   ClaimProps,
   EdgeLabel,
@@ -202,6 +203,39 @@ export class Shared extends SessionCore {
       .map((r) => r.narrowed?.natural_id ?? r.replaced?.natural_id)
       .find((r) => r !== undefined);
     return found === undefined ? undefined : ref("decision", found);
+  }
+
+  /**
+   * The finding this conclusion stands in place of, when the act determines it.
+   *
+   * A replacement analysis re-answers propositions its predecessor answered, so
+   * a conclusion on the same proposition supersedes that predecessor's finding.
+   * Recorded here, at the act, where the ambiguous case is visible: two
+   * superseded findings on one proposition mean the act does not say which, and
+   * `replacing` is how the caller does.
+   *
+   * Nothing is refused. A pairing that is not determined is simply not written,
+   * and a reader reports the finding unpaired rather than guessing later.
+   */
+  private async impliedSupersession(
+    analysis: AnalysisRef,
+    proposition: IndexedString,
+  ): Promise<RecordedConclusion | undefined> {
+    const revision = await this.revisedBy(analysis);
+    if (revision === undefined) return undefined;
+    // **Scoped to what this revision superseded, not to everything the old
+    // analysis concluded.** `keep` carries conclusions forward, and a kept
+    // finding still stands; pairing to one would say a live finding was
+    // replaced.
+    const fell = await this.graph.query(
+      `MATCH (:Decision {natural_id: $decision})-[:SUPERSEDES]->(c:Claim {name: $proposition})
+       RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { decision: revision.decision, proposition },
+    );
+    const answering = [...new Set(fell.map((r) => r.c.natural_id))];
+    if (answering.length !== 1) return undefined;
+    return (await this.conclusionsOf(revision.old)).find((c) => c.claim === answering[0]);
   }
 
   protected async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
@@ -493,8 +527,24 @@ export class Shared extends SessionCore {
         unitOfWork.edge(evidence, "RECORDED_IN", output);
         unitOfWork.edge(evidence, bearing === "challenges" ? "CHALLENGES" : "SUPPORTS", claim);
 
+        // **The pairing this act implies, when the caller did not name one.**
+        // A replacement re-answering a proposition its predecessor answered
+        // stands in place of that finding; recording it here is the act saying
+        // so, not a reader inferring it afterwards from wording. Only when
+        // exactly one superseded finding answers this proposition -- two mean
+        // the act does not determine which, and `--replacing` says.
+        //
+        // Deliberately a separate variable from `superseded` above: that one
+        // also drives proposition and bearing inheritance, and inferring into
+        // it would make a caller who typed no `--bearing` hit the
+        // challenging-bearing refusal for a pairing they never asked for.
+        const stands = superseded ?? (await this.impliedSupersession(input.analysis, proposition));
+        if (stands !== undefined && revision === undefined)
+          revision = await this.revisedBy(input.analysis);
+
         // Per-finding supersession, on the edges the model already has.
-        if (superseded) {
+        if (stands) {
+          const superseded = stands;
           const decision = await unitOfWork.node("Decision", {
             decided_at: at,
             reason: `superseded by "${input.finding}"`,
