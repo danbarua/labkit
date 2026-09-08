@@ -560,9 +560,18 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "untested — nothing has been run against it, which is not a failure and not an " +
       "inconclusive result; pursuing it does not change that, recording work under it does. " +
       "Use `open_enquiry` instead to ask and start in one act.",
-    inputSchema: { question: z.string().describe("the question, as asked") },
+    inputSchema: {
+      question: z.string().describe("the question, as asked"),
+      from: z
+        .string()
+        .optional()
+        .describe(
+          "the note this question came out of, when it came out of one — a hunch written down before there was anything to ask",
+        ),
+    },
     outputSchema: posedSchema,
-    handler: (write, { question }) => write.pose({ question }),
+    handler: (write, { question, from }) =>
+      write.pose({ question, ...(from ? { from: ref("note", from) } : {}) }),
   }),
 
   writeTool({
@@ -572,9 +581,18 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     description:
       "Ask and pursue in one act — the usual way work begins. Records one event, not two: " +
       "a researcher who opened an enquiry did one thing.",
-    inputSchema: { question: z.string().describe("the question, as asked") },
+    inputSchema: {
+      question: z.string().describe("the question, as asked"),
+      from: z
+        .string()
+        .optional()
+        .describe(
+          "the note this question came out of, when it came out of one — a hunch written down before there was anything to ask",
+        ),
+    },
     outputSchema: openedEnquirySchema,
-    handler: (write, { question }) => write.openEnquiry(question),
+    handler: (write, { question, from }) =>
+      write.openEnquiry(question, from ? ref("note", from) : undefined),
   }),
 
   writeTool({

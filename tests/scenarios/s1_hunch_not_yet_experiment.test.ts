@@ -222,7 +222,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     const later = new ResearchSession(await scenario.current(), { clock });
     const durable = await later.originOf(sharper);
     expect(durable?.from).toBe(hunch);
-    expect(durable?.fromAsks).toBe(
+    expect(durable?.said).toBe(
       "is the learned topology doing something computationally interesting?",
     );
 

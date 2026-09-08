@@ -412,14 +412,33 @@ test("a question nobody sharpened renders as an answer, not a gap", () => {
 
   const sharpened = renderOrigin(
     {
+      kind: "sharpened",
       from: ref("question", "Q_0"),
-      fromAsks: "does the schedule matter?",
+      said: "does the schedule matter?",
       reason: "the first sweep only moved at depth 4",
       knownAtTheTime: [{ evidence: ref("evidence", "EV_1"), states: "moves by ~3 steps" }],
     },
     ref("question", "Q_1"),
     PLAIN,
   );
+  const noted = renderOrigin(
+    {
+      kind: "noted",
+      from: ref("note", "NOTE_2"),
+      said: "something about how the edge is handled matters",
+      reason: null,
+      knownAtTheTime: [],
+    },
+    ref("question", "Q_2"),
+    PLAIN,
+  );
+  // A note's own words, and no "because" line — there is no reason to print,
+  // and an empty one would read as a reason nobody gave.
+  expect(noted).toContain("came out of a note");
+  expect(noted).toContain("something about how the edge is handled matters");
+  expect(noted).not.toContain("because:");
+  expect(noted).not.toContain("Known at that moment");
+
   expect(sharpened).toContain("does the schedule matter?");
   expect(sharpened).toContain("moves by ~3 steps");
   // The frozen-at-the-time caveat, without which a reader takes the list for

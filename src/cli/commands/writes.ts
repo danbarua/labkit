@@ -18,7 +18,7 @@ import {
 } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
-import type { ClaimRef, ClaimState, DomainEvent, EnquiryRef, GateRef } from "../../domain";
+import type { ClaimRef, ClaimState, DomainEvent, EnquiryRef, GateRef, NoteRef } from "../../domain";
 import type { Prose } from "../../db/domain";
 import { isRefOfKind, ref } from "../../domain/report";
 import type { CitedBasis } from "../../domain/commands";
@@ -46,8 +46,14 @@ export function registerWrites(program: Command, run: Run): void {
     .summary("put a question on the record")
     .description("A question, without starting work on it. `open` does both at once.")
     .argument("<question>", "the question, as worded")
-    .action(async (question: string) =>
-      run(async ({ write }) => answer(await write.pose({ question }), mintedView())),
+    .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3", handle("note"))
+    .action(async (question: string, opts: { from?: NoteRef }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.pose({ question, ...(opts.from ? { from: opts.from } : {}) }),
+          mintedView(),
+        ),
+      ),
     );
   program
     .command("open")
@@ -59,8 +65,9 @@ export function registerWrites(program: Command, run: Run): void {
         "did one thing.",
     )
     .argument("<question>", "the question, as worded")
-    .action(async (question: string) =>
-      run(async ({ write }) => answer(await write.openEnquiry(question), mintedView())),
+    .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3", handle("note"))
+    .action(async (question: string, opts: { from?: NoteRef }) =>
+      run(async ({ write }) => answer(await write.openEnquiry(question, opts.from), mintedView())),
     );
   program
     .command("pursue")

@@ -10,6 +10,7 @@ import type {
   EnquiryRef,
   GateRef,
   InputRef,
+  NoteRef,
   QuestionRef,
   ReviewRef,
   WorkRef,
@@ -30,11 +31,14 @@ export interface SynthesiseCommand {
 /** `pose` — put a question on the record, unpursued. */
 export interface PoseCommand {
   question: Prose;
+  /** The note this question came out of, when it came out of one. */
+  from?: NoteRef;
 }
 
 /** `openEnquiry` — pose a question and pursue it, as one act. */
 export interface OpenEnquiryCommand {
   question: Prose;
+  from?: NoteRef;
 }
 
 /** `stateCriterion` — state a condition a result will be held to. */

@@ -897,12 +897,18 @@ export interface KnowledgeSurvey {
  * Where a question came from, when it came from sharpening an earlier one.
  */
 export interface QuestionOrigin {
-  /** Identity of the question this one was sharpened from. */
-  from: QuestionRef;
-  /** What that question asked — still in its original words. */
-  fromAsks: string;
-  /** Why it was sharpened. */
-  reason: string;
+  /**
+   * Which kind of origin this is: a question narrowed from an earlier one, or a question posed
+   * out of a note somebody wrote before there was anything to ask.
+   */
+  kind: "sharpened" | "noted";
+  /** Identity of the record it came out of. */
+  from: QuestionRef | NoteRef;
+  /** What that record said, in its own words. */
+  said: string;
+  /** Why it was sharpened. `null` for a note: posing from a hunch records no reason. */
+  reason: string | null;
+  /** What was known when it was sharpened. Empty for a note, which cites nothing. */
   knownAtTheTime: CitedFinding[];
 }
 
