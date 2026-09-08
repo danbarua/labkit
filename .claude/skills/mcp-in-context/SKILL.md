@@ -101,6 +101,21 @@ needed: `--db` into a temporary directory, driven through the CLI rather than
 through the inspector. Never point a write at a record someone is working in;
 never `rm -rf` a `.labkit` directory that is not yours.
 
+## SDK traps (`@modelcontextprotocol/sdk` 1.30.0)
+
+Each was found by debugging. Each is a behaviour, not a design rule.
+
+| behaviour | consequence |
+|---|---|
+| the package's `exports` maps `"."` to a `dist/esm/index.js` that is not on disk | verified under Bun. `server/index.js` looks like the obvious alternative and exports the deprecated `Server`. Import from subpaths only |
+| `normalizeObjectSchema` returns `undefined` for a plain union rather than throwing | a union `outputSchema` makes **every call to that tool fail validation** |
+| a `z.discriminatedUnion` `outputSchema` | **crashes every call**. Write the arms out literally as `z.strictObject` |
+| an unrecognised key on a tool definition is stripped | it is stripped from the tool object **and** from its `annotations`, where `readOnlyHint` lives |
+| `structuredContent` must be an object | a tool answering with a bare array or a bare handle has to wrap it |
+| a thrown error becomes `isError: true` carrying the message | the message travels verbatim to the calling agent, so nothing on that path may log bound parameters |
+| `StdioServerTransport` subscribes to stdin's `data` and `error`, never `end` | `onclose` fires only on an explicit `close()`. A process whose only handle is that listener stays up indefinitely |
+| zod emits `required` whenever any field is required | an absent `required` array means nothing is required — not "cannot tell" |
+
 ## Additional resources
 
 - **`scripts/mcp-call.sh`** — resolves the binary, runs one method against a
