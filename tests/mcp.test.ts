@@ -1,5 +1,10 @@
 /**
  * The MCP server, driven as a client drives it.
+ *
+ * Every harness here hands `buildServer` surfaces it built itself, so this file
+ * covers the declarations and the handlers and nothing about how `surfacesOver`
+ * assembles a write. Guard a change to that in `tests/mcp-stdio.test.ts`: a test
+ * added here passes on a server that never made the call.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
