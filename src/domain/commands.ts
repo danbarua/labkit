@@ -198,7 +198,11 @@ export interface AmendDesignCommand {
   criterion: CriterionRef;
   nowRequires: string;
   because: string;
-  citing: ClaimRef;
+  /**
+   * The diagnosis the amendment rests on. Omitted only while the condition has never been
+   * evaluated — before the first number there is nothing to have found.
+   */
+  citing?: ClaimRef;
 }
 
 /**

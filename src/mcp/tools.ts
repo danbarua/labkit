@@ -964,16 +964,23 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Change a locked condition, and say what it costs",
     group: "Saying in advance what counts",
     description:
-      "Reword a prespecified criterion after work has begun, citing what prompted it. The " +
-      "answer says whether the change was **mechanical** (a repair that moves nothing) or " +
-      "**scientific** (one that does), and names the confirmatory results affected — the " +
-      "difference between a legitimate repair and p-hacking, decided from the record rather " +
-      "than from the author's account of it.",
+      "Reword a prespecified criterion, citing what prompted it. The answer says whether the " +
+      "change was **mechanical** (a repair that moves nothing), **scientific** (one that does), " +
+      "or **prespecification** — made before the condition had ever been evaluated, when there " +
+      "is no number for the wording to have been chosen around. `citing` is omitted only in " +
+      "that last case, and is required from the first evaluation onward. The difference between " +
+      "a legitimate repair and p-hacking, decided from the record rather than from the author's " +
+      "account of it.",
     inputSchema: {
       criterion: z.string().describe(`criterion id, e.g. ${CRITERION_PREFIX}1`),
       now_requires: z.string().describe("the new wording"),
       because: z.string().describe("why it is being amended"),
-      citing: z.string().describe(`id of the claim prompting the amendment, e.g. ${CLAIM_PREFIX}4`),
+      citing: z
+        .string()
+        .optional()
+        .describe(
+          `id of the claim prompting the amendment, e.g. ${CLAIM_PREFIX}4 — omit only before the condition's first evaluation`,
+        ),
     },
     outputSchema: amendmentReportSchema,
     handler: (write, { criterion, now_requires, because, citing }) =>
@@ -981,7 +988,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         criterion: ref("criterion", criterion),
         nowRequires: now_requires,
         because,
-        citing: ref("claim", citing),
+        ...(citing ? { citing: ref("claim", citing) } : {}),
       }),
   }),
 

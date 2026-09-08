@@ -26,6 +26,8 @@ import type {
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
+import { compose, per, type Row } from "../facts";
+import { criterionDetail, type CheckState } from "../survey-facts";
 import type { UnitOfWork } from "../projection";
 
 export class Counting extends SessionCore {
@@ -160,9 +162,22 @@ export class Counting extends SessionCore {
           `no condition ${input.criterion} to amend; state the criterion first, or name one already on the record`,
         );
 
-      const cited = await this.findingOn(input.citing);
-      if (!cited) throw new Error(noFindingBearsOn(input.citing));
-      const diagnosis = cited.evidence;
+      // **`never-run`, not "no standing verdicts".** `stateOf` in survey-facts
+      // already tells the two apart, and the difference is the whole rule: a
+      // criterion whose only evaluation was undone reads `no-standing-verdict`,
+      // and a number existed there for somebody to have seen.
+      const everEvaluated = (await this.stateOfCriterion(input.criterion)) !== "never-run";
+      if (input.citing === undefined && everEvaluated)
+        throw new Error(
+          `condition ${input.criterion} has been evaluated; an amendment after a result names the finding that prompted it — pass --citing`,
+        );
+
+      let diagnosis: EvidenceRef | undefined;
+      if (input.citing !== undefined) {
+        const cited = await this.findingOn(input.citing);
+        if (!cited) throw new Error(noFindingBearsOn(input.citing));
+        diagnosis = cited.evidence;
+      }
 
       const gates = await this.gatesGovernedBy(input.criterion);
       if (gates.length === 0) {
@@ -207,7 +222,7 @@ export class Counting extends SessionCore {
       );
       unitOfWork.edge(decision, "CHANGES", input.criterion);
       unitOfWork.edge(decision, "MOTIVATES", replacement);
-      unitOfWork.edge(decision, "BASED_ON", diagnosis);
+      if (diagnosis) unitOfWork.edge(decision, "BASED_ON", diagnosis);
       if (prior) unitOfWork.edge(decision, "SUPERSEDES", prior);
 
       return {
@@ -226,10 +241,32 @@ export class Counting extends SessionCore {
           // something the confirmatory boundary rests on is in its blast radius --
           // which is the difference between repairing a solver and moving the
           // goalposts, and is not a thing the person amending gets to assert.
-          nature: confirmatoryAffected.length > 0 ? "scientific" : "mechanical",
+          // Prespecification is a fact about the condition's history and is
+          // decided first; the other two are decided by the blast radius, which
+          // is empty for a condition nothing has run against anyway.
+          nature: diagnosis
+            ? confirmatoryAffected.length > 0
+              ? "scientific"
+              : "mechanical"
+            : "prespecification",
         },
       };
     });
+  }
+
+  /**
+   * Whether this condition has ever been evaluated, in the words the read side already uses.
+   * `never-run` is the only state with no number behind it; `no-standing-verdict` means every
+   * verdict was retracted, and somebody saw a result before that happened.
+   */
+  private async stateOfCriterion(criterion: CriterionRef): Promise<CheckState> {
+    const { cypher, decoders } = compose(
+      `MATCH (crit:Criterion {natural_id: $id})`,
+      criterionDetail,
+      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
+    );
+    const rows = (await this.graph.query(cypher, decoders, { id: criterion })) as unknown as Row[];
+    return [...per(criterionDetail, rows).values()][0]?.state ?? "never-run";
   }
 
   private async gatesGovernedBy(criterion: CriterionRef): Promise<GateRef[]> {
