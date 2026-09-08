@@ -2,7 +2,7 @@
  * The durable event sink.
  */
 
-import { and, asc, eq, gt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { LabKitDB } from "../db/backend";
 import { ormOver, unwrapped } from "../db/orm";
 import { labkitEvents } from "../db/schema";
@@ -50,6 +50,12 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
       if (filter.by !== undefined) conditions.push(eq(labkitEvents.attribution_id, filter.by));
       if (filter.operation !== undefined)
         conditions.push(eq(labkitEvents.operation, filter.operation));
+      if (filter.reconstructed !== undefined)
+        conditions.push(
+          filter.reconstructed
+            ? isNotNull(labkitEvents.reconstructed_from)
+            : isNull(labkitEvents.reconstructed_from),
+        );
       // Subject *or* created. "What happened to this record" has to include the
       // act that brought it into existence, and for most verbs that act names
       // something else as its subject. jsonb containment is the `@>` this needs,

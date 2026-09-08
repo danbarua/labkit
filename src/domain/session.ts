@@ -102,6 +102,8 @@ export class ResearchSession {
   readonly search: ReadSurface["search"] = (...args) => this.reads.search(...args);
   readonly whatHappened: ReadSurface["whatHappened"] = (...args) =>
     this.reads.whatHappened(...args);
+  readonly howMuchWasTranscribed: ReadSurface["howMuchWasTranscribed"] = (...args) =>
+    this.reads.howMuchWasTranscribed(...args);
   readonly enquiryInContext: ReadSurface["enquiryInContext"] = (...args) =>
     this.reads.enquiryInContext(...args);
   readonly now: ReadSurface["now"] = (...args) => this.reads.now(...args);

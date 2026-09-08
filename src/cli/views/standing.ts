@@ -30,6 +30,15 @@ export function renderStanding(standing: Standing, p: Palette): string {
     "",
     renderKnown(standing.known, p),
     "",
+    // The whole record in both readings, so it is stated as such -- a `--since`
+    // report narrows every section above and this line does not follow.
+    ...(standing.transcribed.transcribed > 0
+      ? [
+          p.quiet(
+            `${standing.transcribed.transcribed} of ${standing.transcribed.acts} acts on this record were read off something  —  \`happened --reconstructed\` lists them`,
+          ),
+        ]
+      : []),
     p.quiet(`seq: ${standing.seq}  —  \`now --since ${standing.seq}\` asks what moves next`),
   ].join("\n");
 }

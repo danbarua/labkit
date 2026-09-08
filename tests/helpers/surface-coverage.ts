@@ -128,5 +128,10 @@ export const NOT_EXPOSED: Readonly<Record<string, string>> = {
   // `private`. Neither is a question a researcher would ask — "list this
   // record's edges" is the storage shape, and `why` is the intent.
   neighboursOf: "reached only through `why`, as the walked kinds' body",
+  // Composed by `now`, whose output carries the count, and `what_happened`'s
+  // `reconstructed` filter is the list. A tool of its own would be a second
+  // spelling of one question.
+  howMuchWasTranscribed:
+    "reached through `now`, which prints the count — a command of its own would be a second spelling of one question",
   proseFor: "reached only through `why`, as the walked kinds' body",
 };

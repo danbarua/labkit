@@ -135,6 +135,12 @@ export interface EventFilter {
   operation?: string;
   /** Acts about, or minting, this handle. */
   touching?: string;
+  /**
+   * `true` for acts that say what they were read off, `false` for the rest. Absent is
+   * everything — the rest are acts nobody sourced, which is not the same as acts somebody
+   * watched.
+   */
+  reconstructed?: boolean;
   limit?: number;
 }
 
@@ -168,6 +174,7 @@ export function inMemoryEventLog(): EventSink {
     (f.since === undefined || (e.seq ?? 0) > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
+    (f.reconstructed === undefined || (e.reconstructedFrom !== null) === f.reconstructed) &&
     (f.touching === undefined || e.subject === f.touching || createdIn(e).includes(f.touching));
   return {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
