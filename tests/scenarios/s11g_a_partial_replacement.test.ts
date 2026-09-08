@@ -39,6 +39,7 @@ afterEach(async () => {
 
 /** Two of Bonsai's four comparisons: one the re-analysis revisits, one it excludes. */
 const REVISITED = "T differs from the current-random control";
+const SURVIVES = "T differs from the lattice control";
 const EXCLUDED = "T differs from the lattice control";
 const AGGREGATION = "the aggregation is done on the correct scale";
 
@@ -400,14 +401,14 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
-   * **A pairing nobody stated is not a pairing.**
+   * **The pairing the act implies is recorded by the act.**
    *
-   * The wording is unique on both sides here, so it *could* be matched — and
-   * matching it would report a before/after the researcher never asserted.
-   * `conclude --replacing` is how a successor says what it stands in place of;
-   * without it the record does not know, and says so.
+   * A replacement re-answering a proposition its predecessor answered stands
+   * in place of that finding. `conclude` records it, so `why` reads an edge
+   * rather than matching sentences afterwards, and a researcher gets the
+   * before/after without naming anything.
    */
-  test("a successor that names nothing is unpaired, even when the wording is unambiguous", async () => {
+  test("a successor is paired to the finding it replaces, with nothing named", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from its controls?");
     const { observations } = await session.recordObservations({
       enquiry,
@@ -426,8 +427,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       because: review,
       method: "log-scale re-aggregation",
     });
-    // One sentence, one finding on each side, and nothing named.
-    await session.conclude({
+    const { claims } = await session.conclude({
       analysis: report.replacement,
       proposition: REVISITED,
       finding: "p = 0.007 log",
@@ -435,7 +435,68 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
     const why = await (await afterwards()).why(report.replacement);
     if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
-    expect(why.report.changed).toEqual([]);
-    expect(why.report.unpaired.map((u) => u.claim)).toEqual([v1Claims[0]!.claim]);
+    expect(why.report.unpaired).toEqual([]);
+    expect(why.report.changed.map((c) => c.was)).toEqual([v1Claims[0]!.claim]);
+    expect(why.report.changed[0]!.claim).toBe(claims[0]!.claim);
+    expect(why.report.changed[0]!.before).toBe("p = 0.03 raw");
+    expect(why.report.changed[0]!.after).toBe("p = 0.007 log");
+  });
+
+  /**
+   * **A kept finding still stands, so nothing replaces it.**
+   *
+   * `keep` carries a conclusion forward on its original evidence. A successor
+   * concluding on the same proposition is a second finding, not a replacement
+   * — pairing to a kept claim would say a live finding had fallen.
+   */
+  test("a conclusion is never paired to a finding the revision kept", async () => {
+    const events = inMemoryEventLog();
+    session = new ResearchSession(await scenario.current(), { clock, events });
+    const { enquiry } = await session.openEnquiry("does T differ from its controls?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "per-image results",
+      finding: "one batch",
+    });
+    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "raw-scale aggregation",
+      from: [observations],
+      concludes: [
+        { proposition: REVISITED, finding: "p = 0.03 raw" },
+        { proposition: SURVIVES, finding: "the lattice comparison, unaffected by scale" },
+      ],
+    });
+    const { review } = await session.recordReview({ of: v1, verdict: "wrong scale" });
+    const report = await session.keep({
+      keeping: [claimOf(v1Claims, SURVIVES)],
+      because: review,
+      method: "log-scale re-aggregation",
+    });
+
+    // On the proposition that was KEPT, not the one that fell.
+    await session.conclude({
+      analysis: report.replacement,
+      proposition: SURVIVES,
+      finding: "the lattice comparison again, on the log scale",
+    });
+
+    // **Asserted on what the act wrote, not on a report.** No read shows this:
+    // `analysisRevision` iterates the claims the LINEAGE decision superseded,
+    // and `withdrawalOf` needs every claim asserting a proposition to have
+    // fallen -- the successor's own conclusion keeps it standing. A
+    // supersession wrongly written onto a kept claim would sit in the record
+    // with nothing able to report it, which is why this reads the delta.
+    const superseding = (await events.all())
+      .flatMap((e) => e.changes)
+      .filter((c) => c.change === "EdgeCreated" && c.label === "SUPERSEDES")
+      .map((c) => (c as { to: string }).to);
+    expect(superseding).not.toContain(claimOf(v1Claims, SURVIVES));
+
+    const later = await afterwards();
+    const why = await later.why(report.replacement);
+    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
+    // What did fall is the other conclusion, and this act did not answer it.
+    expect(why.report.unpaired.map((u) => u.claim)).toEqual([claimOf(v1Claims, REVISITED)]);
   });
 });

@@ -69,9 +69,9 @@ export async function recordAnalysis(
  * `WriteSurface.replaceAnalysis` had before its conclusions became acts of
  * their own.
  *
- * `replacing` on each conclusion names the finding it stands in for; one the
- * caller does not name is not superseded, and nothing recovers the pairing
- * afterwards.
+ * `replacing` names the finding a conclusion stands in for. It is the override:
+ * `conclude` records the pairing itself when exactly one superseded finding
+ * answers the proposition, and needs telling only when two do.
  *
  * Distinct from `reviewAndReplace`, which mints the review as well — this
  * takes one already on the record, as the verb does.
