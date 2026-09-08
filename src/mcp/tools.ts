@@ -503,16 +503,23 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       by: z.string().optional().describe("one agent's acts, by attribution id"),
       operation: z.string().optional().describe("one verb, e.g. `record_analysis`"),
       touching: z.string().optional().describe("acts about, or minting, this id"),
+      reconstructed: z
+        .boolean()
+        .optional()
+        .describe(
+          "true for acts that say what they were read off, false for the rest — omit for both. The rest are acts nobody sourced, which is not the same as acts somebody watched",
+        ),
       limit: z.number().optional().describe("how many at most (default 50)"),
     },
     outputSchema: whatHappenedSchema,
-    handler: async (read, { since_seq, by, operation, touching, limit }) => ({
+    handler: async (read, { since_seq, by, operation, touching, reconstructed, limit }) => ({
       events: (
         await read.whatHappened({
           ...(since_seq === undefined ? {} : { since: since_seq }),
           ...(by === undefined ? {} : { by }),
           ...(operation === undefined ? {} : { operation }),
           ...(touching === undefined ? {} : { touching }),
+          ...(reconstructed === undefined ? {} : { reconstructed }),
           limit: limit ?? 50,
         })
       ).map((e) => ({

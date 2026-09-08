@@ -31,6 +31,7 @@ import type {
   ReproductionReport,
   SearchGroup,
   Standing,
+  Transcription,
   SupportExplanation,
   StoppedReason,
   TaskContract,
@@ -80,6 +81,11 @@ export class ReadSurface extends SessionCore {
    */
   async whatHappened(filter: EventFilter = {}): Promise<readonly DomainEvent[]> {
     return this.#happened.whatHappened(filter);
+  }
+
+  /** How much of the record was read off something rather than performed. */
+  async howMuchWasTranscribed(): Promise<Transcription> {
+    return this.#happened.howMuchWasTranscribed();
   }
 
   /** Every line of enquiry pursuing this question. */
@@ -217,11 +223,14 @@ export class ReadSurface extends SessionCore {
    * comment for the shape and why there is no `at=`.
    */
   async now(since?: number): Promise<Standing> {
-    const [events, gates, work, known] = await Promise.all([
+    const [events, gates, work, known, transcribed] = await Promise.all([
       this.whatHappened(since === undefined ? {} : { since }),
       this.gateList(),
       this.workList(),
       this.whatIsKnown(),
+      // Not derived from `events` above: with a cursor that list is the window,
+      // and this answer is about the record.
+      this.howMuchWasTranscribed(),
     ]);
     const last = events.at(-1);
     const seq = last?.seq ?? since ?? 0;
@@ -238,6 +247,7 @@ export class ReadSurface extends SessionCore {
         },
         untouched: work.filter((w) => w.state === "planned"),
         known,
+        transcribed,
         seq,
       };
     }
@@ -267,6 +277,7 @@ export class ReadSurface extends SessionCore {
         untested: known.untested.filter(movedById),
         accepted: known.accepted.filter(movedById),
       },
+      transcribed,
       seq,
       since,
     };

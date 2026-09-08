@@ -1256,6 +1256,12 @@ export interface Standing {
   untouched: ListedWork[];
   /** Where every question currently stands. */
   known: KnowledgeSurvey;
+  /**
+   * How much of the record was read off something. **The whole record, in both readings**: the
+   * sections above narrow to what moved since a cursor, and a count that narrowed with them
+   * would be a different number under the same name.
+   */
+  transcribed: Transcription;
   /** This read's position in the event stream — what `now({since})` takes next. */
   seq: number;
   /**
@@ -1264,4 +1270,14 @@ export interface Standing {
    * since that cursor — presence *is* the "moved" marker, not a per-item flag repeating it.
    */
   since?: number;
+}
+
+/**
+ * How much of a record was read off something rather than performed. `acts` is every act on the
+ * record; the difference is acts nobody sourced, which is **not** the same as acts somebody
+ * watched — no process can observe that, and naming the remainder would claim it.
+ */
+export interface Transcription {
+  transcribed: number;
+  acts: number;
 }

@@ -1026,6 +1026,12 @@ export const workListSchema = z.strictObject({
 export type _ListedGate = Assert<Exact<z.infer<typeof listedGate>, ListedGate>>;
 export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;
 
+/** How much of the record was read off something. See `Transcription` in the domain. */
+export const transcriptionSchema = z.strictObject({
+  transcribed: z.number(),
+  acts: z.number(),
+});
+
 /**
  * `now` — "what am I blocked on right now, what are my priorities?"
  * `blocked`/`unevaluated`/`untouched` reuse `listedGate`/`listedWork`; `known` reuses
@@ -1036,6 +1042,7 @@ export const standingSchema = z.strictObject({
   unevaluated: z.strictObject({ gates: z.array(listedGate), work: z.array(listedWork) }),
   untouched: z.array(listedWork),
   known: knowledgeSurveySchema,
+  transcribed: transcriptionSchema,
   seq: z.number(),
   since: z.number().optional(),
 });

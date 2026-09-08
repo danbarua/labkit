@@ -336,6 +336,11 @@ export function registerReads(program: Command, run: Run): void {
     .option("--since <seq>", "only acts after this seq — the cursor", whole)
     .option("--by <id>", "one agent's acts, by attribution id")
     .option("--operation <verb>", "one verb, e.g. recordAnalysis")
+    .option("--reconstructed", "only acts that say what they were read off")
+    // Not `--no-reconstructed`: a negatable flag defaults to on, and the
+    // default here is neither arm. "Unsourced" and not "performed" -- nobody
+    // said, which is not the same as somebody watched.
+    .option("--unsourced", "only acts that say nothing about where they came from")
     .option("--limit <n>", "how many at most", whole, 50)
     .action(
       async (
@@ -344,15 +349,23 @@ export function registerReads(program: Command, run: Run): void {
           since?: number;
           by?: string;
           operation?: string;
+          reconstructed?: boolean;
+          unsourced?: boolean;
           limit: number;
         },
       ) =>
         run(async ({ read }) => {
+          if (opts.reconstructed && opts.unsourced)
+            throw new Error(
+              "--reconstructed and --unsourced ask for opposite halves; pass neither for both",
+            );
           const filter: EventFilter = {
             ...(id === undefined ? {} : { touching: id }),
             ...(opts.since === undefined ? {} : { since: opts.since }),
             ...(opts.by === undefined ? {} : { by: opts.by }),
             ...(opts.operation === undefined ? {} : { operation: opts.operation }),
+            ...(opts.reconstructed ? { reconstructed: true } : {}),
+            ...(opts.unsourced ? { reconstructed: false } : {}),
             limit: opts.limit,
           };
           return answer(await read.whatHappened(filter), renderHappened);
