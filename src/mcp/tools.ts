@@ -525,6 +525,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         attribution_id: e.attribution.attribution_id,
         attribution_how: e.attribution.attribution_how,
         git_hash: e.attribution.git_hash,
+        reconstructed_from: e.reconstructedFrom,
         command: e.command,
       })),
     }),

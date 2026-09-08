@@ -74,6 +74,11 @@ export const labkitEvents = p
       attribution_how: p.text(),
       git_hash: p.text().notNull(),
       /**
+       * What the act was read off, when it was not performed. Nullable, and the absence means
+       * nobody said — see `CommandContext` in `src/domain/events.ts`.
+       */
+      reconstructed_from: p.text(),
+      /**
        * The command the caller issued, verbatim.
        */
       command: p.jsonb().notNull(),

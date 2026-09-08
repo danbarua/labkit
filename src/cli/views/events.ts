@@ -42,9 +42,15 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
       const wired = edgesIn(e).map(
         (x) => `           ${p.handle(x.from)} ${p.quiet(`-[${x.label}]->`)} ${p.handle(x.to)}`,
       );
+      // Its own line, and only when there is one. An absence here means nobody
+      // said what the act was read off, which is not a claim that it was watched.
+      const source = e.reconstructedFrom
+        ? [`         ${p.quiet(`read off ${e.reconstructedFrom}`)}`]
+        : [];
       return [
         `${p.quiet(String(e.seq ?? 0).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${p.handle(e.subject)}`,
         `         ${p.quiet(`by ${who}`)}${how}${p.quiet(commit)}${minted}`,
+        ...source,
         ...(wired.length ? [`         ${p.quiet("connecting")}`, ...wired] : []),
       ].join("\n");
     })

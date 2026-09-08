@@ -19,6 +19,12 @@ export interface Globals {
   tenant?: string;
   db?: string;
   author?: string;
+  /**
+   * `--reconstructed-from`, falling back to `$LABKIT_RECONSTRUCTED_FROM` — what an act was read
+   * off, for a record built after the work. A script backfilling a finished programme exports it
+   * once; `labkit happened` then shows it on every act, which is what makes a stale one visible.
+   */
+  reconstructedFrom?: string;
   json?: boolean;
   /** Commander's negatable `--no-ansi`: present and `false` when passed. */
   ansi?: boolean;
@@ -69,7 +75,12 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
       const answered = await work({
         read: new ReadSurface(graph, { events }),
         write: new WriteSurface(graph, {
-          ...commandContext(gitContext, personContext(opts.author), clock),
+          ...commandContext(
+            gitContext,
+            personContext(opts.author),
+            clock,
+            opts.reconstructedFrom ?? process.env.LABKIT_RECONSTRUCTED_FROM,
+          ),
           events,
         }),
       });

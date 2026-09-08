@@ -136,6 +136,8 @@ export const whatHappenedSchema = z.strictObject({
       // which is the exact shape this field exists to stop.
       attribution_how: z.enum(["observed", "claimed", "unattributed"]).nullable(),
       git_hash: z.string(),
+      /** What the act was read off, or `null` if nobody said. Nullable for the reason above. */
+      reconstructed_from: z.string().nullable(),
       command: z.record(z.string(), z.unknown()),
     }),
   ),
@@ -202,6 +204,7 @@ export const domainEventSchema = z.strictObject({
   subject: z.string(),
   changes: changesList,
   command,
+  reconstructedFrom: z.string().nullable(),
 });
 
 const questionStanding = z.strictObject({

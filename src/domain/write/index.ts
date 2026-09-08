@@ -228,6 +228,7 @@ export class WriteSurface extends SessionCore {
         subject: act.subject,
         command,
         changes: unitOfWork.delta(),
+        reconstructedFrom: this.reconstructedFrom,
       });
       // The graph is one of these, not the step this used to be. Ordered:
       // a projector that reads the graph must come after the one that writes

@@ -26,6 +26,10 @@ export function globalOptions(program: Command): Command {
         "the directory holding .labkit/ (default: $LABKIT_HOME, else the nearest .labkit/ at or above cwd)",
       )
       .option("--author <name>", "who to attribute writes to (default: your username)")
+      .option(
+        "--reconstructed-from <source>",
+        "what these writes were read off, if you did not see the work happen (default: $LABKIT_RECONSTRUCTED_FROM)",
+      )
       .option("--json", "emit the report as JSON instead of prose")
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only
       // subtracts: colour is off already when stdout is not a terminal or

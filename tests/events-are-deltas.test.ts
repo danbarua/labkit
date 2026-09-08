@@ -130,6 +130,7 @@ test("a property set in place is carried by the delta and applied from it", asyn
     subject: question,
     command: { question: "and now it says this" },
     changes: [{ change: "PropsChanged", id: question, props: { name: "and now it says this" } }],
+    reconstructedFrom: null,
   });
 
   const after = await fresh.query(

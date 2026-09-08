@@ -33,6 +33,7 @@ const toEvent = (r: EventRow): DomainEvent => {
     subject: r.subject,
     changes: r.changes as DomainEvent["changes"],
     command: r.command as DomainEvent["command"],
+    reconstructedFrom: r.reconstructed_from,
   };
 };
 
@@ -93,6 +94,7 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
             attribution_id: event.attribution.attribution_id,
             attribution_how: event.attribution.attribution_how,
             git_hash: event.attribution.git_hash,
+            reconstructed_from: event.reconstructedFrom,
             // `jsonb` takes the value, not a string: the driver serialises it.
             // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
             // payload is the classic way that goes wrong.

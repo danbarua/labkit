@@ -144,6 +144,7 @@ export function commandContext(
   git: GitContextProvider,
   session: SessionContextProvider,
   clock: Clock = systemClock,
+  reconstructedFrom?: string,
 ): CommandContext {
   const attribution: AttributionContext = {
     attribution_label: session.label(),
@@ -151,5 +152,7 @@ export function commandContext(
     attribution_how: session.how(),
     git_hash: git.head(),
   };
-  return { clock, attribution };
+  // Omitted rather than passed as `undefined`, so a caller spreading this over
+  // `ResearchSessionOptions` cannot overwrite a source set beside it.
+  return reconstructedFrom ? { clock, attribution, reconstructedFrom } : { clock, attribution };
 }
