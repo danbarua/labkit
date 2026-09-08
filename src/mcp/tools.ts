@@ -145,6 +145,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     description:
       "What this research programme currently knows, partitioned by how well each answer is " +
       "held up: established, provisional, accepted as unresolved, unresolved, untested. " +
+      "Any evidence recorded against a pursuit moves a question from untested to unresolved. A harness shakedown counts: the record cannot tell one from an experiment, only the shape of the acts can. " +
       "Given `at` (an ISO instant) it answers as of that moment instead, from durable state " +
       "rather than a log — but the historical form cannot split `open` into worked-on and " +
       "untouched, because nothing records when work began.",

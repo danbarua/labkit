@@ -62,6 +62,14 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
     "",
     p.untested("Untested (nothing has been run against these)"),
     list(survey.untested),
+    "",
+    // The two buckets above name what they hold and not what moves a question
+    // between them, and the available inference is the wrong one: "unresolved"
+    // sounds like a judgement about the science and is a fact about whether
+    // anything addresses the enquiry.
+    p.quiet("Any evidence recorded against a pursuit moves a question from untested to"),
+    p.quiet("unresolved. A harness shakedown counts: the record cannot tell one from an"),
+    p.quiet("experiment, only the shape of the acts can."),
   ].join("\n");
 }
 
