@@ -22,6 +22,8 @@
  *
  * Exit 0 = clean. Exit 1 = strays, listed. Not wired into any hook; run it after
  * moving code between files, which is when the defect is created.
+ *
+ * retire-when: the formatter cannot separate a doc comment from what it documents.
  */
 import { readFileSync } from "node:fs";
 import { Glob } from "bun";

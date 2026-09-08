@@ -21,6 +21,8 @@
  * would be matching a shape. Every one of them starts at the value `ormOver()`
  * returned, so that is what gets tracked: each reference to it must have an
  * `unwrapped(` call somewhere above it in the tree.
+ *
+ * retire-when: drizzle stops printing bound parameters in its error message.
  */
 
 import ts from "typescript";

@@ -1,8 +1,8 @@
 /**
- * The query/mutation surface for one tenant's graph (, ): one Apache AGE graph per tenant, addressed and
- * mutated exclusively through the `TenantGraph` class below — never a hardcoded graph name,
- * never an arbitrary property-map edge match, never AGE's internal graphid past this file's
- * boundary.
+ * The query and mutation surface for one tenant's graph.
+ *
+ * One AGE graph per tenant, reached only through `TenantGraph`. No hardcoded graph name, no
+ * property-map edge match, and no AGE graphid past this file.
  */
 
 import { LABKIT_SCHEMA } from "./schema";

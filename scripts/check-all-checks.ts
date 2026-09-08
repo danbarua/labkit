@@ -26,6 +26,8 @@
  *
  * Usage: bun run check:all-checks
  * Exit:  0 when every wired-up script has a findable summary, 1 otherwise.
+ *
+ * retire-when: the check runner reads a description from somewhere other than line 4.
  */
 
 import { readFileSync } from "node:fs";

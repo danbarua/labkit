@@ -520,9 +520,8 @@ export function labelForNaturalId(naturalId: string): NodeLabel {
 
 /**
  * A node as returned to callers outside the persistence layer: AGE's internal graphid
- * (`AgtypeVertex.id`, a large opaque number/bigint — see src/db/agtype.ts) is stripped and
- * replaced with the short, incrementing `natural_id` that's safe to show a user or an AI-agent
- * caller.
+ * (`AgtypeVertex.id`, a large opaque number/bigint — see src/db/agtype.ts) is stripped and replaced
+ * with the short, incrementing `natural_id` that's safe to show a user or an AI-agent caller.
  */
 export interface PublicNode<L extends NodeLabel> {
   natural_id: string;

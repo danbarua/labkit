@@ -28,6 +28,8 @@
 		"check:no-tracked-symlinks": "bash scripts/check-no-tracked-symlinks.sh",
 		"check:orm-unwrapped": "bun scripts/check-orm-unwrapped.ts",
 		"check:cypher-labels": "bun scripts/check-cypher-labels.ts",
+		"check:claude-md": "bun scripts/check-claude-md.ts",
+		"check:comment-length": "bun scripts/check-comment-length.ts",
 		"check:help-groups": "bun scripts/check-help-groups.ts",
 		"check:empty-population": "bun scripts/check-empty-population.ts",
 		"check:facts": "bun scripts/check-facts.ts",

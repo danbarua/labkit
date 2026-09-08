@@ -95,6 +95,12 @@ say, not a flag naming how the answer is stored.
 
 **Do not use this repo's shorthand when reporting to the user.**
 
+**Every `check:*` script carries a `retire-when:` line** naming the condition
+under which it is deleted. A check with no such condition is a rule nobody can
+remove. This is a convention rather than a check, because a check that reads
+other checks is the shape being retired — and every existing one carries the
+line, so a new one without it is the odd case rather than the normal one.
+
 ## Platform traps
 
 These cost real debugging time. Load the skill before you need it, not after:

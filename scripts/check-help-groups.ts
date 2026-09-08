@@ -14,6 +14,8 @@
  * declared, so a command appended to the wrong place silently moves a whole
  * heading. That is checked here by walking the declarations in file order and
  * asserting the groups appear in the order the domain lists them.
+ *
+ * retire-when: commander can require a help group at declaration.
  */
 
 import { readFileSync, readdirSync } from "node:fs";

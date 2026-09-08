@@ -28,6 +28,8 @@
  * It reads the **written type node**, not the resolved type. All five
  * aliases resolve to `string`, so a checker asking the type checker what
  * these are would learn nothing.
+ *
+ * retire-when: INDEXED_PROPS is derived from the property types instead of written by hand.
  */
 
 import ts from "typescript";

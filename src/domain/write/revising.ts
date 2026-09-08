@@ -251,10 +251,9 @@ export class Revising extends Shared {
   }
 
   /**
-   * "Replace the analysis, mark the prior inference superseded, and propagate whatever claims
-   * change." One instruction in the conversation, so one verb here — it invalidates the old
-   * analysis's output, records the replacement against the same observations, and returns what
-   * moved.
+   * Replaces an analysis, supersedes the inference it stood on, and returns what moved.
+   *
+   * One instruction, so one verb. The replacement is recorded against the same observations.
    */
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
     return this.revise({ ...input, keeping: [] }, "replaceAnalysis");

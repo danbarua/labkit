@@ -17,6 +17,7 @@
 #
 # Usage: scripts/check-no-tracked-symlinks.sh
 # Exit:  0 when clean, 1 when a tracked symlink is found.
+# retire-when: git refuses to track a symlink.
 
 set -euo pipefail
 

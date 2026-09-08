@@ -148,12 +148,10 @@ class TenantGraphProvisioner {
   }
 
   /**
-   * DB-enforced edge-relationship uniqueness: every edge label's underlying table has exactly
-   * `id`/`start_id`/`end_id`/`properties` columns (AGE materializes edges as real tables just
-   * like vertices — confirmed via `information_schema.columns`), so `UNIQUE (start_id, end_id)`
-   * encodes "at most one edge of this type between these two nodes" directly, closing the
-   * concurrent-create race `TenantGraph.createEdge()`'s check-then-create fast path alone can't
-   * (see that method's docstring).
+   * At most one edge of a type between two nodes, enforced by the database.
+   *
+   * An edge label is a real table with `start_id`/`end_id` columns, so `UNIQUE (start_id, end_id)`
+   * states it directly. It closes the race `createEdge`'s check-then-create cannot.
    */
   private async ensureEdgeUniqueIndex(edge: EdgeLabel, existing: Set<string>): Promise<void> {
     const indexName = `${edge.toLowerCase()}_start_end_idx`;
