@@ -31,30 +31,9 @@ export class Work extends Shared {
   }
 
   /**
-   * Records raw observations — the durable measurements an analysis later
-   * interprets. Kept distinct from the conclusions drawn from them: an
-   * inference can be wrong while the observations it consumed remain fine.
-   *
-   * **Taking measurements is work, and this records it as such.** Without a
-   * producing `EvidenceUnit` the `Evidence` has no producer at all, and
-   * `whatIsKnown()` decides whether anyone has looked at a question from
-   * `EvidenceUnit -ADDRESSES-> LineOfEnquiry` — so a question pursued only
-   * through observations would report itself `untested`, meaning *nothing has
-   * ever been run against it*. Populated, confident, and false.
-   *
-   * The unit `PRODUCES` the evidence and **not** the artefact, which is where
-   * this differs from `recorded()`. There the artefact is an analysis *output*
-   * the unit brought into existence; here the artefact **is** the observation
-   * record, and the unit did not produce the measurement — it is the activity
-   * of taking it. Wiring the second edge would claim the record was generated
-   * by the act that describes it.
-   *
-   * No `Computation`, deliberately. LabKit did not run the instrument, and
-   * minting one to make this shape match the analysis path would invent
-   * execution state that never existed. It is also what keeps the blast radius
-   * to one read: every other query that reaches a unit does so either through
-   * `Evidence -SUPPORTS|CHALLENGES-> Claim`, which observation evidence has
-   * neither of, or through a required `USES -> Computation`.
+   * Records raw observations — the durable measurements an analysis later interprets. Kept
+   * distinct from the conclusions drawn from them: an inference can be wrong while the
+   * observations it consumed remain fine.
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
     return this.handle("recordObservations", input, async (unitOfWork) => {
@@ -72,12 +51,9 @@ export class Work extends Shared {
       unitOfWork.edge(evidence, "RECORDED_IN", artefact);
       unitOfWork.edge(unit, "PRODUCES", evidence);
       unitOfWork.edge(unit, "ADDRESSES", input.enquiry);
-      // The enquiry requires these observations -- a statement about the
-      // enquiry, not about any analysis. What a given analysis actually read is
-      // CONSUMES, drawn in recordAnalysis(); this edge no longer stands in for
-      // it. REQUIRES says the enquiry depends on this evidence, ADDRESSES says
-      // this work was done towards the enquiry, and `whatDependsOn()` reads the
-      // first.
+      // The enquiry requires these observations -- a statement about the enquiry, not about any
+      // analysis. What a given analysis actually read is CONSUMES, drawn in recordAnalysis();
+      // this edge no longer stands in for it.
       unitOfWork.edge(input.enquiry, "REQUIRES", evidence);
 
       const observations = ref("observations", artefact);
@@ -89,14 +65,9 @@ export class Work extends Shared {
   }
 
   /**
-   * Records an analysis: a method applied to observations, yielding
-   * conclusions. Creates the computation, the unit of work that ran it, the
-   * artefact holding its output, and one finding + proposition per conclusion.
-   *
-   * `from` names the observations consumed, recorded as real execution lineage
-   * (`CONSUMES`). A route back to inputs through the enquiry instead answers a
-   * different question and produces a false inference in `whySupported()`. See
-   * EDGE_SCHEMA.CONSUMES.
+   * Records an analysis: a method applied to observations, yielding conclusions. Creates the
+   * computation, the unit of work that ran it, the artefact holding its output, and one finding
+   * + proposition per conclusion.
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.handle("recordAnalysis", input, async (unitOfWork) => {
@@ -112,31 +83,7 @@ export class Work extends Shared {
   }
 
   /**
-   * Assert one thing an analysis found. **The primitive the compound verbs are
-   * built from.**
-   *
-   * A conclusion is a research act of its own: a run draws its findings one at a
-   * time, and each is recorded when it is reached.
-   *
-   * ## `replacing` names which finding this one stands in place of
-   *
-   * It does not supersede: by the time a successor's conclusions are recorded,
-   * `keep` has already superseded everything it did not carry forward. This
-   * says *which* superseded finding a new one replaces, so a reader does not
-   * have to match on wording.
-   *
-   * The decision it mints writes `SUPERSEDES` to the old claim and `MOTIVATES`
-   * to the new — not `CHANGES`, which means *the same evidence read
-   * differently*. `REVERIFIES` is the other edge that looks right and is not:
-   * it means the same proposition checked again.
-   *
-   * ## What is not written
-   *
-   * **Nothing is marked on the output artefact.** A flag over the whole
-   * artefact would summarise the standing of every finding it carries.
-   * Standing is per finding, and `whySupported` computes it. There was an
-   * `Artefact.invalidated` property saying exactly that, unwritten by any verb
-   * and read by three; it is gone.
+   * Assert one thing an analysis found. **The primitive the compound verbs are built from.**
    */
   async conclude(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.concludeOne(input);
@@ -144,20 +91,6 @@ export class Work extends Shared {
 
   /**
    * Draws one finding across findings already on the record, running nothing.
-   *
-   * **No computation, no evidence unit, no evidence.** A synthesis takes
-   * findings that exist and states what they say together; it measures
-   * nothing, so there is nothing for `SUPPORTS` to come from. What the claim
-   * rests on is the claims themselves, written as `RESTS_ON` at the moment the
-   * act names them — `whySupported` reads them back.
-   *
-   * Recording it as an analysis was the alternative and it is worse: it mints
-   * a `Computation` that never ran and `CONSUMES` edges to artefacts it never
-   * read, which is a run the record would then report as reproducible.
-   *
-   * Under no line of enquiry, deliberately: the findings a synthesis draws
-   * across need not share one. Bonsai's Stage 1D drew across four comparisons
-   * recorded under two.
    */
   async synthesise(input: SynthesiseCommand): Promise<Synthesised> {
     return this.handle("synthesise", input, async (unitOfWork) => {
@@ -206,10 +139,6 @@ export class Work extends Shared {
 
   /**
    * Records a reviewer's finding about an analysis.
-   *
-   * The review attaches to the inferential activity (the evidence unit), not to
-   * the execution that ran it: what a reviewer criticises is the method, and
-   * nothing ran incorrectly. See EDGE_SCHEMA.EVALUATES.
    */
   async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
     return this.handle("recordReview", input, async (unitOfWork) => {

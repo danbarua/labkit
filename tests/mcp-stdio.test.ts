@@ -1,27 +1,5 @@
 /**
  * **The real process, over a real pipe.**
- *
- * Every other MCP test constructs `buildServer` in-process and talks to it
- * through `InMemoryTransport`. That proves the tools answer; it does not prove
- * the thing anyone actually runs works. `bun run mcp` is the deployment
- * artefact, and until this file existed nothing had ever launched it: not the
- * database connection, not the file lock, not migrations, not tenant
- * resolution, not `StdioServerTransport`, and not the shutdown path.
- *
- * It also checks the property `bun run check:stdout` exists for, and the last
- * test here is the reason that check cannot be retired. **Measured, because
- * the first version of this file claimed something false:** a stray
- * `console.log` under `src/` does *not* stop this SDK's client connecting.
- * Prefixing `src/db/tenant.ts` with `console.log("POLLUTION")` put that line on
- * stdout ahead of the JSON-RPC and all three tests below still passed — the
- * SDK's read buffer skips lines it cannot parse. So the client is no witness,
- * and the last test reads the raw pipe instead.
- *
- * That tolerance is this SDK's, not the protocol's. A stricter client is
- * entitled to fail, which is why the static check stays too.
- *
- * Given its own temporary directory, because the PGlite backend puts its data
- * under `<cwd>/.labkit` and a test must not write into the repo.
  */
 
 import pkg from "../package.json" with { type: "json" };
@@ -34,10 +12,6 @@ import { join } from "node:path";
 
 /**
  * A handle out of a tool's reply.
- *
- * A tool whose whole answer is one handle returns it under a field named for
- * what it is — `{"question": "Q_1"}` — because MCP's `structuredContent` must
- * be an object and a handle is a bare string now. This takes that sole value.
  */
 const id = (v: unknown): string =>
   // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
@@ -49,13 +23,6 @@ const SERVER = join(import.meta.dir, "..", "src", "mcp", "server.ts");
 
 /**
  * This process's environment with `LABKIT_DB_URL` removed.
- *
- * Every test here gives the server its own temporary directory, and
- * `LABKIT_DB_URL` **wins over that** (`src/db/connect.ts`) — so under
- * `bun run test:pg` these children would silently write into the shared
- * container while the test believed it had a private database. Stripping it
- * keeps the subject of this file what it says: the real process, over a real
- * pipe, against its own PGlite.
  */
 function childEnv(): Record<string, string> {
   const { LABKIT_DB_URL: _dropped, ...rest } = process.env as Record<string, string>;
@@ -92,14 +59,9 @@ afterAll(async () => {
 });
 
 /**
- * **Over the wire, not off the constructor.** `serverInfo.version` reaches a
- * client through the `initialize` response, and asserting the value handed to
- * `new McpServer` would pass while the wire said something else.
- *
- * It said `0.0.1` from before the first release until 2026-09-05 (#282) while
- * `labkit --version` was right — one binary, two surfaces, disagreeing about
- * what they were. A client that displays the field faithfully showed a wrong
- * answer that reads as sourced, which is worse than an absent one.
+ * **Over the wire, not off the constructor.** `serverInfo.version` reaches a client through the
+ * `initialize` response, and asserting the value handed to `new McpServer` would pass while the
+ * wire said something else.
  */
 test(
   "the launched server tells a client the version the package says",
@@ -122,13 +84,9 @@ test(
 test(
   "the launched server refuses a write until it is told who is calling",
   async () => {
-    // **This is the gate's only test against a real process.** Everything else
-    // drives `buildServer` in-process over `InMemoryTransport`; here the server
-    // was spawned, and the registry it consults is the one `main()` built.
-    //
-    // It runs before the write test below because a registration lasts for the
-    // life of the connection, and this file shares one client across tests —
-    // so this is the only point at which the server is genuinely unregistered.
+    // **This is the gate's only test against a real process.** Everything else drives
+    // `buildServer` in-process over `InMemoryTransport`; here the server was spawned, and the
+    // registry it consults is the one `main()` built.
     const refused = await client.callTool({
       name: "pose",
       arguments: { question: "who is asking?" },
@@ -183,10 +141,6 @@ test(
 
 /**
  * Every line the process writes to stdout parses as JSON.
- *
- * Spawned separately and read raw, because the SDK client tolerates lines it
- * cannot parse and so cannot notice — see this file's header. One stray
- * `console.log` under `src/` shows up here as a line that is not JSON.
  */
 test(
   "nothing but JSON-RPC reaches stdout",

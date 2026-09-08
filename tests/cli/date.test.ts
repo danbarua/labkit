@@ -1,14 +1,7 @@
 /**
- * `--date` reaching a durable read — the check that was missing before this
- * flag merged. A hidden flag nothing asserts is the same shape as a check
- * that cannot fail: it exists in the code and nobody would notice it silently
- * stopped working.
- *
- * Driven through `runner()` directly rather than `buildProgram`/`parseAsync`
- * — commander's own parsing of `--date` (refused when not an ISO instant) is
- * `tests/cli/args.test.ts`'s job. This is about the one line downstream: does
- * the value commander accepted actually become the clock a write runs
- * against, durably.
+ * `--date` reaching a durable read — the check that was missing before this flag merged. A
+ * hidden flag nothing asserts is the same shape as a check that cannot fail: it exists in the
+ * code and nobody would notice it silently stopped working.
  */
 
 import { mkdtempSync, rmSync } from "node:fs";

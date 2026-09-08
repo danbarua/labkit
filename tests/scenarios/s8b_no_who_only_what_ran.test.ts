@@ -1,26 +1,5 @@
 /**
  * S-8b — "There is no who."
- * docs/project-journal/008_user_story_mining.md §3 row S
- *
- * *"Who approved the scale-up, and on what projected cost?"* has no answer,
- * and not because attribution is hard: identity is cross-cutting
- * infrastructure, not domain.
- *
- * **A design requiring persistent attribution would be wrong about the
- * domain.** It would be designing for a population of actors this
- * system does not have. Substitute the real one — analyses run by agents, not by
- * people with names, tenure and accountability — and *who* has no referent. An
- * agent invocation is not a person: it does not persist between runs, accrues no
- * standing, and cannot be held to anything. Asking it to sign work imports a
- * governance model from human organisations into a record of computations.
- *
- * What the question was actually reaching for survives, and it is provenance:
- * **what ran, on what inputs, under what configuration.** That is what this
- * scenario checks, and the answer is that the model already carries it — the
- * configuration is an input artefact like any other, carried by `CONSUMES`
- * lineage.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -67,13 +46,9 @@ const CONFIG = "agent configuration";
 
 describe("S-8b: there is no who, only what ran", () => {
   /**
-   * Researcher: "Two analyses reached the same conclusion. One was run by an
-   *  agent on last month's configuration and one on this month's. Which was
-   *  which, and does the difference matter?"
-   *
-   * The question a human-organisation model would phrase as *who ran it*. Here
-   * the configuration is the answer, and it is recorded as what it is: an input
-   * with a content hash.
+   * Researcher: "Two analyses reached the same conclusion. One was run by an agent on last
+   * month's configuration and one on this month's. Which was which, and does the difference
+   * matter?"
    */
   test("what produced an analysis is recoverable, and two configurations are distinguishable", async () => {
     const result = await inOneWorld(async (s) => {
@@ -139,13 +114,6 @@ describe("S-8b: there is no who, only what ran", () => {
 
   /**
    * *"On what projected cost?"*
-   *
-   * A cost projection is a finding with provenance like any other, and an
-   * approval is a decision taken on evidence against a stated condition.
-   * Asserted here so the claim that "who approved it" dissolves into things
-   * the model has is checked rather than argued — the decision names its
-   * reason, cites the finding it rests on, and the criterion it was held to
-   * is recoverable.
    */
   test("approval is a decision on evidence against a condition, with no signer", async () => {
     const answer = await inOneWorld(async (s) => {

@@ -1,24 +1,5 @@
 /**
  * The embedded migrations are the same migrations.
- *
- * `src/db/migrations.ts` exists because `readMigrationFiles` reads the folder
- * off disk with `node:fs`, and a `bun build --compile` bundle has no folder —
- * `bun run build` produced a binary that died on `Can't find
- * meta/_journal.json file` against an empty database, and had since the build
- * script was written.
- *
- * **"A fresh database migrates" is the weaker claim, and it is not the one that
- * matters here.** The risk in swapping the source is an *existing* database:
- * drizzle's ledger stores `hash` and `created_at`, and a mismatch would either
- * re-apply migrations over live data or silently skip one. So the test is
- * equivalence — the embedded builder against `readMigrationFiles` over the same
- * folder, deep-equal — rather than a smoke test that would pass with a subtly
- * different hash.
- *
- * It also keeps checking as migrations are added, which is the other half:
- * `src/db/migrations.ts` names its files by hand, and this is what notices when
- * the hand-written list and the folder disagree in a way the builder's own
- * guards do not already throw on.
  */
 
 import { expect, test } from "bun:test";

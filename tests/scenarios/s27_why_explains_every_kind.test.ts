@@ -1,17 +1,5 @@
 /**
  * S-27: why, of anything on the record.
- *
- * **Researcher:** I have a handle. I want to know why it is there. I should
- * not have to know what kind of thing it is to be allowed to ask.
- *
- * **Agent:** Ask. Whatever it names, the record can say what it is joined to.
- *
- * Six of the fourteen kinds used to refuse, on the stated grounds that a case
- * would be added when somebody asked and got the refusal. A cold agent driving
- * the surface over MCP asked about a question — the first thing on any record —
- * and was told to go away. `Decision` carries more edge types than any other
- * kind and is the only node holding a person's written reason for an act; it
- * was refused too, by the verb called `why`.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

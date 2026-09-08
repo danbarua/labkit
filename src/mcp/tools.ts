@@ -1,31 +1,6 @@
 /**
- * The tools, as data — reads in `TOOLS`, writes in `WRITE_TOOLS`, and the one
- * that is neither in `SESSION_TOOLS`.
- *
- * Separated from transport deliberately. A tool here is a name, a description,
- * an input shape and a handler taking `(read, args)` — nothing that needs a
- * server to exist. That is what lets `tests/mcp.test.ts` enumerate the set and
- * call a handler without standing anything up, and it keeps the wiring in
- * `server.ts` down to a loop.
- *
- * **The two lists are separate, and that is the whole safety story.** A read
- * handler receives a `ReadSurface` and has no write verb in scope to reach for;
- * a write handler receives a `WriteSurface`. Nothing prevents a server from
- * registering both — this one does — but a tool cannot reach the half it was
- * not handed. `src/cli.ts` keeps the stronger property: it builds only a
- * `ReadSurface`, so it cannot write at all.
- *
- * The MCP server was read-only for one batch of work and is not any more. An
- * agent that can only read a record nothing lets it write is answering
- * questions about an empty graph.
- *
- * **Every public verb on either surface is exposed**, or listed in
- * `NOT_EXPOSED` with a reason — `tests/mcp.test.ts` derives the list from the
- * source and fails otherwise, and `tests/mcp-smoke.test.ts` fails if any tool
- * goes uncalled.
- *
- * `labkit://docs/tools` is the tool list. This file deliberately does not count
- * them.
+ * The tools, as data — reads in `TOOLS`, writes in `WRITE_TOOLS`, and the one that is neither
+ * in `SESSION_TOOLS`.
  */
 
 import { createdIn } from "../domain";
@@ -89,26 +64,13 @@ export interface ToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly title: string;
   /**
    * What a caller is doing when they reach for this — see `READ_GROUPS`.
-   *
-   * **Required, and it does not reach the client.** Measured against the SDK
-   * (2026-09-03): a `group` key is stripped from both the tool object and its
-   * `annotations`, where `readOnlyHint` survives. So what an agent sees of the
-   * grouping is the *order* of `tools/list` and whatever the descriptions say;
-   * this field orders that list and renders the sections of
-   * `labkit://docs/tools`. Required rather than optional because a tool added
-   * later would otherwise land in no group silently, which is the shape of
-   * every one-place-forgot defect here.
    */
   readonly group: ReadGroup;
   readonly description: string;
   readonly inputSchema: Shape;
   /**
-   * The shape of what the handler returns, mirrored from `src/domain/report.ts`
-   * and held to it at compile time — see `./schemas`. The SDK validates
-   * `structuredContent` against this and errors when it does not match, so a
-   * schema here is a claim about the handler, not documentation of it.
-   *
-   * Optional for one tool only, and for a measured reason — see `known`.
+   * The shape of what the handler returns, mirrored from `src/domain/report.ts` and held to it
+   * at compile time — see `./schemas`.
    */
   readonly outputSchema?: z.ZodType;
   handler(read: ReadSurface, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
@@ -142,10 +104,7 @@ function writeTool<Shape extends z.ZodRawShape>(
 }
 
 /**
- * The natural-id prefix an artefact carries. `whatDependsOn` takes a name or an
- * explicit reference and **refuses** an ambiguous name rather than answering
- * about the union, so the caller needs a way to hand in the reference —
- * and over a wire the only handle there is is the id itself.
+ * The natural-id prefix an artefact carries.
  */
 const ARTEFACT_PREFIX = "ART_";
 const ANALYSIS_PREFIX = "COMP_";
@@ -192,20 +151,10 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       at: z.string().optional().describe("ISO instant, e.g. 2026-08-21T09:00:00.000Z"),
     },
-    // **No `outputSchema`, and this is the one tool without one.** It returns
-    // `KnowledgeSurvey | HistoricalSurvey` — genuinely two reports, not one
-    // with an extra field: the as-of answer has `open` where the present-day
-    // one has `unresolved` and `untested`, and cannot split them. The SDK
-    // cannot carry that: `normalizeObjectSchema` returns **undefined** for a
-    // union rather than throwing, so declaring one makes every call to this
-    // tool fail validation. Measured against the installed
-    // `@modelcontextprotocol/sdk@1.30.0`, not inferred from the spec.
-    //
-    // The schemas exist either way (`knowledgeSurveySchema`,
-    // `historicalSurveySchema`) and `tests/mcp.test.ts` parses this tool's
-    // output against them, so the shapes are still checked — just not by the
-    // SDK. Splitting this into two tools would give both an `outputSchema`;
-    // that is a wire change, so it is not being made on the way past.
+    // **No `outputSchema`, and this is the one tool without one.** It returns `KnowledgeSurvey
+    // | HistoricalSurvey` — genuinely two reports, not one with an extra field: the as-of
+    // answer has `open` where the present-day one has `unresolved` and `untested`, and cannot
+    // split them.
     handler: (read, { at }) => (at ? read.whatWasKnown(at) : read.whatIsKnown()),
   }),
 
@@ -224,13 +173,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       subject: z.string().describe("a handle of any kind, or a claim's proposition"),
     },
-    // No `outputSchema` -- see `known`'s comment for the measured reason. The
-    // installed SDK's `normalizeObjectSchema` cannot carry a `known` (plain
-    // union) at all; `explanationSchema`'s `z.discriminatedUnion` fares worse
-    // here, crashing every call rather than silently validating nothing --
-    // measured against the same `@modelcontextprotocol/sdk@1.30.0`, 2026-09-01.
-    // The schema exists either way and `tests/mcp.test.ts` parses this tool's
-    // output against it, so the shape is still checked -- just not by the SDK.
+    // No `outputSchema` -- see `known`'s comment for the measured reason.
     handler: (read, { subject }) => read.why(subject),
   }),
 
@@ -589,10 +532,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;
 
 /**
- * The natural-id prefixes a caller hands back. `recordAnalysis` takes a mixed
- * list of observation and analysis ids, and the prefix is what says which is
- * which — the same discrimination `TenantGraph.createEdge` makes, from the same
- * table (`NODE_TYPES` in `src/db/domain.ts`).
+ * The natural-id prefixes a caller hands back.
  */
 // Observations are an `Artefact` -- `recordObservations` returns the artefact's
 // id, not the evidence unit's -- so this is `ARTEFACT_PREFIX` and not a second
@@ -907,14 +847,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "Declare that some work is gated on some criteria, and say what the gate is for. The " +
       "gate's state follows from its criteria's evaluations.",
     inputSchema: {
-      // **`.min(1)` because this refusal is agent-reachable only.** The CLI
-      // declares both as `requiredOption`, so a person cannot send an empty
-      // list; an agent can, and the domain then refuses. Saying it at the
-      // boundary names the field the caller got wrong, which is what
-      // `isoInstant` already does for `--date`. The domain check stays: it is
-      // reachable from the CLI, from tests and from any later surface, and
-      // deleting it because one adapter now validates would move a domain
-      // invariant into an adapter.
+      // **`.min(1)` because this refusal is agent-reachable only.** The CLI declares both as
+      // `requiredOption`, so a person cannot send an empty list; an agent can, and the domain
+      // then refuses. Saying it at the boundary names the field the caller got wrong, which is
+      // what `isoInstant` already does for `--date`.
       governed_by: z
         .array(z.string())
         .min(1, "a gate needs at least one criterion to govern it: a gate enforces a condition")
@@ -1280,22 +1216,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
 ] as ReadonlyArray<WriteToolDefinition<z.ZodRawShape>>;
 
 /**
- * One session tool. A third kind, and the third kind exists because the other
- * two are defined by the surface their handler is handed — and this handler is
- * handed neither.
- *
- * It touches no graph and no verb: it records who is calling, in process
- * memory, for the life of one stdio connection. That makes it the first tool
- * here that is plumbing rather than a research action, which is the same shape
- * the CLI already tolerates in `doctor` and `completions`.
- *
- * **Not a member of {@link WRITE_TOOLS}, and not inline in `server.ts`.** In
- * `WRITE_TOOLS` it would be gated by the gate it exists to open. Inline in
- * `server.ts` it would be invisible to every enumeration in
- * `tests/mcp.test.ts` — *every tool is documented*, *every tool's real output
- * parses against its schema*, *every tool but `known` declares one* all iterate
- * these arrays, so a tool declared elsewhere escapes the lot. A check that
- * cannot see a thing cannot fail on it.
+ * One session tool. A third kind, and the third kind exists because the other two are defined
+ * by the surface their handler is handed — and this handler is handed neither.
  */
 export interface SessionToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly name: string;

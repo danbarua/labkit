@@ -1,18 +1,5 @@
 /**
  * S-11b — "Which review retracted it?"
- * docs/project-journal/008_user_story_mining.md §3 row O
- * docs/consumer-contract/031_row_o_predictions.md
- *
- * *Which review caused an invalidation* describes why state changed and
- * belongs to event history. Row O's own verified-state line asks a
- * different, present-tense question instead: whether a standing retraction
- * rests on valid grounds -- exactly what dependency propagation is for.
- *
- * The scenario is ordinary, which is the point. An analysis draws two reviews —
- * one critical, one confirming — and is then replaced on the strength of one of
- * them. A programme with more than one reviewer produces this constantly.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -61,11 +48,8 @@ const UNSOUND = "the fit used a linear model where the response is plainly sigmo
 const CONFIRMING = "numbers check out; independently recomputed the same values";
 
 /**
- * Researcher: "We have an analysis, and two colleagues have looked at it. One
- *  says the method is wrong. The other says the arithmetic is right."
- *
- * Both are true at once and neither is unusual: a review confirming what it
- * checked is not a review approving the whole analysis.
+ * Researcher: "We have an analysis, and two colleagues have looked at it. One says the method
+ * is wrong. The other says the arithmetic is right."
  */
 async function anAnalysisWithTwoReviews(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("does the coating shift the onset temperature?");
@@ -114,18 +98,8 @@ describe("S-11b: which review retracted it?", () => {
   });
 
   /**
-   * **Row O.** Two worlds identical except for which review the replacement was
-   * made on the strength of.
-   *
-   * In world A the critical review caused it; in world B the confirming one
-   * did. Both are records a real programme produces, and a reader asking *why
-   * is the original finding no longer standing?* must get the verdict that
-   * actually caused the retraction.
-   *
-   * Before `INVALIDATED_BY`, `because` was validated and then written nowhere,
-   * so these two worlds were byte-identical to every read on the surface — and
-   * both reported the **confirming** review among the reasons the work was
-   * retracted. An approval presented as a retraction.
+   * **Row O.** Two worlds identical except for which review the replacement was made on the
+   * strength of.
    */
   test("the reason a finding was superseded is the review that caused it", async () => {
     const build = (pick: "critical" | "confirming") => async (s: ResearchSession) => {
@@ -158,14 +132,8 @@ describe("S-11b: which review retracted it?", () => {
   });
 
   /**
-   * The other half, asked of one world so the claim does not depend on the
-   * pairing: one supersession is reported **once**.
-   *
-   * `findingsBearing()` returns a row per matching review, so before row O a
-   * finding superseded once appeared twice — with two different reasons that
-   * contradicted each other. That was a query defect and the query owns it; the
-   * dedupe stayed when the edge arrived, because the edge fixes attribution and
-   * not multiplicity.
+   * The other half, asked of one world so the claim does not depend on the pairing: one
+   * supersession is reported **once**.
    */
   test("one supersession is reported once, with the reason that caused it", async () => {
     const reasons = await inOneWorld(async (s) => {

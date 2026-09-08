@@ -1,23 +1,5 @@
 /**
  * Is `--json` the same document an MCP client gets?
- *
- * It should be, and this is where that stops being an intention. The CLI
- * answers with the domain report unaltered; `src/mcp/schemas.ts` is pinned to
- * `src/domain/report.ts` at compile time. So a report serialised by the CLI
- * must parse against the schema the MCP tool declares for the same verb, and
- * the schemas are `strictObject` — an extra key fails, not just a missing one.
- *
- * **The CLI does not import those schemas.** The dependency lives here, in a
- * test, rather than in `src/cli/`: the claim is about two adapters agreeing,
- * and putting it in one of them would make the other's shape a consequence
- * instead of a check.
- *
- * Two honest exceptions, both MCP's and both recorded with reasons rather than
- * quietly skipped. See {@link ENVELOPES} and {@link RESHAPED}.
- *
- * The commands run against a seeded scenario graph with **no database
- * connection** — `Run` is injected into the program precisely so the command
- * layer can be exercised without `connectDb`, a tenant, or a process to exit.
  */
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
@@ -59,12 +41,6 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 
 /**
  * Tools whose answer MCP wraps in a single-key object, and the key.
- *
- * Not a difference of content. `structuredContent` must be an object, so a tool
- * whose answer is a bare array or a bare handle has to put it under a name. The
- * terminal has no such constraint and prints the array. Reshaping the CLI to
- * match a wire format it does not use would be the tail wagging the dog, so the
- * assertion unwraps instead.
  */
 const ENVELOPES: Readonly<Record<string, string>> = {
   claims: "claims",
@@ -75,16 +51,6 @@ const ENVELOPES: Readonly<Record<string, string>> = {
 
 /**
  * Commands whose `--json` is deliberately **not** the MCP document, and why.
- *
- * One, and it is a real divergence rather than an envelope. `what_happened`
- * flattens each event's `attribution` into three sibling keys and defaults an
- * absent `seq` to `0`, which is a wire shape chosen for a tool caller. The CLI
- * prints the `DomainEvent` as the domain holds it, nested attribution and all,
- * because a person reading `--json` is reading the record and an absent `seq`
- * is not a zero.
- *
- * Recorded here rather than skipped silently: the next person to ask "is
- * `--json` the MCP document?" gets *yes, except here, for this reason*.
  */
 const RESHAPED: Readonly<Record<string, string>> = {
   happened:
@@ -113,12 +79,6 @@ let seeded: {
 
 /**
  * Seeds by driving the **write commands**, not the surfaces.
- *
- * Two things at once, deliberately. The read cases below need a graph with
- * something in it, and the write commands need exercising against the same
- * schemas — so the seed *is* the write-command test rather than a fixture
- * beside it. A seed built through `surfaces.write` would leave every write
- * command unrun while the file claimed to check the CLI's JSON.
  */
 beforeAll(async () => {
   scenario = await openScenario();
@@ -234,12 +194,6 @@ beforeAll(async () => {
 
 /**
  * Drops this file's graph before the next file runs.
- *
- * `end()` is what resets — `close()` alone only closes the connection. Leaving
- * it out is invisible here and fails somewhere else: this file's tenant graph
- * survived into `tests/scenarios/s18`, whose reader then found a question this
- * file had established and asserted `established` was empty. Nothing in this
- * file went red, and no check looks for a missing teardown.
  */
 afterAll(async () => {
   await scenario.end();
@@ -248,10 +202,6 @@ afterAll(async () => {
 
 /**
  * Runs one command and returns what it answered with.
- *
- * A fresh program per invocation, because commander accumulates parsed option
- * values on the command objects it builds — reusing one would let an earlier
- * `--at` leak into a later `known`.
  */
 async function invoke(argv: string[]): Promise<Answer> {
   let captured: Answer | undefined;

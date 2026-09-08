@@ -1,13 +1,5 @@
 /**
  * The spike's question: is an event a delta?
- *
- * `pose` and `closeEnquiry` book their ids, state what they are about to do,
- * record it, and only then write. If the recorded delta is complete, applying
- * it to an empty graph reproduces what the verb produced — and nothing has to
- * read the original record to do it.
- *
- * The other nineteen verbs still write first and drain afterwards. They are
- * out of the spike.
  */
 
 import { createdIn } from "../src/domain";
@@ -43,10 +35,6 @@ afterEach(async () => {
 
 /**
  * Every node and edge in a graph, **properties included**.
- *
- * Ids alone are not enough and that was found rather than reasoned: with only
- * ids compared, dropping `props` from the applier left every test green. The
- * delta's whole claim is that it carries what the node is made of.
  */
 async function contents(g: TenantGraph): Promise<{ nodes: string[]; edges: string[] }> {
   const nodes = await g.query(`MATCH (n) RETURN n`, { n: vertexProps<Identified>() }, {});

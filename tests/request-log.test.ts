@@ -1,10 +1,5 @@
 /**
- * The failed-request log: what it keeps, what it cuts, and what it must never
- * do to a caller.
- *
- * The subject is a diagnostic, so its own failure modes are the interesting
- * ones — a logger that throws on its input, or hangs on a cyclic object, turns
- * a reported error into an unreported one.
+ * The failed-request log: what it keeps, what it cuts, and what it must never do to a caller.
  */
 
 import { describe, expect, test } from "bun:test";

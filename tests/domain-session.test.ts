@@ -1,14 +1,6 @@
 /**
- * Robustness tests for the domain service layer's queries, against states the
- * persistence layer can legitimately produce but the research verbs don't
- * currently create themselves.
- *
- * These live outside tests/scenarios/ deliberately. A scenario asserts that a
- * researcher's intent works through research verbs alone and may not import
- * src/db; this file needs to write a raw property to set up its case, which
- * makes it a persistence-adjacent test rather than an acceptance scenario.
- * Adding a verb just to reach the state would be inventing API to satisfy a
- * test.
+ * Robustness tests for the domain service layer's queries, against states the persistence layer
+ * can legitimately produce but the research verbs don't currently create themselves.
  */
 
 import { afterAll, beforeAll, beforeEach, afterEach, expect, test } from "bun:test";
@@ -40,16 +32,6 @@ afterEach(async () => {
 
 /**
  * Compound verbs must be all-or-nothing.
- *
- * These live here rather than in tests/scenarios/ on purpose: "does this
- * command roll back when its second half fails?" is not a question a
- * researcher asks, and staging the failure needs a seam a scenario is not
- * allowed to touch. It is an invariant of the service layer, not an acceptance
- * conversation.
- *
- * `replaceAnalysis()`, `reverify()`, `reinterpret()`, and `amendDesign()` all
- * leave a demonstrably wrong record when interrupted, so they get the
- * boundary tested from here.
  */
 function failingOn(
   graph: TenantGraph,
@@ -74,16 +56,10 @@ function failingOn(
 }
 
 /**
- * A reinterpretation interrupted after the original has been withdrawn but
- * before the narrower claim inherits its evidence retracts a finding and puts
- * nothing in its place: the record stops asserting the original sentence, and
- * the sentence meant to replace it is supported by nothing at all.
- *
- * Note which edge that is. The obvious guess -- fail before the withdrawal, so
- * both sentences stand -- was wrong, and probing each edge in turn showed why:
- * at that point no reader has changed its answer yet. The damage is one write
- * later. Guessing where a compound verb hurts is exactly as reliable here as
- * guessing anywhere else in this project.
+ * A reinterpretation interrupted after the original has been withdrawn but before the narrower
+ * claim inherits its evidence retracts a finding and puts nothing in its place: the record
+ * stops asserting the original sentence, and the sentence meant to replace it is supported by
+ * nothing at all.
  */
 test("an interrupted reinterpret does not retract a finding it cannot replace", async () => {
   const { enquiry } = await session.openEnquiry("does T differ from rewired?");
@@ -186,21 +162,6 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
 
 /**
  * Row AD's atomicity, and the reason this test exists at all.
- *
- * `recordObservations()` wrote two nodes and two edges for eighteen scenarios
- * with no transaction around them, and that was survivable: an interrupted call
- * left a half-written record, but nothing the model called impossible.
- *
- * Minting the `EvidenceUnit` changes that. A failure between the evidence and
- * the unit writes *precisely* the invariant the fix exists to remove — an
- * `Evidence` with no producing `EvidenceUnit` — durably, and looking exactly
- * like the records that predate the fix, which is the worst possible disguise
- * for a defect. So the verb became transactional in the same change, and this
- * is the negative test every other compound verb in `src/domain` already has.
- *
- * Deterministic by injection rather than by racing: the graph's `createNode` is
- * made to throw on the `EvidenceUnit` specifically, which is the one ordering
- * where a partial write would be indistinguishable from history.
  */
 test("recordObservations writes the unit and the evidence together or not at all", async () => {
   const { enquiry } = await session.openEnquiry("does the coating hold at temperature?");
@@ -248,10 +209,8 @@ test("recordObservations writes the unit and the evidence together or not at all
 });
 
 /**
- * Every write verb runs inside `inTransaction()`, because an event has to
- * commit with the writes it describes. So an interrupted `sharpen` leaves
- * nothing at all -- not even an unreachable leftover -- which is what a
- * reader checking the record after a failure would expect.
+ * Every write verb runs inside `inTransaction()`, because an event has to commit with the
+ * writes it describes.
  */
 test("an interrupted sharpen leaves nothing at all", async () => {
   const { enquiry } = await session.openEnquiry("does the coating hold?");
@@ -313,11 +272,6 @@ test("an interrupted sharpen leaves nothing at all", async () => {
 
 /**
  * `evaluateCriterion`'s three interruption windows.
- *
- * `sharpen` cleared because its reachability edge (`MOTIVATES`) is written
- * **last**, so an interruption leaves nothing to walk to. This verb writes
- * `EVALUATED_AS` **second**, so from the third write onward the evaluation is
- * reachable and the edges after it are the ones that say what it means.
  */
 const aGatedCheck = async () => {
   const { enquiry } = await session.openEnquiry("does the solver converge?");
@@ -346,16 +300,8 @@ const aGatedCheck = async () => {
 };
 
 /**
- * All three edges, one test each: the verb is transactional, so nothing
- * survives an interruption at any of them.
- *
- * Window 1 (`EVALUATED_AS`) leaves no orphan node reachable — an absence.
- * Window 2 (`TRIGGERS`) can leave a gate reporting the check `never-run`
- * *and* `everFailed: true` from a single call — startling, and **not** a
- * defect, because the no-gate path produces it legitimately and
- * `everFailed`'s scope is documented as deliberately unfiltered by gate.
- * Window 3 is asserted below in the only form that stays true: the verdict
- * does not exist, so it cannot stand.
+ * All three edges, one test each: the verb is transactional, so nothing survives an
+ * interruption at any of them.
  */
 for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
   test(`evaluateCriterion interrupted at ${edge} writes no verdict at all`, async () => {
@@ -390,16 +336,7 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
 }
 
 /**
- * `closeEnquiry`, third off the inferred pile. Predictions in `042` were wrong
- * about the mechanism — it writes **one** `BASED_ON`, not one per finding — and
- * wrong about the consequence: `enquiryStatus` guards the empty case explicitly
- * (*"abandoned, not answered — absence of evidence is not a negative result"*),
- * so there is no polarity inversion.
- *
- * What survives is the retry. The close writes `RESOLVES` before `BASED_ON`, so
- * an interrupted close leaves a resolving decision behind and the caller, who
- * saw a throw, retries. Two decisions then resolve one question, and
- * `enquiryStatus` picks with `.find()` over unordered rows.
+ * `closeEnquiry`, third off the inferred pile.
  */
 test("a close interrupted before BASED_ON, then retried, leaves two resolving decisions", async () => {
   const { enquiry } = await session.openEnquiry("does the coating fail under load?");
@@ -449,11 +386,8 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
 });
 
 /**
- * With the writes intact, retracting the evidence a verdict was reached
- * against **does** withdraw it: `isWithdrawn` is `cited > 0 && standing === 0`.
- * `basis: []` alone is an empty result, not a wrong answer; a verdict that
- * insists *"this still stands"* after its basis was retracted is the wrong
- * answer this distinguishes.
+ * With the writes intact, retracting the evidence a verdict was reached against **does**
+ * withdraw it: `isWithdrawn` is `cited > 0 && standing === 0`.
  */
 test("a verdict is withdrawn when the evidence it was reached against is retracted", async () => {
   const { enquiry, obs, analysis, analysisClaims, criterion, gate } = await aGatedCheck();
@@ -491,19 +425,6 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
 
 /**
  * Closing a closed question is refused.
- *
- * A second `closeEnquiry` writes a second `RESOLVES`, and `enquiryStatus()`
- * picks between them with `.find()` over rows AGE returns in no defined order.
- * Which close a reader sees would then be arbitrary -- reachable through the
- * public API with **no interruption**, which is why this is guarded directly
- * rather than left to the transaction that covers the interrupted-then-retried
- * route.
- *
- * Without the guard: abandon an enquiry, later find a result and close it
- * citing the evidence, and the record could still report `closure: "abandoned"`,
- * `answer: null`, `evidence: []` -- the answer erased. `abandoned` is a
- * positive classification, not an empty result, so that would be a wrong
- * answer, not a harmless absence.
  */
 test("an enquiry cannot be closed twice, and the refusal names the existing close", async () => {
   const s = session;
@@ -546,12 +467,6 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
 
 /**
  * The guard keys on `RESOLVES`, and that is load-bearing rather than incidental.
- *
- * `acceptAsUnresolved()` writes `DEFERS`, not `RESOLVES` — a question left open
- * on purpose, with the condition that would reopen it recorded. If the
- * "already closed" test treated that as closed, a question deliberately left
- * open could **never afterwards be closed on evidence**. Asserted rather than
- * argued from reading the query, since reading is not evidence.
  */
 test("a question accepted as unresolved can still be closed when evidence arrives", async () => {
   const s = session;
@@ -595,18 +510,6 @@ test("a question accepted as unresolved can still be closed when evidence arrive
 
 /**
  * `pursue` is NOT transactional and does not need to be.
- *
- * It writes the `LineOfEnquiry` node and then `MOTIVATES`: **reachability edge
- * last**, `sharpen`'s arrangement rather than `evaluateCriterion`'s. An
- * interruption leaves an orphan enquiry, and no reader can derive an answer from
- * it — `enquiryStatus` matches by `natural_id` and the caller never got one,
- * every survey traversal enters through `Question -[:MOTIVATES]->`, and
- * `whatDependsOn`'s bare `OPTIONAL MATCH (loe:LineOfEnquiry)` is saved only by
- * requiring an inbound `REQUIRES` that an orphan has none of.
- *
- * **That last one is the tripwire**, which is why it is asserted rather than
- * described: if anything ever writes `REQUIRES` before `MOTIVATES`, the orphan
- * becomes reachable and `pursue` needs the transaction.
  */
 test("an interrupted pursue leaves no enquiry at all", async () => {
   const { question } = await session.pose({ question: "does the coating hold at temperature?" });
@@ -645,11 +548,8 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
 });
 
 /**
- * `stateCriterion` and `planWork` write **one node and no edge**, so they have no
- * interruption window at all — a single `createNode` either commits or does not.
- * That is a third *kind* of answer rather than two more clean results, and the
- * assertion below is about the shape rather than about a partial state, because
- * there is no partial state to assert on.
+ * `stateCriterion` and `planWork` write **one node and no edge**, so they have no interruption
+ * window at all — a single `createNode` either commits or does not.
  */
 test("stateCriterion and planWork have no interruption window to have", async () => {
   const realCreateEdge = graph.createEdge.bind(graph);
@@ -717,10 +617,7 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
 });
 
 /**
- * `declareGate` writes its edges **after** the node -- `evaluateCriterion`'s
- * arrangement. Every write verb runs inside `inTransaction`, because an event
- * has to commit with the writes it describes, so an interrupted call leaves
- * no gate at all: nothing for a reader to enumerate or fail to enumerate.
+ * `declareGate` writes its edges **after** the node -- `evaluateCriterion`'s arrangement.
  */
 test("an interrupted declareGate leaves no gate at all", async () => {
   const { criterion: c1 } = await session.stateCriterion("residual below 1e-8");
@@ -761,20 +658,7 @@ test("an interrupted declareGate leaves no gate at all", async () => {
 });
 
 /**
- * The empty contract, which is the case the array conversion could have broken
- * quietly.
- *
- * `Task.mayRead` is read back through a `JSON.parse` in a try/catch. The
- * populated round trip is covered elsewhere; nothing covered **no** values,
- * and that is where a native agtype array can differ from a serialised one --
- * an empty list is the shape most likely to come back absent rather than
- * empty.
- *
- * Both spellings are asserted because `planWork` accepts either, and both mean
- * "reads nothing". `contractFor` has **no fallback** for a missing property, so
- * these assertions read the stored array itself rather than a default standing
- * in for it -- verified by putting a sentinel in a `?? []` and watching it
- * never appear.
+ * The empty contract, which is the case the array conversion could have broken quietly.
  */
 test("a task planned with no readable inputs reports an empty contract, not a missing one", async () => {
   const { work: omitted } = await session.planWork({

@@ -1,31 +1,5 @@
 /**
  * A clock you can wind, for tests about time.
- *
- * The consumer probes were written against `{ now: () => "2026-08-20T09:00:00.000Z" }`
- * and `docs/consumer-contract/024_vertical_slice_results.md` called that "a
- * pinned clock", concluding the harness *structurally* could not evaluate
- * whether row Z's ordering can be derived from durable state.
- *
- * That was wrong twice. A constant function is not a clock, it is a frozen
- * value with a call signature; and the limitation was the fixture's, not the
- * harness's. Winding is all it takes.
- *
- * It matters more than a fixture usually would, because a frozen clock makes
- * every durable stamp identical — so it hides which stamps exist. Wound, the
- * question becomes answerable by observation: of the six places a verb reads
- * the clock, exactly one reaches the graph (`CriterionEvaluation.evaluated_at`);
- * the other five reach only the event stream, which is not durable state.
- *
- * Three clocks, three jobs, and picking the wrong one quietly weakens a test:
- *
- * - **frozen** — every stamp identical. Right when a read must not be able to
- *   separate two worlds by wall-clock, which is what the paired-world probes
- *   need: a read that distinguishes them only because time passed has
- *   distinguished the test runs, not the research states.
- * - **auto-advancing** (`tick++`, as the scenario tests use) — right when a
- *   test needs distinct stamps but does not care what they are.
- * - **windable** (here) — right when the *interval* is the subject: when a test
- *   must place two acts at stated times and ask what the record can recover.
  */
 
 import type { Clock } from "../../src/domain";

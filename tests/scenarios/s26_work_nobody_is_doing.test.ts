@@ -1,18 +1,5 @@
 /**
  * S-26: the work we decided not to do.
- *
- * **Researcher:** We planned the GPU port behind a numerical-agreement gate.
- * The box went back to the vendor and the CPU path is fast enough. We are not
- * doing it — and I do not want it sitting at the top of my list every morning.
- *
- * **Agent:** Recorded, with your reason. It is out of what is ready to start,
- * and it no longer reads as held up by its gate.
- *
- * Until this, a `Task` had three states and nothing wrote any of them: gated
- * work was `blocked`, work with an analysis against it `carried-out`, and
- * everything else `planned` for ever. `Task.is_open` existed for one day and
- * was deleted for being written by every writer and read by none — so the one
- * thing a researcher could not say was that a piece of work was over.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

@@ -1,27 +1,5 @@
 /**
  * The durable event sink.
- *
- * `src/domain/events.ts` argued for years that the in-memory log was a decision
- * and not an unfinished edge, and it was right for as long as nothing needed to
- * read the stream: every historical question the scenarios ask is answered from
- * the graph, asserted with a provably empty log. What changed is attribution
- * — every event carries who ran the command and against which commit,
- * and until now that reached the end of the process and stopped.
- *
- * **The rule this does not break.** *Events explain how state changed; the graph
- * explains what the current research state is.* Nothing here answers a "what is
- * true now" question, and `read.ts` still never consults the sink for one. The
- * only question it serves is *what happened*, which the graph genuinely cannot
- * answer.
- *
- * It lives under `src/domain/` rather than `src/db/` because `EventSink` does,
- * and because `src/db` may not import `src/domain` — dependency-cruiser enforces
- * that direction. Taking a `LabKitDB` is the allowed way round.
- *
- * **The `WHERE` clause is built by the ORM, not by hand.** Assembling SQL from
- * fragments is what this file would otherwise be doing on a table whose filters
- * come from an MCP caller — the graph side has `CypherRunner`, and this is the
- * relational half of the same seam. See `src/db/orm.ts`.
  */
 
 import { and, asc, eq, gt, or, sql } from "drizzle-orm";
@@ -60,13 +38,6 @@ const toEvent = (r: EventRow): DomainEvent => {
 
 /**
  * An `EventSink` backed by `public.labkit_event`, scoped to one tenant.
- *
- * **It takes the same `LabKitDB` the graph is using**, and that is the whole
- * atomicity story: `WriteSurface.emit` runs inside the verb's `inTransaction`,
- * so the INSERT below joins the transaction already holding that verb's writes.
- * An event and the writes it describes commit together or neither does. Hand it
- * a second connection and that silently stops being true. The ORM is built over
- * that same seam and inherits the property for free (`src/db/orm.ts`).
  */
 export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
   const orm = ormOver(db);

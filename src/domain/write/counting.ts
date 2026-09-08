@@ -106,17 +106,6 @@ export class Counting extends SessionCore {
 
   /**
    * Records that a criterion was actually evaluated, and what came back.
-   *
-   * **A gate is optional.** Named, the criterion must already govern it:
-   * otherwise the evaluation attaches to an unrelated gate and `gateStatus()`
-   * mostly *hides* the result — its traversal starts from `GOVERNS`, so a
-   * malformed evaluation sits in the graph without producing a visibly wrong
-   * report. That is a wrong handle, and it is refused before anything is
-   * written so a rejected command leaves no partial state.
-   *
-   * Named no gate, nothing is required. A researcher who checked a condition
-   * checked it, and `why <criterion>` reads every verdict a criterion has —
-   * `anyVerdict` puts no gate on the traversal.
    */
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
     return this.handle("evaluateCriterion", input, async (unitOfWork) => {
@@ -151,29 +140,8 @@ export class Counting extends SessionCore {
   }
 
   /**
-   * Amends a locked design: replaces one condition with another, recording the
-   * act rather than editing the setting.
-   *
-   * The decision is the whole point: the original setting has to stay readable,
-   * the reason and its evidence have to survive, and one amendment has to be
-   * orderable against another.
-   *
-   * The diagnosis is cited **specifically**, not snapshotted. `sharpen()`
-   * freezes everything standing because a sharpening genuinely is taken in
-   * light of everything known; an amendment is taken on one diagnosis, and
-   * recording every finding on the record as its basis would manufacture a
-   * rationale the researcher never had. `BASED_ON` carries both senses, and
-   * this is the boundary between them.
-   *
-   * `SUPERSEDES` chains this amendment to the previous one on **the same
-   * condition**, found rather than supplied: an ordering that depends on the
-   * caller remembering to pass the right handle is not an ordering. Per
-   * condition and not per gate — a gate governs several settings, and a chain
-   * across them says one setting was replaced by a change to another.
-   *
-   * `MOTIVATES` records the condition the amendment put in force, which is
-   * what makes that chain findable in one hop and what a reader walks back
-   * along to reconstruct the design's history.
+   * Amends a locked design: replaces one condition with another, recording the act rather than
+   * editing the setting.
    */
   async amendDesign(input: AmendDesignCommand): Promise<AmendmentReport> {
     return this.handle("amendDesign", input, async (unitOfWork) => {
@@ -275,11 +243,6 @@ export class Counting extends SessionCore {
 
   /**
    * The amendment that put this condition in force, if an amendment did.
-   *
-   * One hop along `MOTIVATES`, which the amendment writes to the condition it
-   * introduced. Walking a gate instead reaches every amendment to every
-   * condition it governs, and a chain built from that says one setting was
-   * replaced by a change to a different one.
    */
   private async amendmentThatIntroduced(criterion: CriterionRef): Promise<DecisionRef | undefined> {
     const rows = await this.graph.query(
@@ -293,11 +256,6 @@ export class Counting extends SessionCore {
 
   /**
    * The evidence a citation names, by whichever route the caller held.
-   *
-   * One hop, inferred rather than restated: a claim knows the finding that
-   * bears on it and an observations record knows the finding recorded in it,
-   * so a caller who named either has already said which evidence. An evidence
-   * handle is already the answer.
    */
   private async evidenceFor(cited: CitedBasis): Promise<EvidenceRef> {
     const label = labelForNaturalId(cited);

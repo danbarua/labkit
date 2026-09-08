@@ -1,21 +1,5 @@
 /**
  * The views, held to the distinctions the reports carry.
- *
- * **These assertions are the old `tests/cli.test.ts`'s, moved unchanged.** That
- * is the point of a port rather than a rewrite: an external review of the first
- * renderers (2026-08-21) found three distinctions the domain has scenarios for
- * being dropped between the report and the page, every one correct in `--json`,
- * and these are the tests that came out of it. Re-deriving them against new
- * modules would test the new modules against a fresh reading of the same code,
- * which is not the same thing at all.
- *
- * Only the imports changed: the renderers now live in `src/cli/views/`, split
- * by what they render rather than piled in one file.
- *
- * Fixtures rather than a seeded graph, as before. They are typed as the real
- * report interfaces, so a renamed or removed field is a compile error here —
- * which is the coupling that matters. What the *domain* puts in those fields is
- * covered by the scenarios.
  */
 
 import { expect, test } from "bun:test";
@@ -163,12 +147,8 @@ test("withdrawn, challenged and never-examined render apart", () => {
 });
 
 /**
- * A synthesis measured nothing, so it reaches the last branch of the verdict
- * — the one whose words are "nothing has examined this". Findings did examine
- * it; what nobody recorded is whether they bear the sentence out or against
- * it, because a synthesis may assert what its parts say or the negation of
- * it. Bonsai's Stage 1D headline is the second kind, drawn across four claims
- * and asserting that none of them holds.
+ * A synthesis measured nothing, so it reaches the last branch of the verdict — the one whose
+ * words are "nothing has examined this".
  */
 test("a synthesis declines the verdict and names its basis", () => {
   const base: SupportExplanation = {
@@ -218,11 +198,6 @@ test("a synthesis declines the verdict and names its basis", () => {
 
 /**
  * The page that misled a reader into filing a defect against a correct record.
- *
- * A challenged claim has no supporting findings by definition, so whatever
- * heading sits above that list is what the page says the claim has none of.
- * The inputs it rests on are a different list and must not answer to the same
- * words.
  */
 test("a challenged claim says it has no supporting findings, not that it rests on nothing", () => {
   const challenged: SupportExplanation = {
@@ -533,34 +508,16 @@ test("an empty event log does not read as an empty record", () => {
   expect(out).toContain("CLM_1");
 });
 
-// ---------------------------------------------------------------------------
-// Colour.
-//
-// **Every assertion above renders with `PLAIN`**, which is what `bun test`
-// would get anyway — stdout is not a terminal, so `isColorSupported` is false
-// and the composition root hands out an identity palette. That is exactly the
-// trap named when this work was queued: if the palette were a
-// module-level global rather than a parameter, all thirteen of those tests
-// would silently be checking the uncoloured path and nothing would check the
-// other one.
-//
-// So these render the same fixtures through a forced-on palette and assert on
-// the difference — not on specific escape codes, which would be testing
-// picocolors, but on the properties that matter: the colour is there, it lands
-// on the state word rather than the whole line, and turning it on changes
-// nothing a reader would read.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Colour. **Every
+// assertion above renders with `PLAIN`**, which is what `bun test` would get anyway — stdout is
+// not a terminal, so `isColorSupported` is false and the composition root hands out an identity
+// palette.
 
 const COLOUR = palette(true);
 const ESC = "\u001b";
 
 /**
  * Strips every SGR sequence, so a coloured page can be compared to a plain one.
- *
- * The rule below is right in general — a control character in a regex is
- * usually a typo — and this is the case it is wrong about: matching ANSI is
- * what the escape is *for*. Suppressed on the line rather than by turning the
- * rule off, which is the difference `biome.jsonc` argues for.
  */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI is the point
 const stripped = (s: string): string => s.replace(/\u001b\[[0-9;]*m/g, "");
@@ -667,11 +624,8 @@ test("a write command's handle is never coloured, even forced", () => {
 
 test("an evaluation with no basis reads as asserted, not as measured", () => {
   // Empty `basis` means the verdict was asserted, not measured (report.ts's
-  // EvaluationRecord.basis doc comment) -- the page renders that distinction
-  // rather than printing an asserted verdict the same as a cited one.
-  //
-  // It reads off `why <criterion>`, which is where a verdict's text lives; a
-  // gate's page carries states, so it never had the basis to render.
+  // EvaluationRecord.basis doc comment) -- the page renders that distinction rather than
+  // printing an asserted verdict the same as a cited one.
   const explanation: Explanation = {
     kind: "criterion",
     subject: ref("criterion", "CRIT_1"),
@@ -711,13 +665,10 @@ test("an evaluation with no basis reads as asserted, not as measured", () => {
 });
 
 test("an undecided claim's findings are one list, and no heading picks a side", () => {
-  // The claim-level state says the evidence settles this neither way. Splitting
-  // the findings into a supporting list and a `Bearing against` list re-asserts
-  // a per-finding direction that state has overridden, and puts a heading that
-  // picks a side directly under a verdict line saying nobody has.
-  //
-  // Merged, not hidden: each line still says how the finding was recorded, so
-  // the stored bearing survives where a reader can act on it.
+  // The claim-level state says the evidence settles this neither way. Splitting the findings
+  // into a supporting list and a `Bearing against` list re-asserts a per-finding direction that
+  // state has overridden, and puts a heading that picks a side directly under a verdict line
+  // saying nobody has.
   const base: SupportExplanation = {
     claim: ref("claim", "CLM_7"),
     proposition: "T vs rewiring is distinguishable",

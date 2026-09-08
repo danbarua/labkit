@@ -1,29 +1,5 @@
 /**
  * The write commands — one per public verb on `WriteSurface`.
- *
- * **Handles in, handles out.** Every command here prints the handles its act
- * minted, one per line and nothing else, because that is what the next
- * command takes: `labkit close "$(labkit analyse …)"` only composes if the id
- * is the whole of stdout. That is the transport half of the repo's rule that
- * *a verb that mints something returns what it minted* — the verbs already
- * do, by way of the event `WriteSurface.emit` records, and a CLI printing
- * "done" would put the caller back to searching for what they had just made.
- *
- * **The handles printed are `events[0].created`** — every verb's return value
- * carries `events: DomainEvent[]`, and `created` is the drained list of
- * everything the act minted. A per-verb field instead withholds every handle
- * but the one a return type happens to name — an enquiry without its question,
- * a claim without the decision beside it — and answers some acts with nothing
- * created at all. `mintedHandles()` below reads
- * every event's `created` uniformly, so a verb minting several things and one
- * minting nothing both fall out of the same line rather than a per-command
- * special case.
- *
- * `--json` gives the full return value — the same shape the MCP tool answers
- * with for the same verb, `events` included.
- *
- * Each body calls `write.someVerb(` literally, and `tests/cli/coverage.test.ts`
- * greps this directory for exactly that.
  */
 
 import { createdIn } from "../../domain";
@@ -48,11 +24,7 @@ import { isRefOfKind, ref } from "../../domain/report";
 import type { CitedBasis } from "../../domain/commands";
 
 /**
- * Every handle an act minted, across however many events it recorded — in
- * practice one per act. Reading `events` rather than a per-verb field is
- * what makes this the same line for every command: a verb minting nothing
- * prints nothing, one minting several prints all of them, with no command
- * having to know which case it is.
+ * Every handle an act minted, across however many events it recorded — in practice one per act.
  */
 const mintedHandles = (events: readonly DomainEvent[]): readonly string[] =>
   events.flatMap(createdIn);

@@ -1,24 +1,5 @@
 /**
  * The tool surface, as prose, generated from the tools.
- *
- * An agent that has just connected can list the tools and read their schemas,
- * but a JSON Schema per tool is a poor way to learn what a *record* is for.
- * This renders the same declarations as documentation: what each tool answers,
- * what it takes, and what comes back, field by field.
- *
- * **Rendered on every read, and stored nowhere.** There is no second copy to go
- * stale, so nothing has to hold two things equal.
- *
- * **Do not check a rendered copy in.** Its only failure mode is "someone
- * regenerated late", catching that costs a build that has to run on
- * documentation, and a generated file beside the code it describes invites a
- * genre of ceremony: parity docs for the other surface, tests asserting the two
- * agree, a gate over all of it.
- *
- * The types are rendered from **JSON Schema**, not from the Zod objects, for
- * the same reason `server.ts` ships the whole report rather than a chosen
- * subset: JSON Schema is what actually crosses the wire, so a reader is shown
- * the shape they will receive rather than the shape the server thinks in.
  */
 
 import { z } from "zod";
@@ -37,18 +18,6 @@ export const DOCS_URI = "labkit://docs/tools";
 
 /**
  * The same document as a tool.
- *
- * Not every client implements resources. One that reaches tools and nothing
- * else sees `labkit://docs/tools` in no list, and its first move is to search
- * the record for the documentation — which is the one place it cannot be. So
- * the document has two routes in, both rendering the same declarations; a
- * caller takes whichever its client can reach.
- *
- * Not a `ToolDefinition`: it has no input, no output schema and no surface to
- * hand a handler. It is the one tool that describes the server rather than
- * touching the record, which is why it has a list of its own — and, like the
- * other lists, the entry carries what it does, so a second meta tool would
- * not silently serve this page.
  */
 export interface MetaToolDefinition {
   readonly name: string;
@@ -101,10 +70,6 @@ const toJson = (schema: z.ZodType): JsonSchema => z.toJSONSchema(schema) as Json
 
 /**
  * A type, as one line a person can read.
- *
- * Deliberately lossy where JSON Schema is verbose: a nullable enum renders as
- * `"a" | "b" | null` rather than as an `anyOf` of two branches. The full schema
- * is a `tools/list` away for anyone who needs it.
  */
 function typeName(s: JsonSchema): string {
   if (s.const !== undefined) return JSON.stringify(s.const);
@@ -121,16 +86,6 @@ function typeName(s: JsonSchema): string {
 
 /**
  * True when a schema has named fields worth expanding under their parent.
- *
- * A union of objects sharing one field set is **merged**, per field, rather
- * than rendered from whichever branch came first. `InputRef` is two branches
- * differing only in a `kind` literal, and taking branch one rendered
- * `kind?: "observations"` — the wrong literal, and marked optional because the
- * parent `anyOf` carries no `required`. A document whose whole job is being
- * reviewable cannot say that.
- *
- * Branches with differing field sets fall back to the first, which is what
- * this did for all unions before. No such case exists on this surface today.
  */
 function fieldsOf(s: JsonSchema): Record<string, JsonSchema> | undefined {
   if (s.properties) return s.properties;
@@ -218,10 +173,6 @@ function renderOutput(tool: AnyTool): string[] {
 
 /**
  * The whole document.
- *
- * Takes the tool list rather than reading the module's, so a test can render a
- * subset and a future server can serve a filtered surface without this needing
- * to know about it.
  */
 export function renderToolDocs(
   reads: readonly ToolDefinition[] = TOOLS,
@@ -240,10 +191,6 @@ export function renderToolDocs(
   const entry = (t: AnyTool) => `- [\`${t.name}\`](${anchor(t)}) — ${t.title}`;
   /**
    * The index, under the group each tool declares.
-   *
-   * Groups appear in the order the array does rather than in a list written
-   * here: the array *is* the presentation order, and a second copy of it would
-   * be a second thing to keep in step.
    */
   const index = (list: readonly AnyTool[]) => {
     const lines: string[] = [];

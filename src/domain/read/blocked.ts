@@ -32,17 +32,6 @@ import { dedupeById, type Identified } from "./shared";
 
 /**
  * What each of these criteria is holding up.
- *
- * Walks `GOVERNS` **from the criterion**, which nothing did before — it was
- * written by `stateCriterion`/`declareGate` and read only from the gate's
- * end, so a caller holding a criterion had no way back. See
- * {@link UnmetCheck.blocks}.
- *
- * `OPTIONAL MATCH` on the protected work, because a gate that guards nothing
- * yet is a real state and must not drop the gate from the answer.
- *
- * A plain function rather than a method: `whySupported` (`./story.ts`) needs
- * it too, and a private method on one group class is invisible to a sibling.
  */
 export async function blockedBy(
   graph: TenantGraph,
@@ -86,33 +75,6 @@ export async function blockedBy(
 
 /**
  * A gate's state, from the checks governing it.
- *
- * **Extracted because a second reader arrived.** It was inline in
- * `gateStatus` until `gateList` needed the same answer for every gate at once,
- * and that is the condition this repository already applies to a fact: a
- * computation earns a name when more than one reader has to reach the same
- * answer about the same subject. Two copies of a four-branch precedence chain
- * is the six-occurrence defect shape — written once, forgotten the second time,
- * and silently disagreeing thereafter.
- *
- * Order matters and neither branch is cosmetic. Absence is checked before
- * satisfaction so a gate nobody evaluated can never fall through to
- * `satisfied`; failure is checked before incompleteness because a failure is
- * decisive.
- *
- * **`satisfied` requires positive proof — every check passed — rather than
- * being the branch left over once the others are ruled out.** As an `else` it
- * catches any state the branches above do not name: a criterion whose only
- * evaluations were retracted matches neither `failed` nor `never-run` and
- * would fall through to `satisfied`, disagreeing with the itemised per-check
- * report in the same object. Requiring a positive `passed` means a new
- * `CheckState` lands in `incomplete` by construction, rather than by whoever
- * edits this function next remembering to add a branch for it.
- *
- * **A gate with no criteria at all reports `never-evaluated`.** `every` over an
- * empty list is `true`, which is the right answer for the wrong-looking reason:
- * a gate governing nothing has certainly not been shown to hold. `declareGate`
- * refuses to mint one anyway, so this is a defence rather than a case.
  */
 export function gateStateFrom(checks: readonly { state: CheckState }[]): GateStatus["state"] {
   return checks.every((c) => c.state === "never-run")
@@ -126,27 +88,6 @@ export function gateStateFrom(checks: readonly { state: CheckState }[]): GateSta
 
 /**
  * A task's state, from the edges that reach it.
- *
- * **`blocked` first, and that is the one real decision in this enum.** A task
- * can be both carried out and protected by a gate that has not been satisfied,
- * and the two readings are both defensible: *the work happened*, or *its result
- * cannot be built on*. This picks the second, on the same rule
- * `GateStatus.state` already applies to `blocked` over `incomplete` — a reader
- * scanning for what needs attention must see the blockage, because a state that
- * hides it is a state nobody can act on.
- *
- * The other reading is real and is why the overlap has a test of its own rather
- * than being left to fall out of the branch order below.
- *
- * **A gate that is merely unevaluated does not block; it holds.** `blocked`
- * is a failed condition — something to fix. `never-evaluated` and `incomplete`
- * mean nobody has finished checking, and work behind such a gate is `waiting`:
- * not ready to start, and not blocked either. Folding it into `planned` put
- * gated work on the ready-to-start list the day it was planned; folding it
- * into `blocked` would make a queue that can never be emptied. A gate that is
- * `satisfied` holds nothing. A gate the map does not know about holds too:
- * "no state for this gate" is not "no gate", and the direction to fail in is
- * not-ready-until-something-says-so.
  */
 export function workStateFrom(
   task: { gates: Set<string>; implemented: boolean; stopped: boolean },
@@ -216,11 +157,6 @@ export class BlockedGroup extends SessionCore {
 
   /**
    * Which criterion governs this gate?
-   *
-   * Answered via `GOVERNS`, which exists from the moment the gate is declared.
-   * A route through `CriterionEvaluation` instead returns nothing for a gate
-   * nobody has evaluated — which is exactly the gate the question is usually
-   * asked about. See EDGE_SCHEMA.GOVERNS.
    */
   async criteriaGoverning(gate: GateRef): Promise<CriterionRef[]> {
     const rows = await this.graph.query(
@@ -233,14 +169,6 @@ export class BlockedGroup extends SessionCore {
 
   /**
    * A locked design and everything that has happened to it, oldest first.
-   *
-   * One history per condition the gate is governed by. The order within a
-   * condition comes from walking its own lineage — `MOTIVATES` back to the
-   * decision that introduced each step, `CHANGES` back to what that step
-   * replaced. No decision carries a timestamp, nothing is read from the event
-   * log, and natural-id allocation order is never consulted. Two conditions'
-   * amendments are not ordered relative to each other, and no gate-wide
-   * ordering is invented.
    */
   async designHistory(gate: GateRef): Promise<DesignHistory> {
     const governing = await this.graph.query(
@@ -286,12 +214,6 @@ export class BlockedGroup extends SessionCore {
 
   /**
    * The amendments that led to one condition, oldest first.
-   *
-   * Walked backwards from what is in force: each step is the decision that
-   * `MOTIVATES` the condition reached so far, and the condition it `CHANGES`
-   * is the step before it. A condition may be amended once -- `amendDesign`
-   * refuses a second -- so the walk is a line by construction and has nothing
-   * to reconcile.
    */
   private async amendmentChain(
     condition: Condition,
@@ -339,10 +261,6 @@ export class BlockedGroup extends SessionCore {
 
   /**
    * May this gate be relied on, and on what evidence?
-   *
-   * Every governing condition is itemised, including the ones nobody has
-   * evaluated. That is the point: a failed check must be distinguishable from
-   * one never run, and an absent list entry cannot carry that difference.
    */
   async gateStatus(gate: GateRef): Promise<GateStatus> {
     const declared = await this.graph.query(
@@ -356,25 +274,9 @@ export class BlockedGroup extends SessionCore {
         `no gate ${gate}; a gate is declared over a criterion and the work it protects, and 'search' finds its handle by the consequence`,
       );
 
-    // Every governing criterion with the evaluations that pertain to THIS
-    // gate. Two scopes are deliberately kept apart:
-    //
-    //   gate-scoped  (here) -- has this condition been checked FOR this gate?
-    //   criterion-scoped    -- has this check ever been shown able to fail?
-    //
-    // One criterion can govern several gates and be evaluated separately
-    // against each (the same hash check, run against staging and against
-    // release). Collapsing the two scopes made a gate nobody had evaluated
-    // report as blocked because its criterion had failed somewhere else.
-    //
-    // OPTIONAL MATCH is load-bearing twice over: a criterion nobody evaluated
-    // must still appear as a check, and `g` is bound from the first MATCH so
-    // only evaluations triggering this gate count.
-    // Composed from the gate-scoped verdict fact. The scope is the argument
-    // rather than a paragraph: `verdictForGate` counts only evaluations
-    // reached FOR this gate, where `anyVerdict` counts every evaluation of the
-    // criterion. Collapsing the two made a gate nobody had evaluated report as
-    // blocked because its criterion had failed somewhere else.
+    // Every governing criterion with the evaluations that pertain to THIS gate. Two scopes are
+    // deliberately kept apart:  gate-scoped  (here) -- has this condition been checked FOR this
+    // gate? criterion-scoped    -- has this check ever been shown able to fail?
     const { cypher, decoders } = compose(anchorInForce("one"), checkStatusForGate, {
       crit: vertexProps<{ natural_id: string; proposition: string }>(),
       amended: optional(vertexProps<{ natural_id: string }>()),
@@ -448,30 +350,6 @@ export class BlockedGroup extends SessionCore {
 
   /**
    * Every gate, with the state a reader is filtering on.
-   *
-   * **The verb that lets an agent start.** Every other gate verb takes a
-   * `GateRef`, and until this existed the only way to obtain one was to already
-   * hold a claim and ask `whySupported` — so an agent opening a cold record
-   * could not answer *"what is blocked?"* at all, and the only thing that could
-   * was `whatHappened`, which is the event log and the one place this repo
-   * forbids answering a "what is true now" question from.
-   *
-   * **One query, then folded per gate.** `compose()` takes the anchor, so the
-   * gate-scoped check fact `gateStatus` uses composes just as well over every
-   * gate as over one. What does not carry is the **grain**: `checkStatusForGate`
-   * is grained `byCriterion`, and a criterion may govern several gates — the
-   * same hash check against staging and against release — so folding the whole
-   * result by criterion would merge two gates' verdicts into one answer.
-   *
-   * So the rows are bucketed by gate first and `per()` is applied within each
-   * bucket. The alternative — a composite grain — would have to change
-   * `checkStatusForGate` itself, and grains are compared by reference, so it
-   * would silently re-scope `gateStatus` too.
-   *
-   * The state comes from {@link gateStateFrom}, the same function `gateStatus`
-   * calls. Not a matter of tidiness: a reader who lists blocked gates and then
-   * opens one must not find it satisfied, and two copies of a four-branch
-   * precedence chain is the defect shape this repo has now hit six times.
    */
   async gateList(state?: GateStatus["state"]): Promise<ListedGate[]> {
     const { cypher, decoders } = compose(anchorInForce("every"), checkStatusForGate, {
@@ -495,12 +373,10 @@ export class BlockedGroup extends SessionCore {
       byGate.set(gate.natural_id, bucket);
     }
 
-    // **Sorted by handle, because Cypher imposes no ordering.** Without it the
-    // rows come back in whatever order the query produced them, so two runs of
-    // `labkit gates` can print the same record differently and an agent
-    // diffing successive `gate_list` calls sees change where nothing changed.
-    // `checkStatusOver` already makes this argument about evaluations; the
-    // same one applies to the list itself.
+    // **Sorted by handle, because Cypher imposes no ordering.** Without it the rows come back
+    // in whatever order the query produced them, so two runs of `labkit gates` can print the
+    // same record differently and an agent diffing successive `gate_list` calls sees change
+    // where nothing changed.
     const listed = [...byGate.entries()]
       .map(([id, { consequence, rows: forGate }]) => ({
         gate: ref("gate", id),
@@ -517,10 +393,6 @@ export class BlockedGroup extends SessionCore {
 
   /**
    * The act that stopped a piece of work, if one did.
-   *
-   * `workList` reports the *state*; this reports the reason, which is the whole
-   * of what `stopWork` records and the only thing that tells work dropped for a
-   * reason from work nobody got to.
    */
   async stoppedWork(work: WorkRef): Promise<StoppedReason | undefined> {
     const [row] = await this.graph.query(
@@ -538,27 +410,6 @@ export class BlockedGroup extends SessionCore {
 
   /**
    * Every planned piece of work, with the state a reader is filtering on.
-   *
-   * The other half of what an agent needs to orient, and **not redundant with
-   * {@link gateList}**: a gate reaches only the work it protects, and
-   * `planWork` requires no gate. Work that is planned and ungated — the
-   * commonest thing in a standup — is reachable from nowhere else.
-   *
-   * **Five states.** Four are derived from the edges that reach a Task,
-   * `Gate -[:GATES]-> Task` and `Task -[:IMPLEMENTS]-> EvidenceUnit`, with the
-   * gates' own states. `abandoned` is the one an act states:
-   * `Decision -RESOLVES-> Task`, written by `stopWork`, and it wins over the
-   * other four. See {@link WorkState}, which carries the argument.
-   *
-   * **Nothing is stored.** There is no `is_open` flag to set, because a stored
-   * flag is the first place a work queue rots — and the reason a researcher
-   * could not once say a piece of work was over, which `stopWork` fixed by
-   * recording the act instead of setting a value.
-   *
-   * **`OPTIONAL MATCH` three times, and all are load-bearing.** A task with no
-   * gate, no analysis and no stopping decision is the *most* interesting row
-   * here — it is the ready work — so a plain `MATCH` on any of them would
-   * silently drop precisely what a standup is asking for.
    */
   async workList(state?: WorkState): Promise<ListedWork[]> {
     const rows = await this.graph.query(

@@ -1,15 +1,5 @@
 /**
  * Argument handling, through the real program.
- *
- * Four behaviours the hand-rolled parser had to implement and get wrong first,
- * now commander's — which is not a reason to stop asserting them. A dependency
- * doing something today is not a promise it will next major version, and three
- * of the four are here because this repo shipped the opposite at least once.
- *
- * Driven through `buildProgram` with a capturing `Run`, so nothing opens a
- * database: `exitOverride()` turns commander's `process.exit` into a throw the
- * test can catch, and a command that reaches its action records what it was
- * given instead of running a verb.
  */
 
 import { expect, test } from "bun:test";
@@ -18,13 +8,6 @@ import type { Run } from "../../src/cli/session";
 
 /**
  * Parses one argv and reports whether the command's action was reached.
- *
- * **`run` records and does not invoke.** The first version called
- * `work({} as Surfaces)`, on the reasoning that no assertion here reaches a
- * verb — which was wrong the moment it ran: `known`'s body calls
- * `read.whatIsKnown` before anything else, and the empty object threw. Reaching
- * `run` at all is the whole property this needs, and stopping there keeps the
- * lie from ever being dereferenced.
  */
 async function parse(argv: string[]): Promise<{ globals: Record<string, unknown>; ran: boolean }> {
   let ran = false;
@@ -39,13 +22,6 @@ async function parse(argv: string[]): Promise<{ globals: Record<string, unknown>
 
 /**
  * The message commander produces for a bad value, without the process exiting.
- *
- * `exitOverride` and `configureOutput` are applied to **every** command, not
- * just the root. Commander copies inherited settings when a subcommand is
- * added, and `buildProgram` adds all of them before this runs — so configuring
- * only the root leaves each subcommand still calling `process.exit` and still
- * printing its own help to stderr. Found by a test run that printed a usage
- * page into the middle of the suite output.
  */
 async function refusal(argv: string[]): Promise<string> {
   const program = buildProgram(async () => {});
@@ -61,13 +37,9 @@ async function refusal(argv: string[]): Promise<string> {
 }
 
 test("a global flag may precede or follow the command", () => {
-  // The bug this replaced: positionals were "the first argument not starting
-  // with --", so `labkit why --tenant acme "the schedule…"` asked why `acme`
-  // was supported. Order-sensitivity in an argument parser is the kind of
-  // defect that looks like the user's mistake.
-  //
-  // Not run through `parse` because `why` would reach a surface; the assertion
-  // is about where the flag lands, which `optsWithGlobals` settles.
+  // The bug this replaced: positionals were "the first argument not starting with --", so
+  // `labkit why --tenant acme "the schedule…"` asked why `acme` was supported. Order-
+  // sensitivity in an argument parser is the kind of defect that looks like the user's mistake.
   const before = buildProgram(async () => {});
   before.parseOptions(["--tenant", "acme", "known"]);
   expect(before.opts().tenant).toBe("acme");
@@ -78,14 +50,10 @@ test("a global flag may precede or follow the command", () => {
 });
 
 test("an unknown flag is refused, not ignored", async () => {
-  // Dropping it on the floor and trusting a missing positional to surface
-  // the mistake would hold for a read, where the worst case is an answer to
-  // a slightly different question. A mistyped `--becuase` on a write puts a
-  // record on the permanent register with a field the caller believes they
-  // set.
-  // On a command with no required options, so the message is about the unknown
-  // flag rather than a missing one -- `promote --becuase …` reports the absent
-  // `--because` first, which would let this pass for the wrong reason.
+  // Dropping it on the floor and trusting a missing positional to surface the mistake would
+  // hold for a read, where the worst case is an answer to a slightly different question. A
+  // mistyped `--becuase` on a write puts a record on the permanent register with a field the
+  // caller believes they set.
   expect(await refusal(["known", "--becuase", "it holds"])).toContain("--becuase");
 });
 
@@ -155,15 +123,10 @@ test("a non-ISO --date is refused, not stamped into the record", async () => {
 });
 
 test("a bad --state is refused before the action, so no database is opened", async () => {
-  // **This is the assertion that would have caught it, and the message one
-  // would not.** `gateState` was called *inside* `.action()`, so it did throw --
-  // but by then `run` had been reached and the run wrapper had created a
-  // database. Worse, `main()`'s catch returns early on any error carrying an
-  // `exitCode`, on the assumption commander has already printed it. Commander
-  // had not: `labkit gates --state blockd` exited 1 in complete silence, having
-  // created a 42MB record on the way. Measured before the fix.
-  //
-  // As a parser the refusal happens during `parseAsync`, so `ran` stays false.
+  // **This is the assertion that would have caught it, and the message one would not.**
+  // `gateState` was called *inside* `.action()`, so it did throw -- but by then `run` had been
+  // reached and the run wrapper had created a database. Worse, `main()`'s catch returns early
+  // on any error carrying an `exitCode`, on the assumption commander has already printed it.
   for (const argv of [
     ["gates", "--state", "blockd"],
     ["work", "--state", "carriedout"],

@@ -1,20 +1,5 @@
 /**
  * S-22: a measured check reads as measured.
- *
- * **Researcher:** The go/no-go was a pipeline-health count — 0 of 240,000
- * evolutions failed, 270 of 270 fits converged. I recorded it as observations.
- * Now I want the gate's check to say it passed *on that*.
- *
- * **Agent:** The verdict cites the observations.
- *
- * From Bonsai's Stage 2A (#150). Before this, `--citing` took only a claim, so
- * a check backed by counts had to be recorded citing nothing — and an empty
- * basis is what the record reads as **asserted**. The measured verdict and the
- * asserted one came out identical, with the measured one mislabelled.
- *
- * The workaround was worse than the gap: `analyse` the counts into a claim
- * ("the pipeline ran clean") and cite that, which manufactures a scientific
- * finding for a non-scientific check and files it under a question in `known`.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

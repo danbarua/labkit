@@ -1,18 +1,5 @@
 /**
  * S-23: was this prespecified, or did we promote it afterwards?
- *
- * **Researcher:** Two results both read `confirmatory`. One was prespecified —
- * we said before the run that it would count. The other was exploratory until
- * a check passed and we promoted it. Which is which?
- *
- * **Agent:** The one nobody promoted was prespecified.
- *
- * `Claim.kind` says both *this was prespecified* and *this has been promoted*,
- * under one word, for the good reason that both mean "not scratch" (#63). The
- * question was whether a reader can tell them apart. They can, two ways, and
- * neither was asserted anywhere until this file — which is the whole reason
- * the question stayed open: the property held by construction and nothing
- * would have noticed it breaking.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

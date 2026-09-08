@@ -26,10 +26,6 @@ export class FindingGroup extends SessionCore {
 
   /**
    * Where a question came from, if it came from sharpening an earlier one.
-   *
-   * `null` for a question somebody simply asked — most questions have no
-   * origin beyond the person who thought of it, and inventing one would be
-   * worse than saying so.
    */
   async originOf(question: QuestionRef): Promise<QuestionOrigin | null> {
     const rows = await this.graph.query(
@@ -67,12 +63,6 @@ export class FindingGroup extends SessionCore {
 
   /**
    * Claims asserting a proposition — the **one** place wording is resolved.
-   *
-   * Every verb takes a handle; a person types a sentence. This is the seam
-   * between the two, and it is a verb of its own rather than a guess buried in
-   * each read: it returns *all* matches and lets the caller refuse, instead of
-   * picking one and being wrong when a sentence is asserted in two lines of
-   * enquiry.
    */
   async claimsAsserting(proposition: IndexedString): Promise<ConcludedClaim[]> {
     const rows = await this.graph.query(
@@ -87,29 +77,8 @@ export class FindingGroup extends SessionCore {
   }
 
   /**
-   * Every record containing the text, as `{handle, wording}` pairs grouped by
-   * label — how a caller holding only wording finds the handle for it.
-   *
-   * **Returns every match and refuses to pick, exactly as {@link
-   * claimsAsserting} does** — this is a second seam where wording is
-   * resolved, not the same one widened, because the two answer different
-   * questions: `claimsAsserting` finds a claim by its *exact* asserted
-   * sentence (its wording behaves like a key); this finds a *substring*
-   * across every kind of record that carries free text. A caller wanting
-   * one specific claim by its sentence should still use that verb — it is
-   * both narrower and cheaper.
-   *
-   * **Scans every stored string a person typed** — `src/db/domain.ts`'s
-   * `SEARCHABLE_TEXT`/`SEARCHABLE_TEXT_ARRAYS`, which is every `Prose` and
-   * `IndexedString` property, held to the annotations by
-   * `check:prop-classes`. A machine value is not scanned: a timestamp, a
-   * content hash, a role nothing reads.
-   *
-   * Case-insensitive (`toLower` both sides — measured against AGE 2026-08-31:
-   * plain `CONTAINS` works, `toLower(...) CONTAINS toLower(...)` also
-   * works, `ANY(x IN list WHERE ...)` does not — a list property needs
-   * `size([x IN list WHERE ...]) > 0` instead, which is why array and
-   * scalar properties are two tables and two query shapes here, not one).
+   * Every record containing the text, as `{handle, wording}` pairs grouped by label — how a
+   * caller holding only wording finds the handle for it.
    */
   async search(text: Prose): Promise<SearchGroup[]> {
     const groups: SearchGroup[] = [];
@@ -123,13 +92,9 @@ export class FindingGroup extends SessionCore {
       // be a finding worth its own sentence, not a runtime case to guard.
       const kind = KIND_BY_LABEL[label];
       if (!kind) throw new Error(`${label} is searchable but names no research-concept kind`);
-      // `ref()`'s own kind<->label check is what makes the cast below safe:
-      // `kind` is looked up FROM `label`, so the two cannot disagree, and
-      // `ref` would throw before an actually-mismatched handle ever reached
-      // `SearchMatch`. The cast narrows a dynamically-looked-up `string` to
-      // the specific union `KIND_BY_LABEL`'s own type can't express without
-      // a label-indexed conditional type -- more machinery than the
-      // fact ("this group is one label, hence one kind") needs.
+      // `ref()`'s own kind<->label check is what makes the cast below safe: `kind` is looked up
+      // FROM `label`, so the two cannot disagree, and `ref` would throw before an actually-
+      // mismatched handle ever reached `SearchMatch`.
       const matches: SearchMatch[] = [];
       for (const prop of scalarProps) {
         const rows = await this.graph.query(

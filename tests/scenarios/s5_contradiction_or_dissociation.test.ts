@@ -1,18 +1,5 @@
 /**
  * S-5 — "Contradiction or dissociation?"
- * docs/project-journal/008_user_story_mining.md
- *
- * The first direct test of claim scope, and the first scenario built around
- * two claims worded **identically** on purpose. Every read verb in the domain
- * layer currently addresses a claim by its proposition text; S-5 is where that
- * stops being adequate, because the whole question is whether two sentences
- * that look the same are the same claim.
- *
- * Deliberately not pre-decided: whether scope needs a property on the claim,
- * whether a claim is a proposition or an occurrence of asserting one, and what
- * handle a caller should use to name one claim rather than another.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -56,10 +43,6 @@ const EXTERNAL = "does the graph construction matter for external classification
 
 /**
  * Two stages of one programme that appear to disagree.
- *
- * The earlier stage measured internal mapping strength and found the graph
- * choice made no difference. The later stage measured external classification
- * utility and ranked the constructions. Same sentence, different endpoints.
  */
 async function twoStages() {
   const { question: internal } = await session.pose({ question: INTERNAL });
@@ -145,9 +128,6 @@ describe("S-5 — contradiction or dissociation?", () => {
 
   /**
    * Afterward 1 — which question does each claim answer, and what bears on it?
-   *
-   * Derived from what each claim is attached to. Nothing in this test compares
-   * one sentence to another, and the two sentences are identical anyway.
    */
   test("each claim carries its own question and its own evidence", async () => {
     const programme = await twoStages();
@@ -179,9 +159,6 @@ describe("S-5 — contradiction or dissociation?", () => {
 
   /**
    * Afterward 2 — what would a genuine contradiction look like here?
-   *
-   * Two claims of the same scope with opposing support. Built, so the verdict
-   * is discriminating rather than always saying "dissociation".
    */
   test("two opposing findings within one question are a contradiction", async () => {
     const programme = await twoStages();
@@ -226,13 +203,7 @@ describe("S-5 — contradiction or dissociation?", () => {
   });
 
   /**
-   * Afterward 3 — does revising or withdrawing one interpretation affect the
-   * other?
-   *
-   * It must not. This is the sharpest consequence of a revision path meeting
-   * two identically worded claims: withdrawing one reading in one line of
-   * work, and finding an unrelated line of work silently retracted, with no
-   * decision anywhere saying so.
+   * Afterward 3 — does revising or withdrawing one interpretation affect the other?
    */
   test("withdrawing one reading leaves the identically worded one alone", async () => {
     const programme = await twoStages();
@@ -261,10 +232,6 @@ describe("S-5 — contradiction or dissociation?", () => {
 
   /**
    * Nothing about another line of enquiry's closure rests on this reading.
-   *
-   * The sharpest remaining leak, because it is invisible when only one scope
-   * ever closes anything: a question closed elsewhere on an identically worded
-   * claim would be reported as depending on a reading nobody there held.
    */
   test("a question closed in another line of enquiry is not reported as resting on this reading", async () => {
     const programme = await twoStages();
@@ -318,12 +285,7 @@ describe("S-5 — contradiction or dissociation?", () => {
   });
 
   /**
-   * A sentence withdrawn in one line of enquiry does not block work in
-   * another.
-   *
-   * A guard refuses to re-assert a withdrawn proposition. Unscoped, that
-   * guard would have the defect this scenario is about, in the opposite
-   * direction: it would block legitimate work.
+   * A sentence withdrawn in one line of enquiry does not block work in another.
    */
   test("withdrawing a sentence here does not block concluding it elsewhere", async () => {
     const programme = await twoStages();
@@ -387,11 +349,6 @@ describe("S-5 — contradiction or dissociation?", () => {
 
   /**
    * A bare proposition is refused when it names more than one claim.
-   *
-   * Text remains the right handle when a sentence is asserted once, which is
-   * the ordinary case and every earlier scenario. When it is not, LabKit says
-   * so rather than picking one — the wrong answer here is not "no result", it
-   * is a confident answer about a claim the caller did not mean.
    */
   test("an ambiguous proposition is refused at the one place wording is resolved", async () => {
     const programme = await twoStages();

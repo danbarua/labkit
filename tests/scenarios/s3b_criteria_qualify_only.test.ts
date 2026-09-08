@@ -1,15 +1,5 @@
 /**
  * S-3b — "The same design with nothing downstream."
- * docs/project-journal/008_user_story_mining.md, §3
- *
- * S-3's criteria do two jobs at once: they gate the tertiary analysis, and
- * they decide whether the primary finding can be relied on. This scenario is
- * S-3's conversation with the tertiary model taken away. Same checks,
- * same significant result, nothing downstream at all — so the qualification
- * job is the only one left, and whatever the model needs here it needs for
- * that job alone.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -90,12 +80,7 @@ async function aFindingHeldToAgreedChecks() {
 
 describe("S-3b: the same design with nothing downstream", () => {
   /**
-   * Afterward 1. "Does the finding stand?" — no, and not because evidence is
-   * missing.
-   *
-   * `QUALIFIES` gives a claim a path to the conditions it must satisfy, so
-   * a `supported` verdict means more than "some evidence exists" — it means the
-   * evidence holds up by the standard set for it.
+   * Afterward 1. "Does the finding stand?" — no, and not because evidence is missing.
    */
   test("Afterward 1: the finding does not stand, and the numbers are still good", async () => {
     const { primary, median, analysisClaims } = await aFindingHeldToAgreedChecks();
@@ -166,14 +151,8 @@ describe("S-3b: the same design with nothing downstream", () => {
   });
 
   /**
-   * Afterward 3. "What is waiting on those checks?" — nothing, and the record
-   * must say nothing rather than name work that does not exist.
-   *
-   * Before this scenario a standard could only be recorded by declaring a gate
-   * for it, so expressing "nothing is waiting on this" required minting a gate
-   * that protected nothing — which `gateStatus()` then reported as `blocked`
-   * with an empty `gating` list. Both halves are now closed: the gate is
-   * refused, and the standard no longer needs one.
+   * Afterward 3. "What is waiting on those checks?" — nothing, and the record must say nothing
+   * rather than name work that does not exist.
    */
   test("Afterward 3: a standard with nothing downstream needs no gate, and cannot fake one", async () => {
     const { primary } = await aFindingHeldToAgreedChecks();
@@ -214,10 +193,9 @@ describe("S-3b: the same design with nothing downstream", () => {
   });
 
   /**
-   * The state a finding held to nothing is in. `standard: []` is an answer —
-   * "held to no agreed standard" — and must not read as "met its standard"
-   * nor as "failed it". Every scenario before this one is in this state, which
-   * is why they still pass.
+   * The state a finding held to nothing is in. `standard: []` is an answer — "held to no agreed
+   * standard" — and must not read as "met its standard" nor as "failed it". Every scenario
+   * before this one is in this state, which is why they still pass.
    */
   test("a finding held to no agreed standard is neither qualified nor disqualified", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from rewired?");
@@ -241,16 +219,8 @@ describe("S-3b: the same design with nothing downstream", () => {
   });
 
   /**
-   * **Researcher:** I checked the pipeline was sane before I ran anything. It
-   * gates nothing and no finding is held to it — I just checked it.
-   *
-   * **Agent:** Recorded, and `why` on the condition says so.
-   *
-   * This was refused until 2026-09-06, on the grounds that an evaluation no
-   * reader could reach would sit in the graph looking like a check that had
-   * been performed. `why <criterion>` reads every verdict a criterion has,
-   * whatever gate it was reached for, so the reader the refusal said could not
-   * exist had existed since it shipped.
+   * **Researcher:** I checked the pipeline was sane before I ran anything. It gates nothing and
+   * no finding is held to it — I just checked it.
    */
   test("a check that gates nothing is still recorded, and still reads back", async () => {
     const { criterion: standalone } = await session.stateCriterion("the pipeline was sane");
@@ -270,12 +240,6 @@ describe("S-3b: the same design with nothing downstream", () => {
 
   /**
    * A replaced analysis's checks are as historical as its findings.
-   *
-   * `whySupported()` already excludes a superseded analysis's inputs from
-   * `restingOn`; the standard is read through the same filter, and this is
-   * what makes that filter load-bearing rather than tidy. Without it the dead
-   * analysis's failed check would disqualify the claim the *replacement*
-   * supports.
    */
   test("a superseded analysis's failed checks do not disqualify its replacement", async () => {
     const { median, analysis, enquiry, observations } = await aFindingHeldToAgreedChecks();

@@ -28,10 +28,6 @@ export class Stopping extends SessionCore {
 
   /**
    * Closes an enquiry by resolving the question that motivates it.
-   *
-   * `answeredBy` is what makes this an answer rather than an abandonment:
-   * closing with nothing cited is a real and different act, and the two must
-   * not read alike.
    */
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
     return this.handle("closeEnquiry", input, async (unitOfWork) => {
@@ -44,26 +40,9 @@ export class Stopping extends SessionCore {
           `enquiry ${input.enquiry} has no motivating question to resolve; closure attaches to the question an enquiry pursues, so pursue one before closing`,
         );
 
-      // **Closing a closed question is refused, not recorded.** A second close
-      // writes a second `RESOLVES`, and `enquiryStatus()` picks between them with
-      // `.find()` over rows AGE returns in no defined order — so which close a
-      // reader sees is arbitrary. Demonstrated through the public API with no
-      // interruption at all: abandon an enquiry, later find a result and close it
-      // citing the evidence, and the record still reports `abandoned`,
-      // `answer: null`, `evidence: []`. The answer is erased, and `abandoned` is
-      // a positive classification rather than an empty result. Two clean calls
-      // are enough; nothing has to fail halfway.
-      //
-      // **Refused rather than resolved in the reader**, and the choice is not
-      // arbitrary: `closeEnquiry` is the only writer of `RESOLVES`, so with this
-      // guard two resolving decisions cannot exist, and a reader-side tie-break
-      // would be a branch nothing can reach, and an unreachable branch is not
-      // merely dead but usually wrong.
-      //
-      // The refusal has something real to refuse: a caller closing a question
-      // that is already closed. Re-opening a settled question on new evidence is
-      // a *different research act* and has no verb; it gets built when something
-      // needs it, rather than being smuggled in as a second close.
+      // **Closing a closed question is refused, not recorded.** A second close writes a second
+      // `RESOLVES`, and `enquiryStatus()` picks between them with `.find()` over rows AGE
+      // returns in no defined order — so which close a reader sees is arbitrary.
       const alreadyResolved = await this.graph.query(
         `MATCH (d:Decision)-[:RESOLVES]->(:Question {natural_id: $id}) RETURN d`,
         { d: vertexProps<{ natural_id: string; reason: string }>() },
@@ -80,12 +59,10 @@ export class Stopping extends SessionCore {
       let answerBearing: EvidenceRef[] = [];
       let answeredProposition: string | undefined;
       if (input.answeredBy) {
-        // The claim identifies itself; what still has to be checked is that it
-        // belongs to THIS enquiry. One hop from the claim rather than a search
-        // for a proposition.
-        // BOTH bearings. A question answered "no" is answered on a finding that
-        // CHALLENGES its proposition, so checking only SUPPORTS rejects exactly
-        // that closure.
+        // The claim identifies itself; what still has to be checked is that it belongs to THIS
+        // enquiry. One hop from the claim rather than a search for a proposition. BOTH
+        // bearings. A question answered "no" is answered on a finding that CHALLENGES its
+        // proposition, so checking only SUPPORTS rejects exactly that closure.
         const addresses: unknown[] = [];
         for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
           addresses.push(
@@ -123,17 +100,9 @@ export class Stopping extends SessionCore {
           answerBearing = [found.evidence];
           answeredProposition = found.asserts;
         } else {
-          // A synthesis rests on findings rather than producing one, so the
-          // closure rests on the findings underneath it — all of them. Citing
-          // one would name an arbitrary part as the answer to a question the
-          // whole was drawn to settle.
-          //
-          // **Both bearings, and AGE has no edge alternation.** Naming only
-          // `SUPPORTS` is silent: the rows are simply absent, and a synthesis
-          // drawn across findings that all *challenge* their propositions —
-          // which is what a negative result looks like, and what Bonsai's
-          // Stage 1D headline is — reads as a claim nothing bears on. Shipped
-          // that way in #276 and found by running the transcript.
+          // A synthesis rests on findings rather than producing one, so the closure rests on
+          // the findings underneath it — all of them. Citing one would name an arbitrary part
+          // as the answer to a question the whole was drawn to settle.
           const parts: { c: { name: string }; e: { natural_id: string } }[] = [];
           for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
             parts.push(
@@ -186,20 +155,6 @@ export class Stopping extends SessionCore {
 
   /**
    * Records that a question is being left open on purpose.
-   *
-   * Not closing it. `closeEnquiry()` with nothing cited reports the question
-   * **abandoned** — nobody worked on it, no result behind it — which reads a
-   * deliberate decision as neglect.
-   *
-   * `until` is the condition that would reopen it, landing on the decision's
-   * `invalidation_check`: what would make this decision wrong. The condition
-   * should be about the world — new design, new data — rather than "run the
-   * analysis again", and nothing here can enforce that. What the model
-   * guarantees is that a condition was named at all, which is the difference
-   * between deciding to stop and drifting to a halt.
-   *
-   * **No `Task` is created.** A to-do item nobody intends to action, minted so
-   * a survey can report it, is ceremony.
    */
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
     return this.handle("acceptAsUnresolved", input, async (unitOfWork) => {
@@ -237,19 +192,6 @@ export class Stopping extends SessionCore {
 
   /**
    * Planned work somebody decided not to do.
-   *
-   * **An act, not a flag.** `Task` has no stored open-flag — one existed, was
-   * written by `planWork` and read by nothing, and went. So the only thing
-   * that can say *we are not doing this* is a `Decision` with a reason, which
-   * is also the only form that keeps the reason.
-   *
-   * The same shape `closeEnquiry` writes, `RESOLVES` and all: a question
-   * closed and work dropped are both something settled, and a reader reaching
-   * one through the edge reaches the other the same way.
-   *
-   * **Refuses work already stopped**, as `closeEnquiry` refuses a closed
-   * question: two decisions would stand against one task, each with its own
-   * reason, and nothing says which holds.
    */
   async stopWork(input: StopWorkCommand): Promise<StoppedWork> {
     return this.handle("stopWork", input, async (unitOfWork) => {

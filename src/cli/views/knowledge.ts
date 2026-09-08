@@ -1,12 +1,5 @@
 /**
  * What the programme knows, and why.
- *
- * **Ported verbatim from the monolithic `src/cli.ts`, comments included**, and
- * that is deliberate: an external review of the first version (2026-08-21)
- * found three distinctions the domain has scenarios for being dropped between
- * the report and the page, every one of them correct in `--json`. The comments
- * on each function are what those defects cost, and a rewrite during a move is
- * how they come back.
  */
 
 import type {
@@ -39,13 +32,9 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
 }
 
 /**
- * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was
- * answered. Without the polarity, reading only `asks` for an established
- * question cannot tell a confirmed "no" apart from a "yes".
- *
- * A question that had been parked keeps saying so. The condition it was parked
- * on is what a reader checks the answer against — whether this is the thing
- * that was being waited for, or something else that arrived first.
+ * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was answered. Without
+ * the polarity, reading only `asks` for an established question cannot tell a confirmed "no"
+ * apart from a "yes".
  */
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => {
@@ -101,10 +90,6 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
 
 /**
  * How each verdict reads on the page, and in which colour.
- *
- * A total map rather than a chain of ternaries: the compiler now says when a
- * verdict has been added and this page has nothing to print for it, which is
- * how the previous version came to have no words for a synthesis.
  */
 const VERDICT_LINE: Record<Verdict, (why: SupportExplanation, p: Palette) => string> = {
   supported: (_, p) => p.settled("supported"),
@@ -122,12 +107,6 @@ const VERDICT_LINE: Record<Verdict, (why: SupportExplanation, p: Palette) => str
 
 /**
  * Why a proposition stands, or does not.
- *
- * The ways a proposition can fail to be supported are printed apart, because
- * they are different scientific states: nothing has examined it, evidence
- * bears against it, it does not meet the standard it was held to, or nobody
- * asserts the sentence any more. The first version of this renderer collapsed
- * them into `NOT supported` above a list of perfectly good findings.
  */
 export function renderWhy(why: SupportExplanation, p: Palette): string {
   const undecided = why.standing === "undecided";
@@ -144,19 +123,10 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       ? `  replaced by: "${why.replacedBy.asserts}"  ${p.handle(`(${why.replacedBy.claim})`)}`
       : "",
     "",
-    // **One word, one meaning.** This list is the supporting *findings*; the
-    // inputs they rest on are `restingOn`, below. An undecided claim keeps its
-    // findings and they support nothing, so the heading names what they are
-    // rather than what they do -- a heading has to describe the list under it.
-    // **An undecided claim's findings are one list.** The claim-level state
-    // says the evidence settles this neither way; splitting them into a
-    // supporting list and a `Bearing against` one re-asserts a per-finding
-    // direction that state has overridden, under a heading that picks a side
-    // directly below a verdict line saying nobody has. Merged rather than
-    // hidden: each line still carries how the finding was recorded.
-    // A synthesis has no findings of its own, and `Supported by / no supporting
-    // findings` directly under a verdict line reading "drawn across 4 findings"
-    // is the same wrong answer one line lower. Its basis is `Drawn across`.
+    // **One word, one meaning.** This list is the supporting *findings*; the inputs they rest
+    // on are `restingOn`, below. An undecided claim keeps its findings and they support
+    // nothing, so the heading names what they are rather than what they do -- a heading has to
+    // describe the list under it.
     synthesis ? "" : p.heading(undecided ? "Findings" : "Supported by"),
     synthesis
       ? ""
@@ -238,11 +208,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
 }
 
 /**
- * The `Work`/`LineOfEnquiry` cases of `why` — one sentence, then the causes
- * behind it. `Claim` gets the richer view above
- * instead (`renderWhyDispatch`, below); this is deliberately the smaller of
- * the two, since a task or an enquiry's own detail command already prints the
- * embedded `report` in full.
+ * The `Work`/`LineOfEnquiry` cases of `why` — one sentence, then the causes behind it.
  */
 function renderExplanation(explanation: Explanation, p: Palette): string {
   const sentence = `${p.handle(explanation.subject)} is ${explanation.is}`;
@@ -259,17 +225,9 @@ function renderExplanation(explanation: Explanation, p: Palette): string {
 }
 
 /**
- * `why <handle>` — dispatches on `Explanation.kind`, not on what the caller
- * passed in: the redesign's whole point is that the CLI does not know which
- * kind it got until the domain says so.
- *
- * `Claim` renders through the existing rich view over its embedded
- * `SupportExplanation` (the *Resting on / Held to / Ultimately resting on*
- * page); every other kind (`Work`, `LineOfEnquiry`, `Gate`) renders the
- * sentence-plus-causes shape instead, since their own detail commands
- * (`contract`, `enquiry`, `gate`) already show the fuller report. `--json`
- * gets the same `{kind, subject, is, because, report}` envelope regardless of
- * which branch prints for a terminal.
+ * `why <handle>` — dispatches on `Explanation.kind`, not on what the caller passed in: the
+ * redesign's whole point is that the CLI does not know which kind it got until the domain says
+ * so.
  */
 export function renderWhyDispatch(explanation: Explanation, p: Palette): string {
   switch (explanation.kind) {
@@ -304,13 +262,6 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
 
 /**
  * Which claims assert a sentence — the one place text becomes a handle.
- *
- * Several matches is not a duplicate to be tidied away. Two lines of enquiry
- * can assert the same sentence about different endpoints, and they are two
- * claims; collapsing them reports one record that is simultaneously
- * supported and challenged when each separately has a clean answer. So the
- * multiple case gets a sentence saying so, rather than a list a reader might
- * take for redundancy.
  */
 export function renderClaims(claims: ConcludedClaim[], proposition: string, p: Palette): string {
   return [
@@ -353,12 +304,6 @@ export function renderSearch(groups: SearchGroup[], text: string, p: Palette): s
 
 /**
  * Whether two conclusions disagree.
- *
- * Three relations, three sentences, and `dissociation` is the one this verb
- * exists for: two analyses reaching opposite-sounding results are not in
- * conflict if they asked about different endpoints. Rendering that as a
- * contradiction is precisely the defect the domain went to trouble to prevent
- * so the word never appears for it.
  */
 export function renderConflict(verdict: ConflictVerdict, p: Palette): string {
   const side = (s: ConflictSide): string =>

@@ -1,33 +1,5 @@
 /**
  * Optional query tracing, off unless asked for.
- *
- * **Why this exists.** An intermittent test failure is argued about until
- * somebody measures it, and hand-instrumenting the test helper is where each
- * investigation starts. With every query tracked from start to completion,
- * "it hangs" is answerable with *59,086 queries, zero unfinished* rather than
- * argued.
- *
- * The two numbers that did the work are the two this module records. **In-flight
- * queries outstanding past a threshold** is what turns "it hung" into "nothing
- * hung" — a negative result no post-mortem log can produce, because a query that
- * never completes never writes a completion line. **Per-connection counts and
- * durations** is what turned a 5-second timeout into "311 sequential queries
- * summing 4.955s of real round trips", which located the cost in provisioning
- * rather than in any stall.
- *
- * **Zero cost when off.** `traced()` returns the connection it was handed,
- * unwrapped, so a disabled trace is one env-var read at construction and no
- * per-query work at all. The check is never made per query.
- *
- * ```sh
- * LABKIT_TRACE=1 bun test                      # slow queries + a stuck-query watchdog
- * LABKIT_TRACE=1 LABKIT_TRACE_SLOW_MS=200 …    # lower the slow threshold
- * LABKIT_TRACE=all bun test 2> queries.jsonl   # every query, one JSON object per line
- * ```
- *
- * **Parameters are never logged.** They carry research content — propositions,
- * findings, verdicts — and a trace file is a debugging artefact that gets pasted
- * into issues and chat. SQL text is truncated for the same reason.
  */
 import type { LabKitDB } from "./backend";
 
@@ -78,9 +50,6 @@ let watchdog: ReturnType<typeof setInterval> | undefined;
 
 /**
  * One shared watchdog for every traced connection, started lazily.
- *
- * `unref()` so it can never hold a process open — a debugging aid that stops a
- * test run from exiting would be worse than no aid at all.
  */
 function ensureWatchdog(stuckMs: number): void {
   if (watchdog) return;
@@ -107,15 +76,6 @@ function ensureWatchdog(stuckMs: number): void {
 
 /**
  * What is in flight right now, as a snapshot.
- *
- * The watchdog above is the production consumer; this exists so the claim can
- * be **asserted** rather than described. A thrown query must not leave a
- * phantom entry — the one failure mode that would make this module lie — and a
- * comment saying so beside `expect(true)` is a second copy of the claim rather
- * than a check on it. Moving `inFlight.delete(id)` out of the `finally` leaves
- * the whole suite green; with the snapshot exported it fails.
- *
- * A copy, not the map: a caller holding the live map could clear it.
  */
 export function tracedInFlight(): Array<{
   id: number;
@@ -142,13 +102,7 @@ export function traceTotals(): Array<{
 }
 
 /**
- * Wraps a connection so its queries are traced, or hands it straight back when
- * tracing is off.
- *
- * `label` is how the connection appears in the output — a test name, a role
- * such as `admin`, anything that tells two connections apart. Telling them
- * apart is most of the value: the teardown race this module was built to
- * diagnose is invisible unless you can see which connection did what.
+ * Wraps a connection so its queries are traced, or hands it straight back when tracing is off.
  */
 export function traced(db: LabKitDB, label = "db"): LabKitDB {
   const opts = options();

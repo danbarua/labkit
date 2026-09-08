@@ -1,21 +1,5 @@
 /**
  * S-18b — "The answer is no, and somebody vouched for it."
- *
- * A question can be substantively answered **no**, by evidence that
- * `CHALLENGES` the claim answering it, and `promote()` moves a finding from
- * scratch to citable. Each has a scenario; neither crosses the other, and
- * this scenario is where the crossing turns out broken:
- *
- * > three read paths still discover the promoted closing claim using only
- * > `Evidence -SUPPORTS-> Claim`, not `CHALLENGES`.
- *
- * A negative result somebody checked and vouched for is an ordinary and
- * valuable thing — arguably the most valuable kind — and reporting it as
- * resting on scratch tells a reader not to build on it. That is the same
- * SUPPORTS-only assumption already fixed twice in this codebase, in `scopeOf`
- * and in `closeEnquiry`'s ownership check, surviving in the read layer.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

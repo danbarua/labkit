@@ -1,28 +1,6 @@
 /**
  * S-9b — "Was this a rebuild, or new work?"
- * docs/project-journal/008_user_story_mining.md §3 row F
- * docs/consumer-contract/027_row_f_predictions.md
- *
- * **Rung 1.** Built to be shown insufficient before anything is added, the way
- * row Z's was. Nothing in `src/` changes on this commit.
- *
- * Where the story comes from matters more than usual here. Row F is the oldest
- * unowned row in the ledger and a scenario written to satisfy it would
- * manufacture its own result. This one is not: Designer 2 — cold, with no
- * access to row F or this repository — independently required a durable
- * reconstruction attempt whose remembered fields include its historical
- * target, which is the external pressure the scenario method was waiting for
- * and could not produce from inside itself.
- *
- * Row F was already half-settled elsewhere. Identity was settled: two
- * artefacts may share a `logical_name`, and refusing the ambiguous name stops
- * the regenerated one
- * inheriting the historical one's dependants. What it did not settle is
- * **direction** — a reader holding only the rebuilt artefact cannot say what it
- * was rebuilding, because the rebuild is written by an ordinary
- * `recordObservations()` naming nothing historical.
- *
- * Imports only src/domain — never src/db (enforced).
+ * row F
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -34,10 +12,9 @@ import { recordAnalysis } from "../helpers/analysis";
 let scenario: Scenario;
 
 /**
- * Frozen, not merely fixed. Two worlds that a read could separate only because
- * wall-clock time moved between them would have been separated as test runs,
- * not as research states — `tests/helpers/clock.ts` on why that distinction is
- * load-bearing.
+ * Frozen, not merely fixed. Two worlds that a read could separate only because wall-clock time
+ * moved between them would have been separated as test runs, not as research states —
+ * `tests/helpers/clock.ts` on why that distinction is load-bearing.
  */
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
@@ -58,10 +35,6 @@ async function afterwards(): Promise<ResearchSession> {
 
 /**
  * One world, begun and torn down inside the test.
- *
- * `beforeEach`/`afterEach` cannot own the lifecycle here, because the
- * paired-world tests below open and close two graphs of their own within a
- * single test; the two managers raced and closed the connection twice.
  */
 async function inOneWorld<T>(build: (s: ResearchSession) => Promise<T>): Promise<T> {
   const graph = await scenario.begin();
@@ -77,10 +50,6 @@ const MATCHES = "the accelerated path matches the reference";
 
 /**
  * Two worlds, each built from scratch on its own graph, then compared.
- *
- * The clock is reset per world and never wound, so the two cannot be told
- * apart by wall-clock time — a read that separated them only because time
- * passed would have distinguished the test runs, not the research states.
  */
 async function inTwoWorlds<T>(
   worldA: (s: ResearchSession) => Promise<T>,
@@ -90,13 +59,8 @@ async function inTwoWorlds<T>(
 }
 
 /**
- * Researcher: "There's a cached construction from the old study. The control
- *  that went into it has no recorded provenance — nobody wrote down what
- *  generated it."
- *
- * The same opening situation as the scenario before this one, kept
- * deliberately identical so that what this scenario adds is visible
- * against it.
+ * Researcher: "There's a cached construction from the old study. The control that went into it
+ * has no recorded provenance — nobody wrote down what generated it."
  */
 async function theCachedConstruction(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("does the accelerated path match the reference?");
@@ -126,13 +90,8 @@ function normaliseIds<T>(value: T): T {
 
 describe("S-9b: was this a rebuild, or new work?", () => {
   /**
-   * The control, and it is doing the same job probe 1 does in the consumer
-   * slice: it proves the harness **can** return unequal answers for two
-   * worlds. Without it, every equality below would be uninterpretable — it
-   * could be a fact about `inTwoWorlds` rather than about the read surface.
-   *
-   * The worlds differ in something a researcher plainly cares about: whether
-   * the second control agrees with the first.
+   * The control, and it is doing the same job probe 1 does in the consumer slice: it proves the
+   * harness **can** return unequal answers for two worlds.
    */
   test("two worlds that differ in what the record says are told apart", async () => {
     const build = (recorded: string) => async (s: ResearchSession) => {
@@ -169,20 +128,8 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * Rung 1, and the finding. Two research situations that mean different
-   * things produce **the same durable record**.
-   *
-   * World A: the second researcher infers the old algorithm and regenerates
-   * the control. It is a reconstruction of the historical one.
-   *
-   * World B: the second researcher generates a control for a new stage,
-   * independently, from a method they wrote themselves. It reconstructs
-   * nothing. It carries the same name because that is what such a series is
-   * called.
-   *
-   * A consumer asking Designer 2's question — *is this original work or an
-   * attempt to rebuild something, and if so, of what?* — has the same bytes to
-   * work from in both worlds.
+   * Rung 1, and the finding. Two research situations that mean different things produce **the
+   * same durable record**.
    */
   test("a reconstruction and independent fresh work leave the same durable record", async () => {
     const build = (finding: string) => async (s: ResearchSession) => {
@@ -230,14 +177,8 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * And here is the part that decides whether row F clears or stays an
-   * absence: **what does the record actually claim** in the world where the
-   * second control is a rebuild?
-   *
-   * If `whySupported()` reports the proposition resting on two independent
-   * findings, that is a wrong answer at the artefact level — a claim
-   * established once reporting itself corroborated twice — and it is
-   * demonstrated, not argued.
+   * And here is the part that decides whether row F clears or stays an absence: **what does the
+   * record actually claim** in the world where the second control is a rebuild?
    */
   test("what the record claims when the second control is a rebuild", async () => {
     const why = await inOneWorld(async (s) => {
@@ -265,14 +206,8 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * Rung 2, tested rather than argued: does a verb that already exists record
-   * the rebuild as an act with a target?
-   *
-   * `reverify()` is the closest thing on the surface — it writes
-   * `Evidence -REVERIFIES-> Evidence` and `whySupported()` reads it back as
-   * "re-checked, not independently corroborated". If the rebuild can be
-   * recorded through it, the double count above is preventable with no model
-   * change at all, and row F does not get to claim it.
+   * Rung 2, tested rather than argued: does a verb that already exists record the rebuild as an
+   * act with a target?
    */
   test("the rebuild recorded through the verb that already exists", async () => {
     const why = await inOneWorld(async (s) => {
@@ -297,23 +232,9 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * A researcher opens the question of what generated the historical control
-   * and works on it: three candidate algorithms tried, none reproduces the
-   * recorded series. That is real, recorded, durable work, and a negative
-   * result is a result.
-   *
-   * `whatIsKnown()` must report the question **`unresolved`**, not
-   * **`untested`** — *"one nothing has ever been run against"* would be
-   * false here. `recordObservations()` mints an `EvidenceUnit`, and the
-   * survey's `worked` test walks `EvidenceUnit -ADDRESSES-> LineOfEnquiry`;
-   * work recorded as observations is reachable through it exactly as work
-   * recorded as an analysis is. The sibling question below reads
-   * `unresolved` regardless, which is what isolates the cause rather than
-   * alleging it.
-   *
-   * The sibling assertion is kept for the same reason it is useful as a
-   * diagnosis: if a future change makes `unresolved` unreachable, this test
-   * must fail for that too, not quietly agree with itself.
+   * A researcher opens the question of what generated the historical control and works on it:
+   * three candidate algorithms tried, none reproduces the recorded series. That is real,
+   * recorded, durable work, and a negative result is a result.
    */
   test("a reconstruction attempt that fails is not a question nobody has looked at", async () => {
     const { untested, unresolved } = await inOneWorld(async (s) => {
@@ -354,18 +275,6 @@ describe("S-9b: was this a rebuild, or new work?", () => {
 
   /**
    * Where rung 2 stops, stated precisely rather than gestured at.
-   *
-   * `reverify()` re-checks a **conclusion**: it looks up the finding by which
-   * the historical analysis concluded a proposition, and refuses when there is
-   * none. Designer 2's case is a researcher who rebuilt an *input* and drew no
-   * conclusion at all — the control was regenerated so that later work could
-   * proceed, not to re-check anything. There is no proposition to name, so the
-   * verb that would have recorded the act declines, correctly.
-   *
-   * This is the boundary, and it is worth being exact about: rung 2 covers a
-   * rebuild that concludes something, which is the case that could otherwise
-   * produce a wrong answer. It does not cover a rebuild that concludes nothing,
-   * which produces no answer at all.
    */
   test("a rebuild that concludes nothing has no act to be recorded as", async () => {
     await inOneWorld(async (s) => {
@@ -396,12 +305,8 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   });
 
   /**
-   * What `reverify()` still does not answer, stated on its own so the
-   * remaining gap is not overstated or lost.
-   *
-   * It records that a *finding* was re-checked. Designer 2 asked about an
-   * *artefact*: what was this thing an attempt to rebuild? A reader holding
-   * the regenerated control has no route from it to the control it replaces.
+   * What `reverify()` still does not answer, stated on its own so the remaining gap is not
+   * overstated or lost.
    */
   test("what was this artefact rebuilding — still nothing answers", async () => {
     await inOneWorld(async (s) => {
@@ -424,17 +329,10 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // Asking by name is refused, correctly.
       await expect(reader.whatDependsOn(CONTROL)).rejects.toThrow(/2 artefacts are named/);
 
-      // Asking by reference answers about that artefact only. The assertion is
-      // on the report's **shape**, not on its values, and that is deliberate:
-      // a test that only checked `claims` would stay green even if a field
-      // naming what was rebuilt were added to this report by mistake. Give
-      // any read on this path such a field and this line fails.
-      //
-      // The detector cannot tell which field arrived, only that the shape
-      // moved -- `subject` is the handle of the artefact ASKED ABOUT, which is
-      // not the artefact it was an attempt to rebuild, so its presence alone
-      // does not answer the question this scenario is about. That is what the
-      // detector is for, and why the list is updated rather than loosened.
+      // Asking by reference answers about that artefact only. The assertion is on the report's
+      // **shape**, not on its values, and that is deliberate: a test that only checked `claims`
+      // would stay green even if a field naming what was rebuilt were added to this report by
+      // mistake.
       const exact = await reader.whatDependsOn(regenerated);
       expect(Object.keys(exact).sort()).toEqual([
         "claims",

@@ -1,21 +1,5 @@
 /**
- * S-9 — "The artefact survived; its provenance didn't."
- * docs/project-journal/008_user_story_mining.md, §2 and §3 rows F, P
- *
- * A cached construction that can be mostly, but not exactly, rebuilt. Three of
- * its components come back byte-identical; the historical random control does
- * not, because whatever generated it was never written down.
- *
- * The researcher then asks for the thing the record must refuse to let happen
- * quietly: regenerate the missing part and carry on. LabKit may do it, but the
- * result is a *different* artefact with inferred provenance, and the question
- * of what actually produced the original stays open.
- *
- * Row F predicts an Artefact→Artefact edge is needed. The predictions for this
- * build say otherwise — that the damage is identity, not lineage. Either way
- * the test is the same: show the wrong answer first.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-9 — "The artefact survived; its provenance didn't."  and rows F, P
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -60,11 +44,8 @@ const CONTROL = "historical random control";
 const PROPOSITION = "the accelerated path matches the reference";
 
 /**
- * Researcher: "There's a cached construction from the old study. Four parts
- *  went into it, and a result rests on it."
- *
- * Three parts were recorded with a hash. The control was not — nobody wrote
- * down what generated it, which is the whole situation.
+ * Researcher: "There's a cached construction from the old study. Four parts went into it, and a
+ * result rests on it."
  */
 async function aCachedConstructionWithOneUnrecordedPart() {
   const { enquiry } = await session.openEnquiry("does the accelerated path match the reference?");
@@ -112,10 +93,9 @@ async function aCachedConstructionWithOneUnrecordedPart() {
 
 describe("S-9: the artefact survived; its provenance didn't", () => {
   /**
-   * Afterward 1. "Which parts of this artefact are reproducible?" — three
-   * named exactly, one not. A part with no recorded hash is not a part that
-   * differs; it is a part nobody can check, and the two must not read alike.
-   * Row I's distinction, asked of an artefact.
+   * Afterward 1. "Which parts of this artefact are reproducible?" — three named exactly, one
+   * not. A part with no recorded hash is not a part that differs; it is a part nobody can
+   * check, and the two must not read alike.
    */
   test("Afterward 1: three parts reproduce exactly, one cannot be checked at all", async () => {
     const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
@@ -151,14 +131,8 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
   });
 
   /**
-   * Afterward 3, and the one the scenario exists for. "Is the regenerated
-   * version the same artefact?" — no.
-   *
-   * Regenerating produces something that plausibly carries the same name. If
-   * the record identifies artefacts by that name, the regenerated part
-   * inherits everything the historical one carried: its dependents, and with
-   * them its standing. That is precisely what the story says must not happen
-   * quietly.
+   * Afterward 3, and the one the scenario exists for. "Is the regenerated version the same
+   * artefact?" — no.
    */
   test("Afterward 3: a regenerated part does not inherit the original's dependents", async () => {
     const { enquiry, parts } = await aCachedConstructionWithOneUnrecordedPart();
@@ -230,11 +204,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
   });
 
   /**
-   * The refusal, stated on its own. Asking by name is fine while a name
-   * identifies one thing; once a part has been regenerated it does not, and
-   * answering about the union is how inferred provenance would inherit the
-   * original's standing. A command that declines beats an answer about
-   * something the caller did not mean.
+   * The refusal, stated on its own. Asking by name is fine while a name identifies one thing;
+   * once a part has been regenerated it does not, and answering about the union is how inferred
+   * provenance would inherit the original's standing.
    */
   test("asking by name is refused once two artefacts share it", async () => {
     const { enquiry } = await aCachedConstructionWithOneUnrecordedPart();
@@ -257,19 +229,8 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
   });
 
   /**
-   * External review. A part the caller simply did not rebuild is not a part
-   * that came back different.
-   *
-   * The first cut reported it `differing`, because the offered map had no entry
-   * and "no entry" compared unequal to the recorded hash — claiming evidence of
-   * inequality where there was only absence of a comparison. That is the exact
-   * conflation this report was written to avoid, one branch away from the
-   * branch that avoids it.
-   *
-   * Three reasons a part cannot be compared, and they are not the same: the
-   * record never had a hash (`unverifiable`), or this attempt did not rebuild
-   * it (`notRebuilt`). The first is a permanent property of the record; the
-   * second is a property of this attempt and says nothing about the artefact.
+   * External review. A part the caller simply did not rebuild is not a part that came back
+   * different.
    */
   test("a part that was not rebuilt is not a part that differs", async () => {
     const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
@@ -307,20 +268,10 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
   });
 
   /**
-   * A regeneration needs no artefact lineage to record its direction, because
-   * the direction is not durable in the first place: the regenerated part is
-   * created with an ordinary `recordObservations()` that names nothing
-   * historical, and `reproducibilityOf()` is a read that takes the historical
-   * parts as arguments and persists nothing. The direction lives in the
-   * caller's variables and in prose, not in durable state.
-   *
-   * What this test pins is the half that IS demonstrable: the two artefacts
-   * have distinct identity and distinct dependants. What it deliberately does
-   * **not** try to pin is the absence itself -- "no existing domain answer
-   * reconstructs their relationship" is an absence of capability, and
-   * asserting it strongly would mean inventing the very query that is
-   * missing. The executable part of this scenario asserts only what it can
-   * actually observe.
+   * A regeneration needs no artefact lineage to record its direction, because the direction is
+   * not durable in the first place: the regenerated part is created with an ordinary
+   * `recordObservations()` that names nothing historical, and `reproducibilityOf()` is a read
+   * that takes the historical parts as arguments and persists nothing.
    */
   test("BOUNDARY: nothing durable says what a regeneration was reconstructing", async () => {
     const { enquiry, parts } = await aCachedConstructionWithOneUnrecordedPart();

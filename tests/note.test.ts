@@ -1,10 +1,5 @@
 /**
  * `note` — the one write with no prerequisites besides `pose`.
- *
- * The behaviour worth asserting is exactly the shape of the promise: nothing
- * beyond `text` is required, `search` reaches it for free once it exists, and
- * `on` is a real edge to whatever the caller names — including another note,
- * since `CONCERNS` is deliberately not scoped to one target kind.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";

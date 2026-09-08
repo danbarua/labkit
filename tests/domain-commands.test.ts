@@ -1,17 +1,5 @@
 /**
  * The write half's commands, held as values.
- *
- * `src/domain/commands.ts` is an extraction: every shape it names is one a
- * verb already declared inline. Structural typing means `tsc` passing proves
- * the shapes are unchanged — so what needs a test is not the shapes but the
- * property the extraction exists for.
- *
- * A caller can now **hold** a command before issuing it: build it, pass it
- * around, issue it later. That was impossible while the shapes were anonymous,
- * and it is exactly what an MCP write tool has to do — receive arguments over a
- * wire, assemble a command, then call. This file does that, and asserts the
- * record afterwards, so it fails if a command type stops being importable or
- * stops matching the verb it names.
  */
 
 import { afterAll, beforeAll, describe, expect, test, beforeEach, afterEach } from "bun:test";

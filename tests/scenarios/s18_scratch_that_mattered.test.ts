@@ -1,14 +1,5 @@
 /**
  * S-18 — "Scratch work that unexpectedly mattered."
- * docs/project-journal/008_user_story_mining.md, §1 story 18, §3 row K
- *
- * The story: low-friction exploration must be capturable without ephemeral
- * scratch becoming part of the scientific record by accident. Its rule is
- * *capture cheaply, promote before citing*. The premise matters — scratch is
- * recorded **before** anyone knows it will matter, so whatever standing it ends
- * up with cannot have been declared when it was written.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -55,9 +46,6 @@ const PROPOSITION = "the pruning schedule shifts the convergence point";
 
 /**
  * Researcher: "I poked at this in a notebook over lunch. Nothing careful."
- *
- * Recorded the cheap way, which is the only way it could have been recorded —
- * nobody knew it would matter.
  */
 async function scratchExploration() {
   const { enquiry } = await session.openEnquiry(QUESTION);
@@ -82,11 +70,9 @@ async function scratchExploration() {
 
 describe("S-18: scratch work that unexpectedly mattered", () => {
   /**
-   * Afterward 1. Still answered — the question *is* settled as far as anyone
-   * has taken it, and pretending otherwise would be its own lie — but
-   * `provisional` rather than `established`, and the closure says what it rests
-   * on. A reader asking "what do we actually know" no longer gets scratch mixed
-   * in silently.
+   * Afterward 1. Still answered — the question *is* settled as far as anyone has taken it, and
+   * pretending otherwise would be its own lie — but `provisional` rather than `established`,
+   * and the closure says what it rests on.
    */
   test("Afterward 1: a question settled on scratch is answered provisionally, not established", async () => {
     const { enquiry, analysisClaims } = await scratchExploration();
@@ -107,10 +93,9 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   });
 
   /**
-   * Afterward 2. Promotion is an act, and it happens *after* the work — which
-   * is the whole premise. The researcher could not have declared confirmatory
-   * standing when the notebook sweep was recorded, because they did not yet
-   * know it mattered.
+   * Afterward 2. Promotion is an act, and it happens *after* the work — which is the whole
+   * premise. The researcher could not have declared confirmatory standing when the notebook
+   * sweep was recorded, because they did not yet know it mattered.
    */
   test("Afterward 2: promoting is an act taken later, with a reason", async () => {
     const { enquiry, analysisClaims } = await scratchExploration();

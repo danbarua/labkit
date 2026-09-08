@@ -1,14 +1,5 @@
 /**
  * S-4 — "A negative result that closes the question."
- * docs/project-journal/008_user_story_mining.md
- *
- * First scenario to exercise question lifecycle rather than the control
- * chain. Three things are deliberately NOT pre-decided here — whether
- * `Question` and `LineOfEnquiry` are genuinely distinct, whether closure
- * polarity belongs on `Decision`, and how a well-supported null should be
- * represented. The scenario is written to discriminate.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -262,12 +253,8 @@ describe("S-4: a negative result that closes the question", () => {
 
     const refuted = await session.whySupported(await claimNamed(session, SPECIFICITY));
 
-    // **A sentence nobody claimed has no claim to ask about.** `whySupported`
-    // takes a handle, and there is no handle to hand it for an unclaimed
-    // sentence. The distinction the scenario exists for survives, one step
-    // earlier: a refuted claim EXISTS and is challenged, an unexamined
-    // sentence does not exist at all -- which is a stronger statement than a
-    // false flag.
+    // **A sentence nobody claimed has no claim to ask about.** `whySupported` takes a handle,
+    // and there is no handle to hand it for an unclaimed sentence.
     expect(await session.claimsAsserting("nobody has ever asked this")).toEqual([]);
 
     expect(refuted.verdict).toBe("challenged");
@@ -429,12 +416,10 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    // A challenging finding is superseded exactly as a supporting one is —
-    // reading only the supporting side saw nothing here at all.
-    //
-    // By handle, not by sentence: after the replacement two records assert
-    // these words, and this names the refutation's own claim, the one that was
-    // withdrawn.
+    // A challenging finding is superseded exactly as a supporting one is — reading only the
+    // supporting side saw nothing here at all. By handle, not by sentence: after the
+    // replacement two records assert these words, and this names the refutation's own claim,
+    // the one that was withdrawn.
     const revision = await (await afterwards()).why(report.replacement);
     if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
     expect(revision.report.changed).toHaveLength(1);

@@ -1,31 +1,6 @@
 /**
- * S-10d — "The record keeps the order it was given."
- * External review of PR #2, discriminator 3, then corrected by Dan.
- *
- * **What this file first argued, and why that was wrong.** It ran an analysis
- * called "first input minus second" twice with the inputs swapped, got +0.4 and
- * −0.4, and called the report's `execution: "reproduced"` a wrong answer. The
- * remedy was a third value meaning "cannot say".
- *
- * Both halves of that were scope creep. Whether +0.4 and −0.4 are the same
- * result depends on the question — if the researcher asked for the absolute
- * magnitude of the difference, they are — and the probe answered that question
- * on the researcher's behalf in order to declare the record wrong. Then the fix
- * made the record hedge its own answer to the same question rather than stop
- * answering it.
- *
- * **LabKit is bookkeeping. Interpreting the books is for the reader.** So
- * `execution` and `comparable` are gone, along with `incomparableBecause`. The
- * report says what each run read, in the order it was given, and what differs
- * between them. Whether that constitutes a reproduction is a question about the
- * method, which the record does not know.
- *
- * What survives from the probe is the defect underneath it, which is a
- * bookkeeping defect and squarely LabKit's: `recordAnalysis({ from })` took an
- * ordered array and the record threw the order away. Losing something the
- * caller said is the one thing this store exists not to do.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-10d — "The record keeps the order it was given." External review of PR #2, discriminator 3,
+ * then corrected by Dan.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -136,10 +111,6 @@ describe("S-10d — the order a run read its inputs in", () => {
 
   /**
    * The pairing that makes the two tests above evidence rather than decoration.
-   *
-   * If order were still discarded, both would report the same list and the
-   * first test could not fail. This asserts the two orders are genuinely
-   * different sequences of the same two records.
    */
   test("the two orders are different sequences of the same records", async () => {
     const { enquiry, treated, control, analysis } = await aDifference();

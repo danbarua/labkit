@@ -1,16 +1,5 @@
 /**
- * `connectScratch` opens the directory it is given and never what
- * `LABKIT_DB_URL` names.
- *
- * The hazard is not a test concern. `replayIntoScratch` replays a record's
- * whole history as real writes, so a `--db` Explorer trace taken against a
- * deployment whose `LABKIT_DB_URL` is set would have replayed every one of
- * them into that deployment's own database. It was found as two failing
- * replay tests on the Postgres arm, which is the cheap end of the same bug.
- *
- * The URL below is deliberately unreachable: `connectDb` would try it and
- * fail, so a change routing scratch back through `connectDb` turns this red
- * rather than quietly writing somewhere real.
+ * `connectScratch` opens the directory it is given and never what `LABKIT_DB_URL` names.
  */
 
 import { afterEach, expect, test } from "bun:test";

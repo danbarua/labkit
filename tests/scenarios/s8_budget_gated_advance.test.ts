@@ -1,21 +1,5 @@
 /**
  * S-8 — "Don't spend the whole budget discovering the pipeline is broken."
- * docs/project-journal/008_user_story_mining.md
- *
- * The reverse of row V: criteria that **gate work and qualify no finding**.
- * Criteria that do both jobs at once cannot discriminate between row V's two
- * models. This scenario is the other half of that probe, and it narrows row
- * V rather than settling it.
- *
- * One Afterward bullet is deliberately not probed. "Who approved the
- * scale-up?" has no home, because LabKit has no concept of user identity —
- * a cross-cutting infrastructure, persistence and API concern that waits
- * until the domain model is consolidated. That is a standing decision, not an
- * oversight, and it is recorded here so it does not read as a question nobody
- * noticed. The other half of the same bullet — *on what projected cost* — is
- * a finding like any other, and is probed below.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -61,11 +45,8 @@ const SOLVER_HEALTH = "the solver converges on every feasibility fold";
 const COST = "a full run costs roughly 9,000 GPU-hours at the current throughput";
 
 /**
- * A staged programme: a cheap feasibility step, and an expensive full run that
- * may not start until two conditions are established.
- *
- * The conditions gate work and qualify nothing. No claim's standing depends on
- * them, which is the whole point of this scenario.
+ * A staged programme: a cheap feasibility step, and an expensive full run that may not start
+ * until two conditions are established.
  */
 async function aStagedProgramme() {
   const { enquiry } = await session.openEnquiry(
@@ -105,12 +86,8 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
   test("the conversation runs end to end through research verbs alone", async () => {
     const programme = await aStagedProgramme();
 
-    // Researcher: run the classification stage.
-    // LabKit:     the first feasibility step is ready — 1,000 training images.
-    //             The official test data is not accessible to this task.
-    // The contract is closed-world: what it may read is the whole of it, so
-    // "the official test data is not accessible to this task" is derived from
-    // the absence rather than from a second list nobody can keep complete.
+    // Researcher: run the classification stage. LabKit:     the first feasibility step is ready
+    // — 1,000 training images. The official test data is not accessible to this task.
     const contract = await session.contractFor(programme.feasibility);
     expect(contract.mayRead).toEqual(["the 1,000-image training slice"]);
     expect(contract.mayRead).not.toContain("the held-out official test set");
@@ -155,10 +132,6 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
   /**
    * Afterward 1 — why can't the full run start?
-   *
-   * The unmet condition, named. Not "the gate is closed", and emphatically not
-   * "the gate passed" — one condition established and another never run is a
-   * real state of its own.
    */
   test("the condition blocking the expensive run is named, and 'some checked' is not 'all passed'", async () => {
     const programme = await aStagedProgramme();
@@ -200,11 +173,6 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
   /**
    * Afterward 2 — which conditions have been evaluated, and on what evidence?
-   *
-   * Row W. "The condition was recorded as passing" and "the condition was
-   * exercised against evidence and passed" are two different propositions, and
-   * a promotion decided on agent enthusiasm must not read like one decided on
-   * measurement.
    */
   test("an evidence-backed evaluation is distinguishable from a bare assertion", async () => {
     const programme = await aStagedProgramme();
@@ -243,9 +211,6 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
   /**
    * Afterward 3 — what is this task allowed to touch?
-   *
-   * Recorded, readable back, and closed-world: the contract is what the task
-   * may read, and anything absent is outside it.
    */
   test("a task's contract is recorded and readable, and is advisory", async () => {
     const programme = await aStagedProgramme();
@@ -266,10 +231,6 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
   /**
    * Afterward 4 — on what projected cost?
-   *
-   * The cost projection is a finding like any other, with provenance back to
-   * the measurements it was derived from. The *who* half of this bullet is out
-   * of scope — see this file's header.
    */
   test("the projected cost is a finding with provenance, not a number in a comment", async () => {
     const programme = await aStagedProgramme();
@@ -286,11 +247,6 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
   /**
    * The other half of row V.
-   *
-   * These criteria gate expensive work and qualify no finding. The throughput
-   * claim's standing is unaffected by the gate that its evaluation triggered —
-   * which is what makes control and qualification separable jobs rather than
-   * one job seen twice.
    */
   test("gating work does not change the standing of the findings involved", async () => {
     const programme = await aStagedProgramme();

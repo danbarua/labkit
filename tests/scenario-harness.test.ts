@@ -1,27 +1,5 @@
 /**
- * The scenario harness itself, under the one condition that produces a
- * teardown cascade.
- *
- * The suite's intermittent `graph "labkit_t1" does not exist` and
- * `Connection terminated unexpectedly` bursts were a **teardown cascade**, not
- * the pglite-socket defect they were twice attributed to —
- * a defect since removed along with the socket itself.
- * bun's fixed 5000ms per-test timeout does not cancel the test body: an
- * overrunning test keeps executing while the next one starts, and its late
- * `scenario.end()` resets the database and closes a connection that by
- * then belongs to the live test.
- *
- * **The overrun is the trigger; the cascade is the defect.** This file tests
- * the defect and not the trigger, so it needs no six-second sleep and no
- * deliberately failing test: interleaving `begin()` and `end()` by hand
- * reproduces exactly the ordering bun produces, in milliseconds.
- *
- * It was demonstrated the other way round first — a scratch file with a test
- * that really did sleep past the ceiling — because a hand-interleaved test
- * proves the harness survives *this ordering*, and only the real one proves
- * that this ordering is what bun actually produces. Before the fix that
- * scratch file gave 0 pass / 2 fail / 1 unhandled error; after it, the second
- * test passes and the error is gone.
+ * The scenario harness itself, under the one condition that produces a teardown cascade.
  */
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { vertexProps } from "../src/db/cypher";

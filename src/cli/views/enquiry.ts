@@ -1,8 +1,5 @@
 /**
  * Questions and the lines of enquiry under them.
- *
- * Ported verbatim from the monolithic `src/cli.ts` — see `./knowledge.ts` for
- * why the comments came with the code.
  */
 
 import type { EnquiryRef, EnquiryStatus, QuestionOrigin, QuestionRef } from "../../domain";
@@ -11,17 +8,6 @@ import { bullets } from "./format";
 
 /**
  * An enquiry's standing.
- *
- * `accepted-as-unresolved` deliberately carries `open: true` — it *is* still
- * open, on purpose — so rendering the boolean alone reported the one closure
- * a deliberately-parked question as though nobody had got round to it. The
- * rationale and the reopening condition are what distinguish deciding to stop
- * from not having started, and they now print.
- *
- * Answered enquiries say what their closure rests on for the same reason:
- * `exploratory` does not mean the answer is wrong, it means nobody has
- * confirmed what it rests on, and a reader deciding whether to build on it
- * should not have to go and look.
  */
 export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
   const q = status.question;
@@ -80,14 +66,6 @@ export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef, p
 
 /**
  * Where a question came from.
- *
- * `null` is an answer and prints as one. Most questions are simply asked;
- * only a sharpened one has an earlier question behind it, and rendering the
- * common case as an absence would read as a gap in the record.
- *
- * `knownAtTheTime` was frozen when the sharpening was recorded, not recomputed
- * now, and the line says so, because a reader who
- * assumes it is current will read later evidence into an earlier decision.
  */
 export function renderOrigin(
   origin: QuestionOrigin | null,

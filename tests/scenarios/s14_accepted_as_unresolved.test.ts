@@ -1,18 +1,5 @@
 /**
- * S-14 — "Deliberately leaving something unresolved."
- * docs/project-journal/008_user_story_mining.md, §2 and §3 row J
- *
- * A marginal comparison that cannot be settled: the confirmatory dataset is
- * spent and there is no larger held-out sample. The researcher does not want it
- * pursued, and does not want it closed. They want it *accepted* as unresolved,
- * with the condition that would reopen it written down.
- *
- * The trap this scenario exists to catch is named in §2: a model that can only
- * express this as an open task has failed. So no `Task` is created anywhere
- * below, and none may be needed to make a query answer correctly — the record
- * should not accumulate ceremony.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-14 — "Deliberately leaving something unresolved."  and
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -60,9 +47,6 @@ const CONDITION = "a genuinely new design, or a data source other than the spent
 
 /**
  * Researcher: "We ran it. It's marginal, and the confirmatory data is gone."
- *
- * Work was done — this is not a question nobody reached. That distinction is
- * the whole point of the first Afterward bullet.
  */
 async function aMarginalComparisonWithNothingLeftToRunIt() {
   const { enquiry } = await session.openEnquiry(MARGINAL);
@@ -82,12 +66,8 @@ async function aMarginalComparisonWithNothingLeftToRunIt() {
 
 describe("S-14: deliberately leaving something unresolved", () => {
   /**
-   * Afterward 1. "Is this question open?" — yes, and *accepted* as open. Three
-   * states where the model had two: closed, awaiting work, and accepted.
-   *
-   * Before this scenario the third was unreachable. `enquiryStatus()` could
-   * report `closure: "deferred"` and no verb had ever written the edge behind
-   * it, so an accepted question and an untouched one returned the same answer.
+   * Afterward 1. "Is this question open?" — yes, and *accepted* as open. Three states where the
+   * model had two: closed, awaiting work, and accepted.
    */
   test("Afterward 1: accepted-as-open is a state of its own, not 'still being worked'", async () => {
     const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
@@ -133,13 +113,10 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(known.untested.map((q) => q.asks)).not.toContain(MARGINAL);
     expect(known.accepted.map((q) => q.asks)).toEqual([MARGINAL]);
 
-    // The ceremony test is that nothing above needed a `Task` to come out
-    // right, and none was created. A `blocking: []` field was drafted here and
-    // removed: its only consumer would have been this assertion, which is
-    // inventing API to satisfy a test — and inventing a to-do list in order to
-    // report it empty is precisely the ceremony the scenario forbids. The
-    // survey putting this question outside `unresolved` is the observable
-    // claim, and it is made above.
+    // The ceremony test is that nothing above needed a `Task` to come out right, and none was
+    // created. A `blocking: []` field was drafted here and removed: its only consumer would
+    // have been this assertion, which is inventing API to satisfy a test — and inventing a to-
+    // do list in order to report it empty is precisely the ceremony the scenario forbids.
   });
 
   /**
@@ -160,11 +137,8 @@ describe("S-14: deliberately leaving something unresolved", () => {
   });
 
   /**
-   * Afterward 4. "Why was it accepted rather than pursued?" — the exhausted
-   * dataset, recorded, and the finding it was accepted in light of.
-   *
-   * Asserted from durable state with the event log empty: a reason that
-   * survives only in the event stream has not been recorded.
+   * Afterward 4. "Why was it accepted rather than pursued?" — the exhausted dataset, recorded,
+   * and the finding it was accepted in light of.
    */
   test("Afterward 4: the reasoning survives, and so does what was known at the time", async () => {
     const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
@@ -185,10 +159,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
   });
 
   /**
-   * The control, and the reason this is not just a relabelling: a question
-   * genuinely awaiting work must still read that way. If accepting is
-   * indistinguishable from not-yet-reached in either direction, nothing has
-   * been gained.
+   * The control, and the reason this is not just a relabelling: a question genuinely awaiting
+   * work must still read that way. If accepting is indistinguishable from not-yet-reached in
+   * either direction, nothing has been gained.
    */
   test("a question nobody has accepted still reads as open work", async () => {
     const { enquiry } = await aMarginalComparisonWithNothingLeftToRunIt();
@@ -244,12 +217,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(status.question!.closure).toBe("answered");
     expect(status.question!.answer).toBe("yes");
 
-    // **And the deferral survives the answer.** The question was left open on
-    // a stated condition, and a reader meeting the answer has to be able to
-    // ask whether that is the condition being met or something unrelated that
-    // arrived first. Both facts are durable and both are about now; dropping
-    // one the moment the other appears makes the pairing unreconstructable
-    // from anything but the researcher's memory.
+    // **And the deferral survives the answer.** The question was left open on a stated
+    // condition, and a reader meeting the answer has to be able to ask whether that is the
+    // condition being met or something unrelated that arrived first.
     expect(status.question!.acceptedBecause).toBe(
       "the confirmatory dataset is spent and there is no larger held-out sample",
     );
@@ -265,19 +235,8 @@ describe("S-14: deliberately leaving something unresolved", () => {
   });
 
   /**
-   * The wrong answer, against shipped behaviour, kept as the contrast that
-   * gives `acceptAsUnresolved()` its meaning.
-   *
-   * This is not merely a missing feature manufacturing an empty result. A
-   * researcher who wants the record to say "we are leaving this" has a verb
-   * available today — `closeEnquiry()` with nothing cited — and it reports the
-   * question **abandoned**: nobody worked on it, no result behind it. Work was
-   * done, and the reason is specific and recorded nowhere. That is a confident
-   * misreading of a deliberate decision as neglect, which is the worst
-   * available answer rather than the absence of one.
-   *
-   * It still reports that, and correctly: abandoning is a real thing that
-   * happens. What was missing was a way to say the other thing.
+   * The wrong answer, against shipped behaviour, kept as the contrast that gives
+   * `acceptAsUnresolved()` its meaning.
    */
   test("closing it without a result reads as abandoned, which is the opposite of accepted", async () => {
     const { enquiry } = await aMarginalComparisonWithNothingLeftToRunIt();

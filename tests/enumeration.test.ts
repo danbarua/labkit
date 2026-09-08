@@ -1,19 +1,5 @@
 /**
  * **Enumeration: the two verbs that let an agent start.**
- *
- * Every other gate verb takes a `GateRef` and every work verb a `WorkRef`. Until
- * `gateList` and `workList` existed the only route to either ran through a
- * claim — `whySupported` → `unmet` → the gate it blocks — so a record with work
- * planned and nothing analysed against it yet was invisible to every cold entry
- * point except `whatHappened`, which is the event log and the one place this
- * repository forbids answering a "what is true now" question from.
- *
- * Two properties are load-bearing here and each has a control:
- *
- *   - the fixture really contains every state, or the filter assertions pass by
- *     matching nothing;
- *   - `gateList` and `gateStatus` agree about every gate, which is the whole
- *     reason the state computation was extracted rather than written twice.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -35,20 +21,10 @@ const session = async () => new ResearchSession(await scenario.begin());
 
 /**
  * **The two verbs that let an agent start.**
- *
- * Every other gate verb takes a `GateRef` and every work verb a `WorkRef`, and
- * until these existed the only route to either ran through a claim — so a
- * record with work planned and nothing analysed was invisible to everything
- * except the event log (#55, #66).
  */
 describe("enumerating gates and work", () => {
   /**
    * A gate in each of the four states, plus work in each of the three.
-   *
-   * Built once and read by every test below, because the filter assertions are
-   * **vacuous for any state the fixture does not contain** — a filter returning
-   * nothing passes just as well when nothing matches as when the filter is
-   * broken.
    */
   async function fixture(s: ResearchSession) {
     const { question } = await s.pose({ question: "does the enumeration hold?" });

@@ -1,16 +1,5 @@
 /**
  * S-11g — "The replacement addressed three of four conclusions."
- *
- * One analysis with two conclusions. A review, and a re-analysis that restates
- * one of them and deliberately excludes the other — a real re-analysis, whose
- * own text says the excluded result *"stands as final"*.
- *
- * What it holds the record to: the excluded finding still stands and still
- * rests on its input; the restated one falls and names the review that caused
- * it; and a criterion evaluation falls or stands according to which of the two
- * findings it cited.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -44,12 +33,8 @@ const EXCLUDED = "T differs from the lattice control";
 const AGGREGATION = "the aggregation is done on the correct scale";
 
 /**
- * Researcher: "One run, four comparisons. Then we found the aggregation was on
- *  the wrong scale for the stochastic controls — but not for the lattice one,
- *  and that result stands as final."
- *
- * One analysis with two conclusions, one review, and a replacement that
- * restates only the first. `stands` is what the researcher says is untouched.
+ * Researcher: "One run, four comparisons. Then we found the aggregation was on the wrong scale
+ * for the stochastic controls — but not for the lattice one, and that result stands as final."
  */
 async function aRunPartlyReAnalysed(holdTo = false) {
   const { enquiry } = await session.openEnquiry("does T differ from its controls?");
@@ -148,11 +133,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
   /**
    * The read has to be able to say "I cannot tell", or it is guessing.
-   *
-   * Two conclusions of one analysis may assert the same sentence about
-   * different endpoints, which is why a claim has a handle of its own. Pairing
-   * a successor's findings to the superseded ones by wording is then ambiguous,
-   * and a read cannot refuse — so it reports the finding unpaired.
    */
   test("a superseded finding whose wording matches two is reported unpaired, not guessed", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from its controls?");
@@ -198,13 +178,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
   /**
    * **A replacement whose finding flips the answer.**
-   *
-   * A corrected number usually cuts the same way, so a replacement inherits
-   * the proposition it restates. Which way it cuts is not the same kind of
-   * fact: a replacement exists because something changed, and the case that
-   * matters most is the one where what changed is the answer. Inheriting
-   * `challenges` onto a finding that says *exact match* puts a confidently
-   * wrong sentence on a record whose purpose is to be true.
    */
   test("a replacement does not inherit a challenging bearing in silence", async () => {
     const { enquiry } = await session.openEnquiry("does the port reproduce the cached map?");
@@ -252,11 +225,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
   /**
    * The other half of the test above: named, so not a guess.
-   *
-   * Wording cannot separate two claims asserting one sentence — that is what
-   * the handle is for — so a successor that *names* what it replaces must be
-   * paired on the name. Reported unpaired, this says nothing stands in place
-   * of a finding whose replacement was stated at write time.
    */
   test("a successor that names what it replaces is paired on the handle, not the wording", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from its controls?");
@@ -305,16 +273,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
   /**
    * **The boundary of the successor's exemption**, in a pair.
-   *
-   * A revision withdraws every conclusion it does not keep, so its successor
-   * has to be allowed to re-assert those propositions — that is what recording
-   * the successor's findings *is*. The exemption must reach no further: a
-   * proposition some **other** act retired is still refused, because nothing
-   * about revising one analysis licenses re-asserting what somebody else's
-   * decision withdrew.
-   *
-   * Both halves against one record, since an exemption that covered everything
-   * and one that covered nothing would each satisfy a single assertion.
    */
   test("a successor may re-assert what its own revision withdrew, and nothing else", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from its controls?");
@@ -402,11 +360,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
   /**
    * **The pairing the act implies is recorded by the act.**
-   *
-   * A replacement re-answering a proposition its predecessor answered stands
-   * in place of that finding. `conclude` records it, so `why` reads an edge
-   * rather than matching sentences afterwards, and a researcher gets the
-   * before/after without naming anything.
    */
   test("a successor is paired to the finding it replaces, with nothing named", async () => {
     const { enquiry } = await session.openEnquiry("does T differ from its controls?");
@@ -444,10 +397,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
 
   /**
    * **A kept finding still stands, so nothing replaces it.**
-   *
-   * `keep` carries a conclusion forward on its original evidence. A successor
-   * concluding on the same proposition is a second finding, not a replacement
-   * — pairing to a kept claim would say a live finding had fallen.
    */
   test("a conclusion is never paired to a finding the revision kept", async () => {
     const events = inMemoryEventLog();
@@ -482,11 +431,9 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     });
 
     // **Asserted on what the act wrote, not on a report.** No read shows this:
-    // `analysisRevision` iterates the claims the LINEAGE decision superseded,
-    // and `withdrawalOf` needs every claim asserting a proposition to have
-    // fallen -- the successor's own conclusion keeps it standing. A
-    // supersession wrongly written onto a kept claim would sit in the record
-    // with nothing able to report it, which is why this reads the delta.
+    // `analysisRevision` iterates the claims the LINEAGE decision superseded, and
+    // `withdrawalOf` needs every claim asserting a proposition to have fallen -- the
+    // successor's own conclusion keeps it standing.
     const superseding = (await events.all())
       .flatMap((e) => e.changes)
       .filter((c) => c.change === "EdgeCreated" && c.label === "SUPERSEDES")

@@ -1,16 +1,5 @@
 /**
  * S-7 — "Locked design, then feasibility finds a mechanical defect."
- * docs/project-journal/008_user_story_mining.md
- *
- * The first scenario where sequence genuinely matters, and the first to put
- * an explicit researcher decision in the middle of the record.
- *
- * Nothing is pre-decided about: what "locked" means, whether decision
- * chronology needs stored timestamps, whether `SUPERSEDES` is enough to
- * reconstruct before/after, whether edges need properties, or whether
- * mechanical-vs-scientific is a property or derivable.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -52,13 +41,8 @@ const MULTICOLLINEAR =
   "non-convergence is driven by feature multicollinearity, not by the effect under test";
 
 /**
- * A programme with a locked design and a confirmatory boundary already in
- * place, plus one result of each kind on the record.
- *
- * The two boundaries are deliberately separate gates over separate work: the
- * whole question S-7 asks is whether repairing one can be shown not to touch
- * the other, and that is only a real question if they were capable of
- * touching.
+ * A programme with a locked design and a confirmatory boundary already in place, plus one
+ * result of each kind on the record.
  */
 async function lockedProgramme() {
   const { enquiry } = await session.openEnquiry(
@@ -163,12 +147,10 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
   test("the conversation runs end to end through research verbs alone", async () => {
     const programme = await lockedProgramme();
 
-    // Agent:      feasibility failed -- the evolved condition doesn't converge
-    //             at the locked limit.
-    // Researcher: is that evidence against the hypothesis, or an
-    //             implementation constraint?
-    // Agent:      diagnosis points to severe feature multicollinearity;
-    //             increasing the sample doesn't fix it.
+    // Agent:      feasibility failed -- the evolved condition doesn't converge at the locked
+    // limit. Researcher: is that evidence against the hypothesis, or an implementation
+    // constraint? Agent:      diagnosis points to severe feature multicollinearity; increasing
+    // the sample doesn't fix it.
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
 
     // Researcher: raise the limit to 10,000 and rerun the affected feasibility
@@ -190,9 +172,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
   /**
    * Afterward 1 — what did the design originally say, and what replaced it?
-   *
-   * The original setting is still readable in its own words. Amending is not
-   * editing.
    */
   test("the original setting survives the amendment verbatim", async () => {
     const programme = await lockedProgramme();
@@ -219,9 +198,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
   /**
    * Afterward 2 — why was it changed, and on what evidence?
-   *
-   * The diagnosis is cited specifically, and has its own provenance: it is a
-   * finding of a real analysis, not a sentence typed into the amendment.
    */
   test("the amendment cites its diagnosis, and the diagnosis has provenance of its own", async () => {
     const programme = await lockedProgramme();
@@ -255,10 +231,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
   /**
    * Afterward 3 — was any confirmatory result affected?
-   *
-   * Demonstrated, not asserted: the confirmatory boundary reports exactly what
-   * it reported before, and the amendment's blast radius is enumerated rather
-   * than declared empty.
    */
   test("the confirmatory boundary is untouched, and shown to be", async () => {
     const programme = await lockedProgramme();
@@ -288,11 +260,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
   /**
    * Afterward 4 — is this amendment mechanical or scientific?
-   *
-   * The distinction has to survive into the record, because it is what
-   * separates a legitimate repair from p-hacking. Two amendments, one of each
-   * kind, because a scenario that only ever produces "mechanical" cannot show
-   * the answer is derived rather than defaulted.
    */
   test("mechanical and scientific amendments are told apart", async () => {
     const programme = await lockedProgramme();
@@ -329,10 +296,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
   /**
    * Afterward 5 — which change happened first?
-   *
-   * Asked after both have happened, from a session with an empty event log,
-   * with no timestamp on any decision. If this can only be answered by the
-   * order natural ids happen to have been allocated in, it is not answered.
    */
   test("two amendments of one setting are ordered without timestamps or an event log", async () => {
     const programme = await lockedProgramme();
@@ -396,9 +359,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
   /**
    * Afterward 6 — what else was rerun as a consequence?
-   *
-   * Enumerated, not "everything downstream", and reaching only the work the
-   * amended condition actually protected.
    */
   test("the work forced to be rerun is enumerated, and stops at the amended boundary", async () => {
     const programme = await lockedProgramme();
@@ -428,23 +388,10 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
   /**
    * Amending a setting that has already been amended is refused.
-   *
-   * It would fork the design: two conditions in force at once, and no answer
-   * to "what does this design require". Refusing the command is better than
-   * accepting it and having the history throw at read time — writing state
-   * that cannot be read back is the one outcome with nothing to recommend it.
    */
   /**
-   * **Researcher:** The gate failed, I diagnosed why, I amended it in the open,
-   * and the amended condition passes. Am I still blocked?
-   *
-   * **Agent:** No. The gate is satisfied, and it says it failed once.
-   *
-   * A criterion an `amend` replaced still `GOVERNS` the gate — that is what
-   * keeps the original readable, and `design` reports it. Counting it as a
-   * live condition made Bonsai's Stage 2B ladder read `blocked` in `now`
-   * months after its amended encoder gate passed and the stage ran to
-   * completion.
+   * **Researcher:** The gate failed, I diagnosed why, I amended it in the open, and the amended
+   * condition passes. Am I still blocked?
    */
   test("an amended-away condition stops holding the gate, and everFailed does not", async () => {
     const programme = await lockedProgramme();
@@ -546,14 +493,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
   });
 
   /**
-   * **Researcher:** The feasibility boundary has two conditions on it — the
-   * iteration cap and a tolerance. I raised the cap last week; today the
-   * tolerance moved too. Show me what happened to my design.
-   *
-   * **Agent:** Two histories, one per condition. Neither amendment stands
-   * instead of the other — they are separate settings that moved for separate
-   * reasons, and putting them on one line would say the tolerance change
-   * replaced the cap change.
+   * **Researcher:** The feasibility boundary has two conditions on it — the iteration cap and a
+   * tolerance. I raised the cap last week; today the tolerance moved too. Show me what happened
+   * to my design.
    */
   test("a gate with two conditions has one history per condition, and they do not interleave", async () => {
     const programme = await lockedProgramme();

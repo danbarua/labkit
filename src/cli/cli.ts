@@ -1,26 +1,6 @@
 #!/usr/bin/env bun
 /**
  * The composition root, and nothing else.
- *
- * Wiring lives here: which program, which runner, what a failure does to the
- * process. Everything with a decision in it lives elsewhere — `./program.ts`
- * assembles the commands, `./commands/` declares them, `./args.ts` turns text
- * into things the domain accepts, `./views/` turns reports into pages, and
- * `./session.ts` is the wrap that gives a command its surfaces.
- *
- * **This file and the old `src/cli.ts` are the only two places under `src/`
- * that may write to stdout**, which `scripts/check-stdout.sh` enforces —
- * stdout is the MCP protocol channel, and one stray `console.log` in a module
- * the server transitively imports interleaves a non-JSON line into the stream.
- * The views return strings; the printing happens here.
- *
- * **A thrown error is a message, not a stack.** Several verbs *refuse* on
- * purpose — closing on exploratory evidence, reinterpreting into wording that
- * changes nothing — and those refusals are the domain working. A researcher who
- * reads "cannot close on exploratory evidence" has been told what to do next;
- * the same sentence under twenty frames of `bun:internal` has not. Commander
- * handles the other half itself: an `InvalidArgumentError` out of `./args.ts`
- * is a caller's typo and prints as one.
  */
 
 import { buildProgram } from "./program";
@@ -30,18 +10,6 @@ import { runner } from "./session";
 
 /**
  * Writes one report to stdout, whatever its size.
- *
- * **A single write does not necessarily write it all.** `runner` renders the
- * whole answer and hands it over in one call, and stdout is not always a file:
- * when it is a pipe — `labkit happened | less`, or `$(labkit …)` — the fd is
- * non-blocking, so one write moves what fits in the pipe buffer, returns that
- * count, and reports no error for the rest. Measured on a 1200-event record:
- * 109,386 bytes to a file, exactly 65,536 through a pipe, exit 0 either way.
- * A caller got a truncated report that looked complete.
- *
- * So the count is the answer, not a formality, and the loop is the fix.
- * `EAGAIN` means the pipe is full rather than broken — the reader has not
- * caught up — so it is retried rather than thrown.
  */
 function writeOut(line: string): void {
   const out = Buffer.from(`${line}\n`, "utf8");
@@ -62,13 +30,7 @@ function writeOut(line: string): void {
 }
 
 /**
- * Parses and runs. Returns a process exit code rather than taking one, so a
- * test can call it.
- *
- * `exitOverride` turns commander's own `process.exit` into a throw, which is
- * what lets `--help` and a bad flag reach the same handler as everything else.
- * Commander reports those with `exitCode` already set and its message already
- * printed, so they pass straight through.
+ * Parses and runs. Returns a process exit code rather than taking one, so a test can call it.
  */
 
 export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> {

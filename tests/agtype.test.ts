@@ -12,13 +12,9 @@ import { resolveTenantContext } from "../src/db/tenant";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 
 /**
- * Validates parseAgtype's assumptions and uncovers gaps, per the review
- * that motivated rewriting it as a real recursive-descent parser rather
- * than a strip-and-delegate-to-JSON.parse shortcut (see src/db/agtype.ts's
- * file-level comment). Split into pure unit tests against hand-constructed
- * agtype text (no DB needed, exercises the two shapes the original sketch
- * got wrong) and integration tests against live pglite-age (confirms the
- * assumptions those unit tests encode actually match what AGE emits).
+ * Validates parseAgtype's assumptions and uncovers gaps, per the review that motivated
+ * rewriting it as a real recursive-descent parser rather than a strip-and-delegate-to-
+ * JSON.parse shortcut (see src/db/agtype.ts's file-level comment).
  */
 
 describe("parseAgtype — pure parsing", () => {
@@ -78,12 +74,10 @@ describe("parseAgtype — pure parsing", () => {
     expect(v.properties).toEqual({ name: 'a string with "::vertex," inside' });
   });
 
-  // Bug in the original sketch: `is_array_path` (age.c) requires an
-  // odd-length array alternating vertex/edge/vertex to get an outer
-  // ::path tag. A plain `RETURN [n, m]` of two vertices is NOT a path —
-  // it's an untagged array whose elements are each still individually
-  // tagged ::vertex. A parser that treats "the last annotation in the
-  // string" as "the whole thing's tag" misparses this as a single vertex.
+  // Bug in the original sketch: `is_array_path` (age.c) requires an odd-length array
+  // alternating vertex/edge/vertex to get an outer ::path tag. A plain `RETURN [n, m]` of two
+  // vertices is NOT a path — it's an untagged array whose elements are each still individually
+  // tagged ::vertex.
   test("an untagged array of two vertices is not misparsed as a path or a vertex", () => {
     const raw =
       `[{"id": 1, "label": "A", "properties": {}}::vertex,` +
@@ -254,19 +248,10 @@ describe("parseAgtype — against live pglite-age", () => {
     expect(parsedPath.elements.map((el) => el.kind)).toEqual(["vertex", "edge", "vertex"]);
   });
 
-  // The headline case this rewrite exists for. graphid = label_id * 2^48 +
-  // entry_id, so the label count is what puts SUPERSEDES — a late edge label in
-  // provisioning order — past Number.MAX_SAFE_INTEGER on its very first edge,
-  // in every tenant, today, not hypothetically.
-  //
-  // No counts here: a number in a comment is a maintenance claim nobody
-  // agreed to keep.
-  //
-  // Nor are they asserted, which was the first instinct and is wrong: the
-  // property that matters is asserted empirically below — `Number.isSafeInteger`
-  // on the real graphid — and that guard tightens as labels are added, where
-  // `expect(EDGE_LABELS.length).toBe(n)` would merely break. An assertion that
-  // protects nothing an existing assertion does not is a change-detector.
+  // The headline case this rewrite exists for. graphid = label_id * 2^48 + entry_id, so the
+  // label count is what puts SUPERSEDES — a late edge label in provisioning order — past
+  // Number.MAX_SAFE_INTEGER on its very first edge, in every tenant, today, not hypothetically.
+  // No counts here: a number in a comment is a maintenance claim nobody agreed to keep.
   test("a SUPERSEDES edge's internal id, past Number.MAX_SAFE_INTEGER, round-trips exactly via bigint", async () => {
     const ctx = await resolveTenantContext(db, db.tx, "labkit");
     const graph = new TenantGraph(ctx, db, db.tx);
@@ -305,10 +290,9 @@ describe("parseAgtype — against live pglite-age", () => {
 });
 
 /**
- * The AS clause AGE requires is unquoted SQL, so Postgres case-folds it while
- * AGE keys its result rows by the name the Cypher RETURN used. A camelCase
- * column therefore comes back present and NULL for every row -- no error, and
- * a decoder reads it as "nothing matched".
+ * The AS clause AGE requires is unquoted SQL, so Postgres case-folds it while AGE keys its
+ * result rows by the name the Cypher RETURN used. A camelCase column therefore comes back
+ * present and NULL for every row -- no error, and a decoder reads it as "nothing matched".
  */
 describe("buildAsClause rejects names that would decode as null", () => {
   test("a camelCase column name is refused, with the alias to use instead", () => {

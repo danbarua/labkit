@@ -1,20 +1,6 @@
 /**
- * S-10 — "Rerunning is not reproducing."
- * docs/project-journal/008_user_story_mining.md, §2 and §3 rows E, P
- *
- * A historical result whose initial conditions were never written down. The
- * protocol can be run again, but not *reproduced*: the new run specifies its
- * own conditions, so agreement between the two is agreement between two
- * different executions, and disagreement would not be evidence against the
- * original either.
- *
- * The scenario exists to find out whether the model can hold "related to that
- * claim, but not the same execution" without an evidence-to-evidence
- * relationship. Row E predicts it cannot. An *empty* answer would not settle
- * that — the first test is here to establish whether the answer is instead
- * confidently wrong.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-10 — "Rerunning is not reproducing." and
+ * rows E, P
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -59,11 +45,8 @@ async function afterwards(): Promise<ResearchSession> {
 const PROPOSITION = "the annealed protocol converges below tolerance";
 
 /**
- * Researcher: "There's a result from the old study saying the annealed
- *  protocol converges. Nobody wrote down what it started from."
- *
- * The historical run consumed nothing that was recorded — which is the whole
- * situation, and is expressible today.
+ * Researcher: "There's a result from the old study saying the annealed protocol converges.
+ * Nobody wrote down what it started from."
  */
 async function aHistoricalResultWithNoRecordedInputs() {
   const { enquiry } = await session.openEnquiry(
@@ -80,23 +63,8 @@ async function aHistoricalResultWithNoRecordedInputs() {
 
 describe("S-10: rerunning is not reproducing", () => {
   /**
-   * The wrong answer this scenario was built on, kept as the contrast that
-   * gives `reverify()` its meaning.
-   *
-   * Without `REVERIFIES`, the only way to record a re-run is: an analysis in
-   * the same line of enquiry concluding the same proposition, which resolves
-   * to the same claim under the scope rules. The record then says the
-   * proposition rests on two independent findings when it rests on one,
-   * checked twice, by a run that specified conditions the original never
-   * recorded.
-   *
-   * It still says that, and correctly. Recording two analyses is a claim of
-   * two independent results, which is a real and different situation from a
-   * re-verification — so `recordAnalysis()` is not made to refuse this the way
-   * `declareGate()` refuses a phantom gate. What was missing was a way
-   * to say the other thing, not a way to stop saying this one. The two tests
-   * below run the identical pair of executions through `reverify()` and get a
-   * different answer; that difference is the whole finding.
+   * The wrong answer this scenario was built on, kept as the contrast that gives `reverify()`
+   * its meaning.
    */
   test("recorded as two analyses, the re-run reads as independent confirmation", async () => {
     const { enquiry, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
@@ -188,10 +156,9 @@ describe("S-10: rerunning is not reproducing", () => {
   });
 
   /**
-   * Afterward 3. "Does the new run raise or lower confidence?" — answerable,
-   * and distinct from "confirms it". An agreeing re-verification strengthens
-   * the claim without reproducing it, and the report must not let a reader
-   * take the first for the second.
+   * Afterward 3. "Does the new run raise or lower confidence?" — answerable, and distinct from
+   * "confirms it". An agreeing re-verification strengthens the claim without reproducing it,
+   * and the report must not let a reader take the first for the second.
    */
   test("Afterward 3: bearing on the historical claim is answerable and is not confirmation", async () => {
     const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
@@ -227,13 +194,8 @@ describe("S-10: rerunning is not reproducing", () => {
   });
 
   /**
-   * Afterward 4. "Can the two be compared numerically?" — no, and the record
-   * says so unprompted, alongside the rest of the answer.
-   *
-   * LabKit has no verb that plots or compares numbers, so a
-   * `compareNumerically()` existing only to reject its arguments would be a
-   * feature invented to manufacture a wrong answer. The caveat has to travel
-   * with the report a reader already asks for.
+   * Afterward 4. "Can the two be compared numerically?" — no, and the record says so
+   * unprompted, alongside the rest of the answer.
    */
   test("Afterward 4: the record says the original never recorded what it read", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
@@ -306,10 +268,8 @@ describe("S-10: rerunning is not reproducing", () => {
   });
 
   /**
-   * Execution equality must not be compared by artefact *name* -- that is the
-   * identity-versus-wording mistake, and it recurs.
-   *
-   * Two runs can each record "initial conditions" and mean different data.
+   * Execution equality must not be compared by artefact *name* -- that is the identity-versus-
+   * wording mistake, and it recurs.
    */
   test("two inputs sharing a name are not the same input", async () => {
     const { enquiry } = await session.openEnquiry(
@@ -343,11 +303,9 @@ describe("S-10: rerunning is not reproducing", () => {
     });
 
     const report = await (await afterwards()).reproductionOf(rerun.verification);
-    // Both directions, and both are true: the re-run read an "initial
-    // conditions" the original did not, and the original read one the re-run
-    // did not. Identical names, two artefacts, two differences.
-    //
-    // The entries carry identity, so "which one changed" is answerable even
+    // Both directions, and both are true: the re-run read an "initial conditions" the original
+    // did not, and the original read one the re-run did not. Identical names, two artefacts,
+    // two differences. The entries carry identity, so "which one changed" is answerable even
     // though the names collide.
     expect(report.differs.map((d) => d.what.name)).toEqual([
       "initial conditions",
@@ -476,10 +434,7 @@ describe("S-10: rerunning is not reproducing", () => {
   });
 
   /**
-   * External review, finding 5. `whySupported()` removed the re-verifying
-   * finding from `support`, but `restingOn` still walked it — so the claim was
-   * reported as resting directly on inputs belonging to something the same
-   * report had just said was not an independent supporting finding.
+   * External review, finding 5.
    */
   test("the claim does not rest on the re-run's inputs", async () => {
     const { enquiry } = await session.openEnquiry(

@@ -1,8 +1,5 @@
 /**
  * The acts themselves — the one view over the event log rather than the graph.
- *
- * Ported verbatim from the monolithic `src/cli.ts` — see `./knowledge.ts` for
- * why the comments came with the code.
  */
 
 import { createdIn, edgesIn } from "../../domain";
@@ -11,12 +8,6 @@ import type { Palette } from "../palette";
 
 /**
  * The acts themselves, oldest first.
- *
- * **The only renderer here reading the event log rather than the graph**, and
- * the attribution is why it exists: who ran a command is not reconstructable
- * from the record at all, so this line is the only place it can be
- * read back. `seq` prints first because it is both the order and the cursor —
- * a reader paging through hands the last one back as `--since`.
  */
 export function renderHappened(events: readonly DomainEvent[], p: Palette): string {
   if (events.length === 0)
@@ -29,13 +20,9 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
   return events
     .map((e) => {
       const who = e.attribution.attribution_label || "unattributed";
-      // **How the name was come by, printed beside it.** `labkit happened` is
-      // the command the grade exists for: it is where `--author dan` and a bare
-      // an OS-supplied name are otherwise indistinguishable. `observed` is
-      // left silent because it is the ordinary case and a mark on every line
-      // marks nothing; what a reader needs to see is the line that was merely
-      // asserted. `null` is a row written before the grade existed and says so
-      // rather than being guessed at.
+      // **How the name was come by, printed beside it.** `labkit happened` is the command the
+      // grade exists for: it is where `--author dan` and a bare an OS-supplied name are
+      // otherwise indistinguishable.
       const how =
         e.attribution.attribution_how === "claimed"
           ? p.quiet(" (claimed)")

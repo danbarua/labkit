@@ -1,14 +1,5 @@
 /**
  * S-9d — "Resting on one thing, or two?"
- * docs/project-journal/008_user_story_mining.md §3 row F
- * docs/consumer-contract/033_row_f_third_bite_predictions.md
- *
- * A rule enforced on the way **in** and dropped on the way **out**.
- * `reproducibilityOf()` took parts by reference, argued for it in a comment, and
- * reported bare names. `whySupported().restingOn` is the same construction, in
- * the most-used read on the surface.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -48,13 +39,9 @@ const NAME = "control series";
 const DIVERGE = "the treated and control arms diverge";
 
 /**
- * Researcher: "Most of the original control was lost, so we regenerated the
- *  remainder. This analysis reads both — the surviving fragment and the
- *  regeneration — because the comparison needs the whole series."
- *
- * Two artefacts, one name: a regenerated part naturally carries the name of
- * the part it replaces. One of the two has
- * provenance nobody can vouch for, which is the situation that matters.
+ * Researcher: "Most of the original control was lost, so we regenerated the remainder. This
+ * analysis reads both — the surviving fragment and the regeneration — because the comparison
+ * needs the whole series."
  */
 async function anAnalysisRestingOnBothControls(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("do the treated and control arms diverge?");
@@ -81,13 +68,9 @@ async function anAnalysisRestingOnBothControls(s: ResearchSession) {
 
 describe("S-9d: resting on one thing, or two?", () => {
   /**
-   * The control, and it does real work: it establishes that the two inputs are
-   * genuinely distinct in the record, so the collapse below is a fact about the
-   * read rather than about the fixture.
-   *
-   * Asserted through `reproducibilityOf()`, which reports both. Same graph,
-   * different read, different answer -- which is what makes this a reporting
-   * defect and not a recording one.
+   * The control, and it does real work: it establishes that the two inputs are genuinely
+   * distinct in the record, so the collapse below is a fact about the read rather than about
+   * the fixture.
    */
   test("the record holds two distinct inputs under the one name", async () => {
     const { surviving, regenerated, analysis } = await anAnalysisRestingOnBothControls(session);
@@ -102,19 +85,8 @@ describe("S-9d: resting on one thing, or two?", () => {
   });
 
   /**
-   * The question a researcher actually asks: *why does this conclusion count as
-   * supported?* — and the answer now names both inputs.
-   *
-   * **Inverted, not deleted.** This shipped asserting the wrong answer, with the
-   * assertion it should make sitting in a comment; that comment is the live
-   * assertion now. `restingOn` was
-   * `[...new Set(rows.map((r) => r.a.logical_name))]`, so two artefacts sharing
-   * a name collapsed into one entry: the record stating a conclusion rested on
-   * a single input when it rested on two, with the vanished one
-   * indistinguishable from the survivor. A reader auditing the basis of a claim
-   * could not see that a regeneration with inferred provenance was underneath.
-   *
-   * Deduplicated by identity now. The names stay identical — that is the point.
+   * The question a researcher actually asks: *why does this conclusion count as supported?* —
+   * and the answer now names both inputs.
    */
   test("two inputs sharing a name are reported as two", async () => {
     const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
@@ -128,12 +100,8 @@ describe("S-9d: resting on one thing, or two?", () => {
   });
 
   /**
-   * The same claim from a second reader, so this is a statement about durable
-   * state rather than about a value the first call happened to return.
-   *
-   * The graph holds two artefacts, each carrying the claim independently, and
-   * the surface already knows the name is ambiguous — `whatDependsOn()` refuses
-   * it. Three reads, three consistent answers about how many things are there.
+   * The same claim from a second reader, so this is a statement about durable state rather than
+   * about a value the first call happened to return.
    */
   test("the collapse is in the read, not in what was recorded", async () => {
     const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);

@@ -1,17 +1,5 @@
 /**
  * S-12 — "The numbers are right; the sentence about them is wrong."
- * docs/project-journal/008_user_story_mining.md
- *
- * The first probe of what a `Claim` actually is. Everything underneath stays
- * valid — computations, artefacts, observations, findings — and only the
- * interpretation changes. That is the one thing `replaceAnalysis` cannot
- * express, because its whole mechanism is invalidating the output.
- *
- * Deliberately not pre-decided: whether claims supersede claims, whether a
- * claim is a proposition or an occurrence of asserting one, and whether the
- * review that caused a narrowing needs a relationship of its own.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -49,10 +37,6 @@ const NARROWER = "discriminative signal attenuates less than non-discriminative 
 
 /**
  * One proposition, asserted twice from two independent runs.
- *
- * The duplication is the point, not incidental setup: an interpretation that
- * two analyses arrived at is the normal case, and withdrawing it has to
- * withdraw all of it.
  */
 async function assertedTwice() {
   const { enquiry } = await session.openEnquiry(
@@ -142,11 +126,6 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
   /**
    * Afterward 1 — what does the record claim now, and what did it claim before?
-   *
-   * The original is still readable and reads as withdrawn. This is the
-   * assertion that the duplicate-claim case exists to break: withdrawing an
-   * interpretation two analyses reached must withdraw all of it, not the one
-   * node that happened to be found first.
    */
   test("the withdrawn interpretation stops standing, in full", async () => {
     const programme = await assertedTwice();
@@ -191,11 +170,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   });
 
   /**
-   * Afterward 2 — which evidence remains valid, and does this require
-   * recomputation?
-   *
-   * No. Nothing about the computations or artefacts changed, and the narrower
-   * interpretation rests on exactly the findings the original rested on.
+   * Afterward 2 — which evidence remains valid, and does this require recomputation?
    */
   test("every finding survives, and nothing was invalidated", async () => {
     const programme = await assertedTwice();
@@ -233,13 +208,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   });
 
   /**
-   * Afterward 3 — does anything downstream of the original claim need
-   * revisiting?
-   *
-   * Enumerable, and a different answer from a replacement's: there the inputs
-   * become invalid, here they do not. What is at risk is anything that was
-   * decided on the strength of the sentence, not anything computed from the
-   * numbers.
+   * Afterward 3 — does anything downstream of the original claim need revisiting?
    */
   test("a question closed on the old interpretation is surfaced as resting on it", async () => {
     const programme = await assertedTwice();
@@ -309,10 +278,6 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
   /**
    * A claim can be challenged without its source evidence becoming invalid.
-   *
-   * This is the third thing S-12 has to keep apart: challenged is about the
-   * proposition, invalidated is about the analysis output, and here challenge
-   * has to coexist with evidence that is entirely fine.
    */
   test("challenging a claim leaves its evidence standing", async () => {
     const programme = await assertedTwice();
@@ -353,13 +318,6 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
   /**
    * A withdrawn interpretation cannot be re-asserted by side effect.
-   *
-   * The ordinary case, not an exotic one: a colleague who has not read the
-   * review records an analysis concluding the sentence again. Nothing about
-   * that reverses the withdrawal, and if a fresh claim node quietly restored
-   * it, the record would un-retract itself while the reviewer's objection
-   * still stood. Re-opening a withdrawn reading is a deliberate act and LabKit
-   * has no verb for it yet, so it refuses rather than doing it accidentally.
    */
   test("recording the withdrawn sentence again does not quietly restore it", async () => {
     const programme = await assertedTwice();

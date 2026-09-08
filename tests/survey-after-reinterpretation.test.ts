@@ -1,30 +1,5 @@
 /**
  * Reinterpreting a closed question's claim does not move the question.
- *
- * **A port could get this wrong, which is why it is asserted here.**
- * `reinterpret` adds a second `SUPPORTS` from the same evidence to the
- * narrowed claim, so the closing decision's cited evidence reaches *two*
- * claims — and code that took whichever the store handed back first would
- * report the question `provisional` or `established` by luck.
- *
- * **LabKit has the same order-dependence and does not have the bug.**
- * `answeringClaimBearing`'s fold is `found ?? row.answering`, which is a
- * take-first over an unordered read; the precondition below asserts two claims
- * really are reachable. Yet the answer is stable, and two mutations confirm the
- * pick does not reach it:
- *
- *   reverse the fold to take the LAST claim   -> still passes
- *   regrain `checksOf` from byClaim to byQuestion -> still passes
- *
- * **Why it does not reach the answer is not established.** A mechanism was
- * proposed — that `checksOf`'s per-claim grain isolates it — and the second
- * mutation refutes that story without replacing it. So this file asserts the
- * observable property and deliberately does not explain it: a comment naming
- * the wrong reason is a defect no test catches, and this passes either way.
- *
- * What the test is for: if a future consumer of `answeringClaim` ever depends
- * on *which* claim came back, it goes red here rather than intermittently in
- * somebody's report.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";

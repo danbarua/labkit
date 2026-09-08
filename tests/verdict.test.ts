@@ -1,13 +1,5 @@
 /**
  * The priority order in `verdictOf`, asserted directly.
- *
- * A claim can be withdrawn *and* challenged, or challenged *and* held to a
- * standard it does not meet, so which arm wins is a decision rather than a
- * consequence. It used to be made twice — once in the CLI's `renderWhy` and
- * once in `explain` — over `supported: boolean` and the fields beside it, and
- * the two orders were not the same set: `explain` had no arm for a synthesis
- * or for a finding that settles nothing, so both came back as "nothing has
- * examined it".
  */
 
 import { describe, expect, test } from "bun:test";

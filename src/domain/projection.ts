@@ -1,12 +1,6 @@
 /**
- * The graph as a projection of the event stream, and the seam that makes it
- * one consumer rather than the privileged one.
- *
- * `GraphChange` is a write-ahead record for a graph store — a node created, an
- * edge created, properties changed — so anything fed the same stream in the
- * same order builds the same state. {@link graphProjector} is what does that
- * for AGE; a second store would be a second {@link Projector} and no change to
- * a verb.
+ * The graph as a projection of the event stream, and the seam that makes it one consumer rather
+ * than the privileged one.
  */
 
 import type {
@@ -22,10 +16,6 @@ import type { DomainEvent } from "./events";
 
 /**
  * One `NodeCreated`, for one label.
- *
- * A function rather than an object literal at the push: the change type is
- * distributed over the labels, and only here — where `L` is still the single
- * label the caller named — do the label and its property shape line up.
  */
 function nodeCreated<L extends NodeLabel>(
   id: string,
@@ -37,12 +27,6 @@ function nodeCreated<L extends NodeLabel>(
 
 /**
  * Where a new record's id comes from.
- *
- * The one thing staging needs from a store, named so that it is the *only*
- * thing: a `UnitOfWork` used to hold a whole `TenantGraph` to reach
- * `reserveId`, which put the graph on the command side of the pipeline for a
- * counter's worth of reason. A counter is a valid implementation, which is
- * what makes the staging half testable with no database at all.
  */
 export interface IdSource {
   reserve(label: NodeLabel): Promise<string>;
@@ -81,14 +65,6 @@ export class UnitOfWork {
 
 /**
  * Something that builds state from the stream.
- *
- * **Runs inside the act's transaction**, on the same connection, so a
- * projection failure rolls the act back with it. That is deliberate and is the
- * whole of what this seam currently promises: an out-of-process consumer reads
- * the committed log on its own terms, and is not one of these.
- *
- * Order is the caller's list order and is load-bearing — a projector that
- * *reads* the graph must come after the one that *writes* it.
  */
 export interface Projector {
   apply(event: DomainEvent): Promise<void>;

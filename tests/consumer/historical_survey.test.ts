@@ -1,15 +1,5 @@
 /**
  * The historical survey, put under a wound clock.
- *
- * This file runs two predicted wrong answers against the real code rather
- * than arguing from reading `whatWasKnown()` alone: a candidate is not a
- * finding until someone runs it, so the tests below are written to
- * *demonstrate*, and each one names what it expects the current code to do.
- *
- * Both probes return a **confidently incorrect** answer, not an empty or
- * absent one: a question is placed in a bucket it could not have been in.
- *
- * Imports only src/domain, never src/db (enforced — see .dependency-cruiser.cjs).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -53,18 +43,6 @@ const asked = (survey: {
 describe("what was known, as of an instant", () => {
   /**
    * **A question posed in April was not open in March. It did not exist.**
-   *
-   * `whatWasKnown()` starts `MATCH (q:Question)` — every question that exists
-   * *now* — and classifies each by whether a dated `Decision` resolved,
-   * promoted or accepted it by the stated instant. A question posed after that
-   * instant has none of those, so it falls through every branch into `open`.
-   *
-   * That is not an absence. `open` is an assertion: this question was on the
-   * record and nothing had settled it. Reported for a question nobody had
-   * asked yet, it back-dates the programme's own agenda — the mirror of the
-   * failure the method's docstring already guards against for promotion
-   * ("it would report a question `established` in March on the strength of a
-   * promotion made in August").
    */
   test("a question posed after the instant is not reported as open at it", async () => {
     const clock = windableClock("2026-03-01T09:00:00.000Z");
@@ -80,18 +58,7 @@ describe("what was known, as of an instant", () => {
   });
 
   /**
-   * **`at` is compared as a string, so a valid instant with an offset orders
-   * wrongly.**
-   *
-   * The instant is validated with `Date.parse()`, which accepts any ISO-8601
-   * form, and then compared with `<=` against a `decided_at` the clock always
-   * writes as UTC. `2026-03-01T09:00:00-05:00` is 14:00Z — *after* a decision
-   * at 10:00Z — but sorts lexically before it. The survey reports the question
-   * unresolved at a moment when it had been resolved for four hours.
-   *
-   * Same severity as the probe above and a much smaller fix: canonicalise the
-   * caller's instant once, rather than trusting that two ISO strings sort the
-   * way the moments they name do.
+   * **`at` is compared as a string, so a valid instant with an offset orders wrongly.**
    */
   test("an instant given with a UTC offset is compared as a moment, not as text", async () => {
     const clock = windableClock("2026-03-01T08:00:00.000Z");

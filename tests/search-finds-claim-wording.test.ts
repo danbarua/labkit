@@ -1,15 +1,5 @@
 /**
  * `search` reaches a claim's proposition and an artefact's name.
- *
- * Both are `IndexedString` — text that also behaves like a key — and both were
- * excluded from `search` on the argument that `claimsAsserting` is already the
- * exact-match lookup for a claim's wording. `claimsAsserting` needs the whole
- * sentence, so a researcher with a phrase in mind got "nothing on the record
- * contains this text" about a record that contained it.
- *
- * A phrase, not a whole proposition, is the point of every assertion here: a
- * test passing the full sentence would pass against `claimsAsserting`'s own
- * behaviour and prove nothing about substring reach.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
@@ -88,13 +78,6 @@ test("claimsAsserting still needs the whole sentence, which is why search had to
 
 /**
  * The third property that was excluded for the same wrong reason.
- *
- * `Computation.method` held the researcher's own description of how a run was
- * carried out and was annotated `ReadOnlyString`, so the taxonomy kept it out
- * of `search` — and *"which runs did a paired comparison?"* answered that
- * nothing on the record contained the text, about a record whose analysis says
- * exactly that. Same defect as the claim and the artefact above, found by
- * renaming the property rather than by anyone searching for it.
  */
 test("a phrase from an analysis's method finds the computation", async () => {
   await aRecordedFinding();

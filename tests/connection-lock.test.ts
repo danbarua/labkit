@@ -1,21 +1,6 @@
 /**
- * PGlite is single-writer and file-backed, so the lockfile is the only thing
- * standing between two LabKit processes and a corrupt database.
- *
- * **This replaced `tests/leader-election.test.ts`**, which raced three
- * concurrent `connectDb()` calls against one directory to prove that exactly
- * one elected itself primary and served the other two over a socket. There is
- * no election and no socket any more: a process takes the lock, does its work,
- * and gives it back. The three claims worth keeping from that file are the
- * three below, and each is now reached deterministically rather than by racing
- * — that file was the suite's flakiest, and it was flaky because proving a
- * concurrency property by running a real race is how you get a test that
- * usually proves it.
- *
- * These open real `dataDir`s, so they are slow by the suite's standards. A cold
- * open is ~1s (measured 2026-08-26) and every test here pays at least one, hence
- * the explicit per-test timeouts: bun's 5000ms default is not generous enough
- * for a test whose subject is a database starting up.
+ * PGlite is single-writer and file-backed, so the lockfile is the only thing standing between
+ * two LabKit processes and a corrupt database.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";

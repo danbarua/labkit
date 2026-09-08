@@ -1,24 +1,5 @@
 /**
  * Clock ordering — what a wound clock reaches, and the two rungs row Z walked.
- *
- * docs/consumer-contract/024_vertical_slice_results.md (probe 5),
- * `025` and `026` (row Z's predictions and outcomes).
- *
- * **Split out of `vertical_slice.test.ts` on 2026-08-21, for containment.** The
- * suite was flaky and concentrated here: five consecutive plain `bun test` runs
- * gave 0, 2, 2, 9 and 1 failures, and the nine was one file cascading after a
- * single death. The containment argument no longer applies — the cascade was a
- * teardown race, fixed on 2026-08-22 (`tests/scenario-harness.test.ts`), and
- * the socket the rest of it was attributed to has since been deleted. The split
- * stays for the reason in the next paragraph, which was always the better one.
- *
- * The seam is real rather than convenient. Everything here winds a clock;
- * everything left behind freezes one, deliberately, so that two worlds cannot
- * be told apart by elapsed time. `tests/helpers/clock.ts` explains why a
- * constant function is a frozen *value* and not a clock at all — a distinction
- * `024` got wrong and had to withdraw.
- *
- * Imports only src/domain, never src/db (enforced — see .dependency-cruiser.cjs).
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -49,15 +30,9 @@ const CONVERGES = "the pruning schedule shifts the convergence point";
 
 describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
   /**
-   * A frozen clock cannot distinguish ordering from argument, so this probe
-   * winds one. Of the six places a write verb reads the clock, **one**
-   * reaches the graph — `evaluateCriterion`, stamping
-   * `CriterionEvaluation.evaluated_at`. The other five reach only the event
-   * stream, which the record excludes from "what is true now".
-   *
-   * So the record's own claim about time is narrower than "the record has no
-   * time in it": **evaluations are ordered, decisions are not**. A frozen
-   * clock could not show this, because every stamp would be identical.
+   * A frozen clock cannot distinguish ordering from argument, so this probe winds one. Of the
+   * six places a write verb reads the clock, **one** reaches the graph — `evaluateCriterion`,
+   * stamping `CriterionEvaluation.evaluated_at`.
    */
   test("an evaluation carries the time it was reached; a decision carries none", async () => {
     const graph = await scenario.begin();
@@ -137,18 +112,8 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
 
 describe("Probe 6 — rung 1: ordering derived from evidence times alone", () => {
   /**
-   * The change bar's first rung, walked before anything is added to the model:
-   * **reader semantics → existing relationships → new property → a new noun.**
-   *
-   * Rows P and F are why this is not a formality. P looked like missing
-   * structure across two builds and was resolved in the query; F looked like a
-   * missing edge and was answered by a refusal. A property added without
-   * walking the rungs is a guess that happened to work.
-   *
-   * The best ordering a consumer can build today: a closure that cites a finding
-   * held to an evaluated criterion is **no earlier than** that evaluation. The
-   * probe implements exactly that, using only public reads, and asks it to
-   * separate two programmes that settled the same questions in opposite orders.
+   * The change bar's first rung, walked before anything is added to the model: **reader
+   * semantics → existing relationships → new property → a new noun.**
    */
   const FIRST = {
     asks: "does pruning move convergence?",
@@ -215,18 +180,8 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
 
   test("even with checks, the bound cannot order two closures", async () => {
     /**
-     * The generous case for rung 1: *both* questions carry an evaluated
-     * criterion, so both have a bound. It still fails, and the reason is what
-     * kills the rung — the bound records when the *evidence* was checked, not
-     * when the question was settled, and a programme can sit on checked evidence
-     * for months before closing on it.
-     *
-     * The variable has to be isolated, and the first draft of this test failed
-     * to: it wound the clock before each closure, so delaying one closure also
-     * delayed the *next question's evaluation*, and the two worlds differed in
-     * evidence times as well as closure order. The bounds duly differed, and for
-     * the wrong reason. Both worlds now evaluate both checks at the same two
-     * instants and differ **only** in which question is closed first.
+     * The generous case for rung 1: *both* questions carry an evaluated criterion, so both have
+     * a bound.
      */
     const prepare = async (s: ResearchSession, asks: string, prop: string) => {
       const { enquiry } = await s.openEnquiry(asks);
@@ -309,15 +264,9 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
 
 describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", () => {
   /**
-   * Rung 1 was built first and shown to fail (probe 6); rung 2 was declined by
-   * argument rather than demonstration — sequence is a property of each act,
-   * not a relation between two, and an `AFTER` edge would leave a reader
-   * reconstructing a total order from pairs. Then, and only then, one
-   * property: `Decision.decided_at`.
-   *
-   * The success condition: two programmes settling the same questions in
-   * **opposite orders** return *different* as-of answers, each correct, from
-   * durable state — with the event log empty beside it.
+   * Rung 1 was built first and shown to fail (probe 6); rung 2 was declined by argument rather
+   * than demonstration — sequence is a property of each act, not a relation between two, and an
+   * `AFTER` edge would leave a reader reconstructing a total order from pairs.
    */
   const FIRST = {
     asks: "does pruning move convergence?",
@@ -412,10 +361,8 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
 
   test("a promotion cannot establish a question before it happened", async () => {
     /**
-     * The wrong answer `025` predicted I would write, and would have: keying the
-     * as-of survey on `Claim.kind` reports the present. Here the promotion comes
-     * a month after the closure, so there is a window in which the question is
-     * settled but not established -- and the current-state read cannot see it.
+     * The wrong answer `025` predicted I would write, and would have: keying the as-of survey
+     * on `Claim.kind` reports the present.
      */
     const graph = await scenario.begin();
     try {
@@ -473,10 +420,9 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
   });
 
   /**
-   * A question is open only between being asked and being settled. Before it
-   * exists, and after it exists but before anything settles it, are two
-   * different moments — asking "what was known" in the first must not read
-   * back as `open`; only the second moment is.
+   * A question is open only between being asked and being settled. Before it exists, and after
+   * it exists but before anything settles it, are two different moments — asking "what was
+   * known" in the first must not read back as `open`; only the second moment is.
    */
   test("a question is open only between being asked and being settled", async () => {
     const graph = await scenario.begin();

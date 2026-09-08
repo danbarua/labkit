@@ -1,14 +1,5 @@
 /**
  * The durable event log, and the six things about it that could break quietly.
- *
- * `pgEventLog` is the first sink that outlives the process, and the first
- * LabKit-owned relational table besides `tenants`. Both of those bring failure
- * modes the in-memory log never had: a write that does not commit with what it
- * describes, and a read that crosses a tenant boundary.
- *
- * These live outside `tests/scenarios/` — a scenario asserts a researcher's
- * intent can be carried out through research verbs alone, and none of this is a
- * research question.
  */
 
 import { createdIn, edgesIn } from "../src/domain/events";
@@ -57,10 +48,9 @@ const surfaceFor = async (slug: string) => {
 
 describe("the event log outlives the process that wrote it", () => {
   /**
-   * The whole point, stated as the thing the in-memory sink could not do.
-   * A second connection is the closest this harness gets to a second process:
-   * it shares no JavaScript state with the first, so anything it can read came
-   * out of Postgres.
+   * The whole point, stated as the thing the in-memory sink could not do. A second connection
+   * is the closest this harness gets to a second process: it shares no JavaScript state with
+   * the first, so anything it can read came out of Postgres.
    */
   test("an event written through one connection is readable through another", async () => {
     const { write } = await surfaceFor("labkit");
@@ -80,11 +70,6 @@ describe("the event log outlives the process that wrote it", () => {
 
   /**
    * **The first isolation test on the relational side.**
-   *
-   * A tenant's graph is its own Postgres schema, so nothing in the graph has to
-   * say which tenant it belongs to. `labkit_event` is one table for everyone,
-   * and every read has to carry the filter itself. Nothing structural enforces
-   * that — this test is the enforcement.
    */
   test("two tenants do not see each other's events", async () => {
     const a = await surfaceFor("tenant-a");
@@ -103,13 +88,9 @@ describe("the event log outlives the process that wrote it", () => {
 
 describe("an event commits with the writes it describes, or not at all", () => {
   /**
-   * The atomicity choice, exercised the way `domain-graph.test.ts` exercises a
-   * `23505`: inject the failure deterministically rather than race two
-   * connections, which this backend cannot reliably support.
-   *
-   * Before every verb was wrapped in `inTransaction`, the event was written
-   * after the closure returned — so a verb that failed *after* its writes would
-   * have left an event describing work that was rolled back.
+   * The atomicity choice, exercised the way `domain-graph.test.ts` exercises a `23505`: inject
+   * the failure deterministically rather than race two connections, which this backend cannot
+   * reliably support.
    */
   test("a verb that throws leaves no event", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
@@ -129,11 +110,6 @@ describe("an event commits with the writes it describes, or not at all", () => {
 
   /**
    * The residue guard, which is one line in `inTransaction`'s `finally`.
-   *
-   * A verb that throws never reaches its `emit`, so the ids it minted are still
-   * in `TenantGraph`'s buffer. Without the clear, the *next* verb's event would
-   * claim to have created records that no longer exist — a false statement in
-   * an audit log, which is the worst kind of thing to have in one.
    */
   test("after a failure, the next event claims only its own records", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
@@ -154,15 +130,6 @@ describe("an event commits with the writes it describes, or not at all", () => {
 
   /**
    * The same guard, for the other buffer.
-   *
-   * **It must fail on a verb whose failing edge is not its first**, and the
-   * obvious choice is wrong: `openEnquiry` mints `MOTIVATES` and nothing else,
-   * so injecting there leaves an empty buffer and the assertion below holds
-   * whether or not anything clears it. That version was written, run against a
-   * removed clear, and passed — a check that cannot fail.
-   *
-   * `recordAnalysis` writes eight edges. Failing on `SUPPORTS`, the last,
-   * leaves seven in the buffer at the throw.
    */
   test("after a failure, the next event claims only its own edges", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
@@ -200,15 +167,6 @@ describe("an event commits with the writes it describes, or not at all", () => {
 describe("the two sinks answer one filter the same way", () => {
   /**
    * **`since` returned nothing from the in-memory sink, for every value.**
-   *
-   * `matches` reads `(e.seq ?? 0) > f.since`, and nothing assigned a `seq`, so
-   * every event scored 0 and every cursor filtered everything out —
-   * while `pgEventLog` answered the same call correctly. Two implementations
-   * of one interface disagreeing, and the only `since` test in the suite used
-   * the other one, which is why it stood.
-   *
-   * No database: the point is the sink, and reaching for one would hide which
-   * half is under test.
    */
   test("in-memory: since is a cursor, not a filter that empties the log", async () => {
     const log = inMemoryEventLog();
@@ -236,23 +194,11 @@ describe("the two sinks answer one filter the same way", () => {
 
 describe("an event records the edges the act created", () => {
   /**
-   * **The asymmetry this closed.** `createNode` pushed to a buffer from the day
-   * the collector was written; `createEdge` pushed to nothing. So an act's
-   * nodes were visible in the log and what connected them was not —
-   * `recordAnalysis` writes five nodes and eight edges, and reported zero.
-   *
-   * Asserted on the compound verb rather than a one-edge one, because the
-   * single-edge case passes under a collector that only ever remembers the
-   * last write.
+   * **The asymmetry this closed.** `createNode` pushed to a buffer from the day the collector
+   * was written; `createEdge` pushed to nothing.
    */
   /**
    * The log names the act the caller performed.
-   *
-   * `keep` and `replace` share one private implementation, and the shared half
-   * emitted a fixed name — so a `keep` read back as a replacement, which is a
-   * different act: one carries conclusions forward and the other supersedes
-   * every one of them. `happened` and `now --since` are the readers that
-   * cannot tell them apart.
    */
   test("a verb emits its own name", async () => {
     const { ctx, write } = await surfaceFor("labkit");
@@ -291,13 +237,7 @@ describe("an event records the edges the act created", () => {
   });
 
   /**
-   * The log says what standing a conclusion was recorded with, and what a
-   * promotion moved.
-   *
-   * `promote` mutates `Claim.kind` in place, so after it runs nothing on the
-   * record holds the value it replaced. Without both halves a reader cannot
-   * tell a claim recorded `confirmatory` from one promoted later, and has to
-   * infer it from whether a `promote` happens to follow.
+   * The log says what standing a conclusion was recorded with, and what a promotion moved.
    */
   test("standing is on the conclusion, and a promotion says what it moved", async () => {
     const { ctx, write } = await surfaceFor("labkit");
@@ -376,15 +316,10 @@ describe("an event records the edges the act created", () => {
     const labels: string[] = edgesIn(analysis!).map((e) => e.label);
     labels.sort();
 
-    // Every one of these is written by `recorded()` and none appears in the
-    // command, which carries the enquiry and the method.
-    //
-    // **Two `PRODUCES`, and which two is the point of writing the list out.**
-    // The computation's artefact, and `EvidenceUnit -> Artefact`, which no
-    // read reaches — the event log is the only place it is visible.
-    //
-    // The rest of what an analysis produces is on the `conclude` event
-    // asserted below, minted by an act of its own.
+    // Every one of these is written by `recorded()` and none appears in the command, which
+    // carries the enquiry and the method. **Two `PRODUCES`, and which two is the point of
+    // writing the list out.** The computation's artefact, and `EvidenceUnit -> Artefact`, which
+    // no read reaches — the event log is the only place it is visible.
     expect(labels).toEqual(["ADDRESSES", "CONSUMES", "PRODUCES", "PRODUCES", "USES"].sort());
 
     // The other half, which makes the assertion above a split rather than a
@@ -403,10 +338,6 @@ describe("an event records the edges the act created", () => {
 
   /**
    * An act that connects nothing says so, and `[]` is not `null`.
-   *
-   * The column is nullable for one population — rows written before the
-   * collector existed — and this is what stops that meaning leaking onto rows
-   * written after it.
    */
   test("an act that connects nothing records an empty list, not an absent one", async () => {
     const { ctx, write } = await surfaceFor("labkit");
@@ -422,12 +353,6 @@ describe("an event records the edges the act created", () => {
 describe("the log answers what the graph cannot", () => {
   /**
    * **Why `created` exists at all**, on the verb that proves it.
-   *
-   * `closeEnquiry` mints a `Decision` and emits against the *enquiry*, because
-   * that is what the researcher was doing. Six verbs mint a Decision and only
-   * `amendDesign` names it as the subject — so "which act created this
-   * decision?" is unanswerable from `subject` for five of the six, and
-   * answerable from `created` for all of them.
    */
   test("an act is found by what it created, not only by what it was about", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");

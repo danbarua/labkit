@@ -1,21 +1,5 @@
 /**
  * S-11 — "The analysis was wrong; the observations were fine."
- * docs/project-journal/008_user_story_mining.md
- *
- * This is the CONTROL scenario: the one the current model was designed for
- * and the one most likely to pass unchanged. Its value is diagnostic — if
- * S-11 strains, the problem runs deeper than a surface gap.
- *
- * Two rules this file exists to enforce, not just to describe:
- *
- *  1. It imports only `src/domain` — never `src/db`. If a scenario cannot be
- *     written without reaching into the persistence layer, the domain service
- *     has failed its purpose. (tests/helpers/db.ts is exempt: it is harness,
- *     not caller.)
- *  2. Every "Afterward" answer is asserted twice — once from the report the
- *     operation returned, and once from a query issued afterwards. "Afterward"
- *     means reconstructible from durable state, not merely present in a return
- *     value the caller happened to keep.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -285,12 +269,6 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   /**
    * The regression test for the relationship S-11 earned.
-   *
-   * Without `Computation -[:CONSUMES]-> Artefact`, "what does this claim rest
-   * on?" would answer by going out to the enquiry and back, returning every
-   * observation the ENQUIRY is associated with -- so one enquiry carrying two
-   * analyses over different inputs would return both observation sets for
-   * both claims, not just each analysis's own input.
    */
   test("a claim rests only on what its own analysis consumed, not on everything in the enquiry", async () => {
     const { enquiry } = await session.openEnquiry("which construction classifies best?");
@@ -352,11 +330,8 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
   });
 
   /**
-   * The review relationship constrains a research action, not just an
-   * explanatory query: a replacement has to be justified by a review OF the
-   * analysis being replaced. Without this, any verdict could retire any
-   * analysis and whySupported() would report a withdrawal reason that never
-   * referred to the withdrawn work.
+   * The review relationship constrains a research action, not just an explanatory query: a
+   * replacement has to be justified by a review OF the analysis being replaced.
    */
   test("a replacement cannot cite a review of some other analysis", async () => {
     const { enquiry } = await session.openEnquiry("which construction classifies best?");
@@ -426,16 +401,10 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // analysis it revises, which is what `replace` means.
     expect(replacement[0]!.command).toMatchObject({ supersedes: analysis, keeping: [] });
 
-    // Every research action left a trace, in order — one per action, not one
-    // per write.
-    //
-    // **The `conclude` entries are actions**: this run drew six conclusions and
-    // the record says so six times, as it would had a person typed `labkit
-    // conclude` six times. The count is the caller's, not the graph's.
-    //
-    // Spelled out rather than counted, because the absence is half the claim:
-    // there is no second `recordAnalysis` between the review and the
-    // replacement. A researcher who replaced an analysis did one thing.
+    // Every research action left a trace, in order — one per action, not one per write. **The
+    // `conclude` entries are actions**: this run drew six conclusions and the record says so
+    // six times, as it would had a person typed `labkit conclude` six times. The count is the
+    // caller's, not the graph's.
     const concluded = (n: number) => Array.from({ length: n }, () => "conclude" as const);
     expect((await events.all()).map((e) => e.operation)).toEqual([
       "openEnquiry",
@@ -450,15 +419,8 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     ]);
   });
   /**
-   * **Researcher:** I superseded that analysis. Then I noticed one more thing
-   * in its output and went to record it against it.
-   *
-   * **Agent:** Refused, naming the analysis that replaced it.
-   *
-   * A finding recorded on a spent analysis is indistinguishable downstream
-   * from one on a live analysis, which is why this is refused rather than
-   * flagged. It read `Artefact.invalidated` until 2026-09-06 — a property no
-   * verb has ever written — so the refusal never fired and the finding landed.
+   * **Researcher:** I superseded that analysis. Then I noticed one more thing in its output and
+   * went to record it against it.
    */
   test("a superseded analysis takes no further conclusions", async () => {
     const { enquiry, analysis, observations } = await bootstrapAnalysisAsShipped();
