@@ -421,6 +421,10 @@ describe("S-4: a negative result that closes the question", () => {
           proposition: SPECIFICITY,
           finding: "still no separation, corrected metric",
           bearing: "challenges",
+          // Named, not left to be matched: after this act two records assert
+          // these words, and only the researcher knows the corrected metric
+          // answers the refutation's own claim.
+          replacing: claimOf(refutationClaims, SPECIFICITY),
         },
       ],
     });

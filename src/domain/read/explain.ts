@@ -205,29 +205,24 @@ export class ExplainGroup extends SessionCore {
     const fell = await this.claimsFrom(decision, "SUPERSEDES");
     const kept = await this.claimsFrom(decision, "KEEPS");
 
-    // **The recorded pairing first, wording only where there is none.**
-    // `conclude --replacing` mints a decision per finding carrying
-    // `SUPERSEDES` to what fell and `MOTIVATES` to what stands in its place,
-    // so which claim replaced which is on the record at write time. Matching
-    // propositions cannot recover it: an analysis may assert one sentence
-    // twice about different endpoints, which is what a claim's handle is for.
+    // **The pairing the act recorded, and no other.** `conclude --replacing`
+    // mints a decision per finding carrying `SUPERSEDES` to what fell and
+    // `MOTIVATES` to what stands in its place, so which claim replaced which
+    // is on the record at write time.
+    //
+    // A successor that named nothing is reported `unpaired`. Matching
+    // propositions instead would put a before/after on the record that nobody
+    // asserted -- and it cannot recover the pairing anyway, since an analysis
+    // may assert one sentence twice about different endpoints, which is what a
+    // claim's handle is for.
     const named = await this.namedSuccessors(fell.map((c) => c.claim));
 
-    // The fallback, for a conclusion recorded without naming what it replaces.
-    // Unique on both sides or nothing: this is a description rather than an
-    // act and cannot refuse, so an ambiguous match is reported unpaired
-    // instead of guessed.
-    const countBy = (cs: ConcludedClaim[], p: string) => cs.filter((c) => c.asserts === p).length;
     const changed: RevisedFinding[] = [];
     const restated: ConcludedClaim[] = [];
     const unpaired: ConcludedClaim[] = [];
     for (const was of fell) {
       const stated = named.get(was.claim);
-      const successor =
-        (stated && now.find((c) => c.claim === stated)) ??
-        (countBy(fell, was.asserts) === 1 && countBy(now, was.asserts) === 1
-          ? now.find((c) => c.asserts === was.asserts)
-          : undefined);
+      const successor = stated && now.find((c) => c.claim === stated);
       if (!successor) {
         unpaired.push({ claim: was.claim, asserts: was.asserts });
         continue;

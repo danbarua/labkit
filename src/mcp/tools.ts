@@ -1068,9 +1068,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "Records a successor to the analysis those claims came from, supersedes every other " +
       "conclusion of it, and carries the named ones forward on their original evidence — " +
       "`why` on a kept claim still rests on the run that produced the number. Record the " +
-      "successor's own findings with `conclude`. The successor reads what its predecessor " +
-      "read; `from` adds to that. Answers with what was superseded, which is the complement " +
-      "of what you named.",
+      "successor's own findings with `conclude`, passing `replacing` on each one that stands " +
+      "in place of a superseded finding: that pairing is only on the record if you state it. " +
+      "The successor reads what its predecessor read; `from` adds to that. Answers with what " +
+      "was superseded, which is the complement of what you named.",
     inputSchema: {
       keeping: z
         .array(z.string())
@@ -1106,8 +1107,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "Record a corrected analysis in place of a defective one, citing the review that " +
       "justified the retraction, and the lineage between them. **Every conclusion of the " +
       "superseded analysis falls here** — use `keep` instead to carry some of them forward. " +
-      "Record the successor's own findings with `conclude`. It reads what its predecessor " +
-      "read; `from` adds to that.",
+      "Record the successor's own findings with `conclude`, passing `replacing` on each one " +
+      "that stands in place of a fallen finding: that pairing is only on the record if you " +
+      "state it. It reads what its predecessor read; `from` adds to that.",
     inputSchema: {
       supersedes: z
         .string()

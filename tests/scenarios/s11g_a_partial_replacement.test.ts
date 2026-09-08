@@ -398,4 +398,44 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     // not.
     expect(await state("stands")).toBe("failed");
   });
+
+  /**
+   * **A pairing nobody stated is not a pairing.**
+   *
+   * The wording is unique on both sides here, so it *could* be matched — and
+   * matching it would report a before/after the researcher never asserted.
+   * `conclude --replacing` is how a successor says what it stands in place of;
+   * without it the record does not know, and says so.
+   */
+  test("a successor that names nothing is unpaired, even when the wording is unambiguous", async () => {
+    const { enquiry } = await session.openEnquiry("does T differ from its controls?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "per-image results",
+      finding: "one batch",
+    });
+    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "raw-scale aggregation",
+      from: [observations],
+      concludes: [{ proposition: REVISITED, finding: "p = 0.03 raw" }],
+    });
+    const { review } = await session.recordReview({ of: v1, verdict: "wrong scale" });
+    const report = await session.replaceAnalysis({
+      supersedes: v1,
+      because: review,
+      method: "log-scale re-aggregation",
+    });
+    // One sentence, one finding on each side, and nothing named.
+    await session.conclude({
+      analysis: report.replacement,
+      proposition: REVISITED,
+      finding: "p = 0.007 log",
+    });
+
+    const why = await (await afterwards()).why(report.replacement);
+    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
+    expect(why.report.changed).toEqual([]);
+    expect(why.report.unpaired.map((u) => u.claim)).toEqual([v1Claims[0]!.claim]);
+  });
 });

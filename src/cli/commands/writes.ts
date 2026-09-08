@@ -456,7 +456,9 @@ export function registerWrites(program: Command, run: Run): void {
         "conclusion of it, and carries the named ones forward on their original evidence — " +
         "`labkit why` on a kept claim still rests on the run that produced the number. Add the " +
         "successor's own findings with `labkit conclude`. The successor reads what its " +
-        "predecessor read; --from adds to that.",
+        "predecessor read; --from adds to that. Use `--replacing <claim-id>` on a " +
+        "conclusion that stands in place of a superseded one: that pairing is only on the " +
+        "record if you state it.",
     )
     .argument("<claim-id...>", "the conclusions that survive", (v, prev: string[] = []) => [
       ...prev,
@@ -490,7 +492,9 @@ export function registerWrites(program: Command, run: Run): void {
     .summary("supersede a defective analysis with a corrected one")
     .description(
       "Every conclusion of the superseded analysis falls here — use `labkit keep` instead to " +
-        "carry some of them forward. Add the successor's own findings with `labkit conclude`. " +
+        "carry some of them forward. Add the successor's own findings with `labkit conclude`, " +
+        "and `--replacing <claim-id>` on each one that stands in place of a fallen finding: " +
+        "that pairing is only on the record if you state it. " +
         "It reads what its predecessor read; --from adds to that.",
     )
     .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
