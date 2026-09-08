@@ -494,6 +494,27 @@ test("two claims asserting one sentence are not rendered as a duplicate", () => 
   expect(renderClaims([], "nobody says this", PLAIN)).toContain("nothing on the record asserts");
 });
 
+/**
+ * The two buckets named what they hold and not what moves a question between them, and a reader
+ * who inferred the rule inferred the wrong one — "unresolved" sounds like a judgement about the
+ * science and is a fact about whether anything addresses the enquiry.
+ */
+test("`known` says what moves a question from untested to unresolved", () => {
+  const empty: KnowledgeSurvey = {
+    established: [],
+    provisional: [],
+    accepted: [],
+    unresolved: [],
+    untested: [],
+  };
+  const out = renderKnown(empty, PLAIN);
+  expect(out).toContain("moves a question from untested to");
+  expect(out).toContain("unresolved");
+  // The half a reader would not guess: work that nobody would call an
+  // experiment moves it just the same.
+  expect(out).toContain("harness shakedown counts");
+});
+
 test("an empty event log does not read as an empty record", () => {
   const empty = renderHappened([], PLAIN);
   expect(empty).toContain("Nothing matching");
