@@ -34,6 +34,8 @@ import {
 } from "../src/mcp/schemas";
 import { DOCS_TOOL, DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "../src/mcp/docs";
 import { z } from "zod";
+import { Command } from "commander";
+import { globalOptions } from "../src/cli/program";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import {
   NOT_EXPOSED,
@@ -593,6 +595,30 @@ describe("the tool documentation resource", () => {
     } finally {
       await scenario.end();
     }
+  });
+
+  /**
+   * Both surfaces say what `reconstructed_from` is **not** for, and that is the whole of the
+   * guard: an earlier wording said only "if you did not see the work happen", which a caller
+   * writing up yesterday's own run reads as an invitation. An over-stamped act is
+   * indistinguishable downstream from a real transcription, so the description is load-bearing.
+   */
+  test("the reconstruction flag says what it is not for, on both surfaces", () => {
+    const registerSession = SESSION_TOOLS.find((t) => t.name === "register_session")!;
+    // Through `toJSONSchema`, the way the output-field test below reads names:
+    // it is what an agent is actually handed.
+    const declared = z.toJSONSchema(z.strictObject(registerSession.inputSchema)) as {
+      properties: Record<string, { description?: string }>;
+    };
+    const described = declared.properties.reconstructed_from!.description!.toLowerCase();
+    expect(described).toContain("did not perform");
+    expect(described).toContain("not for your own results");
+
+    const cli = globalOptions(new Command("labkit"))
+      .options.find((o) => o.long === "--reconstructed-from")!
+      .description.toLowerCase();
+    expect(cli).toContain("did not perform");
+    expect(cli).toContain("not for your own results");
   });
 
   test("every tool, and every field of every declared output, is documented", async () => {

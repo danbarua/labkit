@@ -21,8 +21,9 @@ export interface Globals {
   author?: string;
   /**
    * `--reconstructed-from`, falling back to `$LABKIT_RECONSTRUCTED_FROM` — what an act was read
-   * off, for a record built after the work. A script backfilling a finished programme exports it
-   * once; `labkit happened` then shows it on every act, which is what makes a stale one visible.
+   * off, for work somebody else did. Not lateness: your own run written up afterwards was
+   * performed and takes nothing here. A script transcribing a finished programme exports it
+   * once; `labkit happened` shows it on every act, which is what makes a stale one visible.
    */
   reconstructedFrom?: string;
   json?: boolean;
