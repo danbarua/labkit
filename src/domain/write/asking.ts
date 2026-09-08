@@ -1,12 +1,13 @@
 /** Putting a question on the record, and opening a line of enquiry against it. */
 
 import { optional, vertexProps } from "../../db/cypher";
-import type { Prose } from "../../db/domain";
+import { labelForNaturalId, type Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import type {
   EnquiryRef,
   EvidenceRef,
   OpenedEnquiry,
+  AnyRef,
   Noted,
   NoteRef,
   Posed,
@@ -14,7 +15,7 @@ import type {
   QuestionRef,
   SharpenedQuestion,
 } from "../report";
-import { ref } from "../report";
+import { KIND_BY_LABEL, ref } from "../report";
 import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
@@ -65,10 +66,57 @@ export class Asking extends SessionCore {
    */
   async note(input: NoteCommand): Promise<Noted> {
     return this.handle("note", input, async (unitOfWork) => {
+      if (input.prompted) await this.hasNoOriginYet(input.prompted);
       const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
+      if (input.prompted) unitOfWork.edge(noted, "MOTIVATES", input.prompted);
       return { subject: noted, result: { note: noted } };
     });
+  }
+
+  /**
+   * Refuses a question that does not exist, and one that already says where it came from. Two
+   * origins would leave a reader two answers to *why was this asked* and nothing saying which
+   * holds.
+   */
+  private async hasNoOriginYet(question: QuestionRef): Promise<void> {
+    const asked = await this.graph.query(
+      `MATCH (q:Question {natural_id: $id}) RETURN q`,
+      { q: vertexProps<{ name: string }>() },
+      { id: question },
+    );
+    if (asked.length === 0)
+      throw new Error(
+        `no question ${question} for this note to have prompted; pose it first, or write the note without --prompted`,
+      );
+
+    const origin = await this.originAlready(question);
+    if (origin)
+      throw new Error(
+        `${question} already came from ${origin}; a question has one origin, and a second would leave a reader two answers to why it was asked`,
+      );
+  }
+
+  /** What a question already says it came from — a note, or the decision that sharpened it. */
+  private async originAlready(question: QuestionRef): Promise<AnyRef | undefined> {
+    // Two MATCHes: AGE has no edge alternation, and the sharpening arm arrives
+    // through the decision that recorded why rather than directly.
+    for (const pattern of [
+      `MATCH (n:Note)-[:MOTIVATES]->(:Question {natural_id: $id}) RETURN n AS found`,
+      `MATCH (d:Decision)-[:MOTIVATES]->(:Question {natural_id: $id})
+       MATCH (d)-[:NARROWS]->(:Question) RETURN d AS found`,
+    ]) {
+      const rows = await this.graph.query(
+        pattern,
+        { found: vertexProps<{ natural_id: string }>() },
+        { id: question },
+      );
+      // The kind differs by arm -- a Note on the first, the Decision that
+      // recorded the sharpening on the second -- and the caller only prints it.
+      const found = rows[0]?.found.natural_id;
+      if (found) return ref(KIND_BY_LABEL[labelForNaturalId(found)]!, found);
+    }
+    return undefined;
   }
 
   /**

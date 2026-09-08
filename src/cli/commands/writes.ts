@@ -18,7 +18,15 @@ import {
 } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
-import type { ClaimRef, ClaimState, DomainEvent, EnquiryRef, GateRef, NoteRef } from "../../domain";
+import type {
+  ClaimRef,
+  ClaimState,
+  DomainEvent,
+  EnquiryRef,
+  GateRef,
+  NoteRef,
+  QuestionRef,
+} from "../../domain";
 import type { Prose } from "../../db/domain";
 import { isRefOfKind, ref } from "../../domain/report";
 import type { CitedBasis } from "../../domain/commands";
@@ -104,13 +112,23 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<text>", "the note, in your own words")
     .option("--on <handle>", "what this note concerns, if anything", anyRef)
-    .action(async (text: string, opts: { on?: ReturnType<typeof anyRef> }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.note({ text, ...(opts.on === undefined ? {} : { on: opts.on }) }),
-          mintedView(),
+    .option(
+      "--prompted <question-id>",
+      "a question this note is the reason for — why it was asked, not what it is about",
+      handle("question"),
+    )
+    .action(
+      async (text: string, opts: { on?: ReturnType<typeof anyRef>; prompted?: QuestionRef }) =>
+        run(async ({ write }) =>
+          answer(
+            await write.note({
+              text,
+              ...(opts.on === undefined ? {} : { on: opts.on }),
+              ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
+            }),
+            mintedView(),
+          ),
         ),
-      ),
     );
   program
     .command("observe")
