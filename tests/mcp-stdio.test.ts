@@ -184,3 +184,50 @@ test(
   },
   COLD_START,
 );
+
+test(
+  "a session that says what it is reading off stamps every act it writes",
+  async () => {
+    // The launched process, so this exercises `surfacesOver` -- the in-memory
+    // harness in `tests/mcp.test.ts` builds its own surfaces and would pass
+    // even if the server never sampled the registry for a source.
+    const source = "Ito et al. 2024, fig. 3";
+    await client.callTool({
+      name: "register_session",
+      arguments: { id: "stdio-test-0", label: "mcp-stdio test", reconstructed_from: source },
+    });
+    const posed = await client.callTool({
+      name: "pose",
+      arguments: { question: "was this act read off something?" },
+    });
+    expect(posed.isError ?? false).toBe(false);
+    const subject = id(posed.structuredContent);
+
+    const seen = await client.callTool({ name: "what_happened", arguments: { touching: subject } });
+    const acts = (seen.structuredContent as { events: { reconstructed_from: string | null }[] })
+      .events;
+    expect(acts.length).toBeGreaterThan(0);
+    expect(acts.map((e) => e.reconstructed_from)).toEqual(acts.map(() => source));
+
+    // Registering again is a fresh statement of who is on the line, so the
+    // source does not carry over onto work nobody said was reconstructed.
+    await client.callTool({
+      name: "register_session",
+      arguments: { id: "stdio-test-0", label: "mcp-stdio test" },
+    });
+    const live = await client.callTool({
+      name: "pose",
+      arguments: { question: "and this one, asked with no source?" },
+    });
+    const after = await client.callTool({
+      name: "what_happened",
+      arguments: { touching: id(live.structuredContent) },
+    });
+    expect(
+      (after.structuredContent as { events: { reconstructed_from: string | null }[] }).events.map(
+        (e) => e.reconstructed_from,
+      ),
+    ).toEqual([null]);
+  },
+  COLD_START,
+);

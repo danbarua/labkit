@@ -107,6 +107,12 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 db="${1:-${LABKIT_HOME:-}}"
+# Nothing here was watched happening: every act below is transcribed from a
+# source, so every event it writes says which one. One export covers the file;
+# `labkit happened` shows it on each act, which is what makes a stale one
+# visible rather than silent.
+export LABKIT_RECONSTRUCTED_FROM="bonsai-2026 git history"
+
 [ -n "$db" ] || { echo "usage: LABKIT_HOME=<dir> $0, or $0 <db-dir>" >&2; exit 2; }
 
 lab() { bun "$root/src/cli/cli.ts" --db "$db" --author probe-bonsai-2a.sh "$@"; }

@@ -2,7 +2,7 @@
  * The temporal seam.
  */
 
-import type { EdgeCreated, GraphChange, NodeCreated, PropsChanged } from "../db/domain";
+import type { EdgeCreated, GraphChange, NodeCreated, Prose, PropsChanged } from "../db/domain";
 import type { Command } from "./commands";
 
 export type { EdgeCreated, GraphChange, NodeCreated, PropsChanged };
@@ -47,6 +47,12 @@ export type RecordedAttribution = Omit<AttributionContext, "attribution_how"> & 
 export interface CommandContext {
   clock: Clock;
   attribution: AttributionContext;
+  /**
+   * What the act was read off, when it was not performed — a paper, a colleague's notebook, a
+   * commit history. Absent means **nobody said**, and not that anything was witnessed: no
+   * process can observe that a researcher watched the work happen.
+   */
+  reconstructedFrom?: Prose;
 }
 
 /**
@@ -90,13 +96,22 @@ export interface DomainEvent {
    * What the caller asked for, verbatim.
    */
   command: Command;
+  /**
+   * What this act was read off, or `null` if nobody said. See {@link CommandContext}.
+   */
+  reconstructedFrom: Prose | null;
 }
 
 /** Builds a `DomainEvent`, defaulting `changes` to empty. */
 export function domainEvent(
-  fields: Omit<DomainEvent, "changes"> & Partial<Pick<DomainEvent, "changes">>,
+  fields: Omit<DomainEvent, "changes" | "reconstructedFrom"> &
+    Partial<Pick<DomainEvent, "changes" | "reconstructedFrom">>,
 ): DomainEvent {
-  return { ...fields, changes: fields.changes ?? [] };
+  return {
+    ...fields,
+    changes: fields.changes ?? [],
+    reconstructedFrom: fields.reconstructedFrom ?? null,
+  };
 }
 
 /** Every handle an act created. */

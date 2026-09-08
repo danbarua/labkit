@@ -525,6 +525,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         attribution_id: e.attribution.attribution_id,
         attribution_how: e.attribution.attribution_how,
         git_hash: e.attribution.git_hash,
+        reconstructed_from: e.reconstructedFrom,
         command: e.command,
       })),
     }),
@@ -1262,19 +1263,36 @@ export const SESSION_TOOLS: readonly SessionToolDefinition<z.ZodRawShape>[] = [
         .min(1)
         .optional()
         .describe("human-readable name a person scans in a report (default: the id)"),
+      reconstructed_from: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          "what the writes on this connection were read off, if you did not see the work happen — a paper, a document, a commit history",
+        ),
     },
     outputSchema: registeredSessionSchema,
     // Returns what it recorded, which is the rule for a verb that mints
     // something: a caller who cannot read back what LabKit understood cannot
     // tell a typo from a success. `replaced` is the previous registration, so
     // registering twice is visible rather than silent.
-    handler: async (registry, { id, label }) => {
-      const replaced = registry.registered();
-      registry.register(label ?? id, id);
+    handler: async (registry, { id, label, reconstructed_from }) => {
+      const was = registry.registered();
+      registry.register(label ?? id, id, reconstructed_from);
       const now = registry.registered();
+      // Both sides built field by field rather than handed the registry's own
+      // object, so a field added to the registration cannot reach a strict
+      // output schema that does not declare it.
+      const said = (who: NonNullable<typeof was>) => ({
+        id: who.id,
+        label: who.label,
+        reconstructed_from: who.reconstructedFrom,
+      });
       return {
-        registered: { id: now?.id ?? id, label: now?.label ?? label ?? id },
-        replaced: replaced ?? undefined,
+        registered: now
+          ? said(now)
+          : { id, label: label ?? id, reconstructed_from: reconstructed_from ?? null },
+        replaced: was ? said(was) : undefined,
       };
     },
   }),

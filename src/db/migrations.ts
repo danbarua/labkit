@@ -16,6 +16,7 @@ import m0005 from "../../drizzle/0005_equal_elektra.sql" with { type: "text" };
 import m0006 from "../../drizzle/0006_sour_vermin.sql" with { type: "text" };
 import m0007 from "../../drizzle/0007_note_natural_id.sql" with { type: "text" };
 import m0008 from "../../drizzle/0008_concerned_next_avengers.sql" with { type: "text" };
+import m0009 from "../../drizzle/0009_fuzzy_sersi.sql" with { type: "text" };
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -30,6 +31,7 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0006_sour_vermin": m0006,
   "0007_note_natural_id": m0007,
   "0008_concerned_next_avengers": m0008,
+  "0009_fuzzy_sersi": m0009,
 };
 
 /**

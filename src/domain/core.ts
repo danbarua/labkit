@@ -57,6 +57,8 @@ export class SessionCore {
    * Who is running commands through this surface.
    */
   protected readonly attribution: AttributionContext;
+  /** What every act through this surface was read off, or `null` if nobody said. */
+  protected readonly reconstructedFrom: Prose | null;
   readonly events: EventSink;
   protected readonly projectors: Projector[];
 
@@ -66,6 +68,7 @@ export class SessionCore {
   ) {
     this.clock = options.clock ?? systemClock;
     this.attribution = options.attribution ?? UNATTRIBUTED;
+    this.reconstructedFrom = options.reconstructedFrom ?? null;
     this.events = options.events ?? inMemoryEventLog();
     this.projectors = options.projectors ?? [graphProjector(graph)];
   }

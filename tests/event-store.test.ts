@@ -177,6 +177,7 @@ describe("the two sinks answer one filter the same way", () => {
       subject,
       command: { question: "does it hold?" },
       changes: [],
+      reconstructedFrom: null,
     });
     await log.record(ev("Q_1"));
     await log.record(ev("Q_2"));
