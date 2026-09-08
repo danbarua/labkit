@@ -652,11 +652,22 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .string()
         .optional()
         .describe("what this note concerns, if anything -- any handle already on the record"),
+      prompted: z
+        .string()
+        .optional()
+        .describe(
+          "a question this note is the reason for -- why it was asked, not what it is about. " +
+            "The other direction of `pose`'s `from`, for a note written after the question",
+        ),
     },
     outputSchema: notedSchema,
-    handler: (write, { text, on }) => {
+    handler: (write, { text, on, prompted }) => {
       const kind = on ? kindOf(on) : null;
-      return write.note({ text, ...(on && kind ? { on: ref(kind, on) } : {}) });
+      return write.note({
+        text,
+        ...(on && kind ? { on: ref(kind, on) } : {}),
+        ...(prompted ? { prompted: ref("question", prompted) } : {}),
+      });
     },
   }),
 

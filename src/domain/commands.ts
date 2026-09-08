@@ -58,6 +58,11 @@ export interface PursueCommand {
 export interface NoteCommand {
   text: string;
   on?: AnyRef;
+  /**
+   * A question this note is the reason for — the other direction of `pose --from`, for when the
+   * note is written after the question rather than before it.
+   */
+  prompted?: QuestionRef;
 }
 
 /** `sharpen` — narrow a question into a more precise one, recording why. */
