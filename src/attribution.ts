@@ -102,20 +102,26 @@ export function personContext(override?: string): SessionContextProvider {
  * Who is on the other end of one stdio connection, once they have said.
  */
 export interface SessionRegistry {
-  /** Records the caller's identity, replacing any previous one. */
-  register(label: string, id: string): void;
+  /**
+   * Records the caller's identity, replacing any previous one. `reconstructedFrom` is what the
+   * connection's writes were read off, when the agent did not see the work happen.
+   */
+  register(label: string, id: string, reconstructedFrom?: string): void;
   /**
    * What was registered, or `null` if nobody has said yet.
    */
-  registered(): { label: string; id: string } | null;
+  registered(): { label: string; id: string; reconstructedFrom: string | null } | null;
 }
 
 /** A fresh registry, holding nobody. */
 export function sessionRegistry(): SessionRegistry {
-  let who: { label: string; id: string } | null = null;
+  let who: { label: string; id: string; reconstructedFrom: string | null } | null = null;
   return {
-    register: (label, id) => {
-      who = { label, id };
+    // Replaced whole rather than merged: registering again is a new statement of
+    // who is on the line, and a source carried over from the previous one would
+    // stamp acts the caller never said were reconstructed.
+    register: (label, id, reconstructedFrom) => {
+      who = { label, id, reconstructedFrom: reconstructedFrom ?? null };
     },
     registered: () => who,
   };

@@ -982,17 +982,16 @@ export type _Undone = Assert<Exact<z.infer<typeof undoneSchema>, Undone>>;
 /**
  * What `register_session` recorded.
  */
+const registration = z.strictObject({
+  id: z.string(),
+  label: z.string(),
+  /** What this connection's writes were read off, or `null` if nobody said. */
+  reconstructed_from: z.string().nullable(),
+});
+
 export const registeredSessionSchema = z.strictObject({
-  registered: z.strictObject({
-    id: z.string(),
-    label: z.string(),
-  }),
-  replaced: z
-    .strictObject({
-      id: z.string(),
-      label: z.string(),
-    })
-    .optional(),
+  registered: registration,
+  replaced: registration.optional(),
 });
 
 /** One gate in a list of them. */

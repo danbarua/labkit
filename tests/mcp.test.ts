@@ -823,7 +823,15 @@ describe("the write gate, and what a registered write is signed with", () => {
         work({
           read: new ReadSurface(graph, { events }),
           write: new WriteSurface(graph, {
-            ...commandContext(mockGitContext, registeredSession(session)),
+            // Sampled per call, and from the registry, because that is what
+            // `surfacesOver` does -- a source read once at connect would pass a
+            // test the server would fail.
+            ...commandContext(
+              mockGitContext,
+              registeredSession(session),
+              undefined,
+              session.registered()?.reconstructedFrom ?? undefined,
+            ),
             events,
           }),
         }),
@@ -886,7 +894,7 @@ describe("the write gate, and what a registered write is signed with", () => {
       // Returns what it recorded -- a caller who cannot read back what LabKit
       // understood cannot tell a typo from a success.
       expect(registered.structuredContent).toEqual({
-        registered: { id: "claude:9f3a", label: "labkit-mcp-dev" },
+        registered: { id: "claude:9f3a", label: "labkit-mcp-dev", reconstructed_from: null },
       });
 
       const posed = await client.callTool({
@@ -912,6 +920,53 @@ describe("the write gate, and what a registered write is signed with", () => {
     }
   });
 
+  /**
+   * An agent transcribing a document has no terminal, so the flag and its environment variable
+   * are out of reach. The registration is the seam it does have.
+   */
+  test("an agent says what it is reading off, and every act it writes carries it", async () => {
+    const graph = await scenario.begin();
+    try {
+      const { client } = await serverWithRegistry(graph, sessionRegistry());
+      await client.callTool({
+        name: "register_session",
+        arguments: { id: "claude:9f3a", reconstructed_from: "Ito et al. 2024, fig. 3" },
+      });
+      await client.callTool({
+        name: "pose",
+        arguments: { question: "does the coating slow corrosion?" },
+      });
+
+      // Through `what_happened`, not the event: the wire is what an agent sees,
+      // and the field could reach the log and still be dropped from the output.
+      const seen = await client.callTool({ name: "what_happened", arguments: {} });
+      expect(
+        (seen.structuredContent as { events: { reconstructed_from: string | null }[] }).events.map(
+          (e) => e.reconstructed_from,
+        ),
+      ).toEqual(["Ito et al. 2024, fig. 3"]);
+
+      // Registering again is a fresh statement of who is on the line. A source
+      // carried over would stamp acts the caller never said were reconstructed.
+      await client.callTool({ name: "register_session", arguments: { id: "claude:9f3a" } });
+      await client.callTool({
+        name: "pose",
+        arguments: { question: "and this one, asked without a source?" },
+      });
+
+      const after = await client.callTool({ name: "what_happened", arguments: {} });
+      expect(
+        (after.structuredContent as { events: { reconstructed_from: string | null }[] }).events.map(
+          (e) => e.reconstructed_from,
+        ),
+      ).toEqual(["Ito et al. 2024, fig. 3", null]);
+
+      await client.close();
+    } finally {
+      await scenario.end();
+    }
+  });
+
   test("registering again replaces, and says what it replaced", async () => {
     const graph = await scenario.begin();
     try {
@@ -930,8 +985,8 @@ describe("the write gate, and what a registered write is signed with", () => {
       // defaulting to the id keeps a reader from seeing the previous name
       // against the new id.
       expect(again.structuredContent).toEqual({
-        registered: { id: "second-0", label: "second-0" },
-        replaced: { id: "first-0", label: "first" },
+        registered: { id: "second-0", label: "second-0", reconstructed_from: null },
+        replaced: { id: "first-0", label: "first", reconstructed_from: null },
       });
       await client.close();
     } finally {

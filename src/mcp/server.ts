@@ -229,7 +229,12 @@ export function surfacesOver(tenant: string, session: SessionRegistry): WithSurf
       return await work({
         read: new ReadSurface(graph, { events }),
         write: new WriteSurface(graph, {
-          ...commandContext(mockGitContext, registeredSession(session)),
+          ...commandContext(
+            mockGitContext,
+            registeredSession(session),
+            undefined,
+            session.registered()?.reconstructedFrom ?? undefined,
+          ),
           events,
         }),
       });
