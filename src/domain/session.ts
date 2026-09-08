@@ -1,23 +1,5 @@
 /**
  * `ResearchSession` — the whole research surface in one object.
- *
- * A facade, and deliberately only that. It exists because tests and future
- * callers want one thing to hold: `new ResearchSession(graph, { clock, events })`
- * then verbs in researcher language. It owns no logic — every member below
- * forwards to {@link ReadSurface} or {@link WriteSurface}.
- *
- * Application code need not bind to it. When this was split, `findReferences`
- * on the class reported 113 references across 19 files and **every one outside
- * `src/domain` was a test** — `src/cli.ts` was empty and `src/index.ts` was a
- * hello-world. So the facade is a usage affordance, not a contract the modules
- * are subordinate to. An MCP or CLI adapter should compose the two surfaces
- * directly and take only the half it needs; a read-only adapter that cannot
- * construct a `WriteSurface` cannot write, which is worth more than a comment
- * saying it should not.
- *
- * Delegation is written as `readonly x: Surface["x"] = (...args) => ...` rather
- * than restating every signature. The types come from the surfaces, so a
- * signature cannot drift here, and the line names which half owns the verb.
  */
 
 import type { TenantGraph } from "../db/graph";
@@ -127,28 +109,12 @@ export class ResearchSession {
 
 /**
  * **`ResearchSession` delegates every research verb, checked at compile time.**
- *
- * `ResearchWrites` names the write verbs a research move calls;
- * `fragments/` depends on that type rather than on `WriteSurface`, and this is
- * what keeps a session able to satisfy it. A delegate whose signature drifts,
- * or one nobody added, fails to compile **here** rather than three files away
- * in whichever fragment happened to call it.
- *
- * A type, not a test, because the claim is about signatures: a runtime check
- * could only see that the properties exist, and the drift worth catching is a
- * delegate that still exists and no longer matches. A verb with no delegate at
- * all is invisible to the suite — every scenario writes through this class, and
- * one nobody has called yet is simply never reached.
  */
 const _sessionDelegatesEveryResearchVerb: ResearchWrites = null as unknown as ResearchSession;
 void _sessionDelegatesEveryResearchVerb;
 
 /**
  * The same check for the read half.
- *
- * A read verb with no delegate is invisible in exactly the way a write one is:
- * every scenario reads through this class, and one nobody has called yet is
- * simply never reached.
  */
 const _sessionDelegatesEveryRead: ResearchReads = null as unknown as ResearchSession;
 void _sessionDelegatesEveryRead;

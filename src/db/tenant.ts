@@ -1,10 +1,6 @@
 /**
- * Tenant identity: resolving a slug to the `TenantContext` everything below
- * the CLI/MCP boundary is scoped by.
- *
- * The graph *schema* side of a tenant — creating labels and indexes —
- * lives in src/db/provisioning.ts; this file only decides which tenant we're
- * talking about, then hands off.
+ * Tenant identity: resolving a slug to the `TenantContext` everything below the CLI/MCP
+ * boundary is scoped by.
  */
 
 import { eq } from "drizzle-orm";
@@ -20,19 +16,8 @@ export interface TenantContext {
 }
 
 /**
- * Resolves (creating if needed) a tenant by slug, reconciles its AGE graph,
- * and returns the `TenantContext` every `TenantGraph` operation requires.
- * This is the CLI/MCP/bootstrap-boundary resolution point the tenancy design
- * describes — below this, there is no "tenant omitted" mode.
- *
- * Insert-or-fetch rather than fetch-or-insert: `on conflict do nothing`
- * returning nothing is how this learns a concurrent process won the race, and
- * the select that follows is the loser's path rather than the common one.
- *
- * `graph_name` is never sent — it is `generated always as ('labkit_t' || id)`,
- * so the server derives it from the trusted internal id and no application can
- * desync the two. Drizzle knows that from the column declaration
- * and leaves it out of the insert while still reading it back.
+ * Resolves (creating if needed) a tenant by slug, reconciles its AGE graph, and returns the
+ * `TenantContext` every `TenantGraph` operation requires.
  */
 export async function resolveTenantContext(
   db: LabKitDB,

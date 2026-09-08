@@ -1,23 +1,6 @@
 /**
  * S-3c — "The check was wrong, not the result."
- * docs/project-journal/008_user_story_mining.md, §3, row X
- *
- * One policy: re-running a robustness check until it happens to come back
- * green must not erase the earlier failure. What shipped is broader — *any*
- * failing evaluation is decisive forever, and disqualifies a finding as well
- * as blocking work.
- *
- * This is the case that rule was never asked about. The check itself was
- * defective; it was reviewed, corrected and re-run. Nothing about the result
- * changed. Under the shipped rule the original failure remains permanently
- * decisive, and the record cannot tell that case apart from someone re-rolling
- * the dice — which is the distinction the policy exists to protect.
- *
- * Both cases appear here side by side, deliberately: a fix that clears the
- * second while also clearing the first has not narrowed the rule, it has
- * removed it.
- *
- * Imports only src/domain — never src/db (enforced).
+ *, row X
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -78,10 +61,8 @@ const DISAGREES = "median aggregation disagrees";
 const AGREES = "median aggregation agrees";
 
 /**
- * Researcher: "I've a significant pairwise result, and before I ran it we
- *  agreed it only counts if the median aggregation agrees with the mean."
- *
- * The standard is stated before the run it qualifies.
+ * Researcher: "I've a significant pairwise result, and before I ran it we agreed it only counts
+ * if the median aggregation agrees with the mean."
  */
 async function aResultHeldToARobustnessCheck() {
   const { criterion: robustness } = await session.stateCriterion(ROBUSTNESS);
@@ -180,16 +161,8 @@ describe("S-3c: the check was wrong, not the result", () => {
   });
 
   /**
-   * Case 2, the one the shipped rule was never asked about, and the wrong
-   * answer this scenario exists to demonstrate.
-   *
-   * Researcher: "The median check was broken — it dropped the last fold. I've
-   *  fixed it and re-run it, and it agrees."
-   *
-   * Nothing about the result changed. What changed is that the earlier verdict
-   * was reached against work that has since been reviewed and withdrawn, which
-   * is a different situation from a verdict that still stands and is merely
-   * old.
+   * Case 2, the one the shipped rule was never asked about, and the wrong answer this scenario
+   * exists to demonstrate.
    */
   test("a check that was itself defective, corrected and re-run, no longer disqualifies the finding", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
@@ -334,10 +307,9 @@ describe("S-3c: the check was wrong, not the result", () => {
   });
 
   /**
-   * The narrowing, stated as its own assertion rather than inferred from the
-   * two cases above: what distinguishes them is whether the failing verdict's
-   * basis still stands, and nothing else. Same criterion, same outcomes, same
-   * order, same clock.
+   * The narrowing, stated as its own assertion rather than inferred from the two cases above:
+   * what distinguishes them is whether the failing verdict's basis still stands, and nothing
+   * else.
    */
   test("what separates the two cases is whether the failed verdict's basis was withdrawn", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
@@ -448,14 +420,8 @@ describe("S-3c: the check was wrong, not the result", () => {
   });
 
   /**
-   * External review, finding 2. The state between "the check was found
-   * defective" and "the corrected check has been re-run".
-   *
-   * S-3c's own tests never reach it: the corrected case records a replacement
-   * pass immediately, and the narrowing test has an older pass available. With
-   * neither, every verdict on the check is withdrawn and `checksFrom()` falls
-   * through to `never-run` — while `evaluations` still lists the withdrawn
-   * failure. The check certainly ran; what it has is no verdict that stands.
+   * External review, finding 2. The state between "the check was found defective" and "the
+   * corrected check has been re-run".
    */
   test("a check whose every verdict has been withdrawn has no standing verdict, and did not never-run", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
@@ -513,16 +479,6 @@ describe("S-3c: the check was wrong, not the result", () => {
 
   /**
    * A replacement that cannot be completed must leave nothing behind.
-   *
-   * Replacing an analysis withdraws the criterion evaluations that cited its
-   * findings, so a failure can stop counting. If the replacement's own writes
-   * then fail, the record would hold a failure that no longer decides its check
-   * and no corrected check in existence — a partially committed scientific
-   * state, which is the thing LabKit exists to prevent.
-   *
-   * The failure is provoked through a real guard rather than a mock: the
-   * narrowing below withdraws the finding, and `conclude()` refuses to
-   * supersede one that has already been superseded.
    */
   test("a replacement that cannot be completed leaves the earlier failure standing", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
@@ -573,19 +529,8 @@ describe("S-3c: the check was wrong, not the result", () => {
   });
 
   /**
-   * The itemised check above is right — `no-standing-verdict` is exactly what
-   * "a check whose every verdict has been withdrawn" test asserts. This is
-   * the *aggregate*: `gateStateFrom` fed on the same checks could fall
-   * through its `else` branch to `satisfied`, because a retracted verdict
-   * matches neither `failed` nor `never-run`. One function, three readers —
-   * `gateStatus`, `gateList`, and `work` (via `workStateFrom`, which treats
-   * anything short of `blocked` as not holding a task) — so all three are
-   * asserted here, not just the one `gate <id>` prints.
-   *
-   * The passing evaluation (not a failing one, unlike the test above) is the
-   * sharper case — a *retracted pass* is the one a stale four-branch chain
-   * can misreport as `satisfied` outright, where a retracted fail at least
-   * reads as something-other-than-satisfied by accident.
+   * The itemised check above is right — `no-standing-verdict` is exactly what "a check whose
+   * every verdict has been withdrawn" test asserts.
    */
   test("a gate whose only verdict was withdrawn reads incomplete, not satisfied", async () => {
     const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();

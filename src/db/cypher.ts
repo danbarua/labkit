@@ -1,18 +1,5 @@
 /**
  * Typed execution of Cypher against one AGE graph.
- *
- * The seam this closes: AGE returns every column as agtype *text*, and
- * `cypher()` needs its result columns declared at the SQL level because it
- * cannot infer them. Carried by hand that is two halves per call site — a
- * literal `"(e agtype, comp agtype)"` matching the RETURN arity, and a
- * `parseAgtype()` plus kind-narrowing dance. Here a column is declared once, as
- * a decoder, and both halves fall out of it.
- *
- * Decoding happens here, at the query boundary — deliberately not via `pg`'s
- * `types.setTypeParser()` global registry, which is what the Apache AGE
- * driver's `setAGETypes()` does. That registry is process-global and invisible
- * to any code path holding a raw PGlite instance, so it takes effect in
- * production and not in tests.
  */
 
 import {
@@ -33,10 +20,7 @@ import type { LabKitDB } from "./backend";
 // ---------------------------------------------------------------------------
 
 /**
- * Turns one column's raw agtype text into a typed value. `null` is passed
- * through rather than parsed — an unmatched `OPTIONAL MATCH` column arrives
- * as a SQL NULL, so only `optional()` accepts it; every other decoder treats
- * it as a mismatch, which is what makes a missing row loud instead of silent.
+ * Turns one column's raw agtype text into a typed value.
  */
 export type ColumnDecoder<T> = (raw: string | null, column: string) => T;
 
@@ -95,10 +79,7 @@ export function agtypeValue(): ColumnDecoder<AgtypeValue> {
 }
 
 /**
- * Makes a column nullable. Covers both shapes a missing value can arrive in:
- * a SQL NULL (what an unmatched `OPTIONAL MATCH` produces today) and an
- * agtype `null` scalar (what a `RETURN`ed absent *property* produces) — the
- * latter would otherwise reach the inner decoder and throw a kind mismatch.
+ * Makes a column nullable.
  */
 export function optional<T>(inner: ColumnDecoder<T>): ColumnDecoder<T | null> {
   return (raw, column) => {
@@ -165,10 +146,7 @@ export class CypherRunner {
   }
 
   /**
-   * Runs a statement with no `RETURN` (`CREATE`, `SET`, …). AGE requires an
-   * `AS` clause on every `cypher()` call regardless of whether the query
-   * produces rows, so one is supplied here and its (empty) result discarded —
-   * that requirement is AGE's, and callers shouldn't have to know it.
+   * Runs a statement with no `RETURN` (`CREATE`, `SET`, …).
    */
   async execute(cypher: string, params?: Record<string, unknown>): Promise<void> {
     await this.run(cypher, buildAsClause([{ name: "unused" }]), params);

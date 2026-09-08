@@ -1,16 +1,5 @@
 /**
  * S-20 — "The re-analysis narrowed it and did not close it."
- *
- * A re-verification produces a finding its own researcher calls genuinely
- * inconclusive: two of three tests agree it is significant, the third does
- * not, and a pre-commitment forbids trying a fourth. The finding is real and
- * it settles the proposition neither way.
- *
- * What it holds the record to: the claim reads as neither supported nor
- * challenged, the finding stays visible under it, and the question it was
- * asked against is not counted as answered.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

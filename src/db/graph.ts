@@ -1,15 +1,8 @@
 /**
- * The query/mutation surface for one tenant's graph
- * (docs/project-journal/003_review_domain_tenancy.md,
- * docs/project-journal/004_tenancy_implementation_plan.md): one Apache AGE
- * graph per tenant, addressed and mutated exclusively through the
- * `TenantGraph` class below — never a hardcoded graph name, never an
- * arbitrary property-map edge match, never AGE's internal graphid past this
- * file's boundary.
- *
- * What LabKit's entities *are* lives in src/db/domain.ts; how a tenant's
- * graph gets created lives in src/db/provisioning.ts. This file is only the
- * verbs.
+ * The query/mutation surface for one tenant's graph (, ): one Apache AGE graph per tenant, addressed and
+ * mutated exclusively through the `TenantGraph` class below — never a hardcoded graph name,
+ * never an arbitrary property-map edge match, never AGE's internal graphid past this file's
+ * boundary.
  */
 
 import { LABKIT_SCHEMA } from "./schema";
@@ -36,19 +29,14 @@ import type { Transactor } from "./transactor";
 import type { TenantContext } from "./tenant";
 
 /**
- * Bundles `ctx`/`db` once instead of threading a `TenantContext` through every
- * call, and gives `EDGE_SCHEMA` validation, natural-id -> label resolution and
- * the `Decision` lifecycle invariant one home rather than scattering them
- * across free functions.
+ * Bundles `ctx`/`db` once instead of threading a `TenantContext` through every call, and gives
+ * `EDGE_SCHEMA` validation, natural-id -> label resolution and the `Decision` lifecycle
+ * invariant one home rather than scattering them across free functions.
  */
 export class TenantGraph {
   private readonly runner: CypherRunner;
   /**
-   * `tx` is required and never defaulted. Two graphs over one connection must
-   * share one boundary — `tests/helpers/scenario.ts`'s `current()` and
-   * `tests/domain-graph.test.ts`'s two-tenant cases both build a second one —
-   * and a defaulted transactor would give them a depth counter each. See
-   * `./transactor.ts`.
+   * `tx` is required and never defaulted.
    */
   constructor(
     private readonly ctx: TenantContext,
@@ -64,33 +52,17 @@ export class TenantGraph {
   }
 
   /**
-   * Runs `work` inside one database transaction: everything it writes commits
-   * together, or none of it does.
-   *
-   * **Not infrastructure hygiene: a partial research act is a wrong answer.**
-   * Revising an analysis withdraws the criterion evaluations that cited its
-   * findings, so a failure between the halves leaves a record where the earlier
-   * failure has stopped deciding its check and no corrected check exists.
-   * `reverify()` has the same shape with a worse landing: without its second
-   * write the durable state is a second independent support where a
-   * re-verification was meant.
-   *
-   * **The boundary itself is not this class's any more** — see
-   * `./transactor.ts` for why it moved and what it would cost to move back.
-   *
-   * Note this is a *transaction* boundary, not a raw-string escape hatch: no
-   * caller gains the ability to issue Cypher this class would not otherwise
-   * run. See the file header.
+   * Runs `work` inside one database transaction: everything it writes commits together, or none
+   * of it does.
    */
   async inTransaction<T>(work: () => Promise<T>): Promise<T> {
     return this.tx.inTransaction(work);
   }
 
   /**
-   * Runs a read query against this tenant's graph. `columns` declares each
-   * `RETURN`ed name and how to decode it (see src/db/cypher.ts's decoders) —
-   * that one declaration produces both the SQL `AS` clause AGE requires and
-   * the row type this resolves to.
+   * Runs a read query against this tenant's graph. `columns` declares each `RETURN`ed name and
+   * how to decode it (see src/db/cypher.ts's decoders) — that one declaration produces both the
+   * SQL `AS` clause AGE requires and the row type this resolves to.
    */
   async query<S extends RowSpec>(
     cypher: string,
@@ -102,16 +74,6 @@ export class TenantGraph {
 
   /**
    * Reserves the next natural id for a label, creating nothing.
-   *
-   * `label` is one of NODE_LABELS, never caller-controlled input — the
-   * generator call's `label`/`prefix` arguments are template-interpolated
-   * literals for that reason (`labkit_next_natural_id` in
-   * drizzle/0002_natural_ids.sql), never passed through `$`-params.
-   *
-   * The `::text` casts on those two literals are required, not decorative:
-   * AGE types bare Cypher string literals as `agtype`, and Postgres won't
-   * resolve a `(text, text)` function overload against `agtype` arguments —
-   * confirmed empirically against pglite-age before this was written this way.
    */
   async reserveId(label: NodeLabel): Promise<string> {
     const { rows } = await this.db.query<{ id: string }>(
@@ -124,19 +86,8 @@ export class TenantGraph {
   }
 
   /**
-   * Creates a single node. `label` selects the property shape
-   * (`NodePropsByLabel`), so passing another label's props is a compile error.
-   *
-   * `id` is a natural id already taken from {@link reserveId}; without one the
-   * node takes a fresh id in the same round trip.
-   *
-   * `label` is one of NODE_LABELS, never caller-controlled input — the
-   * generator call's `label`/`prefix` arguments are template-interpolated
-   * literals for that reason, never passed through `props`/`$`-params.
-   *
-   * The `::text` casts on those two literals are required, not decorative:
-   * AGE types bare Cypher string literals as `agtype`, and Postgres won't
-   * resolve a `(text, text)` function overload against `agtype` arguments.
+   * Creates a single node. `label` selects the property shape (`NodePropsByLabel`), so passing
+   * another label's props is a compile error.
    */
   async createNode<L extends NodeLabel>(
     label: L,
@@ -184,60 +135,8 @@ export class TenantGraph {
   }
 
   /**
-   * Creates a directed edge identified by natural IDs — never AGE's
-   * internal graphid, never an arbitrary property-map match that could
-   * silently address more than one node. The label of each
-   * endpoint is inferred from its natural-id prefix (`labelForNaturalId`),
-   * then validated as a legal `(fromLabel, edge, toLabel)` combination
-   * against `EDGE_SCHEMA` before anything is matched in the database. A
-   * missing source/target throws explicitly rather than silently creating
-   * zero edges.
-   *
-   * `(fromId, edge, toId)` is a unique key for a relationship — calling
-   * this twice with the same three values is a no-op, not a duplicate
-   * parallel edge, so agent retries are safe by construction. This is
-   * implemented as an explicit existence check before `CREATE` (the fast
-   * path), NOT Cypher `MERGE` — `MERGE` for a relationship between two
-   * already-matched nodes was spiked and found broken under pglite-age (the
-   * created edge's `start_id`/`end_id` are both `0`, so it never actually
-   * connects the nodes — see .claude/skills/postgres-age/SKILL.md's
-   * gotchas).
-   *
-   * The check-then-create fast path alone would leave a race under
-   * concurrent callers on the direct-Postgres backend (already shipped, not
-   * hypothetical — two processes can both pass the existence check before
-   * either `CREATE`s). Closed at the DB layer instead: every edge label's
-   * table has a `UNIQUE (start_id, end_id)` index (provisioned in
-   * `src/db/provisioning.ts`, confirmed to actually enforce uniqueness — a
-   * duplicate `CREATE` raises a real Postgres `23505` error), and this
-   * method catches exactly that error code and treats it as the same
-   * successful no-op the fast-path check would have produced. The
-   * uniqueness guarantee is real regardless of backend; the pre-check is
-   * purely an optimization to avoid a wasted round trip in the common case.
-   *
-   * **`props` are set on creation only, and that is a consequence of the
-   * idempotency above rather than a separate decision.** This verb is
-   * create-if-absent, so a second call against an existing edge is a no-op and
-   * any properties it carries are dropped, silently. Making it an upsert would
-   * mean two callers with different properties racing to overwrite each other
-   * under a contract that currently promises retries are free. If a property
-   * ever needs to change after the fact, that wants its own verb and its own
-   * argument rather than a second `createEdge` with different properties.
-   *
-   * Ledger row **T** claimed edges cannot carry properties. They can — every
-   * AGE label is a real Postgres table and an edge row has the same
-   * `properties` agtype column a vertex row has, verified in
-   * `tests/domain-graph.test.ts` through Cypher and through plain SQL. Nothing
-   * was stopping this parameter existing except that no caller had wanted one.
-   * What survives of the row is narrower and real: **`UNIQUE (start_id, end_id)`
-   * means a property can annotate a relationship but never distinguish two of
-   * them.** Two edges of the same label between the same pair are one edge, and
-   * no property changes that.
-   *
-   * Untyped per label, deliberately. `EDGE_SCHEMA` declares endpoint pairs and
-   * no property shapes, so there is nothing to key a `NodePropsByLabel`
-   * equivalent off. When an edge earns a declared shape, type it the way node
-   * props are typed rather than widening this signature further.
+   * Creates a directed edge identified by natural IDs — never AGE's internal graphid, never an
+   * arbitrary property-map match that could silently address more than one node.
    */
   async createEdge(
     fromId: string,
@@ -249,19 +148,8 @@ export class TenantGraph {
     // edges. See `recorded()`.
     props?: Record<string, string | number | boolean | number[]>,
     /**
-     * Skip the duplicate check because at least one endpoint was created by
-     * the *same* call and cannot already carry this edge.
-     *
-     * The check is not decoration: a `23505` raised inside `inTransaction`
-     * poisons the enclosing Postgres transaction, so an idempotent re-call
-     * would take a compound verb down with it. It costs a round trip per edge
-     * — 284 of 1584 queries in `tests/scenarios/s11_invalidate_analysis.test.ts`,
-     * 18% of that file — and where the endpoint was minted microseconds ago it
-     * is buying a guarantee already held by construction.
-     *
-     * **Only pass this when a fresh node is an endpoint.** It is a claim about
-     * the caller, not a preference, and `EDGE_SCHEMA` validation and endpoint
-     * diagnosis are unaffected either way.
+     * Skip the duplicate check because at least one endpoint was created by the *same* call and
+     * cannot already carry this edge.
      */
     endpointIsNew = false,
   ): Promise<void> {
@@ -275,21 +163,10 @@ export class TenantGraph {
       );
     }
 
-    // **The endpoints are not checked up front**, which would cost three round
-    // trips per edge before a single byte is written. The `CREATE` below
-    // matches both endpoints itself: if either is missing the pattern binds
-    // nothing, the statement creates nothing and returns **no rows** — the same
-    // information a check would buy. The lookups are issued only then, purely
-    // to say *which* endpoint was missing. Measured on
-    // `tests/scenarios/s11b_which_review_retracted_it.test.ts`: 240 of that
-    // file's 812 queries were these two, 30% of everything it ran.
-    //
-    // Verified against this backend before relying on it, because pglite-age
-    // has form on edge operations (`MERGE` builds edges with both endpoints
-    // `0`): `CREATE (a)-[e:E]->(b) RETURN e` returns exactly one row when both
-    // endpoints exist and the edge genuinely connects them, returns zero rows
-    // and **no error** when one is missing, and still raises `23505` on a
-    // duplicate.
+    // **The endpoints are not checked up front**, which would cost three round trips per edge
+    // before a single byte is written. The `CREATE` below matches both endpoints itself: if
+    // either is missing the pattern binds nothing, the statement creates nothing and returns
+    // **no rows** — the same information a check would buy.
     if (!endpointIsNew) {
       const existing = await this.query(
         `MATCH (:${fromLabel} {natural_id: $from})-[e:${edge}]->(:${toLabel} {natural_id: $to}) RETURN e`,
@@ -299,14 +176,10 @@ export class TenantGraph {
       if (existing.length > 0) return;
     }
 
-    // Expanded per key rather than passed as a map: AGE rejects a whole-map
-    // `CREATE (a)-[e:LABEL $props]->(b)`, the same limitation createNode()
-    // works around.
-    //
-    // Not `buildPropertyClause()`, whose own comment says it is the shape this
-    // method builds on -- it names each parameter after its key, and this query
-    // already binds `$from` and `$to`. A property called `from` would silently
-    // rebind the source node's natural id. Same validator, prefixed parameters.
+    // Expanded per key rather than passed as a map: AGE rejects a whole-map `CREATE
+    // (a)-[e:LABEL $props]->(b)`, the same limitation createNode() works around. Not
+    // `buildPropertyClause()`, whose own comment says it is the shape this method builds on --
+    // it names each parameter after its key, and this query already binds `$from` and `$to`.
     const entries = Object.entries(props ?? {});
     for (const [key] of entries) validateIdentifier(key, "edge property key");
     const assignment = entries.length

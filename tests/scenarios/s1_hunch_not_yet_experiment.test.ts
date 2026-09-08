@@ -1,21 +1,5 @@
 /**
  * S-1 — "A hunch that is not yet an experiment."
- * docs/project-journal/008_user_story_mining.md
- *
- * The first scenario to ask what `Question` and `LineOfEnquiry` mean beyond
- * closure -- closure attaches to the question, not the pursuit -- including
- * one question carrying two pursuits, and a question created from something
- * other than a researcher typing one.
- *
- * Three things are deliberately NOT pre-decided:
- *   - whether question-to-question lineage needs an edge of its own;
- *   - whether "what did we know then" needs a durable event store;
- *   - whether identity of a question is its wording.
- * The Afterward queries are written to discriminate, and the wording one is
- * probed from both sides: two pursuits of one question must not become two
- * questions, and two identically-worded questions must not become one.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -57,15 +41,8 @@ const NONLINEAR = "the encoding responds nonlinearly to its input";
 const SMEAR = "the internal response is more than a nonlinear smear";
 
 /**
- * The programme before the researcher says anything, planted as durable state
- * so that "what do we already know?" is answered from the record rather than
- * from the conversation.
- *
- * Three different scientific states, deliberately arranged so that no two of
- * them can be told apart by reading text:
- *   - nonlinearity: pursued, analysed, closed on a cited result;
- *   - the smear question: pursued, analysed, nothing closed;
- *   - external task utility: written down and never pursued at all.
+ * The programme before the researcher says anything, planted as durable state so that "what do
+ * we already know?" is answered from the record rather than from the conversation.
  */
 async function priorState() {
   const { question: nonlinearity } = await session.pose({
@@ -173,10 +150,6 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
   /**
    * Afterward 1 — what is established, what is unresolved, what is untested?
-   *
-   * Three answers, not two. The untested question must not appear as
-   * unresolved, and nothing here may render as a failure: nobody has run
-   * anything that failed.
    */
   test("three states of knowledge, and untested is not a kind of failure", async () => {
     const prior = await priorState();
@@ -194,13 +167,10 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(ids(known.established)).not.toContain(prior.smear);
     expect(ids(known.untested)).not.toContain(prior.smear);
 
-    // Untested is not failure and not a negative result. The disjointness
-    // above is what carries that; this pins the weaker companion claim -- that
-    // posing a question mints nothing that could later be read as a finding
-    // against it. It would hold for any string, and is here to stay holding.
-    // Posing a question mints no claim, so there is nothing to ask about --
-    // which is the same statement the old assertion made (a verdict other than `supported`,
-    // `against: []`) and a stronger one: no record exists at all.
+    // Untested is not failure and not a negative result. The disjointness above is what carries
+    // that; this pins the weaker companion claim -- that posing a question mints nothing that
+    // could later be read as a finding against it. It would hold for any string, and is here to
+    // stay holding.
     expect(
       await session.claimsAsserting("does the learned topology help on an external task?"),
     ).toEqual([]);
@@ -233,10 +203,6 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
   /**
    * Afterward 2 — where did the current sharper question come from?
-   *
-   * Traceable to the vague original, without that original having been
-   * rewritten to look like it was always this precise, and without it having
-   * been closed by an act that only said "narrow".
    */
   test("the sharper question is traceable to the hunch, which is neither rewritten nor closed", async () => {
     const { question: hunch } = await session.pose({
@@ -271,13 +237,8 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
   });
 
   /**
-   * Afterward 3 — what was the state of knowledge at the moment this question
-   * was sharpened, asked after later evidence has arrived?
-   *
-   * The hunch is sharpened twice, with a result landing in between. If the two
-   * sharpenings report the same knowledge, the model cannot attribute a
-   * sharpening to what preceded it -- which is a wrong answer, not an empty
-   * one, because the second answer would be back-dated onto the first.
+   * Afterward 3 — what was the state of knowledge at the moment this question was sharpened,
+   * asked after later evidence has arrived?
    */
   test("the knowledge behind a sharpening is the knowledge that existed then", async () => {
     const prior = await priorState();
@@ -342,11 +303,6 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
   /**
    * Sharpening validates before it writes anything.
-   *
-   * The act writes a decision, two edges per standing finding, and a question.
-   * A rejection partway through would leave a decision recording a narrowing
-   * that produced nothing — an unreadable state, the same shape as S-4's
-   * closure guards.
    */
   test("sharpening a question that is not on the record writes nothing", async () => {
     await priorState();
@@ -382,10 +338,6 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
   /**
    * Afterward 4 — one question, pursued more than one way.
-   *
-   * Two pursuits of the same question, worded similarly, must remain one
-   * question; two questions worded identically must remain two. Identity is
-   * the handle the caller holds, never the text.
    */
   test("a second pursuit of one question does not mint a second question", async () => {
     const { question } = await session.pose({

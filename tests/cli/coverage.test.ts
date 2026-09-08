@@ -1,21 +1,5 @@
 /**
  * Does every domain verb have a command?
- *
- * Derived from the surface declarations and from the command modules' own
- * source, never listed here, so a verb added later is covered without anyone
- * remembering. Same derivation `tests/mcp.test.ts` uses for tool exposure, and
- * the same helper.
- *
- * **The coverage runs one way only, deliberately.** Every read verb needs a
- * command; a command needs no MCP tool and no domain verb behind it at all.
- * `--backup`, `doctor`, `completions` — anything the terminal wants and an
- * agent does not — is a feature, not a parity failure, and a test that
- * reddened when the CLI grew a command MCP lacks would be an obstacle rather
- * than a guard.
- *
- * Derived from the **call**, `read.someVerb(`, and not from a `verb:` field
- * beside each command. A field records what a declaration *says* and can
- * disagree with the line below it; the call is the thing that runs.
  */
 
 import { expect, test } from "bun:test";
@@ -38,11 +22,6 @@ const commandFiles = readdirSync(COMMANDS_DIR)
 
 /**
  * The same files as text, comments stripped, for the bypass check only.
- *
- * The verb coverage below goes through the compiler and needs none of this —
- * an AST has no comments in it, so naming a verb in prose was never going to
- * look like calling one. The bypass check is a search for a *name*, not a call,
- * so it still reads text and still has to drop the comments that discuss it.
  */
 const commandSource = commandFiles
   .map((f) => readFileSync(f, "utf8"))
@@ -52,10 +31,6 @@ const commandSource = commandFiles
 
 /**
  * Verbs deliberately without a command, and why.
- *
- * The same shape as `NOT_EXPOSED` in `tests/helpers/surface-coverage.ts`: a
- * bare list of names would decay into whatever happens to be unimplemented
- * today, so an exclusion has to carry a reason.
  */
 const NO_COMMAND_FOR: Readonly<Record<string, string>> = {
   // Both reached only through `why`'s dispatch table in src/domain/read.ts,

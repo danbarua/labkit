@@ -1,34 +1,5 @@
 /**
  * Zod mirrors of the report types the seven read tools return.
- *
- * **Why a mirror is allowed here, given that a mirror is a copy.** Every schema
- * below is held to its interface by `Exact<>` at the bottom of this file, so
- * drift is a `tsc --noEmit` failure rather than a wrong answer a caller
- * discovers. A copy a gate holds to its original is a different thing from a
- * copy nobody checks.
- *
- * **What the check does not cover, measured rather than reasoned about.**
- * Two-way assignability catches a field added, removed or retyped — all three
- * demonstrated by making the edit and watching `tsc` fail. It does **not**
- * catch a mirror that drops an *optional* field, because an object without one
- * is still assignable both ways.
- *
- * The schemas are `strictObject`, so `tests/mcp.test.ts` parsing a real output
- * catches a dropped optional field as an unknown key — **but only for a field
- * the seeded session actually populates.** Both halves were demonstrated:
- * deleting `restsOn` (populated) fails two tests; deleting `replacedBy` (not
- * populated by that session) passes everything, `tsc` included.
- *
- * So the residual gap is exact: an optional field that no test data produces
- * can be dropped from a schema and nothing here notices. Widening the seed is
- * what narrows it; nothing else does.
- *
- * **The failure mode this introduces.** The SDK validates `structuredContent`
- * against `outputSchema` and throws `McpError` when it does not match
- * (`validateToolOutput`, verified in the installed `dist/esm/server/mcp.js`).
- * So a schema that drifts turns a *working* read into an error for the caller,
- * where before it turned into stale documentation. That is the trade: a louder
- * failure, caught by a gate, instead of a quiet one that is not.
  */
 
 import { z } from "zod";
@@ -102,20 +73,8 @@ import type { Command } from "../domain/commands";
 import type { EdgeLabel } from "../db/domain";
 
 /**
- * `Ref<K>` — the natural-id handle the domain passes around, which over the
- * wire is just its id: `"GATE_1"`, not `{"kind":"gate","id":"GATE_1"}`.
- *
- * **These are output schemas, so there is nothing here to validate.** They
- * describe what LabKit returns, and LabKit returns handles it minted itself.
- * The `kind` argument is kept for readability at the ~46 call sites — it says
- * which handle a field carries — and is deliberately unused.
- *
- * **The check is `ref()`, not a `z.literal(kind)` here.** A literal would
- * verify only that a caller *said* "gate", never that the id was one, and the
- * two can disagree. Input handles reach the domain through `ref()`
- * (`src/domain/report.ts`), which refuses an id whose prefix names another
- * label, and `server.ts` turns that throw into an `isError` result carrying the
- * message.
+ * `Ref<K>` — the natural-id handle the domain passes around, which over the wire is just its
+ * id: `"GATE_1"`, not `{"kind":"gate","id":"GATE_1"}`.
  */
 const ref = <K extends string>(_kind: K) => z.string() as unknown as z.ZodType<Ref<K>>;
 
@@ -158,21 +117,7 @@ export const searchSchema = z.strictObject({
 });
 
 /**
- * `what_happened` — the acts themselves, which is the one thing the graph does
- * not hold.
- *
- * `attribution` is flattened rather than nested, because a caller reading this
- * is asking *who* and would otherwise have to reach through a wrapper to find
- * out. `seq` is the order and the cursor: pass the last one back as
- * `since_seq`.
- *
- * **Not `domainEventSchema` below**, on purpose: a row read back from the sink
- * always has a `seq` and a grade, so this shape says so with `.nullable()`
- * rather than `.optional()` — the one thing `Exact<>` cannot catch is an
- * optional field a schema silently drops, and a row genuinely read back always
- * carries these keys. `domainEventSchema` describes the event as `emit` hands
- * it to a caller in the same call that created it, where the type allows all
- * four for a hand-built fixture predating the collector; here they never are.
+ * `what_happened` — the acts themselves, which is the one thing the graph does not hold.
  */
 export const whatHappenedSchema = z.strictObject({
   events: z.array(
@@ -197,13 +142,8 @@ export const whatHappenedSchema = z.strictObject({
 });
 
 /**
- * A `DomainEvent` as a write verb hands it back. Every write tool's output
- * includes `events`, and this is the one mirror they share.
- *
- * `edges[].label` is `z.string()` cast to the domain's union, the same trick
- * `ref()` above uses: this is an output schema with nothing to validate, since
- * LabKit only ever emits values it minted itself. `operation` needs no cast —
- * a stored event's verb is a string.
+ * A `DomainEvent` as a write verb hands it back. Every write tool's output includes `events`,
+ * and this is the one mirror they share.
  */
 const operation = z.string();
 const edgeLabel = z.string() as unknown as z.ZodType<EdgeLabel>;
@@ -324,13 +264,8 @@ const unmetCheck = z.strictObject({
 });
 
 /**
- * `Condition` and `UnmetCheck` are **separate interfaces that shared a shape**,
- * and this was `const condition = unmetCheck` until `UnmetCheck` gained
- * `blocks`. The alias was never a claim that they are the same thing — a
- * condition is what an amendment replaced, and carries no consequences —
- * so they diverge here rather than one being widened to fit the other.
- *
- * The `Exact<>` assertions below are what caught it; nothing else would have.
+ * `Condition` and `UnmetCheck` are **separate interfaces that shared a shape**, and this was
+ * `const condition = unmetCheck` until `UnmetCheck` gained `blocks`.
  */
 const condition = z.strictObject({
   criterion: ref("criterion"),
@@ -500,10 +435,9 @@ export const reproductionReportSchema = z.strictObject({
 /* -- the six reads exposed later than the rest ---------------------------- */
 
 /**
- * `origin_of` — `null` for a question somebody simply asked, which is most of
- * them. Wrapped, because `structuredContent` must be an object and a bare
- * `null` is not one; `origin: null` says "asked outright" rather than "no
- * answer available".
+ * `origin_of` — `null` for a question somebody simply asked, which is most of them. Wrapped,
+ * because `structuredContent` must be an object and a bare `null` is not one; `origin: null`
+ * says "asked outright" rather than "no answer available".
  */
 export const questionOriginSchema = z.strictObject({
   from: ref("question"),
@@ -562,10 +496,9 @@ export const gateStatusSchema = z.strictObject({
 });
 
 /**
- * `why` — one record's `{handle, wording}` citation, the shape `because`
- * arrays are built from. `handle` spans every {@link Kind}, exactly like
- * `SearchMatch.handle` above -- the same `ref()` cast, since it is an output
- * schema and there is nothing here to validate.
+ * `why` — one record's `{handle, wording}` citation, the shape `because` arrays are built from.
+ * `handle` spans every {@link Kind}, exactly like `SearchMatch.handle` above -- the same
+ * `ref()` cast, since it is an output schema and there is nothing here to validate.
  */
 const explanationCause: z.ZodType<Cause> = z.strictObject({
   handle: z.string() as unknown as z.ZodType<Ref<Kind>>,
@@ -594,13 +527,10 @@ const analysisRevisionSchema = z.strictObject({
 });
 
 /**
- * `why` — a discriminated union on `kind`, not one shape with optional
- * fields: `report` differs by kind (`SupportExplanation` for a claim,
- * `TaskContract` for work, `EnquiryInContext` for a line of enquiry,
- * `GateStatus` for a gate), and a caller narrowing on `kind` gets the right
- * one without a cast. Every kind is a member: the six answered by walking the
- * record carry `is` and `because` and no `report`, since what those kinds are
- * is their edges.
+ * `why` — a discriminated union on `kind`, not one shape with optional fields: `report` differs
+ * by kind (`SupportExplanation` for a claim, `TaskContract` for work, `EnquiryInContext` for a
+ * line of enquiry, `GateStatus` for a gate), and a caller narrowing on `kind` gets the right
+ * one without a cast.
  */
 const gateGoverned = z.strictObject({
   gate: ref("gate"),
@@ -742,13 +672,9 @@ export const reproducibilityReportSchema = z.strictObject({
 /* -- the write tools' return shapes --------------------------------------- */
 
 /**
- * A verb that mints something returns its reference, and over the wire that
- * reference is the only handle the caller gets. `structuredContent` must be an
- * object, so a handle cannot cross on its own — hence this wrapper.
- *
- * Naming the field says more than a `kind` tag would: `{"question":"Q_1"}` says
- * what the id is *for* in this reply, where a tag repeats what the prefix
- * already carries and can contradict it.
+ * A verb that mints something returns its reference, and over the wire that reference is the
+ * only handle the caller gets. `structuredContent` must be an object, so a handle cannot cross
+ * on its own — hence this wrapper.
  */
 const minted = <K extends string>(kind: K) =>
   z.strictObject({ [kind]: ref(kind) } as { [P in K]: z.ZodType<Ref<K>> });
@@ -760,9 +686,6 @@ export const analysisRefSchema = ref("analysis");
 
 /**
  * What `record_analysis` returns: the analysis, and **the claims it minted**.
- *
- * A caller holds a handle to every claim the moment it exists, so nothing
- * downstream has to name one by wording.
  */
 export const recordedAnalysisSchema = z.strictObject({
   analysis: analysisRefSchema,
@@ -874,11 +797,6 @@ const changedConclusion = z.strictObject({
 
 /**
  * A handle to what a run read — observations, or an earlier analysis.
- *
- * A union in an OUTPUT schema, which is the only one on this surface. It
- * survives `normalizeObjectSchema` because the union is nested inside an
- * object rather than being the tool's whole return shape; a top-level union
- * normalises to `undefined` and would silently drop validation.
  */
 const inputRefSchema = z.union([ref("observations"), ref("analysis")]);
 
@@ -938,12 +856,9 @@ export const pursuitsSchema = z.strictObject({
 /* -- the gate ------------------------------------------------------------- */
 
 /**
- * Two-way assignability. `Exact<A, B>` is `true` only when each side accepts
- * the other, so a field added to the interface, removed from it, or retyped on
- * either side stops this file compiling.
- *
- * The `[A] extends [B]` brackets are not decoration: a bare conditional
- * distributes over a union, and `known`'s two survey shapes are one.
+ * Two-way assignability. `Exact<A, B>` is `true` only when each side accepts the other, so a
+ * field added to the interface, removed from it, or retyped on either side stops this file
+ * compiling.
  */
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 type Assert<T extends true> = T;
@@ -1065,18 +980,6 @@ export type _Undone = Assert<Exact<z.infer<typeof undoneSchema>, Undone>>;
 
 /**
  * What `register_session` recorded.
- *
- * **Not held to a report interface by `Exact<>`, and that is not an exemption
- * being claimed quietly.** Every other schema here mirrors a type in
- * `src/domain/report.ts`, and the gate exists because a hand-written mirror of
- * something goes stale against it. This one mirrors nothing: a registration is
- * not a report, it never reaches the graph, and `src/domain/` does not know the
- * concept — the seam it belongs to is `src/attribution.ts`, which is
- * deliberately outside all three layers. There is no original for a check to
- * hold it to.
- *
- * `replaced` is optional and present only when a second registration displaced
- * a first, so registering twice is visible in the answer rather than silent.
  */
 export const registeredSessionSchema = z.strictObject({
   registered: z.strictObject({
@@ -1121,11 +1024,8 @@ export type _ListedWork = Assert<Exact<z.infer<typeof listedWork>, ListedWork>>;
 
 /**
  * `now` — "what am I blocked on right now, what are my priorities?"
- * `blocked`/`unevaluated`/`untouched` reuse `listedGate`/`listedWork`;
- * `known` reuses `knowledgeSurveySchema` whole, all five buckets. `since` is
- * absent for the full-standing form and present once a cursor narrowed
- * every section -- see `Standing`'s own doc comment in
- * `src/domain/report.ts`.
+ * `blocked`/`unevaluated`/`untouched` reuse `listedGate`/`listedWork`; `known` reuses
+ * `knowledgeSurveySchema` whole, all five buckets.
  */
 export const standingSchema = z.strictObject({
   blocked: z.strictObject({ gates: z.array(listedGate), work: z.array(listedWork) }),

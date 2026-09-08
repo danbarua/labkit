@@ -1,24 +1,6 @@
 /**
- * S-11e — "The replacement rests on the thing it just retracted."
- * External review of PR #2, discriminator 2.
- *
- * `replaceAnalysis` invalidates the superseded analysis's output and then
- * records the replacement. Nothing stops the replacement naming the analysis
- * it is superseding as an input, so its computation consumes the very artefact
- * the same act invalidated.
- *
- * The review's framing is what makes this a probe rather than a tidiness
- * complaint:
- *
- * > The important assertion is not that the graph contains the invalidated
- * > input. It correctly does. The question is whether the replacement
- * > conclusion still reports as currently supported while its computation
- * > rests on the artefact that the same act invalidated.
- *
- * Two answers are checked, in the order the caller meets them: the report the
- * act hands back, and the read anyone would ask afterwards.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-11e — "The replacement rests on the thing it just retracted." External review of PR #2,
+ * discriminator 2.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

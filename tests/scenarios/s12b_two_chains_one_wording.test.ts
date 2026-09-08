@@ -1,36 +1,6 @@
 /**
- * S-12b — "Two revision chains that meet at a sentence."
- * External review of PR #2, discriminator 4.
- *
- * A reinterpretation narrows a *reading*, and a reading two analyses reached
- * must be withdrawn in full. This asks the question one step along: when two
- * **independent** chains happen to pass through the same wording, can each
- * still be read back?
- *
- * The review's framing, which is this repo's own lesson arriving from outside:
- *
- * > same proposition text != same claim identity
- *
- * `interpretationHistory` took a handle and keyed its loop guard by id, but
- * each step found the previous claim by the *name* of the one after it. Two
- * chains sharing an intermediate wording is exactly what that cannot express:
- * both histories threw `is not a single line`, refusing a legitimate ask.
- *
- * **A prediction this refuted.** The queued row said walking by id "wants the
- * revision chain to carry an edge a caller can follow, which is a model
- * question rather than a projection". It wanted nothing of the sort. Every
- * step was already reachable by identity — `reinterpret` writes
- * `Decision -MOTIVATES-> narrower` and `Decision -CHANGES-> each withdrawn
- * claim`, both with natural ids — so the whole remedy was a different query
- * over structure that had been there since the verb was written. The row had
- * been sitting in "needs a model decision" on an assumption nobody checked.
- *
- * It also moved the `is not a single line` guard from a statement about
- * wording to one about structure: it now fires when a history *merges*, which
- * is a real thing to refuse, rather than when two unrelated chains happen to
- * read alike.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-12b — "Two revision chains that meet at a sentence." External review of PR #2,
+ * discriminator 4.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -76,10 +46,6 @@ const NARROWER = "the sampler stalls at the batch boundary above eight workers";
 
 /**
  * Two chains, three claims each, meeting only at their middle wording.
- *
- * Different lines of enquiry, so nothing about this is a duplicate reading:
- * these are two programmes that happened to arrive at the same sentence,
- * which is the ordinary case rather than a collision.
  */
 async function twoChains() {
   const chain = async (opens: string, first: string, middle: string, last: string) => {
@@ -147,12 +113,8 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
 });
 
 /**
- * Two readings inside **one** enquiry that were separately narrowed to the
- * same sentence, and then narrowed again together.
- *
- * `reinterpret` withdraws every claim in scope asserting the reading it
- * replaces, so the last act takes both branches at once and the history
- * behind it is a merge rather than a line.
+ * Two readings inside **one** enquiry that were separately narrowed to the same sentence, and
+ * then narrowed again together.
  */
 async function twoBranchesThatMeet() {
   const { enquiry } = await session.openEnquiry("why does the sampler stall?");
@@ -196,11 +158,8 @@ async function twoBranchesThatMeet() {
 
 describe("S-12b — a history that merges", () => {
   /**
-   * **Researcher:** Two separate readings turned out to be the same thing, and
-   * I narrowed that once more. Show me how I got here.
-   *
-   * **Agent:** Both branches, and the act that joined them. Neither branch is
-   * older than the other and I do not pretend one is.
+   * **Researcher:** Two separate readings turned out to be the same thing, and I narrowed that
+   * once more. Show me how I got here.
    */
   test("a merge is answered with both branches, not refused", async () => {
     const { left, right, viaLeft, viaRight, after } = await twoBranchesThatMeet();
@@ -307,12 +266,8 @@ const NARROWED_AGAIN = "the sampler stalls at the batch boundary above eight wor
 
 describe("S-12b — a reading is narrowed once", () => {
   /**
-   * **Researcher:** I narrowed that reading last week and forgot. What happens
-   * if I narrow it again?
-   *
-   * **Agent:** Refused, with the reading that stands in its place. Two
-   * narrowings of one reading would put two successors on it with nothing
-   * saying which the record now asserts.
+   * **Researcher:** I narrowed that reading last week and forgot. What happens if I narrow it
+   * again?
    */
   test("a reading that has already been narrowed is refused, naming what stands instead", async () => {
     const { enquiry } = await session.openEnquiry("why does the sampler stall?");
@@ -353,15 +308,7 @@ describe("S-12b — a reading is narrowed once", () => {
   });
 
   /**
-   * Why only the named claim is checked, and not every claim the wording match
-   * returns.
-   *
-   * A reading is withdrawn in full — `reinterpret` takes every claim in scope
-   * asserting it — and `recordAnalysis` refuses to put the sentence back. So
-   * within one scope the claims asserting a reading are standing together or
-   * withdrawn together, and a withdrawn one cannot sit in the match beside a
-   * standing one. Without this, the guard above would need a filter over the
-   * whole match, and that filter would be one nothing could make fire.
+   * Why only the named claim is checked, and not every claim the wording match returns.
    */
   test("a withdrawn reading cannot be put back, so the match never mixes the two", async () => {
     const { enquiry } = await session.openEnquiry("why does the sampler stall?");
@@ -395,10 +342,9 @@ describe("S-12b — a reading is narrowed once", () => {
   });
 
   /**
-   * A finding can stop standing without its reading ever being narrowed:
-   * replacing the analysis supersedes the claim instead. Both acts leave a
-   * reading nobody should narrow, and AGE has no edge alternation, so the two
-   * predicates are two clauses and reading one is silent.
+   * A finding can stop standing without its reading ever being narrowed: replacing the analysis
+   * supersedes the claim instead. Both acts leave a reading nobody should narrow, and AGE has
+   * no edge alternation, so the two predicates are two clauses and reading one is silent.
    */
   test("a reading whose finding was superseded is refused too, not only a narrowed one", async () => {
     const { enquiry } = await session.openEnquiry("why does the sampler stall?");

@@ -1,12 +1,5 @@
 /**
  * `traced()` must be free when off and useful when on.
- *
- * Both halves matter. Free-when-off is what lets this ship in the DB layer
- * rather than living in a scratch diff that gets rebuilt from memory every time
- * someone investigates — which is what happened twice, at the cost of three
- * documents asserting a wrong cause in between. Useful-when-on means recording
- * the two things that actually settled that investigation: in-flight queries,
- * and per-connection totals.
  */
 import { afterEach, expect, test } from "bun:test";
 import { traced, traceTotals, tracedInFlight } from "../src/db/trace";

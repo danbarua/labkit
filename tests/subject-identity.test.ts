@@ -1,43 +1,5 @@
 /**
  * **Which record is this answer about?**
- *
- * Six regions of this model have had to decide that *identity is never
- * wording* — claims, interpretations, criteria, evaluations, execution inputs
- * and artefacts. All six are the same question asked at one end: *are these two
- * records the same one?*
- *
- * This file is the question asked at the other end. A reference denotes a
- * record; a verb takes the reference and answers something. **Is the answer
- * about the record the reference denotes?** Three places in the domain say no,
- * and they were found within a day of each other by exposing the whole surface
- * over MCP, where every handle is a bare string and nothing can be passed by
- * accident.
- *
- * | reference | the id denotes | what the verb takes it to mean |
- * | --- | --- | --- |
- * | `EnquiryRef` into `enquiryStatus` | a line of enquiry | the **question** it pursues |
- * | `ObservationsRef` | an artefact of either kind | "observations", asserted by `kind` |
- * | `AnalysisRef` as an input | a computation | that computation's **output artefact** |
- *
- * **These tests assert what the model does today, including where that is
- * wrong.** They are written so that fixing a defect turns this file red rather
- * than leaving it quietly green, and that has now happened three times: rows 1
- * and 3 of the table above, and every report that named its subject only in
- * prose. Each section says in its own title which state it is pinning.
- *
- * What is left is row 2, and it is the one nobody has shown to give a wrong
- * answer. Section 2 measures the two routes as equivalent *inside the
- * process*. Row 3's consumer failure was the same measurement taken on the
- * wrong side of the adapter — it looked equivalent until a consumer that held
- * only computation ids tried it — so row 2 needs a read that is wrong, not an
- * argument that the naming is untidy.
- *
- * One diagnosis does not imply one remedy: the same question -- *does the act
- * record what it produced?* -- has needed four different fixes across this
- * model. Section 2's dereference is one of them: it is convenient, it writes
- * the correct edge, and making it "honest" would mean callers naming artefacts
- * they do not hold — which is precisely what row 3 was fixed by *not* making
- * them do.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -59,10 +21,6 @@ import { recordAnalysis } from "./helpers/analysis";
 
 /**
  * A handle out of a tool's reply.
- *
- * A tool whose whole answer is one handle returns it under a field named for
- * what it is — `{"question": "Q_1"}` — because MCP's `structuredContent` must
- * be an object and a handle is a bare string now. This takes that sole value.
  */
 const id = (v: unknown): string =>
   // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
@@ -120,13 +78,10 @@ const call = async (c: Client, name: string, args: Record<string, unknown>) => {
   };
 };
 
-describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6", () => {
+describe("1. an enquiry's status was the question's status — FIXED,", () => {
   /**
-   * Ana runs the seed sweep, Bruno the ablation, on one question. Ana's is
-   * decisive and gets closed. Bruno asks where his is up to.
-   *
-   * The setup — two pursuits of one question stay one question — is already
-   * established elsewhere and stops one step before this.
+   * Ana runs the seed sweep, Bruno the ablation, on one question. Ana's is decisive and gets
+   * closed. Bruno asks where his is up to.
    */
   test("closing one pursuit no longer reports the other as having produced it", async () => {
     const s = await session();
@@ -162,14 +117,10 @@ describe("1. an enquiry's status was the question's status — FIXED, PJ-030 §6
       expect(ana.question!.closure).toBe("answered");
       expect(bruno.question!.closure).toBe("answered");
 
-      // **The fix.** What each pursuit itself produced -- the thing the two
-      // reports must NOT agree on. The closing evidence is nested under
-      // `question`, not a top-level field on both: were it a top-level field,
-      // a caller summing findings across pursuits would count one finding
-      // twice.
-      // Ana's pursuit produced the observations AND the analysis; the closure
-      // cites only the latter. Two different sets, deliberately -- "what this
-      // pursuit produced" is not "what the answer rests on".
+      // **The fix.** What each pursuit itself produced -- the thing the two reports must NOT
+      // agree on. The closing evidence is nested under `question`, not a top-level field on
+      // both: were it a top-level field, a caller summing findings across pursuits would count
+      // one finding twice.
       const anasFindings = ana.contributed.map((e) => e.evidence);
       const closingEvidence = ana.question!.evidence.map((e) => e.evidence);
       expect(closingEvidence.every((id) => anasFindings.includes(id))).toBe(true);
@@ -329,14 +280,9 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
 
 describe("4. the read models drop identifiers the graph already minted", () => {
   /**
-   * Every entity here has a natural id, minted in the same round
-   * trip that created it. Three reports carry one **beside** the wording, which
-   * is the template; the rest emit wording alone and the caller cannot follow
-   * it anywhere.
-   *
-   * This is the demonstration step of that plan. It asserts the defect, so it
-   * goes **red** as each report is fixed — which is the point. When a row here
-   * fails, delete the row.
+   * Every entity here has a natural id, minted in the same round trip that created it. Three
+   * reports carry one **beside** the wording, which is the template; the rest emit wording
+   * alone and the caller cannot follow it anywhere.
    */
   const looksLikeAnId = (v: string) =>
     /^(Q|LOE|EU|EV|CLM|DEC|CRIT|CEVAL|GATE|REV|ART|COMP|TASK)_\d+$/.test(v);
@@ -422,7 +368,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("EnquiryStatus identifies its question — FIXED, PJ-030 §5 step 2", async () => {
+  test("EnquiryStatus identifies its question — FIXED, step 2", async () => {
     try {
       const { read, enquiry, question } = await programme();
       const status = await read.enquiryStatus(enquiry);
@@ -442,7 +388,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("whatDependsOn now identifies what is affected — FIXED, PJ-030 §5 step 2", async () => {
+  test("whatDependsOn now identifies what is affected — FIXED, step 2", async () => {
     // Was: claims:["depth moves convergence"], enquiries:["seed sweep"] -- prose
     // no follow-up verb accepts. Now both, in the shape the other reports use.
     try {
@@ -459,7 +405,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("whySupported identifies the analysis it cites — FIXED, PJ-030 §5 step 2", async () => {
+  test("whySupported identifies the analysis it cites — FIXED, step 2", async () => {
     try {
       const { read } = await programme();
       const why = await read.whySupported(await claimNamed(read, MOVES));
@@ -480,7 +426,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     }
   });
 
-  test("gateStatus identifies the work it gates — FIXED, PJ-030 §5 step 2", async () => {
+  test("gateStatus identifies the work it gates — FIXED, step 2", async () => {
     try {
       const { read, gate } = await programme();
       const status = await read.gateStatus(gate);
@@ -499,15 +445,8 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
   /**
    * The same question asked of the report as a whole rather than of its rows.
-   *
-   * `enquiryStatus`, `gateStatus`, `designHistory` and `contractFor` all named
-   * their subject already. Three did not: they took a handle, answered about
-   * it, and gave back only wording — so the answer stopped identifying itself
-   * the moment it was stored or sent, which over MCP is exactly what happens
-   * to it. The subject is an echo of an argument the verb already holds, which
-   * is why the whole remedy is one field each.
    */
-  test("every report names the record it is about — FIXED, PJ-030 §5 step 2", async () => {
+  test("every report names the record it is about — FIXED, step 2", async () => {
     try {
       const { read, gate, enquiry } = await programme();
       const claim = await claimNamed(read, MOVES);
@@ -533,16 +472,9 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
 describe("3. a consumer can now repair a two-stage pipeline with its own handles — FIXED", () => {
   /**
-   * `record_analysis` takes an analysis id as an input reference; the other
-   * two recording verbs take observations alone — while all three write the
-   * same `CONSUMES` edge, which does not allow `Computation -> Computation`.
-   *
-   * Section 2's measurement said the two routes were *equivalent*, measured
-   * inside the process holding an artefact id the domain had handed back. A
-   * consumer over the wire holds what the tools returned, which for an
-   * analysis is a computation id, not the `ART_` id the edge needs — so the
-   * repair takes the handle the consumer actually holds, with no detour
-   * through `why_supported` to surface an artefact id first.
+   * `record_analysis` takes an analysis id as an input reference; the other two recording verbs
+   * take observations alone — while all three write the same `CONSUMES` edge, which does not
+   * allow `Computation -> Computation`.
    */
   test("the repair takes the handle the consumer holds, with no detour", async () => {
     // Section 2 showed the two routes equivalent -- measured inside the process,
@@ -629,20 +561,8 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
 });
 
 /**
- * **A handle whose id names another record is refused at the moment it is
- * minted.** This is the check that replaced the `kind` field.
- *
- * Under `{ kind, id }` the two halves could disagree — `{kind: "claim", id:
- * "GATE_1"}` was constructible and nothing anywhere noticed, because `kind` was
- * never the authority: `createEdge` has always resolved an endpoint's label
- * from the id's prefix. A branded handle *is* the id, so the disagreement
- * cannot be written down; `ref()` enforces the same fact one step earlier, when
- * a caller names which kind of thing an id is supposed to be.
- *
- * This is the mistake an agent assembling a call from two different reports
- * actually makes — passing the claim it just read where the gate belongs — and
- * before this it reached the graph and returned an empty result, which reads
- * like "nothing matched" rather than "you named the wrong thing".
+ * **A handle whose id names another record is refused at the moment it is minted.** This is the
+ * check that replaced the `kind` field.
  */
 test("ref refuses an id whose prefix names a different record", () => {
   expect(() => ref("gate", "CLM_1")).toThrow(/gate handle expected a Gate id/);

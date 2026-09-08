@@ -1,23 +1,5 @@
 /**
  * What more than one write group needs to reach the same record the same way.
- *
- * `Work` and `Revising` both `extend Shared` (which itself `extends
- * SessionCore`) rather than holding an instance of it, and that choice is not
- * style: `tests/helpers/surface-coverage.ts` derives every exposed verb by
- * walking every class in `write/`'s files and reading `public`/`private` off
- * the declaration, so a method here that were merely `public` — reachable via
- * a held instance — would be counted as an unexposed write verb by that scan,
- * exactly like a real one accidentally left off a command. `protected` is
- * invisible to it, the same way `SessionCore`'s own helpers already are, and
- * inheritance is what makes `protected` reachable from two unrelated classes
- * that happen to share this ancestor.
- *
- * **Membership is by use, not by topic.** `unitOf`, `revisedBy`, `recorded`,
- * `concluding` and `conclusionEvents` read like `Work`'s own machinery — and
- * were first drafted there — until `reverify` (a `Revising` verb) turned out to
- * call all five, three of them via `concluding`'s own body. The test is the one
- * `supersessionOf`/`conclusionsOf`/`outputArtefactOf`/`enquiryOf` already met:
- * called from both, not called by one and read by another.
  */
 
 import { optional, vertexProps } from "../../db/cypher";
@@ -51,13 +33,7 @@ import type { UnitOfWork } from "../projection";
 import type { DomainEvent } from "../events";
 
 /**
- * A conclusion as this file records it — the public shape plus the standing the
- * write resolved.
- *
- * `ConcludedClaim` is what a caller gets back and does not carry standing: the
- * claim itself does, and `whySupported` reports it. This is for the event,
- * which has to say what standing the act *recorded* rather than what the claim
- * reads today.
+ * A conclusion as this file records it — the public shape plus the standing the write resolved.
  */
 export type ConcludedWithStanding = Required<ConcludedClaim> & {
   standing: "exploratory" | "confirmatory";
@@ -65,11 +41,6 @@ export type ConcludedWithStanding = Required<ConcludedClaim> & {
 
 /**
  * The public half of a {@link ConcludedWithStanding}.
- *
- * The standing is for the event, not for the caller: the claim carries it and
- * `whySupported` reports it. Returning it would widen `ConcludedClaim`, and
- * MCP's output schemas are `strictObject`, so an extra key is a validation
- * error at the wire rather than an unused field.
  */
 export const asConcludedClaim = (c: ConcludedWithStanding): Required<ConcludedClaim> => ({
   claim: c.claim,
@@ -79,11 +50,6 @@ export const asConcludedClaim = (c: ConcludedWithStanding): Required<ConcludedCl
 
 /**
  * A conclusion **already on the record**, as read back from the graph.
- *
- * Deliberately not {@link ConcludedClaim}, which is the *command* shape: a
- * caller recording conclusions holds no claim id yet, so widening the input to
- * carry one would demand a handle for a record that does not exist. Reading
- * them back is the other direction and the id is right there.
  */
 export interface RecordedConclusion {
   claim: ClaimRef;
@@ -95,26 +61,6 @@ export interface RecordedConclusion {
 
 /**
  * The refusal a caller meets when they cite a claim nothing has concluded.
- *
- * **What a refusal may point a caller at** — the rule, with its evidence, is on
- * `ReadSurface` in `../read.ts`. In short: name the act, never a command (the
- * two surfaces disagree on four of five names), and name a verb only when both
- * surfaces spell it identically *and* its promise has been checked against the
- * code implementing it.
- *
- * **One spelling, because four is this repository's oldest defect shape.** The
- * text was hand-written at four call sites, which is written-once and forgotten
- * the second time — the same shape as the `SUPPORTS`/`CHALLENGES` traversal
- * that appeared six times and was corrected five. A message is not a
- * traversal, but the arithmetic is identical: the next person to improve this
- * wording improves one of four, and the record then refuses the same act in
- * two different voices.
- *
- * It is the highest-frequency refusal in the domain — every verb that cites a
- * claim reaches it — so it is the one most worth having exactly once.
- *
- * Ordered fact, rule, implication — what the domain got, what it expected, what
- * would satisfy it. Every refusal here follows that order.
  */
 export const noFindingBearsOn = (claim: ClaimRef): string =>
   `no finding bears on claim ${claim}; a claim can be cited only once an analysis ` +
@@ -124,12 +70,6 @@ export const noFindingBearsOn = (claim: ClaimRef): string =>
 export class Shared extends SessionCore {
   /**
    * The inferential activity behind an analysis.
-   *
-   * An `AnalysisRef` currently carries the computation's id, so reaching the
-   * unit is a hop. Worth watching: "analysis" keeps behaving like the
-   * EvidenceUnit (the bounded inferential activity) rather than the
-   * Computation (its execution) -- the review endpoint goes that way too.
-   * Flagged rather than renamed: renaming nouns is not a reason to refactor.
    */
   protected async unitOf(analysis: AnalysisRef): Promise<UnitRef> {
     const rows = await this.graph.query(
@@ -147,10 +87,6 @@ export class Shared extends SessionCore {
 
   /**
    * The analysis this one is a revision of, by way of the lineage decision.
-   *
-   * `new <-MOTIVATES- Decision -CHANGES-> old`. Lineage only: that this
-   * analysis revises that one, never that the old one's findings fell. See the
-   * `Computation` pair on `EDGE_SCHEMA.CHANGES`.
    */
   protected async revisedBy(
     analysis: AnalysisRef,
@@ -177,15 +113,6 @@ export class Shared extends SessionCore {
 
   /**
    * Why a claim no longer stands, or `undefined` if it does.
-   *
-   * **Both predicates, and AGE has no edge alternation** — `[:CHANGES|SUPERSEDES]`
-   * is a syntax error, so this is two clauses. Naming one is silent: the row is
-   * absent and the caller reads a withdrawn claim as standing.
-   *
-   * Claim grain, where `withdrawalOf` is proposition grain. The two answer
-   * different questions and both are wanted: whether the record has stopped
-   * asserting a sentence, and whether this particular finding has already
-   * fallen.
    */
   protected async supersessionOf(claim: ClaimRef): Promise<Ref<"decision"> | undefined> {
     const rows = await this.graph.query(
@@ -207,15 +134,6 @@ export class Shared extends SessionCore {
 
   /**
    * The finding this conclusion stands in place of, when the act determines it.
-   *
-   * A replacement analysis re-answers propositions its predecessor answered, so
-   * a conclusion on the same proposition supersedes that predecessor's finding.
-   * Recorded here, at the act, where the ambiguous case is visible: two
-   * superseded findings on one proposition mean the act does not say which, and
-   * `replacing` is how the caller does.
-   *
-   * Nothing is refused. A pairing that is not determined is simply not written,
-   * and a reader reports the finding unpaired rather than guessing later.
    */
   private async impliedSupersession(
     analysis: AnalysisRef,
@@ -303,10 +221,6 @@ export class Shared extends SessionCore {
 
   /**
    * The write half of `recordAnalysis`, unitOfWork rather than written.
-   *
-   * Composed verbs call this. A researcher who re-verified a result did one
-   * thing, and a log that also records the analysis underneath it describes the
-   * implementation instead of the act.
    */
   protected async recorded(
     input: Omit<RecordAnalysisCommand, "concludes">,
@@ -328,24 +242,16 @@ export class Shared extends SessionCore {
     for (const criterion of input.heldTo ?? []) {
       unitOfWork.edge(criterion, "QUALIFIES", unit);
     }
-    // Both levels of provenance, deliberately: the evidence unit produced
-    // this scientific output; the computation produced this concrete
-    // execution output. Without the second, CONSUMES would be half a pair --
-    // "what did this computation read" answerable in one hop while "what did
-    // it produce" still needed a detour through the unit.
-    //
-    // The FIRST of the two is unwalked: nothing reads `EvidenceUnit -PRODUCES->
-    // Artefact`. Kept under the no-cull policy -- an endpoint pair is a claim
-    // about the domain the same way a label is -- and named here so it is a
-    // computable map rather than an oversight.
+    // Both levels of provenance, deliberately: the evidence unit produced this scientific
+    // output; the computation produced this concrete execution output. Without the second,
+    // CONSUMES would be half a pair -- "what did this computation read" answerable in one hop
+    // while "what did it produce" still needed a detour through the unit.
     unitOfWork.edge(unit, "PRODUCES", output);
     unitOfWork.edge(computation, "PRODUCES", output);
-    // Every position at which each artefact was read, collected before staging.
-    //
-    // `positions` and not `position`, and one edge per distinct artefact rather
-    // than one per occurrence: `createEdge` treats `(from, label, to)` as
-    // identity and a repeat is a no-op, so `from: [A, B, A]` cannot be three
-    // edges and writing it as two silently drops the second A.
+    // Every position at which each artefact was read, collected before staging. `positions` and
+    // not `position`, and one edge per distinct artefact rather than one per occurrence:
+    // `createEdge` treats `(from, label, to)` as identity and a repeat is a no-op, so `from:
+    // [A, B, A]` cannot be three edges and writing it as two silently drops the second A.
     const positionsFor = new Map<ObservationsRef, number[]>();
     for (const [position, source] of input.from.entries()) {
       // An analysis is named by its computation; what it *read* is that
@@ -384,15 +290,9 @@ export class Shared extends SessionCore {
         const unit = staging?.unit ?? (await this.unitOf(input.analysis));
         const output = staging?.output ?? (await this.outputArtefactOf(input.analysis));
 
-        // Superseded analyses take no new conclusions. Adding one would put a
-        // fresh finding on a record the caller has already declared spent, and
-        // nothing downstream distinguishes it from a live one.
-        //
-        // **The `SUPERSEDES` edge, not a flag on the output artefact.** This
-        // read `Artefact.invalidated` until 2026-09-06 — a property no verb has
-        // ever written, so the refusal never fired and a finding did land on a
-        // spent analysis. Supersession is an act and the act is on the record;
-        // asking the edge is asking the thing that happened.
+        // Superseded analyses take no new conclusions. Adding one would put a fresh finding on
+        // a record the caller has already declared spent, and nothing downstream distinguishes
+        // it from a live one.
         const [spent] = await this.graph.query(
           `MATCH (:Computation {natural_id: $id})<-[:SUPERSEDES]-(d:Decision)
            OPTIONAL MATCH (d)-[:MOTIVATES]->(instead:Computation)
@@ -442,16 +342,10 @@ export class Shared extends SessionCore {
             );
           }
 
-          // **A finding falls once, and it fell when the revision was
-          // recorded.** So `replacing` here is not the act of superseding; it
-          // names which superseded finding this one stands in place of, for a
-          // reader that would otherwise match on wording.
-          //
+          // **A finding falls once, and it fell when the revision was recorded.** So
+          // `replacing` here is not the act of superseding; it names which superseded finding
+          // this one stands in place of, for a reader that would otherwise match on wording.
           // What is refused is naming a finding that some OTHER act withdrew.
-          // Two decisions would then stand instead of one claim, each naming a
-          // different successor, and no reader can say which holds --
-          // `withdrawalOf` takes whichever row it sees first. The refusal names
-          // the claim, not the wording.
           const gone = await this.supersessionOf(superseded.claim);
           if (gone !== undefined && gone !== revision?.decision)
             throw new Error(
@@ -470,16 +364,9 @@ export class Shared extends SessionCore {
             `conclude needs the proposition this finding bears on and none was given; ` +
               `pass it, or pass the claim or finding being superseded so it can be inherited`,
           );
-        // **A challenging bearing is never inherited in silence.**
-        // Inheriting `supports` is indistinguishable from the default, so
-        // nothing is being assumed on the caller's behalf. Inheriting
-        // `challenges` is: it asserts a direction nobody typed, onto a
-        // replacement that exists *because* something changed — and what
-        // changed is sometimes the answer. A corrected run reading "exact
-        // match" then reports the proposition challenged by its own evidence.
-        //
-        // Which way a finding cuts is the act's own content and no walk
-        // recovers it, so the remedy is to ask rather than to guess.
+        // **A challenging bearing is never inherited in silence.** Inheriting `supports` is
+        // indistinguishable from the default, so nothing is being assumed on the caller's
+        // behalf.
         if (input.bearing === undefined && superseded?.bearing === "challenges")
           throw new Error(
             `${superseded.claim} challenges "${superseded.proposition}", and a replacement ` +
@@ -488,22 +375,8 @@ export class Shared extends SessionCore {
           );
         const bearing = input.bearing ?? superseded?.bearing ?? "supports";
 
-        // A withdrawn proposition cannot be re-asserted as a side effect of
-        // recording some other analysis.
-        //
-        // **The exemption is one decision wide.** `keep` supersedes every
-        // conclusion it does not carry forward at the moment it records the
-        // successor, so the successor's own findings are asserted against
-        // propositions this very act has just withdrawn; restating those is
-        // what it exists to do, and without the exemption `keep` could never
-        // be followed by `conclude`.
-        //
-        // It reaches no further than that. A proposition withdrawn by some
-        // OTHER act -- a reinterpretation that narrowed it, an earlier
-        // revision -- is still refused here, even to a successor, because
-        // nothing about revising one analysis licenses re-asserting what
-        // somebody else's decision retired. Compared by decision, not by
-        // whether this analysis happens to be a successor at all.
+        // A withdrawn proposition cannot be re-asserted as a side effect of recording some
+        // other analysis.
         if (superseded === undefined) {
           if (revision === undefined) revision = await this.revisedBy(input.analysis);
           const enquiry = staging?.enquiry ?? (await this.enquiryOf(input.analysis));
@@ -527,17 +400,10 @@ export class Shared extends SessionCore {
         unitOfWork.edge(evidence, "RECORDED_IN", output);
         unitOfWork.edge(evidence, bearing === "challenges" ? "CHALLENGES" : "SUPPORTS", claim);
 
-        // **The pairing this act implies, when the caller did not name one.**
-        // A replacement re-answering a proposition its predecessor answered
-        // stands in place of that finding; recording it here is the act saying
-        // so, not a reader inferring it afterwards from wording. Only when
-        // exactly one superseded finding answers this proposition -- two mean
-        // the act does not determine which, and `--replacing` says.
-        //
-        // Deliberately a separate variable from `superseded` above: that one
-        // also drives proposition and bearing inheritance, and inferring into
-        // it would make a caller who typed no `--bearing` hit the
-        // challenging-bearing refusal for a pairing they never asked for.
+        // **The pairing this act implies, when the caller did not name one.** A replacement re-
+        // answering a proposition its predecessor answered stands in place of that finding;
+        // recording it here is the act saying so, not a reader inferring it afterwards from
+        // wording.
         const stands = superseded ?? (await this.impliedSupersession(input.analysis, proposition));
         if (stands !== undefined && revision === undefined)
           revision = await this.revisedBy(input.analysis);

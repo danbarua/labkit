@@ -1,15 +1,5 @@
 /**
  * S-10c — "Which input changed?"
- * docs/project-journal/008_user_story_mining.md §3 row F
- * docs/consumer-contract/035_row_f_verdict_predictions.md
- *
- * The same defect recurs across API surfaces: `reproducibilityOf()`,
- * `whySupported().restingOn`, and here in `reproductionOf().differs` — keyed
- * by `natural_id` internally, reported as a bare `logical_name`.
- *
- * The shape every time: identity is used to decide, and dropped to report.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -48,12 +38,8 @@ const NAME = "control series";
 const HOLDS = "the effect holds against the control";
 
 /**
- * Researcher: "The original control was lost after the first run. We re-checked
- *  the finding against the regenerated one — same name, different series."
- *
- * A re-verification that swapped one input for another carrying the same name.
- * The two are different artefacts and the record knows it; the question is what
- * the report of the re-run says changed.
+ * Researcher: "The original control was lost after the first run. We re-checked the finding
+ * against the regenerated one — same name, different series."
  */
 async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("does the effect hold against the control?");
@@ -107,19 +93,6 @@ describe("S-10c: which input changed?", () => {
 
   /**
    * **The fourth bite.** *Which* input changed is unanswerable from the report.
-   *
-   * `differs` decides by `natural_id` — correctly, which is why there are two
-   * entries — and then reports each one's bare `logical_name`. Both say
-   * "control series": one `changed`, one `not-used-by-the-re-run`, contradicting
-   * each other under a single label, with nothing to distinguish them.
-   *
-   * A reader asking the question this report exists to answer — *what did the
-   * re-run do differently?* — is told that a thing called "control series" was
-   * both introduced and dropped.
-   *
-   * Identity is carried through rather than the ambiguous name. The name
-   * stays ambiguous; that is the point, and it is why the name was never
-   * identity.
    */
   test("the two entries name the same thing and mean different artefacts", async () => {
     const { original, regenerated, verification } =
@@ -140,12 +113,6 @@ describe("S-10c: which input changed?", () => {
 
   /**
    * The enumeration behind row F's verdict, asserted rather than argued.
-   *
-   * Every read that touches an artefact either takes a **reference**, or takes a
-   * name and **refuses** when it is ambiguous, or now **returns** identity. So
-   * no read on this surface needs to know that two artefacts are versions of one
-   * thing — the caller already holds the identity, or is told the name will not
-   * serve.
    */
   test("a name is never enough, and a reference always is", async () => {
     const { original, regenerated } = await aReVerificationAgainstTheRegeneratedControl(session);

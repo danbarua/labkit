@@ -1,31 +1,6 @@
 /**
- * S-19 — "Somebody vouched for it. Nobody checked it."
- * The wrong answer is demonstrated first, in §1, and the fix's shape is
- * what §2 asserts.
- *
- * The story: a researcher agrees a condition *before* running, records the run
- * holding it to that condition, decides the result matters and promotes it,
- * and closes the question on it. Every step is ordinary and none is a mistake.
- * The prespecified check is never evaluated.
- *
- * `labkit known` then reports the question **established** — its strongest
- * word, meaning the answer rests on promoted, confirmatory work — while
- * `whySupported` on the same claim reports the check unmet. Two verbs, one
- * record, contradictory answers about one claim's standing, and the reassuring
- * one is what a person reads first.
- *
- * **This is a positive assertion, not an absence**, which is the distinction
- * that earns the change. `whatIsKnown` is not silent about the question; it
- * answers, and the answer is wrong.
- *
- * **Never-run rather than failed, deliberately.** A prespecified check
- * nobody ran must count against the finding it qualifies — which is why
- * `QUALIFIES` is written when the analysis is recorded and not
- * when the check is evaluated. The survey is the one reader that ignored it,
- * and never-run is the case with no gate, no evaluation and no second act in
- * it: three verbs and the contradiction is there.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-19 — "Somebody vouched for it. Nobody checked it." The wrong answer is demonstrated first,
+ * in, and the fix's shape is what asserts.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -63,10 +38,6 @@ async function afterwards(): Promise<ResearchSession> {
 
 /**
  * The whole conversation. Six acts, none of them irregular.
- *
- * The check is stated **before** the enquiry, because it is prespecified —
- * agreeing it afterwards is the thing a prespecified condition exists to stop,
- * and a scenario that states it late would be testing a different story.
  */
 async function aPromotedAnswerNobodyChecked() {
   const { criterion: check } = await session.stateCriterion(CHECK);
@@ -104,12 +75,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
   });
 
   /**
-   * Afterward. "What do we know?" — and the survey must not answer
-   * `established`.
-   *
-   * Asserted from a **second reader over the same graph** rather than from the
-   * value the write returned, because "afterward" means reconstructible from
-   * durable state. `scenario.current()` exists for exactly this.
+   * Afterward. "What do we know?" — and the survey must not answer `established`.
    */
   test("the survey does not call the question established", async () => {
     const { claim } = await aPromotedAnswerNobodyChecked();
@@ -144,11 +110,8 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
   });
 
   /**
-   * The control. Run the same check and pass it, and nothing else changes —
-   * the question is established, as it always was.
-   *
-   * Without this the scenario above is satisfiable by a survey that never says
-   * `established` at all, which would be a wrong answer of its own.
+   * The control. Run the same check and pass it, and nothing else changes — the question is
+   * established, as it always was.
    */
   test("a check that was run and passed leaves the answer established", async () => {
     const { check, claim } = await aPromotedAnswerNobodyChecked();
@@ -166,18 +129,6 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
 
   /**
    * The mirror image, and the case that was passing for the wrong reason.
-   *
-   * A promoted **negative** result whose prespecified check ran and passed must
-   * reach `established` exactly as a positive one does. It did not: `checksOf`
-   * collected criteria from both bearings while the *grain* read one column, so
-   * a criterion reached down the challenged path was silently dropped — and a
-   * dropped criterion reads as "no checks", which is vacuously met.
-   *
-   * **The never-run test above passed for the wrong reason** while that was
-   * true: dropping the row and finding the check unmet give the same bucket.
-   * That is a right conclusion with the reasoning under it wrong, and no test
-   * catching it because the tests pass either way. This is the case that
-   * could have been positive and was not.
    */
   test("a promoted negative result whose check passed is established", async () => {
     const { criterion: check } = await session.stateCriterion(CHECK);

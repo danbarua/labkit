@@ -39,14 +39,7 @@ import { blockedBy } from "./blocked";
 import { dedupeById, type Identified } from "./shared";
 
 /**
- * What a deferral says, carried onto whatever the question's standing turns
- * out to be.
- *
- * A question left open on a stated condition and later answered has both facts
- * true at once, and they are both about now. Reporting only the answer leaves
- * a reader unable to ask the question that matters — is this the condition
- * being met, or something unrelated that arrived first — from anything but the
- * researcher's memory.
+ * What a deferral says, carried onto whatever the question's standing turns out to be.
  */
 const deferral = (
   accepting: { reason: string; invalidation_check: string } | null,
@@ -168,12 +161,10 @@ export class StoryGroup extends SessionCore {
     // What the closing decision rests on. Nothing cited means the question was
     // abandoned, not answered -- absence of evidence is not a negative result.
     const cited = await this.graph.query(
-      // Only the challenging bearing is fetched: polarity is "no" when
-      // something challenges and "yes" otherwise, so the supporting side is the
-      // default rather than an input. Returning it as `forClaim` would also be
-      // silently broken, since a camelCase column decodes as null (see
-      // `buildAsClause`, which
-      // now refuses the name that hid this).
+      // Only the challenging bearing is fetched: polarity is "no" when something challenges and
+      // "yes" otherwise, so the supporting side is the default rather than an input. Returning
+      // it as `forClaim` would also be silently broken, since a camelCase column decodes as
+      // null (see `buildAsClause`, which now refuses the name that hid this).
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(against:Claim)
        RETURN e, against`,
@@ -206,22 +197,9 @@ export class StoryGroup extends SessionCore {
     // proposition was answered "no".
     const challenges = cited.some((r) => r.against !== null);
 
-    // What the closure rests on: promoted work, or scratch nobody promoted.
-    // Answered either way -- the question is settled as far as anyone has taken
-    // it -- but a reader deciding whether to build on it should not have to go
-    // and look.
-    // **Both bearings.** A question answered *no* is settled by evidence that
-    // CHALLENGES the claim, so walking only SUPPORTS finds no claim at all and
-    // a promoted negative result reports itself as resting on scratch. No edge
-    // alternation in AGE, so it is two OPTIONAL MATCHes.
-    // **The `PROMOTES` edge, not `Claim.kind`.** Only `is <claim> confirmed`
-    // writes that edge, and `labkit is --help` says what it is for: a finding
-    // others may build on, which moves a question answered on it from
-    // provisional to established. `kind` cannot answer this, because
-    // `conclude --standing confirmatory` writes the same value to record that a
-    // finding was *prespecified* -- a different fact, and one nobody vouched
-    // for. Reading `kind` reported Bonsai's compute-cost question as resting on
-    // promoted work when nothing had promoted it.
+    // What the closure rests on: promoted work, or scratch nobody promoted. Answered either way
+    // -- the question is settled as far as anyone has taken it -- but a reader deciding whether
+    // to build on it should not have to go and look.
     const promoted = await this.graph.query(
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
@@ -261,21 +239,8 @@ export class StoryGroup extends SessionCore {
   }
 
   /**
-   * Findings bearing on a proposition **within an enquiry**, one way or the
-   * other — deliberately not by claim handle, which was tried and refuted.
-   *
-   * `bearing` is interpolated because pglite-age rejects edge-type alternation
-   * outright — `[:SUPPORTS|CHALLENGES]` is a syntax error, not merely
-   * unsupported for variable-length patterns. The value comes from a closed set
-   * of literals here, never from a caller.
-   *
-   * Everything else in `whySupported` now selects by handle, because two
-   * analyses in one enquiry concluding the same sentence are two claims and a
-   * check held by one is not the other's standard. **Findings are the
-   * exception**, and the distinction is a domain fact: a re-run producing the
-   * same conclusion **corroborates**, so findings aggregate over the
-   * proposition, while a prespecified check **belongs to** the analysis held to
-   * it. Same two nodes, two different questions, two answers.
+   * Findings bearing on a proposition **within an enquiry**, one way or the other —
+   * deliberately not by claim handle, which was tried and refuted.
    */
   private async findingsBearing(
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
@@ -314,11 +279,6 @@ export class StoryGroup extends SessionCore {
 
   /**
    * What a re-run did and did not establish.
-   *
-   * The execution verdict is derived from what each run recorded consuming, not
-   * from a stored flag: two runs are a reproduction when they read the same
-   * recorded inputs. Structure in the query rather than in the stored model, so
-   * there is no value anyone can set to "reproduced".
    */
   async reproductionOf(verification: AnalysisRef): Promise<ReproductionReport> {
     const link = await this.graph.query(
@@ -344,22 +304,10 @@ export class StoryGroup extends SessionCore {
       { id: verification },
     );
 
-    // Keyed by natural id, never by `logical_name`. Two runs can each record
-    // something called "initial conditions" and mean different data; comparing
-    // the names would make those the same execution input.
-    // What a run read, **in order and with repeats**, plus the same as a set
-    // for the difference calculation below.
-    //
-    // Two shapes because they answer different questions. `read` is the
-    // sequence the caller gave: `from: [A, B, A]` is three occurrences and a
-    // reader comparing two runs needs all three. `bySubject` is which records
-    // were involved, which is what `differs` is about -- reading one twice and
-    // reading it once are not a *difference in inputs*, they are a difference
-    // in the sequence, and the two lists show that plainly.
-    //
-    // Edges written before `positions` existed have none; they sort last and
-    // among themselves by identity, so the list is stable rather than
-    // arbitrary. An absent position is not position zero.
+    // Keyed by natural id, never by `logical_name`. Two runs can each record something called
+    // "initial conditions" and mean different data; comparing the names would make those the
+    // same execution input. What a run read, **in order and with repeats**, plus the same as a
+    // set for the difference calculation below.
     const inputs = async (
       computation: string,
     ): Promise<{
@@ -468,27 +416,11 @@ export class StoryGroup extends SessionCore {
 
   /**
    * An interpretation and every narrowing behind it, oldest first.
-   *
-   * The chain walks claim-to-claim through the decisions that made it: each
-   * revision `CHANGES` the readings it withdrew and `MOTIVATES` the one that
-   * replaced them. No timestamps and nothing from the event log.
-   *
-   * **A history is a graph, not a line.** `reinterpret` withdraws every claim
-   * in scope asserting the reading it replaces, so one act can take two
-   * separately-narrowed branches at once. Branches are not ordered against
-   * each other and no ordering between them is invented; `originally` is every
-   * reading the walk reached that nothing narrowed, which on a merge is more
-   * than one.
    */
   async interpretationHistory(claim: ClaimRef): Promise<InterpretationHistory> {
-    // **Walked by id.** `reinterpret` writes `Decision -MOTIVATES-> narrower`
-    // and `Decision -CHANGES-> each withdrawn claim`, both carrying natural
-    // ids, so every step is reachable by identity.
-    //
-    // Matching by NAME instead breaks on two independent chains passing through
-    // one sentence: the match finds the other chain's claim and its decision,
-    // and a legitimate history reports the wrong one. Same text is not same
-    // claim.
+    // **Walked by id.** `reinterpret` writes `Decision -MOTIVATES-> narrower` and `Decision
+    // -CHANGES-> each withdrawn claim`, both carrying natural ids, so every step is reachable
+    // by identity.
     const proposition = await this.assertedBy(claim);
     if (proposition === undefined)
       throw new Error(
@@ -589,10 +521,6 @@ export class StoryGroup extends SessionCore {
 
   /**
    * Whether two findings actually conflict.
-   *
-   * Answered from what each claim is attached to — the question it answers and
-   * the way its evidence bears — never from comparing the two sentences. Two
-   * claims can be worded identically and not conflict at all.
    */
   async doTheseConflict(a: ClaimRef, b: ClaimRef): Promise<ConflictVerdict> {
     const sides = [await this.sideOf(a), await this.sideOf(b)];
@@ -711,12 +639,10 @@ export class StoryGroup extends SessionCore {
           method: row.comp.method,
           analysis: ref("analysis", row.comp.natural_id),
         };
-        // **Per claim, not per artefact**: a decision that changed *this*
-        // claim, which is the same fact `withdrawalOf` reads. An artefact-grain
-        // answer could only say why the whole *analysis* was replaced.
-        //
-        // Deduped, and one reason per finding rather than one per review of
-        // its unit.
+        // **Per claim, not per artefact**: a decision that changed *this* claim, which is the
+        // same fact `withdrawalOf` reads. An artefact-grain answer could only say why the whole
+        // *analysis* was replaced. Deduped, and one reason per finding rather than one per
+        // review of its unit.
         if (row.d) {
           if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
             superseded.push({
@@ -749,13 +675,9 @@ export class StoryGroup extends SessionCore {
       }
     }
 
-    // What the still-current analyses actually consumed -- one hop from the
-    // computation, not a detour through the enquiry. Only currently-standing
-    // findings count: a superseded analysis's inputs are not what the claim
-    // rests on now.
-    // Both bearings, and by handle: a claim its evidence bears *against* rests
-    // on inputs exactly as one it supports does, and a one-sided walk reports
-    // `restingOn: []` for it.
+    // What the still-current analyses actually consumed -- one hop from the computation, not a
+    // detour through the enquiry. Only currently-standing findings count: a superseded
+    // analysis's inputs are not what the claim rests on now.
     const resting = (
       await Promise.all(
         (["SUPPORTS", "CHALLENGES"] as const).map((bearing) =>
@@ -764,31 +686,9 @@ export class StoryGroup extends SessionCore {
       )
     ).flat();
 
-    // The standard the finding was held to, if it was held to one. The criteria
-    // a researcher agreed before the run are what "does this stand?" is
-    // answered against; without them a finding whose own prespecified checks
-    // failed reads as a `supported` verdict.
-    //
-    // Same invalidation filter as `restingOn` above: a replaced analysis's
-    // checks are as historical as its findings, and applying one filter and not
-    // the other makes two fields of one answer disagree.
-    //
-    // **Boundary: only the SUPPORTING analyses' standards are read.** An
-    // analysis recorded with `heldTo` whose findings CHALLENGE the proposition
-    // reads as a live challenge even if its own checks failed, so `challenged`
-    // is not qualified the way the supporting side is. What would settle it is a null
-    // result whose robustness checks disagree, which nothing records yet.
-    // The same fact the survey and a gate read, so "which checks does this
-    // claim answer to" is one definition. Selected by handle: two analyses in
-    // one enquiry concluding the same sentence are two claims, and matching by
-    // wording makes this verb and `whatIsKnown` contradict each other.
-    //
-    // Both bearings, merged, and a loop rather than two hand-written anchors
-    // because the one-sided version is silent: a promoted negative result
-    // reports "held to no prespecified standard" while the record holds the
-    // check.
-    // Which of the inputs this claim rests on have been retracted outright --
-    // every finding they record superseded. One query for all of them.
+    // The standard the finding was held to, if it was held to one. The criteria a researcher
+    // agreed before the run are what "does this stand?" is answered against; without them a
+    // finding whose own prespecified checks failed reads as a `supported` verdict.
     const retractedInputs = await this.retractedArtefacts([
       ...new Set(resting.map((r) => ref("observations", r.a.natural_id))),
     ]);
@@ -830,12 +730,8 @@ export class StoryGroup extends SessionCore {
     // the reading moved.
     const { withdrawn, replacedBy } = await this.withdrawalOf(scope);
 
-    // Standing, and why it was conferred. Read from the claim rather than the
-    // conclusion so a promotion taken later is visible here at all.
-    // By handle, and with no traversal at all. A promotion is an edge on the
-    // claim, so reaching it through `<-[:SUPPORTS]-` cannot see a promoted
-    // negative result, and selecting by name within an enquiry can return a
-    // different claim's promotion.
+    // Standing, and why it was conferred. Read from the claim rather than the conclusion so a
+    // promotion taken later is visible here at all. By handle, and with no traversal at all.
     const promotion = await this.graph.query(
       `MATCH (c:Claim {natural_id: $claim})
        OPTIONAL MATCH (d:Decision)-[:PROMOTES]->(c)
@@ -872,12 +768,10 @@ export class StoryGroup extends SessionCore {
       claim,
       proposition,
       drawnAcross,
-      // Six ways not to be supported, and they are different states: the
-      // interpretation withdrawn, evidence bearing against it, a synthesis
-      // that measured nothing, evidence that fails the standard set for it,
-      // evidence that settles the proposition neither way, and nothing having
-      // examined it at all. `support` stays populated for all but the last:
-      // the numbers are fine, and blanking them would say otherwise.
+      // Six ways not to be supported, and they are different states: the interpretation
+      // withdrawn, evidence bearing against it, a synthesis that measured nothing, evidence
+      // that fails the standard set for it, evidence that settles the proposition neither way,
+      // and nothing having examined it at all.
       verdict: verdictOf({
         support,
         withdrawn,
@@ -892,17 +786,9 @@ export class StoryGroup extends SessionCore {
       reverifiedBy,
       standard,
       unmet,
-      // Re-verifying findings are excluded here for the same reason they are
-      // kept out of `support`: the claim does not rest on inputs belonging to
-      // something this very report says is not an independent supporting
-      // finding. Filtered in TypeScript rather than in the query, because AGE
-      // rejects a `NOT (pattern)` predicate outright -- `cypher_yyerror`, not a
-      // decode problem.
-      // Deduplicated by **identity**, never by name. Two artefacts may share a
-      // `logical_name`, since a regeneration carries the name of the part it
-      // replaces, so collapsing on the name reports a conclusion resting on one
-      // input when it rests on two, with the vanished one indistinguishable
-      // from the survivor.
+      // Re-verifying findings are excluded here for the same reason they are kept out of
+      // `support`: the claim does not rest on inputs belonging to something this very report
+      // says is not an independent supporting finding.
       restingOn: [
         ...new Map(
           resting
@@ -930,14 +816,6 @@ export class StoryGroup extends SessionCore {
 
   /**
    * How much of a past construction can be rebuilt.
-   *
-   * The caller re-runs whatever it can and offers the hashes it got back; this
-   * says which parts match, which disagree, and which nobody can check because
-   * the original never recorded a hash. The one reader of `content_hash`.
-   *
-   * Offered per part rather than by name, deliberately. A regenerated part
-   * carries the name of the part it regenerates, so a name-keyed map would
-   * merge exactly the two things this scenario exists to keep apart.
    */
   async reproducibilityOf(
     analysis: AnalysisRef,
@@ -977,16 +855,10 @@ export class StoryGroup extends SessionCore {
     const notRebuilt: IdentifiedArtefact[] = [];
     for (const { a } of parts) {
       const candidate = offered.get(ref("observations", a.natural_id));
-      // Two ways for no comparison to happen, and neither is inequality:
-      // the record has no hash (permanent, about the artefact), or this
-      // attempt did not rebuild the part (about the attempt). `differing` is a
-      // comparison that ran and came out unequal, which is a different kind of
-      // statement. Folding either absence into it claims evidence the record
-      // does not have.
-      //
-      // Keyed by natural id, never by name: an original and its regeneration
-      // legitimately share a `logical_name`, so bare names put one string in
-      // `exact` and `differing` at once.
+      // Two ways for no comparison to happen, and neither is inequality: the record has no hash
+      // (permanent, about the artefact), or this attempt did not rebuild the part (about the
+      // attempt). `differing` is a comparison that ran and came out unequal, which is a
+      // different kind of statement.
       const entry = {
         part: ref("observations", a.natural_id),
         name: a.logical_name,
@@ -1005,12 +877,10 @@ export class StoryGroup extends SessionCore {
       differing: differing.sort(byName),
       unverifiable: unverifiable.sort(byName),
       notRebuilt: notRebuilt.sort(byName),
-      // Anything not shown to match leaves the construction unshown.
-      //
-      // `exact.length > 0` is the conjunct three empty lists cannot supply: an
-      // analysis that consumed nothing satisfies "nothing differed, nothing was
-      // unverifiable, nothing went unrebuilt" vacuously, and would report that
-      // a construction with no parts reproduces. Absence is still absence.
+      // Anything not shown to match leaves the construction unshown. `exact.length > 0` is the
+      // conjunct three empty lists cannot supply: an analysis that consumed nothing satisfies
+      // "nothing differed, nothing was unverifiable, nothing went unrebuilt" vacuously, and
+      // would report that a construction with no parts reproduces.
       reproducible:
         exact.length > 0 &&
         differing.length === 0 &&
@@ -1021,52 +891,19 @@ export class StoryGroup extends SessionCore {
 
   /**
    * What is affected if this artefact turns out to be wrong?
-   *
-   * Deliberately the affected side only. What is *not* affected depends on what
-   * a replacement rests on rather than on the invalidated record alone.
-   *
-   * Distinct from `whySupported()`'s `restingOn`: this asks which enquiries
-   * REQUIRE the evidence held here, not what any computation read.
-   *
-   * **Two routes in.** An artefact reached by `Evidence -RECORDED_IN->` is an
-   * analysis *output*, and the evidence recorded in it bears on claims
-   * directly. An artefact a computation `CONSUMES` is an *input*, and nothing
-   * recorded in it
-   * bears on anything; what rests on it are the claims of every analysis that
-   * read it. Walking only the first returned `claims: []` for an input a claim
-   * demonstrably rested on, while still naming the enquiry — a confident,
-   * populated, wrong answer, and the same verb answering one question two
-   * incompatible ways depending on which end of a computation it was aimed at.
-   * `Evidence` carries both senses, and a query that walks one of them answers
-   * about half the record.
-   *
-   * `subject` is a name while a name identifies one artefact, and an explicit
-   * reference when it does not: a regenerated part carries the name of the part
-   * it regenerates. Given an ambiguous name this **refuses** rather than answering
-   * about the union, because the union is exactly the "inferred provenance
-   * silently inheriting the original's standing" the scenario exists to prevent.
    */
   async whatDependsOn(subject: IndexedString | ObservationsRef): Promise<DependencyReport> {
-    // **`typeof` cannot tell these apart any more, and that is the trap.** A
-    // handle is a branded string now, so `typeof subject === "string"` is true
-    // for both arms of the union and sent every handle off to be looked up by
-    // logical name -- which threw `no artefact named "ART_21"`. The union is
-    // real to the type system and invisible at runtime, so the discrimination
-    // has to read the value: `isRefOfKind` asks whether the id's own prefix
-    // names an Artefact, which is the same question `ref()` asks when minting.
+    // **`typeof` cannot tell these apart any more, and that is the trap.** A handle is a
+    // branded string now, so `typeof subject === "string"` is true for both arms of the union
+    // and sent every handle off to be looked up by logical name -- which threw `no artefact
+    // named "ART_21"`.
     const start = isRefOfKind("observations", subject)
       ? (subject as ObservationsRef)
       : await this.artefactNamed(subject);
 
-    // Walk the pipeline downstream before asking what rests on it. An analysis
-    // can read another analysis's output (row AE), so invalidating a raw input
-    // reaches every stage built on top of it -- and asking only about the
-    // artefact handed in stops at the first stage.
-    //
-    // Iterative rather than a variable-length pattern: the chain alternates
-    // CONSUMES and PRODUCES, and AGE has no edge-type alternation at all.
-    // Visited-set rather than a depth cap, so a
-    // cycle terminates without silently truncating a legitimate long pipeline.
+    // Walk the pipeline downstream before asking what rests on it. An analysis can read another
+    // analysis's output (row AE), so invalidating a raw input reaches every stage built on top
+    // of it -- and asking only about the artefact handed in stops at the first stage.
     const reached = new Set<ObservationsRef>([start]);
     for (let frontier = [start]; frontier.length > 0; ) {
       const next: ObservationsRef[] = [];
@@ -1116,26 +953,6 @@ export class StoryGroup extends SessionCore {
 
   /**
    * The artefacts a claim's still-current analyses consumed, for one bearing.
-   *
-   * The inverse of {@link restingOnArtefact}, which walks artefact → claims.
-   * Named apart deliberately: `restingArtefacts` beside `restingOnArtefact` was
-   * two names one letter apart for opposite traversals.
-   *
-   * One hop from the computation, not a detour through the enquiry. Only
-   * currently-standing findings count: a superseded analysis's inputs are not
-   * what the claim rests on now — and the `invalidated` filter is on the
-   * evidence's **own** output, never on what the computation read, because a
-   * retracted input must still be reported and marked.
-   *
-   * Called once per bearing: a single-bearing version reports an empty list for
-   * a claim its evidence bears *against*, the same silent hole `checksAnchor`
-   * exists to close.
-   *
-   * **Selected by proposition within the enquiry, not by handle** — the same
-   * exception `findingsBearing` documents, and refuted the same way: selecting
-   * by handle emptied `restingOn` for a two-stage pipeline in
-   * `tests/subject-identity.test.ts`. What a claim rests on aggregates over the
-   * proposition; what it was *held to* belongs to one analysis.
    */
   private async artefactsConsumedBy(
     scope: { proposition: IndexedString; enquiry?: EnquiryRef },
@@ -1170,14 +987,6 @@ export class StoryGroup extends SessionCore {
 
   /**
    * The artefacts among these whose every recorded finding has been superseded.
-   *
-   * **Every, not any.** An artefact holds one finding per conclusion its
-   * analysis drew; replacing one leaves the rest standing, and so leaves the
-   * artefact a live record a reader may still rest on. Only when nothing in it
-   * stands has the record itself been retracted.
-   *
-   * An artefact holding no findings at all is **not** retracted: there is
-   * nothing in it to have fallen.
    */
   private async retractedArtefacts(ids: ObservationsRef[]): Promise<Set<ObservationsRef>> {
     if (ids.length === 0) return new Set();
@@ -1289,11 +1098,6 @@ export class StoryGroup extends SessionCore {
 
   /**
    * Resolves an artefact name to one artefact, or refuses.
-   *
-   * Two artefacts can carry one name — a regenerated part carries the name of
-   * the part it regenerates — and answering about both merges a historical
-   * record with an inferred one. Declining beats guessing, exactly as it does
-   * for a claim asserted in two lines of enquiry.
    */
   private async artefactNamed(name: IndexedString): Promise<ObservationsRef> {
     const rows = await this.graph.query(

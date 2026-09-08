@@ -1,8 +1,5 @@
 /**
  * Analyses: what rests on them, what re-checked them, how they were read.
- *
- * Ported verbatim from the monolithic `src/cli.ts` — see `./knowledge.ts` for
- * why the comments came with the code.
  */
 
 import type {
@@ -45,12 +42,6 @@ export function renderAffects(report: DependencyReport, p: Palette): string {
 
 /**
  * A re-run, against what its original read.
- *
- * It says `agrees`/`disagrees` and never `reproduced`, which is the word a
- * reader most wants and the one the record cannot support: whether reading the
- * same inputs constitutes the same execution depends on what the method does,
- * and the record does not know that. The closing paragraph says so
- * rather than leaving the reader to supply the stronger claim themselves.
  */
 export function renderReproduction(report: ReproductionReport, p: Palette): string {
   const verdict = report.conclusion === "agrees" ? p.settled : p.contested;
@@ -85,10 +76,6 @@ export function renderReproduction(report: ReproductionReport, p: Palette): stri
 
 /**
  * Whether an analysis can be accounted for from what it read.
- *
- * `unverifiable` gets its own bucket and its own explanation. It is the record
- * admitting it kept no hash, which is not the same answer as "differs" — and
- * folding it in would report a failure nobody found.
  */
 export function renderReproducibility(report: ReproducibilityReport, p: Palette): string {
   return [
@@ -124,11 +111,6 @@ export function renderReproducibility(report: ReproducibilityReport, p: Palette)
 
 /**
  * How a claim's current reading was arrived at.
- *
- * Every step names records rather than a sentence, because one narrowing can
- * withdraw several claims at once — two analyses reaching one reading are
- * withdrawn together. A rendering keyed on wording would show one
- * withdrawal where there were two.
  */
 export function renderInterpretation(history: InterpretationHistory, p: Palette): string {
   const revision = (r: Revision): string =>

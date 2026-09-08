@@ -1,18 +1,5 @@
 /**
  * A report reaches a pipe whole, not just a file.
- *
- * `runner` renders the answer and writes it in **one** call. Stdout is not
- * always a file: through a pipe — `labkit happened | less`, `$(labkit …)`, and
- * `probe-bonsai-replay.sh`'s own capture — the fd is non-blocking, so a single
- * write moves what fits in the pipe buffer, returns that count, and reports
- * nothing about the rest. The caller gets a short report, exit 0, and no way
- * to tell.
- *
- * The subprocess is the whole point: this cannot be tested in-process, because
- * the defect is a property of the file descriptor and not of the rendering.
- * The record has to be big enough to exceed one pipe buffer (64 KiB here), so
- * it is seeded through the domain rather than the CLI — one process instead of
- * a thousand.
  */
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
@@ -57,11 +44,6 @@ afterAll(() => rmSync(home, { recursive: true, force: true }));
 
 /**
  * The CLI's own bytes, once to a file and once through a real shell pipe.
- *
- * A shell, not `Bun.spawnSync({stdout: "pipe"})`: that reads the child's
- * output with a descriptor of its own making and does not reproduce the
- * defect — the first version of this test passed against the broken code,
- * which is the only reason the shell is here.
  */
 function bytes(): { file: number; piped: number } {
   const out = join(home, "out.txt");

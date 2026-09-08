@@ -1,24 +1,5 @@
 /**
  * The MCP server, driven as a client drives it.
- *
- * `tests/cli.test.ts` checks the CLI's source text for write verbs, which is
- * worth having and is not behaviour. This file stands the real server up over
- * `InMemoryTransport` and issues real `tools/list` and `tools/call` requests
- * against a real seeded graph, in-process — the SDK's own transport pair, so
- * nothing about the protocol is faked.
- *
- * Two properties, and they are different:
- *
- *   - **structural**: every public verb on either surface is exposed as a tool
- *     or listed in `NOT_EXPOSED` with a reason, and each tool's `readOnlyHint`
- *     matches the list it came from. Derived from both surfaces the server
- *     holds, never restated — see tests/helpers/surface-coverage.ts.
- *   - **behavioural**: specific answers, over the wire, matching what the read
- *     surface answers directly.
- *
- * `tests/mcp-smoke.test.ts` is the third property and a different one again:
- * every tool is *called* at least once. Exposed is not the same as working,
- * and this file only ever exercised the tools its own scenarios needed.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -61,10 +42,6 @@ import { recordAnalysis } from "./helpers/analysis";
 
 /**
  * A handle out of a tool's reply.
- *
- * A tool whose whole answer is one handle returns it under a field named for
- * what it is — `{"question": "Q_1"}` — because MCP's `structuredContent` must
- * be an object and a handle is a bare string now. This takes that sole value.
  */
 const id = (v: unknown): string =>
   // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
@@ -73,11 +50,8 @@ const id = (v: unknown): string =>
   typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
 /**
- * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and
- * handed to a **scope** the server enters per tool call. The sink must be
- * constructed at this level rather than taken from a surface — a per-call
- * surface defaulting to its own log would fragment the stream and leave the two
- * halves of one call holding different ones.
+ * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and handed to a
+ * **scope** the server enters per tool call.
  */
 async function connectServer(
   graph: TenantGraph,
@@ -96,14 +70,8 @@ async function connectServer(
 }
 
 /**
- * A registry that has already been registered, which is what every test but the
- * gate's own wants.
- *
- * **Defaulted rather than left to each caller**, so adding a write test does not
- * mean remembering the handshake — and *not* defaulted inside `buildServer`,
- * where an unregistered-means-ungated server would be the safety property
- * shipping switched off. The one test that wants the gate armed passes a fresh
- * registry explicitly, which is the only way to reach the refusal from here.
+ * A registry that has already been registered, which is what every test but the gate's own
+ * wants.
  */
 function registeredSessionRegistry(): SessionRegistry {
   const session = sessionRegistry();
@@ -180,16 +148,10 @@ describe("structure", () => {
 
 describe("an agent can track work through the tools alone", () => {
   /**
-   * The sentence this file exists to assert: **an agent with nothing but this
-   * server can put a piece of research on the record and then ask about it.**
-   * Every act below goes over the wire through `callTool` — no `ResearchSession`
-   * is constructed, no verb is called directly, and the reads at the end see
-   * only what the writes put there.
-   *
-   * It is deliberately the shortest whole loop rather than a tour: ask, start,
-   * measure, conclude, close. If the write half were removed, every read at the
-   * end would answer about an empty graph and the test would fail on the first
-   * of them.
+   * The sentence this file exists to assert: **an agent with nothing but this server can put a
+   * piece of research on the record and then ask about it.** Every act below goes over the wire
+   * through `callTool` — no `ResearchSession` is constructed, no verb is called directly, and
+   * the reads at the end see only what the writes put there.
    */
   async function client() {
     const graph = await scenario.begin();
@@ -262,12 +224,8 @@ describe("an agent can track work through the tools alone", () => {
       });
       expect(why.verdict).toBe("supported");
 
-      // **`provisional` before promotion, `established` after** — the whole of
-      // capture-cheaply-then-promote, asserted on both sides of the one act
-      // that moves it. A question answered on a finding nobody vouched for is
-      // settled as far as anyone has taken it and no further, so reading the
-      // survey for "what do we actually know" cannot silently include a
-      // lunchtime sweep.
+      // **`provisional` before promotion, `established` after** — the whole of capture-cheaply-
+      // then-promote, asserted on both sides of the one act that moves it.
       const asks = (bucket: unknown) => (bucket as Array<{ asks: string }>).map((q) => q.asks);
       const before = await call(c, "known", {});
       expect(asks(before.provisional)).toContain("does the pruning schedule move convergence?");
@@ -431,10 +389,10 @@ describe("an agent can track work through the tools alone", () => {
   });
 
   /**
-   * `replace_analysis(supersedes=A2, from=[A1])` accepts an earlier
-   * analysis's own id as an input, not only the artefact id underneath it --
-   * so a caller holding a `COMP_` id from an earlier recording step can pass
-   * it straight through, rather than looking up what that analysis read.
+   * `replace_analysis(supersedes=A2, from=[A1])` accepts an earlier analysis's own id as an
+   * input, not only the artefact id underneath it -- so a caller holding a `COMP_` id from an
+   * earlier recording step can pass it straight through, rather than looking up what that
+   * analysis read.
    */
   test("a replacement can read an earlier analysis's output, by that analysis's id", async () => {
     const c = await client();
@@ -558,17 +516,8 @@ describe("an agent can track work through the tools alone", () => {
 
 describe("the tool documentation resource", () => {
   /**
-   * The property worth testing is not that the markdown looks right -- it is
-   * that it is *derived*. Nothing below names a tool or a field: every
-   * expectation is computed from TOOLS, so a tool added without documentation,
-   * or a field renamed in a report type, fails here rather than shipping a
-   * document that quietly describes last week's server.
-   *
-   * Demonstrated by breaking the generator and watching this fail: dropping a
-   * tool's description fails it, and so does refusing to render nested fields.
-   * The second only became true after the test was fixed -- the first version
-   * read `properties` at the top level only, and passed with every nested name
-   * missing from the document. A derived test can still check the wrong thing.
+   * The property worth testing is not that the markdown looks right -- it is that it is
+   * *derived*.
    */
   /** Every property name in a JSON Schema, at any depth. */
   function leafNames(schema: unknown, depth = 0): string[] {
@@ -681,10 +630,9 @@ describe("the tool documentation resource", () => {
 
 describe("behaviour — the same answers, over the wire", () => {
   /**
-   * One programme: a question asked, worked on, concluded and closed, plus a
-   * second question nothing has touched. Enough for every tool to have
-   * something to say and for `known` to have both a settled and an untested
-   * bucket.
+   * One programme: a question asked, worked on, concluded and closed, plus a second question
+   * nothing has touched. Enough for every tool to have something to say and for `known` to have
+   * both a settled and an untested bucket.
    */
   async function seeded() {
     const graph = await scenario.begin();
@@ -791,17 +739,9 @@ describe("behaviour — the same answers, over the wire", () => {
   });
 
   test("every tool's real output parses against its declared schema", async () => {
-    // The compile-time gate in src/mcp/schemas.ts is two-way assignability, and
-    // it has one measured hole: a schema that DROPS an optional field is still
-    // assignable both ways, so tsc passes.
-    //
-    // This narrows that hole and does not close it. The schemas are strict, so
-    // an output carrying a key the schema has forgotten fails to parse here --
-    // but only if this session produces that key. Demonstrated both ways:
-    // deleting `restsOn` from enquiryStatusSchema fails this test; deleting
-    // `replacedBy` from supportExplanationSchema passes it, because nothing
-    // below withdraws a claim. An optional field no test data produces is
-    // still unguarded.
+    // The compile-time gate in src/mcp/schemas.ts is two-way assignability, and it has one
+    // measured hole: a schema that DROPS an optional field is still assignable both ways, so
+    // tsc passes. This narrows that hole and does not close it.
     const { client, read, enquiry } = await seeded();
     try {
       const parsed = async (name: string, args: Record<string, unknown>) => {
@@ -873,16 +813,6 @@ describe("behaviour — the same answers, over the wire", () => {
 
 /**
  * **Who signed this?**
- *
- * A write's identity column is the whole purpose of a record built for
- * provenance, and a uniform placeholder for every agent, session, and
- * machine would be worse than an empty field: empty reads as unknown, a
- * placeholder reads as known.
- *
- * These build the server the way `main()` does — `commandContext` over
- * `registeredSession` — because the composition is the thing under test. The
- * helper at the top of this file deliberately does not, so the rest of the file
- * stays about tools rather than about attribution.
  */
 describe("the write gate, and what a registered write is signed with", () => {
   /** `main()`'s composition, with the registry left for the caller to control. */
@@ -1013,12 +943,6 @@ describe("the write gate, and what a registered write is signed with", () => {
 
 /**
  * **A server that cannot write does not offer to.**
- *
- * `--read-only` exists for a desktop client that should read the record and
- * never change it. It *hides* the write tools where the registration gate
- * *refuses* them, and the difference is `not here` against `not yet`: an
- * unregistered caller has a remedy and the refusal names it, a read-only
- * caller has none.
  */
 describe("read-only", () => {
   async function listToolsFrom(graph: TenantGraph, readOnly: boolean) {

@@ -1,26 +1,6 @@
 /**
- * S-10e — "A run that read the same record twice."
- * External peer review of PR #2, merge blocker 1.
- *
- * LabKit does not decide what a run's inputs mean, but it must faithfully
- * retain what the caller said. This is that principle turned on the case a
- * regression using two distinct inputs cannot see: two occurrences of the
- * same input, not two different ones.
- *
- * > LabKit accepted two occurrences and later reports one. That is pure
- * > bookkeeping loss.
- *
- * `TenantGraph.createEdge()` treats `(from, label, to)` as identity and a
- * repeat as a no-op, backed by a real `UNIQUE (start_id, end_id)` index — so a
- * second `CONSUMES` to the same artefact cannot exist. `reproductionOf()` then
- * keys its inputs by artefact id, so a repeat could not survive the read
- * either.
- *
- * A null test is the ordinary reason to do this: comparing a series against
- * itself. There is nothing exotic about `from = [A, A]`, and refusing it would
- * be LabKit deciding that a legitimate run is not recordable.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-10e — "A run that read the same record twice." External peer review of PR #2, merge blocker
+ * 1.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";

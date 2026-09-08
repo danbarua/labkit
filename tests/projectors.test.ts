@@ -1,17 +1,6 @@
 /**
- * The event stream is a write-ahead log for a graph store, and this shows it
- * rather than asserting it.
- *
- * `GraphChange` says a node was created, an edge was created, properties
- * changed. Nothing in that vocabulary is AGE's: fed the same stream in the
- * same order, a `Map` reaches the same state the graph does. The projector
- * below is thirty lines, touches no Cypher and holds no `TenantGraph` — if it
- * agrees with what AGE built from the same acts, then a second store is a
- * second `Projector` and no change to a verb.
- *
- * **Not a shipped consumer.** Nothing reads this projection; it exists to make
- * the claim falsifiable, which is why it lives in a test rather than in
- * `src/`.
+ * The event stream is a write-ahead log for a graph store, and this shows it rather than
+ * asserting it.
  */
 
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, test } from "bun:test";
@@ -42,10 +31,6 @@ interface Projected {
 
 /**
  * A graph store in a `Map`. Every change kind, and nothing else.
- *
- * `PropsChanged` merges rather than replaces, which is what
- * `TenantGraph.setNodeProperty` does one key at a time — a projector that
- * replaced the object would diverge the first time `is` confirmed a claim.
  */
 function inMemoryProjector(): { projector: Projector; state: Projected } {
   const state: Projected = { nodes: new Map(), edges: new Set() };
@@ -73,12 +58,6 @@ function inMemoryProjector(): { projector: Projector; state: Projected } {
 
 /**
  * What AGE holds for a named set of handles, in the same two shapes.
- *
- * **Scoped to the handles the stream mentions**, not `MATCH (n)` over the whole
- * tenant. The unscoped version passed on PGlite and failed under
- * `bun run test:pg`, where a connection sees what another file committed to the
- * same tenant graph -- it was asserting test isolation, not projection. What is
- * compared is whether the two projections of *these acts* agree.
  */
 async function fromTheGraph(graph: TenantGraph, ids: string[]): Promise<Projected> {
   const nodes = new Map<string, { label: string; props: Record<string, unknown> }>();

@@ -1,21 +1,6 @@
 /**
- * `undo` retracts through the same tenant-scoped role every real session
- * runs as, not through the admin connection the rest of the suite uses.
- *
- * `tests/scenarios/` runs `resolveTenantContext()` and stops there, which is
- * every scenario test's own connection running as the table owner — RLS does
- * not apply to a table's owner by default, so a scenario test cannot see
- * whether retraction actually hides anything. This is where that is
- * demonstrated, through `scopeToTenant()`, the same step production takes
- * between resolving a tenant and handing the connection to the domain (see
- * CLAUDE.md's fixed session-assembly order).
- *
- * **Deliberately not on `setupTestDb()`.** `tests/tenancy-isolation.test.ts`'s
- * own header says why: that shares one PGlite session across the whole
- * suite, and `SET ROLE` is session state with no way back down this
- * connection came up — a test that stepped down there leaves every later
- * test running as `labkit_app`, cascading into failures with no visible
- * connection to this file. This one opens its own connection and closes it.
+ * `undo` retracts through the same tenant-scoped role every real session runs as, not through
+ * the admin connection the rest of the suite uses.
  */
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";

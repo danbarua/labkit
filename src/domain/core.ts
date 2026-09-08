@@ -1,22 +1,5 @@
 /**
  * What every research verb needs, and the few helpers both halves share.
- *
- * The seam between the two surfaces is one the domain already asserts: events
- * explain how state changed, the graph explains what the current research state
- * is. Read and write verbs partition cleanly along it, with no member doing
- * both.
- *
- * This class holds the graph, the clock, the attribution and the event sink,
- * plus the helpers both halves genuinely need.
- *
- * **Membership is by use, and by transitive closure rather than by name.** A
- * helper that reads like a query can still be reached only from the write side
- * — `withdrawalOf` is one — so what belongs here is what both halves actually
- * call, which has to be re-derived rather than assumed.
- *
- * It deliberately holds **no verbs and no `emit`**. `emit` lives on the write
- * side so that a read *cannot* stamp an event: the invariant that reads are
- * silent is structural here rather than remembered.
  */
 
 import type { TenantGraph } from "../db/graph";
@@ -51,46 +34,18 @@ import type {
 import { ref } from "./report";
 
 /**
- * What a surface is constructed with: a command's execution context, plus where
- * its events go.
- *
- * `extends Partial<CommandContext>` rather than `{ ctx?: CommandContext }`, and
- * the difference is the whole cost of the change. Nesting would have rewritten
- * 110 construction sites across 38 test files — `{ clock }` to
- * `{ ctx: { clock, attribution } }` — to change no behaviour whatsoever. Spread
- * flat, every existing call site stays valid, `clock` keeps its name and
- * position, and an adapter that has built a whole `CommandContext` still hands
- * it over in one piece: `new WriteSurface(graph, { ...ctx, events })`.
- *
- * Both context fields stay optional. `tests/domain-session.test.ts` constructs
- * `new ResearchSession(graph)` bare, and a surface with no stated attribution is
- * a real case — the CLI is one — not a caller who forgot.
+ * What a surface is constructed with: a command's execution context, plus where its events go.
  */
 export interface ResearchSessionOptions extends Partial<CommandContext> {
   events?: EventSink;
   /**
    * What builds state from this session's events, in order.
-   *
-   * Defaults to the graph alone, which is what every caller wants and why no
-   * composition root passes this. A second entry is how a consumer joins the
-   * stream without a verb changing — `fragments/derive.ts`'s
-   * `provenanceProjector` is one, added after the graph projector because it
-   * reads what the graph was just told.
    */
   projectors?: Projector[];
 }
 
 /**
  * The callable, public method names of a class.
- *
- * `keyof` on a class type already excludes `private`/`protected` members —
- * TypeScript drops them from the type's key set, not merely from what an
- * outside caller may write — so this needs only the function-type filter:
- * `SessionCore`'s one public member, `events`, is a property rather than a
- * method and is excluded by that filter, not by anything about visibility.
- * `ResearchWrites`/`ResearchReads` (`./write`, `./read`) both key off this
- * rather than a hand-written list, so a verb neither surface has excluded by
- * name is in the Pick automatically.
  */
 export type Methods<T> = {
   [K in keyof T]-?: T[K] extends (...args: never[]) => unknown ? K : never;
@@ -100,15 +55,6 @@ export class SessionCore {
   protected readonly clock: Clock;
   /**
    * Who is running commands through this surface.
-   *
-   * Session-scoped in the field and *per-command* in practice, because a
-   * surface is cheap to construct: `src/mcp/server.ts` builds a fresh
-   * `WriteSurface` per tool call over the same graph and the same sink, so each
-   * call can carry its own attribution and its own `git_hash`. That works
-   * because neither surface declares a field or a constructor of its own: the
-   * three assignments below are the whole of a surface's state, and the only
-   * mutable state in reach — `inTransaction`'s re-entrancy depth — belongs to
-   * the shared `TenantGraph`, not here.
    */
   protected readonly attribution: AttributionContext;
   readonly events: EventSink;
@@ -126,10 +72,6 @@ export class SessionCore {
 
   /**
    * The finding that bears on a claim, and what the claim asserts.
-   *
-   * The direct replacement for `findingFor(analysis, proposition)`: with a
-   * `ClaimRef` there is nothing to search for, so this matches the claim by id
-   * and walks one edge back. No wording crosses the query.
    */
   protected async findingOn(
     claim: ClaimRef,
@@ -196,13 +138,8 @@ export class SessionCore {
   }
 
   /**
-   * The params half of {@link withinScope}, so the clause and the binding it
-   * needs are never written apart.
-   *
-   * They were: eight call sites each spelled
-   * `...(scope.enquiry ? { enquiry: scope.enquiry } : {})` beside a
-   * `withinScope(scope)`, and a clause emitted without its param is a Cypher
-   * error at runtime rather than a type error now.
+   * The params half of {@link withinScope}, so the clause and the binding it needs are never
+   * written apart.
    */
   protected scopeParams(scope: { enquiry?: EnquiryRef }): { enquiry?: string } {
     return scope.enquiry ? { enquiry: scope.enquiry } : {};
@@ -231,12 +168,6 @@ export class SessionCore {
 
   /**
    * Confirmatory results standing behind these gates.
-   *
-   * Reaches the *results*, not just the work: gate -> work -> the unit that
-   * carried it out -> what that unit concluded. Without the last two hops this
-   * could only report "no confirmatory result affected" by virtue of seeing no
-   * results at all — the same answer a genuinely clean amendment gives, and
-   * absence of evidence must not read as a negative result.
    */
 
   protected async confirmatoryResultsBehind(gates: GateRef[]): Promise<ConfirmatoryResult[]> {
@@ -270,17 +201,6 @@ export class SessionCore {
 
   /**
    * Which of these claims still stand, and what replaced the ones that do not.
-   *
-   * Per claim, where {@link withdrawalOf} folds a whole proposition into one
-   * answer. A verb that acts on one reading needs the claim-level answer:
-   * whether *this* record still stands, not whether the sentence does.
-   *
-   * **Both predicates, and AGE has no edge alternation** — `[:CHANGES|SUPERSEDES]`
-   * is a syntax error, so this is two clauses. Naming only one is silent: the
-   * row is absent and the caller concludes the claim stands. A claim is
-   * withdrawn either way — its reading was narrowed (`CHANGES`) or its finding
-   * superseded (`SUPERSEDES`) — and the consequence for whether it still
-   * stands is the same.
    */
   protected async standingOf(claims: ClaimRef[]): Promise<Map<ClaimRef, ClaimStanding>> {
     const state = new Map<ClaimRef, ClaimStanding>(
@@ -314,13 +234,10 @@ export class SessionCore {
         const acted = ref("decision", decision.natural_id);
         if (!entry.by.includes(acted)) entry.by.push(acted);
       }
-      // By handle: two successors phrased alike are two records, and this list
-      // is what a refusal names.
-      //
-      // **It can be empty on a withdrawn claim.** `replaceAnalysis` supersedes
-      // a claim and mints the replacement's conclusions without pairing them,
-      // so the decision `MOTIVATES` the new *analysis* and no new claim. A
-      // caller must say "no successor is recorded" rather than name none.
+      // By handle: two successors phrased alike are two records, and this list is what a
+      // refusal names. **It can be empty on a withdrawn claim.** `replaceAnalysis` supersedes a
+      // claim and mints the replacement's conclusions without pairing them, so the decision
+      // `MOTIVATES` the new *analysis* and no new claim.
       for (const next of [row.insteadof, row.successor]) {
         if (!next) continue;
         const successor = ref("claim", next.natural_id);
@@ -339,16 +256,9 @@ export class SessionCore {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
        ${this.withinScope(scope)}
-       // **Both predicates, and AGE has no edge alternation** -- [:CHANGES|SUPERSEDES]
-       // is a syntax error, so this is two clauses and the fold below must read
-       // both. Naming only one is SILENT: the row is simply absent and a reader
-       // concludes the claim still stands. That is this repository's
-       // six-occurrence defect, so it is spelled once here rather than at each
-       // caller.
-       //
-       // A claim is withdrawn either way: its reading was narrowed (CHANGES)
-       // or its finding superseded (SUPERSEDES). Different acts, same
-       // consequence for whether it still stands.
+       // **Both predicates, and AGE has no edge alternation** -- [:CHANGES|SUPERSEDES] is a
+       // syntax error, so this is two clauses and the fold below must read both. Naming only
+       // one is SILENT: the row is simply absent and a reader concludes the claim still stands.
        OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
        OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)

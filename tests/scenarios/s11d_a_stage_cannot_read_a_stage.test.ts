@@ -1,15 +1,5 @@
 /**
  * S-11d — "Reproducible, on top of something that isn't."
- *
- * `recordAnalysis({ from })` takes only observations handles, and
- * `recordObservations()` is the only thing that makes one. So an analysis
- * cannot read another analysis's output, and a two-stage pipeline can only be
- * recorded by re-entering the intermediate as if it were fresh measurement.
- *
- * That breaks `whatDependsOn()`, and this test shows it produces a
- * confidently wrong answer rather than merely an empty or missing one.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -47,12 +37,8 @@ async function afterwards(): Promise<ResearchSession> {
 const TRENDS = "the response trends upward with dose";
 
 /**
- * Researcher: "The raw series came off an instrument nobody logged the settings
- *  for. We calibrated it, and the trend analysis reads the calibrated series."
- *
- * The raw series has no content hash — its provenance is genuinely
- * unrecoverable, which the record is right to say. Everything downstream
- * inherits that, in the world if not in the record.
+ * Researcher: "The raw series came off an instrument nobody logged the settings for. We
+ * calibrated it, and the trend analysis reads the calibrated series."
  */
 async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("does the response trend upward with dose?");
@@ -98,14 +84,9 @@ describe("S-11d: a stage cannot read a stage", () => {
   });
 
   /**
-   * Stage two no longer claims to be reproducible on top of something that
-   * isn't. **Inverted, not deleted** — the two lines this test shipped with in
-   * a comment are the live assertions now.
-   *
-   * It rests on stage one, which rests on a series nobody can check. The record
-   * now says so: stage two's input is the calibration's output artefact, which
-   * carries no content hash, so the report reads `unverifiable` rather than
-   * inventing a clean bill.
+   * Stage two no longer claims to be reproducible on top of something that isn't. **Inverted,
+   * not deleted** — the two lines this test shipped with in a comment are the live assertions
+   * now.
    */
   test("stage two does not claim reproducibility it cannot have", async () => {
     const { trend } = await aPipelineOnUnverifiableRawData(session);
@@ -119,11 +100,8 @@ describe("S-11d: a stage cannot read a stage", () => {
   });
 
   /**
-   * Invalidating the raw series reaches the trend claim two stages
-   * downstream -- the query walks more than one hop.
-   *
-   * Still open-world. Transitive is not complete: `complete: false` and
-   * `routesWalked` stay, because a longer walk is still a walk of *some* routes.
+   * Invalidating the raw series reaches the trend claim two stages downstream -- the query
+   * walks more than one hop.
    */
   test("what depends on the raw series reaches every stage built on it", async () => {
     const { raw } = await aPipelineOnUnverifiableRawData(session);

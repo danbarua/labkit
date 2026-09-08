@@ -1,17 +1,5 @@
 /**
  * What the composition root wires up, asserted on its source.
- *
- * **Source assertions, and that is the honest choice here.** Both properties
- * below are about what `src/cli/session.ts` *constructs*; observing them at
- * runtime would mean standing up a database in order to watch an absence — an
- * event that never arrives, a mock hash that is not there. Reading the wiring
- * is a smaller claim and the one the text supports.
- *
- * These came out of `tests/cli.test.ts`, which was deleted at the cutover.
- * Comparing the two files' test names is what found them: the old file had
- * twenty-four tests, most obsoleted by commander generating its own help, and
- * these three were neither obsolete nor ported. That comparison is worth doing
- * whenever a test file is retired.
  */
 
 import { expect, test } from "bun:test";
@@ -34,15 +22,8 @@ test("the wiring under test was found at all", () => {
 });
 
 test("the CLI hands the event log in rather than letting it default", () => {
-  // `SessionCore` defaults `events` to `inMemoryEventLog()`. In a process that
-  // exits after one command that is an array nothing ever wrote to. On the read
-  // side `happened` reports that nothing has ever happened against a full
-  // database; on the write side a verb commits its graph changes durably while
-  // the event describing them dies at exit -- durable state with no record of
-  // the act that caused it. Both are confidently wrong rather than empty.
-  //
-  // One sink, constructed once and handed to both, which is also what keeps the
-  // stream from fragmenting.
+  // `SessionCore` defaults `events` to `inMemoryEventLog()`. In a process that exits after one
+  // command that is an array nothing ever wrote to.
   expect(session).toContain("const events = pgEventLog(connection.db, ctx.tenantId)");
   expect(session).toMatch(/new ReadSurface\(graph, \{ events \}\)/);
   expect(session).toMatch(/new WriteSurface\(graph, \{[\s\S]*?events,/);

@@ -40,11 +40,6 @@ import type { Identified } from "./shared";
 export class ExplainGroup extends SessionCore {
   /**
    * A record's own text, whatever kind it is — the properties `search` scans.
-   *
-   * Read from {@link SEARCHABLE_TEXT} rather than a second map of label to
-   * property: those are the same question ("what did a person type here"),
-   * and a second copy is a second thing to go stale. `EvidenceUnit` is absent
-   * from it and is the one kind holding no prose at all.
    */
   async proseFor(subject: AnyRef): Promise<string | null> {
     const props = SEARCHABLE_TEXT[labelForNaturalId(subject)] ?? [];
@@ -63,17 +58,8 @@ export class ExplainGroup extends SessionCore {
   }
 
   /**
-   * One record's neighbours: everything joined to it, both directions, with
-   * the edge each was reached by and the other end's own prose.
-   *
-   * **Reached only through `why`** — a researcher asks *why is this here*, not
-   * *list this node's edges*. See `NO_COMMAND_FOR` in
-   * tests/cli/coverage.test.ts.
-   *
-   * Untyped `-[r]->` with `type(r)`, the shape `retractedDependents` already
-   * uses. AGE has no edge alternation, so naming the edges would mean one
-   * clause per type and a silent absence for any forgotten — the defect
-   * `src/domain/facts.ts` exists for, which an untyped match cannot have.
+   * One record's neighbours: everything joined to it, both directions, with the edge each was
+   * reached by and the other end's own prose.
    */
   async neighboursOf(subject: AnyRef): Promise<Neighbour[]> {
     const decoders = {
@@ -110,18 +96,8 @@ export class ExplainGroup extends SessionCore {
   }
 
   /**
-   * `why <criterion>` — what a condition requires, what has been said about it,
-   * and what it holds up.
-   *
-   * **Reached only through `why`** — a researcher asks *why is this condition
-   * in the state it is*, and that is one verb, not a second one named for the
-   * report. See `NO_COMMAND_FOR` in tests/cli/coverage.test.ts.
-   *
-   * Evaluations here are **criterion-scoped, not gate-scoped**: one criterion
-   * can govern several gates and be evaluated separately against each, and a
-   * reader asking about the condition itself is asking about all of them.
-   * `gateStatus` keeps the narrower scope for the opposite reason, stated
-   * there.
+   * `why <criterion>` — what a condition requires, what has been said about it, and what it
+   * holds up.
    */
   async criterionStanding(criterion: CriterionRef): Promise<CriterionStanding> {
     const { cypher, decoders } = compose(
@@ -175,11 +151,6 @@ export class ExplainGroup extends SessionCore {
 
   /**
    * What an analysis revised, and which findings moved — {@link AnalysisRevision}.
-   *
-   * Three reads, because they are three different questions about one act: the
-   * lineage decision (which analysis this revises, on which review), the
-   * per-finding decisions (old claim to new), and the superseded analysis's
-   * own conclusions (so the ones nothing named can be reported standing).
    */
   async analysisRevision(analysis: AnalysisRef): Promise<AnalysisRevision> {
     const lineage = await this.graph.query(
@@ -205,16 +176,10 @@ export class ExplainGroup extends SessionCore {
     const fell = await this.claimsFrom(decision, "SUPERSEDES");
     const kept = await this.claimsFrom(decision, "KEEPS");
 
-    // **The pairing the act recorded, and no other.** `conclude --replacing`
-    // mints a decision per finding carrying `SUPERSEDES` to what fell and
-    // `MOTIVATES` to what stands in its place, so which claim replaced which
-    // is on the record at write time.
-    //
-    // A successor that named nothing is reported `unpaired`. Matching
-    // propositions instead would put a before/after on the record that nobody
-    // asserted -- and it cannot recover the pairing anyway, since an analysis
-    // may assert one sentence twice about different endpoints, which is what a
-    // claim's handle is for.
+    // **The pairing the act recorded, and no other.** `conclude --replacing` mints a decision
+    // per finding carrying `SUPERSEDES` to what fell and `MOTIVATES` to what stands in its
+    // place, so which claim replaced which is on the record at write time. A successor that
+    // named nothing is reported `unpaired`.
     const named = await this.namedSuccessors(fell.map((c) => c.claim));
 
     const changed: RevisedFinding[] = [];
@@ -279,14 +244,6 @@ export class ExplainGroup extends SessionCore {
 
   /**
    * Which claim was recorded as standing in place of each fallen one.
-   *
-   * `conclude --replacing` mints a decision per finding, `SUPERSEDES` to what
-   * fell and `MOTIVATES` to what replaces it — so the pairing is a fact the
-   * act stated, not one a reader has to infer from wording.
-   *
-   * Two clauses rather than one pattern because AGE has no edge alternation,
-   * and both are `MATCH`: a decision carrying only `SUPERSEDES` is the
-   * revision's own act of retiring the finding, which names no successor.
    */
   private async namedSuccessors(fallen: ClaimRef[]): Promise<Map<ClaimRef, ClaimRef>> {
     if (fallen.length === 0) return new Map();
@@ -336,18 +293,8 @@ export class ExplainGroup extends SessionCore {
 }
 
 /**
- * `enquiryStatus`, alongside where this enquiry's own question sits in the
- * overall survey — one bucket, not the whole survey. See
- * `EnquiryInContext`'s own doc comment.
- *
- * **No adapter reaches this directly.** It is the body of `why <enquiry>`'s
- * `LineOfEnquiry` case (`explainEnquiry`, below) — see `NOT_EXPOSED`.
- *
- * **A module-level function taking `self: ReadSurface`, not a method here.**
- * It reads `enquiryStatus` (`./story.ts`) and `whatIsKnown` (`./standing.ts`),
- * both in other groups — a `SessionCore` method on this file's own class has
- * no way to reach a sibling group, so this takes the composed surface instead,
- * the same shape `Explainer` below uses.
+ * `enquiryStatus`, alongside where this enquiry's own question sits in the overall survey — one
+ * bucket, not the whole survey. See `EnquiryInContext`'s own doc comment.
  */
 export async function enquiryInContext(
   self: ReadSurface,
@@ -380,15 +327,8 @@ export async function enquiryInContext(
 }
 
 /**
- * One record's `why`, over the report that already exists for its kind — the
- * table `ReadSurface.why` dispatches through.
- *
- * **Module-level functions, not private methods.** `check:no-stringly-typed`
- * scans class members only (its own doc comment says so), so a class method
- * taking `subject: string` before it is known which kind's `Ref` that string
- * names would need an allowlist entry there; a free function does not. It also
- * keeps the table itself a plain value — `satisfies Record<Kind, Explainer>`
- * checks totality once, here, rather than at every call site.
+ * One record's `why`, over the report that already exists for its kind — the table
+ * `ReadSurface.why` dispatches through.
  */
 type Explainer = (self: ReadSurface, subject: string) => Promise<Explanation>;
 
@@ -528,11 +468,10 @@ async function explainEnquiry(self: ReadSurface, subject: string): Promise<Enqui
 }
 
 /**
- * One governing condition's cause, worded by its own state — the same
- * `CheckStatus.state` four-way split `renderGate` colours, turned into prose
- * instead: `blocked` and `incomplete` both cite whichever of these are not
- * `passed`, so the wording (not just `when`) is what tells a failed check
- * apart from one nobody has run.
+ * One governing condition's cause, worded by its own state — the same `CheckStatus.state` four-
+ * way split `renderGate` colours, turned into prose instead: `blocked` and `incomplete` both
+ * cite whichever of these are not `passed`, so the wording (not just `when`) is what tells a
+ * failed check apart from one nobody has run.
  */
 function causeForCheck(c: CheckStatus): Cause {
   switch (c.state) {
@@ -556,10 +495,6 @@ function causeForCheck(c: CheckStatus): Cause {
 
 /**
  * The `Computation` case: what this analysis revised, and which findings moved.
- *
- * An analysis that revises nothing answers so. That is the ordinary case — most
- * analyses are a first run — and reporting it as "revises nothing" is an
- * answer, where a refusal would say the question does not apply.
  */
 async function explainAnalysis(self: ReadSurface, subject: string): Promise<AnalysisExplanation> {
   const analysis = ref("analysis", subject);
@@ -595,17 +530,8 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
 }
 
 /**
- * `why <criterion>` — what a condition requires, what has been said about it,
- * and what it holds up.
- *
- * **The detail `gate` sheds.** A gate's page answers what state every
- * condition is in and deliberately carries no verdict text; this is where the
- * text lives, one criterion at a time.
- *
- * The evaluations are **not** scoped to a gate: one criterion can govern
- * several and be evaluated separately against each, so a reader asking about
- * the condition itself is asking about all of them. `gateStatus` keeps the
- * narrower scope, and its own comment says why.
+ * `why <criterion>` — what a condition requires, what has been said about it, and what it holds
+ * up.
  */
 async function explainCriterion(self: ReadSurface, subject: string): Promise<CriterionExplanation> {
   const criterion = ref("criterion", subject);
@@ -646,12 +572,8 @@ async function explainCriterion(self: ReadSurface, subject: string): Promise<Cri
 }
 
 /**
- * The `Gate` case: `gateStatus`, exhaustive over `GateStatus.state` — the same
- * four-way split `gateStateFrom` computes, worded rather than coloured.
- * `blocked` and `incomplete` both cite every condition not currently passing,
- * since a blocked gate can carry a never-run condition beside its failed one;
- * `satisfied` and `never-evaluated` cite every condition, all of them sharing
- * one state there.
+ * The `Gate` case: `gateStatus`, exhaustive over `GateStatus.state` — the same four-way split
+ * `gateStateFrom` computes, worded rather than coloured.
  */
 async function explainGate(self: ReadSurface, subject: string): Promise<GateExplanation> {
   const gate = ref("gate", subject);
@@ -685,11 +607,6 @@ async function explainGate(self: ReadSurface, subject: string): Promise<GateExpl
 
 /**
  * The kinds `why` actually explains, and their cases.
- *
- * Every other kind gets a refusal built from **this** object, below, so a kind
- * added here is one the refusal stops claiming for itself. Naming the explained
- * kinds twice — once in a hand-written list, once in the table — is drift in
- * the direction that fails silently.
  */
 const EXPLAINED = {
   claim: explainClaim,
@@ -711,13 +628,7 @@ export interface Neighbour {
 }
 
 /**
- * What one record is connected to, in a researcher's words rather than the
- * schema's.
- *
- * Total over the edge schema, so a new edge is a compile error rather than a
- * page printing `SUPERSEDES` at somebody. The rule that a researcher never
- * says a label out loud applies to what `why` prints as much as to a
- * scenario's dialogue.
+ * What one record is connected to, in a researcher's words rather than the schema's.
  */
 const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   MOTIVATES: { out: "led to", in: "was prompted by" },
@@ -754,11 +665,6 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
 
 /**
  * What a record is, for the one case with no words of its own.
- *
- * `EvidenceUnit` is the only kind absent from `SEARCHABLE_TEXT` — nothing a
- * person typed is stored on it — so it is the only kind this is reached for
- * as a subject. As a *neighbour* any kind can be wordless, since a record may
- * be created before its prose is set.
  */
 function describe(handle: AnyRef): string {
   const kind = kindOf(handle);
@@ -778,14 +684,8 @@ const SAYS: Record<WalkedKind, string> = {
 };
 
 /**
- * The one query behind every walked kind: the node, and everything joined to
- * it, both directions.
- *
- * Untyped `-[r]->` with `type(r)`, the shape `retractedDependents` already
- * uses — AGE has no edge alternation, so naming edges here would mean one
- * clause per type and a silent absence for any that was forgotten. That is
- * the defect `src/domain/facts.ts` exists for, and an untyped match cannot
- * have it.
+ * The one query behind every walked kind: the node, and everything joined to it, both
+ * directions.
  */
 function walked(kind: WalkedKind): Explainer {
   return async (self, subject) => {
@@ -811,10 +711,6 @@ function walked(kind: WalkedKind): Explainer {
 
 /**
  * Every kind `why` answers by walking, rather than from a report of its own.
- *
- * `satisfies Record<WalkedKind, Explainer>` keeps it total, so a kind moved
- * into {@link EXPLAINED} must leave here — the compiler refuses the excess
- * property rather than leaving a case nothing can reach.
  */
 const WALKED = {
   question: walked("question"),
@@ -828,14 +724,7 @@ const WALKED = {
 } satisfies Record<WalkedKind, Explainer>;
 
 /**
- * The total table `why` dispatches through — one entry per {@link Kind}, so a
- * kind added to `LABEL_BY_KIND` with no case is a `tsc` failure.
- *
- * **There is no refusal arm.** Six kinds used to get one, on the stated
- * grounds that a case would be added "when someone asks and gets the
- * refusal". Nobody had to ask: every one of them has edges, `Decision` has
- * more than any other kind on the record, and a verb named `why` declining to
- * explain the node that carries a person's reason for an act was never
- * something the record could not answer.
+ * The total table `why` dispatches through — one entry per {@link Kind}, so a kind added to
+ * `LABEL_BY_KIND` with no case is a `tsc` failure.
  */
 export const EXPLAINERS = { ...EXPLAINED, ...WALKED } satisfies Record<Kind, Explainer>;

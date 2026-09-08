@@ -1,16 +1,5 @@
 /**
- * S-9c — "Both reproduced and not, under one name."
- * docs/project-journal/008_user_story_mining.md §3 row F.
- *
- * Row F says an artefact has no identity apart from its content: `logical_name`
- * is wording, not identity, and `content_hash` is the bytes. The input side
- * is already guarded — `reproducibilityOf()` takes parts by reference, and
- * its comment says a name-keyed map "would merge exactly the two things this
- * scenario exists to keep apart".
- *
- * The **output** side was never given the same treatment.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-9c — "Both reproduced and not, under one name." .
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -48,11 +37,7 @@ async function afterwards(): Promise<ResearchSession> {
 const NAME = "control series";
 
 /**
- * Researcher: "We regenerated the control, and this analysis compares it
- *  against the original."
- *
- * Both are called what the thing is called: a regenerated part naturally
- * carries the name of the part it replaces.
+ * Researcher: "We regenerated the control, and this analysis compares it against the original."
  */
 async function anAnalysisComparingBothControls(s: ResearchSession) {
   const { enquiry } = await s.openEnquiry("do the two controls agree?");
@@ -79,15 +64,8 @@ async function anAnalysisComparingBothControls(s: ResearchSession) {
 
 describe("S-9c: two parts, one name", () => {
   /**
-   * The reproducibility report identifies parts by reference, so a caller can
-   * tell which one is which — and a name that two parts share cannot silently
-   * merge them.
-   *
-   * Before this, the same name appeared in **both** `exact` and `differing`:
-   * the record stating that "control series" had reproduced exactly *and* come
-   * back different, with no way to tell which was which. Contradictory rather
-   * than merely thin, and a reader working from `exact` would have concluded
-   * the control reproduced.
+   * The reproducibility report identifies parts by reference, so a caller can tell which one is
+   * which — and a name that two parts share cannot silently merge them.
    */
   test("a part that matched and a part that differed are distinguishable", async () => {
     const { original, regenerated, comparison } = await anAnalysisComparingBothControls(session);

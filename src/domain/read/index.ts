@@ -1,8 +1,5 @@
 /**
  * The verbs that answer questions about the record, and change nothing.
- *
- * Nothing in this module tree may emit. `emit` is not reachable from
- * `SessionCore`, so that is enforced by construction rather than by review.
  */
 
 import { createdIn, edgesIn } from "../events";
@@ -51,38 +48,13 @@ import { StoryGroup } from "./story";
 import { ExplainGroup, EXPLAINERS, enquiryInContext as enquiryInContextOf } from "./explain";
 
 /**
- * The read verbs a research session answers — the read half of
- * {@link ResearchWrites}, and derived the same way (see {@link Methods}).
- *
- * Its whole job is the assertion in `../session.ts`: a `ResearchSession`
- * composes a `ReadSurface` and delegates each verb by hand, so a verb added
- * here without a delegate there is reachable from the CLI and MCP and from
- * nowhere a scenario can call.
+ * The read verbs a research session answers — the read half of {@link ResearchWrites}, and
+ * derived the same way (see {@link Methods}).
  */
 export type ResearchReads = Pick<ReadSurface, Methods<ReadSurface>>;
 
 /**
  * **What a refusal may point a caller at, and what it may not.**
- *
- * Two near-misses in two pull requests produced this, and both looked done
- * because the first case checked out.
- *
- * **A refusal may not name a command.** The domain does not know which surface
- * is calling, and the two do not agree: `pursuits`/`pursuits_of`,
- * `claims`/`claims_asserting`, `work`/`work_list`, `gates`/`gate_list`. Four of
- * the five checked differ, so naming one hands the other audience
- * `unknown command`. Name the **act** instead — *an enquiry is opened against a
- * question* — which is true wherever the caller is.
- *
- * **A verb may be named only if both surfaces spell it identically AND its
- * promise has been checked against the code that implements it.** Spelling is
- * not enough: `search` is spelled the same on both surfaces but scans only
- * {@link SEARCHABLE_TEXT}, and `Computation`, `Claim` and `Artefact` are
- * absent from that table — so *"'search' finds its handle by the method"* sends
- * a caller to a search that returns nothing.
- *
- * **A taught remedy that fails is worse than the opacity it replaced**, because
- * the caller believes it and spends the trust before finding out.
  */
 export class ReadSurface extends SessionCore {
   readonly #happened: HappenedGroup;
@@ -234,45 +206,15 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * `enquiryStatus`, alongside where this enquiry's own question sits in the
-   * overall survey. See `./explain.ts`'s `enquiryInContext` for why this is a
-   * function taking the composed surface rather than a group method: it reads
-   * both `enquiryStatus` (`./story.ts`) and `whatIsKnown` (`./standing.ts`).
+   * `enquiryStatus`, alongside where this enquiry's own question sits in the overall survey.
    */
   async enquiryInContext(enquiry: EnquiryRef): Promise<EnquiryInContext> {
     return enquiryInContextOf(this, enquiry);
   }
 
   /**
-   * "What am I blocked on right now, what are my priorities?" — see
-   * `Standing`'s own doc comment for the shape and why there is no `at=`.
-   *
-   * With no `since`, the full standing. With one, every section narrowed to
-   * what a touched handle appears in since that cursor — `whatHappened`'s
-   * `created`/`edges`/`subject` on every act since it, never a snapshot of
-   * what things *were*.
-   *
-   * **A task is moved if its own id was touched, or any gate governing it
-   * was.** `evaluateCriterion` touches the criterion, the evaluation and the
-   * gate (`TRIGGERS`) — never the task a gate protects — so a task newly
-   * blocked (or newly unblocked) by an evaluation would otherwise be
-   * invisible. `ListedWork.gates` is what `workStateFrom` already reads to
-   * compute `state`; checking those ids against the same touched set is one
-   * more membership test, not a new query.
-   *
-   * **A question is moved if its own id was touched, or the claim answering
-   * it was.** `closeEnquiry`/`acceptAsUnresolved` both write an edge landing
-   * on the question itself (`RESOLVES`/`DEFERS`), so those show up from the
-   * question id alone — but `promote`/`reinterpret`/`reverify` touch only the
-   * claim, never the question they move into `established` or out of
-   * `provisional`. `AnsweredQuestion.claim` is `whatIsKnown()`'s own
-   * resolution of the same fact, so the check is a membership test too.
-   *
-   * **What is still not caught, after both joins**: a question moving
-   * `unresolved` ↔ `untested` has no claim to check and no edge landing on
-   * the question either — `unresolved`/`untested`/`accepted` can only be
-   * marked moved by their own id. Not fixed with more traversal; named so
-   * the gap is a documented one rather than a discovered one.
+   * "What am I blocked on right now, what are my priorities?" — see `Standing`'s own doc
+   * comment for the shape and why there is no `at=`.
    */
   async now(since?: number): Promise<Standing> {
     const [events, gates, work, known] = await Promise.all([
@@ -331,14 +273,9 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
-   * `why <handle>` — dispatches on the handle's own kind, over the report that
-   * already exists for it, and renders it as `{subject, is, because}`. Also
-   * takes a proposition: text resolves through `claimsAsserting` and refuses an
-   * ambiguous match rather than picking.
-   *
-   * **The dispatch table lives at module scope, not as a switch here.** `Kind`
-   * is closed (see `LABEL_BY_KIND`), so `EXPLAINERS satisfies Record<Kind, …>`
-   * makes a kind nobody explains a compile error rather than a runtime branch.
+   * `why <handle>` — dispatches on the handle's own kind, over the report that already exists
+   * for it, and renders it as `{subject, is, because}`. Also takes a proposition: text resolves
+   * through `claimsAsserting` and refuses an ambiguous match rather than picking.
    */
   async why(subject: AnyRef | IndexedString): Promise<Explanation> {
     const kind = kindOf(subject);

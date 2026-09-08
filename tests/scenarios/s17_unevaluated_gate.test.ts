@@ -1,13 +1,5 @@
 /**
  * S-17 — "Does the guard actually guard?"
- * docs/project-journal/008_user_story_mining.md
- *
- * A gate's status must depend on evidence that its criterion was actually
- * evaluated, not on the presence of something named "gate" -- nothing may
- * flow out of a gate that no evaluation triggered. S-17 tests whether that
- * holds.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -38,12 +30,6 @@ afterEach(async () => {
 
 /**
  * A second reader over the same graph, with an event log of its own.
- *
- * Every Afterward answer here is re-asserted through one of these. The point
- * is not repetition: a status read back from the session that wrote it could
- * be held in that session's memory, and "Afterward" means reconstructible from
- * durable state. See tests/helpers/scenario.ts on what this does and does not
- * prove.
  */
 async function afterwards(): Promise<ResearchSession> {
   return new ResearchSession(await scenario.current(), {
@@ -149,10 +135,9 @@ describe("S-17: does the guard actually guard?", () => {
   });
 
   /**
-   * What makes GOVERNS load-bearing rather than merely written: "has this
-   * guard been shown able to fail?" is a question about the criterion, so it
-   * is answered across every evaluation of the governing criterion — not only
-   * those that happened to trigger this particular gate.
+   * What makes GOVERNS load-bearing rather than merely written: "has this guard been shown able
+   * to fail?" is a question about the criterion, so it is answered across every evaluation of
+   * the governing criterion — not only those that happened to trigger this particular gate.
    */
   test("a criterion shown to fail on one gate counts as demonstrated for another it governs", async () => {
     const { criterion } = await session.stateCriterion(
@@ -195,10 +180,9 @@ describe("S-17: does the guard actually guard?", () => {
   });
 
   /**
-   * An evaluation must be attached to a gate the criterion actually governs.
-   * Without the guard, gateStatus() would mostly HIDE the malformed
-   * evaluation — its traversal starts from GOVERNS — so the graph would carry
-   * durable nonsense without producing a visibly wrong report.
+   * An evaluation must be attached to a gate the criterion actually governs. Without the guard,
+   * gateStatus() would mostly HIDE the malformed evaluation — its traversal starts from GOVERNS
+   * — so the graph would carry durable nonsense without producing a visibly wrong report.
    */
   test("a criterion cannot be evaluated against a gate it does not govern", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
@@ -235,10 +219,9 @@ describe("S-17: does the guard actually guard?", () => {
   });
 
   /**
-   * The reviewer's actual demand: "show me evidence that it fails when the
-   * protected artefact is wrong." That is a question about the CRITERION, not
-   * about this gate's history -- it should be answerable without knowing
-   * which gate to ask about.
+   * The reviewer's actual demand: "show me evidence that it fails when the protected artefact
+   * is wrong." That is a question about the CRITERION, not about this gate's history -- it
+   * should be answerable without knowing which gate to ask about.
    */
   test("Afterward 2, restated: which criterion governs this gate?", async () => {
     const { gate, criterion } = await aDeclaredButUnevaluatedGate();

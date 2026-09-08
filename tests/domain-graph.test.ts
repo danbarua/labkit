@@ -18,15 +18,11 @@ import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { transactor } from "../src/db/transactor";
 
 /**
- * Exercises the LabKit domain model (docs/project-journal/001_git_init.md,
- * revised by docs/project-journal/003_review_domain_tenancy.md and
- * docs/project-journal/004_tenancy_implementation_plan.md) against Apache
- * AGE, migrated and provisioned the same way a real connection would be
- * (runMigrations() + resolveTenantContext(), not hand-rolled setup) and
- * queried through the same `LabKitDB` seam production uses (see
+ * Exercises the LabKit domain model revised by
+ * and ) against Apache AGE, migrated and provisioned the
+ * same way a real connection would be (runMigrations() + resolveTenantContext(), not hand-
+ * rolled setup) and queried through the same `LabKitDB` seam production uses (see
  * tests/helpers/db.ts).
- * Each test corresponds to one of the journal's MVP acceptance-criteria
- * questions, or one of its acceptance tests.
  */
 
 let testDb: TestDb;
@@ -145,12 +141,9 @@ describe("invalidation propagation", () => {
     await graph.createEdge(decision.natural_id, "BASED_ON", evidence.natural_id);
 
     // Follows only the edges that represent "depends on this evidence" —
-    // RECORDED_IN/SUPPORTS/BASED_ON/REQUIRES — not PRODUCES/USES/ADDRESSES,
-    // which are provenance of how the evidence came to exist and aren't
-    // invalidated retroactively just because its durable record was.
-    // "Affected" is not the same as "unsupported" — this traversal answers
-    // "what needs reconsideration", not "what is now false"; nothing here
-    // marks the claim unsupported.
+    // RECORDED_IN/SUPPORTS/BASED_ON/REQUIRES — not PRODUCES/USES/ADDRESSES, which are
+    // provenance of how the evidence came to exist and aren't invalidated retroactively just
+    // because its durable record was.
     const rows = await graph.query(
       `MATCH (a:Artefact {natural_id: $artefactId})
        OPTIONAL MATCH (a)<-[:RECORDED_IN]-(e:Evidence)
@@ -386,15 +379,10 @@ describe("Gate is reconnected to what it actually gates", () => {
 });
 
 describe("all node labels", () => {
-  // Minimal valid props per label's *Props interface in src/db/domain.ts.
-  // Exists so every label (not just the ones exercised by the acceptance
-  // queries above) actually round-trips through createNode(), which is the
-  // only thing that would catch a NODE_TYPES[label].prefix entry drifting
-  // out of sync with the sequence names in drizzle/0002_natural_ids.sql.
-  //
-  // Typed per-label rather than as Record<string, unknown>: a fixture that
-  // doesn't satisfy its label's *Props interface is now a compile error
-  // here, not a runtime surprise inside AGE.
+  // Minimal valid props per label's *Props interface in src/db/domain.ts. Exists so every label
+  // (not just the ones exercised by the acceptance queries above) actually round-trips through
+  // createNode(), which is the only thing that would catch a NODE_TYPES[label].prefix entry
+  // drifting out of sync with the sequence names in drizzle/0002_natural_ids.sql.
   const fixtures: { [L in NodeLabel]: NodePropsByLabel[L] } = {
     Question: { name: "q", posed_at: "2026-01-01T00:00:00.000Z" },
     LineOfEnquiry: { name: "loe" },
@@ -492,12 +480,9 @@ describe("tenant isolation", () => {
 });
 
 describe("provisioning reconciliation", () => {
-  // Every test here re-resolves the SAME production path
-  // (resolveTenantContext -> provisionTenantGraph, transaction + advisory
-  // lock) that every real connection uses — not an internal reconciliation
-  // function called directly. Reconciliation that only a test can reach
-  // isn't the thing being claimed; it has to hold for actual tenant
-  // resolution, unconditionally, every time.
+  // Every test here re-resolves the SAME production path (resolveTenantContext ->
+  // provisionTenantGraph, transaction + advisory lock) that every real connection uses — not an
+  // internal reconciliation function called directly.
 
   test("re-resolving the tenant restores a dropped natural-id index", async () => {
     await db.query(`DROP INDEX "${ctx.graphName}".claim_natural_id_idx`);
@@ -517,12 +502,11 @@ describe("provisioning reconciliation", () => {
   });
 
   test("a new NODE_LABELS entry reaches an already-provisioned tenant on the next resolution", async () => {
-    // Simulates "the codebase gained a label after this tenant was already
-    // provisioned" without actually changing NODE_LABELS: drop one label's
-    // vertex table entirely (as if it never existed for this tenant), then
-    // confirm the next ordinary resolveTenantContext() call notices and
-    // recreates it — proven through the real reconciliation path rather than
-    // a test-only shortcut.
+    // Simulates "the codebase gained a label after this tenant was already provisioned" without
+    // actually changing NODE_LABELS: drop one label's vertex table entirely (as if it never
+    // existed for this tenant), then confirm the next ordinary resolveTenantContext() call
+    // notices and recreates it — proven through the real reconciliation path rather than a
+    // test-only shortcut.
     await db.query(`SELECT ag_catalog.drop_label($1, 'Task', false)`, [ctx.graphName]);
     const before = await db.query(
       `SELECT 1 FROM ag_catalog.ag_label WHERE name = 'Task' AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $1)`,
@@ -563,20 +547,10 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
     ).rejects.toThrow(/duplicate key value violates unique constraint/);
   });
 
-  // NOT a real Promise.all() race against two live connections, and the reason
-  // has outlived the bug it started as. It was originally that concurrent
-  // queries against pglite-socket were not reliable enough to depend on
-  // (confirmed 2026-08-18; see the postgres-age skill's "Upstream filing").
-  // There is no socket now: the embedded database is single-writer and held
-  // under an exclusive lock, so two live connections to it is not a state this
-  // deployment can reach at all. What is actually testable deterministically:
-  // the DB
-  // constraint itself (the "duplicate CREATE... blocked at the database"
-  // test above, one connection, no race needed) and createEdge()'s own
-  // handling of losing that race — proven here by making the CREATE step
-  // specifically throw a synthetic 23505, the same shape Postgres would
-  // raise from a real conflict, without needing two connections to
-  // actually collide to get there.
+  // NOT a real Promise.all() race against two live connections, and the reason has outlived the
+  // bug it started as. It was originally that concurrent queries against pglite-socket were not
+  // reliable enough to depend on (confirmed 2026-08-18; see the postgres-age skill's "Upstream
+  // filing").
   test("createEdge treats a 23505 from the CREATE step as success, not a race failure", async () => {
     const question = await graph.createNode("Question", {
       name: "q",
@@ -622,21 +596,8 @@ describe("edge uniqueness is DB-enforced, not just app-checked", () => {
 });
 
 /**
- * Row T says "edges cannot carry properties". They can, and this is the check
- * that keeps the correction from being re-derived wrongly.
- *
- * Every AGE label is a real Postgres table, edge labels included, and an edge
- * row has the same `properties` agtype column a vertex row has. So the
- * constraint row T describes is not a storage limit at all — it is two narrower
- * facts about this codebase:
- *
- *   1. `createEdge(from, edge, to)` takes no properties. An API choice.
- *   2. Edge identity is `UNIQUE (start_id, end_id)`, so a property can annotate
- *      a relationship but can never distinguish two of them. That one is real
- *      and is the honest statement of the row.
- *
- * Written through `graph.query()` rather than `createEdge()` on purpose: the
- * point is what the backend supports, not what the write surface exposes.
+ * Row T says "edges cannot carry properties". They can, and this is the check that keeps the
+ * correction from being re-derived wrongly.
  */
 test("an edge carries properties, in Cypher and in the table underneath it", async () => {
   const question = await graph.createNode("Question", {
@@ -669,14 +630,8 @@ test("an edge carries properties, in Cypher and in the table underneath it", asy
 });
 
 /**
- * `createEdge()` writes properties, and the idempotency contract decides what
- * happens on the second call. Row T again, from the write surface this time.
- *
- * Create-if-absent means a repeat call is a no-op, so properties it carries are
- * dropped. Asserted rather than left to be discovered: an upsert would let two
- * callers race to overwrite each other under a contract that promises retries
- * are free, and a property that needs to change later wants its own verb and
- * its own argument.
+ * `createEdge()` writes properties, and the idempotency contract decides what happens on the
+ * second call. Row T again, from the write surface this time.
  */
 test("createEdge writes edge properties, and a repeat call does not change them", async () => {
   const question = await graph.createNode("Question", {
@@ -723,18 +678,8 @@ test("createEdge refuses a property key that is not an identifier", async () => 
 });
 
 /**
- * `inTransaction()`'s depth counter must survive a failing COMMIT, and a
- * failing ROLLBACK must not replace the error that caused it.
- *
- * Found incidentally while investigating the suite flake, and it was never
- * observed to fire in a real run — every capture had COMMIT succeed. It is a
- * latent defect rather than a live one, which is why it gets a demonstration
- * before a fix: the old code decremented `depth` before COMMIT *and* again in
- * the catch, so a throwing COMMIT left `depth` at **-1**. Re-entrancy is
- * keyed on `depth > 0`, so the next compound verb would open a transaction
- * that read as depth 0, and a verb nested inside it would issue a **second
- * BEGIN** rather than joining the outer one. That is the re-entrancy contract
- * silently inverted, and it survives for the life of the TenantGraph.
+ * `inTransaction()`'s depth counter must survive a failing COMMIT, and a failing ROLLBACK must
+ * not replace the error that caused it.
  */
 test("a failing COMMIT does not corrupt the transaction depth", async () => {
   const issued: string[] = [];
@@ -767,12 +712,6 @@ test("a failing COMMIT does not corrupt the transaction depth", async () => {
 
 /**
  * A failing ROLLBACK must not mask the error that triggered it.
- *
- * Fully mocked rather than wrapping the real connection: injecting a ROLLBACK
- * failure into a live session leaves it in an aborted transaction, and the
- * teardown that follows then stalls for five seconds — which is the very
- * failure mode this test file is helping to characterise. A test that
- * reproduces the bug it is adjacent to is not a useful test.
  */
 test("a failing ROLLBACK does not replace the original error", async () => {
   const issued: string[] = [];

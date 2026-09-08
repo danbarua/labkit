@@ -1,19 +1,5 @@
 /**
- * agtype parsing + identifier validation. Replaces the vendored
- * src/db/pg-age.ts (Apache AGE's official Node.js driver) and the
- * `pg-age`/`antlr4ts` npm packages that came with it — reviewed as
- * reference implementations, not dependencies (see
- * `.claude/skills/postgres-age/SKILL.md` for that review).
- *
- * `parseAgtype` is a real recursive-descent parser, not a strip-and-
- * delegate-to-`JSON.parse` shortcut: agtype's `::tag` extended-type
- * annotations (`numeric`/`vertex`/`edge`/`path` — the complete set, per
- * `age/src/backend/utils/adt/agtype.c`'s output serializer) nest at any
- * depth, and AGE's internal graphid can exceed
- * `Number.MAX_SAFE_INTEGER` on graphs LabKit already creates today, not
- * hypothetically. See tests/agtype.test.ts for what's actually verified —
- * both the specific bugs this design avoids and the live-DB proof of the
- * precision issue — rather than re-narrating it here.
+ * agtype parsing + identifier validation.
  */
 
 // ---------------------------------------------------------------------------
@@ -90,11 +76,7 @@ const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
 /**
- * Recursive-descent scanner. `parseTagged()` is the single entry point used
- * everywhere — top-level `RETURN` result, an object's property value, an
- * array's element — so a `::tag` is resolved identically no matter how
- * deep it's nested; there is deliberately no separate "top-level only"
- * tag-handling path.
+ * Recursive-descent scanner.
  */
 class Scanner {
   private i = 0;
@@ -123,12 +105,10 @@ class Scanner {
   /** Parses one value and resolves whatever `::tag` immediately follows it, if any. */
   parseTagged(): AgtypeJSON {
     this.skipWhitespace();
-    // Numbers are handled as their own case (not via parseValue()) because
-    // resolving a `::numeric` tag needs the exact source digits — by the
-    // time a value has come back as a JS `number`, a non-integral numeric
-    // may already have lost precision, so there's nothing left to recover
-    // the exact text from. Capturing raw text alongside the parse, not
-    // after it, is what actually fixes that rather than documenting it.
+    // Numbers are handled as their own case (not via parseValue()) because resolving a
+    // `::numeric` tag needs the exact source digits — by the time a value has come back as a JS
+    // `number`, a non-integral numeric may already have lost precision, so there's nothing left
+    // to recover the exact text from.
     if (this.looksLikeNumberStart()) return this.parseNumberTagged();
 
     const value = this.parseValue();
@@ -192,13 +172,10 @@ class Scanner {
   }
 
   /**
-   * Scans the full numeric token as text — `float8out` emits bare
-   * `Infinity`/`-Infinity`/`NaN` (not valid JSON tokens) alongside ordinary
-   * numbers, and a `.`/`e`/`E` in an ordinary token means AGTV_FLOAT
-   * (always safe as a JS `number`, since `float8out` is IEEE double either
-   * way). Captures the exact digit text *before* any conversion, so a
-   * following `::numeric` tag can use it directly with zero precision lost
-   * in between.
+   * Scans the full numeric token as text — `float8out` emits bare `Infinity`/`-Infinity`/`NaN`
+   * (not valid JSON tokens) alongside ordinary numbers, and a `.`/`e`/`E` in an ordinary token
+   * means AGTV_FLOAT (always safe as a JS `number`, since `float8out` is IEEE double either
+   * way).
    */
   private parseNumberTagged(): AgtypeJSON {
     if (this.s.startsWith("Infinity", this.i))
@@ -301,14 +278,9 @@ class Scanner {
   }
 
   /**
-   * Resolves a `::tag` against the value it followed — the one place tag
-   * semantics live, used identically for the top-level `RETURN` result and
-   * any nested property value or path element. A tag outside the closed
-   * set AGE's serializer actually emits (confirmed via
-   * `age/src/backend/utils/adt/agtype.c`'s `agtype_put_escaped_value`:
-   * exactly `numeric`/`vertex`/`edge`/`path`, nothing else) degrades to a
-   * visible `{ kind: "unknown", ... }` node rather than throwing — the set
-   * is closed for the pinned AGE version, not a permanent constant.
+   * Resolves a `::tag` against the value it followed — the one place tag semantics live, used
+   * identically for the top-level `RETURN` result and any nested property value or path
+   * element.
    */
   private applyTag(tag: string, value: AgtypeJSON): AgtypeJSON {
     if (tag === "vertex" || tag === "edge") {
@@ -354,36 +326,17 @@ export function parseAgtype<T = Record<string, AgtypeJSON>>(raw: string): Agtype
   return { kind: "scalar", value } as AgtypeValue<T>;
 }
 
-// ---------------------------------------------------------------------------
-// Identifier validation
-//
-// Ported from Apache AGE's driver (VALID_GRAPH_NAME / VALID_LABEL_NAME /
-// VALID_SQL_IDENTIFIER, index.ts:31-63) as understood, in-house logic — not
-// imported. Reused here for the gap that review actually surfaced for
-// LabKit: property KEYS, not just graph/label names — LabKit's primary use
-// case is a per-project MCP server where an external agent supplies props.
-//
-// `createNode` is `<L extends NodeLabel>(label: L, props: NodePropsByLabel[L])`,
-// and the key validation happens in `buildPropertyClause()` below.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Identifier
+// validation  Ported from Apache AGE's driver (VALID_GRAPH_NAME / VALID_LABEL_NAME /
+// VALID_SQL_IDENTIFIER, index.ts:31-63) as understood, in-house logic — not imported.
 
 /** AGE graph names: dots/hyphens allowed in the middle, not at the ends. */
 const VALID_GRAPH_NAME = /^[A-Za-z_][A-Za-z0-9_.-]*[A-Za-z0-9_]$/;
 
 /**
- * Everything else this file validates follows plain Postgres bare-identifier
- * rules: no dots or hyphens anywhere. One regex rather than upstream's three
- * near-duplicate ones, since (unlike graph names) none of these has a reason to
- * differ from the others for LabKit.
- *
- * What it actually guards, checked rather than listed from memory: property
- * keys, `cypher()` column names and column types, and edge property keys in
- * `graph.ts`. **Not** vertex or edge labels, which an earlier version of this
- * comment advertised — those are interpolated raw, and are safe because
- * `createNode`/`createEdge` dereference a label-keyed map (`NODE_TYPES`,
- * `EDGE_SCHEMA`) before the label reaches query text, so an unknown label
- * throws on the lookup. Incidental, not designed; worth knowing before anyone
- * adds a path that interpolates a label without that deref.
+ * Everything else this file validates follows plain Postgres bare-identifier rules: no dots or
+ * hyphens anywhere. One regex rather than upstream's three near-duplicate ones, since (unlike
+ * graph names) none of these has a reason to differ from the others for LabKit.
  */
 const VALID_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -417,15 +370,9 @@ export function buildAsClause(columns: CypherColumn[]): string {
   return columns
     .map((col) => {
       validateIdentifier(col.name, "cypher() column name");
-      // Rejected here rather than left to fail at runtime, because it does not
-      // fail loudly: this clause is unquoted SQL, so Postgres folds `basisOut`
-      // to `basisout`, while AGE keys the returned row by the name the Cypher
-      // RETURN used. The column comes back present and NULL for every row --
-      // no error, no warning, and a decoder reads it as "nothing matched".
-      // A name that cannot be written costs nothing, where the silent NULL
-      // costs a debugging session. Labels and property keys are unaffected:
-      // they are
-      // quoted, and `Criterion` / `natural_id` stay exactly as they are.
+      // Rejected here rather than left to fail at runtime, because it does not fail loudly:
+      // this clause is unquoted SQL, so Postgres folds `basisOut` to `basisout`, while AGE keys
+      // the returned row by the name the Cypher RETURN used.
       if (col.name !== col.name.toLowerCase()) {
         throw new Error(
           `cypher() column name must be lower-case: "${col.name}" would silently decode as null; ` +
@@ -439,13 +386,8 @@ export function buildAsClause(columns: CypherColumn[]): string {
 }
 
 /**
- * Validates every key before it reaches query text — the actual gap this file
- * exists to close — and returns a `{k: $k, ...}` clause.
- *
- * **`createNode()` uses this; `createEdge()` deliberately does not**, and says
- * why at its call site: it binds its parameters under a `p_` prefix, because an
- * edge property called `from` would otherwise rebind the source node's natural
- * id.
+ * Validates every key before it reaches query text — the actual gap this file exists to close —
+ * and returns a `{k: $k, ...}` clause.
  */
 export function buildPropertyClause(props: Record<string, unknown>): string {
   return Object.keys(props)
@@ -457,15 +399,9 @@ export function buildPropertyClause(props: Record<string, unknown>): string {
 }
 
 /**
- * Wraps a Cypher query in a dollar-quoted string literal for embedding in
- * the SQL `cypher(graph, $$ … $$, params)` call, choosing a delimiter that
- * can't collide with the query text.
- *
- * Ported from the Apache AGE driver's `cypherDollarQuote` (index.ts), with
- * one gap closed: upstream uses bare `$$` whenever the query doesn't
- * *contain* `$$`, but a query *ending* in `$` also breaks it —
- * `$$` + `RETURN n.a$` + `$$` lexes as body `RETURN n.a` followed by a
- * stray `$`. Both cases fall through to a tagged delimiter here.
+ * Wraps a Cypher query in a dollar-quoted string literal for embedding in the SQL
+ * `cypher(graph, $$ … $$, params)` call, choosing a delimiter that can't collide with the query
+ * text.
  */
 export function cypherDollarQuote(cypher: string): string {
   if (!cypher.includes("$$") && !cypher.endsWith("$")) return `$$${cypher}$$`;

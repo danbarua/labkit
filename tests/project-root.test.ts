@@ -1,15 +1,5 @@
 /**
  * Which directory holds the record, and the two ways of getting it wrong.
- *
- * `resolveProjectRoot()` (`src/db/connect.ts`) is the whole of that decision,
- * pure and parameterised so these cases cost no database. The last `describe`
- * is the exception and says why: it is about *when* the question is asked
- * rather than how it is answered, which only `connectDb` can show. Both
- * behaviours it asserts guard opposite failure directions: a mistyped
- * `LABKIT_HOME` is refused rather than created, and a working directory
- * below a project root is walked up rather than taken at face value.
- * Either mistake would otherwise produce a fresh empty record that a
- * reader cannot tell from a project nobody has worked on yet.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -77,16 +67,8 @@ describe("with LABKIT_HOME unset", () => {
 });
 
 /**
- * A worktree is a **sibling** of the main checkout, not a descendant, so
- * walking up from one never passes through it. Every session in this project
- * runs in a worktree, and three `.labkit/` databases had accumulated for one
- * project before anyone looked — 41M, 60M and 41M, written on three different
- * days.
- *
- * These build real repositories and real worktrees rather than faking the
- * layout, because the bug *is* the layout: a test that only ever runs in a
- * normal checkout cannot fail either way, which is the shape that let this
- * ship.
+ * A worktree is a **sibling** of the main checkout, not a descendant, so walking up from one
+ * never passes through it.
  */
 describe("a worktree resolves to the repository, not to itself", () => {
   const git = (cwd: string, ...args: string[]) =>
@@ -94,11 +76,6 @@ describe("a worktree resolves to the repository, not to itself", () => {
 
   /**
    * A repository with one commit, and a worktree beside it.
-   *
-   * `realpathSync` because git reports resolved paths and macOS files temp
-   * directories under `/var`, which is a symlink to `/private/var`. Without it
-   * every assertion here fails on the prefix while naming the same directory —
-   * a test artefact, not a defect, but one that would otherwise read as one.
    */
   function repoWithWorktree(): { root: string; worktree: string } {
     const base = realpathSync(scratch());
@@ -163,20 +140,8 @@ describe("a worktree resolves to the repository, not to itself", () => {
 });
 
 /**
- * The filesystem answer, tested directly — it is the case the walk cannot solve
- * and the environment `bun run build` ships into: a compiled binary on a host
- * without git. Found in review; the fallback could not fix the bug it was the
- * fallback for, because a sibling worktree walks up and misses the repository
- * exactly as before.
- *
- * **Tested directly rather than through `resolveProjectRoot`, and the reason is
- * measured.** Under bun 1.3.14 `spawnSync` finds `git` with `PATH` set to the
- * empty string, unset, or pointing at an empty directory — all three checked —
- * so the subprocess cannot be made to fail in-process and the fallback cannot
- * be reached that way. The first version of this block tried, and its own
- * control caught it: four tests were passing through the subprocess and
- * asserting nothing about the code they named. The composition is a single
- * `??`; the logic is what these cover.
+ * The filesystem answer, tested directly — it is the case the walk cannot solve and the
+ * environment `bun run build` ships into: a compiled binary on a host without git.
  */
 describe("dotGitProjectRoot — the answer with no git to ask", () => {
   const git = (cwd: string, ...args: string[]) =>
@@ -245,13 +210,6 @@ describe("dotGitProjectRoot — the answer with no git to ask", () => {
 describe("connectDb asks for a project root only when it needs one", () => {
   /**
    * `LABKIT_DB_URL` is checked before the root is resolved.
-   *
-   * **Asserted on which error, not on success**, because a connection to a
-   * closed port must still fail. A `LABKIT_HOME` error means the root was
-   * resolved; anything else means it was not, which is the whole claim. Seen
-   * red before it was written: with the default parameter in place this threw
-   * `LABKIT_HOME names a directory that does not exist` and never reached the
-   * connection string.
    */
   test("a missing LABKIT_HOME does not stop a URL-backed connection", async () => {
     const missing = join(scratch(), "not-here");

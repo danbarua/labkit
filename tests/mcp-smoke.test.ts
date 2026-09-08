@@ -1,23 +1,5 @@
 /**
  * **Every tool, called once, over the wire.**
- *
- * `tests/mcp.test.ts` asserts every public verb is *exposed*. That is not the
- * same as it working: eleven of the thirty-three tools had never been called
- * by any test at all, and three tool descriptions told a caller to pass
- * arguments that do not exist — `why_supported`'s said "pass `analysis`",
- * `do_these_conflict`'s said each side is "named by its analysis and
- * proposition", and `close_enquiry`'s described `answered_by` as "the analysis
- * and the proposition it concluded". All three were true of an earlier
- * signature and had been left behind by the one that replaced it.
- *
- * The description is the only thing an agent has to go on, and nothing
- * executes it. What can be executed is the tool, so this file does that, and
- * the last test refuses to pass while any tool is unexercised. A new tool
- * either gets a call here or fails the run.
- *
- * It is deliberately three ordinary sessions rather than a synthetic loop over
- * the tool list: arguments have to come from earlier answers, which is the
- * property that matters and the one a generated call cannot check.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -48,12 +30,8 @@ afterAll(async () => {
 const called = new Set<string>();
 
 /**
- * The composition `src/mcp/server.ts` uses: one graph and one sink owned here,
- * handed to a **scope** the server enters per tool call. The sink must be
- * constructed at this level rather than taken from a surface — a per-call
- * surface defaulting to its own log would fragment the stream and leave the two
- * halves of one call holding different ones. The server's own scope opens and
- * closes a database connection as well; a test has a graph already.
+ * The composition `src/mcp/server.ts` uses: one graph and one sink owned here, handed to a
+ * **scope** the server enters per tool call.
  */
 async function connectServer(
   graph: TenantGraph,
@@ -81,10 +59,6 @@ async function connectServer(
 
 /**
  * A client, and the sink its server writes through.
- *
- * The sink is returned because attribution is only observable there — it rides
- * on the event, not on any tool's reply — so the one test that checks it
- * survives the full MCP path needs a handle on the log the server is filling.
  */
 async function client(): Promise<{ client: Client; events: EventSink }> {
   const graph = await scenario.begin();
@@ -113,11 +87,6 @@ async function call(c: Client, name: string, args: Json): Promise<Json> {
 
 /**
  * A handle out of a tool's reply.
- *
- * It was `(v as { id: string }).id` while a handle was `{kind, id}` on the
- * wire. It is the id itself now, and a tool whose whole answer is one handle
- * returns it under a field named for what it is — `{"question": "Q_1"}` — so
- * this takes the sole value of that object.
  */
 const id = (v: unknown): string =>
   // A bare string passes through: `Object.values("COMP_1")[0]` is `"C"`, which
@@ -296,14 +265,9 @@ describe("every tool answers when an agent actually calls it", () => {
       expect(conditions).toHaveLength(1);
       expect(conditions[0]!.amendments).toHaveLength(1);
 
-      // Attribution over the full MCP path, not just a direct surface call.
-      // The server builds a fresh `WriteSurface` per tool call, so this also
-      // checks the sink survived that: every write in this session landed in
-      // one log, each stamped by the mock providers. Asserted against
-      // `commandContext` rather than literals -- a test restating the mock's
-      // constants would agree with itself and notice nothing.
-      // `what_happened` over the wire, which is also what keeps this file's
-      // last test honest: a tool nothing calls fails it.
+      // Attribution over the full MCP path, not just a direct surface call. The server builds a
+      // fresh `WriteSurface` per tool call, so this also checks the sink survived that: every
+      // write in this session landed in one log, each stamped by the mock providers.
       const happened = await call(c, "what_happened", { limit: 5 });
       expect((happened.events as unknown[]).length).toBeGreaterThan(0);
 
@@ -594,9 +558,6 @@ describe("every tool answers when an agent actually calls it", () => {
 
   /**
    * The gate. It runs last because it reads what the tests above recorded.
-   *
-   * A tool with no call here is a tool nobody has ever driven, which is how
-   * three descriptions came to describe signatures that no longer existed.
    */
   test("no tool goes unexercised", () => {
     const all = [...META_TOOLS, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS]

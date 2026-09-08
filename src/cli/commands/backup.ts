@@ -1,33 +1,5 @@
 /**
  * `labkit backup` — the whole record, in one file, before something changes it.
- *
- * **It does not go through {@link Run}**, for the reason `./serve.ts` does not:
- * `runner()` opens a database, resolves a tenant, does one unit of work through
- * the domain verbs and prints a report. A backup reaches past the domain
- * entirely — it copies the cluster, every tenant in it, and answers nothing
- * about research. Handing it a surface and a printer would be handing it two
- * things it has no use for.
- *
- * **A gzip tarball, not SQL, and the extension says so.** `--path backup.sql`
- * suggests `pg_dump`, and PGlite has no `pg_dump`: what it has is
- * `dumpDataDir()`, which writes the data directory itself. The two are not
- * interchangeable — one is a stream of statements that replays into any
- * Postgres, the other is a cluster you restore by unpacking. Measured on the
- * real Bonsai record (2026-09-01, 335 events): the raw directory is 59MB, an
- * uncompressed dump 59.8MB, a gzip dump **9.3MB**, restoring cleanly through
- * PGlite's own `loadDataDir`. So this writes `.tar.gz` and refuses a path that
- * claims otherwise rather than producing a file whose name is a lie.
- *
- * **Through `connectDb`, never a raw `new PGlite({dataDir})`.** The data
- * directory is only safe to open under the lock `connectDb` takes; a second
- * unlocked open is the concurrent-writer case the lock exists to prevent, and
- * a `dataDir` missing its last path segment does not error — it silently
- * initialises a fresh empty cluster and backs *that* up. `connection.pglite`
- * reaches the dump through the connection already holding the lock.
- *
- * **It refuses to overwrite.** A backup names a moment; writing over one makes
- * the name a lie about which moment. The same reasoning
- * `scripts/snapshot-record.ts` runs on, and this is the user-facing half of it.
  */
 
 import { existsSync, mkdirSync } from "node:fs";

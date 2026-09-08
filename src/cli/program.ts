@@ -1,14 +1,5 @@
 /**
  * The program, assembled.
- *
- * Separate from `./cli.ts` so a test can build the whole command surface and
- * inspect it — names, arguments, options, help — without a database, a process
- * or an exit code. That is the same property `src/mcp/tools.ts` has and says it
- * has: a tool there is data plus a handler, and nothing needs a server to
- * exist.
- *
- * Nothing here knows how to connect to anything. `run` arrives from the
- * composition root and is the only route to a surface.
  */
 
 import { Command } from "commander";
@@ -25,12 +16,6 @@ const VERSION = pkg.version;
 
 /**
  * The options every command shares.
- *
- * On the root rather than repeated per command, and read back with
- * `optsWithGlobals()` so `labkit --json known` and `labkit known --json` are
- * the same invocation. Order-sensitivity in an argument parser is the kind of
- * defect that looks like the user's mistake, and the monolithic CLI shipped one
- * of those once already.
  */
 export function globalOptions(program: Command): Command {
   return (
@@ -65,20 +50,13 @@ export function globalOptions(program: Command): Command {
 
 /**
  * Every command, registered against one program.
- *
- * `exitOverride` is not set here: the composition root decides what a parse
- * failure does to the process, and a test that wants an exception rather than
- * an exit says so itself.
  */
 export function buildProgram(run: Run): Command {
   const program = new Command("labkit")
     .description("a research record, from the command line")
-    // The worktree is a diagnostic, not a version: two checkouts of one
-    // repository run two stacks, and an answer that does not say which one
-    // produced it is what made a green `/healthz` describe someone else's
-    // server. Omitted when there is no git to ask -- a compiled binary on a
-    // host without it has no checkout to name, and inventing one would be
-    // exactly the meaningless-but-actionable value this is here to remove.
+    // The worktree is a diagnostic, not a version: two checkouts of one repository run two
+    // stacks, and an answer that does not say which one produced it is what made a green
+    // `/healthz` describe someone else's server.
     .version(worktreeName() ? `${VERSION} (${worktreeName()})` : VERSION)
     .showHelpAfterError();
   globalOptions(program);

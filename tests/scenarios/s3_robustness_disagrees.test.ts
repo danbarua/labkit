@@ -1,15 +1,5 @@
 /**
- * S-3 — "Significant by the primary test, untrustworthy by its own
- * robustness checks."
- * docs/project-journal/008_user_story_mining.md
- *
- * The prediction under test: that `CriterionEvaluation.outcome` being binary
- * (`pass`/`fail`) cannot carry this scenario's honest state. The alternative
- * worth testing is that the individual checks really did pass and fail, and
- * it is the conclusion drawn from them that is inconclusive. This scenario is
- * built to discriminate between those, not to confirm either.
- *
- * Imports only src/domain — never src/db (enforced).
+ * S-3 — "Significant by the primary test, untrustworthy by its own robustness checks."
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -42,10 +32,7 @@ afterEach(async () => {
 });
 
 /**
- * A second reader over the same graph, with an event log of its own. Every
- * gate status below is re-read through one of these and compared whole: a
- * status returned by the session that wrote it could be held in that session's
- * memory, and "Afterward" means reconstructible from durable state.
+ * A second reader over the same graph, with an event log of its own.
  */
 async function afterwards(): Promise<ResearchSession> {
   return new ResearchSession(await scenario.current(), {
@@ -232,12 +219,6 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
   /**
    * Afterward 1, asked of the CLAIM rather than the gate.
-   *
-   * The conversation's question is "does that overturn the old null?", and
-   * LabKit's answer is "not yet — the prespecified robustness criteria
-   * disagree". The criteria are therefore doing two jobs: gating downstream
-   * work, AND qualifying whether the present finding can be relied on. Only
-   * the first is modelled. This test asks for the second.
    */
   test("is the primary finding trustworthy? — the criteria that qualify it", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();

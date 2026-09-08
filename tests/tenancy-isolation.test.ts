@@ -1,44 +1,5 @@
 /**
  * Row-level security, asserted rather than described.
- *
- * The generated RLS migration puts a policy on `public.labkit_event`,
- * `drizzle/0002_natural_ids.sql` creates the role and grants it, and
- * `src/db/scoped.ts` steps a session down to the role it applies to. Neither is
- * worth anything unless something demonstrates that a scoped session *cannot*
- * see another tenant's rows — a policy with no reader is the same shape as this
- * repo's unwalked-edge problem, and the failure mode is worse: it looks like it
- * is working right up until it is not.
- *
- * **It runs the whole stack, not a hand-built connection.** `connectDb()`, the
- * real `resolveTenantContext`, the real `scopeToTenant`, the real event store —
- * so a grant this repo forgot shows up here as a permissions error rather than
- * being quietly supplied by the test.
- *
- * **Deliberately not on `setupTestDb()`.** That shares one PGlite session across
- * the entire suite, and `SET ROLE` is session state: a test that stepped down
- * there would leave every later test running as `labkit_app`, including the
- * teardown that truncates. This file opens its own connections and closes them.
- *
- * Under `bun run test:pg` these are two genuinely concurrent connections to one
- * Postgres, which is the arrangement production has and PGlite cannot express.
- * Under the default they are two sequential ones against a private database,
- * ~90ms a cycle. The visibility claim is the same either way; only the second
- * proves it under concurrency.
- *
- * **The graph-side isolation tests stay in `tests/domain-graph.test.ts`, and
- * moving them here was planned and then declined.** The plan assumed
- * session-scoped tenancy would break a single connection resolving two tenants;
- * it does not — `resolveTenantContext` scopes nothing, only `scopeToTenant`
- * does, and that file never calls it. Worse, the move would *weaken* the
- * second of them: "an edge in A cannot address a node in B" is a claim about
- * `createEdge` resolving endpoints against a graph name, and it needs one
- * connection holding both graphs to say anything. Split across two connections
- * it would pass for a reason that has nothing to do with the code under test.
- *
- * So the two files divide by what isolates: AGE isolates by *schema*, one graph
- * per tenant, and that needs no session scoping to demonstrate. The relational
- * side has one shared table and isolates by *policy*, which is what this file
- * is about.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -84,9 +45,6 @@ const anEvent = (subject: string): DomainEvent =>
 
 /**
  * One connection, resolved and stepped down, for the duration of `work`.
- *
- * `LABKIT_DB_URL` decides whether that is a fresh PGlite under a lock or a real
- * Postgres session; nothing here needs to know which.
  */
 async function asTenant<T>(
   slug: string,

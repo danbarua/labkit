@@ -1,13 +1,6 @@
 /**
- * `check:migrations` refuses destructive DDL, an un-annotated `ALTER TABLE`,
- * and a run that examined no migrations at all.
- *
- * It drives the real script as a subprocess against a temporary `drizzle/`,
- * because the exit code is half of what a check promises and importing the
- * module would run it against this repo's own migrations instead. The last
- * case is the one that has no other watcher: `readMigrations` filters by
- * `.sql`, so an empty folder reaches the loop with nothing in it, and every
- * assertion inside a `for` over an empty list passes.
+ * `check:migrations` refuses destructive DDL, an un-annotated `ALTER TABLE`, and a run that
+ * examined no migrations at all.
  */
 
 import { expect, test } from "bun:test";

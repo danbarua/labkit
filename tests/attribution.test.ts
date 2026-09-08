@@ -1,15 +1,5 @@
 /**
  * Attribution: who ran a command, recorded beside when.
- *
- * Four tests, and each of them exists because a different thing could break
- * silently. The feature has no reader in the product yet — nothing queries an
- * event's attribution — so this file *is* the only thing standing between the
- * field and a regression nobody would notice.
- *
- * It lives outside `tests/scenarios/` on purpose. A scenario asserts that a
- * researcher's intent can be carried out through research verbs alone; this
- * asserts something about the *execution context* a verb runs in, which is not
- * a research question and does not belong in a research conversation.
  */
 
 import type { PoseCommand } from "../src/domain/commands";
@@ -76,13 +66,6 @@ describe("an event says who caused it", () => {
 
   /**
    * The default is a **statement**, not an absence.
-   *
-   * `tests/domain-session.test.ts` constructs `new ResearchSession(graph)` bare
-   * and every scenario passes only a clock, so the unattributed path is the one
-   * most of the suite runs. It has to produce a value a reader can act on: an
-   * event carrying three empty strings under a named constant says nobody
-   * claimed this, where an absent key would leave a reader unable to tell that
-   * from a writer that forgot.
    */
   test("a surface given no attribution emits UNATTRIBUTED, not undefined", async () => {
     const events = inMemoryEventLog();
@@ -95,13 +78,6 @@ describe("an event says who caused it", () => {
 
   /**
    * The point of the feature, stated as the thing it makes possible.
-   *
-   * Two surfaces over one graph and one sink, differing only in who is
-   * running them, produce a stream in which the two authors are separable —
-   * which is the question "who did this?" answered, and the reason
-   * `attribution_id` is a field of its own rather than a label. The labels here
-   * would be enough; they are not asserted on, because a label is renameable
-   * and an id is what a later reader would actually group by.
    */
   test("two agents writing to one record stay distinguishable", async () => {
     const events = inMemoryEventLog();
@@ -122,16 +98,8 @@ describe("an event says who caused it", () => {
   });
 
   /**
-   * **The regression guard on the sink hoist**, and the reason it is here
-   * rather than in the MCP tests.
-   *
-   * `src/mcp/server.ts` builds a `WriteSurface` per tool call so each one can
-   * carry its own attribution. That is only safe because the sink is
-   * constructed by `main()` and passed in. If it ever goes back to being
-   * defaulted per surface — `new WriteSurface(graph)` — every call gets a
-   * private log, the read half holds whichever one was built first, and the
-   * event stream fragments with nothing failing. This test fails in exactly
-   * that case, one layer below where the mistake would be made.
+   * **The regression guard on the sink hoist**, and the reason it is here rather than in the
+   * MCP tests.
    */
   test("surfaces built per command share the sink they were handed", async () => {
     const events = inMemoryEventLog();

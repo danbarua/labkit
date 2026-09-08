@@ -1,22 +1,5 @@
 /**
  * The read commands — one per public verb on `ReadSurface`.
- *
- * **Declared, not dispatched.** The monolithic CLI answered every question
- * inside one `switch` five hundred lines long, where a command's arguments, its
- * validation, its verb call and its rendering were four things separated by
- * indentation. Here commander owns parsing, `../args` owns coercion, `../views`
- * owns rendering, and what is left in each body is the sentence that matters:
- * which verb, with which handles.
- *
- * Each body calls `read.someVerb(` literally, and `tests/cli/coverage.test.ts`
- * greps this directory for exactly that. Derived rather than listed, so a verb
- * added to the surface later is covered without anyone remembering — and
- * derived from the call, not from a `verb:` field beside it, because a field
- * records what a declaration *says* and can disagree with the line below it.
- *
- * The coverage runs one way only: **every read verb needs a command, and a
- * command needs no MCP tool.** `--backup` or anything else the terminal wants
- * and an agent does not is a feature, not a parity failure.
  */
 
 import type { Command } from "commander";
@@ -177,14 +160,9 @@ export function registerReads(program: Command, run: Run): void {
         "handle, and until this existed the only way to get one was to already hold a " +
         "claim. `--state blocked` is what is stopping work.",
     )
-    // **The coercion is commander's parser, not called in the action.** Passed
-    // here, commander catches the `InvalidArgumentError`, prints it with usage
-    // and exits before any command body runs. Called inside `.action()` it
-    // still threw, but `main()`'s catch sees a `CommanderError` with
-    // `exitCode` already set and returns early on the assumption commander has
-    // printed it -- so `labkit gates --state blockd` exited 1 in **silence**,
-    // and created a database on the way, because the run wrapper opens one
-    // before the body validates anything.
+    // **The coercion is commander's parser, not called in the action.** Passed here, commander
+    // catches the `InvalidArgumentError`, prints it with usage and exits before any command
+    // body runs.
     .option("--state <state>", "never-evaluated | incomplete | blocked | satisfied", gateState)
     .action(async (opts: { state?: ReturnType<typeof gateState> }) =>
       run(async ({ read }) => answer(await read.gateList(opts.state), renderGateList)),

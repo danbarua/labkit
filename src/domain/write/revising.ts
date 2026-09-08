@@ -41,12 +41,6 @@ const anyRef = (id: string): Ref<Kind> => ref((kindOf(id) ?? id) as Kind, id);
 
 /**
  * The `Claim.kind` each state is stored as.
- *
- * `confirmed` is the researcher's word and `confirmatory` is the stored one,
- * which is not a translation layer creeping in: the property predates the verb
- * and every read already branches on its value, so renaming it would be a data
- * migration bought with nothing. The map is here so the two words meet in one
- * place rather than at each write.
  */
 const STORED_KIND: Record<ClaimState, NonNullable<ClaimProps["kind"]>> = {
   undecided: "undecided",
@@ -69,20 +63,7 @@ export class Revising extends Shared {
   }
 
   /**
-   * Records that a historical result was re-checked, without claiming its run
-   * was reproduced.
-   *
-   * `recordAnalysis` plus one edge, and the edge is the whole point: recorded
-   * as an ordinary analysis the re-run becomes a second finding behind the same
-   * claim, and the record then says a proposition established once rests on two
-   * independent results. See `EDGE_SCHEMA.REVERIFIES`.
-   *
-   * `under` is what the *new* run consumed. It is normally non-empty precisely
-   * because the historical run's inputs were never recorded — that asymmetry is
-   * the situation, not an error, and `reproductionOf()` reads it back as
-   * `unrecorded-in-the-original` rather than as a difference.
-   *
-   * One event, not two: a researcher who re-verified a result did one thing.
+   * Records that a historical result was re-checked, without claiming its run was reproduced.
    */
   async reverify(input: ReverifyCommand): Promise<VerificationReport> {
     return this.handle("reverify", input, async (unitOfWork) => {
@@ -144,20 +125,7 @@ export class Revising extends Shared {
   }
 
   /**
-   * Puts a claim into a state its evidence does not carry, and records what
-   * put it there.
-   *
-   * **The state is on the claim, not on a third kind of edge.** A finding that
-   * settles nothing is not a third direction for evidence to point — AGE has
-   * no edge alternation, so every clause reaching a claim already spells
-   * `SUPPORTS` and `CHALLENGES` separately, and a third label would have to be
-   * added to each of them with silence as the failure mode. `promote` is the
-   * shape this follows: mint the deciding act, connect it, set the property.
-   *
-   * The Decision carries `GRADES`, not `CHANGES`: `supersededClaim()` reads
-   * every `CHANGES` into a claim as that claim no longer standing, and a
-   * finding recorded as undecided is not withdrawn — it is real, and it still
-   * rests under the claim.
+   * Puts a claim into a state its evidence does not carry, and records what put it there.
    */
   async is(input: IsCommand): Promise<Restated> {
     return this.handle("is", input, async (unitOfWork) => {
@@ -201,42 +169,14 @@ export class Revising extends Shared {
 
   /**
    * Takes back a mistaken act, naming the event it recorded.
-   *
-   * **Retracts, does not delete.** Every handle the act minted is marked
-   * `retracted`, which an RLS policy per label (`ensureRetractionPolicy`,
-   * `src/db/provisioning.ts`) hides from `labkit_app` — the role every
-   * ordinary read and write runs as. An edge into or out of a retracted node
-   * is hidden the same way, for free: a Cypher `MATCH` naming a hidden node as
-   * either endpoint cannot match it, so nothing further is written to hide
-   * `EdgeCreated` changes on their own account. That is also this verb's
-   * present limit — an edge between two nodes **neither** of which this act
-   * created has no natural id of its own to mark, and stays visible; every
-   * verb on this surface mints at least one node for anything it connects,
-   * so this has not yet been a real case.
-   *
-   * **Hidden from the ordinary read surface, not made unreachable.** The
-   * `SET ROLE` every session steps down to can `RESET ROLE` back — a safety
-   * boundary against a query that forgot its tenant, not a security one — so
-   * an operator with cause can still read what this retracted. That is the
-   * compensating act this verb is: the record keeps the mistake and stops
-   * traversing it, rather than erasing that it happened.
-   *
-   * **Refuses rather than cascades.** An act whose `changes` include a
-   * `PropsChanged` set a property in place with nothing to retract it to —
-   * `is` is the one verb that does this today — and is refused outright,
-   * naming the reason. An act whose creations something else already rests
-   * on is also refused, naming what depends on it: retracting silently would
-   * turn a verdict measured against real evidence into one asserted against
-   * nothing, which is a wrong answer with no error to find it by.
    */
   async undo(input: UndoCommand): Promise<Undone> {
     return this.handle("undo", input, async (unitOfWork) => {
-      // `since: event - 1, limit: 1` rather than an exact-seq filter: `seq` is
-      // per-tenant but the underlying sequence is shared across tenants (see
-      // `DomainEvent.seq`'s own doc comment), so a gap at this tenant's next
-      // number is a real, ordinary case and not a bug — checked explicitly
-      // rather than trusted, because a `since` filter finds the *next* event
-      // whether or not this one exists.
+      // `since: event - 1, limit: 1` rather than an exact-seq filter: `seq` is per-tenant but
+      // the underlying sequence is shared across tenants (see `DomainEvent.seq`'s own doc
+      // comment), so a gap at this tenant's next number is a real, ordinary case and not a bug
+      // — checked explicitly rather than trusted, because a `since` filter finds the *next*
+      // event whether or not this one exists.
       const [found] = await this.events.select({ since: input.event - 1, limit: 1 });
       if (found?.seq !== input.event)
         throw new Error(`no event ${input.event}; 'labkit happened' names the acts on the record`);
@@ -256,14 +196,10 @@ export class Revising extends Shared {
             `a value it overwrote`,
         );
 
-      // What rests on any of this, from outside the act itself -- an edge
-      // between two things this same event created is the act's own wiring,
-      // not a dependent. Unlabeled on both sides deliberately: a dependent
-      // can be any kind of node, and naming one label would silently miss
-      // every other. Both directions, separately: `evidence -[:BASED_ON]->
-      // criterion-evaluation` and `question -[:MOTIVATES]-> enquiry` are
-      // both a hidden node breaking something external's own traversal, one
-      // pointing at what is retracted and one pointing away from it.
+      // What rests on any of this, from outside the act itself -- an edge between two things
+      // this same event created is the act's own wiring, not a dependent. Unlabeled on both
+      // sides deliberately: a dependent can be any kind of node, and naming one label would
+      // silently miss every other.
       const into = await this.graph.query(
         `MATCH (external)-[r]->(target)
          WHERE target.natural_id IN $ids AND NOT external.natural_id IN $ids
@@ -286,13 +222,9 @@ export class Revising extends Shared {
         },
         { ids: retracting },
       );
-      // An edge THIS event wrote is the act's own wiring even when one of its
-      // two endpoints already existed -- `conclude` staging `unit PRODUCES
-      // evidence` reaches a pre-existing unit, and that unit is not a
-      // dependent of the evidence it produced. Keyed on the same triple
-      // `edgesIn` reports the event minted, since that is the one thing that
-      // tells an act's own edge apart from an identical-looking one somebody
-      // else wrote.
+      // An edge THIS event wrote is the act's own wiring even when one of its two endpoints
+      // already existed -- `conclude` staging `unit PRODUCES evidence` reaches a pre-existing
+      // unit, and that unit is not a dependent of the evidence it produced.
       const ownEdges = new Set(edgesIn(found).map((e) => `${e.from}|${e.label}|${e.to}`));
       const dependents = [...into, ...outOf].filter(
         (d) => !ownEdges.has(`${d.origin.natural_id}|${d.via}|${d.reaches.natural_id}`),
@@ -319,14 +251,10 @@ export class Revising extends Shared {
   }
 
   /**
-   * "Replace the analysis, mark the prior inference superseded, and propagate
-   * whatever claims change." One instruction in the conversation, so one verb
-   * here — it invalidates the old analysis's output, records the replacement
-   * against the same observations, and returns what moved.
-   *
-   * The observations are deliberately untouched: only the artefact holding the
-   * old analysis's OUTPUT gets the `INVALIDATED_BY` edge. An inference can be
-   * wrong while the measurements it read remain fine.
+   * "Replace the analysis, mark the prior inference superseded, and propagate whatever claims
+   * change." One instruction in the conversation, so one verb here — it invalidates the old
+   * analysis's output, records the replacement against the same observations, and returns what
+   * moved.
    */
   async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
     return this.revise({ ...input, keeping: [] }, "replaceAnalysis");
@@ -334,13 +262,6 @@ export class Revising extends Shared {
 
   /**
    * Revises an analysis by naming the conclusions that survive.
-   *
-   * Everything else that analysis concluded is superseded here, at this moment,
-   * rather than one `conclude --replacing` at a time. A caller who forgets an
-   * entry supersedes something still true — visible in the answer — where
-   * forgetting to supersede leaves something stale reading as current.
-   *
-   * The kept claims identify the analysis, so they must come from one.
    */
   async keep(input: KeepCommand): Promise<ReplacementReport> {
     if (input.keeping.length === 0)
@@ -395,10 +316,7 @@ export class Revising extends Shared {
   private async revise(
     input: KeepCommand & { supersedes: AnalysisRef },
     /**
-     * Which act the caller performed. **Taken from the caller, not fixed
-     * here**: `keep` and `replace` share this implementation and are different
-     * acts — one carries conclusions forward, the other supersedes every one
-     * of them — so a log that named them alike could not tell them apart.
+     * Which act the caller performed.
      */
     operation: "keep" | "replaceAnalysis",
   ): Promise<ReplacementReport> {
@@ -484,11 +402,6 @@ export class Revising extends Shared {
 
   /**
    * Narrows an interpretation without touching anything it was inferred from.
-   *
-   * The computations, artefacts, observations and findings all stay exactly as
-   * they were — this verb exists precisely because `replaceAnalysis` cannot
-   * express that, its whole mechanism being invalidation of the output. Here
-   * the numbers were right and only the sentence about them was wrong.
    */
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
     return this.handle("reinterpret", input, async (unitOfWork) => {
@@ -528,15 +441,10 @@ export class Revising extends Shared {
         asserts: previously,
       }));
 
-      // **The match above is on wording, and wording does not say whether a
-      // claim still stands.** A reading narrowed weeks ago carries its name and
-      // its evidence unchanged, so it matches again -- and narrowing it a second
-      // time puts two successors on one reading with nothing saying which the
-      // record asserts. The same act-level incoherence `amendDesign` refuses.
-      //
-      // Only the named claim is checked: a reading is withdrawn in full, and
-      // `recordAnalysis` refuses to re-assert a withdrawn one, so a withdrawn
-      // claim cannot sit in this match beside a standing one.
+      // **The match above is on wording, and wording does not say whether a claim still
+      // stands.** A reading narrowed weeks ago carries its name and its evidence unchanged, so
+      // it matches again -- and narrowing it a second time puts two successors on one reading
+      // with nothing saying which the record asserts.
       const named = (await this.standingOf([input.of])).get(input.of);
       if (named?.withdrawn)
         throw new Error(
@@ -605,13 +513,9 @@ export class Revising extends Shared {
   }
 
   /**
-   * A replacement must be justified by a review OF the analysis being
-   * replaced -- otherwise any review's verdict could retire any analysis,
-   * and `whySupported()` would report a withdrawal reason that never
-   * referred to the withdrawn work.
-   *
-   * This is why `Review -[:EVALUATES]-> EvidenceUnit` is not decorative: it
-   * constrains a research action, not just an explanatory query.
+   * A replacement must be justified by a review OF the analysis being replaced -- otherwise any
+   * review's verdict could retire any analysis, and `whySupported()` would report a withdrawal
+   * reason that never referred to the withdrawn work.
    */
   private async assertReviewOf(review: ReviewRef, analysis: AnalysisRef): Promise<void> {
     const rows = await this.graph.query(

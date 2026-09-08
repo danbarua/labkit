@@ -1,19 +1,5 @@
 /**
  * S-10b — "The same inputs, in a different order."
- * docs/project-journal/008_user_story_mining.md §3 row T
- * docs/consumer-contract/034_row_t_predictions.md
- *
- * Row T claimed edges cannot carry properties. Refuted: they can, and
- * `createEdge()` now takes them. What survives is that an edge property cannot
- * be part of edge identity and cannot be changed after creation — so the only
- * discriminator left is a fact **intrinsic to a relationship**, where being
- * unable to put it there gives a wrong answer.
- *
- * Input order on `CONSUMES` is the best candidate: intrinsic, unchanging,
- * incapable of recurring between one pair, and badly served by a node — since
- * reifying "the second input" as an entity is worse than a number on an edge.
- *
- * Imports only src/domain — never src/db (enforced).
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -52,12 +38,8 @@ async function afterwards(): Promise<ResearchSession> {
 const SHIFTED = "the second series is shifted relative to the first";
 
 /**
- * Researcher: "The alignment is a subtraction — first series minus second. Run
- *  it the other way round and the sign flips, so the order of the two inputs is
- *  part of what the run was."
- *
- * An ordinary order-sensitive method. Nothing exotic: any difference,
- * regression-against-baseline, or sequential fit has this property.
+ * Researcher: "The alignment is a subtraction — first series minus second. Run it the other way
+ * round and the sign flips, so the order of the two inputs is part of what the run was."
  */
 async function anAlignmentRunInOneOrder(
   s: ResearchSession,
@@ -103,20 +85,6 @@ describe("S-10b: the same inputs, in a different order", () => {
 
   /**
    * **The finding, and it is an absence rather than row T's wrong answer.**
-   *
-   * Order is not recorded: `CONSUMES` says which artefacts a computation read,
-   * never in what sequence. So a rebuild that read the same two series the
-   * other way round reports itself fully reproducible against the original.
-   *
-   * That answer is *wrong about the world* — the two runs computed different
-   * things — but it is **not evidence for row T**, and the reason is the whole
-   * result. The record does not know `pairwise-alignment` is order-sensitive.
-   * Put an ordinal on the edge and this report still says `reproducible: true`,
-   * because nothing compares the orders. Fixing it needs the model to know the
-   * method cares about order, and *that* is a gap about methods, not about
-   * where a property can live.
-   *
-   * Row T would be taking credit for someone else's absence.
    */
   test("a rebuild in the opposite order reports itself reproducible", async () => {
     const backwards = await anAlignmentRunInOneOrder(session, "second-then-first");
@@ -133,12 +101,9 @@ describe("S-10b: the same inputs, in a different order", () => {
   });
 
   /**
-   * And the same absence through the verb built for exactly this question.
-   * `reproductionOf()` decides whether two runs are a reproduction by comparing
-   * what each recorded consuming — a set comparison, with no order in it.
-   *
-   * Asserted so the claim is about durable state and not about one report's
-   * internals: two genuinely different executions, one verdict of `reproduced`.
+   * And the same absence through the verb built for exactly this question. `reproductionOf()`
+   * decides whether two runs are a reproduction by comparing what each recorded consuming — a
+   * set comparison, with no order in it.
    */
   test("re-verification treats the reversed run as a reproduction", async () => {
     const { enquiry, first, second, analysis, analysisClaims } = await anAlignmentRunInOneOrder(

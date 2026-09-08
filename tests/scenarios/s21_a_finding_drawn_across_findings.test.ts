@@ -1,17 +1,5 @@
 /**
  * S-21: the headline that computes nothing new.
- *
- * **Researcher:** Four comparisons are on the record — a lattice control and
- * three stochastic ones — and none of them shows an advantage. The finding I
- * want to report is the four of them together: *no detectable advantage over
- * any of the tested controls*. I did not run anything to reach it.
- *
- * **Agent:** That is a claim resting on the four, not a fifth analysis.
- *
- * From Bonsai's Stage 1D (#146). The workaround before this verb existed was
- * to close the enquiry citing one of the four — the lattice comparison, being
- * the cleanest — so the record named a single control's result as the answer
- * to a question about four.
  */
 
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, test } from "bun:test";
@@ -96,11 +84,6 @@ describe("S-21: a finding drawn across findings", () => {
 
   /**
    * The second reader, which `why` answers over MCP.
-   *
-   * `renderWhy` declines the verdict and names the basis; `explain` had no
-   * branch for a synthesis at all, so it fell through to the arm whose words
-   * are "nothing has examined it" — of a sentence four analyses were drawn
-   * across. Measured on the Bonsai record's CLM_22 before the fix.
    */
   test("the synthesis reads the same way whichever reader is asked", async () => {
     const { claims } = await fourComparisons();
@@ -132,13 +115,6 @@ describe("S-21: a finding drawn across findings", () => {
 
   /**
    * The bearing half, which is what a negative result looks like.
-   *
-   * `closeEnquiry` reached a synthesis's parts through `SUPPORTS` alone, so a
-   * headline drawn across findings that all *challenge* their propositions —
-   * Bonsai's Stage 1D exactly — read as a claim nothing bears on and the
-   * closure was refused. AGE has no edge alternation, so naming one bearing is
-   * silent: the rows are absent rather than wrong. Shipped in #276 and found
-   * by running the transcript, not by review.
    */
   test("a synthesis over challenging findings can close its enquiry too", async () => {
     const { enquiry } = await session.openEnquiry("does T beat the controls?");
