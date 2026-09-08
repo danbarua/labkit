@@ -22,6 +22,8 @@
  *
  * Usage: bun run check:bunx-bun
  * Exit:  0 when every such call passes `--bun`, 1 otherwise.
+ *
+ * retire-when: bunx passes --bun by default, or these binaries drop their node shebang.
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";

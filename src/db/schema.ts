@@ -2,11 +2,8 @@ import * as p from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
- * Single source of truth for the schema LabKit's own vanilla SQL objects (the `tenants` table,
- * the natural-id sequences/functions in drizzle/0002_natural_ids.sql) live in — hardcoded to
- * Postgres's default `public` for now, named in exactly one place so every raw-SQL call site
- * (src/db/tenant.ts, src/db/graph.ts) can schema-qualify explicitly instead of relying on
- * session `search_path` ordering.
+ * The schema LabKit's own SQL objects live in: the `tenants` table and the natural-id sequences.
+ * Named once so every raw-SQL call site qualifies explicitly rather than trusting `search_path`.
  */
 export const LABKIT_SCHEMA = "public";
 

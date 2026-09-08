@@ -172,10 +172,9 @@ class Scanner {
   }
 
   /**
-   * Scans the full numeric token as text — `float8out` emits bare `Infinity`/`-Infinity`/`NaN`
-   * (not valid JSON tokens) alongside ordinary numbers, and a `.`/`e`/`E` in an ordinary token
-   * means AGTV_FLOAT (always safe as a JS `number`, since `float8out` is IEEE double either
-   * way).
+   * Scans the full numeric token as text — `float8out` emits bare `Infinity`/`-Infinity`/`NaN` (not
+   * valid JSON tokens) alongside ordinary numbers, and a `.`/`e`/`E` in an ordinary token means
+   * AGTV_FLOAT (always safe as a JS `number`, since `float8out` is IEEE double either way).
    */
   private parseNumberTagged(): AgtypeJSON {
     if (this.s.startsWith("Infinity", this.i))

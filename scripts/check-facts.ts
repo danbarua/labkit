@@ -6,6 +6,8 @@
  * fail loudly and explains why the third cannot be checked here. All three were
  * live defects during the port, and none of them errored at the time — that is
  * the point. A fact that gets one wrong returns a plausible answer.
+ *
+ * retire-when: `grain` and clause dependencies are expressible in the type system.
  */
 
 import ts from "typescript";

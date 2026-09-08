@@ -20,6 +20,8 @@
  *
  * Usage: bun run check:migrations
  * Exit:  0 when every migration is within policy, 1 otherwise.
+ *
+ * retire-when: migrations stop being hand-written SQL.
  */
 
 import fs from "node:fs";

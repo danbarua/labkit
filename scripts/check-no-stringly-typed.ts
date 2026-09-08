@@ -32,6 +32,8 @@
  * one of those was out of reach here and was fixed by hand. What *is* in scope
  * is a `Map` or `Set` in a real signature; the wrapper list below was widened
  * after that case showed the walker stopping at `Promise` and `Array`.
+ *
+ * retire-when: the compiler can reject a bare string in these signatures on its own.
  */
 
 import ts from "typescript";

@@ -18,11 +18,10 @@ import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { transactor } from "../src/db/transactor";
 
 /**
- * Exercises the LabKit domain model revised by
- * and ) against Apache AGE, migrated and provisioned the
- * same way a real connection would be (runMigrations() + resolveTenantContext(), not hand-
- * rolled setup) and queried through the same `LabKitDB` seam production uses (see
- * tests/helpers/db.ts).
+ * Exercises the LabKit domain model revised by and ) against Apache AGE, migrated and
+ * provisioned the same way a real connection would be (runMigrations() +
+ * resolveTenantContext(), not hand- rolled setup) and queried through the same `LabKitDB` seam
+ * production uses (see tests/helpers/db.ts).
  */
 
 let testDb: TestDb;

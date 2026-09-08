@@ -25,6 +25,8 @@
  *
  * Usage: bun scripts/check-test-teardown.ts
  * Exit:  0 when clean, 1 when a file opens a scenario and never resets.
+ *
+ * retire-when: the scenario harness resets the database itself.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

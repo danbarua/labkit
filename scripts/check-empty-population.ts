@@ -22,6 +22,8 @@
  *
  * The scaffold symlinks `node_modules` rather than copying it, so this costs
  * a few seconds rather than a minute.
+ *
+ * retire-when: every check reports its population count on its own.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, copyFileSync } from "node:fs";

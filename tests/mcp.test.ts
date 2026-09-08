@@ -150,8 +150,8 @@ describe("an agent can track work through the tools alone", () => {
   /**
    * The sentence this file exists to assert: **an agent with nothing but this server can put a
    * piece of research on the record and then ask about it.** Every act below goes over the wire
-   * through `callTool` — no `ResearchSession` is constructed, no verb is called directly, and
-   * the reads at the end see only what the writes put there.
+   * through `callTool` — no `ResearchSession` is constructed, no verb is called directly, and the
+   * reads at the end see only what the writes put there.
    */
   async function client() {
     const graph = await scenario.begin();
@@ -389,10 +389,9 @@ describe("an agent can track work through the tools alone", () => {
   });
 
   /**
-   * `replace_analysis(supersedes=A2, from=[A1])` accepts an earlier analysis's own id as an
-   * input, not only the artefact id underneath it -- so a caller holding a `COMP_` id from an
-   * earlier recording step can pass it straight through, rather than looking up what that
-   * analysis read.
+   * `replace_analysis(supersedes=A2, from=[A1])` accepts an earlier analysis's own id as an input,
+   * not only the artefact id underneath it -- so a caller holding a `COMP_` id from an earlier
+   * recording step can pass it straight through, rather than looking up what that analysis read.
    */
   test("a replacement can read an earlier analysis's output, by that analysis's id", async () => {
     const c = await client();

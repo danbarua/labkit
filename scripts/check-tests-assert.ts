@@ -35,6 +35,8 @@
  * assertion is decidable.
  *
  * Exit 0 = clean. Exit 1 = tests that assert nothing, listed.
+ *
+ * retire-when: the test runner fails a test that asserts nothing.
  */
 import { readFileSync } from "node:fs";
 import { Glob } from "bun";

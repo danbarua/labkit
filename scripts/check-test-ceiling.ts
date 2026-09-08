@@ -28,6 +28,8 @@
  *
  * Usage: bun run check:test-ceiling
  * Exit:  0 when every caller goes through the script, 1 otherwise.
+ *
+ * retire-when: bun honours `[test] timeout` in bunfig.toml.
  */
 
 import { readFileSync, readdirSync } from "node:fs";

@@ -527,10 +527,8 @@ const analysisRevisionSchema = z.strictObject({
 });
 
 /**
- * `why` — a discriminated union on `kind`, not one shape with optional fields: `report` differs
- * by kind (`SupportExplanation` for a claim, `TaskContract` for work, `EnquiryInContext` for a
- * line of enquiry, `GateStatus` for a gate), and a caller narrowing on `kind` gets the right
- * one without a cast.
+ * `why` — a discriminated union on `kind`. `report` differs by kind, so a caller that narrows on
+ * `kind` gets the right shape without a cast.
  */
 const gateGoverned = z.strictObject({
   gate: ref("gate"),

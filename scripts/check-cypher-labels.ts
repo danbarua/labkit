@@ -24,6 +24,8 @@
  * `-[:GATES]->(w:Task)` drops a gated `Computation` and returns the rest,
  * which reads as a shorter answer rather than a wrong one. This asks whether
  * a name exists; whether it is the right one of several is a reader's job.
+ *
+ * retire-when: the Cypher strings are gone, or a typed query builder makes an undeclared label impossible.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";

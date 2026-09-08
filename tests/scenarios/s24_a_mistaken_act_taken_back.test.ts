@@ -75,10 +75,9 @@ describe("S-24 — a mistaken act taken back", () => {
   });
 
   /**
-   * The case #134 was filed for, and the one no test above could catch: the dependents check
-   * first read every edge into or out of what is being retracted, and `conclude` writes two of
-   * its own -- `unit PRODUCES evidence`, `evidence RECORDED_IN output` -- to nodes the analysis
-   * already had.
+   * The case #134 was filed for, and the one no test above could catch: the dependents check first
+   * read every edge into or out of what is being retracted, and `conclude` writes two of its own --
+   * `unit PRODUCES evidence`, `evidence RECORDED_IN output` -- to nodes the analysis already had.
    */
   test("an act's own edges to pre-existing nodes are not dependents of it", async () => {
     const { enquiry } = await session.openEnquiry("does depth move convergence?");

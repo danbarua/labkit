@@ -19,6 +19,7 @@
 #
 # Usage: scripts/check-stdout.sh
 # Exit:  0 when clean, 1 when a banned write is found.
+# retire-when: the CLI is the only thing that can reach stdout by construction.
 
 set -euo pipefail
 
