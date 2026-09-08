@@ -19,9 +19,8 @@ triggers:
 
 LabKit's provenance graph (Question, LineOfEnquiry, EvidenceUnit, Evidence,
 Claim, Decision, Criterion, CriterionEvaluation, Gate, Review, Artefact,
-Computation, Task — see `docs/project-journal/001_git_init.md`) lives in
-**one Apache AGE graph per tenant** (`docs/project-journal/003_review_domain_tenancy.md`,
-`docs/project-journal/004_tenancy_implementation_plan.md`), running inside
+Computation, Task) lives in
+**one Apache AGE graph per tenant**, running inside
 PGlite via `pglite-age`. There is no fixed graph name — every tenant's graph
 is named `labkit_t${tenantId}` (e.g. `labkit_t1`), resolved via
 `resolveTenantContext()` (`src/db/tenant.ts`) into a `TenantContext`. All
@@ -33,7 +32,7 @@ Application code above the persistence layer talks to `src/domain/` (research
 actions) rather than to `TenantGraph` directly; this document stays relevant
 there only for understanding what those actions compile down to. New labels
 and edges are earned by an acceptance scenario returning a wrong answer
-without them — see PJ-009.
+without them.
 
 `pglite-age` is a genuine compile of Apache AGE's own C source under
 Emscripten/WASM, not a reduced/reimplemented subset — `electric-sql/postgres-pglite`
@@ -50,7 +49,7 @@ makes for its own 8-byte types on 4-byte-`Datum` platforms. `docker-compose.yml`
 runs a real Postgres 18 + AGE 1.7.0 container
 (`apache/age:release_PG18_1.7.0`, no WASM) for comparing behavior directly
 against this pinned version when a gotcha's platform-specificity is in
-question — see "LabKit-specific gotchas" below, and PJ-006 for how this was
+question — see "LabKit-specific gotchas" below, for how this was
 established.
 
 Treat anything not already proven working in this repo's own tests as worth
@@ -183,21 +182,21 @@ again — the MCP/CLI read layer is where it would.
 **Provisioning is reconciliation, not a one-time gate.** `create_graph`/
 `create_vlabel`/`create_elabel`/index/view creation all happen via
 `src/db/provisioning.ts`'s `provisionTenantGraph()` (called from every
-`resolveTenantContext()`, unconditionally — no version check, see PJ-005),
+`resolveTenantContext()`, unconditionally — no version check),
 which independently ensures each resource exists — not gated behind a
 single "does the graph already exist" check. That distinction matters
 because there's no `ALTER GRAPH` DDL the way there's `ALTER TABLE`: evolving
 an already-provisioned tenant's graph structure is the application's job,
 and an all-or-nothing gate would mean a tenant provisioned before a new
 label/edge/view shipped never sees
-it. See docs/project-journal/005_provisioning_reconciliation.md.
+it.
 
 ## LabKit-specific gotchas
 
 Root causes below are cited against the actual AGE 1.7.0-rc0/PG18 source
 (`electric-sql/postgres-pglite`'s `age` submodule — see "Overview" above).
-When something's not already proven working in this repo's own tests, spike
-it in a throwaway script first — see PJ-006 for how these were found.
+When something is not already proven by this repo's own tests, spike it in a
+throwaway script before relying on it.
 
 - **`MERGE` for a relationship between two already-matched nodes is broken.**
   `MATCH (a...), (b...) MERGE (a)-[:EDGE]->(b)` runs without error and
@@ -349,7 +348,7 @@ not yet submitted anywhere:
   hitting the primary's socket concurrently, which is exactly this trigger
   condition — `tests/leader-election.test.ts` is a live, unresolved
   instance of it, not fixable the same way the `TenantGraph` tests were
-  (see PJ-006).
+.
 
 ## LabKit query cookbook
 
@@ -449,7 +448,7 @@ RETURN input, output
 computation consumed, *not* via the enquiry. Going out through
 `ADDRESSES`/`REQUIRES` instead answers "what observations is this enquiry
 associated with", which returns the wrong answer once one enquiry carries two
-analyses over different inputs (PJ-009 §4):
+analyses over different inputs:
 ```cypher
 MATCH (:Claim {name: $name})<-[:SUPPORTS]-(e:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(comp:Computation)
 MATCH (comp)-[:CONSUMES]->(a:Artefact)
@@ -468,25 +467,72 @@ RETURN c, ev
 ```
 Dropping the `-[:TRIGGERS]->(g)` tail widens it to criterion scope — a
 different and also useful question ("has this check ever been shown able to
-fail?"), and a silent bug if you meant the first one. See PJ-011 §3.
+fail?"), and a silent bug if you meant the first one.
 
-## References
+## Traps with no other home
 
-- [Overview](https://age.apache.org/age-manual/master/intro/overview.html)
-- [Graphs — create_graph, create_vlabel/elabel, how graphs are stored](https://age.apache.org/age-manual/master/intro/graphs.html)
-- [Clauses](https://age.apache.org/age-manual/master/clauses/match.html) (MATCH, CREATE, MERGE, SET, RETURN, ...)
-- [AGE Beyond Cypher — Overview](https://age.apache.org/age-manual/master/advanced/advanced_overview.html)
-- [AGE Beyond Cypher — CTE/JOIN/expression composition](https://age.apache.org/age-manual/master/advanced/advanced.html)
-- [SQL In Cypher](https://age.apache.org/age-manual/master/advanced/sql_in_cypher.html)
-- `docs/project-journal/001_git_init.md` — the domain model this graph implements
-- `docs/project-journal/002_schema_dot_ts.md` — the first implementation's write-up
-- `docs/project-journal/003_review_domain_tenancy.md` — the tenancy/domain review
-- `docs/project-journal/004_tenancy_implementation_plan.md` — this implementation's plan
-- `docs/project-journal/005_provisioning_reconciliation.md` — provisioning reconciliation, why there's no version gate
-- `docs/project-journal/006_agtype_client_and_concurrency_hardening.md` — AGE provenance, the in-house `agtype.ts` parser, schema-qualification, and the pglite-socket concurrency bug
-- `docs/project-journal/007_db_layering_and_typed_cypher.md` — layering `src/db/`, the column-decoder query API, and the `NODE_TYPES` domain registry
-- `docs/project-journal/008_user_story_mining.md` — the interaction corpus the graph model is now tested against, and its running ledger of design pressure
-- `docs/project-journal/009_domain_service_layer_s11.md` — the domain service layer, and the bar a new label/edge has to clear to be added
-- `docs/project-journal/010_cold_context_review.md` — cold-context review after the first scenario: what four unprimed reviewers could and couldn't reconstruct
-- `docs/project-journal/011_control_chain_two_wrong_predictions.md` — the Criterion/Gate chain under scenario pressure, and why unused labels are not culled
-- `docs/project-journal/012_implementers_perspective.md` — the implementing agent's read of what has and hasn't held up; opinion, not decision
+Each was found by debugging. Each is a behaviour, not a design rule.
+
+### Cypher the grammar rejects
+
+| form | what happens |
+|---|---|
+| `WHERE NOT (a)-[:R]->(:X)` | `cypher_yyerror` — a grammar error, not an unsupported feature. Fetch the candidate and filter in application code |
+| `ANY(x IN list WHERE cond)` | syntax error. Use `size([x IN n.prop WHERE …]) > 0` |
+| `[:A\|B]` at any length | syntax error. Chain one `OPTIONAL MATCH` per type |
+| whole-map `CREATE (a)-[e:L $props]->(b)` | rejected. Expand per key |
+| `MERGE` for a relationship between two matched nodes | creates an edge whose `start_id` and `end_id` are both `0`. Use `MATCH` then `CREATE`, with a real `UNIQUE (start_id, end_id)` index as the concurrency guarantee |
+
+### Silent wrong answers
+
+| form | what happens |
+|---|---|
+| `MATCH (a),(b) CREATE (a)-[e:E]->(b) RETURN e` with a missing endpoint | zero rows, **no error**. A duplicate still raises `23505` |
+| a camelCase `RETURN` name | decodes as `null`. The unquoted `AS` clause folds `basisOut` to `basisout` while AGE keys the row by the Cypher name. Column present, `NULL`, no error |
+| a `RETURN` name that is a SQL reserved word | breaks the `AS` clause: `42601`, `scanner_yyerror`, not `cypher_yyerror`. Alias it |
+| any query without `ORDER BY` | rows come back in no defined order. A `.find()` over them is nondeterministic |
+| a query text **ending** in `$` | breaks bare `$$…$$` dollar-quoting — `$$RETURN n.a$$$` mislexes. Not only a query containing `$$` |
+
+### agtype decoding
+
+- `float8out` emits bare `Infinity`, `-Infinity` and `NaN`, which are not valid
+  JSON tokens.
+- `::path` is applied only to an odd-length array alternating vertex and edge.
+- `::numeric` needs the exact source digits; once a value is a JS `number` the
+  precision is gone.
+- An unmatched `OPTIONAL MATCH` column arrives as SQL `NULL`; a returned absent
+  *property* arrives as an agtype `null` scalar. Two different shapes.
+- Every `cypher()` call needs an `AS (...)` clause, including one with no
+  `RETURN`.
+
+### Postgres, roles and RLS
+
+| behaviour | consequence |
+|---|---|
+| `agtype_access_operator` returns SQL `NULL` for an absent property, and `NULL <> true` is `NULL` | a predicate written `<> true` excludes every ordinary row. Use `IS DISTINCT FROM` |
+| a `FOR ALL` policy with no `WITH CHECK` defaults it to the `USING` expression | it then refuses the very write that flips the flag it filters on. Write `WITH CHECK (true)` deliberately |
+| an RLS policy with `USING` and no `WITH CHECK` | a scoped session can write a row it cannot then read |
+| `current_setting('x')` without `missing_ok` | raises `42704`. With `true` it returns `NULL` and the policy silently matches nothing |
+| `LOAD 'age'` requires superuser (`42501`) | without the library `agtype` does not resolve, so every Cypher query fails, reads included |
+| `shared_preload_libraries=age` puts AGE in every backend | a plain LOGIN role that never issues `LOAD` can read and write through Cypher, and is refused `SET ROLE postgres` with `42501` |
+| `SET search_path` in one migration is still active when the next runs | an unqualified `CREATE FUNCTION` lands wherever the previous migration pointed |
+| `ALTER DEFAULT PRIVILEGES` is not retroactive | it needs a blanket `GRANT … ON ALL TABLES` beside it |
+| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` is a catalog write with no table scan | it still takes `ACCESS EXCLUSIVE` briefly and can queue behind a long transaction |
+| `ON CONFLICT DO NOTHING` returning no rows | that is how you learn a concurrent process won the insert race |
+| AGE's `cypher()` respects RLS on the label tables it reads | confirmed by probe, 2026-09-05 |
+| `pg_advisory_xact_lock` is a plain builtin | it works identically on PGlite |
+
+### Graph structure
+
+- There is no `ALTER GRAPH` DDL, so structure evolution is application-level
+  reconciliation, run every time.
+- Every label is a real Postgres table registered in `ag_catalog.ag_label`.
+  Reading that catalog is sanctioned; writing it is not — `create_vlabel` does
+  bookkeeping *and* creates the table.
+- A property lives inside one `properties` agtype column, so an index must be a
+  functional index on the extraction expression.
+- Graph names permit dots and hyphens mid-string but not at the ends. Labels,
+  property keys and `cypher()` column names follow plain Postgres
+  bare-identifier rules.
+- `LOAD` and `SET search_path` are session-scoped. Every connecting process must
+  run them; they cannot be migrated away.
