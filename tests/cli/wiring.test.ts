@@ -34,7 +34,10 @@ test("the CLI attributes writes to a real person and a real commit", () => {
   // Not the mocks. `mockGitContext` answers forty zeros *designed to read as
   // fake*, which is right for a stand-in and wrong in a permanent record -- the
   // first person to see a git_hash will try to check it out.
-  expect(session).toContain("commandContext(gitContext, personContext(");
+  // `toMatch` and not `toContain`, for the reason line 29 is: biome splits a
+  // call whose arguments outgrow the line, and a substring match then fails on
+  // code that is correct.
+  expect(session).toMatch(/commandContext\(\s*gitContext,\s*personContext\(/);
   expect(session).not.toContain("mockGitContext");
   expect(session).not.toContain("mockSessionContext");
 });
