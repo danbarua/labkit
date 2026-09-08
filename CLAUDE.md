@@ -65,9 +65,6 @@ Scenarios are researcher conversations as executable tests. They may import
 `src/domain` and never `src/db` — enforced by dependency-cruiser. A scenario
 that needs the persistence layer has found a missing verb.
 
-A scenario line must not name a node or edge label. Needing one means the
-storage model has leaked into the vocabulary a user speaks.
-
 Everything else in `tests/` tests persistence directly and may import `src/db`
 freely.
 
