@@ -28,7 +28,7 @@ export function globalOptions(program: Command): Command {
       .option("--author <name>", "who to attribute writes to (default: your username)")
       .option(
         "--reconstructed-from <source>",
-        "what these writes were read off, if you did not see the work happen (default: $LABKIT_RECONSTRUCTED_FROM)",
+        "what these writes were read off, for work you did not perform — not for your own results written up later (default: $LABKIT_RECONSTRUCTED_FROM)",
       )
       .option("--json", "emit the report as JSON instead of prose")
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only

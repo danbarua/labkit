@@ -49,8 +49,10 @@ export interface CommandContext {
   attribution: AttributionContext;
   /**
    * What the act was read off, when it was not performed — a paper, a colleague's notebook, a
-   * commit history. Absent means **nobody said**, and not that anything was witnessed: no
-   * process can observe that a researcher watched the work happen.
+   * commit history. **The test is whether you did the work, not when you wrote it down**: your
+   * own run, recorded a week later, was performed and takes nothing here. Absent means nobody
+   * said, and not that anything was witnessed: no process can observe that a researcher watched
+   * the work happen.
    */
   reconstructedFrom?: Prose;
 }

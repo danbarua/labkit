@@ -1286,7 +1286,9 @@ export const SESSION_TOOLS: readonly SessionToolDefinition<z.ZodRawShape>[] = [
         .min(1)
         .optional()
         .describe(
-          "what the writes on this connection were read off, if you did not see the work happen — a paper, a document, a commit history",
+          "what the writes on this connection were read off — a paper, a document, a commit history. " +
+            "For work you did not perform. Not for your own results recorded afterwards: those were " +
+            "performed, however long ago, and take nothing here",
         ),
     },
     outputSchema: registeredSessionSchema,
