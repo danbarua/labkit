@@ -3,6 +3,7 @@
  */
 
 import { optional, vertexProps } from "../db/cypher";
+import type { ColumnDecoder } from "../db/cypher";
 import { ref } from "./report";
 import type { CheckStatus, ClaimRef, EvaluationRecord, EvidenceRef } from "./report";
 import type { Derived, Leaf, Row } from "./facts";
@@ -100,7 +101,11 @@ export function checksOfBearing(bearing: "SUPPORTS" | "CHALLENGES"): Leaf<Set<st
 /**
  * One evaluation, folded: its verdict, and how much of its basis still stands.
  */
-export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verdict> {
+export function verdictsWhere(
+  name: string,
+  evaluationClause: string,
+  alsoYields: Record<string, ColumnDecoder<unknown>> = {},
+): Leaf<Verdict> {
   return {
     name,
     grain: byEvaluation,
@@ -121,15 +126,33 @@ export function verdictsWhere(name: string, evaluationClause: string): Leaf<Verd
       basis: optional(vertexProps<Node>()),
       supported: optional(vertexProps<Node>()),
       challenged: optional(vertexProps<Node>()),
+      ...alsoYields,
     },
-    empty: () => ({ cited: 0, standing: 0, outcome: null, at: "", value: "", basis: [] }),
+    empty: () => ({
+      cited: 0,
+      standing: 0,
+      outcome: null,
+      at: "",
+      value: "",
+      basis: [],
+      elsewhere: false,
+    }),
     fold: (verdict, row) => {
       const evaluation = row.ev as EvaluationNode | null;
       // The subject as it now stands: the successor when one exists.
       const judged = (row.instead as Node | null) ?? (row.judged as Node | null);
+      // Only the gate-scoped leaf yields `trig`; everywhere else both are
+      // undefined and every verdict is at home.
+      const reachedFor = row.trig as Node | null | undefined;
+      const readThrough = row.g as Node | null | undefined;
+      const elsewhere =
+        reachedFor != null &&
+        readThrough != null &&
+        reachedFor.natural_id !== readThrough.natural_id;
       const seen: Verdict = evaluation
         ? {
             ...verdict,
+            elsewhere,
             outcome: evaluation.outcome,
             at: evaluation.evaluated_at,
             value: evaluation.value,
@@ -173,7 +196,21 @@ export interface Verdict {
   basis: { evidence: EvidenceRef; states: string }[];
   /** The finding it judged, when one criterion is applied to several (#133). */
   about?: ClaimRef;
+  /**
+   * Reached for a gate other than the one this row was read through. False
+   * when the act named no gate, and false for every reader that is not asking
+   * about a particular gate.
+   */
+  elsewhere: boolean;
 }
+
+/**
+ * Whether a verdict bears on the gate the row was read through. A **fail**
+ * bears on every gate the criterion governs; a **pass** only on the gate it
+ * was reached for, so evidence gathered elsewhere never clears a gate nobody
+ * checked. `elsewhere` is false for every reader not asking about a gate.
+ */
+const bearsHere = (v: Verdict): boolean => !v.elsewhere || v.outcome === "fail";
 
 /** The four states a prespecified condition can be in. */
 export type CheckState = "passed" | "failed" | "never-run" | "no-standing-verdict";
@@ -196,6 +233,7 @@ function stateOf(group: Verdict[]): CheckState {
 function bySubject(found: Map<string, Verdict>): Map<string, Verdict[]> {
   const groups = new Map<string, Verdict[]>();
   for (const v of found.values()) {
+    if (!bearsHere(v)) continue;
     const key = v.about ?? "";
     groups.set(key, [...(groups.get(key) ?? []), v]);
   }
@@ -238,10 +276,18 @@ export const anyVerdict = verdictsWhere(
   `OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)`,
 );
 
-/** Only the evaluations reached **for this gate** (S-17 with S-3; see above). */
-export const verdictForGate = verdictsWhere(
-  "verdictForGate",
-  `OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)-[:TRIGGERS]->(g)`,
+/**
+ * Every evaluation of a criterion, each marked with whether it was reached for
+ * a gate other than the one the row came through. The filtering is `bearsHere`
+ * in TypeScript rather than a `WHERE` in Cypher: the predicate is
+ * outcome-dependent, and AGE's null handling across two `OPTIONAL MATCH`es is
+ * where that goes silently wrong.
+ */
+export const verdictBearingOnGate = verdictsWhere(
+  "verdictBearingOnGate",
+  `OPTIONAL MATCH (crit)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
+           OPTIONAL MATCH (ev)-[:TRIGGERS]->(trig:Gate)`,
+  { trig: optional(vertexProps<Node>()), g: vertexProps<Node>() },
 );
 
 /** How a check bears on a finding: every verdict counts. */
@@ -250,8 +296,8 @@ export const checkState = checkStateOver(anyVerdict);
 /** A finding's prespecified conditions, itemised. */
 export const checkStatus = checkStatusOver(anyVerdict);
 
-/** A gate's conditions, itemised, scoped to verdicts reached for that gate. */
-export const checkStatusForGate = checkStatusOver(verdictForGate);
+/** A gate's conditions, itemised, over the verdicts that bear on that gate. */
+export const checkStatusForGate = checkStatusOver(verdictBearingOnGate);
 
 /** Every evaluation of a criterion, whatever gate it was run for. */
 export const criterionEvaluations = evaluationsOver(anyVerdict);
@@ -347,6 +393,7 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus[]>
       const criterion = needs.criterionProps as CriterionNode;
       const ordered = [...found]
         .map(([evaluation, v]) => ({ evaluation, ...v }))
+        .filter(bearsHere)
         .sort((a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation));
       const records = recordsOf(ordered, criterion.natural_id);
 
