@@ -67,12 +67,19 @@ export class ReadSurface extends SessionCore {
 
   constructor(...args: ConstructorParameters<typeof SessionCore>) {
     super(...args);
-    this.#happened = new HappenedGroup(...args);
-    this.#finding = new FindingGroup(...args);
-    this.#standing = new StandingGroup(...args);
-    this.#blocked = new BlockedGroup(...args);
-    this.#story = new StoryGroup(...args);
-    this.#explain = new ExplainGroup(...args);
+    // The sink this surface settled on, not the one it was handed — see
+    // `WriteSurface`'s constructor for what taking the default twice cost.
+    const [graph, options] = args;
+    const shared: ConstructorParameters<typeof SessionCore> = [
+      graph,
+      { ...options, events: this.events },
+    ];
+    this.#happened = new HappenedGroup(...shared);
+    this.#finding = new FindingGroup(...shared);
+    this.#standing = new StandingGroup(...shared);
+    this.#blocked = new BlockedGroup(...shared);
+    this.#story = new StoryGroup(...shared);
+    this.#explain = new ExplainGroup(...shared);
   }
 
   /**
