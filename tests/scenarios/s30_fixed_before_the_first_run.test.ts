@@ -150,6 +150,46 @@ describe("S-30: fixed before the first run", () => {
     ).rejects.toThrow(/has been evaluated/);
   });
 
+  /**
+   * The state the rule turns on and the one the other tests miss: the verdict cited a finding,
+   * and the claim that finding bears on has since been superseded, so nothing it rested on
+   * stands. `no-standing-verdict`, not `never-run` — a number was reached and read, and an
+   * amendment now is not prespecification.
+   */
+  test("Afterward 5: a verdict whose whole basis fell is still a verdict", async () => {
+    const { criterion, gate } = await aLockedDesign();
+    const { question } = await session.pose({ question: "what did the pilot show?" });
+    const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
+    const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
+    const pilot = await session.conclude({
+      analysis,
+      finding: "the gap is 2.4 sd on the pilot split",
+      proposition: "the gap clears two standard deviations",
+      bearing: "supports",
+    });
+
+    await session.evaluateCriterion({
+      criterion,
+      gate,
+      value: "2.4 sd on the pilot split",
+      outcome: "pass",
+      citing: [pilot.claims[0]!.claim],
+    });
+
+    // `replaceAnalysis`, not `reinterpret`: only a Decision that SUPERSEDES the
+    // claim fells the finding beneath it, which is what `verdictsWhere` counts.
+    const { review } = await session.recordReview({ of: analysis, verdict: "the pilot had a bug" });
+    await session.replaceAnalysis({
+      supersedes: analysis,
+      because: review,
+      method: "the pilot, with the bug fixed",
+    });
+
+    await expect(
+      session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
+    ).rejects.toThrow(/has been evaluated/);
+  });
+
   test("a diagnosis is still accepted before the first run, and still classified by its blast radius", async () => {
     const { criterion } = await aLockedDesign();
     const { question } = await session.pose({ question: "does ddof matter here?" });
