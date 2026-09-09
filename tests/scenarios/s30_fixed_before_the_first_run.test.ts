@@ -117,7 +117,7 @@ describe("S-30: fixed before the first run", () => {
    * was reached and read, which is the fact the rule turns on.
    */
   test("Afterward 4: a verdict whose claim was superseded is still a verdict", async () => {
-    const { criterion, gate } = await aLockedDesign();
+    const { criterion, gate, work } = await aLockedDesign();
     const { question } = await session.pose({ question: "what did the pilot show?" });
     const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
     const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
@@ -144,6 +144,58 @@ describe("S-30: fixed before the first run", () => {
       as: "the gap clears two standard deviations on the pilot split only",
       because: "the pilot split is not the reporting split",
     });
+
+    await expect(
+      session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
+    ).rejects.toThrow(/has been evaluated/);
+  });
+
+  /**
+   * The state the rule turns on and the one the other tests miss: the verdict cited a finding,
+   * and the claim that finding bears on has since been superseded, so nothing it rested on
+   * stands. `no-standing-verdict`, not `never-run` — a number was reached and read, and an
+   * amendment now is not prespecification.
+   */
+  test("Afterward 5: a verdict whose whole basis fell is still a verdict", async () => {
+    const { criterion, gate, work } = await aLockedDesign();
+    const { question } = await session.pose({ question: "what did the pilot show?" });
+    const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
+    const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
+    const pilot = await session.conclude({
+      analysis,
+      finding: "the gap is 2.4 sd on the pilot split",
+      proposition: "the gap clears two standard deviations",
+      bearing: "supports",
+    });
+
+    await session.evaluateCriterion({
+      criterion,
+      gate,
+      value: "2.4 sd on the pilot split",
+      outcome: "pass",
+      citing: [pilot.claims[0]!.claim],
+    });
+
+    // `replaceAnalysis`, not `reinterpret`: only a Decision that SUPERSEDES the
+    // claim fells the finding beneath it, which is what `verdictsWhere` counts.
+    const { review } = await session.recordReview({ of: analysis, verdict: "the pilot had a bug" });
+    await session.replaceAnalysis({
+      supersedes: analysis,
+      because: review,
+      method: "the pilot, with the bug fixed",
+    });
+
+    // What a reader sees once the verdict's whole basis has fallen: the gate is
+    // `incomplete` — not passed, not failed — and the work it protects is back
+    // among the things waiting on a gate nobody has finished checking, rather
+    // than blocked or ready. Recorded here because a live programme reaching
+    // this shape will ask exactly this, and the answer is not obvious.
+    const later = await afterwards();
+    expect((await later.gateList()).map((g) => g.state)).toEqual(["incomplete"]);
+    const standing = await later.now();
+    expect(standing.unevaluated.work.map((w) => w.work)).toEqual([work]);
+    expect(standing.blocked.work).toEqual([]);
+    expect(standing.untouched).toEqual([]);
 
     await expect(
       session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
