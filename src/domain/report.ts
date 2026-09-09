@@ -925,7 +925,13 @@ export interface AmendmentReport {
   rerun: GatedWork[];
   /** Confirmatory results in the blast radius. Empty is the claim "none", and it is computed rather than assumed. */
   confirmatoryAffected: ConfirmatoryResult[];
-  nature: "mechanical" | "scientific";
+  /**
+   * `prespecification` when the condition had never been evaluated and the amendment cited
+   * nothing — a fact about the condition's history, not about the amendment. An amendment after
+   * an evaluation that was undone also cites nothing and is **not** prespecification, which is
+   * why this is a named value rather than the absence of a citation.
+   */
+  nature: "mechanical" | "scientific" | "prespecification";
   events: DomainEvent[];
 }
 
@@ -938,7 +944,8 @@ export interface AmendmentRecord {
   /** The findings the amendment was actually taken on — cited specifically, not a snapshot of everything known. */
   citing: CitedFinding[];
   rerun: GatedWork[];
-  nature: "mechanical" | "scientific";
+  /** See {@link AmendmentReport.nature}. Empty `citing` alone does not mean prespecification. */
+  nature: "mechanical" | "scientific" | "prespecification";
 }
 
 /**

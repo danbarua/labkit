@@ -297,7 +297,7 @@ const amendmentRecord = z.strictObject({
   reason: z.string(),
   citing: z.array(citedFinding),
   rerun: z.array(gatedWork),
-  nature: z.enum(["mechanical", "scientific"]),
+  nature: z.enum(["mechanical", "scientific", "prespecification"]),
 });
 
 const revision = z.strictObject({
@@ -827,7 +827,7 @@ export const amendmentReportSchema = z.strictObject({
   nowRequires: condition,
   rerun: z.array(gatedWork),
   confirmatoryAffected: z.array(concludedClaim),
-  nature: z.enum(["mechanical", "scientific"]),
+  nature: z.enum(["mechanical", "scientific", "prespecification"]),
   events: z.array(domainEventSchema),
 });
 

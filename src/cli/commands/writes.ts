@@ -381,15 +381,19 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<criterion-id>", "the condition being amended", handle("criterion"))
     .requiredOption("--now-requires <text>", "the replacement condition")
     .requiredOption("--because <text>", "what prompted the amendment")
-    .requiredOption("--citing <claim-id>", "the diagnosis it rests on", handle("claim"))
-    .action(async (criterion, opts: { nowRequires: string; because: string; citing: ClaimRef }) =>
+    .option(
+      "--citing <claim-id>",
+      "the diagnosis it rests on — required once the condition has been evaluated, omitted for a fix made before the first run",
+      handle("claim"),
+    )
+    .action(async (criterion, opts: { nowRequires: string; because: string; citing?: ClaimRef }) =>
       run(async ({ write }) =>
         answer(
           await write.amendDesign({
             criterion,
             nowRequires: opts.nowRequires,
             because: opts.because,
-            citing: opts.citing,
+            ...(opts.citing === undefined ? {} : { citing: opts.citing }),
           }),
           mintedView(),
         ),
