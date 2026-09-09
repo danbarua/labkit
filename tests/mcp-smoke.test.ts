@@ -108,6 +108,9 @@ describe("every tool answers when an agent actually calls it", () => {
         into: "is the solver faster on sparse instances?",
         because: "faster overall hides which instances moved",
       });
+      const listed = await call(c, "notes", {});
+      expect(listed.notes as unknown[]).toEqual([]);
+
       const origin = await call(c, "origin_of", { question: id(sharp) });
       expect((origin.origin as { kind: string }).kind).toBe("sharpened");
 

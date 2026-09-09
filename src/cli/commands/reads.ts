@@ -30,7 +30,7 @@ import {
   renderReproducibility,
   renderReproduction,
 } from "../views/analysis";
-import { renderHappened } from "../views/events";
+import { renderHappened, renderNotes } from "../views/events";
 import { renderStanding } from "../views/standing";
 
 export function registerReads(program: Command, run: Run): void {
@@ -324,6 +324,16 @@ export function registerReads(program: Command, run: Run): void {
       run(async ({ read }) => answer(await read.doTheseConflict(a, b), renderConflict)),
     );
   program
+    .command("notes")
+    .helpGroup("What was done")
+    .summary("every note on the record, newest first")
+    .description(
+      "Notes are the one write with no prerequisites, and `search` reaches them only by words " +
+        "somebody already remembers. This lists them all — what each says, what it concerns, " +
+        "and the question it prompted where it prompted one.",
+    )
+    .action(async () => run(async ({ read }) => answer(await read.notes(), renderNotes)));
+  program
     .command("happened")
     .helpGroup("What was done")
     .summary("the acts themselves, oldest first, with who ran them")
@@ -368,7 +378,7 @@ export function registerReads(program: Command, run: Run): void {
             ...(opts.unsourced ? { reconstructed: false } : {}),
             limit: opts.limit,
           };
-          return answer(await read.whatHappened(filter), renderHappened);
+          return answer(await read.whatHappenedPage(filter), renderHappened);
         }),
     );
 }

@@ -22,6 +22,7 @@ import {
   amendmentReportSchema,
   posedSchema,
   notedSchema,
+  notesSchema,
   pursuedSchema,
   openedEnquirySchema,
   recordedObservationsSchema,
@@ -513,30 +514,45 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       limit: z.number().optional().describe("how many at most (default 50)"),
     },
     outputSchema: whatHappenedSchema,
-    handler: async (read, { since_seq, by, operation, touching, reconstructed, limit }) => ({
-      events: (
-        await read.whatHappened({
-          ...(since_seq === undefined ? {} : { since: since_seq }),
-          ...(by === undefined ? {} : { by }),
-          ...(operation === undefined ? {} : { operation }),
-          ...(touching === undefined ? {} : { touching }),
-          ...(reconstructed === undefined ? {} : { reconstructed }),
-          limit: limit ?? 50,
-        })
-      ).map((e) => ({
-        seq: e.seq ?? 0,
-        at: e.at,
-        operation: e.operation,
-        subject: e.subject,
-        created: createdIn(e),
-        attribution_label: e.attribution.attribution_label,
-        attribution_id: e.attribution.attribution_id,
-        attribution_how: e.attribution.attribution_how,
-        git_hash: e.attribution.git_hash,
-        reconstructed_from: e.reconstructedFrom,
-        command: e.command,
-      })),
-    }),
+    handler: async (read, { since_seq, by, operation, touching, reconstructed, limit }) => {
+      const page = await read.whatHappenedPage({
+        ...(since_seq === undefined ? {} : { since: since_seq }),
+        ...(by === undefined ? {} : { by }),
+        ...(operation === undefined ? {} : { operation }),
+        ...(touching === undefined ? {} : { touching }),
+        ...(reconstructed === undefined ? {} : { reconstructed }),
+        limit: limit ?? 50,
+      });
+      return {
+        more: page.more,
+        events: page.acts.map((e) => ({
+          seq: e.seq ?? 0,
+          at: e.at,
+          operation: e.operation,
+          subject: e.subject,
+          created: createdIn(e),
+          attribution_label: e.attribution.attribution_label,
+          attribution_id: e.attribution.attribution_id,
+          attribution_how: e.attribution.attribution_how,
+          git_hash: e.attribution.git_hash,
+          reconstructed_from: e.reconstructedFrom,
+          command: e.command,
+        })),
+      };
+    },
+  }),
+
+  tool({
+    name: "notes",
+    title: "Every note on the record",
+    group: "What was done",
+    description:
+      "Notes are the one write with no prerequisites, and `search` reaches them only by words " +
+      "somebody already remembers. This lists them all, newest first — what each says, what it " +
+      "concerns, and the question it prompted where it prompted one.",
+    inputSchema: {},
+    outputSchema: notesSchema,
+    handler: async (read) => ({ notes: await read.notes() }),
   }),
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;
 

@@ -186,6 +186,16 @@ export interface RecordedReview {
 }
 export interface ClosedEnquiry {
   decision: DecisionRef;
+  /** The enquiry that was closed, and the question its closure resolved. */
+  enquiry: EnquiryRef;
+  question: QuestionRef;
+  /**
+   * Which kind of close this was — the same words `why <enquiry>` reads back. A caller
+   * scripting `close` could otherwise not tell a success from a no-op without a second read.
+   */
+  closure: "answered" | "abandoned";
+  /** What answered it, when one was cited. Absent for a close with no result behind it. */
+  answered?: ConcludedClaim;
   events: DomainEvent[];
 }
 export interface StoppedWork {
@@ -1277,6 +1287,26 @@ export interface Standing {
    * since that cursor — presence *is* the "moved" marker, not a per-item flag repeating it.
    */
   since?: number;
+}
+
+/**
+ * One note, as a list of them reads: what it says, what it concerns, and the question it
+ * prompted where it prompted one.
+ */
+export interface ListedNote {
+  note: NoteRef;
+  says: string;
+  concerns: AnyRef[];
+  prompted?: QuestionRef;
+}
+
+/**
+ * One page of the event log, and whether it was the whole answer. `more` is what a caller needs
+ * to know before filtering the result of a limited read.
+ */
+export interface EventPage {
+  acts: readonly DomainEvent[];
+  more: boolean;
 }
 
 /**

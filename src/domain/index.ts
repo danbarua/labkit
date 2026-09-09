@@ -57,6 +57,8 @@ export type {
   KnowledgeSurvey,
   HistoricalSurvey,
   QuestionOrigin,
+  EventPage,
+  ListedNote,
   AmendmentReport,
   AmendmentRecord,
   ConditionHistory,

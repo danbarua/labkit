@@ -92,7 +92,7 @@ describe("a reconstruction says what it was read off", () => {
         reconstructedFrom,
       });
 
-    const rendered = renderHappened([act(1, PAPER), act(2, null)], PLAIN);
+    const rendered = renderHappened({ acts: [act(1, PAPER), act(2, null)], more: false }, PLAIN);
     const lines = rendered.split("\n").filter((l) => l.includes("read off"));
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain(PAPER);
