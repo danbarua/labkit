@@ -138,7 +138,17 @@ export class Stopping extends SessionCore {
 
       return {
         subject: input.enquiry,
-        result: { decision: decided },
+        result: {
+          decision: decided,
+          enquiry: input.enquiry,
+          question,
+          // Derived from what was recorded, not from what the caller passed:
+          // `answeredBy` with no finding behind it never reaches here.
+          closure: answeredProposition ? ("answered" as const) : ("abandoned" as const),
+          ...(input.answeredBy && answeredProposition
+            ? { answered: { claim: input.answeredBy, asserts: answeredProposition } }
+            : {}),
+        },
       };
     });
   }

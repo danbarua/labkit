@@ -516,7 +516,7 @@ test("`known` says what moves a question from untested to unresolved", () => {
 });
 
 test("an empty event log does not read as an empty record", () => {
-  const empty = renderHappened([], PLAIN);
+  const empty = renderHappened({ acts: [], more: false }, PLAIN);
   expect(empty).toContain("Nothing matching");
   expect(empty).toContain("every other command answers from");
 
@@ -539,7 +539,7 @@ test("an empty event log does not read as an empty record", () => {
       ],
     }),
   ];
-  const out = renderHappened(events, PLAIN);
+  const out = renderHappened({ acts: events, more: false }, PLAIN);
   expect(out).toContain("7");
   expect(out).toContain("recordAnalysis");
   // Who ran it and against what commit -- the two facts the graph cannot answer.

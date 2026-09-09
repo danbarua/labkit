@@ -265,11 +265,17 @@ test("the one command whose --json is not the MCP document says so", async () =>
   // reshaping, this reddens and the entry in RESHAPED comes out.
   expect(Object.keys(RESHAPED)).toEqual(["happened"]);
   const answered = await invoke(["happened"]);
-  const events = JSON.parse(JSON.stringify(answered.value)) as Array<Record<string, unknown>>;
-  expect(events.length).toBeGreaterThan(0);
+  const page = JSON.parse(JSON.stringify(answered.value)) as {
+    acts: Array<Record<string, unknown>>;
+    more: boolean;
+  };
+  // A page, not a bare array. `--limit` defaults to 50, so a caller filtering
+  // the list has to be able to tell a full page from the whole answer.
+  expect(page.more).toBe(false);
+  expect(page.acts.length).toBeGreaterThan(0);
   // Nested, where the MCP tool flattens.
-  expect(events[0]!.attribution).toBeDefined();
-  expect(events[0]!.attribution_label).toBeUndefined();
+  expect(page.acts[0]!.attribution).toBeDefined();
+  expect(page.acts[0]!.attribution_label).toBeUndefined();
 });
 
 test("every write command's --json parses against the MCP schema for the same verb", () => {

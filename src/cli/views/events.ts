@@ -3,13 +3,33 @@
  */
 
 import { createdIn, edgesIn } from "../../domain";
-import type { DomainEvent } from "../../domain";
+import type { DomainEvent, EventPage, ListedNote } from "../../domain";
 import type { Palette } from "../palette";
 
 /**
  * The acts themselves, oldest first.
  */
-export function renderHappened(events: readonly DomainEvent[], p: Palette): string {
+export function renderNotes(notes: readonly ListedNote[], p: Palette): string {
+  if (notes.length === 0)
+    return [
+      p.untested("No notes."),
+      "",
+      p.quiet('A note is the one write with nothing required of it — `labkit note "…"`.'),
+    ].join("\n");
+  return notes
+    .map((n) => {
+      const about = n.concerns.length
+        ? p.quiet(" on ") + n.concerns.map((h) => p.handle(h)).join(p.quiet(", "))
+        : "";
+      // Its own line, and only when there is one: this is the fact that makes
+      // the note an origin rather than a remark beside the record.
+      const why = n.prompted ? [`         ${p.quiet("prompted ")}${p.handle(n.prompted)}`] : [];
+      return [`${p.handle(n.note)}${about}`, `  ${n.says}`, ...why].join("\n");
+    })
+    .join("\n\n");
+}
+
+export function renderHappened({ acts: events, more }: EventPage, p: Palette): string {
   if (events.length === 0)
     return [
       p.untested("Nothing matching."),
@@ -17,7 +37,7 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
       p.quiet("An empty log is not an empty record: every other command answers from"),
       p.quiet("the graph, and answers there are durable whether or not an act was logged."),
     ].join("\n");
-  return events
+  const rendered = events
     .map((e) => {
       const who = e.attribution.attribution_label || "unattributed";
       // **How the name was come by, printed beside it.** `labkit happened` is the command the
@@ -55,4 +75,15 @@ export function renderHappened(events: readonly DomainEvent[], p: Palette): stri
       ].join("\n");
     })
     .join("\n");
+  // **Said, not left to be inferred from a full page.** A caller filtering this
+  // list — `.seq > 52` over a default page of 50 — gets an empty answer and
+  // cannot otherwise tell it from an empty record.
+  if (!more) return rendered;
+  const last = events.at(-1)?.seq ?? 0;
+  return [
+    rendered,
+    "",
+    p.quiet(`More acts than this page holds. \`happened --since ${last}\` reads the next,`),
+    p.quiet("or `--limit` takes a bigger one."),
+  ].join("\n");
 }

@@ -30,6 +30,8 @@ import type {
   ReproducibilityReport,
   ReproductionReport,
   SearchGroup,
+  EventPage,
+  ListedNote,
   Standing,
   Transcription,
   SupportExplanation,
@@ -88,6 +90,16 @@ export class ReadSurface extends SessionCore {
    */
   async whatHappened(filter: EventFilter = {}): Promise<readonly DomainEvent[]> {
     return this.#happened.whatHappened(filter);
+  }
+
+  /** Every note on the record, newest first. See `HappenedGroup.notes`. */
+  async notes(): Promise<ListedNote[]> {
+    return this.#happened.notes();
+  }
+
+  /** The same acts, and whether that was all of them. See `HappenedGroup.whatHappenedPage`. */
+  async whatHappenedPage(filter: EventFilter = {}): Promise<EventPage> {
+    return this.#happened.whatHappenedPage(filter);
   }
 
   /** How much of the record was read off something rather than performed. */

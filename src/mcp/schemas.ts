@@ -117,10 +117,28 @@ export const searchSchema = z.strictObject({
   ),
 });
 
+/** `notes` — every note on the record, newest first. */
+export const notesSchema = z.strictObject({
+  notes: z.array(
+    z.strictObject({
+      note: ref("note"),
+      says: z.string(),
+      concerns: z.array(anyRef()),
+      prompted: ref("question").optional(),
+    }),
+  ),
+});
+
 /**
  * `what_happened` — the acts themselves, which is the one thing the graph does not hold.
  */
 export const whatHappenedSchema = z.strictObject({
+  /**
+   * Whether more acts matched than this page holds. A caller filtering `events` — `seq > 52`
+   * over a default page of 50 — gets an empty answer from a full page and cannot otherwise tell
+   * it from an empty record.
+   */
+  more: z.boolean(),
   events: z.array(
     z.strictObject({
       seq: z.number(),
@@ -747,6 +765,10 @@ export const recordedReviewSchema = z.strictObject({
 /** What `close_enquiry` returns — #161's audit: this verb returned nothing. */
 export const closedEnquirySchema = z.strictObject({
   decision: ref("decision"),
+  enquiry: ref("enquiry"),
+  question: ref("question"),
+  closure: z.enum(["answered", "abandoned"]),
+  answered: concludedClaim.optional(),
   events: z.array(domainEventSchema),
 });
 /** What `stop_work` returns. */
