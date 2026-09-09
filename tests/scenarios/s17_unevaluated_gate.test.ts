@@ -135,11 +135,9 @@ describe("S-17: does the guard actually guard?", () => {
   });
 
   /**
-   * What makes GOVERNS load-bearing rather than merely written: "has this guard been shown able
-   * to fail?" is a question about the criterion, so it is answered across every evaluation of
-   * the governing criterion — not only those that happened to trigger this particular gate.
+   * One criterion, two gates, so the two directions can be asked separately.
    */
-  test("a criterion shown to fail on one gate counts as demonstrated for another it governs", async () => {
+  async function oneConditionOverTwoGates() {
     const { criterion } = await session.stateCriterion(
       "the protected artefact matches its recorded hash",
     );
@@ -151,7 +149,6 @@ describe("S-17: does the guard actually guard?", () => {
       objective: "publish to release",
       acceptance: "verified",
     });
-
     const { gate: stagingGate } = await session.declareGate({
       governedBy: [criterion],
       consequence: "block staging unless the artefact verifies",
@@ -162,6 +159,16 @@ describe("S-17: does the guard actually guard?", () => {
       consequence: "block release unless the artefact verifies",
       protecting: [releaseWork],
     });
+    return { criterion, stagingGate, releaseGate };
+  }
+
+  /**
+   * What makes GOVERNS load-bearing rather than merely written: a failed condition is a fact
+   * about the condition. The gate named when the fail was recorded is the work its author was
+   * trying to unblock, not the only gate allowed to know.
+   */
+  test("a criterion shown to fail on one gate fails every gate it governs", async () => {
+    const { criterion, stagingGate, releaseGate } = await oneConditionOverTwoGates();
 
     // The check demonstrably fires on staging.
     await session.evaluateCriterion({
@@ -172,11 +179,63 @@ describe("S-17: does the guard actually guard?", () => {
     });
 
     const release = await session.gateStatus(releaseGate);
-    // Release itself has never been evaluated -- that must not read as passed.
+    expect(release.state).toBe("blocked");
+    expect(release.counts.failed).toBe(1);
+    expect(release.counts["never-run"]).toBe(0);
+    expect(release.everFailed).toBe(true);
+    // And it says what is holding it, rather than reporting a condition nobody ran.
+    expect(release.unmet.map((u) => u.criterion)).toEqual([criterion]);
+
+    const durable = await (await afterwards()).gateStatus(releaseGate);
+    expect(durable.state).toBe("blocked");
+
+    // The reader's own question: `now` must say blocked, not "some checks
+    // remain". An agent waiting on incomplete waits for a check that already
+    // has a verdict.
+    const standing = await (await afterwards()).now();
+    expect(standing.blocked.gates.map((g) => g.gate).sort()).toEqual(
+      [stagingGate, releaseGate].sort(),
+    );
+  });
+
+  /**
+   * The other direction, which is the dangerous one: a pass clears the gate it was reached
+   * for and nothing else. Evidence gathered while checking staging does not release.
+   */
+  test("a criterion passed for one gate leaves another it governs unevaluated", async () => {
+    const { criterion, stagingGate, releaseGate } = await oneConditionOverTwoGates();
+
+    await session.evaluateCriterion({
+      criterion,
+      gate: stagingGate,
+      value: "hash matches",
+      outcome: "pass",
+    });
+
+    expect((await session.gateStatus(stagingGate)).state).toBe("satisfied");
+
+    const release = await session.gateStatus(releaseGate);
     expect(release.state).toBe("never-evaluated");
     expect(release.counts["never-run"]).toBe(release.checks.length);
-    // But the check it relies on HAS been shown able to fail.
-    expect(release.everFailed).toBe(true);
+    expect(release.counts.passed).toBe(0);
+  });
+
+  /**
+   * `--gate` is optional, so a verdict can be recorded about the condition itself. Such a
+   * verdict was reached for no gate in particular, so it counts for every gate the criterion
+   * governs — in both directions, unlike one reached for a gate that was named.
+   */
+  test("a verdict reached for no gate counts for every gate the criterion governs", async () => {
+    const { criterion, stagingGate, releaseGate } = await oneConditionOverTwoGates();
+
+    await session.evaluateCriterion({ criterion, value: "hash differs", outcome: "fail" });
+
+    expect((await session.gateStatus(stagingGate)).state).toBe("blocked");
+    expect((await session.gateStatus(releaseGate)).state).toBe("blocked");
+
+    const durable = await (await afterwards()).gateStatus(releaseGate);
+    expect(durable.state).toBe("blocked");
+    expect(durable.counts.failed).toBe(1);
   });
 
   /**

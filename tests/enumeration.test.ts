@@ -260,10 +260,10 @@ describe("enumerating gates and work", () => {
 
       const states = new Map((await s.gateList()).map((g) => [g.gate as string, g.state]));
       expect(states.get(gateA)).toBe("blocked");
-      // Not blocked: the failure was recorded against gate A. A merged fold
-      // reports this one blocked too, which is the exact collapse the
-      // gate-scoped verdict fact exists to prevent.
-      expect(states.get(gateB)).toBe("never-evaluated");
+      // Blocked too: the condition failed, and gate A was the work whoever
+      // recorded it was trying to unblock, not the only gate allowed to know.
+      // A pass would not carry across; see S-17 for both directions.
+      expect(states.get(gateB)).toBe("blocked");
     } finally {
       await scenario.end();
     }
