@@ -117,7 +117,7 @@ describe("S-30: fixed before the first run", () => {
    * was reached and read, which is the fact the rule turns on.
    */
   test("Afterward 4: a verdict whose claim was superseded is still a verdict", async () => {
-    const { criterion, gate } = await aLockedDesign();
+    const { criterion, gate, work } = await aLockedDesign();
     const { question } = await session.pose({ question: "what did the pilot show?" });
     const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
     const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
@@ -157,7 +157,7 @@ describe("S-30: fixed before the first run", () => {
    * amendment now is not prespecification.
    */
   test("Afterward 5: a verdict whose whole basis fell is still a verdict", async () => {
-    const { criterion, gate } = await aLockedDesign();
+    const { criterion, gate, work } = await aLockedDesign();
     const { question } = await session.pose({ question: "what did the pilot show?" });
     const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
     const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
@@ -184,6 +184,18 @@ describe("S-30: fixed before the first run", () => {
       because: review,
       method: "the pilot, with the bug fixed",
     });
+
+    // What a reader sees once the verdict's whole basis has fallen: the gate is
+    // `incomplete` — not passed, not failed — and the work it protects is back
+    // among the things waiting on a gate nobody has finished checking, rather
+    // than blocked or ready. Recorded here because a live programme reaching
+    // this shape will ask exactly this, and the answer is not obvious.
+    const later = await afterwards();
+    expect((await later.gateList()).map((g) => g.state)).toEqual(["incomplete"]);
+    const standing = await later.now();
+    expect(standing.unevaluated.work.map((w) => w.work)).toEqual([work]);
+    expect(standing.blocked.work).toEqual([]);
+    expect(standing.untouched).toEqual([]);
 
     await expect(
       session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
