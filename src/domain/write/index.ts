@@ -105,12 +105,17 @@ export class WriteSurface extends SessionCore {
 
   constructor(graph: TenantGraph, options: ResearchSessionOptions = {}) {
     super(graph, options);
+    // **`this.events`, not `options.events`.** `SessionCore` defaults an absent
+    // sink to a fresh `inMemoryEventLog()` per surface, so passing `options`
+    // straight down gave each group a log of its own: `handling` recorded into
+    // this one while `undo` read the revising group's, which was empty.
+    const shared: ResearchSessionOptions = { ...options, events: this.events };
     const handle: Handle = (operation, command, work) => this.handling(operation, command, work);
-    this.asking = new Asking(graph, options, handle);
-    this.work = new Work(graph, options, handle);
-    this.counting = new Counting(graph, options, handle);
-    this.revising = new Revising(graph, options, handle);
-    this.stopping = new Stopping(graph, options, handle);
+    this.asking = new Asking(graph, shared, handle);
+    this.work = new Work(graph, shared, handle);
+    this.counting = new Counting(graph, shared, handle);
+    this.revising = new Revising(graph, shared, handle);
+    this.stopping = new Stopping(graph, shared, handle);
   }
 
   async pose(input: PoseCommand): Promise<Posed> {
