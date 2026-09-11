@@ -754,3 +754,18 @@ test("closing a blocked gate releases work without changing its failed check", a
     }),
   ).rejects.toThrow(/no gate/);
 });
+
+test("criterion report refuses an evaluation with no stored outcome", async () => {
+  const { criterion } = await session.stateCriterion("a malformed evaluation is visible");
+  const evaluation = await graph.reserveId("CriterionEvaluation");
+  await graph.query(
+    "CREATE (ev:CriterionEvaluation {natural_id: $id, value: $value, evaluated_at: $at}) RETURN ev",
+    { ev: vertexProps<{ natural_id: string }>() },
+    { id: evaluation, value: "legacy row", at: "2026-09-11T00:00:00.000Z" },
+  );
+  await graph.createEdge(criterion, "EVALUATED_AS", evaluation);
+
+  await expect(session.criterionStanding(criterion)).rejects.toThrow(
+    new RegExp(`evaluation ${evaluation} has no stored outcome`),
+  );
+});

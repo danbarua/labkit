@@ -358,16 +358,20 @@ function recordsOf(
   ordered: (Verdict & { evaluation: string })[],
   criterion: string,
 ): EvaluationRecord[] {
-  return ordered.map((v) => ({
-    evaluation: ref("evaluation", v.evaluation),
-    criterion: ref("criterion", criterion),
-    value: v.value ?? "",
-    outcome: (v.outcome ?? "pass") as "pass" | "fail",
-    at: v.at,
-    basis: v.basis,
-    ...(v.about ? { about: v.about } : {}),
-    ...(retracted(v) ? { withdrawn: true as const } : {}),
-  }));
+  return ordered.map((v) => {
+    if (v.outcome !== "pass" && v.outcome !== "fail")
+      throw new Error(`evaluation ${v.evaluation} has no stored outcome`);
+    return {
+      evaluation: ref("evaluation", v.evaluation),
+      criterion: ref("criterion", criterion),
+      value: v.value ?? "",
+      outcome: v.outcome,
+      at: v.at,
+      basis: v.basis,
+      ...(v.about ? { about: v.about } : {}),
+      ...(retracted(v) ? { withdrawn: true as const } : {}),
+    };
+  });
 }
 
 /**
