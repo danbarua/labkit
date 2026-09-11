@@ -318,7 +318,13 @@ export class ReadSurface extends SessionCore {
   async why(subject: AnyRef | IndexedString): Promise<Explanation> {
     const asHandle = subject.toUpperCase() as AnyRef;
     const kind = kindOf(asHandle);
-    if (kind) return EXPLAINERS[kind](this, asHandle);
+    if (kind) {
+      if (!(await this.reachable(asHandle)))
+        throw new Error(
+          `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
+        );
+      return EXPLAINERS[kind](this, asHandle);
+    }
 
     const found = await this.claimsAsserting(subject);
     if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);

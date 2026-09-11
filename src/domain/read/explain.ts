@@ -48,6 +48,7 @@ export class ExplainGroup extends SessionCore {
   async proseFor(subject: AnyRef): Promise<string | null> {
     const props = SEARCHABLE_TEXT[labelForNaturalId(subject)] ?? [];
     if (props.length === 0) return null;
+    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const [row] = await this.graph.query(
       `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
       { n: vertexProps<Record<string, unknown>>() },
@@ -66,10 +67,10 @@ export class ExplainGroup extends SessionCore {
    *
    * Its own question rather than a null from `proseFor`: an `EvidenceUnit` holds no prose and
    * is still there, so "no words" and "not here" are different answers. Matches without a
-   * label — the kind is not known until the id is parsed — so it filters `retracted` itself
-   * rather than relying on the per-label policy, which an unlabelled pattern never reaches.
+   * label, so it filters `retracted` rather than relying on the per-label policy.
    */
   async reachable(subject: AnyRef): Promise<boolean> {
+    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const rows = await this.graph.query(
       `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
       { n: vertexProps<{ natural_id: string }>() },
@@ -91,6 +92,7 @@ export class ExplainGroup extends SessionCore {
       other: vertexProps<Record<string, unknown> & { natural_id: string }>(),
       via: scalar<string>(),
     };
+    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const [out, into] = await Promise.all([
       this.graph.query(
         `MATCH (n {natural_id: $id})-[r]->(other)
@@ -714,19 +716,11 @@ const SAYS: Record<WalkedKind, string> = {
 
 /**
  * The one query behind every walked kind: the node, and everything joined to it, both
- * directions.
- *
- * Refuses a handle that is not on the record, which includes one `undo` retracted. Absence
- * cannot be inferred from `proseFor` returning null — an `EvidenceUnit` holds no prose and is
- * still there — so reachability is its own question.
+ * directions. Handle existence is checked once by `ReadSurface.why` before dispatch.
  */
 function walked(kind: WalkedKind): Explainer {
   return async (self, subject) => {
     const handle = ref(kind, subject);
-    if (!(await self.reachable(handle)))
-      throw new Error(
-        `no ${SAYS[kind]} ${subject} on this record; it was never written, or an \`undo\` took back the act that minted it`,
-      );
     const neighbours = await self.neighboursOf(handle);
     const own = await self.proseFor(handle);
     return {
