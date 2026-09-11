@@ -289,16 +289,22 @@ describe("enumerating gates and work", () => {
     }
   });
 
-  test("a gate the list does not know about holds the work; it does not vanish", () => {
-    // `gateStates` comes from `gateList()`, which reaches gates through their
-    // criteria. A gate that contributed no rows is absent from the map, and
-    // absent must not read as ungated -- that is the exact answer this state
-    // exists to stop. Not reachable through the verbs today; pinned on the
-    // function so it stays true if `gateList`'s reach ever narrows.
-    const task = { gates: new Set(["GATE_9"]), implemented: false, stopped: false };
+  test("an unknown or retracted gate keeps work waiting", () => {
+    // `gateStates` comes from `gateList()`. A live gate that contributed no rows is absent from
+    // that map; a retracted gate is absent from both the map and the live gate set. Neither case
+    // makes previously gated work equivalent to work that was ready from the start.
+    const task = {
+      gates: new Set(["GATE_9"]),
+      everGated: true,
+      implemented: false,
+      stopped: false,
+    };
     expect(workStateFrom(task, new Map())).toBe("waiting");
     expect(workStateFrom(task, new Map([["GATE_9", "satisfied"]]))).toBe("planned");
-    expect(workStateFrom({ ...task, gates: new Set() }, new Map())).toBe("planned");
+    expect(workStateFrom({ ...task, gates: new Set() }, new Map())).toBe("waiting");
+    expect(workStateFrom({ ...task, gates: new Set(), everGated: false }, new Map())).toBe(
+      "planned",
+    );
   });
 
   test("blocked beats carried-out when both hold", async () => {

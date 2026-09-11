@@ -93,13 +93,14 @@ export function gateStateFrom(checks: readonly { state: CheckState }[]): GateSta
  * A task's state, from the edges that reach it.
  */
 export function workStateFrom(
-  task: { gates: Set<string>; implemented: boolean; stopped: boolean },
+  task: { gates: Set<string>; everGated: boolean; implemented: boolean; stopped: boolean },
   gateStates: ReadonlyMap<string, GateStatus["state"]>,
 ): WorkState {
   if (task.stopped) return "abandoned";
   const states = [...task.gates].map((g) => gateStates.get(g));
   if (states.includes("blocked")) return "blocked";
   if (task.implemented) return "carried-out";
+  if (task.gates.size === 0) return task.everGated ? "waiting" : "planned";
   const cleared = new Set<GateStatus["state"]>(["satisfied", "sidestepped", "retired"]);
   return states.every((state) => state !== undefined && cleared.has(state)) ? "planned" : "waiting";
 }
@@ -452,15 +453,16 @@ export class BlockedGroup extends SessionCore {
   async workList(state?: WorkState): Promise<ListedWork[]> {
     const rows = await this.graph.query(
       `MATCH (t:Task)
+       OPTIONAL MATCH (ever)-[:GATES]->(t)
        OPTIONAL MATCH (g:Gate)-[:GATES]->(t)
        OPTIONAL MATCH (t)-[:IMPLEMENTS]->(u:EvidenceUnit)
        OPTIONAL MATCH (stop:Decision)-[:RESOLVES]->(t)
-       RETURN t, g, u, stop`,
+       RETURN t, ever, g, u, stop`,
       {
         t: vertexProps<{ natural_id: string; objective: string }>(),
-        // All three wrapped, because every MATCH but the first is OPTIONAL and
-        // the row that matters most -- ungated, unimplemented, ready to start
-        // -- is exactly the one where they are all NULL.
+        // `ever` is deliberately unlabelled: the Gate label policy hides retracted gates, while
+        // the GATES edge still records that this work was gated rather than ready from the start.
+        ever: optional(vertexProps<{ natural_id: string }>()),
         g: optional(vertexProps<{ natural_id: string }>()),
         u: optional(vertexProps<{ natural_id: string }>()),
         stop: optional(vertexProps<{ natural_id: string }>()),
@@ -468,20 +470,28 @@ export class BlockedGroup extends SessionCore {
       {},
     );
 
-    // One row per (task, gate, unit) combination, so a task with two gates
-    // arrives twice. Collected before anything is decided.
+    // One row per (task, historical gate, live gate, unit) combination. Collected before
+    // anything is decided.
     const tasks = new Map<
       string,
-      { objective: string; gates: Set<string>; implemented: boolean; stopped: boolean }
+      {
+        objective: string;
+        gates: Set<string>;
+        everGated: boolean;
+        implemented: boolean;
+        stopped: boolean;
+      }
     >();
     for (const row of rows) {
       const id = row.t.natural_id;
       const entry = tasks.get(id) ?? {
         objective: row.t.objective ?? "",
         gates: new Set<string>(),
+        everGated: false,
         implemented: false,
         stopped: false,
       };
+      entry.everGated ||= row.ever !== null;
       entry.stopped ||= row.stop !== null;
       if (row.g?.natural_id) entry.gates.add(row.g.natural_id);
       if (row.u?.natural_id) entry.implemented = true;
