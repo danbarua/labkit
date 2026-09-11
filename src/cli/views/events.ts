@@ -39,7 +39,10 @@ export function renderHappened({ acts: events, more }: EventPage, p: Palette): s
     ].join("\n");
   const rendered = events
     .map((e) => {
-      const who = e.attribution.attribution_label || "unattributed";
+      const who =
+        e.attribution.attribution_how === "unattributed"
+          ? "unattributed"
+          : e.attribution.attribution_label;
       // **How the name was come by, printed beside it.** `labkit happened` is the command the
       // grade exists for: it is where `--author dan` and a bare an OS-supplied name are
       // otherwise indistinguishable.

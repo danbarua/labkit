@@ -97,4 +97,30 @@ describe("a reconstruction says what it was read off", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain(PAPER);
   });
+  test("an empty claimed author is not rendered as unattributed", () => {
+    const rendered = renderHappened(
+      {
+        acts: [
+          domainEvent({
+            seq: 1,
+            at: "2026-09-08T09:00:00.000Z",
+            attribution: {
+              attribution_label: "",
+              attribution_id: "empty-author",
+              attribution_how: "claimed",
+              git_hash: "",
+            },
+            operation: "pose",
+            subject: "Q_1",
+            command: { question: "does the coating slow corrosion?" },
+          }),
+        ],
+        more: false,
+      },
+      PLAIN,
+    );
+    const byLine = rendered.split("\n").find((line) => line.includes("by "));
+    expect(byLine).toContain("by  (claimed)");
+    expect(byLine).not.toContain("by unattributed");
+  });
 });
