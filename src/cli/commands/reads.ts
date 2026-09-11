@@ -166,7 +166,9 @@ export function registerReads(program: Command, run: Run): void {
     // body runs.
     .option("--state <state>", "never-evaluated | incomplete | blocked | satisfied", gateState)
     .action(async (opts: { state?: ReturnType<typeof gateState> }) =>
-      run(async ({ read }) => answer(await read.gateList(opts.state), (gates, p) => renderGateList(gates, p, true))),
+      run(async ({ read }) =>
+        answer(await read.gateList(opts.state), (gates, p) => renderGateList(gates, p, true)),
+      ),
     );
   program
     .command("work")
@@ -183,7 +185,9 @@ export function registerReads(program: Command, run: Run): void {
     // Commander's parser, for the reason given on `gates` above.
     .option("--state <state>", "planned | waiting | blocked | carried-out | abandoned", workState)
     .action(async (opts: { state?: ReturnType<typeof workState> }) =>
-      run(async ({ read }) => answer(await read.workList(opts.state), (work, p) => renderWorkList(work, p, true))),
+      run(async ({ read }) =>
+        answer(await read.workList(opts.state), (work, p) => renderWorkList(work, p, true)),
+      ),
     );
   program
     .command("gate")
