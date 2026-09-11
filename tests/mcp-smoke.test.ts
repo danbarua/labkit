@@ -77,12 +77,17 @@ async function client(): Promise<{ client: Client; events: EventSink }> {
 
 type Json = Record<string, unknown>;
 
-/** One call, recorded. A failure names the tool and says why — see tests/mcp.test.ts. */
-async function call(c: Client, name: string, args: Json): Promise<Json> {
+/** A raw call, recorded. A failure names the tool and says why — see tests/mcp.test.ts. */
+async function rawCall(c: Client, name: string, args: Json) {
   called.add(name);
   const result = await c.callTool({ name, arguments: args });
   if (result.isError) throw new Error(`${name} failed: ${JSON.stringify(result.content)}`);
-  return result.structuredContent as Json;
+  return result;
+}
+
+/** One call, recorded. A failure names the tool and says why — see tests/mcp.test.ts. */
+async function call(c: Client, name: string, args: Json): Promise<Json> {
+  return (await rawCall(c, name, args)).structuredContent as Json;
 }
 
 /**
@@ -172,13 +177,19 @@ describe("every tool answers when an agent actually calls it", () => {
         finding: "three runs per instance",
         content_hash: "sha256:sparse",
       });
-      const analysis = await call(c, "record_analysis", {
+      const analysisResult = await rawCall(c, "record_analysis", {
         enquiry: id(enquiry),
         method: "paired timing",
         from: [id(observations)],
         implementing: id(work),
         held_to: [id(criterion)],
       });
+      const analysis = analysisResult.structuredContent as Json;
+      expect(analysis.heldTo as string[]).toEqual([id(criterion)]);
+      const analysisText = (analysisResult.content as Array<{ type: string; text?: string }>)[0];
+      if (analysisText?.type !== "text" || analysisText.text === undefined)
+        throw new Error("record_analysis returned no text result");
+      expect(JSON.parse(analysisText.text)).toEqual(analysis);
       // The run, then the finding: two acts, two calls.
       const concluded = await call(c, "conclude", {
         analysis: id(analysis.analysis as Json),

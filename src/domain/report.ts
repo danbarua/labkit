@@ -150,10 +150,12 @@ export interface SharpenedQuestion {
 }
 
 /**
- * What `recordAnalysis` produced — the analysis, and **the claims it minted**.
+ * What `recordAnalysis` produced — the analysis, what it is held to, and **the claims it minted**.
  */
 export interface RecordedAnalysis {
   analysis: AnalysisRef;
+  /** The prespecified criteria whose bindings this act recorded. */
+  heldTo: CriterionRef[];
   claims: ConcludedClaim[];
   events: DomainEvent[];
 }

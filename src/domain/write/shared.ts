@@ -18,6 +18,7 @@ import type {
   AnalysisRef,
   ClaimRef,
   ConcludedClaim,
+  CriterionRef,
   EnquiryRef,
   EvidenceRef,
   ObservationsRef,
@@ -219,13 +220,31 @@ export class Shared extends SessionCore {
     return found ? ref("enquiry", found.l.natural_id) : undefined;
   }
 
+  /** The criteria whose `QUALIFIES` edges hold an analysis's unit to them. */
+  protected async heldToOf(analysis: AnalysisRef): Promise<CriterionRef[]> {
+    const rows = await this.graph.query(
+      `MATCH (c:Criterion)-[:QUALIFIES]->(u:EvidenceUnit)-[:USES]->(:Computation {natural_id: $id})
+       RETURN c`,
+      { c: vertexProps<{ natural_id: string }>() },
+      { id: analysis },
+    );
+    return [...new Set(rows.map((r) => ref("criterion", r.c.natural_id)))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+  }
+
   /**
    * The write half of `recordAnalysis`, unitOfWork rather than written.
    */
   protected async recorded(
     input: Omit<RecordAnalysisCommand, "concludes">,
     unitOfWork: UnitOfWork,
-  ): Promise<{ analysis: AnalysisRef; unit: UnitRef; output: ObservationsRef }> {
+  ): Promise<{
+    analysis: AnalysisRef;
+    unit: UnitRef;
+    output: ObservationsRef;
+    heldTo: CriterionRef[];
+  }> {
     const computation = await unitOfWork.node("Computation", {
       method: input.method,
       status: "completed",
@@ -239,9 +258,16 @@ export class Shared extends SessionCore {
     unitOfWork.edge(unit, "USES", computation);
     unitOfWork.edge(unit, "ADDRESSES", input.enquiry);
     if (input.implementing) unitOfWork.edge(input.implementing, "IMPLEMENTS", unit);
-    for (const criterion of input.heldTo ?? []) {
+    for (const criterion of new Set(input.heldTo ?? [])) {
       unitOfWork.edge(criterion, "QUALIFIES", unit);
     }
+    const heldTo = unitOfWork
+      .delta()
+      .filter(
+        (change): change is Extract<GraphChange, { change: "EdgeCreated" }> =>
+          change.change === "EdgeCreated" && change.label === "QUALIFIES" && change.to === unit,
+      )
+      .map((change) => ref("criterion", change.from));
     // Both levels of provenance, deliberately: the evidence unit produced this scientific
     // output; the computation produced this concrete execution output. Without the second,
     // CONSUMES would be half a pair -- "what did this computation read" answerable in one hop
@@ -272,6 +298,7 @@ export class Shared extends SessionCore {
       analysis: ref("analysis", computation),
       unit: ref("unit", unit),
       output: ref("observations", output),
+      heldTo,
     };
   }
 
