@@ -74,10 +74,50 @@ describe("S-24 — a mistaken act taken back", () => {
     ).rejects.toThrow(/rests on what it created/);
   });
 
+  test("allows reverse-order undo once the dependent act is retracted", async () => {
+    const posed = await session.pose({ question: "does pruning depth matter at all?" });
+    const pursued = await session.pursue({
+      question: posed.question,
+      approach: "a depth sweep",
+    });
+
+    await session.undo({
+      event: pursued.events[0]!.seq!,
+      because: "the pursuit was entered against the wrong question",
+    });
+    const undone = await session.undo({
+      event: posed.events[0]!.seq!,
+      because: "the question was entered by mistake",
+    });
+
+    expect(undone.retracted).toContain(posed.question);
+  });
+
+  test("work stays waiting when its last gate is retracted", async () => {
+    const { criterion } = await session.stateCriterion("the result clears the release threshold");
+    const { work } = await session.planWork({
+      objective: "publish the result",
+      acceptance: "the result is published",
+    });
+    const declared = await session.declareGate({
+      governedBy: [criterion],
+      consequence: "the result cannot be published",
+      protecting: [work],
+    });
+
+    await session.undo({
+      event: declared.events[0]!.seq!,
+      because: "the gate was declared against the wrong work",
+    });
+
+    expect((await session.workList()).find((row) => row.work === work)?.state).toBe("waiting");
+    expect((await session.now()).untouched.map((row) => row.work)).not.toContain(work);
+  });
+
   /**
-   * The case #134 was filed for, and the one no test above could catch: the dependents check first
-   * read every edge into or out of what is being retracted, and `conclude` writes two of its own --
-   * `unit PRODUCES evidence`, `evidence RECORDED_IN output` -- to nodes the analysis already had.
+   * The dependants check must distinguish an act's own edges to pre-existing nodes. `conclude`
+   * writes `unit PRODUCES evidence` and `evidence RECORDED_IN output` to nodes the analysis
+   * already had; neither edge makes that same act depend on itself.
    */
   test("an act's own edges to pre-existing nodes are not dependents of it", async () => {
     const { enquiry } = await session.openEnquiry("does depth move convergence?");

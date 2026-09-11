@@ -202,7 +202,9 @@ export class Revising extends Shared {
       // silently miss every other.
       const into = await this.graph.query(
         `MATCH (external)-[r]->(target)
-         WHERE target.natural_id IN $ids AND NOT external.natural_id IN $ids
+         WHERE target.natural_id IN $ids
+           AND NOT external.natural_id IN $ids
+           AND external.retracted IS NULL
          RETURN external AS origin, type(r) AS via, target AS reaches`,
         {
           origin: vertexProps<{ natural_id: string }>(),
@@ -213,7 +215,9 @@ export class Revising extends Shared {
       );
       const outOf = await this.graph.query(
         `MATCH (source)-[r]->(external)
-         WHERE source.natural_id IN $ids AND NOT external.natural_id IN $ids
+         WHERE source.natural_id IN $ids
+           AND NOT external.natural_id IN $ids
+           AND external.retracted IS NULL
          RETURN source AS origin, type(r) AS via, external AS reaches`,
         {
           origin: vertexProps<{ natural_id: string }>(),
