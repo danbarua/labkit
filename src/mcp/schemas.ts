@@ -791,12 +791,15 @@ export const declaredGateSchema = z.strictObject({
   gate: ref("gate"),
   events: z.array(domainEventSchema),
 });
-/** What `evaluate_criterion` returns — #161's audit: this verb returned nothing. */
+/** What evaluate_criterion returns — the decision and what it bears on. */
 export const evaluatedCriterionSchema = z.strictObject({
   evaluation: ref("evaluation"),
+  criterion: ref("criterion"),
+  outcome: z.enum(["pass", "fail"]),
+  value: z.string(),
+  gates: z.array(ref("gate")),
   events: z.array(domainEventSchema),
 });
-/** What `accept_as_unresolved` returns — #161's audit: this verb returned nothing. */
 export const acceptedAsUnresolvedSchema = z.strictObject({
   decision: ref("decision"),
   events: z.array(domainEventSchema),

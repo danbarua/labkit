@@ -216,6 +216,10 @@ export interface DeclaredGate {
 }
 export interface EvaluatedCriterion {
   evaluation: EvaluationRef;
+  criterion: CriterionRef;
+  outcome: "pass" | "fail";
+  value: string;
+  gates: GateRef[];
   events: DomainEvent[];
 }
 export interface AcceptedAsUnresolved {

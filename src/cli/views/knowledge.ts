@@ -273,7 +273,7 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
  */
 export function renderClaims(claims: ConcludedClaim[], proposition: string, p: Palette): string {
   return [
-    p.heading(`Claims asserting "${proposition}"`),
+    p.heading(`Claims asserting "${proposition}" — ${claims.length}`),
     bullets(
       claims.map((c) => `${c.asserts}  ${p.handle(`(${c.claim})`)}`),
       p.untested("none — nothing on the record asserts this wording"),
@@ -291,7 +291,7 @@ export function renderClaims(claims: ConcludedClaim[], proposition: string, p: P
 export function renderSearch(groups: SearchGroup[], text: string, p: Palette): string {
   const total = groups.reduce((n, g) => n + g.matches.length, 0);
   return [
-    p.heading(`Records containing "${text}"`),
+    p.heading(`Records containing "${text}" — ${total}`),
     total === 0
       ? p.untested("none — nothing on the record's text contains this")
       : groups

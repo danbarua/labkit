@@ -154,10 +154,11 @@ export function renderContract(contract: TaskContract, p: Palette): string {
 /**
  * Every gate, one per line, with its state.
  */
-export function renderGateList(gates: ListedGate[], p: Palette): string {
-  if (gates.length === 0) return "nothing";
+export function renderGateList(gates: ListedGate[], p: Palette, heading = false): string {
+  const title = heading ? p.heading(`Gates — ${gates.length}`) : "";
+  if (gates.length === 0) return title ? `${title}\nnothing` : "nothing";
   const width = Math.max(...gates.map((g) => g.state.length));
-  return gates
+  const rows = gates
     .map((g) => {
       const padded = g.state.padEnd(width);
       const state =
@@ -171,15 +172,17 @@ export function renderGateList(gates: ListedGate[], p: Palette): string {
       return `${state}  ${p.handle(g.gate)}  ${g.consequence}`;
     })
     .join("\n");
+  return title ? `${title}\n${rows}` : rows;
 }
 
 /**
  * Every planned piece of work, one per line, with its state.
  */
-export function renderWorkList(work: ListedWork[], p: Palette): string {
-  if (work.length === 0) return "nothing";
+export function renderWorkList(work: ListedWork[], p: Palette, heading = false): string {
+  const title = heading ? p.heading(`Work — ${work.length}`) : "";
+  if (work.length === 0) return title ? `${title}\nnothing` : "nothing";
   const width = Math.max(...work.map((w) => w.state.length));
-  return work
+  const rows = work
     .map((w) => {
       const padded = w.state.padEnd(width);
       const state =
@@ -198,4 +201,5 @@ export function renderWorkList(work: ListedWork[], p: Palette): string {
       return `${state}  ${p.handle(w.work)}  ${w.objective}`;
     })
     .join("\n");
+  return title ? `${title}\n${rows}` : rows;
 }
