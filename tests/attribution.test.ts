@@ -16,6 +16,7 @@ import {
   commandContext,
   mockGitContext,
   mockSessionContext,
+  personContext,
   type GitContextProvider,
   type SessionContextProvider,
 } from "../src/attribution";
@@ -52,6 +53,9 @@ const agent = (label: string, id: string, head: string): AttributionContext =>
   ).attribution;
 
 describe("an event says who caused it", () => {
+  test("an explicitly empty author label is rejected", () => {
+    expect(() => personContext("")).toThrow("author label must not be empty");
+  });
   test("a verb stamps the surface's attribution onto what it emits", async () => {
     const attribution = agent("claude-opus-5", "sess-1", "a".repeat(40));
     const events = inMemoryEventLog();

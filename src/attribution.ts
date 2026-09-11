@@ -76,6 +76,7 @@ export const gitContext: GitContextProvider = {
  * A person at a terminal.
  */
 export function personContext(override?: string): SessionContextProvider {
+  if (override === "") throw new Error("author label must not be empty");
   // `userInfo()` throws when there is no passwd entry for the uid, which
   // happens in containers. `$USER` is the fallback, and "unknown" after that --
   // never an empty string, which `UNATTRIBUTED` already uses to mean something

@@ -6,7 +6,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
-import { WriteSurface, domainEvent, inMemoryEventLog, type Clock } from "../src/domain";
+import {
+  WriteSurface,
+  UNATTRIBUTED,
+  domainEvent,
+  inMemoryEventLog,
+  type Clock,
+} from "../src/domain";
 import { pgEventLog } from "../src/domain/event-store";
 import { commandContext, mockGitContext, mockSessionContext } from "../src/attribution";
 import { renderHappened } from "../src/cli/views/events";
@@ -96,5 +102,52 @@ describe("a reconstruction says what it was read off", () => {
     const lines = rendered.split("\n").filter((l) => l.includes("read off"));
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain(PAPER);
+  });
+  test("a malformed claimed-empty author reports its label defect without an actor", () => {
+    const rendered = renderHappened(
+      {
+        acts: [
+          domainEvent({
+            seq: 1,
+            at: "2026-09-08T09:00:00.000Z",
+            attribution: {
+              attribution_label: "",
+              attribution_id: "empty-author",
+              attribution_how: "claimed",
+              git_hash: "",
+            },
+            operation: "pose",
+            subject: "Q_1",
+            command: { question: "does the coating slow corrosion?" },
+          }),
+        ],
+        more: false,
+      },
+      PLAIN,
+    );
+    const byLine = rendered.split("\n").find((line) => line.includes("by "));
+    expect(byLine).toContain("by [empty author label] (claimed)");
+    expect(byLine).not.toContain("by unattributed");
+    expect(byLine).not.toContain("empty-author");
+
+    const deliberate = renderHappened(
+      {
+        acts: [
+          {
+            ...domainEvent({
+              seq: 2,
+              at: "2026-09-08T09:00:00.000Z",
+              attribution: UNATTRIBUTED,
+              operation: "pose",
+              subject: "Q_2",
+              command: { question: "does the coating slow corrosion?" },
+            }),
+          },
+        ],
+        more: false,
+      },
+      PLAIN,
+    );
+    expect(deliberate).toContain("by unattributed");
   });
 });
