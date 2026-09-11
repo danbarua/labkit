@@ -37,8 +37,11 @@ export class HappenedGroup extends SessionCore {
    * Every note on the record, newest first — what each says, what it concerns, and the question
    * it prompted where it prompted one. `search` reaches a note only by words somebody already
    * remembers; this is the read for the ones nobody does.
+   *
+   * `concerning` narrows to one handle's notes. `why` surfaces them for a question and not for
+   * a claim, gate or line of enquiry, so this is their only route.
    */
-  async notes(): Promise<ListedNote[]> {
+  async notes(concerning?: AnyRef): Promise<ListedNote[]> {
     const rows = await this.graph.query(
       `MATCH (n:Note)
        OPTIONAL MATCH (n)-[:CONCERNS]->(about)
@@ -64,7 +67,11 @@ export class HappenedGroup extends SessionCore {
     }
     // Newest first, by the id's own number — notes carry no timestamp of their
     // own, and the natural id is minted in order.
-    return [...byId.values()].sort((a, b) => numberIn(b.note) - numberIn(a.note));
+    const all = [...byId.values()].sort((a, b) => numberIn(b.note) - numberIn(a.note));
+    // Filtered after the fold, not in the query: a note reaches this point with
+    // every handle it concerns already collected, so the test is a lookup rather
+    // than a second OPTIONAL MATCH whose empty case would drop the note entirely.
+    return concerning ? all.filter((n) => n.concerns.includes(concerning)) : all;
   }
 
   /**

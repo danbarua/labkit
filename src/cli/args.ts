@@ -99,9 +99,10 @@ export function citedBasis(raw: string): CitedBasis {
  * Any handle on the record, resolved to the kind its own prefix names.
  */
 export function anyRef(raw: string): AnyRef {
-  const kind = kindOf(raw);
+  const normalized = raw.toUpperCase();
+  const kind = kindOf(normalized);
   if (!kind) throw new InvalidArgumentError(`\`${raw}\` is not a handle this record recognises`);
-  return ref(kind, raw);
+  return ref(kind, normalized);
 }
 
 /** Which way a finding cuts. The domain's own two words, so a typo is refused rather than defaulted. */
