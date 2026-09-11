@@ -78,18 +78,22 @@ test("pose books its id and names it in the event before the node exists", async
   ]);
 });
 
-test("closeEnquiry states the decision and both its edges", async () => {
-  const { enquiry, question } = await session.openEnquiry("does it hold?");
+test("closeEnquiry states the decision and its exact pursuit target", async () => {
+  const { enquiry } = await session.openEnquiry("does it hold?");
   const { decision, events: recorded } = await session.closeEnquiry({ enquiry });
 
   const closed = recorded[0]!;
   expect(closed.changes.map((c) => c.change)).toEqual(["NodeCreated", "EdgeCreated"]);
-  expect(closed.changes[0]).toMatchObject({ id: decision, label: "Decision" });
+  expect(closed.changes[0]).toMatchObject({
+    id: decision,
+    label: "Decision",
+    props: { resolution_kind: "abandoned" },
+  });
   expect(closed.changes[1]).toEqual({
     change: "EdgeCreated",
     from: decision,
     label: "RESOLVES",
-    to: question,
+    to: enquiry,
   });
 });
 

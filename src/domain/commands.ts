@@ -112,9 +112,14 @@ export interface CloseEnquiryCommand {
   answeredBy?: ClaimRef;
 }
 
-/**
- * `stopWork` — planned work somebody decided not to do.
- */
+/** Close one gate without pretending its checks passed. */
+export interface CloseGateCommand {
+  gate: GateRef;
+  closure: "sidestepped" | "retired";
+  because: Prose;
+}
+
+/** Planned work somebody decided not to do. */
 export interface StopWorkCommand {
   work: WorkRef;
   because: Prose;
@@ -312,6 +317,7 @@ export type Command =
   | AcceptAsUnresolvedCommand
   | AmendDesignCommand
   | CloseEnquiryCommand
+  | CloseGateCommand
   | ConcludeCommand
   | DeclareGateCommand
   | EvaluateCriterionCommand

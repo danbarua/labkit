@@ -73,8 +73,8 @@ describe("S-14: deliberately leaving something unresolved", () => {
     const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
 
     const stillWorking = await session.enquiryStatus(enquiry);
-    expect(stillWorking.question!.open).toBe(true);
-    expect(stillWorking.question!.closure).toBeNull();
+    expect(stillWorking.open).toBe(true);
+    expect(stillWorking.closure).toBeNull();
 
     await session.acceptAsUnresolved({
       enquiry,
@@ -84,10 +84,10 @@ describe("S-14: deliberately leaving something unresolved", () => {
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.question!.open).toBe(true);
-    expect(status.question!.closure).toBe("accepted-as-unresolved");
+    expect(status.open).toBe(true);
+    expect(status.closure).toBeNull();
     // Not answered. Accepting a question is not deciding it.
-    expect(status.question!.answer).toBeNull();
+    expect(status.answer).toBeNull();
   });
 
   /**
@@ -153,7 +153,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(status.question!.acceptedBecause).toBe(
       "the confirmatory dataset is spent and there is no larger held-out sample",
     );
-    expect(status.question!.evidence.map((e) => e.states)).toEqual([
+    expect(status.question!.acceptedInLightOf?.map((e) => e.states)).toEqual([
       "difference 0.4%, CI spans zero",
     ]);
   });
@@ -167,8 +167,8 @@ describe("S-14: deliberately leaving something unresolved", () => {
     const { enquiry } = await aMarginalComparisonWithNothingLeftToRunIt();
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.question!.open).toBe(true);
-    expect(status.question!.closure).toBeNull();
+    expect(status.open).toBe(true);
+    expect(status.closure).toBeNull();
     expect(status.question!.reopensIf).toBeUndefined();
 
     const known = await (await afterwards()).whatIsKnown();
@@ -213,9 +213,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.question!.open).toBe(false);
-    expect(status.question!.closure).toBe("answered");
-    expect(status.question!.answer).toBe("yes");
+    expect(status.open).toBe(false);
+    expect(status.closure).toBe("answered");
+    expect(status.answer).toBe("yes");
 
     // **And the deferral survives the answer.** The question was left open on a stated
     // condition, and a reader meeting the answer has to be able to ask whether that is the
@@ -244,9 +244,9 @@ describe("S-14: deliberately leaving something unresolved", () => {
     await session.closeEnquiry({ enquiry });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.question!.open).toBe(false);
-    expect(status.question!.closure).toBe("abandoned");
+    expect(status.open).toBe(false);
+    expect(status.closure).toBe("abandoned");
     // The work that was done, and the reason it stopped, are both absent.
-    expect(status.question!.evidence).toEqual([]);
+    expect(status.evidence).toEqual([]);
   });
 });

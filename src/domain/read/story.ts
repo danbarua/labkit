@@ -47,7 +47,7 @@ const deferral = (
   accepting ? { acceptedBecause: accepting.reason, reopensIf: accepting.invalidation_check } : {};
 
 export class StoryGroup extends SessionCore {
-  /** Is this enquiry open, and if not, how did it close? */
+  /** Is this enquiry open, and if not, how did this enquiry close? */
   async enquiryStatus(enquiry: EnquiryRef): Promise<EnquiryStatus> {
     const named = await this.graph.query(
       `MATCH (loe:LineOfEnquiry {natural_id: $id}) RETURN loe`,
@@ -60,17 +60,16 @@ export class StoryGroup extends SessionCore {
         `no enquiry ${enquiry}; an enquiry is opened against a question, and 'search' finds its handle by the approach it was opened with`,
       );
 
-    // Closure attaches to the question the enquiry pursues, not to the
-    // enquiry itself -- an enquiry is a way of pursuing a question, and it is
-    // the question that gets answered.
     const rows = await this.graph.query(
-      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $id})
-       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
+      `MATCH (q:Question)-[:MOTIVATES]->(loe:LineOfEnquiry {natural_id: $id})
+       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(loe)
+       OPTIONAL MATCH (resolving)-[:ANSWERS]->(answered:Claim)
        OPTIONAL MATCH (deferring:Decision)-[:DEFERS]->(q)
-       RETURN q, resolving, deferring`,
+       RETURN q, resolving, answered, deferring`,
       {
         q: vertexProps<{ name: string; natural_id: string }>(),
-        resolving: optional(vertexProps<{ natural_id: string }>()),
+        resolving: optional(vertexProps<{ natural_id: string; resolution_kind?: string }>()),
+        answered: optional(vertexProps<{ natural_id: string; name: string }>()),
         deferring: optional(
           vertexProps<{
             natural_id: string;
@@ -82,10 +81,6 @@ export class StoryGroup extends SessionCore {
       { id: enquiry },
     );
 
-    // What this pursuit itself produced. Evidence units address the line of
-    // enquiry they were recorded against, so this is the enquiry's own work --
-    // and it is the field that makes "where is my ablation up to?" answerable
-    // without inferring anything from the question's state.
     const mine = await this.graph.query(
       `MATCH (u:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $id})
        MATCH (u)-[:PRODUCES]->(e:Evidence)
@@ -101,70 +96,65 @@ export class StoryGroup extends SessionCore {
       (f) => f.evidence,
     );
 
-    // Identity and wording, kept apart. The old line was
-    // `rows[0]?.q.name ?? loe.loe.name` -- wording, silently substituting the
-    // enquiry's own name when no question stood behind it. Two entities' text
-    // in one field, and no way for a caller to reach the question at all.
     const behind = rows[0]?.q ?? null;
     const resolving = rows.find((r) => r.resolving)?.resolving ?? null;
-    const deferred = rows.some((r) => r.deferring);
-
-    if (!resolving && !deferred) {
-      return {
-        enquiry,
-        pursuing: loe.loe.name,
-        contributed,
-        question: behind && {
-          question: ref("question", behind.natural_id),
-          asks: behind.name,
-          open: true,
-          closure: null,
-          answer: null,
-          evidence: [],
-        },
-      };
-    }
-    // Accepted, not closed. `open` stays TRUE: a question left open on purpose
-    // is not shut. It has not been answered and nobody claims it has; what
-    // changed is that leaving it open is now a
-    // recorded decision rather than an absence of one.
     const accepting = rows.find((r) => r.deferring)?.deferring ?? null;
-    if (accepting && !resolving) {
-      const inLightOf = await this.graph.query(
-        `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence) RETURN e`,
-        { e: vertexProps<{ statement: string } & Identified>() },
-        { id: accepting.natural_id },
-      );
+    const acceptedBasis = accepting
+      ? await this.graph.query(
+          `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence) RETURN e`,
+          { e: vertexProps<{ statement: string } & Identified>() },
+          { id: accepting.natural_id },
+        )
+      : [];
+    const question = behind
+      ? {
+          question: ref("question", behind.natural_id),
+          asks: behind.name,
+          ...deferral(accepting),
+          ...(accepting
+            ? {
+                acceptedInLightOf: dedupeById(
+                  acceptedBasis.map((r) => ({
+                    evidence: ref("evidence", r.e.natural_id),
+                    states: r.e.statement,
+                  })),
+                  (f) => f.evidence,
+                ),
+              }
+            : {}),
+        }
+      : null;
+
+    if (!resolving)
       return {
         enquiry,
         pursuing: loe.loe.name,
         contributed,
-        question: behind && {
-          question: ref("question", behind.natural_id),
-          asks: behind.name,
-          open: true,
-          closure: "accepted-as-unresolved",
-          answer: null,
-          evidence: dedupeById(
-            inLightOf.map((r) => ({
-              evidence: ref("evidence", r.e.natural_id),
-              states: r.e.statement,
-            })),
-            (f) => f.evidence,
-          ),
-          acceptedBecause: accepting.reason,
-          reopensIf: accepting.invalidation_check,
-        },
+        open: true,
+        closure: null,
+        answer: null,
+        evidence: [],
+        question,
       };
-    }
 
-    // What the closing decision rests on. Nothing cited means the question was
-    // abandoned, not answered -- absence of evidence is not a negative result.
+    if (resolving.resolution_kind === "abandoned")
+      return {
+        enquiry,
+        pursuing: loe.loe.name,
+        contributed,
+        open: false,
+        closure: "abandoned",
+        answer: null,
+        evidence: [],
+        question,
+      };
+
+    if (resolving.resolution_kind !== "answered")
+      throw new Error(
+        `decision ${resolving.natural_id} resolves enquiry ${enquiry} with invalid resolution kind ${resolving.resolution_kind ?? "absent"}`,
+      );
+
     const cited = await this.graph.query(
-      // Only the challenging bearing is fetched: polarity is "no" when something challenges and
-      // "yes" otherwise, so the supporting side is the default rather than an input. Returning
-      // it as `forClaim` would also be silently broken, since a camelCase column decodes as
-      // null (see `buildAsClause`, which now refuses the name that hid this).
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(against:Claim)
        RETURN e, against`,
@@ -172,34 +162,14 @@ export class StoryGroup extends SessionCore {
         e: vertexProps<{ statement: string } & Identified>(),
         against: optional(vertexProps<{ name: string }>()),
       },
-      { id: resolving!.natural_id },
+      { id: resolving.natural_id },
     );
+    const answered = rows.find((r) => r.answered)?.answered ?? null;
+    if (cited.length === 0 || answered === null)
+      throw new Error(
+        `answered decision ${resolving.natural_id} lacks its answering claim or cited evidence for enquiry ${enquiry}`,
+      );
 
-    if (cited.length === 0) {
-      return {
-        enquiry,
-        pursuing: loe.loe.name,
-        contributed,
-        question: behind && {
-          question: ref("question", behind.natural_id),
-          asks: behind.name,
-          open: false,
-          closure: "abandoned",
-          answer: null,
-          evidence: [],
-          ...deferral(accepting),
-        },
-      };
-    }
-
-    // Polarity is derived from which way the cited findings cut, not stored on
-    // the decision: a question answered by evidence that challenges its
-    // proposition was answered "no".
-    const challenges = cited.some((r) => r.against !== null);
-
-    // What the closure rests on: promoted work, or scratch nobody promoted. Answered either way
-    // -- the question is settled as far as anyone has taken it -- but a reader deciding whether
-    // to build on it should not have to go and look.
     const promoted = await this.graph.query(
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
@@ -213,28 +183,25 @@ export class StoryGroup extends SessionCore {
         sp: optional(vertexProps<{ reason?: string }>()),
         cp: optional(vertexProps<{ reason?: string }>()),
       },
-      { id: resolving!.natural_id },
+      { id: resolving.natural_id },
     );
     return {
       enquiry,
       pursuing: loe.loe.name,
       contributed,
-      question: behind && {
-        question: ref("question", behind.natural_id),
-        asks: behind.name,
-        open: false,
-        closure: "answered",
-        answer: challenges ? "no" : "yes",
-        evidence: dedupeById(
-          cited.map((r) => ({
-            evidence: ref("evidence", r.e.natural_id),
-            states: r.e.statement,
-          })),
-          (f) => f.evidence,
-        ),
-        restsOn: promoted.some((r) => (r.sp ?? r.cp) !== null) ? "confirmatory" : "exploratory",
-        ...deferral(accepting),
-      },
+      open: false,
+      closure: "answered",
+      answer: cited.some((r) => r.against !== null) ? "no" : "yes",
+      answered: { claim: ref("claim", answered.natural_id), asserts: answered.name },
+      evidence: dedupeById(
+        cited.map((r) => ({
+          evidence: ref("evidence", r.e.natural_id),
+          states: r.e.statement,
+        })),
+        (f) => f.evidence,
+      ),
+      restsOn: promoted.some((r) => (r.sp ?? r.cp) !== null) ? "confirmatory" : "exploratory",
+      question,
     };
   }
 

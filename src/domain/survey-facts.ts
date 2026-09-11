@@ -50,26 +50,35 @@ export function answeringClaimBearing(
   return {
     name: "answeringClaim",
     grain: byQuestion,
-    // **One path, to the end.** Whether anyone vouched for the answer is the last hop of the
-    // same walk, not a second question asked afterwards: a promotion is `Decision -PROMOTES->
-    // Claim` and nothing else.
-    clause: `OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(q)
+    clause: `OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
+           OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(loe)
+           OPTIONAL MATCH (closing)-[:ANSWERS]->(answering:Claim)
+           OPTIONAL MATCH (answering)-[:RESTS_ON]->(part:Claim)
            OPTIONAL MATCH (closing)-[:BASED_ON]->(cited:Evidence)
-           OPTIONAL MATCH (cited)-[:${bearing}]->(answering:Claim)
+           OPTIONAL MATCH (cited)-[:${bearing}]->(borne:Claim)
            OPTIONAL MATCH (answering)<-[:PROMOTES]-(vouching:Decision)`,
     yields: {
+      loe: optional(vertexProps<Node & { name: string }>()),
+      closing: optional(
+        vertexProps<Node & { decided_at: string; reason: string; resolution_kind?: string }>(),
+      ),
+      part: optional(vertexProps<Node>()),
       cited: optional(vertexProps<Node>()),
+      borne: optional(vertexProps<Node>()),
       answering: optional(vertexProps<ClaimNode>()),
       vouching: optional(vertexProps<Node>()),
     },
     empty: () => null,
-    // The claim is the first one found, as before. The vouch is an OR across
-    // rows: the same claim arrives once per promoting decision and once more
-    // with none, so `found ?? row` would keep whichever row came first and
-    // drop a real promotion on the strength of row order.
     fold: (found, row) => {
-      const claim = found?.claim ?? (row.answering as ClaimNode | null);
-      if (!claim) return found;
+      const claim = (row.answering as ClaimNode | null) ?? found?.claim;
+      const borne = row.borne as Node | null;
+      const part = row.part as Node | null;
+      const bearsOnAnswer = Boolean(
+        claim &&
+          borne &&
+          (borne.natural_id === claim.natural_id || part?.natural_id === borne.natural_id),
+      );
+      if (!claim || !bearsOnAnswer) return found;
       return { claim, vouchedFor: (found?.vouchedFor ?? false) || row.vouching !== null };
     },
   };
@@ -437,37 +446,50 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus[]>
   };
 }
 
-/**
- * Whether the answer stood as promoted **at a moment**, and whether it had been resolved by
- * then.
- */
+/** Whether a question had an open pursuit or a recorded answer at one moment. */
 export function standingAsOf(
   at: string,
   bearing: "SUPPORTS" | "CHALLENGES",
-): Leaf<{ resolved: boolean; promoted: boolean }> {
+): Leaf<{ resolved: boolean; promoted: boolean; open: boolean }> {
   return {
     name: "standingAsOf",
     grain: byQuestion,
-    clause: `OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(q)
+    clause: `OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
+           OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(loe)
+           OPTIONAL MATCH (resolving)-[:ANSWERS]->(answering:Claim)
+           OPTIONAL MATCH (answering)-[:RESTS_ON]->(part:Claim)
            OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
-           OPTIONAL MATCH (cited)-[:${bearing}]->(answering:Claim)
+           OPTIONAL MATCH (cited)-[:${bearing}]->(borne:Claim)
            OPTIONAL MATCH (vouching:Decision)-[:PROMOTES]->(answering)`,
     yields: {
-      resolving: optional(vertexProps<{ decided_at: string }>()),
+      loe: optional(vertexProps<Node & { started_at?: string }>()),
+      resolving: optional(vertexProps<{ decided_at: string; resolution_kind?: string }>()),
+      part: optional(vertexProps<Node>()),
       cited: optional(vertexProps<Node>()),
+      borne: optional(vertexProps<Node>()),
       answering: optional(vertexProps<ClaimNode>()),
       vouching: optional(vertexProps<{ decided_at: string }>()),
     },
-    empty: () => ({ resolved: false, promoted: false }),
+    empty: () => ({ resolved: false, promoted: false, open: false }),
     fold: (standing, row) => {
-      const resolving = row.resolving as { decided_at: string } | null;
-      // A decision taken after the moment asked about has not happened yet.
-      const resolvedByThen = resolving !== null && resolving.decided_at <= at;
+      const loe = row.loe as (Node & { started_at?: string }) | null;
+      const existed = loe !== null && (loe.started_at === undefined || loe.started_at <= at);
+      const resolving = row.resolving as { decided_at: string; resolution_kind?: string } | null;
+      const closed = existed && resolving !== null && resolving.decided_at <= at;
+      const answering = row.answering as ClaimNode | null;
+      const borne = row.borne as Node | null;
+      const part = row.part as Node | null;
+      const bearsOnAnswer = Boolean(
+        answering &&
+          borne &&
+          (borne.natural_id === answering.natural_id || part?.natural_id === borne.natural_id),
+      );
+      const answered = closed && resolving.resolution_kind === "answered" && bearsOnAnswer;
       const vouched = row.vouching as { decided_at: string } | null;
       return {
-        resolved: standing.resolved || (resolvedByThen && row.cited !== null),
-        promoted:
-          standing.promoted || (resolvedByThen && vouched !== null && vouched.decided_at <= at),
+        resolved: standing.resolved || answered,
+        promoted: standing.promoted || (answered && vouched !== null && vouched.decided_at <= at),
+        open: standing.open || (existed && !closed),
       };
     },
   };

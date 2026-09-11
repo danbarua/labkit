@@ -220,6 +220,21 @@ describe("every tool answers when an agent actually calls it", () => {
       // satisfied, so nothing is blocking it.
       expect((workRows.work as Array<{ work: string }>).map((w) => w.work)).toContain(id(work));
 
+      const closedGate = await call(c, "close_gate", {
+        gate: id(gate),
+        closure: "retired",
+        because: "the benchmark decision is complete",
+      });
+      expect(closedGate.closure).toBe("retired");
+      const retired = await call(c, "gate_status", { gate: id(gate) });
+      expect(retired.state).toBe("retired");
+      expect(retired.closure).toEqual({
+        decision: closedGate.decision,
+        kind: "retired",
+        because: "the benchmark decision is complete",
+      });
+      expect(retired.checks as unknown[]).toHaveLength(1);
+
       // `why` dispatches on the handle's own kind. This task was planned
       // with no enquiry (line 149), so its `Work` case names that honestly
       // rather than an empty `because`.
@@ -235,13 +250,17 @@ describe("every tool answers when an agent actually calls it", () => {
       });
       // `known` partitions by how well a question is *answered*, so the
       // enquiry has to be closed before the question can be established.
-      await call(c, "close_enquiry", {
+      const closure = await call(c, "close_enquiry", {
         enquiry: id(enquiry),
         answered_by: claim,
       });
+      expect(closure).toMatchObject({ enquiry: id(enquiry), closure: "answered" });
       const survey = await call(c, "known", {});
       expect((survey.established as Array<{ asks: string }>).map((q) => q.asks)).toContain(
         "is the solver faster on sparse instances?",
+      );
+      expect(survey.closedPursuits as unknown[]).toContainEqual(
+        expect.objectContaining({ enquiry: id(enquiry), closure: "answered" }),
       );
 
       // #55: the morning briefing. No cursor -- the full standing, and
@@ -388,7 +407,7 @@ describe("every tool answers when an agent actually calls it", () => {
         answered_by: narrowedClaim,
       });
       const closed = await call(c, "enquiry_status", { enquiry: id(enquiry) });
-      expect((closed.question as Json).closure).toBe("answered");
+      expect(closed.closure).toBe("answered");
 
       // Work nobody is going to do. It leaves `now`'s ready-to-start list and
       // reads `abandoned` — the state an act writes rather than a traversal
@@ -563,7 +582,11 @@ describe("every tool answers when an agent actually calls it", () => {
         in_light_of: claimIn(denseConcl, HOLDS),
       });
       const left = await call(c, "enquiry_status", { enquiry: id(dense) });
-      expect((left.question as Json).closure).toBe("accepted-as-unresolved");
+      expect(left.open).toBe(true);
+      expect(left.closure).toBeNull();
+      expect((left.question as Json).acceptedBecause).toBe(
+        "the dense set needs an instance generator nobody has written",
+      );
 
       // `undo` — a throwaway act, nothing else here depends on it.
       const mistake = await call(c, "pose", { question: "does undo work?" });

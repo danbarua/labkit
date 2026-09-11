@@ -94,16 +94,16 @@ describe("S-27: why explains every kind", () => {
   });
 
   test("Afterward: a decision says what it settled — the kind with the most edges, once refused", async () => {
-    const { decision, question, claim } = await anArcOfWork();
+    const { decision, enquiry, claim } = await anArcOfWork();
 
     const explained = await (await afterwards()).why(decision);
 
     // Its own reason, which is the only place a person's words for an act live.
     expect(explained.is).toContain("T beats the control");
     const reached = explained.because.map((c) => c.handle);
-    expect(reached).toContain(question);
+    expect(reached).toContain(enquiry);
     // And how it is joined, in words a researcher would use.
-    const settled = explained.because.find((c) => c.handle === question);
+    const settled = explained.because.find((c) => c.handle === enquiry);
     expect(settled!.wording).toContain("settled");
     expect(claim).toBeTruthy();
   });

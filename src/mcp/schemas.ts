@@ -15,6 +15,7 @@ import type {
   Pursued,
   RecordedReview,
   ClosedEnquiry,
+  ClosedGate,
   StoppedWork,
   PlannedWork,
   StatedCriterion,
@@ -23,7 +24,7 @@ import type {
   AcceptedAsUnresolved,
   Restated,
   Undone,
-  QuestionClosure,
+  EnquiryQuestion,
   ConflictSide,
   ConflictVerdict,
   GateStatus,
@@ -237,10 +238,24 @@ const acceptedQuestion = questionStanding.extend({
   acceptedBecause: z.string(),
 });
 
-/** `KnowledgeSurvey.established`/`.provisional` — the claim that answers it, and which way. */
-const answeredQuestion = questionStanding.extend({
+/** Every pursuit that supplied an answer remains visible. */
+const pursuitAnswer = z.strictObject({
+  enquiry: ref("enquiry"),
   claim: ref("claim"),
   answer: z.enum(["yes", "no"]),
+});
+const answeredQuestion = questionStanding.extend({
+  answers: z.array(pursuitAnswer),
+  reopensIf: z.string().optional(),
+  acceptedBecause: z.string().optional(),
+});
+const closedPursuit = z.strictObject({
+  enquiry: ref("enquiry"),
+  pursuing: z.string(),
+  question: ref("question"),
+  decision: ref("decision"),
+  closure: z.enum(["answered", "abandoned"]),
+  answered: z.strictObject({ claim: ref("claim"), answer: z.enum(["yes", "no"]) }).optional(),
 });
 
 const identifiedArtefact = z.strictObject({
@@ -334,6 +349,7 @@ export const knowledgeSurveySchema = z.strictObject({
   untested: z.array(questionStanding),
   provisional: z.array(answeredQuestion),
   accepted: z.array(acceptedQuestion),
+  closedPursuits: z.array(closedPursuit),
 });
 
 export const historicalSurveySchema = z.strictObject({
@@ -386,23 +402,25 @@ export const dependencyReportSchema = z.strictObject({
   complete: z.literal(false),
 });
 
-export const questionClosureSchema = z.strictObject({
+export const enquiryQuestionSchema = z.strictObject({
   question: ref("question"),
   asks: z.string(),
-  open: z.boolean(),
-  closure: z.enum(["answered", "abandoned", "accepted-as-unresolved"]).nullable(),
-  answer: z.enum(["yes", "no"]).nullable(),
   reopensIf: z.string().optional(),
   acceptedBecause: z.string().optional(),
-  restsOn: z.enum(["exploratory", "confirmatory"]).optional(),
-  evidence: z.array(citedFinding),
+  acceptedInLightOf: z.array(citedFinding).optional(),
 });
 
 export const enquiryStatusSchema = z.strictObject({
   enquiry: ref("enquiry"),
   pursuing: z.string(),
   contributed: z.array(citedFinding),
-  question: questionClosureSchema.nullable(),
+  open: z.boolean(),
+  closure: z.enum(["answered", "abandoned"]).nullable(),
+  answer: z.enum(["yes", "no"]).nullable(),
+  answered: concludedClaim.optional(),
+  restsOn: z.enum(["exploratory", "confirmatory"]).optional(),
+  evidence: z.array(citedFinding),
+  question: enquiryQuestionSchema.nullable(),
 });
 
 /**
@@ -507,7 +525,21 @@ export const criteriaGoverningSchema = z.strictObject({
 export const gateStatusSchema = z.strictObject({
   gate: ref("gate"),
   consequence: z.string(),
-  state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
+  state: z.enum([
+    "never-evaluated",
+    "incomplete",
+    "blocked",
+    "satisfied",
+    "sidestepped",
+    "retired",
+  ]),
+  closure: z
+    .strictObject({
+      decision: ref("decision"),
+      kind: z.enum(["sidestepped", "retired"]),
+      because: z.string(),
+    })
+    .optional(),
   checks: z.array(checkStatus),
   unmet: z.array(unmetCheck),
   counts: z.strictObject({
@@ -771,9 +803,18 @@ export const closedEnquirySchema = z.strictObject({
   answered: concludedClaim.optional(),
   events: z.array(domainEventSchema),
 });
-/** What `stop_work` returns. */
+/** What stop_work returns. */
 export const stoppedWorkSchema = z.strictObject({
   decision: ref("decision"),
+  work: ref("work"),
+  closure: z.literal("stopped"),
+  events: z.array(domainEventSchema),
+});
+/** What close_gate returns. */
+export const closedGateSchema = z.strictObject({
+  decision: ref("decision"),
+  gate: ref("gate"),
+  closure: z.enum(["sidestepped", "retired"]),
   events: z.array(domainEventSchema),
 });
 /** What `plan_work` returns. */
@@ -915,8 +956,8 @@ export type _SupportExplanation = Assert<
 export type _DependencyReport = Assert<
   Exact<z.infer<typeof dependencyReportSchema>, DependencyReport>
 >;
-export type _QuestionClosure = Assert<
-  Exact<z.infer<typeof questionClosureSchema>, QuestionClosure>
+export type _EnquiryQuestion = Assert<
+  Exact<z.infer<typeof enquiryQuestionSchema>, EnquiryQuestion>
 >;
 export type _EnquiryStatus = Assert<Exact<z.infer<typeof enquiryStatusSchema>, EnquiryStatus>>;
 export type _EnquiryInContext = Assert<
@@ -993,6 +1034,7 @@ export type _SharpenedQuestion = Assert<
 >;
 export type _RecordedReview = Assert<Exact<z.infer<typeof recordedReviewSchema>, RecordedReview>>;
 export type _ClosedEnquiry = Assert<Exact<z.infer<typeof closedEnquirySchema>, ClosedEnquiry>>;
+export type _ClosedGate = Assert<Exact<z.infer<typeof closedGateSchema>, ClosedGate>>;
 export type _StoppedWork = Assert<Exact<z.infer<typeof stoppedWorkSchema>, StoppedWork>>;
 export type _PlannedWork = Assert<Exact<z.infer<typeof plannedWorkSchema>, PlannedWork>>;
 export type _StatedCriterion = Assert<
@@ -1027,7 +1069,14 @@ export const registeredSessionSchema = z.strictObject({
 const listedGate = z.strictObject({
   gate: ref("gate"),
   consequence: z.string(),
-  state: z.enum(["never-evaluated", "incomplete", "blocked", "satisfied"]),
+  state: z.enum([
+    "never-evaluated",
+    "incomplete",
+    "blocked",
+    "satisfied",
+    "sidestepped",
+    "retired",
+  ]),
 });
 
 /** `gate_list` — an array, wrapped because `structuredContent` must be an object. */

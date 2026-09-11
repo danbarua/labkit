@@ -223,8 +223,8 @@ describe("an agent can track work through the tools alone", () => {
 
       // Now the reads, which had nothing to say before any of the above.
       const status = await call(c, "enquiry_status", { enquiry: id(enquiry) });
-      expect((status.question as { open: boolean }).open).toBe(false);
-      expect((status.question as { closure: string }).closure).toBe("answered");
+      expect(status.open).toBe(false);
+      expect(status.closure).toBe("answered");
 
       const why = await call(c, "why_supported", {
         claim: await claimIdFor(c, PROP),

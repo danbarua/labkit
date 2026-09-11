@@ -1,17 +1,23 @@
-/** Closing a question, or deliberately leaving it open. */
+/** Closing a pursuit or planned work, or deliberately leaving a question open. */
 
 import { optional, scalar, vertexProps } from "../../db/cypher";
 import type { TenantGraph } from "../../db/graph";
 import type {
   AcceptedAsUnresolved,
   ClosedEnquiry,
-  StoppedWork,
+  ClosedGate,
   EnquiryRef,
   EvidenceRef,
   QuestionRef,
+  StoppedWork,
 } from "../report";
 import { ref } from "../report";
-import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand, StopWorkCommand } from "../commands";
+import type {
+  AcceptAsUnresolvedCommand,
+  CloseEnquiryCommand,
+  CloseGateCommand,
+  StopWorkCommand,
+} from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
@@ -26,35 +32,33 @@ export class Stopping extends SessionCore {
     super(graph, options);
   }
 
-  /**
-   * Closes an enquiry by resolving the question that motivates it.
-   */
+  /** Close exactly the named enquiry. Its question is derived by readers. */
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
     return this.handle("closeEnquiry", input, async (unitOfWork) => {
-      // Everything is validated before anything is written. A rejected close
-      // must leave no Decision behind, and an analysis from some other enquiry
-      // must not become the stated basis for resolving this question.
+      const [target] = await this.graph.query(
+        `MATCH (loe:LineOfEnquiry {natural_id: $id})
+         OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(loe)
+         RETURN loe, d`,
+        {
+          loe: vertexProps<{ natural_id: string; name: string }>(),
+          d: optional(vertexProps<{ natural_id: string; reason: string }>()),
+        },
+        { id: input.enquiry },
+      );
+      if (!target)
+        throw new Error(
+          `no enquiry ${input.enquiry}; an enquiry exists once pursue records it, and its handle comes back from that act`,
+        );
       const question = await this.questionBehind(input.enquiry);
       if (!question)
         throw new Error(
-          `enquiry ${input.enquiry} has no motivating question to resolve; closure attaches to the question an enquiry pursues, so pursue one before closing`,
+          `enquiry ${input.enquiry} has no motivating question; an enquiry is opened against a question, so pursue one before closing`,
         );
-
-      // **Closing a closed question is refused, not recorded.** A second close writes a second
-      // `RESOLVES`, and `enquiryStatus()` picks between them with `.find()` over rows AGE
-      // returns in no defined order — so which close a reader sees is arbitrary.
-      const alreadyResolved = await this.graph.query(
-        `MATCH (d:Decision)-[:RESOLVES]->(:Question {natural_id: $id}) RETURN d`,
-        { d: vertexProps<{ natural_id: string; reason: string }>() },
-        { id: question },
-      );
-      if (alreadyResolved.length > 0) {
+      if (target.d)
         throw new Error(
           `enquiry ${input.enquiry} is already closed by decision ` +
-            `${alreadyResolved[0]!.d.natural_id} (${alreadyResolved[0]!.d.reason}); ` +
-            `closing it again would leave two decisions resolving one question`,
+            `${target.d.natural_id} (${target.d.reason}); closing it again would leave two decisions resolving one enquiry`,
         );
-      }
 
       let answerBearing: EvidenceRef[] = [];
       let answeredProposition: string | undefined;
@@ -123,17 +127,22 @@ export class Stopping extends SessionCore {
         }
       }
 
+      const closure =
+        input.answeredBy === undefined ? ("abandoned" as const) : ("answered" as const);
       const decided = ref(
         "decision",
         await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
-          reason: answeredProposition
-            ? `answered on "${answeredProposition}"`
-            : "closed without a cited result",
-          invalidation_check: "new evidence bearing on the question",
+          reason:
+            input.answeredBy === undefined
+              ? "closed without a cited result"
+              : `answered on "${answeredProposition ?? ""}"`,
+          invalidation_check: "new evidence bearing on this enquiry's question",
+          resolution_kind: closure,
         }),
       );
-      unitOfWork.edge(decided, "RESOLVES", question);
+      unitOfWork.edge(decided, "RESOLVES", input.enquiry);
+      if (input.answeredBy) unitOfWork.edge(decided, "ANSWERS", input.answeredBy);
       for (const basis of answerBearing) unitOfWork.edge(decided, "BASED_ON", basis);
 
       return {
@@ -142,12 +151,10 @@ export class Stopping extends SessionCore {
           decision: decided,
           enquiry: input.enquiry,
           question,
-          // Derived from what was recorded, not from what the caller passed:
-          // `answeredBy` with no finding behind it never reaches here.
-          closure: answeredProposition ? ("answered" as const) : ("abandoned" as const),
-          ...(input.answeredBy && answeredProposition
-            ? { answered: { claim: input.answeredBy, asserts: answeredProposition } }
-            : {}),
+          closure,
+          ...(input.answeredBy === undefined
+            ? {}
+            : { answered: { claim: input.answeredBy, asserts: answeredProposition ?? "" } }),
         },
       };
     });
@@ -200,9 +207,46 @@ export class Stopping extends SessionCore {
     });
   }
 
-  /**
-   * Planned work somebody decided not to do.
-   */
+  /** Close one gate without changing what any criterion verdict says. */
+  async closeGate(input: CloseGateCommand): Promise<ClosedGate> {
+    return this.handle("closeGate", input, async (unitOfWork) => {
+      const [target] = await this.graph.query(
+        `MATCH (g:Gate {natural_id: $id})
+         OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(g)
+         RETURN g, d`,
+        {
+          g: vertexProps<{ natural_id: string; consequence: string }>(),
+          d: optional(vertexProps<{ natural_id: string; reason: string }>()),
+        },
+        { id: input.gate },
+      );
+      if (!target)
+        throw new Error(
+          `no gate ${input.gate}; a gate exists once declare records one, and its handle comes back from that act`,
+        );
+      if (target.d)
+        throw new Error(
+          `gate ${input.gate} is already ${target.d.reason} by ${target.d.natural_id}; one decision closes a gate`,
+        );
+
+      const decision = ref(
+        "decision",
+        await unitOfWork.node("Decision", {
+          decided_at: this.clock.now(),
+          reason: input.because,
+          invalidation_check: "a reason for this gate to govern work again",
+          resolution_kind: input.closure,
+        }),
+      );
+      unitOfWork.edge(decision, "RESOLVES", input.gate);
+      return {
+        subject: input.gate,
+        result: { decision, gate: input.gate, closure: input.closure },
+      };
+    });
+  }
+
+  /** Planned work somebody decided not to do. */
   async stopWork(input: StopWorkCommand): Promise<StoppedWork> {
     return this.handle("stopWork", input, async (unitOfWork) => {
       const [task] = await this.graph.query(
@@ -231,13 +275,14 @@ export class Stopping extends SessionCore {
           decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check: "a reason to do this work after all",
+          resolution_kind: "stopped",
         }),
       );
       unitOfWork.edge(decision, "RESOLVES", input.work);
 
       return {
         subject: input.work,
-        result: { decision },
+        result: { decision, work: input.work, closure: "stopped" },
       };
     });
   }

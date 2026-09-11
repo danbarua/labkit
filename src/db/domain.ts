@@ -85,7 +85,8 @@ export const EDGE_LABELS = [
   "GATES", // Gate -> Task/Computation
   "CHANGES", // Decision -> Criterion
   "BASED_ON", // Decision -> Evidence | CriterionEvaluation -> Evidence
-  "RESOLVES", // Decision -> Question
+  "RESOLVES", // Decision -> Question | LineOfEnquiry | Task | Gate
+  "ANSWERS", // Decision -> Claim named as an enquiry's answer
   "NARROWS", // Decision -> Question
   "DEFERS", // Decision -> Question
   "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
@@ -226,13 +227,16 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["CriterionEvaluation", "Evidence"],
   ],
   /**
-   * A decision that settles something: what a question was answered or abandoned on, and work
-   * somebody decided not to do.
+   * The item a decision closes. Question remains legal for replaying historical events; current
+   * question standing is computed from the closures of its lines of enquiry.
    */
   RESOLVES: [
     ["Decision", "Question"],
+    ["Decision", "LineOfEnquiry"],
     ["Decision", "Task"],
+    ["Decision", "Gate"],
   ],
+  ANSWERS: [["Decision", "Claim"]],
   NARROWS: [["Decision", "Question"]],
   DEFERS: [["Decision", "Question"]],
   /**
@@ -328,6 +332,8 @@ export interface QuestionProps {
 
 export interface LineOfEnquiryProps {
   name: Prose;
+  /** When this pursuit entered the record. Historical events may predate this property. */
+  started_at?: Timestamp;
 }
 
 export interface EvidenceUnitProps {
@@ -354,18 +360,16 @@ export interface ClaimProps {
   kind?: "exploratory" | "confirmatory" | "undecided";
 }
 
-/**
- * **No `evidence` string shadow**, and no `is_open`/`closed_at`.
- */
+export type ResolutionKind = "answered" | "abandoned" | "stopped" | "sidestepped" | "retired";
+
+/** No evidence string shadow, and no mutable open or closed property. */
 export interface DecisionProps {
   reason: Prose;
-  /**
-   * What would reopen this decision.
-   */
+  /** Present exactly when this decision closes one item through RESOLVES. */
+  resolution_kind?: ReadOnlyString<ResolutionKind>;
+  /** What would reopen this decision. */
   invalidation_check: Prose;
-  /**
-   * When the act was recorded, from the injected clock. Earned by row Z.
-   */
+  /** When the act was recorded, from the injected clock. Earned by row Z. */
   decided_at: Timestamp;
 }
 

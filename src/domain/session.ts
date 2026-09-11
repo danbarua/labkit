@@ -50,6 +50,7 @@ export class ResearchSession {
   readonly stoppedWork: ReadSurface["stoppedWork"] = (...args) => this.reads.stoppedWork(...args);
   readonly closeEnquiry: WriteSurface["closeEnquiry"] = (...args) =>
     this.writes.closeEnquiry(...args);
+  readonly closeGate: WriteSurface["closeGate"] = (...args) => this.writes.closeGate(...args);
   readonly stopWork: WriteSurface["stopWork"] = (...args) => this.writes.stopWork(...args);
   readonly enquiryStatus: ReadSurface["enquiryStatus"] = (...args) =>
     this.reads.enquiryStatus(...args);

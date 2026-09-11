@@ -457,34 +457,27 @@ async function explainWork(self: ReadSurface, subject: string): Promise<WorkExpl
   };
 }
 
-/** The `LineOfEnquiry` case: `enquiryInContext` -- what `--in-context` computed, before the redesign folded it in here. */
+/** The LineOfEnquiry case: its own closure, with aggregate question context beside it. */
 async function explainEnquiry(self: ReadSurface, subject: string): Promise<EnquiryExplanation> {
   const enquiry = ref("enquiry", subject);
   const report = await self.enquiryInContext(enquiry);
-  const q = report.enquiry.question;
-  // Exhaustive over `QuestionClosure.closure`'s four values (three literals
-  // plus `null`), the same union `renderEnquiry` branches on.
+  const status = report.enquiry;
   let is: string;
-  if (!q) {
-    is = "pursuing nothing on the record";
-  } else {
-    switch (q.closure) {
-      case "answered":
-        is = `closed — answered${q.answer ? ` ${q.answer}` : ""}`;
-        break;
-      case "abandoned":
-        is = "closed — abandoned";
-        break;
-      case "accepted-as-unresolved":
-        is = "open — accepted as unresolved, deliberately";
-        break;
-      case null:
-        is = "open";
-        break;
-      default: {
-        const check: never = q.closure;
-        throw new Error(`unreached enquiry closure: ${check}`);
-      }
+  switch (status.closure) {
+    case "answered":
+      is = `closed — answered${status.answer ? ` ${status.answer}` : ""}`;
+      break;
+    case "abandoned":
+      is = "closed — abandoned";
+      break;
+    case null:
+      is = status.question?.acceptedBecause
+        ? "open — its question is accepted as unresolved"
+        : "open";
+      break;
+    default: {
+      const check: never = status.closure;
+      throw new Error(`unreached enquiry closure: ${check}`);
     }
   }
   const because: Cause[] = report.standing
@@ -624,6 +617,13 @@ async function explainGate(self: ReadSurface, subject: string): Promise<GateExpl
       is = "satisfied";
       because = report.checks.map(causeForCheck);
       break;
+    case "sidestepped":
+    case "retired":
+      is = report.state;
+      because = report.closure
+        ? [{ handle: report.closure.decision, wording: report.closure.because }]
+        : [];
+      break;
     case "never-evaluated":
       is = "never evaluated";
       because = report.checks.map(causeForCheck);
@@ -684,6 +684,7 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   CHANGES: { out: "changed", in: "was changed by" },
   BASED_ON: { out: "rests on", in: "was cited by" },
   RESOLVES: { out: "settled", in: "was settled by" },
+  ANSWERS: { out: "answers on", in: "was named as the answer by" },
   NARROWS: { out: "sharpened", in: "was sharpened by" },
   DEFERS: { out: "deferred", in: "was deferred by" },
   SUPERSEDES: { out: "replaced", in: "was replaced by" },

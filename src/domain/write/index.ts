@@ -8,9 +8,10 @@ import type {
   AcceptedAsUnresolved,
   AmendmentReport,
   ClosedEnquiry,
-  StoppedWork,
+  ClosedGate,
   DeclaredGate,
   EvaluatedCriterion,
+  StoppedWork,
   Noted,
   NoteRef,
   OpenedEnquiry,
@@ -35,6 +36,7 @@ import type {
   AcceptAsUnresolvedCommand,
   AmendDesignCommand,
   CloseEnquiryCommand,
+  CloseGateCommand,
   StopWorkCommand,
   PoseCommand,
   ConcludeCommand,
@@ -164,6 +166,10 @@ export class WriteSurface extends SessionCore {
 
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
     return this.stopping.acceptAsUnresolved(input);
+  }
+
+  async closeGate(input: CloseGateCommand): Promise<ClosedGate> {
+    return this.stopping.closeGate(input);
   }
 
   async stopWork(input: StopWorkCommand): Promise<StoppedWork> {

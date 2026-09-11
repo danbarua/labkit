@@ -1,5 +1,8 @@
 import { labelForNaturalId, type NodeLabel } from "../db/domain";
+import type { ResolutionKind } from "../db/domain";
 import type { DomainEvent } from "./events";
+
+export type { ResolutionKind } from "../db/domain";
 
 /**
  * What the domain layer hands back — research answers, not graph rows.
@@ -186,20 +189,23 @@ export interface RecordedReview {
 }
 export interface ClosedEnquiry {
   decision: DecisionRef;
-  /** The enquiry that was closed, and the question its closure resolved. */
   enquiry: EnquiryRef;
   question: QuestionRef;
-  /**
-   * Which kind of close this was — the same words `why <enquiry>` reads back. A caller
-   * scripting `close` could otherwise not tell a success from a no-op without a second read.
-   */
-  closure: "answered" | "abandoned";
-  /** What answered it, when one was cited. Absent for a close with no result behind it. */
+  closure: Extract<ResolutionKind, "answered" | "abandoned">;
+  /** What answered it, when one was cited. Absent for an abandoned close. */
   answered?: ConcludedClaim;
   events: DomainEvent[];
 }
 export interface StoppedWork {
   decision: DecisionRef;
+  work: WorkRef;
+  closure: Extract<ResolutionKind, "stopped">;
+  events: DomainEvent[];
+}
+export interface ClosedGate {
+  decision: DecisionRef;
+  gate: GateRef;
+  closure: Extract<ResolutionKind, "sidestepped" | "retired">;
   events: DomainEvent[];
 }
 export interface PlannedWork {
@@ -306,57 +312,32 @@ export interface Conclusion {
   standing?: "exploratory" | "confirmatory";
 }
 
-/**
- * The state of a **question** — resolved or not, and on what.
- */
-export interface QuestionClosure {
-  /** The question's identity, matching `QuestionStanding.question`. */
+/** The motivating question, including any deliberate deferral still on the record. */
+export interface EnquiryQuestion {
   question: QuestionRef;
-  /** What it asks, in its own words. */
   asks: string;
-  open: boolean;
-  /**
-   * `accepted-as-unresolved` means one thing: left open on purpose, with the
-   * condition that would reopen it named. "Parked pending work" is a different
-   * state and no verb writes it; it gets built when something needs it.
-   */
-  closure: "answered" | "abandoned" | "accepted-as-unresolved" | null;
-  answer: "yes" | "no" | null;
-  /**
-   * The condition that would reopen an accepted question — "a genuinely new design, or a data
-   * source other than the spent confirmatory set".
-   */
-  reopensIf?: string;
-  /** Why it was accepted rather than pursued. Present with `reopensIf`. */
   acceptedBecause?: string;
-  /**
-   * The standing of the evidence a closure rests on. Present when the question is `answered`.
-   */
-  restsOn?: "exploratory" | "confirmatory";
-  /** The findings the closing decision rests on. Empty means nothing was cited. */
-  evidence: CitedFinding[];
+  reopensIf?: string;
+  acceptedInLightOf?: CitedFinding[];
 }
 
-/**
- * Where one line of enquiry stands.
- */
+/** Where one line of enquiry stands. */
 export interface EnquiryStatus {
-  /** This line of enquiry. */
   enquiry: EnquiryRef;
-  /** Its approach, in the researcher's words — what distinguishes it from a sibling pursuit. */
   pursuing: string;
-  /**
-   * What **this** pursuit has produced, whether or not it closed anything.
-   */
   contributed: CitedFinding[];
-  /**
-   * The question this pursues, and where that question stands. `null` where no
-   * question stands behind the enquiry.
-   */
-  question: QuestionClosure | null;
+  open: boolean;
+  closure: Extract<ResolutionKind, "answered" | "abandoned"> | null;
+  answer: "yes" | "no" | null;
+  answered?: ConcludedClaim;
+  restsOn?: "exploratory" | "confirmatory";
+  /** The findings this enquiry's closing decision rests on. */
+  evidence: CitedFinding[];
+  /** The question this pursuit serves; null only when no live question stands behind it. */
+  question: EnquiryQuestion | null;
 }
 
-/** Which of `KnowledgeSurvey`'s five buckets a question currently sits in. */
+/** Which of KnowledgeSurvey's five buckets a question currently sits in. */
 export type QuestionBucket = "established" | "unresolved" | "untested" | "provisional" | "accepted";
 
 /**
@@ -422,35 +403,21 @@ export interface UnaffectedRecord {
   why: string;
 }
 
-/**
- * Whether a gate may be relied on.
- */
+/** Whether a gate may be relied on. */
 export interface GateStatus {
   gate: GateRef;
   consequence: string;
-  /**
-   * Four states, because a gate can be governed by several conditions and "some checked, none
-   * failing" is a real situation distinct from all three others. `blocked` takes precedence
-   * over `incomplete`: a failure is decisive regardless of what else remains unrun.
-   */
-  state: "never-evaluated" | "incomplete" | "blocked" | "satisfied";
-  /**
-   * Every governing condition, itemised. `never-run` is a first-class value
-   * rather than the absence of an entry: a failing check and one nobody
-   * performed must be distinguishable.
-   */
+  state: "never-evaluated" | "incomplete" | "blocked" | "satisfied" | "sidestepped" | "retired";
+  /** The closing act. Check verdicts remain visible below. */
+  closure?: {
+    decision: DecisionRef;
+    kind: Extract<ResolutionKind, "sidestepped" | "retired">;
+    because: string;
+  };
   checks: CheckStatus[];
-  /**
-   * How many checks are in each state — every state present, zero included.
-   */
   counts: Record<CheckStatus["state"], number>;
-  /** Conditions not currently passing — what would have to change. Named before anyone spends the compute. */
   unmet: UnmetCheck[];
-  /** What is currently relying on this gate — the blast radius of a fake guard. */
   gating: GatedWork[];
-  /**
-   * Whether any evaluation of this criterion has ever come back `fail`.
-   */
   everFailed: boolean;
 }
 
@@ -859,53 +826,40 @@ export interface AcceptedQuestion extends QuestionStanding {
   acceptedBecause: string;
 }
 
-/**
- * `QuestionStanding`, plus the claim that answers it and which way it cuts — carried on
- * `KnowledgeSurvey.established`/`.provisional`: both buckets are "answered", differing only in
- * whether the answer met the standard it was held to and was promoted, and both the claim and
- * the polarity are what `whatIsKnown` already resolved to decide which bucket to place the
- * question in and which bearing (`SUPPORTS`/`CHALLENGES`) answered it.
- */
-export interface AnsweredQuestion extends QuestionStanding {
+/** One pursuit's answer to its motivating question. */
+export interface PursuitAnswer {
+  enquiry: EnquiryRef;
   claim: ClaimRef;
   answer: "yes" | "no";
-  /**
-   * Present when this question had been left open on purpose before it was answered — the same
-   * pair `AcceptedQuestion` carries, from the same `DEFERS` decision.
-   */
+}
+
+/** An answered question retains every pursuit that supplied an answer. */
+export interface AnsweredQuestion extends QuestionStanding {
+  answers: PursuitAnswer[];
   acceptedBecause?: string;
   reopensIf?: string;
 }
 
-/**
- * What the programme knows, in more states than settled-or-not. The buckets are the fields
- * below, and their count is deliberately not written here.
- */
+/** One closed pursuit, shown even when an open sibling keeps the question unsettled. */
+export interface ClosedPursuit {
+  enquiry: EnquiryRef;
+  pursuing: string;
+  question: QuestionRef;
+  decision: DecisionRef;
+  closure: Extract<ResolutionKind, "answered" | "abandoned">;
+  answered?: { claim: ClaimRef; answer: "yes" | "no" };
+}
+
+/** What the programme knows, including the closed pursuits behind question standing. */
 export interface KnowledgeSurvey {
-  /**
-   * Settled on cited evidence. Polarity is not here — an answered "no" is
-   * still settled; see `EnquiryStatus.answer`. `AnsweredQuestion`, not
-   * `QuestionStanding` — see its own doc comment.
-   */
   established: AnsweredQuestion[];
-  /** Something has been run against it, and nothing settles it. */
+  /** Worked on, explicitly closed without an answer, or still split across open pursuits. */
   unresolved: QuestionStanding[];
-  /**
-   * Nothing has ever been run against it — pursued or not. Not a failure and
-   * not an inconclusive result. Opening a line of enquiry does not move a
-   * question out of here; recording observations or an analysis under one does.
-   */
+  /** No evidence and no closed pursuit. Opening a pursuit alone does not count as work. */
   untested: QuestionStanding[];
-  /**
-   * Answered, but not on something to build on — **for either of two reasons**, and the bucket
-   * deliberately holds both.
-   */
   provisional: AnsweredQuestion[];
-  /**
-   * Open on purpose. Worked on, not settled, and deliberately left — with the condition that
-   * would reopen it recorded on the deciding act.
-   */
   accepted: AcceptedQuestion[];
+  closedPursuits: ClosedPursuit[];
 }
 
 /**
