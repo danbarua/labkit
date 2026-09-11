@@ -51,6 +51,24 @@ async function twoPlannedThings() {
   return { work, other, criterion, gate };
 }
 
+async function gatedPair() {
+  const { work: stopped } = await session.planWork({
+    objective: "discarded GPU port",
+    acceptance: "no longer needed",
+  });
+  const { work: active } = await session.planWork({
+    objective: "keep the CPU sampler",
+    acceptance: "a flame graph per stage",
+  });
+  const { criterion } = await session.stateCriterion("the sampler is numerically stable");
+  const { gate } = await session.declareGate({
+    governedBy: [criterion],
+    consequence: "the sampler is released",
+    protecting: [stopped, active],
+  });
+  return { stopped, active, criterion, gate };
+}
+
 describe("S-26: work nobody is doing", () => {
   test("Afterward 1: stopped work reads abandoned, and says why", async () => {
     const { work } = await twoPlannedThings();
@@ -116,5 +134,42 @@ describe("S-26: work nobody is doing", () => {
     await expect(
       session.stopWork({ work, because: "actually the budget came back" }),
     ).rejects.toThrow(/already stopped/);
+  });
+  test("stopped work is absent from blocked projections", async () => {
+    const { stopped, active, criterion, gate } = await gatedPair();
+    await session.evaluateCriterion({
+      criterion,
+      gate,
+      value: "the sampler diverges on the held-out split",
+      outcome: "fail",
+    });
+
+    const before = await (await afterwards()).gateStatus(gate);
+    expect(before.gating.map((w) => w.work)).toEqual(expect.arrayContaining([stopped, active]));
+    expect(before.gating).toHaveLength(2);
+    const beforeBlocked = before.unmet.flatMap((check) =>
+      check.blocks.flatMap((block) => block.gating.map((work) => work.work)),
+    );
+    expect(beforeBlocked).toEqual(expect.arrayContaining([stopped, active]));
+    expect(beforeBlocked).toHaveLength(2);
+
+    await session.stopWork({ work: stopped, because: DROPPED });
+
+    const after = await (await afterwards()).gateStatus(gate);
+    expect(after.gating.map((w) => w.work)).toEqual([active]);
+    const afterBlocked = after.unmet.flatMap((check) =>
+      check.blocks.flatMap((block) => block.gating.map((work) => work.work)),
+    );
+    expect(afterBlocked).toEqual([active]);
+
+    await session.closeGate({
+      gate,
+      closure: "sidestepped",
+      because: "the sampler is no longer released",
+    });
+    const closed = await (await afterwards()).gateStatus(gate);
+    expect(closed.state).toBe("sidestepped");
+    expect(closed.gating.map((w) => w.work)).toEqual([active]);
+    expect(closed.unmet.flatMap((check) => check.blocks)).toEqual([]);
   });
 });
