@@ -1,5 +1,5 @@
 import { optional, vertexProps } from "../../db/cypher";
-import type { Timestamp } from "../../db/domain";
+import type { ClaimProps, Timestamp } from "../../db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
@@ -304,11 +304,11 @@ export class StandingGroup extends SessionCore {
     return out;
   }
 
-  private async kindsOf(ids: ClaimRef[]): Promise<Map<ClaimRef, string | undefined>> {
+  private async kindsOf(ids: ClaimRef[]): Promise<Map<ClaimRef, ClaimProps["kind"]>> {
     if (ids.length === 0) return new Map();
     const rows = await this.graph.query(
       `MATCH (c:Claim) WHERE c.natural_id IN $ids RETURN c`,
-      { c: vertexProps<{ natural_id: string; kind?: string }>() },
+      { c: vertexProps<{ natural_id: string; kind?: ClaimProps["kind"] }>() },
       { ids },
     );
     return new Map(rows.map((row) => [ref("claim", row.c.natural_id), row.c.kind]));
