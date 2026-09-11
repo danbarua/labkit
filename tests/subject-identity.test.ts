@@ -110,19 +110,16 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       const ana = await later.enquiryStatus(anasSweep);
       const bruno = await later.enquiryStatus(brunosAblation);
 
-      // One question, pursued twice. Its state is the same in both reports --
-      // correctly, because it is nested under `question` where neither pursuit
-      // can be read as owning it.
+      // Both reports name the same motivating question, but closure belongs to the pursuit.
       expect(ana.question!.question).toBe(bruno.question!.question);
-      expect(ana.question!.closure).toBe("answered");
-      expect(bruno.question!.closure).toBe("answered");
+      expect(ana.closure).toBe("answered");
+      expect(bruno.closure).toBeNull();
+      expect(bruno.open).toBe(true);
 
-      // **The fix.** What each pursuit itself produced -- the thing the two reports must NOT
-      // agree on. The closing evidence is nested under `question`, not a top-level field on
-      // both: were it a top-level field, a caller summing findings across pursuits would count
-      // one finding twice.
+      // The closure evidence belongs only to Ana's pursuit. A caller summing findings across
+      // pursuits must not count one finding twice.
       const anasFindings = ana.contributed.map((e) => e.evidence);
-      const closingEvidence = ana.question!.evidence.map((e) => e.evidence);
+      const closingEvidence = ana.evidence.map((e) => e.evidence);
       expect(closingEvidence.every((id) => anasFindings.includes(id))).toBe(true);
       expect(anasFindings.length).toBeGreaterThan(closingEvidence.length);
 
@@ -132,16 +129,19 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       // Summing findings over every pursuit must not double-count.
       const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence));
       expect(counted.length).toBe(new Set(counted).size);
+      await s.closeEnquiry({ enquiry: brunosAblation });
+      const afterAna = await later.enquiryStatus(anasSweep);
+      const afterBruno = await later.enquiryStatus(brunosAblation);
+      expect(afterAna.closure).toBe("answered");
+      expect(afterBruno.closure).toBe("abandoned");
     } finally {
       await scenario.end();
     }
   });
 
-  test("both facts a second pursuit needs are now separately readable", async () => {
-    // *Where is my ablation up to?* Two facts a caller here needs: the
-    // question's own status, and what this particular pursuit contributed --
-    // separately readable, rather than the first answering under the
-    // enquiry's name in a way that would make it look like the enquiry's own.
+  test("question standing and a sibling pursuit remain separately readable", async () => {
+    // The untouched pursuit stays open. The survey separately names the answered sibling and
+    // keeps the shared question unresolved while either pursuit remains open.
     const s = await session();
     try {
       const { question } = await s.pose({ question: "does width matter?" });
@@ -170,13 +170,17 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       const later = new ResearchSession(await scenario.current(), { clock });
       const status = await later.enquiryStatus(untouched);
 
-      // Fact one: the question is answered, and the report says which question.
-      expect(status.question!.question).not.toBeNull();
-      expect(status.question!.closure).toBe("answered");
-      expect(status.question!.evidence.length).toBeGreaterThan(0);
+      const known = await later.whatIsKnown();
+      expect(status.question!.question).toBe(question);
+      expect(status.open).toBe(true);
+      expect(status.closure).toBeNull();
+      expect(status.evidence).toEqual([]);
+      expect(known.unresolved.map((q) => q.question)).toContain(question);
+      expect(known.closedPursuits).toContainEqual(
+        expect.objectContaining({ enquiry: worked, question, closure: "answered" }),
+      );
 
-      // Fact two: this pursuit produced nothing. A real answer, and one the
-      // flattened shape could not give -- it had no field that could hold it.
+      // This pursuit produced nothing.
       expect(status.contributed).toEqual([]);
       expect(status.pursuing).toBe("second opinion");
     } finally {
@@ -380,9 +384,9 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       expect(looksLikeAnId(status.question!.asks)).toBe(false);
 
       // Evidence too: identity beside the statement.
-      expect(status.question!.evidence.length).toBeGreaterThan(0);
-      expect(status.question!.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
-      expect(status.question!.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
+      expect(status.evidence.length).toBeGreaterThan(0);
+      expect(status.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
+      expect(status.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
     } finally {
       await scenario.end();
     }

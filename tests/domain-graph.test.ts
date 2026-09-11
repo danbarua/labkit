@@ -167,15 +167,15 @@ describe("invalidation propagation", () => {
   });
 });
 
-describe("open lines of enquiry", () => {
-  test("a line of enquiry is open when its motivating question has no resolving decision", async () => {
+describe("line-of-enquiry closure", () => {
+  test("a line of enquiry is open when it has no resolving decision", async () => {
     const { lineOfEnquiry } = await seedResearchThread();
 
     const rows = await graph.query(
-      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId})
-       OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(q)
-       RETURN q, d`,
-      { q: vertexProps(), d: optional(vertexProps<DecisionProps>()) },
+      `MATCH (loe:LineOfEnquiry {natural_id: $loeId})
+       OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(loe)
+       RETURN loe, d`,
+      { loe: vertexProps(), d: optional(vertexProps<DecisionProps>()) },
       { loeId: lineOfEnquiry.natural_id },
     );
 
@@ -183,27 +183,37 @@ describe("open lines of enquiry", () => {
     expect(rows[0]!.d).toBeNull();
   });
 
-  test("closes once a decision resolves the motivating question", async () => {
-    const { question, lineOfEnquiry } = await seedResearchThread();
+  test("closes exactly the line a decision resolves", async () => {
+    const { lineOfEnquiry } = await seedResearchThread();
     const decision = await graph.createNode("Decision", {
       reason: "accelerated ridge confirmed equivalent",
       invalidation_check: "n/a",
       decided_at: "2026-01-01T00:00:00.000Z",
+      resolution_kind: "answered",
     });
-    await graph.createEdge(decision.natural_id, "RESOLVES", question.natural_id);
+    await graph.createEdge(decision.natural_id, "RESOLVES", lineOfEnquiry.natural_id);
 
     const rows = await graph.query(
-      `MATCH (q:Question)-[:MOTIVATES]->(:LineOfEnquiry {natural_id: $loeId})
-       MATCH (d:Decision)-[:RESOLVES]->(q)
-       RETURN d`,
+      `MATCH (d:Decision)-[:RESOLVES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN d`,
       { d: vertexProps<DecisionProps>() },
       { loeId: lineOfEnquiry.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.d).toMatchObject({
-      reason: "accelerated ridge confirmed equivalent",
+    expect(rows[0]!.d).toMatchObject({ reason: "accelerated ridge confirmed equivalent" });
+  });
+
+  test("still accepts the old question target when replaying historical events", async () => {
+    const { question } = await seedResearchThread();
+    const decision = await graph.createNode("Decision", {
+      reason: "historical close",
+      invalidation_check: "n/a",
+      decided_at: "2025-01-01T00:00:00.000Z",
     });
+
+    await expect(
+      graph.createEdge(decision.natural_id, "RESOLVES", question.natural_id),
+    ).resolves.toBeUndefined();
   });
 });
 

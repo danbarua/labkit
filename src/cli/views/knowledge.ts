@@ -31,15 +31,17 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
   );
 }
 
-/**
- * `AnsweredQuestion`'s own line — `asks`, the handle, and which way it was answered. Without
- * the polarity, reading only `asks` for an established question cannot tell a confirmed "no"
- * apart from a "yes".
- */
+/** Each question line keeps every pursuit answer visible. */
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => {
     const parked = q.reopensIf ? p.quiet(`  (was parked until: ${q.reopensIf})`) : "";
-    return `${q.asks}  ${p.handle(`(${q.question})`)}  — ${q.answer}${parked}`;
+    const answers = q.answers
+      .map(
+        (answer) =>
+          `${answer.answer} via ${p.handle(answer.enquiry)} ${p.handle(`(${answer.claim})`)}`,
+      )
+      .join("; ");
+    return `${q.asks}  ${p.handle(`(${q.question})`)}  — ${answers}${parked}`;
   });
 }
 
@@ -57,19 +59,23 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
     p.provisional("Accepted as unresolved"),
     bullets(acceptedLines(survey.accepted, p), "nothing"),
     "",
-    p.untested("Unresolved (worked on, no answer yet)"),
+    p.untested("Unresolved (active or closed without a complete answer)"),
     list(survey.unresolved),
     "",
-    p.untested("Untested (nothing has been run against these)"),
+    p.untested("Untested (nothing has been run and no pursuit has closed)"),
     list(survey.untested),
     "",
-    // The two buckets above name what they hold and not what moves a question
-    // between them, and the available inference is the wrong one: "unresolved"
-    // sounds like a judgement about the science and is a fact about whether
-    // anything addresses the enquiry.
-    p.quiet("Any evidence recorded against a pursuit moves a question from untested to"),
-    p.quiet("unresolved. A harness shakedown counts: the record cannot tell one from an"),
-    p.quiet("experiment, only the shape of the acts can."),
+    p.heading("Closed pursuits"),
+    bullets(
+      survey.closedPursuits.map(
+        (pursuit) =>
+          `${pursuit.closure}  ${p.handle(pursuit.enquiry)}  ${pursuit.pursuing}  ${p.handle(`(${pursuit.decision})`)}`,
+      ),
+      "nothing",
+    ),
+    "",
+    p.quiet("Evidence or an explicit pursuit closure moves a question from untested to"),
+    p.quiet("unresolved. An open sibling keeps the question unsettled until every pursuit closes."),
   ].join("\n");
 }
 

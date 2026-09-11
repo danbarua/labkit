@@ -28,21 +28,19 @@
 #
 # ## What transcribing this found
 #
-# **A deferred-then-answered question drops its deferral condition.**
-# Filed as #143, then reframed after `labkit-review` measured against
-# source: closure belongs to the QUESTION, not the pursuit
-# (src/domain/report.ts:244, S-14's own decision), so `enquiry LOE_4`
-# printing "has produced nothing yet" and then "Q_4 closed -- answered" is
-# the model working as designed -- every sibling enquiry reports the
-# question's closure correctly. `accept` writes Decision -DEFERS->
-# Question (src/domain/write.ts:920), never touching the enquiry either,
-# so nothing "vanishes" from LOE_4 -- nothing was ever there. The real
-# gap: Q_4 was deferred with a named reopening condition ("run the
-# identical design on independent trajectories"), Stage 1C satisfied it
-# exactly, and no report says so -- the DEFERS edge and the answer both
-# exist in the graph, unread together by anything. Two independent
-# instances in this transcript (item 1 via LOE_4/LOE_7, item 2 via
-# LOE_3/LOE_5); a third predicted for Stage 2A, which establishes Q_6.
+# **Closure belongs to the named pursuit.** Stage 1C starts a new line of
+# enquiry for the independent-trajectory run. Answering that new line does not
+# claim that Stage 1B.2's untested line produced the result. The original line
+# is closed separately, as abandoned, once its named reopening condition has
+# been taken up by the replacement pursuit. `known` keeps the shared question
+# unresolved while either pursuit remains open, then reads the answer from the
+# pursuit that actually produced it.
+#
+# `accept` remains question-level: it writes Decision -DEFERS-> Question with
+# the reason and reopening condition. That deferral remains readable beside
+# the later answer; it is not a closure and does not get retargeted to either
+# line of enquiry. The same enquiry carries Stage 1D's topology work, so its
+# eventual answer closes that exact pursuit without a sibling hand-off.
 #
 # **#133 is fixed, and this transcript is what it was fixed for.** Stage
 # 1D's reporting groups T-vs-lattice (Part 1) with T-vs-three-stochastic-
@@ -145,9 +143,8 @@ say "Stage 1C: does item 1 (generalization) hold? -- and the reopening hesitatio
 # trajectories", 2026-08-01T12:01:38+01:00.
 STAGE1C_RESULTS=2026-08-01T11:01:38.000Z
 
-# No verb reopens generalization_enquiry. `pursue` on the same question
-# mints a NEW, independent line of enquiry -- generalization_enquiry itself
-# is untouched by anything that follows.
+# `pursue` on the same question mints a new, independent line of enquiry. The
+# earlier placeholder pursuit is closed separately after the new one answers.
 generalization_confirmation_enquiry=$(lab --date "$STAGE1C_RESULTS" pursue "$generalization_question" --approach "identical 432-trial design, 9 further independent baseline trajectories (seeds 3010-3090) plus seed=3000 read read-only from Stage 1B2's own committed results, same permutation test")
 trajectory_generalization_observations=$(lab --date "$STAGE1C_RESULTS" observe "$generalization_confirmation_enquiry" --name stage1c_trajectories \
   --finding "10 trajectories' pooled Delta_map: mean 0.3296, range 0.2964-0.3505, SD 0.0172 (CV ~5.2%); every one of 40 per-t_p values positive; 10/10 hit the permutation floor" \
@@ -160,6 +157,7 @@ trajectory_generalization_claim=$(lab --date "$STAGE1C_RESULTS" conclude "$traje
   --finding "10 of 10 trajectories hit the Monte Carlo floor; mean Delta_map 0.3296, CV ~5.2% -- tight clustering, not a wide scatter with a few outliers" \
   | grep '^CLM_')
 lab --date "$STAGE1C_RESULTS" close "$generalization_confirmation_enquiry" --answered-by "$trajectory_generalization_claim" >/dev/null
+lab --date "$STAGE1C_RESULTS" close "$generalization_enquiry" >/dev/null
 
 say "checking the reopening hesitation with real data, not assumed"
 ask enquiry "$generalization_enquiry"

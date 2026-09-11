@@ -36,15 +36,15 @@ test("an enquiry accepted as unresolved does not render as merely open", () => {
     enquiry: ref("enquiry", "LOE_1"),
     pursuing: "response-curvature sweep",
     contributed: [],
+    open: true,
+    closure: null,
+    answer: null,
+    evidence: [],
     question: {
       question: ref("question", "Q_1"),
       asks: "does the pruning schedule move convergence?",
-      open: true,
-      closure: "accepted-as-unresolved",
-      answer: null,
       acceptedBecause: "the confirmatory set is spent",
       reopensIf: "a genuinely new design, or a data source other than the spent set",
-      evidence: [],
     },
   };
   const out = renderEnquiry(status, PLAIN);
@@ -57,23 +57,19 @@ test("an answered enquiry says whether its closure rests on promoted work", () =
   const q = {
     question: ref("question", "Q_2"),
     asks: "does depth move convergence?",
-    open: false,
-    closure: "answered" as const,
-    answer: "yes" as const,
-    evidence: [{ evidence: ref("evidence", "EV_1"), states: "a result" }],
   };
   const base: EnquiryStatus = {
     enquiry: ref("enquiry", "LOE_2"),
     pursuing: "depth sweep",
     contributed: [],
+    open: false,
+    closure: "answered",
+    answer: "yes",
+    evidence: [{ evidence: ref("evidence", "EV_1"), states: "a result" }],
     question: q,
   };
-  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "exploratory" } }, PLAIN)).toContain(
-    "exploratory",
-  );
-  expect(renderEnquiry({ ...base, question: { ...q, restsOn: "confirmatory" } }, PLAIN)).toContain(
-    "confirmatory",
-  );
+  expect(renderEnquiry({ ...base, restsOn: "exploratory" }, PLAIN)).toContain("exploratory");
+  expect(renderEnquiry({ ...base, restsOn: "confirmatory" }, PLAIN)).toContain("confirmatory");
 });
 
 test("withdrawn, challenged and never-examined render apart", () => {
@@ -247,14 +243,16 @@ test("every question in the survey carries its handle", () => {
       {
         question: ref("question", "Q_1"),
         asks: "does it converge?",
-        claim: ref("claim", "CLM_1"),
-        answer: "yes",
+        answers: [
+          { enquiry: ref("enquiry", "LOE_1"), claim: ref("claim", "CLM_1"), answer: "yes" },
+        ],
       },
     ],
     provisional: [],
     accepted: [],
     unresolved: [{ question: ref("question", "Q_2"), asks: "does it converge?" }],
     untested: [{ question: ref("question", "Q_3"), asks: "does depth matter?" }],
+    closedPursuits: [],
   };
   const out = renderKnown(survey, PLAIN);
   // Two questions may share wording, so the handle is what tells them apart.
@@ -506,13 +504,13 @@ test("`known` says what moves a question from untested to unresolved", () => {
     accepted: [],
     unresolved: [],
     untested: [],
+    closedPursuits: [],
   };
   const out = renderKnown(empty, PLAIN);
   expect(out).toContain("moves a question from untested to");
   expect(out).toContain("unresolved");
-  // The half a reader would not guess: work that nobody would call an
-  // experiment moves it just the same.
-  expect(out).toContain("harness shakedown counts");
+  expect(out).toContain("explicit pursuit closure");
+  expect(out).toContain("open sibling");
 });
 
 test("an empty event log does not read as an empty record", () => {
@@ -598,14 +596,16 @@ test("colouring changes nothing a reader would read", () => {
       {
         question: ref("question", "Q_1"),
         asks: "does it converge?",
-        claim: ref("claim", "CLM_1"),
-        answer: "yes",
+        answers: [
+          { enquiry: ref("enquiry", "LOE_1"), claim: ref("claim", "CLM_1"), answer: "yes" },
+        ],
       },
     ],
     provisional: [],
     accepted: [],
     unresolved: [],
     untested: [{ question: ref("question", "Q_2"), asks: "does depth matter?" }],
+    closedPursuits: [],
   };
   expect(stripped(renderKnown(survey, COLOUR))).toBe(renderKnown(survey, PLAIN));
 });

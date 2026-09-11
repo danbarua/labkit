@@ -31,14 +31,11 @@
 #
 # ## What transcribing this found
 #
-# **Third instance of #143's shape, as predicted.** Stage 2A resolves the
-# externally-defined-task question by `close`-ing its enquiry with a real
-# answer -- watch #143's own comment thread for whether this recurs
-# identically (a sibling enquiry never existed here, unlike items 1/2's
-# generalization/topology-specificity pattern in probe-bonsai-1b2-1d.sh, so
-# this enquiry closes on itself rather than being superseded by a second
-# pursuit; worth noting as a *different* shape of the same underlying gap,
-# not a third identical repro).
+# **A same-pursuit closure control.** Stage 2A records its answer in the exact
+# line of enquiry that Stage 1B.2 opened, then closes that line. This differs
+# from Stage 1C: there, the answer comes from a new sibling pursuit and the
+# original placeholder is closed separately. Here no sibling exists, so the
+# enquiry that produced the finding is also the enquiry the decision resolves.
 #
 # **#98, reproduced live, then closed by the same task.** `plan --objective
 # --acceptance` used to mint a Task with no question and no enquiry

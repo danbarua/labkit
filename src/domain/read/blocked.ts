@@ -43,15 +43,18 @@ export async function blockedBy(
     `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate)
        WHERE c.natural_id IN $ids
        OPTIONAL MATCH (g)-[:GATES]->(w)
-       RETURN c, g, w`,
+       OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(g)
+       RETURN c, g, w, closing`,
     {
       c: vertexProps<Identified>(),
       g: vertexProps<{ consequence?: string } & Identified>(),
       w: optional(vertexProps<{ objective?: string } & Identified>()),
+      closing: optional(vertexProps<Identified>()),
     },
     { ids: [...criteria] },
   );
   for (const row of rows) {
+    if (row.closing) continue;
     // `ref()` rather than the raw id: the key is a handle, and
     // `check:no-stringly-typed` is right that a `Map<string, …>` here says
     // nothing about what the string is. It refuses a mismatched prefix too.
@@ -93,13 +96,12 @@ export function workStateFrom(
   task: { gates: Set<string>; implemented: boolean; stopped: boolean },
   gateStates: ReadonlyMap<string, GateStatus["state"]>,
 ): WorkState {
-  // Somebody decided not to do it, so nothing else about it is what a reader
-  // wants: not the gate holding it up, not that nothing has touched it.
   if (task.stopped) return "abandoned";
   const states = [...task.gates].map((g) => gateStates.get(g));
   if (states.includes("blocked")) return "blocked";
   if (task.implemented) return "carried-out";
-  return states.every((s) => s === "satisfied") ? "planned" : "waiting";
+  const cleared = new Set<GateStatus["state"]>(["satisfied", "sidestepped", "retired"]);
+  return states.every((state) => state !== undefined && cleared.has(state)) ? "planned" : "waiting";
 }
 
 export class BlockedGroup extends SessionCore {
@@ -264,8 +266,15 @@ export class BlockedGroup extends SessionCore {
    */
   async gateStatus(gate: GateRef): Promise<GateStatus> {
     const declared = await this.graph.query(
-      `MATCH (g:Gate {natural_id: $id}) RETURN g`,
-      { g: vertexProps<{ consequence: string }>() },
+      `MATCH (g:Gate {natural_id: $id})
+       OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(g)
+       RETURN g, closing`,
+      {
+        g: vertexProps<{ consequence: string }>(),
+        closing: optional(
+          vertexProps<{ natural_id: string; reason: string; resolution_kind?: string }>(),
+        ),
+      },
       { id: gate },
     );
     const found = declared[0];
@@ -315,7 +324,12 @@ export class BlockedGroup extends SessionCore {
       blocks: blocking.get(c.criterion) ?? [],
     }));
 
-    const state = gateStateFrom(checks);
+    const kind = found.closing?.resolution_kind;
+    if (kind !== undefined && kind !== "sidestepped" && kind !== "retired")
+      throw new Error(
+        `decision ${found.closing!.natural_id} resolves gate ${gate} with invalid resolution kind ${kind}`,
+      );
+    const state = kind ?? gateStateFrom(checks);
 
     // Criterion-scoped, deliberately unfiltered by gate: "has this check ever
     // been shown able to fail" is a question about the check itself.
@@ -337,6 +351,15 @@ export class BlockedGroup extends SessionCore {
       gate,
       consequence: found.g.consequence,
       state,
+      ...(kind
+        ? {
+            closure: {
+              decision: ref("decision", found.closing!.natural_id),
+              kind,
+              because: found.closing!.reason,
+            },
+          }
+        : {}),
       checks,
       unmet,
       counts,
@@ -373,15 +396,30 @@ export class BlockedGroup extends SessionCore {
       byGate.set(gate.natural_id, bucket);
     }
 
-    // **Sorted by handle, because Cypher imposes no ordering.** Without it the rows come back
-    // in whatever order the query produced them, so two runs of `labkit gates` can print the
-    // same record differently and an agent diffing successive `gate_list` calls sees change
-    // where nothing changed.
+    const closedRows = await this.graph.query(
+      `MATCH (closing:Decision)-[:RESOLVES]->(g:Gate) RETURN closing, g`,
+      {
+        closing: vertexProps<{ natural_id: string; resolution_kind?: string }>(),
+        g: vertexProps<{ natural_id: string }>(),
+      },
+      {},
+    );
+    const closed = new Map<string, "sidestepped" | "retired">();
+    for (const row of closedRows) {
+      const kind = row.closing.resolution_kind;
+      if (kind !== "sidestepped" && kind !== "retired")
+        throw new Error(
+          `decision ${row.closing.natural_id} resolves gate ${row.g.natural_id} with invalid resolution kind ${kind ?? "absent"}`,
+        );
+      closed.set(row.g.natural_id, kind);
+    }
+
     const listed = [...byGate.entries()]
       .map(([id, { consequence, rows: forGate }]) => ({
         gate: ref("gate", id),
         consequence,
-        state: gateStateFrom([...per(checkStatusForGate, forGate).values()].flat()),
+        state:
+          closed.get(id) ?? gateStateFrom([...per(checkStatusForGate, forGate).values()].flat()),
       }))
       .sort((a, b) => a.gate.localeCompare(b.gate));
 

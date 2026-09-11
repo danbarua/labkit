@@ -72,10 +72,10 @@ describe("S-18b — a negative result that somebody vouched for", () => {
     });
 
     const status = await later.enquiryStatus(enquiry);
-    expect(status.question?.answer).toBe("no");
+    expect(status.answer).toBe("no");
     // The promotion happened and is what a reader deciding whether to build on
     // this needs to see. `exploratory` here says nobody vouched for it.
-    expect(status.question?.restsOn).toBe("confirmatory");
+    expect(status.restsOn).toBe("confirmatory");
   });
 
   test("the survey counts it as established, not as resting on scratch", async () => {
@@ -137,8 +137,8 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       events: inMemoryEventLog(),
     });
     const status = await later.enquiryStatus(enquiry);
-    expect(status.question?.answer).toBe("no");
-    expect(status.question?.restsOn).toBe("exploratory");
+    expect(status.answer).toBe("no");
+    expect(status.restsOn).toBe("exploratory");
 
     const known = await later.whatIsKnown();
     expect(known.provisional.map((q) => q.asks)).toContain("does the sealant reduce cracking?");

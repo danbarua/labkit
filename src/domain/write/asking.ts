@@ -143,7 +143,10 @@ export class Asking extends SessionCore {
 
   /** The write, without the event — see `posed`. */
   private async pursued(input: PursueCommand, unitOfWork: UnitOfWork): Promise<EnquiryRef> {
-    const enquiry = await unitOfWork.node("LineOfEnquiry", { name: input.approach });
+    const enquiry = await unitOfWork.node("LineOfEnquiry", {
+      name: input.approach,
+      started_at: this.clock.now(),
+    });
     unitOfWork.edge(input.question, "MOTIVATES", enquiry);
     return ref("enquiry", enquiry);
   }

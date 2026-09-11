@@ -6,46 +6,51 @@ import type { EnquiryRef, EnquiryStatus, QuestionOrigin, QuestionRef } from "../
 import type { Palette } from "../palette";
 import { bullets } from "./format";
 
-/**
- * An enquiry's standing.
- */
+/** An enquiry's standing, separate from the standing of its question. */
 export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
   const q = status.question;
-  const standing = !q
-    ? p.untested("no question behind this enquiry")
-    : q.closure === "accepted-as-unresolved"
-      ? p.provisional("open — accepted as unresolved, deliberately")
-      : q.open
-        ? p.untested("open")
-        : p.settled(`closed — ${q.closure}`);
+  const standing = status.open
+    ? q?.acceptedBecause
+      ? p.provisional("open — its question is accepted as unresolved")
+      : p.untested("open")
+    : p.settled(`closed — ${status.closure}`);
   return [
-    // The enquiry first, because that is what was asked about. The question's
-    // state is printed as the question's, not as this pursuit's:
-    // flattened, every pursuit of an answered question read as answered itself.
     `${p.heading(status.pursuing)}  ${p.handle(`(${status.enquiry})`)}`,
+    `  ${standing}`,
     status.contributed.length
       ? `  produced ${status.contributed.length} finding${status.contributed.length === 1 ? "" : "s"}`
       : `  ${p.untested("has produced nothing yet")}`,
+    status.answer ? `  answer: ${status.answer}` : "",
+    status.restsOn ? `  resting on ${status.restsOn} work` : "",
     "",
     q
       ? `Pursuing "${q.asks}"  ${p.handle(`(${q.question})`)}`
       : p.untested("Pursuing nothing on the record"),
-    `  ${standing}`,
     q?.acceptedBecause ? `  accepted because: ${q.acceptedBecause}` : "",
     q?.reopensIf ? `  reopens if: ${q.reopensIf}` : "",
-    q?.answer ? `  answer: ${q.answer}` : "",
-    q?.restsOn ? `  resting on ${q.restsOn} work` : "",
-    status.contributed.length
-      ? `\nThis enquiry's findings\n${bullets(
-          status.contributed.map((e) => `${e.states}  (${e.evidence})`),
-          "",
-        )}`
+    q?.acceptedInLightOf?.length
+      ? `
+The question's acceptance rests on
+${bullets(
+  q.acceptedInLightOf.map((e) => `${e.states}  (${e.evidence})`),
+  "",
+)}`
       : "",
-    q?.evidence.length
-      ? `\nThe question's answer rests on\n${bullets(
-          q.evidence.map((e) => `${e.states}  (${e.evidence})`),
-          "",
-        )}`
+    status.contributed.length
+      ? `
+This enquiry's findings
+${bullets(
+  status.contributed.map((e) => `${e.states}  (${e.evidence})`),
+  "",
+)}`
+      : "",
+    status.evidence.length
+      ? `
+This enquiry's closure rests on
+${bullets(
+  status.evidence.map((e) => `${e.states}  (${e.evidence})`),
+  "",
+)}`
       : "",
   ]
     .filter(Boolean)

@@ -2,8 +2,9 @@
  * The verbs that answer questions about the record, and change nothing.
  */
 
-import { createdIn, edgesIn } from "../events";
+import { vertexProps } from "../../db/cypher";
 import type { IdentityString, IndexedString, Prose, Timestamp } from "../../db/domain";
+import { createdIn, edgesIn } from "../events";
 import type { ClaimRef, EnquiryRef, GateRef, WorkRef } from "../report";
 import type {
   AnalysisRef,
@@ -277,10 +278,27 @@ export class ReadSurface extends SessionCore {
     }
 
     const touched = touchedHandles(events);
+    const touchedEnquiries = [...touched].filter((handle) => kindOf(handle) === "enquiry");
+    if (touchedEnquiries.length > 0) {
+      const affected = await this.graph.query(
+        `MATCH (q:Question)-[:MOTIVATES]->(loe:LineOfEnquiry)
+         WHERE loe.natural_id IN $ids
+         RETURN q`,
+        { q: vertexProps<{ natural_id: string }>() },
+        { ids: touchedEnquiries },
+      );
+      for (const row of affected) touched.add(row.q.natural_id);
+    }
     const movedWork = (w: ListedWork) => touched.has(w.work) || w.gates.some((g) => touched.has(g));
     const movedById = (h: { question: string }) => touched.has(h.question);
-    const movedByIdOrClaim = (h: { question: string; claim: string }) =>
-      touched.has(h.question) || touched.has(h.claim);
+    const movedAnswer = (h: KnowledgeSurvey["established"][number]) =>
+      touched.has(h.question) ||
+      h.answers.some((answer) => touched.has(answer.enquiry) || touched.has(answer.claim));
+    const movedPursuit = (pursuit: KnowledgeSurvey["closedPursuits"][number]) =>
+      touched.has(pursuit.question) ||
+      touched.has(pursuit.enquiry) ||
+      touched.has(pursuit.decision) ||
+      (pursuit.answered !== undefined && touched.has(pursuit.answered.claim));
 
     return {
       blocked: {
@@ -295,11 +313,12 @@ export class ReadSurface extends SessionCore {
       },
       untouched: work.filter((w) => w.state === "planned" && movedWork(w)),
       known: {
-        established: known.established.filter(movedByIdOrClaim),
-        provisional: known.provisional.filter(movedByIdOrClaim),
+        established: known.established.filter(movedAnswer),
+        provisional: known.provisional.filter(movedAnswer),
         unresolved: known.unresolved.filter(movedById),
         untested: known.untested.filter(movedById),
         accepted: known.accepted.filter(movedById),
+        closedPursuits: known.closedPursuits.filter(movedPursuit),
       },
       transcribed,
       seq,

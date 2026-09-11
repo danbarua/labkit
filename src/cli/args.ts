@@ -157,9 +157,12 @@ function oneOf<T extends string>(values: readonly T[], flag: string) {
 
 /** `labkit gates --state ...` */
 export const gateState = oneOf(
-  ["never-evaluated", "incomplete", "blocked", "satisfied"] as const,
+  ["never-evaluated", "incomplete", "blocked", "satisfied", "sidestepped", "retired"] as const,
   "--state",
 );
+
+/** `labkit close GATE --as ...` */
+export const gateClosure = oneOf(["sidestepped", "retired"] as const, "--as");
 
 /** `labkit work --state ...` */
 export const workState = oneOf(

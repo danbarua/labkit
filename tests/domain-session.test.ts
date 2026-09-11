@@ -335,10 +335,8 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
   });
 }
 
-/**
- * `closeEnquiry`, third off the inferred pile.
- */
-test("a close interrupted before BASED_ON, then retried, leaves two resolving decisions", async () => {
+/** A failed close is atomic, so its retry owns the only resolving decision. */
+test("a close interrupted before BASED_ON writes nothing before retry", async () => {
   const { enquiry } = await session.openEnquiry("does the coating fail under load?");
   const { observations: obs } = await session.recordObservations({
     enquiry,
@@ -371,18 +369,18 @@ test("a close interrupted before BASED_ON, then retried, leaves two resolving de
   // The caller saw a throw, so it retries. This one succeeds.
   await session.closeEnquiry({ enquiry, answeredBy });
 
-  const resolving = await graph.query(`MATCH (d:Decision)-[:RESOLVES]->(:Question) RETURN d`, {
-    d: vertexProps<{ natural_id: string; reason: string }>(),
-  });
+  const resolving = await graph.query(
+    `MATCH (d:Decision)-[:RESOLVES]->(:LineOfEnquiry {natural_id: $enquiry}) RETURN d`,
+    { d: vertexProps<{ natural_id: string; reason: string }>() },
+    { enquiry },
+  );
   const status = await session.enquiryStatus(enquiry);
-  console.log("CLOSE resolving decisions:", resolving.length);
-  console.log("CLOSE closure:", status.question!.closure, "answer:", status.question!.answer);
-  console.log("CLOSE evidence:", JSON.stringify(status.question!.evidence));
 
+  expect(resolving).toHaveLength(1);
   // The question was answered "no" on a challenging finding. Anything else is
   // the interrupted close being reported as the researcher's act.
-  expect(status.question!.closure).toBe("answered");
-  expect(status.question!.answer).toBe("no");
+  expect(status.closure).toBe("answered");
+  expect(status.answer).toBe("no");
 });
 
 /**
@@ -449,7 +447,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   });
 
   await s.closeEnquiry({ enquiry });
-  expect((await s.enquiryStatus(enquiry)).question!.closure).toBe("abandoned");
+  expect((await s.enquiryStatus(enquiry)).closure).toBe("abandoned");
 
   await expect(
     s.closeEnquiry({
@@ -461,8 +459,8 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   // And the record is unchanged rather than half-updated: one close, the one
   // that happened.
   const after = await s.enquiryStatus(enquiry);
-  expect(after.question!.closure).toBe("abandoned");
-  expect(after.question!.answer).toBeNull();
+  expect(after.closure).toBe("abandoned");
+  expect(after.answer).toBeNull();
 });
 
 /**
@@ -495,8 +493,8 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     inLightOf: claimOf(analysisClaims, "depth moves convergence"),
   });
   const accepted = await s.enquiryStatus(enquiry);
-  expect(accepted.question!.closure).toBe("accepted-as-unresolved");
-  expect(accepted.question!.open).toBe(true);
+  expect(accepted.closure).toBeNull();
+  expect(accepted.open).toBe(true);
 
   // Evidence arrives. This must be allowed -- DEFERS is not RESOLVES.
   await s.closeEnquiry({
@@ -504,8 +502,8 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     answeredBy: claimOf(analysisClaims, "depth moves convergence"),
   });
   const closed = await s.enquiryStatus(enquiry);
-  expect(closed.question!.closure).toBe("answered");
-  expect(closed.question!.answer).toBe("yes");
+  expect(closed.closure).toBe("answered");
+  expect(closed.answer).toBe("yes");
 });
 
 /**
@@ -544,7 +542,7 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
     question,
     approach: "thermal cycling",
   });
-  expect((await session.enquiryStatus(retried)).question!.open).toBe(true);
+  expect((await session.enquiryStatus(retried)).open).toBe(true);
 });
 
 /**
@@ -710,4 +708,49 @@ test("a task planned against an enquiry reports it, with wording; one planned wi
     asks: "can this mapping reach an external task?",
   });
   expect((await session.contractFor(unaddressed)).addressing).toBeUndefined();
+});
+
+test("closing a blocked gate releases work without changing its failed check", async () => {
+  const { criterion } = await session.stateCriterion("the error stays below 1e-6");
+  const { work } = await session.planWork({
+    objective: "publish the comparison",
+    acceptance: "the comparison is in the report",
+  });
+  const { gate } = await session.declareGate({
+    governedBy: [criterion],
+    consequence: "the comparison is withheld",
+    protecting: [work],
+  });
+  await session.evaluateCriterion({ criterion, gate, value: "2e-5", outcome: "fail" });
+
+  expect((await session.gateStatus(gate)).state).toBe("blocked");
+  expect((await session.workList()).find((row) => row.work === work)?.state).toBe("blocked");
+
+  const closed = await session.closeGate({
+    gate,
+    closure: "sidestepped",
+    because: "the report now labels this comparison exploratory",
+  });
+  const status = await session.gateStatus(gate);
+  expect(closed).toMatchObject({ gate, closure: "sidestepped" });
+  expect(status.state).toBe("sidestepped");
+  expect(status.closure).toEqual({
+    decision: closed.decision,
+    kind: "sidestepped",
+    because: "the report now labels this comparison exploratory",
+  });
+  expect(status.checks.map((check) => check.state)).toEqual(["failed"]);
+  expect((await session.workList()).find((row) => row.work === work)?.state).toBe("planned");
+  expect((await session.now()).blocked.work.map((row) => row.work)).not.toContain(work);
+
+  await expect(
+    session.closeGate({ gate, closure: "retired", because: "duplicate" }),
+  ).rejects.toThrow(/already/);
+  await expect(
+    session.closeGate({
+      gate: "GATE_does_not_exist" as typeof gate,
+      closure: "retired",
+      because: "missing",
+    }),
+  ).rejects.toThrow(/no gate/);
 });

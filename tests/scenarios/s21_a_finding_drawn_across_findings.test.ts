@@ -106,11 +106,11 @@ describe("S-21: a finding drawn across findings", () => {
     // Afterward: the question is answered, and answered on the headline —
     // not on whichever of the four was cited to stand in for it.
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.question!.open).toBe(false);
-    expect(status.question!.closure).toBe("answered");
+    expect(status.open).toBe(false);
+    expect(status.closure).toBe("answered");
     // All four findings are what it rests on. Citing one would name an
     // arbitrary part as the answer to a question about the whole.
-    expect(status.question!.evidence).toHaveLength(4);
+    expect(status.evidence).toHaveLength(4);
   });
 
   /**
@@ -142,11 +142,11 @@ describe("S-21: a finding drawn across findings", () => {
     await session.closeEnquiry({ enquiry, answeredBy: claim });
 
     const status = await (await afterwards()).enquiryStatus(enquiry);
-    expect(status.question!.closure).toBe("answered");
+    expect(status.closure).toBe("answered");
     // Answered "no", and resting on all four — the polarity comes from which
     // way the findings underneath it cut.
-    expect(status.question!.answer).toBe("no");
-    expect(status.question!.evidence).toHaveLength(4);
+    expect(status.answer).toBe("no");
+    expect(status.evidence).toHaveLength(4);
   });
 
   test("resting on a claim nobody has concluded is refused, and nothing is written", async () => {

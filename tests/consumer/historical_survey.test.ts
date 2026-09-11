@@ -93,3 +93,40 @@ describe("what was known, as of an instant", () => {
     expect(asked(offset).open).toEqual([]);
   });
 });
+
+test("historical standing follows each pursuit from its own start through closure", async () => {
+  const clock = windableClock("2026-01-01T09:00:00.000Z");
+  const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
+  const { question, enquiry: first } = await s.openEnquiry("does depth move convergence?");
+
+  clock.windTo("2026-01-02T09:00:00.000Z");
+  const { observations } = await s.recordObservations({
+    enquiry: first,
+    name: "depth sweep",
+    finding: "eight paired runs",
+  });
+  const { claims } = await recordAnalysis(s, {
+    enquiry: first,
+    from: [observations],
+    method: "paired comparison",
+    concludes: [{ proposition: "depth moves convergence", finding: "moves by three steps" }],
+  });
+  await s.closeEnquiry({ enquiry: first, answeredBy: claimOf(claims, "depth moves convergence") });
+  clock.windTo("2026-01-04T09:00:00.000Z");
+  const { enquiry: sibling } = await s.pursue({ question, approach: "independent replication" });
+  clock.windTo("2026-01-06T09:00:00.000Z");
+  await s.closeEnquiry({ enquiry: sibling });
+
+  expect(asked(await s.whatWasKnown("2026-01-03T09:00:00.000Z"))).toMatchObject({
+    provisional: ["does depth move convergence?"],
+    open: [],
+  });
+  expect(asked(await s.whatWasKnown("2026-01-05T09:00:00.000Z"))).toMatchObject({
+    provisional: [],
+    open: ["does depth move convergence?"],
+  });
+  expect(asked(await s.whatWasKnown("2026-01-07T09:00:00.000Z"))).toMatchObject({
+    provisional: ["does depth move convergence?"],
+    open: [],
+  });
+});

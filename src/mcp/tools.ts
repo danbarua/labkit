@@ -30,6 +30,7 @@ import {
   recordedReviewSchema,
   synthesisedSchema,
   closedEnquirySchema,
+  closedGateSchema,
   stoppedWorkSchema,
   plannedWorkSchema,
   statedCriterionSchema,
@@ -1233,6 +1234,22 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       }),
   }),
   writeTool({
+    name: "close_gate",
+    title: "Close a gate without passing it",
+    group: "Stopping",
+    description:
+      "Close a gate as sidestepped or retired, with the reason. Its condition verdicts remain " +
+      "on the record, but it no longer holds work. Closing an already-closed gate is refused.",
+    inputSchema: {
+      gate: z.string().describe("gate id, e.g. " + GATE_PREFIX + "2 — from declare_gate"),
+      closure: z.enum(["sidestepped", "retired"]),
+      because: z.string().describe("why this gate no longer governs work"),
+    },
+    outputSchema: closedGateSchema,
+    handler: (write, { gate, closure, because }) =>
+      write.closeGate({ gate: ref("gate", gate), closure, because }),
+  }),
+  writeTool({
     name: "stop_work",
     title: "Stop a piece of planned work",
     group: "Stopping",
@@ -1255,10 +1272,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Leave a question open on purpose",
     group: "Stopping",
     description:
-      "Close a line of enquiry as deliberately unresolved: worked on, not settled, and left " +
-      "that way with the condition that would reopen it. Its own state, not an abandonment " +
-      "and not a failure — a reader scanning for what still needs doing must not find it " +
-      "under unresolved work.",
+      "Leave the motivating question open on purpose, with the reason, the condition that would " +
+      "reopen it, and the claim this acceptance was made in light of. This does not close the " +
+      "named enquiry; a later answer can still close that pursuit.",
     inputSchema: {
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
       because: z.string().describe("why it is being left"),

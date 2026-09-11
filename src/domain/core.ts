@@ -333,7 +333,7 @@ export class SessionCore {
         `MATCH (d:Decision)-[:BASED_ON]->(e:Evidence)-[:${bearing}]->(:Claim {name: $name})
          MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
          ${this.withinScope(scope)}
-         MATCH (d)-[:RESOLVES]->(q:Question)
+         MATCH (d)-[:RESOLVES]->(loe:LineOfEnquiry)<-[:MOTIVATES]-(q:Question)
          RETURN q`,
         { q: vertexProps<{ name: string; natural_id: string }>() },
         { name: scope.proposition, ...this.scopeParams(scope) },

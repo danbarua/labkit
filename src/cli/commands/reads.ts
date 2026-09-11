@@ -164,7 +164,11 @@ export function registerReads(program: Command, run: Run): void {
     // **The coercion is commander's parser, not called in the action.** Passed here, commander
     // catches the `InvalidArgumentError`, prints it with usage and exits before any command
     // body runs.
-    .option("--state <state>", "never-evaluated | incomplete | blocked | satisfied", gateState)
+    .option(
+      "--state <state>",
+      "never-evaluated | incomplete | blocked | satisfied | sidestepped | retired",
+      gateState,
+    )
     .action(async (opts: { state?: ReturnType<typeof gateState> }) =>
       run(async ({ read }) =>
         answer(await read.gateList(opts.state), (gates, p) => renderGateList(gates, p, true)),

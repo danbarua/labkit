@@ -21,8 +21,7 @@ import { bullets } from "./format";
  * A gate, itemised per condition.
  */
 export function renderGate(status: GateStatus, p: Palette): string {
-  // The four states are the whole point of this page, so each gets its own colour rather than
-  // pass/not-pass.
+  // A gate closure is neither a passed nor a failed check. Keep it visibly distinct from both.
   const state = (key: string, text: string = key) =>
     key === "passed" || key === "satisfied"
       ? p.settled(text)
@@ -45,6 +44,9 @@ export function renderGate(status: GateStatus, p: Palette): string {
   return [
     `${p.handle(status.gate)} — ${state(status.state)}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
     `  consequence: ${status.consequence}`,
+    status.closure
+      ? `  closed: ${status.closure.kind} by ${p.handle(status.closure.decision)}\n  because: ${status.closure.because}`
+      : "",
     "",
     `${p.heading("Conditions by state")}\n${bullets(
       (Object.entries(status.counts) as [CheckStatus["state"], number][])

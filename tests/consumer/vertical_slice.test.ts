@@ -159,10 +159,9 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
       /as_?of|believ|assert(ed)?_?at|recorded_?at|effective|when|timestamp|version/i.test(k),
     );
     expect(temporalFields).toEqual([]);
-    // `claim` and `answer` joined #55: which claim answers this question and
-    // which way, not when. Still no time on the row -- the assertion above
-    // is the one that would catch that, and does.
-    expect(Object.keys(a[0]!).sort()).toEqual(["answer", "asks", "claim", "question"]);
+    // `answers` names every answering pursuit, claim and polarity, not time. Still no time
+    // on the row -- the assertion above is the one that would catch that.
+    expect(Object.keys(a[0]!).sort()).toEqual(["answers", "asks", "question"]);
 
     // And the other half: the capability exists, as a read of its own.
     expect(typeof ReadSurface.prototype.whatWasKnown).toBe("function");
@@ -282,14 +281,14 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
 
     // Both closed, both answered, and the two worlds agree on everything the
     // read surface treats as structure.
-    expect(byAlice.question!.closure).toBe("answered");
-    expect(byBob.question!.closure).toBe(byAlice.question!.closure);
-    expect(byAlice.question!.answer).toBe(byBob.question!.answer);
-    expect(byAlice.question!.open).toBe(byBob.question!.open);
+    expect(byAlice.closure).toBe("answered");
+    expect(byBob.closure).toBe(byAlice.closure);
+    expect(byAlice.answer).toBe(byBob.answer);
+    expect(byAlice.open).toBe(byBob.open);
 
     // The difference exists only inside a finding's sentence.
-    expect(byAlice.question!.evidence).not.toEqual(byBob.question!.evidence);
-    expect(byAlice.question!.evidence.map((e) => e.states).join(" ")).toContain("Alice");
+    expect(byAlice.evidence).not.toEqual(byBob.evidence);
+    expect(byAlice.evidence.map((e) => e.states).join(" ")).toContain("Alice");
 
     // And it is not reachable as attribution: no field on the status carries a
     // person, so a caller can only recover the name by parsing evidence prose
