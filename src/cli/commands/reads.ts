@@ -3,10 +3,11 @@
  */
 
 import type { Command } from "commander";
-import { gateState, handle, rebuilt, whole, workState } from "../args";
+import { anyRef, gateState, handle, rebuilt, whole, workState } from "../args";
 import { answer } from "../output";
 import type { Run } from "../session";
 import type { EventFilter } from "../../domain";
+import type { AnyRef } from "../../domain/report";
 import {
   renderHistorical,
   renderKnown,
@@ -330,9 +331,14 @@ export function registerReads(program: Command, run: Run): void {
     .description(
       "Notes are the one write with no prerequisites, and `search` reaches them only by words " +
         "somebody already remembers. This lists them all — what each says, what it concerns, " +
-        "and the question it prompted where it prompted one.",
+        "and the question it prompted where it prompted one. `--on <handle>` narrows to the " +
+        "notes about one record, which is the only route to them for a claim, gate or line of " +
+        "enquiry: `why` surfaces attached notes for a question and not for those.",
     )
-    .action(async () => run(async ({ read }) => answer(await read.notes(), renderNotes)));
+    .option("--on <handle>", "only the notes concerning this record", anyRef)
+    .action(async ({ on }: { on?: AnyRef }) =>
+      run(async ({ read }) => answer(await read.notes(on), renderNotes)),
+    );
   program
     .command("happened")
     .helpGroup("What was done")

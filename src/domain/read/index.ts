@@ -92,9 +92,9 @@ export class ReadSurface extends SessionCore {
     return this.#happened.whatHappened(filter);
   }
 
-  /** Every note on the record, newest first. See `HappenedGroup.notes`. */
-  async notes(): Promise<ListedNote[]> {
-    return this.#happened.notes();
+  /** Every note on the record, newest first, or only those concerning one handle. */
+  async notes(concerning?: AnyRef): Promise<ListedNote[]> {
+    return this.#happened.notes(concerning);
   }
 
   /** The same acts, and whether that was all of them. See `HappenedGroup.whatHappenedPage`. */
@@ -306,10 +306,14 @@ export class ReadSurface extends SessionCore {
    * `why <handle>` — dispatches on the handle's own kind, over the report that already exists
    * for it, and renders it as `{subject, is, because}`. Also takes a proposition: text resolves
    * through `claimsAsserting` and refuses an ambiguous match rather than picking.
+   *
+   * The handle test is case-insensitive and wording keeps the caller's casing, so `why task_8`
+   * resolves rather than falling through to wording and reporting that nothing claims it.
    */
   async why(subject: AnyRef | IndexedString): Promise<Explanation> {
-    const kind = kindOf(subject);
-    if (kind) return EXPLAINERS[kind](this, subject);
+    const asHandle = subject.toUpperCase() as AnyRef;
+    const kind = kindOf(asHandle);
+    if (kind) return EXPLAINERS[kind](this, asHandle);
 
     const found = await this.claimsAsserting(subject);
     if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);

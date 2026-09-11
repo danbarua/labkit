@@ -41,11 +41,15 @@ export function isoInstant(raw: string): string {
 
 /**
  * A handle of a named kind.
+ *
+ * Uppercased before it is resolved, as `anyRef` does: every handle this record
+ * mints is upper-case by construction, so `gate gate_4` is a caller writing the
+ * same handle rather than a different one.
  */
 export function handle<K extends string>(kind: K): (raw: string) => Ref<K> {
   return (raw) => {
     try {
-      return ref(kind, raw);
+      return ref(kind, raw.toUpperCase());
     } catch (e) {
       throw new InvalidArgumentError((e as Error).message);
     }
@@ -99,9 +103,10 @@ export function citedBasis(raw: string): CitedBasis {
  * Any handle on the record, resolved to the kind its own prefix names.
  */
 export function anyRef(raw: string): AnyRef {
-  const kind = kindOf(raw);
+  const normalized = raw.toUpperCase();
+  const kind = kindOf(normalized);
   if (!kind) throw new InvalidArgumentError(`\`${raw}\` is not a handle this record recognises`);
-  return ref(kind, raw);
+  return ref(kind, normalized);
 }
 
 /** Which way a finding cuts. The domain's own two words, so a typo is refused rather than defaulted. */
