@@ -1,5 +1,4 @@
 import { optional, vertexProps } from "../../db/cypher";
-import type { Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
@@ -28,8 +27,7 @@ import {
   inForce,
   type CheckState,
 } from "../survey-facts";
-import { dedupeById, type Identified } from "./shared";
-
+import type { Identified } from "./shared";
 /**
  * What each of these criteria is holding up.
  */
@@ -370,10 +368,12 @@ export class BlockedGroup extends SessionCore {
       checks,
       unmet,
       counts,
-      gating: gating.filter((g) => !g.stopping).map((g) => ({
-        work: ref("work", g.w.natural_id),
-        objective: g.w.objective ?? "",
-      })),
+      gating: gating
+        .filter((g) => !g.stopping)
+        .map((g) => ({
+          work: ref("work", g.w.natural_id),
+          objective: g.w.objective ?? "",
+        })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
   }
