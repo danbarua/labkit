@@ -159,10 +159,9 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
       /as_?of|believ|assert(ed)?_?at|recorded_?at|effective|when|timestamp|version/i.test(k),
     );
     expect(temporalFields).toEqual([]);
-    // `claim` and `answer` joined #55: which claim answers this question and
-    // which way, not when. Still no time on the row -- the assertion above
-    // is the one that would catch that, and does.
-    expect(Object.keys(a[0]!).sort()).toEqual(["answer", "asks", "claim", "question"]);
+    // `answers` names every answering pursuit, claim and polarity, not time. Still no time
+    // on the row -- the assertion above is the one that would catch that.
+    expect(Object.keys(a[0]!).sort()).toEqual(["answers", "asks", "question"]);
 
     // And the other half: the capability exists, as a read of its own.
     expect(typeof ReadSurface.prototype.whatWasKnown).toBe("function");

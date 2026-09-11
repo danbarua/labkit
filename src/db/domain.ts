@@ -25,6 +25,7 @@ export type NodeLabel = (typeof NODE_LABELS)[number];
  */
 export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = {
   Question: ["posed_at"],
+  LineOfEnquiry: ["started_at"],
   Claim: ["name"],
   Decision: ["decided_at"],
   CriterionEvaluation: ["evaluated_at"],
