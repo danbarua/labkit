@@ -158,7 +158,8 @@ export function registerWrites(program: Command, run: Run): void {
     .summary("record a computation and what it read")
     .description(
       "Records the run: a computation, its evidence unit, and an output artefact. Answers with " +
-        "the analysis handle, which is what `labkit conclude` takes to add each finding.",
+        "the analysis handle, which is what `labkit conclude` takes to add each finding. With `--json`, " +
+        "the answer also names the `heldTo` criteria actually bound to the run.",
     )
     .argument("<enquiry-id>", "the line of enquiry this belongs to", handle("enquiry"))
     .requiredOption("--method <text>", "what was done")

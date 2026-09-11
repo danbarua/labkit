@@ -91,4 +91,32 @@ describe("commands are values a caller can hold", () => {
   });
 
   const PROP = "the pruning schedule moves convergence";
+  test("recordAnalysis reports the exact criteria bound to its analysis", async () => {
+    const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
+    const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
+    const { observations } = await s.recordObservations({
+      enquiry,
+      name: "sweep readings",
+      finding: "twelve runs at five seeds",
+    });
+    // The criteria intentionally have the same wording: only their handles can identify which
+    // prespecified conditions the analysis is held to.
+    const { criterion: first } = await s.stateCriterion("the result clears the held-out check");
+    const { criterion: second } = await s.stateCriterion("the result clears the held-out check");
+
+    const recorded = await s.recordAnalysis({
+      enquiry,
+      method: "paired comparison",
+      from: [observations],
+      heldTo: [first, second],
+    });
+    expect(recorded.heldTo).toEqual([first, second]);
+
+    const concluded = await s.conclude({
+      analysis: recorded.analysis,
+      proposition: "the pruning schedule moves convergence",
+      finding: "moves by ~3 steps",
+    });
+    expect(concluded.heldTo).toEqual([first, second]);
+  });
 });

@@ -739,11 +739,10 @@ export const enquiryRefSchema = minted("enquiry");
 export const observationsRefSchema = minted("observations");
 export const analysisRefSchema = ref("analysis");
 
-/**
- * What `record_analysis` returns: the analysis, and **the claims it minted**.
- */
+/** What `record_analysis` returns: the analysis, its bound criteria, and the claims it minted. */
 export const recordedAnalysisSchema = z.strictObject({
   analysis: analysisRefSchema,
+  heldTo: z.array(ref("criterion")),
   claims: z.array(concludedClaim),
   events: z.array(domainEventSchema),
 });

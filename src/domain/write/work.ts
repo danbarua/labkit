@@ -71,13 +71,13 @@ export class Work extends Shared {
    */
   async recordAnalysis(input: RecordAnalysisCommand): Promise<RecordedAnalysis> {
     return this.handle("recordAnalysis", input, async (unitOfWork) => {
-      const { analysis } = await this.recorded(input, unitOfWork);
+      const { analysis, heldTo } = await this.recorded(input, unitOfWork);
       // An analysis with no conclusions yet emits exactly one event and is a
       // real state: `enquiry` prints "has produced nothing yet" and `known`
       // buckets it as worked-on-no-answer.
       return {
         subject: analysis,
-        result: { analysis, claims: [] },
+        result: { analysis, heldTo, claims: [] },
       };
     });
   }
@@ -128,11 +128,12 @@ export class Work extends Shared {
 
   private async concludeOne(input: ConcludeCommand): Promise<RecordedAnalysis> {
     return this.handle("conclude", input, async (unitOfWork) => {
+      const heldTo = await this.heldToOf(input.analysis);
       const concluded = await this.concluding(input, unitOfWork);
 
       return {
         subject: input.analysis,
-        result: { analysis: input.analysis, claims: [asConcludedClaim(concluded)] },
+        result: { analysis: input.analysis, heldTo, claims: [asConcludedClaim(concluded)] },
       };
     });
   }

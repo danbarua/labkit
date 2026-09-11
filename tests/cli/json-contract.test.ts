@@ -72,6 +72,7 @@ let seeded: {
   analysis: string;
   gate: string;
   criterion: string;
+  heldTo: string[];
   work: string;
   question: string;
   review: string;
@@ -123,6 +124,7 @@ beforeAll(async () => {
     "work",
   );
   const criterion = id(await out(["criterion", "the effect holds at n>=20"]), "criterion");
+  const secondCriterion = id(await out(["criterion", "the effect holds at n>=20"]), "criterion");
   const gate = id(
     await out([
       "declare",
@@ -146,6 +148,8 @@ beforeAll(async () => {
     work,
     "--held-to",
     criterion,
+    "--held-to",
+    secondCriterion,
   ]);
   const analysis = recorded.analysis as string;
   // A second call: `analyse` records the run, `conclude` records a finding.
@@ -186,6 +190,7 @@ beforeAll(async () => {
     analysis: verified.verification as string,
     gate,
     criterion,
+    heldTo: [criterion, secondCriterion],
     work,
     question,
     review,
@@ -309,4 +314,10 @@ test("every write command's --json parses against the MCP schema for the same ve
       );
     }
   }
+});
+test("analyse JSON reports the exact criteria bound to its run", () => {
+  const value = JSON.parse(JSON.stringify(written.get("analyse")!.value)) as {
+    heldTo: string[];
+  };
+  expect(value.heldTo).toEqual(seeded.heldTo);
 });
