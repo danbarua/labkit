@@ -1,5 +1,4 @@
 import { optional, vertexProps } from "../../db/cypher";
-import type { Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
@@ -28,8 +27,7 @@ import {
   inForce,
   type CheckState,
 } from "../survey-facts";
-import { dedupeById, type Identified } from "./shared";
-
+import type { Identified } from "./shared";
 /**
  * What each of these criteria is holding up.
  */
@@ -44,17 +42,19 @@ export async function blockedBy(
        WHERE c.natural_id IN $ids
        OPTIONAL MATCH (g)-[:GATES]->(w)
        OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(g)
-       RETURN c, g, w, closing`,
+       OPTIONAL MATCH (stopping:Decision)-[:RESOLVES]->(w)
+       RETURN c, g, w, closing, stopping`,
     {
       c: vertexProps<Identified>(),
       g: vertexProps<{ consequence?: string } & Identified>(),
       w: optional(vertexProps<{ objective?: string } & Identified>()),
       closing: optional(vertexProps<Identified>()),
+      stopping: optional(vertexProps<Identified>()),
     },
     { ids: [...criteria] },
   );
   for (const row of rows) {
-    if (row.closing) continue;
+    if (row.closing || row.stopping) continue;
     // `ref()` rather than the raw id: the key is a handle, and
     // `check:no-stringly-typed` is right that a `Map<string, …>` here says
     // nothing about what the string is. It refuses a mismatched prefix too.
@@ -343,8 +343,13 @@ export class BlockedGroup extends SessionCore {
     );
 
     const gating = await this.graph.query(
-      `MATCH (:Gate {natural_id: $id})-[:GATES]->(w) RETURN w`,
-      { w: vertexProps<{ objective?: string; kind?: string } & Identified>() },
+      `MATCH (:Gate {natural_id: $id})-[:GATES]->(w)
+       OPTIONAL MATCH (stopping:Decision)-[:RESOLVES]->(w)
+       RETURN w, stopping`,
+      {
+        w: vertexProps<{ objective?: string; kind?: string } & Identified>(),
+        stopping: optional(vertexProps<Identified>()),
+      },
       { id: gate },
     );
 
@@ -364,10 +369,12 @@ export class BlockedGroup extends SessionCore {
       checks,
       unmet,
       counts,
-      gating: gating.map((g) => ({
-        work: ref("work", g.w.natural_id),
-        objective: g.w.objective ?? "",
-      })),
+      gating: gating
+        .filter((g) => !g.stopping)
+        .map((g) => ({
+          work: ref("work", g.w.natural_id),
+          objective: g.w.objective ?? "",
+        })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
   }
