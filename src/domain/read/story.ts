@@ -170,21 +170,6 @@ export class StoryGroup extends SessionCore {
         `answered decision ${resolving.natural_id} lacks its answering claim or cited evidence for enquiry ${enquiry}`,
       );
 
-    const promoted = await this.graph.query(
-      `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
-       OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
-       OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
-       OPTIONAL MATCH (sc)<-[:PROMOTES]-(sp:Decision)
-       OPTIONAL MATCH (cc)<-[:PROMOTES]-(cp:Decision)
-       RETURN sc, cc, sp, cp`,
-      {
-        sc: optional(vertexProps<{ kind?: string }>()),
-        cc: optional(vertexProps<{ kind?: string }>()),
-        sp: optional(vertexProps<{ reason?: string }>()),
-        cp: optional(vertexProps<{ reason?: string }>()),
-      },
-      { id: resolving.natural_id },
-    );
     return {
       enquiry,
       pursuing: loe.loe.name,
@@ -200,9 +185,23 @@ export class StoryGroup extends SessionCore {
         })),
         (f) => f.evidence,
       ),
-      restsOn: promoted.some((r) => (r.sp ?? r.cp) !== null) ? "confirmatory" : "exploratory",
+      restsOn: await this.restsOnFor(ref("claim", answered.natural_id)),
       question,
     };
+  }
+
+  /**
+   * Confirmatory only when the answering claim is confirmatory *and* its checks passed —
+   * the same pair `whatIsKnown` uses for established.
+   */
+  private async restsOnFor(claim: ClaimRef): Promise<"exploratory" | "confirmatory"> {
+    const [row] = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $id}) RETURN c`,
+      { c: vertexProps<{ kind?: string }>() },
+      { id: claim },
+    );
+    if (row?.c.kind !== "confirmatory") return "exploratory";
+    return (await this.checksMet(claim)) ? "confirmatory" : "exploratory";
   }
 
   /**
@@ -692,10 +691,11 @@ export class StoryGroup extends SessionCore {
     }));
 
     // A withdrawn interpretation is not supported, however much evidence once
-    // carried it. `support` stays populated deliberately: the findings are
-    // fine, and blanking them would say the numbers had gone wrong when only
-    // the reading moved.
-    const { withdrawn, replacedBy } = await this.withdrawalOf(scope);
+    // carried it. By handle: two claims can assert the same sentence, and
+    // `withdrawalOf` is about the proposition, not this record.
+    const standing = (await this.standingOf([claim])).get(claim);
+    const withdrawn = standing?.withdrawn ?? false;
+    const replacedBy = standing?.insteadOf[0];
 
     // Standing, and why it was conferred. Read from the claim rather than the conclusion so a
     // promotion taken later is visible here at all. By handle, and with no traversal at all.

@@ -59,7 +59,7 @@ test("a reinterpretation does not move the question between buckets", async () =
   const before = await s.whatIsKnown();
   const bucketBefore = BUCKETS.find((b) => before[b].some((q) => q.asks === "does the drug work?"));
 
-  await s.reinterpret({
+  const report = await s.reinterpret({
     of: claim,
     as: "the drug is associated with the improvement",
     because: "the design cannot separate selection from effect",
@@ -68,11 +68,10 @@ test("a reinterpretation does not move the question between buckets", async () =
   const after = await s.whatIsKnown();
   const bucketAfter = BUCKETS.find((b) => after[b].some((q) => q.asks === "does the drug work?"));
 
-  // Promoted over a check that failed reads `provisional`, not
-  // `established`. Both before and after, and the "after" is the claim.
   expect(bucketBefore).toBe("provisional");
   expect(bucketAfter).toBe("provisional");
-
+  const asked = after.provisional.find((q) => q.asks === "does the drug work?");
+  expect(asked?.answers.map((a) => a.claim)).toEqual([report.nowClaims.claim]);
   // Stable, not merely correct once. An order-dependent answer would vary
   // between reads of the same graph.
   const runs: (string | undefined)[] = [];

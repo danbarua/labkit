@@ -5,6 +5,8 @@
 import type { TenantGraph } from "../db/graph";
 import type { IndexedString, Prose } from "../db/domain";
 import { optional, vertexProps } from "../db/cypher";
+import { compose, per, type Row } from "./facts";
+import { checkState } from "./survey-facts";
 import {
   type AttributionContext,
   type Clock,
@@ -187,6 +189,34 @@ export class SessionCore {
     return scope.enquiry ? { enquiry: scope.enquiry } : {};
   }
 
+  /**
+   * Whether every criterion qualifying this claim has passed. Vacuous when none qualify it.
+   */
+  protected async checksMet(claim: ClaimRef): Promise<boolean> {
+    const criteria = new Set<string>();
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      const rows = await this.graph.query(
+        `MATCH (:Claim {natural_id: $id})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+         OPTIONAL MATCH (crit:Criterion)-[:QUALIFIES]->(u)
+         RETURN crit`,
+        { crit: optional(vertexProps<{ natural_id: string }>()) },
+        { id: claim },
+      );
+      for (const row of rows) if (row.crit) criteria.add(row.crit.natural_id);
+    }
+    if (criteria.size === 0) return true;
+    const { cypher, decoders } = compose(
+      `MATCH (crit:Criterion) WHERE crit.natural_id IN $ids`,
+      checkState,
+      { crit: vertexProps<{ natural_id: string }>() },
+    );
+    const rows = (await this.graph.query(cypher, decoders, {
+      ids: [...criteria],
+    })) as unknown as Row[];
+    const states = per(checkState, rows);
+    return [...criteria].every((id) => states.get(id) === "passed");
+  }
+
   /** Work these gates protect, and which therefore has to be run again when their condition changes. */
   protected async workGatedBy(gates: GateRef[]): Promise<GatedWork[]> {
     // Keyed by id, not by objective. Two tasks can share an objective and be
@@ -295,26 +325,34 @@ export class SessionCore {
     proposition: IndexedString;
     enquiry?: EnquiryRef;
   }): Promise<{ withdrawn: boolean; by?: Ref<"decision">; replacedBy?: ReplacementClaim }> {
-    const rows = await this.graph.query(
-      `MATCH (c:Claim {name: $name})<-[:SUPPORTS]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
-       ${this.withinScope(scope)}
-       // **Both predicates, and AGE has no edge alternation** -- [:CHANGES|SUPERSEDES] is a
-       // syntax error, so this is two clauses and the fold below must read both. Naming only
-       // one is SILENT: the row is simply absent and a reader concludes the claim still stands.
-       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
-       OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
-       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
-       OPTIONAL MATCH (replaced)-[:MOTIVATES]->(successor:Claim)
-       RETURN c, narrowed, insteadof, replaced, successor`,
-      {
-        c: vertexProps<{ natural_id: string }>(),
-        narrowed: optional(vertexProps<{ natural_id: string }>()),
-        insteadof: optional(vertexProps<{ name: string; natural_id: string }>()),
-        replaced: optional(vertexProps<{ natural_id: string }>()),
-        successor: optional(vertexProps<{ name: string; natural_id: string }>()),
-      },
-      { name: scope.proposition, ...this.scopeParams(scope) },
-    );
+    const rows: {
+      c: { natural_id: string };
+      narrowed: { natural_id: string } | null;
+      insteadof: { name: string; natural_id: string } | null;
+      replaced: { natural_id: string } | null;
+      successor: { name: string; natural_id: string } | null;
+    }[] = [];
+    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+      rows.push(
+        ...(await this.graph.query(
+          `MATCH (c:Claim {name: $name})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
+           ${this.withinScope(scope)}
+           OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+           OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
+           OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
+           OPTIONAL MATCH (replaced)-[:MOTIVATES]->(successor:Claim)
+           RETURN c, narrowed, insteadof, replaced, successor`,
+          {
+            c: vertexProps<{ natural_id: string }>(),
+            narrowed: optional(vertexProps<{ natural_id: string }>()),
+            insteadof: optional(vertexProps<{ name: string; natural_id: string }>()),
+            replaced: optional(vertexProps<{ natural_id: string }>()),
+            successor: optional(vertexProps<{ name: string; natural_id: string }>()),
+          },
+          { name: scope.proposition, ...this.scopeParams(scope) },
+        )),
+      );
+    }
     if (rows.length === 0) return { withdrawn: false };
 
     // Every node asserting this proposition must have been withdrawn. One left
