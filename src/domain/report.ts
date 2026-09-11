@@ -219,6 +219,7 @@ export interface EvaluatedCriterion {
   criterion: CriterionRef;
   outcome: "pass" | "fail";
   value: string;
+  /** Every gate this criterion governs, regardless of the verdict outcome. */
   gates: GateRef[];
   events: DomainEvent[];
 }

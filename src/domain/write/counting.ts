@@ -115,12 +115,7 @@ export class Counting extends SessionCore {
       const basis: EvidenceRef[] = [];
       for (const cited of input.citing ?? []) basis.push(await this.evidenceFor(cited));
       const at = this.clock.now();
-      const gates =
-        input.outcome === "fail"
-          ? await this.gatesGovernedBy(input.criterion)
-          : input.gate
-            ? [input.gate]
-            : [];
+      const gates = await this.gatesGovernedBy(input.criterion);
 
       const evaluation = ref(
         "evaluation",
@@ -132,7 +127,12 @@ export class Counting extends SessionCore {
       );
       unitOfWork.edge(input.criterion, "EVALUATED_AS", evaluation);
       if (input.gate) unitOfWork.edge(evaluation, "TRIGGERS", input.gate);
+      // What the verdict was reached against. Without it, a condition
+      // established by measurement and one asserted by an agent return
+      // identical records.
       for (const on of new Set(basis)) unitOfWork.edge(evaluation, "BASED_ON", on);
+      // What this verdict judged, when the rule is applied to more than one
+      // finding. `BASED_ON` says what it rested on; this says what it is about.
       if (input.about) unitOfWork.edge(evaluation, "ABOUT", input.about);
 
       return {
