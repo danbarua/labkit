@@ -26,7 +26,7 @@ Status says whether it can be picked up. Priority says what to look at first.
 
 | Priority | meaning |
 | --- | --- |
-| P0 | clear it next. A **demonstrated wrong answer shipping green**, or something that loses work. CLAUDE.md permits at most one of the first kind at a time and requires that clearing it be the next thing built, so P0 is normally one issue and never many. This column is where that lives, and nowhere else. |
+| P0 | clear it next. A **demonstrated wrong answer shipping green**, or something that loses work. |
 | P1 | real, unblocked, and it slides if nobody ranks it |
 | P2 | everything else — Blocked and Parked included. The honest value for a thing nobody should be looking at. |
 | P100 | Dan's, and it means *not important to the user, something an AI got hand-wringy about*. Below P2 rather than beside it. It is a real rank and not an untriaged item; leave it where it is unless he says otherwise. |
