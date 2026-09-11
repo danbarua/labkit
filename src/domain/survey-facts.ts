@@ -213,13 +213,26 @@ export interface Verdict {
   elsewhere: boolean;
 }
 
+type StoredOutcome = "pass" | "fail";
+
+type IdentifiedVerdict = Verdict & { evaluation: string };
+
+/** An evaluation must carry one of the two outcomes the domain understands. */
+function storedOutcome(v: Verdict, evaluation: string): StoredOutcome {
+  if (v.outcome === "pass" || v.outcome === "fail") return v.outcome;
+  throw new Error(`evaluation ${evaluation} has no stored outcome`);
+}
+
 /**
  * Whether a verdict bears on the gate the row was read through. A **fail**
  * bears on every gate the criterion governs; a **pass** only on the gate it
  * was reached for, so evidence gathered elsewhere never clears a gate nobody
  * checked. `elsewhere` is false for every reader not asking about a gate.
  */
-const bearsHere = (v: Verdict): boolean => !v.elsewhere || v.outcome === "fail";
+const bearsHere = (v: IdentifiedVerdict): boolean => {
+  const outcome = storedOutcome(v, v.evaluation);
+  return !v.elsewhere || outcome === "fail";
+};
 
 /** The four states a prespecified condition can be in. */
 export type CheckState = "passed" | "failed" | "never-run" | "no-standing-verdict";
@@ -230,18 +243,19 @@ const retracted = (v: Verdict): boolean => v.cited > 0 && v.standing === 0;
 /**
  * One subject's state, over whichever verdicts the caller chose.
  */
-function stateOf(group: Verdict[]): CheckState {
+function stateOf(group: IdentifiedVerdict[]): CheckState {
   const standing = group.filter((v) => !retracted(v));
   if (standing.length === 0) return group.length > 0 ? "no-standing-verdict" : "never-run";
-  return standing.some((v) => v.outcome === "fail") ? "failed" : "passed";
+  return standing.some((v) => storedOutcome(v, v.evaluation) === "fail") ? "failed" : "passed";
 }
 
 /**
  * A criterion's verdicts, grouped by the finding each judged.
  */
-function bySubject(found: Map<string, Verdict>): Map<string, Verdict[]> {
-  const groups = new Map<string, Verdict[]>();
-  for (const v of found.values()) {
+function bySubject(found: Map<string, Verdict>): Map<string, IdentifiedVerdict[]> {
+  const groups = new Map<string, IdentifiedVerdict[]>();
+  for (const [evaluation, verdict] of found) {
+    const v: IdentifiedVerdict = { ...verdict, evaluation };
     if (!bearsHere(v)) continue;
     const key = v.about ?? "";
     groups.set(key, [...(groups.get(key) ?? []), v]);
@@ -358,16 +372,19 @@ function recordsOf(
   ordered: (Verdict & { evaluation: string })[],
   criterion: string,
 ): EvaluationRecord[] {
-  return ordered.map((v) => ({
-    evaluation: ref("evaluation", v.evaluation),
-    criterion: ref("criterion", criterion),
-    value: v.value ?? "",
-    outcome: (v.outcome ?? "pass") as "pass" | "fail",
-    at: v.at,
-    basis: v.basis,
-    ...(v.about ? { about: v.about } : {}),
-    ...(retracted(v) ? { withdrawn: true as const } : {}),
-  }));
+  return ordered.map((v) => {
+    const outcome = storedOutcome(v, v.evaluation);
+    return {
+      evaluation: ref("evaluation", v.evaluation),
+      criterion: ref("criterion", criterion),
+      value: v.value ?? "",
+      outcome,
+      at: v.at,
+      basis: v.basis,
+      ...(v.about ? { about: v.about } : {}),
+      ...(retracted(v) ? { withdrawn: true as const } : {}),
+    };
+  });
 }
 
 /**
