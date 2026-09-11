@@ -44,6 +44,7 @@ const NO_COMMAND_FOR: Readonly<Record<string, string>> = {
   stoppedWork: "reached only through `why`, as the Task case's abandoned branch",
   neighboursOf: "reached only through `why`, as the walked kinds' body",
   proseFor: "reached only through `why`, as the walked kinds' body",
+  reachable: "reached only through `why`, as the walked kinds' existence check",
   // `now` composes it and its view prints the line; `happened --reconstructed`
   // is the list. A `transcribed` command would answer the same question a
   // third time.

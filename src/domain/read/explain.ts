@@ -40,12 +40,17 @@ import type { Identified } from "./shared";
 export class ExplainGroup extends SessionCore {
   /**
    * A record's own text, whatever kind it is — the properties `search` scans.
+   *
+   * Matches without a label because the kind is not known until the id is parsed, so the
+   * per-label retraction policy cannot apply and `retracted` is filtered here instead. An
+   * unlabelled pattern with no such filter reads nodes `undo` was supposed to have hidden.
    */
   async proseFor(subject: AnyRef): Promise<string | null> {
     const props = SEARCHABLE_TEXT[labelForNaturalId(subject)] ?? [];
     if (props.length === 0) return null;
+    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const [row] = await this.graph.query(
-      `MATCH (n {natural_id: $id}) RETURN n`,
+      `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
       { n: vertexProps<Record<string, unknown>>() },
       { id: subject },
     );
@@ -58,22 +63,48 @@ export class ExplainGroup extends SessionCore {
   }
 
   /**
+   * Is this handle on the record and not retracted?
+   *
+   * Its own question rather than a null from `proseFor`: an `EvidenceUnit` holds no prose and
+   * is still there, so "no words" and "not here" are different answers. Matches without a
+   * label, so it filters `retracted` rather than relying on the per-label policy.
+   */
+  async reachable(subject: AnyRef): Promise<boolean> {
+    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
+    const rows = await this.graph.query(
+      `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
+      { n: vertexProps<{ natural_id: string }>() },
+      { id: subject },
+    );
+    return rows.length > 0;
+  }
+
+  /**
    * One record's neighbours: everything joined to it, both directions, with the edge each was
    * reached by and the other end's own prose.
+   *
+   * Both ends are unlabelled — the subject's kind is not known until its id is parsed, and the
+   * far end is any kind by design — so neither carries the per-label retraction policy and both
+   * filter `retracted` here. Without it, `why` cites decisions and findings `undo` took back.
    */
   async neighboursOf(subject: AnyRef): Promise<Neighbour[]> {
     const decoders = {
       other: vertexProps<Record<string, unknown> & { natural_id: string }>(),
       via: scalar<string>(),
     };
+    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const [out, into] = await Promise.all([
       this.graph.query(
-        `MATCH (n {natural_id: $id})-[r]->(other) RETURN other, type(r) AS via`,
+        `MATCH (n {natural_id: $id})-[r]->(other)
+         WHERE n.retracted IS NULL AND other.retracted IS NULL
+         RETURN other, type(r) AS via`,
         decoders,
         { id: subject },
       ),
       this.graph.query(
-        `MATCH (other)-[r]->(n {natural_id: $id}) RETURN other, type(r) AS via`,
+        `MATCH (other)-[r]->(n {natural_id: $id})
+         WHERE n.retracted IS NULL AND other.retracted IS NULL
+         RETURN other, type(r) AS via`,
         decoders,
         { id: subject },
       ),
@@ -685,7 +716,7 @@ const SAYS: Record<WalkedKind, string> = {
 
 /**
  * The one query behind every walked kind: the node, and everything joined to it, both
- * directions.
+ * directions. Handle existence is checked once by `ReadSurface.why` before dispatch.
  */
 function walked(kind: WalkedKind): Explainer {
   return async (self, subject) => {

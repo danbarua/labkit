@@ -225,6 +225,11 @@ export class ReadSurface extends SessionCore {
     return this.#explain.proseFor(subject);
   }
 
+  /** Is this handle on the record and not retracted — reached only through `why`. */
+  async reachable(subject: AnyRef): Promise<boolean> {
+    return this.#explain.reachable(subject);
+  }
+
   /** What an analysis revised, and which findings moved. */
   async analysisRevision(analysis: AnalysisRef): Promise<AnalysisRevision> {
     return this.#explain.analysisRevision(analysis);
@@ -313,7 +318,13 @@ export class ReadSurface extends SessionCore {
   async why(subject: AnyRef | IndexedString): Promise<Explanation> {
     const asHandle = subject.toUpperCase() as AnyRef;
     const kind = kindOf(asHandle);
-    if (kind) return EXPLAINERS[kind](this, asHandle);
+    if (kind) {
+      if (!(await this.reachable(asHandle)))
+        throw new Error(
+          `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
+        );
+      return EXPLAINERS[kind](this, asHandle);
+    }
 
     const found = await this.claimsAsserting(subject);
     if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);
