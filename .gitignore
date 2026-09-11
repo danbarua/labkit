@@ -72,3 +72,8 @@ spikes/labkit-rust/traces/
 # run without `--db` leaves one at the repo root; `local:` is the bus inbox
 # landing in the same place.
 local:/
+
+# Per-directory gcloud config + ADC (see .envrc). Contains
+# application_default_credentials.json -- a live refresh token. Never commit.
+.gcloud/
+.envrc
