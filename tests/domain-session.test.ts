@@ -769,3 +769,96 @@ test("criterion report refuses an evaluation with no stored outcome", async () =
     new RegExp(`evaluation ${evaluation} has no stored outcome`),
   );
 });
+
+test("knowledge survey refuses an evaluation with a malformed outcome", async () => {
+  const { criterion } = await session.stateCriterion(
+    "a malformed outcome cannot establish knowledge",
+  );
+  const { enquiry } = await session.openEnquiry("does malformed evidence establish knowledge?");
+  const { observations } = await session.recordObservations({
+    enquiry,
+    name: "manual review",
+    finding: "the malformed result was retained",
+  });
+  const { claims } = await recordAnalysis(session, {
+    enquiry,
+    method: "manual review",
+    from: [observations],
+    concludes: [
+      {
+        proposition: "malformed evidence establishes knowledge",
+        finding: "the malformed result was retained",
+      },
+    ],
+    heldTo: [criterion],
+  });
+  const claim = claims[0]!.claim;
+  await session.is({ claim, state: "confirmed", because: "the answer is being relied on" });
+  await session.closeEnquiry({ enquiry, answeredBy: claim });
+
+  const evaluation = await graph.reserveId("CriterionEvaluation");
+  await graph.query(
+    "CREATE (ev:CriterionEvaluation {natural_id: $id, value: $value, outcome: $outcome, evaluated_at: $at}) RETURN ev",
+    { ev: vertexProps<{ natural_id: string }>() },
+    { id: evaluation, value: "legacy row", outcome: "legacy", at: "2026-09-11T00:00:00.000Z" },
+  );
+  await graph.createEdge(criterion, "EVALUATED_AS", evaluation);
+
+  await expect(session.whatIsKnown()).rejects.toThrow(
+    new RegExp(`evaluation ${evaluation} has no stored outcome`),
+  );
+});
+
+test("knowledge standing preserves valid pass and fail outcomes", async () => {
+  const { criterion } = await session.stateCriterion(
+    "a valid outcome preserves knowledge standing",
+  );
+  const { enquiry } = await session.openEnquiry("does a valid outcome preserve knowledge?");
+  const { observations } = await session.recordObservations({
+    enquiry,
+    name: "validation review",
+    finding: "the checked result was retained",
+  });
+  const { claims } = await recordAnalysis(session, {
+    enquiry,
+    method: "validation review",
+    from: [observations],
+    concludes: [
+      {
+        proposition: "valid evidence establishes knowledge",
+        finding: "the checked result was retained",
+      },
+    ],
+    heldTo: [criterion],
+  });
+  const claim = claims[0]!.claim;
+  await session.evaluateCriterion({
+    criterion,
+    outcome: "pass",
+    value: "the check passed",
+    citing: [claim],
+  });
+  await session.is({ claim, state: "confirmed", because: "the checked answer is being relied on" });
+  await session.closeEnquiry({ enquiry, answeredBy: claim });
+
+  expect((await session.criterionStanding(criterion)).state).toBe("passed");
+  let known = await session.whatIsKnown();
+  expect(known.established.map((q) => q.asks)).toContain(
+    "does a valid outcome preserve knowledge?",
+  );
+
+  await session.evaluateCriterion({
+    criterion,
+    outcome: "fail",
+    value: "the later check failed",
+    citing: [claim],
+  });
+  expect((await session.criterionStanding(criterion)).state).toBe("failed");
+  known = await session.whatIsKnown();
+  expect(known.established.map((q) => q.asks)).not.toContain(
+    "does a valid outcome preserve knowledge?",
+  );
+  expect(known.provisional.map((q) => q.asks)).toContain(
+    "does a valid outcome preserve knowledge?",
+  );
+});
