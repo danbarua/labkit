@@ -225,6 +225,11 @@ export class ReadSurface extends SessionCore {
     return this.#explain.proseFor(subject);
   }
 
+  /** Is this handle on the record and not retracted — reached only through `why`. */
+  async reachable(subject: AnyRef): Promise<boolean> {
+    return this.#explain.reachable(subject);
+  }
+
   /** What an analysis revised, and which findings moved. */
   async analysisRevision(analysis: AnalysisRef): Promise<AnalysisRevision> {
     return this.#explain.analysisRevision(analysis);

@@ -44,7 +44,7 @@ export class HappenedGroup extends SessionCore {
   async notes(concerning?: AnyRef): Promise<ListedNote[]> {
     const rows = await this.graph.query(
       `MATCH (n:Note)
-       OPTIONAL MATCH (n)-[:CONCERNS]->(about)
+       OPTIONAL MATCH (n)-[:CONCERNS]->(about) WHERE about.retracted IS NULL
        OPTIONAL MATCH (n)-[:MOTIVATES]->(q:Question)
        RETURN n, about, q`,
       {
