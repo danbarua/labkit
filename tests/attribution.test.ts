@@ -117,4 +117,13 @@ describe("an event says who caused it", () => {
       "second question",
     ]);
   });
+
+  test("an uncaptured HEAD is stored as null, not a hex stand-in", async () => {
+    expect(mockGitContext.head()).toBeNull();
+    const events = inMemoryEventLog();
+    const ctx = commandContext(mockGitContext, mockSessionContext, clock);
+    expect(ctx.attribution.git_hash).toBeNull();
+    await new WriteSurface(graph, { ...ctx, events }).pose({ question: "does the coating hold?" });
+    expect((await events.all())[0]!.attribution.git_hash).toBeNull();
+  });
 });

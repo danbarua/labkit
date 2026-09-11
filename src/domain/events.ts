@@ -26,7 +26,8 @@ export interface AttributionContext {
    * Required, not optional, and required on the **write** side specifically.
    */
   attribution_how: AttributionHow;
-  git_hash: string;
+  /** The commit this act ran against, or `null` when that was not captured. */
+  git_hash: string | null;
 }
 
 /**
@@ -67,7 +68,7 @@ export const UNATTRIBUTED: AttributionContext = {
   // label is: *this ran unattributed* is a positive statement, and a reader
   // meeting an empty field cannot tell it from one nobody filled in.
   attribution_how: "unattributed",
-  git_hash: "",
+  git_hash: null,
 };
 
 /**
