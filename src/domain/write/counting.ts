@@ -115,6 +115,7 @@ export class Counting extends SessionCore {
       const basis: EvidenceRef[] = [];
       for (const cited of input.citing ?? []) basis.push(await this.evidenceFor(cited));
       const at = this.clock.now();
+      const gates = await this.gatesGovernedBy(input.criterion);
 
       const evaluation = ref(
         "evaluation",
@@ -136,7 +137,13 @@ export class Counting extends SessionCore {
 
       return {
         subject: evaluation,
-        result: { evaluation },
+        result: {
+          evaluation,
+          criterion: input.criterion,
+          outcome: input.outcome,
+          value: input.value,
+          gates,
+        },
       };
     });
   }
