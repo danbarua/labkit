@@ -113,7 +113,7 @@ export class Counting extends SessionCore {
     return this.handle("evaluateCriterion", input, async (unitOfWork) => {
       if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
       const basis: EvidenceRef[] = [];
-      for (const cited of input.citing ?? []) basis.push(await this.evidenceFor(cited));
+      for (const cited of input.citing ?? []) basis.push(...(await this.evidenceFor(cited)));
       const at = this.clock.now();
       const gates = await this.gatesGovernedBy(input.criterion);
 
@@ -179,12 +179,7 @@ export class Counting extends SessionCore {
           `condition ${input.criterion} has been evaluated; an amendment after a result names the finding that prompted it — pass --citing`,
         );
 
-      let diagnosis: EvidenceRef | undefined;
-      if (input.citing !== undefined) {
-        const cited = await this.findingOn(input.citing);
-        if (!cited) throw new Error(noFindingBearsOn(input.citing));
-        diagnosis = cited.evidence;
-      }
+      const diagnosis = input.citing === undefined ? [] : await this.evidenceFor(input.citing);
 
       const gates = await this.gatesGovernedBy(input.criterion);
       if (gates.length === 0) {
@@ -229,7 +224,7 @@ export class Counting extends SessionCore {
       );
       unitOfWork.edge(decision, "CHANGES", input.criterion);
       unitOfWork.edge(decision, "MOTIVATES", replacement);
-      if (diagnosis) unitOfWork.edge(decision, "BASED_ON", diagnosis);
+      for (const cited of diagnosis) unitOfWork.edge(decision, "BASED_ON", cited);
       if (prior) unitOfWork.edge(decision, "SUPERSEDES", prior);
 
       return {
@@ -251,11 +246,12 @@ export class Counting extends SessionCore {
           // Prespecification is a fact about the condition's history and is
           // decided first; the other two are decided by the blast radius, which
           // is empty for a condition nothing has run against anyway.
-          nature: diagnosis
-            ? confirmatoryAffected.length > 0
-              ? "scientific"
-              : "mechanical"
-            : "prespecification",
+          nature:
+            diagnosis.length > 0
+              ? confirmatoryAffected.length > 0
+                ? "scientific"
+                : "mechanical"
+              : "prespecification",
         },
       };
     });
@@ -301,13 +297,13 @@ export class Counting extends SessionCore {
   /**
    * The evidence a citation names, by whichever route the caller held.
    */
-  private async evidenceFor(cited: CitedBasis): Promise<EvidenceRef> {
+  private async evidenceFor(cited: CitedBasis): Promise<EvidenceRef[]> {
     const label = labelForNaturalId(cited);
-    if (label === "Evidence") return cited as EvidenceRef;
+    if (label === "Evidence") return [cited as EvidenceRef];
     if (label === "Claim") {
-      const found = await this.findingOn(cited as ClaimRef);
-      if (!found) throw new Error(noFindingBearsOn(cited as ClaimRef));
-      return found.evidence;
+      const origin = await this.claimOrigin(cited as ClaimRef);
+      if (!origin) throw new Error(noFindingBearsOn(cited as ClaimRef));
+      return origin.kind === "direct" ? [origin.evidence] : origin.evidence;
     }
     const rows = await this.graph.query(
       `MATCH (e:Evidence)-[:RECORDED_IN]->(:Artefact {natural_id: $id}) RETURN e`,
@@ -320,7 +316,7 @@ export class Counting extends SessionCore {
         `no finding is recorded in ${cited}; a verdict rests on evidence, and observations ` +
           `produce it when they are recorded — cite the observations a check actually read`,
       );
-    return ref("evidence", found.e.natural_id);
+    return [ref("evidence", found.e.natural_id)];
   }
 
   private async assertCriterionGovernsGate(criterion: CriterionRef, gate: GateRef): Promise<void> {

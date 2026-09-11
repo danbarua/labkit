@@ -273,4 +273,48 @@ describe("S-21: a finding drawn across findings", () => {
       }),
     );
   });
+
+  test("criterion verdicts and design amendments can cite a synthesis", async () => {
+    const { claims } = await fourComparisons();
+    const { claim: synthesis } = await session.synthesise({
+      proposition: HEADLINE,
+      restingOn: claims,
+    });
+    const { work } = await session.planWork({
+      objective: "report the comparison",
+      acceptance: "the result passes its locked check",
+    });
+    const { criterion } = await session.stateCriterion("all four controls show no advantage");
+    const { gate } = await session.declareGate({
+      governedBy: [criterion],
+      consequence: "the comparison is not reported",
+      protecting: [work],
+    });
+
+    await session.evaluateCriterion({
+      criterion,
+      gate,
+      value: "four of four comparisons are within noise",
+      outcome: "pass",
+      citing: [synthesis],
+    });
+
+    const expectedFindings = CONTROLS.map(([name]) => `difference within noise, ${name}`).sort();
+    const standing = await (await afterwards()).criterionStanding(criterion);
+    expect(standing.evaluations[0]!.basis.map((finding) => finding.states).sort()).toEqual(
+      expectedFindings,
+    );
+
+    const amendment = await session.amendDesign({
+      criterion,
+      nowRequires: "all prespecified controls show no advantage",
+      because: "the criterion named the realized count rather than the prespecified set",
+      citing: synthesis,
+    });
+    expect(amendment.nature).toBe("mechanical");
+    const history = await (await afterwards()).designHistory(gate);
+    expect(
+      history.conditions[0]!.amendments[0]!.citing.map((finding) => finding.states).sort(),
+    ).toEqual(expectedFindings);
+  });
 });
