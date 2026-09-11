@@ -167,4 +167,154 @@ describe("S-21: a finding drawn across findings", () => {
       /at least one finding to rest on/,
     );
   });
+  test("reinterpret narrows exactly the named synthesis and preserves its parts", async () => {
+    const { claims } = await fourComparisons();
+    const restingOn = [claims[0]!, claims[1]!, claims[0]!];
+    const { claim: synthesis } = await session.synthesise({
+      proposition: HEADLINE,
+      restingOn,
+    });
+
+    const report = await session.reinterpret({
+      of: synthesis,
+      as: "T shows no advantage in the measured controls",
+      because: "the headline overstates what the comparisons establish",
+    });
+    const edges = report.events[0]!.changes.filter(
+      (change): change is import("../../src/domain").EdgeCreated => change.change === "EdgeCreated",
+    );
+    const expectedParts = [...new Set(restingOn)].sort();
+
+    expect(report.previously).toEqual([{ claim: synthesis, asserts: HEADLINE }]);
+    expect(edges.filter((edge) => edge.label === "CHANGES").map((edge) => edge.to)).toEqual([
+      synthesis,
+    ]);
+    expect(edges.filter((edge) => edge.label === "MOTIVATES").map((edge) => edge.to)).toEqual([
+      report.nowClaims.claim,
+    ]);
+    expect(
+      edges
+        .filter((edge) => edge.label === "RESTS_ON")
+        .map((edge) => edge.to)
+        .sort(),
+    ).toEqual(expectedParts);
+    expect(
+      edges.filter((edge) => edge.label === "SUPPORTS" || edge.label === "CHALLENGES"),
+    ).toEqual([]);
+
+    const narrowed = await (await afterwards()).whySupported(report.nowClaims.claim);
+    expect(narrowed.drawnAcross.map((part) => part.claim).sort()).toEqual(expectedParts);
+    expect(narrowed.support).toEqual([]);
+
+    await expect(
+      session.reinterpret({
+        of: synthesis,
+        as: "T has no measured advantage",
+        because: "trying to reinterpret the superseded synthesis",
+      }),
+    ).rejects.toThrow(new RegExp(`no longer stands.*${report.nowClaims.claim}`, "s"));
+  });
+
+  test("accepting a synthesis keeps its identity and cites every component finding", async () => {
+    const { enquiry } = await session.openEnquiry("does the measured effect hold?");
+    const { observations } = await session.recordObservations({
+      enquiry,
+      name: "paired measurements",
+      finding: "paired measurements",
+    });
+    const { claims } = await recordAnalysis(session, {
+      enquiry,
+      method: "paired comparison",
+      from: [observations],
+      concludes: [
+        { proposition: "the effect is present", finding: "effect estimate is positive" },
+        {
+          proposition: "the effect is absent",
+          finding: "confidence interval spans zero",
+          bearing: "challenges",
+        },
+      ],
+    });
+    const parts = [claims[0]!.claim, claims[1]!.claim, claims[0]!.claim];
+    const { claim: synthesis } = await session.synthesise({
+      proposition: "the effect is unresolved across both comparisons",
+      restingOn: parts,
+    });
+    const accepted = await session.acceptAsUnresolved({
+      enquiry,
+      because: "the available comparisons do not settle the question",
+      until: "a new independent comparison is available",
+      inLightOf: synthesis,
+    });
+    const edges = accepted.events[0]!.changes.filter(
+      (change): change is import("../../src/domain").EdgeCreated => change.change === "EdgeCreated",
+    );
+    const expectedEvidence = [
+      ...(await session.whySupported(claims[0]!.claim)).support,
+      ...(await session.whySupported(claims[1]!.claim)).against,
+    ]
+      .map((finding) => finding.evidence)
+      .sort();
+
+    expect(edges.filter((edge) => edge.label === "IN_LIGHT_OF").map((edge) => edge.to)).toEqual([
+      synthesis,
+    ]);
+    expect(
+      edges
+        .filter((edge) => edge.label === "BASED_ON")
+        .map((edge) => edge.to)
+        .sort(),
+    ).toEqual(expectedEvidence);
+    const explained = await (await afterwards()).why(accepted.decision);
+    expect(explained.because).toContainEqual(
+      expect.objectContaining({
+        handle: synthesis,
+        wording: expect.stringContaining("in light of"),
+      }),
+    );
+  });
+
+  test("criterion verdicts and design amendments can cite a synthesis", async () => {
+    const { claims } = await fourComparisons();
+    const { claim: synthesis } = await session.synthesise({
+      proposition: HEADLINE,
+      restingOn: claims,
+    });
+    const { work } = await session.planWork({
+      objective: "report the comparison",
+      acceptance: "the result passes its locked check",
+    });
+    const { criterion } = await session.stateCriterion("all four controls show no advantage");
+    const { gate } = await session.declareGate({
+      governedBy: [criterion],
+      consequence: "the comparison is not reported",
+      protecting: [work],
+    });
+
+    await session.evaluateCriterion({
+      criterion,
+      gate,
+      value: "four of four comparisons are within noise",
+      outcome: "pass",
+      citing: [synthesis],
+    });
+
+    const expectedFindings = CONTROLS.map(([name]) => `difference within noise, ${name}`).sort();
+    const standing = await (await afterwards()).criterionStanding(criterion);
+    expect(standing.evaluations[0]!.basis.map((finding) => finding.states).sort()).toEqual(
+      expectedFindings,
+    );
+
+    const amendment = await session.amendDesign({
+      criterion,
+      nowRequires: "all prespecified controls show no advantage",
+      because: "the criterion named the realized count rather than the prespecified set",
+      citing: synthesis,
+    });
+    expect(amendment.nature).toBe("mechanical");
+    const history = await (await afterwards()).designHistory(gate);
+    expect(
+      history.conditions[0]!.amendments[0]!.citing.map((finding) => finding.states).sort(),
+    ).toEqual(expectedFindings);
+  });
 });

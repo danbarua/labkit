@@ -86,6 +86,7 @@ export const EDGE_LABELS = [
   "GATES", // Gate -> Task/Computation
   "CHANGES", // Decision -> Criterion
   "BASED_ON", // Decision -> Evidence | CriterionEvaluation -> Evidence
+  "IN_LIGHT_OF", // Decision -> Claim it was accepted in light of
   "RESOLVES", // Decision -> Question | LineOfEnquiry | Task | Gate
   "ANSWERS", // Decision -> Claim named as an enquiry's answer
   "NARROWS", // Decision -> Question
@@ -227,6 +228,7 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Evidence"],
     ["CriterionEvaluation", "Evidence"],
   ],
+  IN_LIGHT_OF: [["Decision", "Claim"]],
   /**
    * The item a decision closes. Question remains legal for replaying historical events; current
    * question standing is computed from the closures of its lines of enquiry.

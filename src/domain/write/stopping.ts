@@ -183,9 +183,9 @@ export class Stopping extends SessionCore {
           `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
         );
 
-      const found = await this.findingOn(input.inLightOf);
-      if (!found) throw new Error(noFindingBearsOn(input.inLightOf));
-      const basis = found.evidence;
+      const origin = await this.claimOrigin(input.inLightOf);
+      if (!origin) throw new Error(noFindingBearsOn(input.inLightOf));
+      const basis = origin.kind === "direct" ? [origin.evidence] : origin.evidence;
 
       const decision = ref(
         "decision",
@@ -196,9 +196,10 @@ export class Stopping extends SessionCore {
         }),
       );
       unitOfWork.edge(decision, "DEFERS", question);
+      unitOfWork.edge(decision, "IN_LIGHT_OF", input.inLightOf);
       // What was known when the call was made, which is what makes
       // `evidence` answerable afterwards rather than only now.
-      unitOfWork.edge(decision, "BASED_ON", basis);
+      for (const cited of basis) unitOfWork.edge(decision, "BASED_ON", cited);
 
       return {
         subject: input.enquiry,

@@ -44,6 +44,10 @@ export interface ResearchSessionOptions extends Partial<CommandContext> {
   projectors?: Projector[];
 }
 
+type ClaimOrigin =
+  | { kind: "direct"; evidence: EvidenceRef; asserts: Prose }
+  | { kind: "synthesis"; parts: ClaimRef[]; evidence: EvidenceRef[]; asserts: Prose };
+
 /**
  * The callable, public method names of a class.
  */
@@ -97,6 +101,41 @@ export class SessionCore {
         };
     }
     return undefined;
+  }
+
+  /** Distinguishes a concluded claim from a synthesis by the edges the claim itself carries. */
+  protected async claimOrigin(claim: ClaimRef): Promise<ClaimOrigin | undefined> {
+    const parts = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $claim})-[:RESTS_ON]->(part:Claim) RETURN c, part`,
+      {
+        c: vertexProps<{ name: string }>(),
+        part: vertexProps<{ natural_id: string }>(),
+      },
+      { claim },
+    );
+    if (parts.length > 0) {
+      const exactParts = [...new Set(parts.map((row) => ref("claim", row.part.natural_id)))];
+      const evidence = new Set<EvidenceRef>();
+      for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+        const rows = await this.graph.query(
+          `MATCH (:Claim {natural_id: $claim})-[:RESTS_ON]->(part:Claim)
+           MATCH (e:Evidence)-[:${bearing}]->(part)
+           RETURN e`,
+          { e: vertexProps<{ natural_id: string }>() },
+          { claim },
+        );
+        for (const row of rows) evidence.add(ref("evidence", row.e.natural_id));
+      }
+      return {
+        kind: "synthesis",
+        parts: exactParts,
+        evidence: [...evidence].sort(),
+        asserts: parts[0]!.c.name,
+      };
+    }
+
+    const found = await this.findingOn(claim);
+    return found ? { kind: "direct", ...found } : undefined;
   }
 
   /** What a claim asserts. */

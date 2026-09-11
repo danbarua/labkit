@@ -405,6 +405,54 @@ export class Revising extends Shared {
   async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
     return this.handle("reinterpret", input, async (unitOfWork) => {
       const at = this.clock.now();
+      const origin = await this.claimOrigin(input.of);
+      if (origin?.kind === "synthesis") {
+        const named = (await this.standingOf([input.of])).get(input.of);
+        if (named?.withdrawn)
+          throw new Error(
+            "claim " +
+              input.of +
+              " no longer stands: " +
+              named.by.join(" and ") +
+              " withdrew it. " +
+              (named.insteadOf.length > 0
+                ? "Reinterpret " +
+                  named.insteadOf.map((c) => c.claim).join(" or ") +
+                  " which stands in its place"
+                : "The record does not say which claim stands in its place; " +
+                  "'labkit why " +
+                  named.by[0] +
+                  "' says what the act was"),
+          );
+
+        const withdrawn: ConcludedClaim[] = [{ claim: input.of, asserts: origin.asserts }];
+        const review = await unitOfWork.node("Review", { verdict: input.because });
+        const narrower = ref(
+          "claim",
+          await unitOfWork.node("Claim", { name: input.as, kind: "exploratory" }),
+        );
+        const decision = await unitOfWork.node("Decision", {
+          decided_at: at,
+          reason: input.because,
+          invalidation_check: "evidence that the original reading was right after all",
+        });
+        unitOfWork.edge(decision, "MOTIVATES", narrower);
+        unitOfWork.edge(review, "EVALUATES", input.of);
+        unitOfWork.edge(decision, "CHANGES", input.of);
+        for (const part of origin.parts) unitOfWork.edge(narrower, "RESTS_ON", part);
+
+        return {
+          subject: narrower,
+          result: {
+            at,
+            previously: withdrawn,
+            nowClaims: { claim: narrower, asserts: input.as },
+            evidenceStanding: [],
+            restingOnTheOldReading: [],
+            requiresRecomputation: false,
+          },
+        };
+      }
 
       // A reinterpretation narrows a READING, not one node: two analyses in one
       // line of enquiry concluding the same sentence share a reading, and both

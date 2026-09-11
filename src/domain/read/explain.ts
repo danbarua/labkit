@@ -683,6 +683,7 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   KEEPS: { out: "kept", in: "was kept by" },
   CHANGES: { out: "changed", in: "was changed by" },
   BASED_ON: { out: "rests on", in: "was cited by" },
+  IN_LIGHT_OF: { out: "is in light of", in: "was considered in light of" },
   RESOLVES: { out: "settled", in: "was settled by" },
   ANSWERS: { out: "answers on", in: "was named as the answer by" },
   NARROWS: { out: "sharpened", in: "was sharpened by" },

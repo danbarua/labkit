@@ -63,8 +63,8 @@ export interface RecordedConclusion {
  * The refusal a caller meets when they cite a claim nothing has concluded.
  */
 export const noFindingBearsOn = (claim: ClaimRef): string =>
-  `no finding bears on claim ${claim}; a claim can be cited only once an analysis ` +
-  `has concluded it and produced the evidence bearing on it`;
+  `no finding bears on claim ${claim}; a claim can be cited only once an analysis has concluded ` +
+  `it or a synthesis has drawn it across concluded claims`;
 
 /** The write helpers `Work` and `Revising` both reach — see the file header. */
 export class Shared extends SessionCore {
