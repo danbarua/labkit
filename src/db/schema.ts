@@ -72,7 +72,10 @@ export const labkitEvents = p
        * `AttributionHow` in `src/domain/events.ts` for what each means and why there are three.
        */
       attribution_how: p.text(),
-      git_hash: p.text().notNull(),
+      /**
+       * The commit this act ran against. Null means it was not captured — never a hex stand-in.
+       */
+      git_hash: p.text(),
       /**
        * What the act was read off, when it was not performed. Nullable, and the absence means
        * nobody said — see `CommandContext` in `src/domain/events.ts`.

@@ -56,7 +56,10 @@ export function renderHappened({ acts: events, more }: EventPage, p: Palette): s
             : "";
       // Short hash, because the full forty characters push the line past a
       // terminal and the first eight are what anybody types back into `git`.
-      const commit = e.attribution.git_hash ? ` @${e.attribution.git_hash.slice(0, 8)}` : "";
+      // `null` is not a hash: print that it was not captured, never a hex stand-in.
+      const commit = e.attribution.git_hash
+        ? ` @${e.attribution.git_hash.slice(0, 8)}`
+        : p.quiet(" (not captured)");
       const created = createdIn(e);
       const minted = created.length
         ? p.quiet(", minting ") + created.map((h) => p.handle(h)).join(p.quiet(", "))

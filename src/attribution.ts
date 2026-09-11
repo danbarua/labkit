@@ -16,9 +16,9 @@ import {
 /** The commit a command ran against. */
 export interface GitContextProvider {
   /**
-   * The current HEAD, or `""` outside a repository.
+   * The current HEAD, or `null` when it was not captured.
    */
-  head(): string;
+  head(): string | null;
 }
 
 /** Who is running commands. */
@@ -34,10 +34,10 @@ export interface SessionContextProvider {
 }
 
 /**
- * A stand-in HEAD, and visibly one.
+ * A stand-in HEAD: not captured, and recorded as such.
  */
 export const mockGitContext: GitContextProvider = {
-  head: () => "0".repeat(40),
+  head: () => null,
 };
 
 /**
@@ -63,11 +63,11 @@ export const gitContext: GitContextProvider = {
       const result = spawnSync("git", ["rev-parse", "HEAD"], {
         encoding: "utf8",
       });
-      return result.status === 0 ? result.stdout.trim() : "";
+      return result.status === 0 ? result.stdout.trim() : null;
     } catch {
       // `spawnSync` throws rather than returning a status when the binary is
       // missing outright, which is a different path from a non-zero exit.
-      return "";
+      return null;
     }
   },
 };

@@ -546,6 +546,28 @@ test("an empty event log does not read as an empty record", () => {
   expect(out).toContain("CLM_1");
 });
 
+test("an uncaptured commit is not printed as a hash", () => {
+  const events: DomainEvent[] = [
+    domainEvent({
+      seq: 8,
+      at: "2026-03-01T00:00:00.000Z",
+      attribution: {
+        attribution_label: "claude-opus-5",
+        attribution_id: "sess_1",
+        attribution_how: "claimed",
+        git_hash: null,
+      },
+      operation: "note",
+      subject: "NOTE_1",
+      command: { text: "a note" },
+      changes: [{ change: "NodeCreated", id: "NOTE_1", label: "Note", props: { text: "a note" } }],
+    }),
+  ];
+  const out = renderHappened({ acts: events, more: false }, PLAIN);
+  expect(out).toContain("not captured");
+  expect(out).not.toMatch(/@[0-9a-f]{8}/);
+});
+
 // --------------------------------------------------------------------------- Colour. **Every
 // assertion above renders with `PLAIN`**, which is what `bun test` would get anyway — stdout is
 // not a terminal, so `isColorSupported` is false and the composition root hands out an identity
