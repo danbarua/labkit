@@ -428,9 +428,9 @@ describe("S-4: a negative result that closes the question", () => {
     // After the replacement the sentence is claimed twice; this asks about
     // the original, which is the one that was withdrawn.
     const after = await session.whySupported(claimOf(refutationClaims, SPECIFICITY));
-    // The old challenge is withdrawn, not still standing.
+    expect(after.withdrawn).toBe(true);
+    expect(after.verdict).toBe("withdrawn");
     expect(after.against.map((a) => a.finding)).toEqual(["still no separation, corrected metric"]);
-    expect(after.superseded).toHaveLength(1);
     expect(after.superseded[0]).toMatchObject({
       finding: "no separation detectable",
       bearing: "challenges",

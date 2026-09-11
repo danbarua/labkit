@@ -78,16 +78,14 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
    * Afterward. "What do we know?" — and the survey must not answer `established`.
    */
   test("the survey does not call the question established", async () => {
-    const { claim } = await aPromotedAnswerNobodyChecked();
+    const { claim, enquiry } = await aPromotedAnswerNobodyChecked();
 
     const later = await afterwards();
     const survey = await later.whatIsKnown();
     const asked = (bucket: readonly { asks: string }[]) => bucket.some((q) => q.asks === QUESTION);
 
-    // The defect this scenario exists for. `established` means the answer rests
-    // on promoted, confirmatory work *and the standard it was held to*; a claim
-    // whose prespecified check nobody ran has not met that.
     expect(asked(survey.established)).toBe(false);
+    expect((await later.enquiryStatus(enquiry)).restsOn).toBe("exploratory");
 
     // It is not untested, not unresolved, and not accepted either: the question
     // *was* worked on, *was* answered, and nobody parked it. Whatever bucket it
@@ -114,17 +112,17 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
    * established, as it always was.
    */
   test("a check that was run and passed leaves the answer established", async () => {
-    const { check, claim } = await aPromotedAnswerNobodyChecked();
+    const { check, claim, enquiry } = await aPromotedAnswerNobodyChecked();
     await session.evaluateCriterion({
       criterion: check,
       outcome: "pass",
       value: "loss 3.6 vs 3.8 baseline",
       citing: [claim],
     });
-
     const later = await afterwards();
     const survey = await later.whatIsKnown();
     expect(survey.established.some((q: { asks: string }) => q.asks === QUESTION)).toBe(true);
+    expect((await later.enquiryStatus(enquiry)).restsOn).toBe("confirmatory");
   });
 
   /**

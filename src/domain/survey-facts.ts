@@ -60,7 +60,14 @@ export function answeringClaimBearing(
     yields: {
       loe: optional(vertexProps<Node & { name: string }>()),
       closing: optional(
-        vertexProps<Node & { decided_at: string; reason: string; resolution_kind?: string }>(),
+        vertexProps<
+          Node & {
+            decided_at: string;
+            reason: string;
+            resolution_kind?: string;
+            retracted?: boolean;
+          }
+        >(),
       ),
       part: optional(vertexProps<Node>()),
       cited: optional(vertexProps<Node>()),
