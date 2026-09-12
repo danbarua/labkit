@@ -1,320 +1,328 @@
 /**
- * The write half's command shapes, named.
+ * The write half's command shapes, named. Zod is the source; the TypeScript
+ * type is `z.infer`. Adapters parse with these objects rather than branding
+ * handles themselves.
  */
 
-import type {
-  AnalysisRef,
-  AnyRef,
-  Conclusion,
-  CriterionRef,
-  EnquiryRef,
-  GateRef,
-  InputRef,
-  NoteRef,
-  QuestionRef,
-  ReviewRef,
-  WorkRef,
-  ClaimRef,
-  EvidenceRef,
-  ObservationsRef,
-} from "./report";
-import type { Prose } from "../db/domain";
+import { z } from "zod";
+import { kindOf, ref } from "./report";
+import type { Kind } from "./report";
+
+/**
+ * A handle field: wire string in, branded ref out. Uppercased first, as the
+ * CLI already did — every handle this record mints is upper-case.
+ */
+function refString<K extends Kind>(kind: K) {
+  return z.string().transform((raw) => ref(kind, raw.toUpperCase()));
+}
+
+function inputRefString() {
+  return z.string().transform((raw) => {
+    const id = raw.toUpperCase();
+    if (id.startsWith("COMP_")) return ref("analysis", id);
+    if (id.startsWith("ART_")) return ref("observations", id);
+    throw new Error(`\`${raw}\` is neither observations (ART_…) nor an analysis (COMP_…)`);
+  });
+}
+
+function supersededRefString() {
+  return z.string().transform((raw) => {
+    const id = raw.toUpperCase();
+    if (id.startsWith("CLM_")) return ref("claim", id);
+    if (id.startsWith("EV_")) return ref("evidence", id);
+    throw new Error(
+      `\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…); ` +
+        `both come back from the act that recorded them, and 'why' names them for a claim already on the record`,
+    );
+  });
+}
+
+function citedBasisString() {
+  return z.string().transform((raw) => {
+    const id = raw.toUpperCase();
+    if (id.startsWith("CLM_")) return ref("claim", id);
+    if (id.startsWith("ART_")) return ref("observations", id);
+    if (id.startsWith("EV_")) return ref("evidence", id);
+    throw new Error(
+      `\`${raw}\` is not a claim (CLM_…), an observations record (ART_…) or a finding (EV_…); ` +
+        `a verdict rests on evidence, and each of those names some`,
+    );
+  });
+}
+
+function anyRefString() {
+  return z.string().transform((raw) => {
+    const normalized = raw.toUpperCase();
+    const kind = kindOf(normalized);
+    if (!kind) throw new Error(`\`${raw}\` is not a handle this record recognises`);
+    return ref(kind, normalized);
+  });
+}
+
+export const GATE_CLOSURES = ["sidestepped", "retired"] as const;
+export type GateClosure = (typeof GATE_CLOSURES)[number];
+
+const bearing = z.enum(["supports", "challenges"]);
+const standing = z.enum(["exploratory", "confirmatory"]);
+
+const conclusion = z.object({
+  proposition: z.string(),
+  finding: z.string(),
+  bearing: bearing.optional(),
+  standing: standing.optional(),
+});
 
 /**
  * `synthesise` — one finding drawn across others, running nothing new.
  */
-export interface SynthesiseCommand {
-  proposition: Prose;
-  restingOn: ClaimRef[];
-}
+export const synthesiseCommand = z.object({
+  proposition: z.string(),
+  restingOn: z.array(refString("claim")),
+});
+export type SynthesiseCommand = z.infer<typeof synthesiseCommand>;
 
 /** `pose` — put a question on the record, unpursued. */
-export interface PoseCommand {
-  question: Prose;
-  /** The note this question came out of, when it came out of one. */
-  from?: NoteRef;
-}
+export const poseCommand = z.object({
+  question: z.string(),
+  from: refString("note").optional(),
+});
+export type PoseCommand = z.infer<typeof poseCommand>;
 
 /** `openEnquiry` — pose a question and pursue it, as one act. */
-export interface OpenEnquiryCommand {
-  question: Prose;
-  from?: NoteRef;
-}
+export const openEnquiryCommand = z.object({
+  question: z.string(),
+  from: refString("note").optional(),
+});
+export type OpenEnquiryCommand = z.infer<typeof openEnquiryCommand>;
 
 /** `stateCriterion` — state a condition a result will be held to. */
-export interface StateCriterionCommand {
-  proposition: Prose;
-}
+export const stateCriterionCommand = z.object({
+  proposition: z.string(),
+});
+export type StateCriterionCommand = z.infer<typeof stateCriterionCommand>;
 
 /** `pursue` — open a line of enquiry against a question already on the record. */
-export interface PursueCommand {
-  question: QuestionRef;
-  approach: string;
-}
+export const pursueCommand = z.object({
+  question: refString("question"),
+  approach: z.string(),
+});
+export type PursueCommand = z.infer<typeof pursueCommand>;
 
 /**
  * `note` — a dated, attributed record with nothing else required.
  */
-export interface NoteCommand {
-  text: string;
-  on?: AnyRef;
-  /**
-   * A question this note is the reason for — the other direction of `pose --from`, for when the
-   * note is written after the question rather than before it.
-   */
-  prompted?: QuestionRef;
-}
+export const noteCommand = z.object({
+  text: z.string(),
+  on: anyRefString().optional(),
+  prompted: refString("question").optional(),
+});
+export type NoteCommand = z.infer<typeof noteCommand>;
 
 /** `sharpen` — narrow a question into a more precise one, recording why. */
-export interface SharpenCommand {
-  from: QuestionRef;
-  into: string;
-  because: string;
-}
+export const sharpenCommand = z.object({
+  from: refString("question"),
+  into: z.string(),
+  because: z.string(),
+});
+export type SharpenCommand = z.infer<typeof sharpenCommand>;
 
 /** `recordObservations` — put measurement on the record, without analysing it. */
-export interface RecordObservationsCommand {
-  enquiry: EnquiryRef;
-  name: string;
-  finding: string;
-  contentHash?: string;
-}
+export const recordObservationsCommand = z.object({
+  enquiry: refString("enquiry"),
+  name: z.string(),
+  finding: z.string(),
+  contentHash: z.string().optional(),
+});
+export type RecordObservationsCommand = z.infer<typeof recordObservationsCommand>;
 
 /**
  * `recordAnalysis` — a computation, its evidence unit, and its output artefact.
  */
-export interface RecordAnalysisCommand {
-  enquiry: EnquiryRef;
-  method: string;
-  /**
-   * What this analysis read.
-   */
-  from: InputRef[];
-  /**
-   * The planned work this analysis carries out, if it carries out any.
-   */
-  implementing?: WorkRef;
-  /**
-   * The prespecified conditions this analysis's conclusions are held to.
-   */
-  heldTo?: CriterionRef[];
-}
+export const recordAnalysisCommand = z.object({
+  enquiry: refString("enquiry"),
+  method: z.string(),
+  from: z.array(inputRefString()),
+  implementing: refString("work").optional(),
+  heldTo: z.array(refString("criterion")).optional(),
+});
+export type RecordAnalysisCommand = z.infer<typeof recordAnalysisCommand>;
 
 /** `recordReview` — a verdict on an analysis, which a later retraction can rest on. */
-export interface RecordReviewCommand {
-  of: AnalysisRef;
-  verdict: string;
-}
+export const recordReviewCommand = z.object({
+  of: refString("analysis"),
+  verdict: z.string(),
+});
+export type RecordReviewCommand = z.infer<typeof recordReviewCommand>;
 
 /** `closeEnquiry` — answered, or abandoned when `answeredBy` is absent. */
-export interface CloseEnquiryCommand {
-  enquiry: EnquiryRef;
-  answeredBy?: ClaimRef;
-}
+export const closeEnquiryCommand = z.object({
+  enquiry: refString("enquiry"),
+  answeredBy: refString("claim").optional(),
+});
+export type CloseEnquiryCommand = z.infer<typeof closeEnquiryCommand>;
 
 /** Close one gate without pretending its checks passed. */
-export interface CloseGateCommand {
-  gate: GateRef;
-  closure: "sidestepped" | "retired";
-  because: Prose;
-}
+export const closeGateCommand = z.object({
+  gate: refString("gate"),
+  closure: z.enum(GATE_CLOSURES),
+  because: z.string(),
+});
+export type CloseGateCommand = z.infer<typeof closeGateCommand>;
 
 /** Planned work somebody decided not to do. */
-export interface StopWorkCommand {
-  work: WorkRef;
-  because: Prose;
-}
+export const stopWorkCommand = z.object({
+  work: refString("work"),
+  because: z.string(),
+});
+export type StopWorkCommand = z.infer<typeof stopWorkCommand>;
 
 /** `planWork` — state an objective and what would count as meeting it. */
-export interface PlanWorkCommand {
-  objective: string;
-  acceptance: string;
-  /**
-   * What this work is permitted to read. Closed-world — see `TaskContract`.
-   */
-  mayRead?: string[];
-  /**
-   * The line of enquiry this work exists to advance, if any.
-   */
-  addressing?: EnquiryRef;
-}
+export const planWorkCommand = z.object({
+  objective: z.string(),
+  acceptance: z.string(),
+  mayRead: z.array(z.string()).optional(),
+  addressing: refString("enquiry").optional(),
+});
+export type PlanWorkCommand = z.infer<typeof planWorkCommand>;
 
 /** `declareGate` — bind criteria to the work they gate. */
-export interface DeclareGateCommand {
-  governedBy: CriterionRef[];
-  consequence: string;
-  protecting: WorkRef[];
-}
-
-/** `evaluateCriterion` — record a check's outcome, optionally citing what decided it. */
-export interface EvaluateCriterionCommand {
-  criterion: CriterionRef;
-  /**
-   * The gate this verdict is being reached for, if it is being reached for
-   * one. Omitted when the condition qualifies a finding and gates no work;
-   * requiring a gate would force the caller to mint one protecting nothing.
-   */
-  gate?: GateRef;
-  value: string;
-  outcome: "pass" | "fail";
-  /**
-   * What this verdict was reached against — the evidence, by whichever route the caller holds.
-   */
-  citing?: CitedBasis[];
-  /**
-   * The finding this verdict is about, when one rule is applied to several.
-   */
-  about?: ClaimRef;
-}
+export const declareGateCommand = z.object({
+  governedBy: z.array(refString("criterion")),
+  consequence: z.string(),
+  protecting: z.array(refString("work")),
+});
+export type DeclareGateCommand = z.infer<typeof declareGateCommand>;
 
 /**
  * A route to the evidence a verdict rests on.
  */
-export type CitedBasis = ClaimRef | ObservationsRef | EvidenceRef;
+export const citedBasis = citedBasisString();
+export type CitedBasis = z.infer<typeof citedBasis>;
+
+/** `evaluateCriterion` — record a check's outcome, optionally citing what decided it. */
+export const evaluateCriterionCommand = z.object({
+  criterion: refString("criterion"),
+  gate: refString("gate").optional(),
+  value: z.string(),
+  outcome: z.enum(["pass", "fail"]),
+  citing: z.array(citedBasis).optional(),
+  about: refString("claim").optional(),
+});
+export type EvaluateCriterionCommand = z.infer<typeof evaluateCriterionCommand>;
 
 /** `reverify` — re-run a historical analysis under current observations. Not reproduction (S-10). */
-export interface ReverifyCommand {
-  historical: AnalysisRef;
-  /**
-   * Optional: the analysis being re-checked knows its own enquiry, and one hop from what the
-   * caller already named is inferred rather than restated. Given explicitly it is honoured — a
-   * re-check may be recorded under a different line of enquiry than the analysis it re-checks.
-   */
-  enquiry?: EnquiryRef;
-  method: string;
-  /** What the re-verification read this time. {@link InputRef} — an earlier analysis's output counts. */
-  under: InputRef[];
-  concludes: Conclusion;
-}
+export const reverifyCommand = z.object({
+  historical: refString("analysis"),
+  enquiry: refString("enquiry").optional(),
+  method: z.string(),
+  under: z.array(inputRefString()),
+  concludes: conclusion,
+});
+export type ReverifyCommand = z.infer<typeof reverifyCommand>;
 
 /** `acceptAsUnresolved` — leave a question open on purpose, with the condition that reopens it (S-14). */
-export interface AcceptAsUnresolvedCommand {
-  enquiry: EnquiryRef;
-  /** Why it is being accepted rather than pursued. */
-  because: string;
-  /** What would reopen it. About the world, not about re-running the same analysis. */
-  until: string;
-  /** The finding it is being accepted in light of — what was known at the time. */
-  inLightOf: ClaimRef;
-}
+export const acceptAsUnresolvedCommand = z.object({
+  enquiry: refString("enquiry"),
+  because: z.string(),
+  until: z.string(),
+  inLightOf: refString("claim"),
+});
+export type AcceptAsUnresolvedCommand = z.infer<typeof acceptAsUnresolvedCommand>;
 
 /** `amendDesign` — change a locked criterion's wording, and report whether the change was mechanical or scientific. */
-export interface AmendDesignCommand {
-  criterion: CriterionRef;
-  nowRequires: string;
-  because: string;
-  /**
-   * The diagnosis the amendment rests on. Omitted only while the condition has never been
-   * evaluated — before the first number there is nothing to have found.
-   */
-  citing?: ClaimRef;
-}
+export const amendDesignCommand = z.object({
+  criterion: refString("criterion"),
+  nowRequires: z.string(),
+  because: z.string(),
+  citing: refString("claim").optional(),
+});
+export type AmendDesignCommand = z.infer<typeof amendDesignCommand>;
 
 /**
  * `conclude` — assert one thing an analysis found.
  */
-export interface ConcludeCommand {
-  /** The analysis this conclusion belongs to. */
-  analysis: AnalysisRef;
-  /** What was found, in this analysis's own words. */
-  finding: string;
-  /**
-   * The proposition the finding bears on.
-   */
-  proposition?: string;
-  /** Which way the finding cuts. Inherited when replacing; otherwise `supports`. */
-  bearing?: "supports" | "challenges";
-  /** Confirmatory standing. Defaults to `exploratory` — see {@link Conclusion}. */
-  standing?: "exploratory" | "confirmatory";
-  /**
-   * The single finding this supersedes — a claim or an evidence handle.
-   */
-  replacing?: ClaimRef | EvidenceRef;
-}
+export const concludeCommand = z.object({
+  analysis: refString("analysis"),
+  finding: z.string(),
+  proposition: z.string().optional(),
+  bearing: bearing.optional(),
+  standing: standing.optional(),
+  replacing: supersededRefString().optional(),
+});
+export type ConcludeCommand = z.infer<typeof concludeCommand>;
 
 /**
  * One of a replacement's conclusions, and which earlier finding it stands in for.
  */
-export interface ReplacementConclusion extends Conclusion {
-  /**
-   * The earlier finding this one stands in for, when the caller wants to say.
-   */
-  replacing?: ClaimRef | EvidenceRef;
-}
+export const replacementConclusion = conclusion.extend({
+  replacing: supersededRefString().optional(),
+});
+export type ReplacementConclusion = z.infer<typeof replacementConclusion>;
 
 /**
  * `keep` — revise an analysis by naming the conclusions that survive.
  */
-export interface KeepCommand {
-  /**
-   * The conclusions that survive the revision.
-   */
-  keeping: ClaimRef[];
-  /** The review that found the analysis wanting. */
-  because: ReviewRef;
-  /** What the revision did differently. */
-  method: string;
-  /**
-   * Inputs the successor read **in addition to** the superseded analysis's own.
-   */
-  from?: InputRef[];
-}
+export const keepCommand = z.object({
+  keeping: z.array(refString("claim")),
+  because: refString("review"),
+  method: z.string(),
+  from: z.array(inputRefString()).optional(),
+});
+export type KeepCommand = z.infer<typeof keepCommand>;
 
 /**
  * `replaceAnalysis` — record a corrected analysis in place of a defective one, and the lineage
  * between them.
  */
-export interface ReplaceAnalysisCommand {
-  supersedes: AnalysisRef;
-  because: ReviewRef;
-  method: string;
-  /**
-   * Inputs the replacement read **in addition to** the superseded analysis's
-   * own. Add-only, as {@link KeepCommand.from} is.
-   */
-  from?: InputRef[];
-}
+export const replaceAnalysisCommand = z.object({
+  supersedes: refString("analysis"),
+  because: refString("review"),
+  method: z.string(),
+  from: z.array(inputRefString()).optional(),
+});
+export type ReplaceAnalysisCommand = z.infer<typeof replaceAnalysisCommand>;
 
 /** `reinterpret` — narrow what a claim is taken to mean, without re-running anything. */
-export interface ReinterpretCommand {
-  /**
-   * Which claim, by handle. Withdrawing by wording alone retracts every claim
-   * asserting the sentence, including an unrelated line of work.
-   */
-  of: ClaimRef;
-  as: string;
-  because: string;
-}
+export const reinterpretCommand = z.object({
+  of: refString("claim"),
+  as: z.string(),
+  because: z.string(),
+});
+export type ReinterpretCommand = z.infer<typeof reinterpretCommand>;
 
 /** `promote` — move a finding from scratch to citable (S-18). */
-export interface PromoteCommand {
-  claim: ClaimRef;
-  because: string;
-}
+export const promoteCommand = z.object({
+  claim: refString("claim"),
+  because: z.string(),
+});
+export type PromoteCommand = z.infer<typeof promoteCommand>;
 
 /**
  * `isUndecided` — a finding that settles the proposition neither way.
  */
-export interface ClaimIsUndecidedCommand {
-  claim: ClaimRef;
-  because: EvidenceRef;
-}
+export const claimIsUndecidedCommand = z.object({
+  claim: refString("claim"),
+  because: refString("evidence"),
+});
+export type ClaimIsUndecidedCommand = z.infer<typeof claimIsUndecidedCommand>;
 
 /**
  * `isConfirmed` — a finding others may build on.
  */
-export interface ClaimIsConfirmedCommand {
-  claim: ClaimRef;
-  because: Prose;
-}
+export const claimIsConfirmedCommand = z.object({
+  claim: refString("claim"),
+  because: z.string(),
+});
+export type ClaimIsConfirmedCommand = z.infer<typeof claimIsConfirmedCommand>;
 
 /**
  * `undo` — takes back a mistaken act by naming the event it recorded.
  */
-export interface UndoCommand {
-  event: number;
-  because: Prose;
-}
+export const undoCommand = z.object({
+  event: z.number(),
+  because: z.string(),
+});
+export type UndoCommand = z.infer<typeof undoCommand>;
 
 /** Every command the write surface takes. What an act was asked to do. */
 export type Command =

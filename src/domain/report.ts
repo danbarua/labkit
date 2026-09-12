@@ -406,10 +406,18 @@ export interface UnaffectedRecord {
 }
 
 /** Whether a gate may be relied on. */
+export const GATE_STATES = [
+  "never-evaluated",
+  "incomplete",
+  "blocked",
+  "satisfied",
+  "sidestepped",
+  "retired",
+] as const;
 export interface GateStatus {
   gate: GateRef;
   consequence: string;
-  state: "never-evaluated" | "incomplete" | "blocked" | "satisfied" | "sidestepped" | "retired";
+  state: (typeof GATE_STATES)[number];
   /** The closing act. Check verdicts remain visible below. */
   closure?: {
     decision: DecisionRef;
@@ -1053,7 +1061,8 @@ export interface StoppedReason {
 /**
  * What a task's state can be, computed from the graph and never stored.
  */
-export type WorkState = "planned" | "waiting" | "blocked" | "carried-out" | "abandoned";
+export const WORK_STATES = ["planned", "waiting", "blocked", "carried-out", "abandoned"] as const;
+export type WorkState = (typeof WORK_STATES)[number];
 
 /**
  * One task in a list of them.
