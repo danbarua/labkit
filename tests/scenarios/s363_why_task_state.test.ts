@@ -120,6 +120,17 @@ describe("why <task> names the state work already computes", () => {
     expect(explained.because.map((c) => c.handle)).toContain(enquiry);
   });
 
+  test("ready work with no enquiry says so", async () => {
+    const { work } = await session.planWork({
+      objective: "run stage 2",
+      acceptance: "a table",
+    });
+
+    const explained = await (await afterwards()).why(work);
+    expect(explained.is).toBe("planned — ready, no gate holds it, and no question named");
+    expect(explained.because).toHaveLength(0);
+  });
+
   test("abandoned work still names the stopping decision", async () => {
     const enquiry = await anEnquiry();
     const { work } = await session.planWork({
