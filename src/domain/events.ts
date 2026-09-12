@@ -4,9 +4,6 @@
 
 import type { EdgeCreated, GraphChange, NodeCreated, Prose, PropsChanged } from "../db/domain";
 import type { Command } from "./commands";
-import type { EventFilter } from "./queries";
-
-export type { EventFilter };
 
 export type { EdgeCreated, GraphChange, NodeCreated, PropsChanged };
 
@@ -127,6 +124,26 @@ export const createdIn = (event: DomainEvent): string[] =>
 /** Every edge an act created. */
 export const edgesIn = (event: DomainEvent): EdgeCreated[] =>
   event.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : []));
+
+/**
+ * What a caller wants out of the stream.
+ */
+export interface EventFilter {
+  /** Strictly after this `seq`. */
+  since?: number;
+  /** One agent's acts, by `attribution_id`. */
+  by?: string;
+  operation?: string;
+  /** Acts about, or minting, this handle. */
+  touching?: string;
+  /**
+   * `true` for acts that say what they were read off, `false` for the rest. Absent is
+   * everything — the rest are acts nobody sourced, which is not the same as acts somebody
+   * watched.
+   */
+  reconstructed?: boolean;
+  limit?: number;
+}
 
 /**
  * Where events go.

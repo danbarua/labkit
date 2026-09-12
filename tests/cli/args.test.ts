@@ -27,7 +27,10 @@ async function refusal(argv: string[]): Promise<string> {
   const program = buildProgram(async () => {});
   const silence = { writeErr: () => {}, writeOut: () => {} };
   program.exitOverride().configureOutput(silence);
-  for (const command of program.commands) command.exitOverride().configureOutput(silence);
+  for (const command of program.commands) {
+    command.exitOverride().configureOutput(silence);
+    for (const child of command.commands) child.exitOverride().configureOutput(silence);
+  }
   try {
     await program.parseAsync(argv, { from: "user" });
   } catch (e) {
@@ -81,6 +84,12 @@ test("a handle of the wrong kind is refused at the boundary", async () => {
   // a kind expects. Carrying that to the boundary means a caller who passes a
   // claim where a gate belongs is told which argument was wrong.
   expect(await refusal(["gate", "CLM_1"])).toContain("gate-id");
+});
+
+test("a write handle of the wrong kind is refused at the boundary", async () => {
+  expect(await refusal(["is", "confirmed", "GATE_1", "--because", "x"])).toContain(
+    "claim handle expected",
+  );
 });
 
 test("a command with no bad arguments reaches its action", async () => {

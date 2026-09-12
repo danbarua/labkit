@@ -5,58 +5,82 @@
  */
 
 import { z } from "zod";
-import { kindOf, ref } from "./report";
-import type { Kind } from "./report";
+import { kindOf, ref, type Kind } from "./ref";
 
 /**
  * A handle field: wire string in, branded ref out. Uppercased first, as the
  * CLI already did — every handle this record mints is upper-case.
+ * `ref()` throws; turn that into a zod issue so `safeParse` can refuse.
  */
 function refString<K extends Kind>(kind: K) {
-  return z.string().transform((raw) => ref(kind, raw.toUpperCase()));
+  return z.string().transform((raw, ctx) => {
+    try {
+      return ref(kind, raw.toUpperCase());
+    } catch (e) {
+      ctx.addIssue({ code: "custom", message: (e as Error).message });
+      return z.NEVER;
+    }
+  });
+}
+
+function issue<T>(ctx: z.RefinementCtx, run: () => T): T {
+  try {
+    return run();
+  } catch (e) {
+    ctx.addIssue({ code: "custom", message: (e as Error).message });
+    return z.NEVER;
+  }
 }
 
 function inputRefString() {
-  return z.string().transform((raw) => {
-    const id = raw.toUpperCase();
-    if (id.startsWith("COMP_")) return ref("analysis", id);
-    if (id.startsWith("ART_")) return ref("observations", id);
-    throw new Error(`\`${raw}\` is neither observations (ART_…) nor an analysis (COMP_…)`);
-  });
+  return z.string().transform((raw, ctx) =>
+    issue(ctx, () => {
+      const id = raw.toUpperCase();
+      if (id.startsWith("COMP_")) return ref("analysis", id);
+      if (id.startsWith("ART_")) return ref("observations", id);
+      throw new Error(`\`${raw}\` is neither observations (ART_…) nor an analysis (COMP_…)`);
+    }),
+  );
 }
 
 function supersededRefString() {
-  return z.string().transform((raw) => {
-    const id = raw.toUpperCase();
-    if (id.startsWith("CLM_")) return ref("claim", id);
-    if (id.startsWith("EV_")) return ref("evidence", id);
-    throw new Error(
-      `\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…); ` +
-        `both come back from the act that recorded them, and 'why' names them for a claim already on the record`,
-    );
-  });
+  return z.string().transform((raw, ctx) =>
+    issue(ctx, () => {
+      const id = raw.toUpperCase();
+      if (id.startsWith("CLM_")) return ref("claim", id);
+      if (id.startsWith("EV_")) return ref("evidence", id);
+      throw new Error(
+        `\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…); ` +
+          `both come back from the act that recorded them, and 'why' names them for a claim already on the record`,
+      );
+    }),
+  );
 }
 
 function citedBasisString() {
-  return z.string().transform((raw) => {
-    const id = raw.toUpperCase();
-    if (id.startsWith("CLM_")) return ref("claim", id);
-    if (id.startsWith("ART_")) return ref("observations", id);
-    if (id.startsWith("EV_")) return ref("evidence", id);
-    throw new Error(
-      `\`${raw}\` is not a claim (CLM_…), an observations record (ART_…) or a finding (EV_…); ` +
-        `a verdict rests on evidence, and each of those names some`,
-    );
-  });
+  return z.string().transform((raw, ctx) =>
+    issue(ctx, () => {
+      const id = raw.toUpperCase();
+      if (id.startsWith("CLM_")) return ref("claim", id);
+      if (id.startsWith("ART_")) return ref("observations", id);
+      if (id.startsWith("EV_")) return ref("evidence", id);
+      throw new Error(
+        `\`${raw}\` is not a claim (CLM_…), an observations record (ART_…) or a finding (EV_…); ` +
+          `a verdict rests on evidence, and each of those names some`,
+      );
+    }),
+  );
 }
 
 function anyRefString() {
-  return z.string().transform((raw) => {
-    const normalized = raw.toUpperCase();
-    const kind = kindOf(normalized);
-    if (!kind) throw new Error(`\`${raw}\` is not a handle this record recognises`);
-    return ref(kind, normalized);
-  });
+  return z.string().transform((raw, ctx) =>
+    issue(ctx, () => {
+      const normalized = raw.toUpperCase();
+      const kind = kindOf(normalized);
+      if (!kind) throw new Error(`\`${raw}\` is not a handle this record recognises`);
+      return ref(kind, normalized);
+    }),
+  );
 }
 
 export const GATE_CLOSURES = ["sidestepped", "retired"] as const;

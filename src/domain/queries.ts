@@ -3,27 +3,16 @@
  */
 
 import { z } from "zod";
+import type { EventFilter } from "./events";
 import { GATE_STATES, WORK_STATES } from "./report";
 
+export type { EventFilter };
+
 /**
- * What a caller wants out of the event stream.
+ * Kept as `z.custom` so this file does not become the home of `EventFilter` —
+ * the log already names that type, and moving it here would cycle events through report.
  */
-export const eventFilter = z.object({
-  /** Strictly after this `seq`. */
-  since: z.number().optional(),
-  /** One agent's acts, by `attribution_id`. */
-  by: z.string().optional(),
-  operation: z.string().optional(),
-  /** Acts about, or minting, this handle. */
-  touching: z.string().optional(),
-  /**
-   * `true` for acts that say what they were read off, `false` for the rest.
-   * Absent is everything.
-   */
-  reconstructed: z.boolean().optional(),
-  limit: z.number().optional(),
-});
-export type EventFilter = z.infer<typeof eventFilter>;
+export const eventFilter = z.custom<EventFilter>();
 
 export const gateListQuery = z.object({
   state: z.enum(GATE_STATES).optional(),
