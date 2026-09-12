@@ -133,7 +133,7 @@ export type {
   AmendDesignCommand,
   ReplaceAnalysisCommand,
   ReinterpretCommand,
+  ClaimIsUndecidedCommand,
+  ClaimIsConfirmedCommand,
   PromoteCommand,
-  IsCommand,
-  ClaimState,
 } from "./commands";

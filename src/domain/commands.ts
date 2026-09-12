@@ -293,16 +293,20 @@ export interface PromoteCommand {
 }
 
 /**
- * A state a claim can be put into, and the whole of what `is` accepts.
+ * `isUndecided` — a finding that settles the proposition neither way.
  */
-export type ClaimState = "undecided" | "confirmed";
+export interface ClaimIsUndecidedCommand {
+  claim: ClaimRef;
+  because: EvidenceRef;
+}
 
 /**
- * Puts a claim into a state, and says what put it there.
+ * `isConfirmed` — a finding others may build on.
  */
-export type IsCommand =
-  | { claim: ClaimRef; state: "undecided"; because: EvidenceRef }
-  | { claim: ClaimRef; state: "confirmed"; because: Prose };
+export interface ClaimIsConfirmedCommand {
+  claim: ClaimRef;
+  because: Prose;
+}
 
 /**
  * `undo` — takes back a mistaken act by naming the event it recorded.
@@ -321,7 +325,8 @@ export type Command =
   | ConcludeCommand
   | DeclareGateCommand
   | EvaluateCriterionCommand
-  | IsCommand
+  | ClaimIsConfirmedCommand
+  | ClaimIsUndecidedCommand
   | KeepCommand
   | NoteCommand
   | OpenEnquiryCommand

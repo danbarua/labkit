@@ -58,9 +58,8 @@ async function twoRoutesToConfirmatory() {
   });
   const prespecified = claimOf(claims, PRESPECIFIED);
   const promoted = claimOf(claims, PROMOTED);
-  await session.is({
+  await session.isConfirmed({
     claim: promoted,
-    state: "confirmed",
     because: "the prespecified robustness check passed",
   });
   return { prespecified, promoted };
@@ -103,7 +102,7 @@ describe("S-23: prespecified is not promoted", () => {
     );
     expect(born.map((c) => c.props.kind)).toEqual(["confirmatory", "exploratory"]);
 
-    const [promotion] = await events.select({ operation: "is" });
+    const [promotion] = await events.select({ operation: "isConfirmed" });
     expect(promotion!.changes).toContainEqual(
       expect.objectContaining({ change: "PropsChanged", props: { kind: "confirmatory" } }),
     );

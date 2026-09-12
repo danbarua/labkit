@@ -114,8 +114,8 @@ structured_transformation_claim=$(lab --date "$STAGE1B2_ORIGINAL" conclude "$str
   | grep '^CLM_')
 
 lab --date "$STAGE1B2_ORIGINAL" evaluate "$monte_carlo_floor_criterion" --value "all four representations hit p_MC~0.00010; 432/432 trials numerically valid" --outcome pass --citing "$structured_transformation_claim" >/dev/null
-lab --date "$STAGE1B2_ORIGINAL" is "$structured_transformation_claim" confirmed --because "Level 2 (structured internal transformation) established: source-retention objection resolved with an audited common-support mask, both linear and nonlinear structure separately carry the mapping, all three input factors separately significant" >/dev/null
-lab --date "$STAGE1B2_ORIGINAL" close "$structured_transformation_enquiry" --answered-by "$structured_transformation_claim" >/dev/null
+lab --date "$STAGE1B2_ORIGINAL" is confirmed "$structured_transformation_claim" --because "Level 2 (structured internal transformation) established: source-retention objection resolved with an audited common-support mask, both linear and nonlinear structure separately carry the mapping, all three input factors separately significant" >/dev/null
+lab --date "$STAGE1B2_ORIGINAL" close enquiry "$structured_transformation_enquiry" --answered-by "$structured_transformation_claim" >/dev/null
 
 say "the three open items, each accepted with its own reopening condition"
 
@@ -156,8 +156,8 @@ trajectory_generalization_claim=$(lab --date "$STAGE1C_RESULTS" conclude "$traje
   --proposition "the structured transformation generalizes across independent baseline trajectories" \
   --finding "10 of 10 trajectories hit the Monte Carlo floor; mean Delta_map 0.3296, CV ~5.2% -- tight clustering, not a wide scatter with a few outliers" \
   | grep '^CLM_')
-lab --date "$STAGE1C_RESULTS" close "$generalization_confirmation_enquiry" --answered-by "$trajectory_generalization_claim" >/dev/null
-lab --date "$STAGE1C_RESULTS" close "$generalization_enquiry" >/dev/null
+lab --date "$STAGE1C_RESULTS" close enquiry "$generalization_confirmation_enquiry" --answered-by "$trajectory_generalization_claim" >/dev/null
+lab --date "$STAGE1C_RESULTS" close enquiry "$generalization_enquiry" >/dev/null
 
 say "checking the reopening hesitation with real data, not assumed"
 ask enquiry "$generalization_enquiry"
@@ -352,7 +352,7 @@ stage1d_headline=$(lab --date "$STAGE1D_CONFIRM_RESULTS" synthesise \
   --resting-on "$confirmatory_hist_random_claim" \
   --resting-on "$confirmatory_curr_random_claim" | grep '^CLM_')
 
-lab --date "$STAGE1D_CONFIRM_RESULTS" close "$topology_specificity_enquiry" --answered-by "$stage1d_headline" >/dev/null
+lab --date "$STAGE1D_CONFIRM_RESULTS" close enquiry "$topology_specificity_enquiry" --answered-by "$stage1d_headline" >/dev/null
 
 say "checking the reopening hesitation a second time, same method"
 ask enquiry "$topology_specificity_enquiry"

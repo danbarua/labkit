@@ -100,8 +100,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   test("Afterward 2: promoting is an act taken later, with a reason", async () => {
     const { enquiry, analysisClaims } = await scratchExploration();
 
-    await session.is({
-      state: "confirmed" as const,
+    await session.isConfirmed({
       claim: claimOf(analysisClaims, PROPOSITION),
       because: "re-run under seed control on the held-out split, same direction and magnitude",
     });
@@ -129,8 +128,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    */
   test("Afterward 3: promotion does not erase what the finding actually rests on", async () => {
     const { analysisClaims } = await scratchExploration();
-    await session.is({
-      state: "confirmed" as const,
+    await session.isConfirmed({
       claim: claimOf(analysisClaims, PROPOSITION),
       because: "re-run under seed control on the held-out split, same direction and magnitude",
     });
@@ -194,8 +192,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       ],
     });
 
-    await session.is({
-      state: "confirmed" as const,
+    await session.isConfirmed({
       claim: claimOf(analysisClaims, PROPOSITION),
       because: "re-run under seed control on the held-out split",
     });

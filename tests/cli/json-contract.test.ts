@@ -164,7 +164,7 @@ beforeAll(async () => {
   const claim = (concluded.claims as Array<{ claim: string }>)[0]!.claim;
 
   await out(["evaluate", criterion, "--gate", gate, "--value", "n=24", "--outcome", "pass"]);
-  await out(["is", claim, "confirmed", "--because", "the prespecified check passed"]);
+  await out(["is", "confirmed", claim, "--because", "the prespecified check passed"]);
   const review = id(await out(["review", analysis, "--verdict", "sound"]), "review");
   const verified = await out([
     "reverify",
@@ -181,7 +181,7 @@ beforeAll(async () => {
     "holds at n=24",
   ]);
   const question = (await surfaces.read.enquiryStatus(enquiry as never)).question!.question;
-  await out(["close", enquiry, "--answered-by", claim]);
+  await out(["close", "enquiry", enquiry, "--answered-by", claim]);
 
   seeded = {
     enquiry,

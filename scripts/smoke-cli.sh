@@ -197,8 +197,8 @@ expect "the gate is satisfied once its condition passes" \
 # concerned -- which is how the first version of this script passed with the
 # promote step commented out. A negative control found it; the assertion below
 # is only worth anything because removing this line reddens it.
-lab is "$claim" confirmed --because 'the prespecified check passed at every depth' >/dev/null
-lab close "$enquiry" --answered-by "$claim" >/dev/null
+lab is confirmed "$claim" --because 'the prespecified check passed at every depth' >/dev/null
+lab close enquiry "$enquiry" --answered-by "$claim" >/dev/null
 
 echo "== reading it back =="
 

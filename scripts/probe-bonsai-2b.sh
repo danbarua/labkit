@@ -172,10 +172,10 @@ lab --date "$STAGE2B_STAGE4" evaluate "$denoising_gate_criterion" --about "$prim
   --value "T vs identity entirely below zero, CI [-0.1335739,-0.1328960] -- reached only because the primary succeeded" \
   --outcome pass --citing "$primary_denoising_claim" >/dev/null
 
-lab --date "$STAGE2B_STAGE4" is "$primary_denoising_claim" confirmed --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, with the denoising gate against identity also passing on its own paired bootstrap" >/dev/null
+lab --date "$STAGE2B_STAGE4" is confirmed "$primary_denoising_claim" --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, with the denoising gate against identity also passing on its own paired bootstrap" >/dev/null
 
 say "closing Stage 2B's own line of enquiry"
-lab --date "$STAGE2B_STAGE4" close "$denoising_enquiry" --answered-by "$primary_denoising_claim" >/dev/null
+lab --date "$STAGE2B_STAGE4" close enquiry "$denoising_enquiry" --answered-by "$primary_denoising_claim" >/dev/null
 ask enquiry "$denoising_enquiry"
 
 printf '\n-- what was known the moment this stage actually closed (#166)?\n'

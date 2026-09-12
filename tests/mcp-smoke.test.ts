@@ -257,8 +257,7 @@ describe("every tool answers when an agent actually calls it", () => {
         id(analysis.analysis as Json),
       );
 
-      await call(c, "is", {
-        state: "confirmed",
+      await call(c, "is_confirmed", {
         claim,
         because: "re-timed on a quiet machine",
       });
@@ -577,9 +576,8 @@ describe("every tool answers when an agent actually calls it", () => {
         finding: "two of three tests agree, the third does not; no further transformation",
       });
       const openClaim = (settlesNothing.claims as Array<{ claim: string; finding: string }>)[0]!;
-      await call(c, "is", {
+      await call(c, "is_undecided", {
         claim: openClaim.claim,
-        state: "undecided",
         because: openClaim.finding,
       });
       const stillOpen = await call(c, "why_supported", { claim: openClaim.claim });

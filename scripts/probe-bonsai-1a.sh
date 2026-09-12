@@ -96,7 +96,7 @@ original_finding_claim=$(lab --date "$STAGE1A_ORIGINAL" conclude "$original_find
   --bearing challenges | grep '^CLM_')
 
 lab --date "$STAGE1A_ORIGINAL" evaluate "$no_significant_difference_criterion" --value "T-vs-rewired p=0.695, T-vs-random p=0.275, T-vs-lattice p=0.084; all above 0.0167" --outcome pass --citing "$original_finding_claim" >/dev/null
-lab --date "$STAGE1A_ORIGINAL" is "$original_finding_claim" confirmed --because "high evidence strength: validated simulator, adaptive integration, independent-solver agreement, tangent-linear verification against finite differences, paired comparisons with multiplicity control; a genuine negative finding, not an exploratory null" >/dev/null
+lab --date "$STAGE1A_ORIGINAL" is confirmed "$original_finding_claim" --because "high evidence strength: validated simulator, adaptive integration, independent-solver agreement, tangent-linear verification against finite differences, paired comparisons with multiplicity control; a genuine negative finding, not an exploratory null" >/dev/null
 
 # "Add Post-hoc robustness note: class-0 pilot on T-vs-random seed-sensitivity",
 # 2026-08-01T10:51:27+01:00 -- the pilot that motivates the sharpening below.
@@ -110,7 +110,7 @@ lab --date "$STAGE1A_PILOT" conclude "$class0_pilot_analysis" \
   --finding "sign of log(T/random) flips in 7/20 seeds (historical control, CV=2.37) and 2/20 seeds (current control, CV=1.08); reinforces rather than contradicts the original null but reveals undocumented within-class seed variance" \
   --bearing challenges >/dev/null
 
-lab --date "$STAGE1A_ORIGINAL" close "$original_enquiry" --answered-by "$original_finding_claim" >/dev/null
+lab --date "$STAGE1A_ORIGINAL" close enquiry "$original_enquiry" --answered-by "$original_finding_claim" >/dev/null
 
 say "the sharpening: why a re-verification"
 
@@ -242,7 +242,7 @@ rewiring_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_
 lab --date "$STAGE1A_V2_RESULTS" evaluate "$robustness_criterion" --about "$historical_random_resolved_claim" --gate "$robustness_gate" --value "log-scale: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322)" --outcome pass --citing "$historical_random_resolved_claim" >/dev/null
 lab --date "$STAGE1A_V2_RESULTS" evaluate "$robustness_criterion" --about "$current_random_resolved_claim" --gate "$robustness_gate" --value "log-scale: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320)" --outcome pass --citing "$current_random_resolved_claim" >/dev/null
 
-lab --date "$STAGE1A_V2_RESULTS" close "$reverification_enquiry" --answered-by "$historical_random_resolved_claim" >/dev/null
+lab --date "$STAGE1A_V2_RESULTS" close enquiry "$reverification_enquiry" --answered-by "$historical_random_resolved_claim" >/dev/null
 
 say "lattice, reproduced: untouched by v2 and still reading correctly (#132, fixed)"
 ask why "$lattice_claim"

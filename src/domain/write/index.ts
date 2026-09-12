@@ -42,7 +42,8 @@ import type {
   ConcludeCommand,
   DeclareGateCommand,
   EvaluateCriterionCommand,
-  IsCommand,
+  ClaimIsConfirmedCommand,
+  ClaimIsUndecidedCommand,
   KeepCommand,
   UndoCommand,
   NoteCommand,
@@ -79,7 +80,7 @@ export type Operation = Methods<WriteSurface>;
 /**
  * An operation no verb writes any more, but that recorded events still carry.
  */
-export type RetiredOperation = "promote";
+export type RetiredOperation = "promote" | "is";
 
 /** What a verb's body returns: what the act was about, and what it produced. */
 export interface Act<R> {
@@ -200,8 +201,12 @@ export class WriteSurface extends SessionCore {
     return this.revising.reverify(input);
   }
 
-  async is(input: IsCommand): Promise<Restated> {
-    return this.revising.is(input);
+  async isUndecided(input: ClaimIsUndecidedCommand): Promise<Restated> {
+    return this.revising.isUndecided(input);
+  }
+
+  async isConfirmed(input: ClaimIsConfirmedCommand): Promise<Restated> {
+    return this.revising.isConfirmed(input);
   }
 
   async undo(input: UndoCommand): Promise<Undone> {

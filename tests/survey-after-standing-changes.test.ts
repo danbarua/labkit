@@ -44,7 +44,7 @@ async function aClosedPromotedAnswer() {
     concludes: [{ proposition: PROP, finding: "loss plateaus" }],
   });
   const claim = rec.claims[0]!.claim;
-  await s.is({ claim, state: "confirmed", because: "we are relying on this" });
+  await s.isConfirmed({ claim, because: "we are relying on this" });
   const closed = await s.closeEnquiry({ enquiry, answeredBy: claim });
   return { enquiry, observations, analysis: rec.analysis, claim, closed };
 }
@@ -79,7 +79,7 @@ test("undecided after promote is not established", async () => {
   const { claim } = await aClosedPromotedAnswer();
   const finding = (await s.whySupported(claim)).support[0]?.evidence;
   if (!finding) throw new Error("the closed answer had no finding to grade");
-  await s.is({ claim, state: "undecided", because: finding });
+  await s.isUndecided({ claim, because: finding });
 
   const known = await (await afterwards()).whatIsKnown();
   expect(known.established.some((q) => q.asks === ASKS)).toBe(false);

@@ -7,7 +7,6 @@ import type { Command } from "commander";
 import {
   anyRef,
   bearing,
-  claimState,
   citedBasis,
   collect,
   gateClosure,
@@ -21,15 +20,14 @@ import { answer, asHandles } from "../output";
 import type { Run } from "../session";
 import type {
   ClaimRef,
-  ClaimState,
   DomainEvent,
   EnquiryRef,
+  EvidenceRef,
   GateRef,
   NoteRef,
   QuestionRef,
 } from "../../domain";
 import type { Prose } from "../../db/domain";
-import { isRefOfKind, ref } from "../../domain/report";
 import type { CitedBasis } from "../../domain/commands";
 
 /**
@@ -401,33 +399,27 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-  program
+  const is = program
     .command("is")
     .helpGroup("Revising")
-    .summary("record what a claim now is, and what put it there")
     .description(
-      "`undecided` is for a finding that settles the proposition neither way: the evidence is " +
-        "real and stays under the claim, and `labkit why` reports neither supports nor challenges " +
-        "rather than picking the less wrong one. `confirmed` is for a finding others may build " +
-        "on, which moves a question answered on it from provisional to established.\n\n" +
-        "`--because` follows the state: the finding's handle for `undecided`, since it is on the " +
-        "record already; a sentence for `confirmed`, since vouching is a judgement about evidence " +
-        "and not one more finding.",
-    )
+      "Record what a claim now is. `undecided`: a finding that settles the proposition neither way. `confirmed`: a finding others may build on.",
+    );
+  is.command("undecided")
+    .helpGroup("Revising")
+    .summary("record that a finding settles the proposition neither way")
     .argument("<claim-id>", "the claim", handle("claim"))
-    .argument("<state>", "undecided or confirmed", claimState)
-    .requiredOption("--because <evidence-id|text>", "what put it there — see above")
-    .action(async (claim, state: ClaimState, { because }: { because: string }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.is(
-            state === "confirmed"
-              ? { claim, state, because }
-              : { claim, state, because: ref("evidence", because) },
-          ),
-          mintedView(),
-        ),
-      ),
+    .requiredOption("--because <evidence-id>", "the finding that left it open", handle("evidence"))
+    .action(async (claim, { because }: { because: EvidenceRef }) =>
+      run(async ({ write }) => answer(await write.isUndecided({ claim, because }), mintedView())),
+    );
+  is.command("confirmed")
+    .helpGroup("Revising")
+    .summary("record that a finding is something others may build on")
+    .argument("<claim-id>", "the claim", handle("claim"))
+    .requiredOption("--because <text>", "what justifies vouching for it")
+    .action(async (claim, { because }: { because: string }) =>
+      run(async ({ write }) => answer(await write.isConfirmed({ claim, because }), mintedView())),
     );
   program
     .command("undo")
@@ -583,73 +575,54 @@ export function registerWrites(program: Command, run: Run): void {
         ),
       ),
     );
-  program
+  const close = program
     .command("close")
     .helpGroup("Stopping")
-    .summary("close a line of enquiry, gate, or piece of planned work")
     .description(
-      "Dispatches on the handle's own kind, as \`why\` does. A line of enquiry closes as " +
-        "answered with --answered-by, or as abandoned without. A gate closes with --as " +
-        "sidestepped or retired and --because, without pretending its checks passed. A task " +
-        "closes as stopped and takes --because. Closing something already closed is refused.",
-    )
-    .argument("<subject-id>", "the line of enquiry, gate, or work")
-    .option("--answered-by <claim-id>", "the claim that answers this enquiry", handle("claim"))
-    .option("--as <closure>", "sidestepped | retired, for a gate", gateClosure)
-    .option("--because <text>", "why the gate or work is being closed")
+      "Close a line of enquiry, a gate, or a piece of planned work. Subcommand names the kind.",
+    );
+  close
+    .command("enquiry")
+    .helpGroup("Stopping")
+    .summary("close a line of enquiry, answered or abandoned")
+    .argument("<enquiry-id>", "the line of enquiry", handle("enquiry"))
+    .option("--answered-by <claim-id>", "the claim that answers it", handle("claim"))
+    .action(async (enquiry, { answeredBy }: { answeredBy?: ClaimRef }) =>
+      run(async ({ write }) =>
+        answer(
+          await write.closeEnquiry({
+            enquiry,
+            ...(answeredBy === undefined ? {} : { answeredBy }),
+          }),
+          mintedView(),
+        ),
+      ),
+    );
+  close
+    .command("gate")
+    .helpGroup("Stopping")
+    .summary("close a gate without passing it")
+    .argument("<gate-id>", "the gate", handle("gate"))
+    .requiredOption("--as <closure>", "sidestepped | retired", gateClosure)
+    .requiredOption("--because <text>", "why the gate no longer governs work")
     .action(
       async (
-        subject: string,
-        {
-          answeredBy,
-          as: gateAs,
-          because,
-        }: {
-          answeredBy?: ClaimRef;
-          as?: "sidestepped" | "retired";
-          because?: Prose;
-        },
+        gate,
+        { as: closure, because }: { as: "sidestepped" | "retired" | undefined; because: Prose },
       ) =>
         run(async ({ write }) => {
-          if (isRefOfKind("gate", subject)) {
-            if (answeredBy !== undefined)
-              throw new Error("--answered-by is for closing a line of enquiry, not a gate");
-            if (gateAs === undefined || because === undefined)
-              throw new Error(
-                `closing gate ${subject} needs both --as sidestepped|retired and --because`,
-              );
-            return answer(
-              await write.closeGate({ gate: ref("gate", subject), closure: gateAs, because }),
-              mintedView(),
-            );
-          }
-          if (isRefOfKind("work", subject)) {
-            if (answeredBy !== undefined || gateAs !== undefined)
-              throw new Error("--answered-by and --as do not apply when closing work");
-            if (because === undefined)
-              throw new Error(
-                `closing work needs --because: ${subject} would otherwise be indistinguishable ` +
-                  "from work nobody got to, and the reason is the whole of what the act says",
-              );
-            return answer(
-              await write.stopWork({ work: ref("work", subject), because }),
-              mintedView(),
-            );
-          }
-          const enquiry = handle("enquiry")(subject);
-          if (because !== undefined || gateAs !== undefined)
-            throw new Error(
-              "--because and --as are for gates or work; an enquiry closes as answered " +
-                "(--answered-by) or as abandoned",
-            );
-          return answer(
-            await write.closeEnquiry({
-              enquiry,
-              ...(answeredBy === undefined ? {} : { answeredBy }),
-            }),
-            mintedView(),
-          );
+          if (closure === undefined) throw new Error("--as is required");
+          return answer(await write.closeGate({ gate, closure, because }), mintedView());
         }),
+    );
+  close
+    .command("work")
+    .helpGroup("Stopping")
+    .summary("stop a piece of planned work")
+    .argument("<work-id>", "the task", handle("work"))
+    .requiredOption("--because <text>", "why it is not being done")
+    .action(async (work, { because }: { because: Prose }) =>
+      run(async ({ write }) => answer(await write.stopWork({ work, because }), mintedView())),
     );
   program
     .command("accept")

@@ -74,9 +74,8 @@ async function priorState() {
       },
     ],
   });
-  await session.is({
+  await session.isConfirmed({
     claim: claimOf(nlAnalysisClaims, NONLINEAR),
-    state: "confirmed",
     because:
       "the locked curvature criterion was met and the departure is well outside the fit interval",
   });
