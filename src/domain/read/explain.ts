@@ -21,9 +21,11 @@ import type {
   Explanation,
   GateExplanation,
   GateGoverned,
+  GateStatus,
   GatedWork,
   AnyRef,
   Kind,
+  ListedWork,
   QuestionBucket,
   QuestionStanding,
   Ref,
@@ -416,45 +418,103 @@ async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimEx
   return { kind: "claim", subject: report.claim, is, because, report };
 }
 
-/** The `Work` case: `contractFor`'s `addressing`, with an honest sentence when there is none (#98). */
+/** The `Work` case: the state `workList` already computes, then the lineage. */
 async function explainWork(self: ReadSurface, subject: string): Promise<WorkExplanation> {
   const work = ref("work", subject);
   const report = await self.contractFor(work);
+  const listed = (await self.workList()).find((row) => row.work === work);
+  if (!listed)
+    throw new Error(
+      `no planned work ${work}; work is planned before it can be read back, and 'search' finds its handle by the objective`,
+    );
 
-  // Somebody decided not to do it, which is the answer to *why is this work in
-  // the state it's in* and displaces every other one: the question it serves
-  // is still true and no longer the reason. The reason `stopWork` recorded is
-  // on the decision, and this is what reads it.
-  const stopped = await self.stoppedWork(work);
-  if (stopped)
-    return {
-      kind: "work",
-      subject: work,
-      is: "abandoned",
-      because: [{ handle: stopped.decision, wording: stopped.because }],
-      report,
-    };
+  const lineage: Cause[] = report.addressing
+    ? [
+        { handle: report.addressing.enquiry, wording: report.addressing.pursuing },
+        { handle: report.addressing.question, wording: report.addressing.asks },
+      ]
+    : [];
 
-  if (!report.addressing) {
-    return {
-      kind: "work",
-      subject: work,
-      is: "planned with no question named -- planning work names the line of enquiry it advances",
-      because: [],
-      report,
-    };
-  }
-  const a = report.addressing;
   return {
     kind: "work",
     subject: work,
-    is: "planned to advance",
-    because: [
-      { handle: a.enquiry, wording: a.pursuing },
-      { handle: a.question, wording: a.asks },
-    ],
+    is: sentenceForWork(listed, Boolean(report.addressing)),
+    because: [...(await causesForWorkState(self, listed)), ...lineage],
     report,
   };
+}
+
+function sentenceForWork(listed: ListedWork, namedQuestion: boolean): string {
+  switch (listed.state) {
+    case "planned":
+      if (listed.gates.length === 0)
+        return namedQuestion
+          ? "planned — ready, no gate holds it"
+          : "planned — ready, no gate holds it, and no question named";
+      return "planned — gates satisfied";
+    case "waiting":
+    case "blocked":
+    case "carried-out":
+    case "abandoned":
+      return listed.state;
+    default: {
+      const state: never = listed.state;
+      throw new Error(`unreached work state: ${state}`);
+    }
+  }
+}
+
+async function causesForWorkState(self: ReadSurface, listed: ListedWork): Promise<Cause[]> {
+  switch (listed.state) {
+    case "abandoned": {
+      const stopped = await self.stoppedWork(listed.work);
+      return stopped ? [{ handle: stopped.decision, wording: stopped.because }] : [];
+    }
+    case "blocked":
+    case "waiting":
+    case "planned":
+      return causesForGates(self, listed.gates);
+    case "carried-out":
+      return implementingAnalyses(self, listed.work);
+    default: {
+      const state: never = listed.state;
+      throw new Error(`unreached work state: ${state}`);
+    }
+  }
+}
+
+async function causesForGates(self: ReadSurface, gates: ListedWork["gates"]): Promise<Cause[]> {
+  const causes: Cause[] = [];
+  for (const gate of gates) {
+    const status = await self.gateStatus(gate);
+    causes.push(causeForHoldingGate(status));
+  }
+  return causes;
+}
+
+function causeForHoldingGate(status: GateStatus): Cause {
+  const failed = status.checks.filter((c) => c.state === "failed");
+  if (status.state === "blocked" && failed[0])
+    return {
+      handle: status.gate,
+      wording: `blocked: ${failed[0].proposition} — failed`,
+      when: failed[0].decidedBy?.at,
+    };
+  return { handle: status.gate, wording: status.state };
+}
+
+async function implementingAnalyses(self: ReadSurface, work: ListedWork["work"]): Promise<Cause[]> {
+  const fromWork = await self.neighboursOf(work);
+  const units = fromWork.filter((n) => n.via === "IMPLEMENTS" && n.direction === "out");
+  const analyses: Cause[] = [];
+  for (const unit of units) {
+    const fromUnit = await self.neighboursOf(unit.handle);
+    for (const n of fromUnit) {
+      if (n.via === "USES" && n.direction === "out" && kindOf(n.handle) === "analysis")
+        analyses.push({ handle: n.handle, wording: "carried out by" });
+    }
+  }
+  return analyses;
 }
 
 /** The LineOfEnquiry case: its own closure, with aggregate question context beside it. */

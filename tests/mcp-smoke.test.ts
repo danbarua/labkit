@@ -246,13 +246,16 @@ describe("every tool answers when an agent actually calls it", () => {
       });
       expect(retired.checks as unknown[]).toHaveLength(1);
 
-      // `why` dispatches on the handle's own kind. This task was planned
-      // with no enquiry (line 149), so its `Work` case names that honestly
-      // rather than an empty `because`.
+      // `why` dispatches on the handle's own kind. This task was implemented
+      // (and never named a question), so the `Work` case leads with that
+      // state rather than the planning sentence it used to print for every
+      // unstopped task.
       const taskWhy = await call(c, "why", { subject: id(work) });
       expect(taskWhy.kind).toBe("work");
-      expect(taskWhy.is as string).toContain("no question named");
-      expect(taskWhy.because as unknown[]).toHaveLength(0);
+      expect(taskWhy.is).toBe("carried-out");
+      expect((taskWhy.because as Array<{ handle: string }>).map((c) => c.handle)).toContain(
+        id(analysis.analysis as Json),
+      );
 
       await call(c, "is", {
         state: "confirmed",
