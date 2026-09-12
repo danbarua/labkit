@@ -279,15 +279,15 @@ describe("an event records the edges the act created", () => {
     expect(standingIn(first!)).toBe("exploratory");
     expect(standingIn(second!)).toBe("confirmatory");
 
-    await write.is({
-      state: "confirmed" as const,
+    await write.isConfirmed({
       claim: exploratory.claims[0]!.claim,
       because: "the prespecified check passed",
     });
-    const [promoted] = await log.select({ operation: "is" });
-    // The act's own words, and the change it made: `is <claim> confirmed`
+    const [promoted] = await log.select({ operation: "isConfirmed" });
+    // The act's own words, and the change it made: `isConfirmed`
     // sets `kind` in place, and the delta is what carries that.
-    expect(promoted!.command).toMatchObject({ state: "confirmed" });
+    expect(promoted!.command).toMatchObject({ because: "the prespecified check passed" });
+    expect(promoted!.command).not.toHaveProperty("state");
     expect(promoted!.changes).toContainEqual({
       change: "PropsChanged",
       id: exploratory.claims[0]!.claim,

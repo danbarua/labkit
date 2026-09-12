@@ -54,8 +54,7 @@ async function aVouchedForNo() {
     ],
   });
   const claim = claimOf(claims, PROP);
-  await session.is({
-    state: "confirmed" as const,
+  await session.isConfirmed({
     claim,
     because: "re-counted blind by a second reader",
   });

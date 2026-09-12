@@ -793,7 +793,7 @@ test("knowledge survey refuses an evaluation with a malformed outcome", async ()
     heldTo: [criterion],
   });
   const claim = claims[0]!.claim;
-  await session.is({ claim, state: "confirmed", because: "the answer is being relied on" });
+  await session.isConfirmed({ claim, because: "the answer is being relied on" });
   await session.closeEnquiry({ enquiry, answeredBy: claim });
 
   const evaluation = await graph.reserveId("CriterionEvaluation");
@@ -838,7 +838,7 @@ test("knowledge standing preserves valid pass and fail outcomes", async () => {
     value: "the check passed",
     citing: [claim],
   });
-  await session.is({ claim, state: "confirmed", because: "the checked answer is being relied on" });
+  await session.isConfirmed({ claim, because: "the checked answer is being relied on" });
   await session.closeEnquiry({ enquiry, answeredBy: claim });
 
   expect((await session.criterionStanding(criterion)).state).toBe("passed");

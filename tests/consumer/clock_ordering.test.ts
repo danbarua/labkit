@@ -390,8 +390,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         answeredBy: claimOf(analysisClaims, FIRST.prop),
       });
       c.wind(days(40));
-      await s.is({
-        state: "confirmed" as const,
+      await s.isConfirmed({
         claim: claimOf(analysisClaims, FIRST.prop),
         because: "replicated under seed control",
       });

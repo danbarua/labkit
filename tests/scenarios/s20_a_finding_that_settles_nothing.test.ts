@@ -78,7 +78,7 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
   test("the claim reads as neither supported nor challenged, and keeps its finding", async () => {
     const w = await aReVerificationThatSettledNothing();
 
-    await session.is({ claim: w.claim, state: "undecided", because: w.finding });
+    await session.isUndecided({ claim: w.claim, because: w.finding });
 
     const why = await (await afterwards()).whySupported(w.claim);
 
@@ -102,7 +102,7 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
 
   test("the question is not counted as answered by a finding that settles nothing", async () => {
     const w = await aReVerificationThatSettledNothing();
-    await session.is({ claim: w.claim, state: "undecided", because: w.finding });
+    await session.isUndecided({ claim: w.claim, because: w.finding });
 
     const survey = await (await afterwards()).whatIsKnown();
 

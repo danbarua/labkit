@@ -10,7 +10,7 @@ import {
   type Clock,
   type RecordObservationsCommand,
   type PursueCommand,
-  type PromoteCommand,
+  type ClaimIsConfirmedCommand,
   type CloseEnquiryCommand,
 } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
@@ -67,11 +67,11 @@ describe("commands are values a caller can hold", () => {
 
     // A command assembled from a previous act's return value -- the shape an
     // adapter is in when it has just answered one call and is making the next.
-    const promoting: PromoteCommand = {
+    const promoting: ClaimIsConfirmedCommand = {
       claim: claimOf(analysisClaims, PROP),
       because: "checked against the held-out split",
     };
-    await s.is({ ...promoting, state: "confirmed" as const });
+    await s.isConfirmed(promoting);
 
     const closing: CloseEnquiryCommand = {
       enquiry,

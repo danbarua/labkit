@@ -55,7 +55,7 @@ async function aPromotedAnswerNobodyChecked() {
     heldTo: [check],
   });
   const claim = claims[0]!.claim;
-  await session.is({ claim, state: "confirmed", because: "we are relying on this to ship" });
+  await session.isConfirmed({ claim, because: "we are relying on this to ship" });
   await session.closeEnquiry({ enquiry, answeredBy: claim });
   return { check, enquiry, claim };
 }
@@ -156,7 +156,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
       value: "loss 3.6 vs 3.8 baseline",
       citing: [claim],
     });
-    await session.is({ claim, state: "confirmed", because: "the answer is no, and we checked" });
+    await session.isConfirmed({ claim, because: "the answer is no, and we checked" });
     await session.closeEnquiry({ enquiry, answeredBy: claim });
 
     const later = await afterwards();

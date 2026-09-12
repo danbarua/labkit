@@ -209,7 +209,7 @@ curr_random_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$clas
 # hierarchy, same treatment Stage 1D's four non-promoted "challenges"
 # claims got, mirrored here for "supports" claims that are real but not the
 # locked primary.
-lab --date "$STAGE2A_CONFIRMATORY" is "$primary_classification_claim" confirmed --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, confirmed by an independent McNemar test on the same disagreement" >/dev/null
+lab --date "$STAGE2A_CONFIRMATORY" is confirmed "$primary_classification_claim" --because "the sole locked primary comparison, DESIGN.md's pre-registered success criterion (entire 95% CI below zero) met unambiguously, confirmed by an independent McNemar test on the same disagreement" >/dev/null
 
 # **The narrowed headline, drawn across all four** (#146). FINDINGS.md's
 # first version claimed the four evolved graphs are not equivalent in task
@@ -231,7 +231,7 @@ say "closing the externally-defined-task question, and checking the reopening he
 # mapping links to an externally defined task, and T's locked comparison is
 # what answers it. The synthesis is the wider statement about the controls
 # as well, which is context rather than the answer.
-lab --date "$STAGE2A_CONFIRMATORY" close "$external_task_enquiry" --answered-by "$primary_classification_claim" >/dev/null
+lab --date "$STAGE2A_CONFIRMATORY" close enquiry "$external_task_enquiry" --answered-by "$primary_classification_claim" >/dev/null
 ask enquiry "$external_task_enquiry"
 ask known
 
@@ -261,7 +261,7 @@ compute_cost_claim=$(lab --date "$STAGE2A_COST_RESULTS" conclude "$compute_cost_
   --proposition "the oscillator readout becomes cheaper than an MLP baseline at some deployment scale" --standing confirmatory \
   --finding "no crossover exists at any plausible deployment scale -- the oscillator is strictly more expensive than either MLP baseline from N=1 to N=100,000,000, and the gap widens with scale rather than narrowing" \
   --bearing challenges | grep '^CLM_')
-lab --date "$STAGE2A_COST_RESULTS" close "$compute_cost_enquiry" --answered-by "$compute_cost_claim" >/dev/null
+lab --date "$STAGE2A_COST_RESULTS" close enquiry "$compute_cost_enquiry" --answered-by "$compute_cost_claim" >/dev/null
 ask enquiry "$compute_cost_enquiry"
 
 printf '\n-- what was known the moment this stage actually closed (#166)?\n'

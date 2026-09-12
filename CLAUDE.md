@@ -8,7 +8,7 @@ The shape is three verbs in three tenses:
 
 - `labkit now` — what stands: what is blocked, what the priorities are.
 - `labkit why <handle>` — the causes behind one record.
-- `labkit is <handle> <state> --because` — assert a new present.
+- `labkit is confirmed <handle> --because` — assert a new present.
 
 `labkit --help` is the command list. `labkit://docs/tools` is the MCP tool
 list, rendered from the declarations on every read.

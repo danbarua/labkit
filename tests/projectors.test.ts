@@ -140,9 +140,8 @@ describe("the event stream is a write-ahead log for a graph store", () => {
       proposition: "the coating holds",
       finding: "0 of 40 failed",
     });
-    await session.is({
+    await session.isConfirmed({
       claim: claims[0]!.claim,
-      state: "confirmed",
       because: "the prespecified check passed",
     });
     await session.closeEnquiry({ enquiry, answeredBy: claims[0]!.claim });

@@ -1010,34 +1010,40 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   }),
 
   writeTool({
-    name: "is",
-    title: "Record what a claim now is",
+    name: "is_undecided",
+    title: "Record that a finding settles the proposition neither way",
     group: "Revising",
     description:
-      "Put a claim into a state its evidence does not carry, and say what put it there. " +
-      "`undecided`: the analysis produced a real finding and it settles the proposition neither " +
-      "way — use it instead of choosing the less wrong bearing, and `why` then reports neither " +
+      "The analysis produced a real finding and it settles the proposition neither way — " +
+      "use it instead of choosing the less wrong bearing, and `why` then reports neither " +
       "supports nor challenges while the question stays `unresolved` rather than counting as " +
-      "answered. `confirmed`: the finding is something others may build on, which moves a " +
-      "question answered on it from `provisional` to `established`. Capture cheaply; confirm " +
-      "before citing.",
+      "answered.",
     inputSchema: {
       claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
-      state: z.enum(["undecided", "confirmed"]).describe("the state to record"),
-      because: z
-        .string()
-        .describe(
-          `for undecided, the id of the finding that left it open, e.g. ${EVIDENCE_PREFIX}7; ` +
-            "for confirmed, a sentence saying what justifies vouching for it",
-        ),
+      because: z.string().describe(`id of the finding that left it open, e.g. ${EVIDENCE_PREFIX}7`),
     },
     outputSchema: restatedSchema,
-    handler: (write, { claim, state, because }) =>
-      write.is(
-        state === "confirmed"
-          ? { claim: ref("claim", claim), state, because }
-          : { claim: ref("claim", claim), state, because: ref("evidence", because) },
-      ),
+    handler: (write, { claim, because }) =>
+      write.isUndecided({
+        claim: ref("claim", claim),
+        because: ref("evidence", because),
+      }),
+  }),
+
+  writeTool({
+    name: "is_confirmed",
+    title: "Record that a finding is something others may build on",
+    group: "Revising",
+    description:
+      "The finding is something others may build on, which moves a question answered on it " +
+      "from `provisional` to `established`. Capture cheaply; confirm before citing.",
+    inputSchema: {
+      claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
+      because: z.string().describe("a sentence saying what justifies vouching for it"),
+    },
+    outputSchema: restatedSchema,
+    handler: (write, { claim, because }) =>
+      write.isConfirmed({ claim: ref("claim", claim), because }),
   }),
 
   writeTool({

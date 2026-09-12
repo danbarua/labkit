@@ -1,7 +1,7 @@
 /** Same thing, understood differently now. */
 
 import { scalar, vertexProps } from "../../db/cypher";
-import type { ClaimProps } from "../../db/domain";
+import type { ClaimProps, Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import { createdIn, edgesIn } from "../events";
 import type {
@@ -23,8 +23,8 @@ import type {
 } from "../report";
 import { kindOf, ref } from "../report";
 import type {
-  ClaimState,
-  IsCommand,
+  ClaimIsConfirmedCommand,
+  ClaimIsUndecidedCommand,
   KeepCommand,
   ReinterpretCommand,
   ReplaceAnalysisCommand,
@@ -40,18 +40,18 @@ import type { UnitOfWork } from "../projection";
 const anyRef = (id: string): Ref<Kind> => ref((kindOf(id) ?? id) as Kind, id);
 
 /**
- * The `Claim.kind` each state is stored as.
+ * The `Claim.kind` each write stores.
  */
-const STORED_KIND: Record<ClaimState, NonNullable<ClaimProps["kind"]>> = {
+const STORED_KIND = {
   undecided: "undecided",
   confirmed: "confirmatory",
-};
+} as const satisfies Record<string, NonNullable<ClaimProps["kind"]>>;
 
 /** What would make a decision of each class wrong. */
-const INVALIDATION_CHECK: Record<ClaimState, string> = {
+const INVALIDATION_CHECK = {
   undecided: "a further finding that settles the proposition either way",
   confirmed: "evidence that the promoted result does not replicate",
-};
+} as const;
 
 export class Revising extends Shared {
   constructor(
@@ -125,40 +125,60 @@ export class Revising extends Shared {
   }
 
   /**
-   * Puts a claim into a state its evidence does not carry, and records what put it there.
+   * Records that a finding settles the proposition neither way.
    */
-  async is(input: IsCommand): Promise<Restated> {
-    return this.handle("is", input, async (unitOfWork) => {
-      // Read before the delta is stated, so the event can say what the state
-      // moved from -- the act overwrites `kind` in place, and afterwards
-      // nothing holds the value it replaced.
-      const [existing] = await this.graph.query(
-        `MATCH (c:Claim {natural_id: $id}) RETURN c`,
-        { c: vertexProps<ClaimProps>() },
-        { id: input.claim },
-      );
-      const was = existing?.c.kind ?? "exploratory";
-      const proposition = await this.assertedBy(input.claim);
+  async isUndecided(input: ClaimIsUndecidedCommand): Promise<Restated> {
+    return this.restating("isUndecided", input, {
+      reason: "recorded as undecided",
+      invalidation_check: INVALIDATION_CHECK.undecided,
+      kind: STORED_KIND.undecided,
+      connect: (unitOfWork, decision) => {
+        unitOfWork.edge(decision, "GRADES", input.claim);
+        unitOfWork.edge(decision, "BASED_ON", input.because);
+      },
+    });
+  }
 
+  /**
+   * Records that a finding is something others may build on.
+   */
+  async isConfirmed(input: ClaimIsConfirmedCommand): Promise<Restated> {
+    return this.restating("isConfirmed", input, {
+      reason: input.because,
+      invalidation_check: INVALIDATION_CHECK.confirmed,
+      kind: STORED_KIND.confirmed,
+      connect: (unitOfWork, decision) => {
+        // Same PROMOTES edge the retired `promote` verb wrote.
+        unitOfWork.edge(decision, "PROMOTES", input.claim);
+      },
+    });
+  }
+
+  /**
+   * Shared graph work for `isUndecided` / `isConfirmed`. Private so a public-verb
+   * sweep does not treat it as a write verb.
+   */
+  private restating(
+    operation: "isUndecided" | "isConfirmed",
+    input: ClaimIsUndecidedCommand | ClaimIsConfirmedCommand,
+    spec: {
+      reason: Prose;
+      invalidation_check: Prose;
+      kind: NonNullable<ClaimProps["kind"]>;
+      connect: (unitOfWork: UnitOfWork, decision: Ref<"decision">) => void;
+    },
+  ): Promise<Restated> {
+    return this.handle(operation, input, async (unitOfWork) => {
       const decision = ref(
         "decision",
         await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
-          reason: input.state === "confirmed" ? input.because : `recorded as ${input.state}`,
-          invalidation_check: INVALIDATION_CHECK[input.state],
+          reason: spec.reason,
+          invalidation_check: spec.invalidation_check,
         }),
       );
-      // **`confirmed` writes exactly what `promote` writes.** The two are one
-      // act spelled two ways, so they must leave one record; a reader able to
-      // tell which verb was typed is the leak the single grammar exists to
-      // close. `undecided` has no act-specific edge and takes `GRADES`.
-      if (input.state === "confirmed") {
-        unitOfWork.edge(decision, "PROMOTES", input.claim);
-      } else {
-        unitOfWork.edge(decision, "GRADES", input.claim);
-        unitOfWork.edge(decision, "BASED_ON", input.because);
-      }
-      unitOfWork.set(input.claim, { kind: STORED_KIND[input.state] });
+      spec.connect(unitOfWork, decision);
+      unitOfWork.set(input.claim, { kind: spec.kind });
 
       return {
         subject: input.claim,

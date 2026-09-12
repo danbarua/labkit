@@ -51,7 +51,7 @@ describe("S-24 — a mistaken act taken back", () => {
     });
     const claim = claims[0]!.claim;
     const finding = claims[0]!.finding!;
-    const { events } = await session.is({ claim, state: "undecided", because: finding });
+    const { events } = await session.isUndecided({ claim, because: finding });
     const seq = events[0]!.seq!;
 
     await expect(

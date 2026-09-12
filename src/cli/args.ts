@@ -8,14 +8,7 @@ import { z } from "zod";
 import { ref, kindOf } from "../domain/report";
 import type { AnyRef } from "../domain/report";
 import type { CitedBasis } from "../domain/commands";
-import type {
-  AnalysisRef,
-  ClaimRef,
-  ClaimState,
-  EvidenceRef,
-  ObservationsRef,
-  Ref,
-} from "../domain";
+import type { AnalysisRef, ClaimRef, EvidenceRef, ObservationsRef, Ref } from "../domain";
 
 /**
  * A whole number, refused rather than coerced.
@@ -122,14 +115,6 @@ export function standing(raw: string): "exploratory" | "confirmatory" {
 }
 
 /**
- * A state a claim can be put into. See `ClaimState`.
- */
-export function claimState(raw: string): ClaimState {
-  if (raw === "undecided" || raw === "confirmed") return raw;
-  throw new InvalidArgumentError(`expected \`undecided\` or \`confirmed\` (got \`${raw}\`)`);
-}
-
-/**
  * A `<part-id>=<hash>` pair.
  */
 export function rebuilt(raw: string): { part: ObservationsRef; hash: string } {
@@ -161,7 +146,7 @@ export const gateState = oneOf(
   "--state",
 );
 
-/** `labkit close GATE --as ...` */
+/** `labkit close gate GATE --as ...` */
 export const gateClosure = oneOf(["sidestepped", "retired"] as const, "--as");
 
 /** `labkit work --state ...` */
