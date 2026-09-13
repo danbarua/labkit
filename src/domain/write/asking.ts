@@ -1,6 +1,6 @@
 /** Putting a question on the record, and opening a line of enquiry against it. */
 
-import { optional, vertexProps } from "../../db/cypher";
+import { vertexProps } from "../../db/cypher";
 import { labelForNaturalId, type Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import type {

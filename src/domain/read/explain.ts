@@ -713,8 +713,6 @@ const EXPLAINED = {
   analysis: explainAnalysis,
 } satisfies Partial<Record<Kind, Explainer>>;
 
-const EXPLAINED_KINDS = Object.keys(EXPLAINED) as Kind[];
-
 /** One record joined to another, and the edge it was reached by. */
 export interface Neighbour {
   handle: AnyRef;

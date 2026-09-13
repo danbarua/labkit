@@ -20,7 +20,6 @@ import { graphProjector, type Projector } from "./projection";
 import type {
   ClaimRef,
   ClaimStanding,
-  ConcludedClaim,
   AnalysisRef,
   EnquiryRef,
   EvidenceRef,

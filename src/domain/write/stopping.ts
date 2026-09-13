@@ -21,7 +21,6 @@ import type {
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
-import type { UnitOfWork } from "../projection";
 
 export class Stopping extends SessionCore {
   constructor(
