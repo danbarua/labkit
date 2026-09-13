@@ -19,7 +19,6 @@ import type {
 import type { ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import { asConcludedClaim, Shared } from "./shared";
-import type { UnitOfWork } from "../projection";
 
 export class Work extends Shared {
   constructor(

@@ -3,7 +3,7 @@
  */
 
 import { createdIn, edgesIn } from "../../domain";
-import type { DomainEvent, EventPage, ListedNote } from "../../domain";
+import type { EventPage, ListedNote } from "../../domain";
 import type { Palette } from "../palette";
 
 /**

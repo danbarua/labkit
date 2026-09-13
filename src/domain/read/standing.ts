@@ -5,7 +5,7 @@ import { compose, per, type Row } from "../facts";
 import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
 import { ref } from "../report";
 import type { KnownAtQuery } from "../queries";
-import { BEARINGS, answeringClaimBearing, checksMetBearing, standingAsOf } from "../survey-facts";
+import { BEARINGS, checksMetBearing, standingAsOf } from "../survey-facts";
 
 export class StandingGroup extends SessionCore {
   /**
@@ -101,7 +101,6 @@ export class StandingGroup extends SessionCore {
     const seen = new Map<string, Entry>();
     const met = new Map<string, boolean>();
     for (const bearing of BEARINGS) {
-      const claimFact = answeringClaimBearing(bearing);
       const metFact = checksMetBearing(bearing);
       const { cypher, decoders } = compose(anchor, metFact, {
         q: vertexProps<{ natural_id: string; name: string }>(),

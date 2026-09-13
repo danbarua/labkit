@@ -1318,7 +1318,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "Close a gate as sidestepped or retired, with the reason. Its condition verdicts remain " +
       "on the record, but it no longer holds work. Closing an already-closed gate is refused.",
     inputSchema: {
-      gate: z.string().describe("gate id, e.g. " + GATE_PREFIX + "2 — from declare_gate"),
+      gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}2 — from declare_gate`),
       closure: z.enum(["sidestepped", "retired"]),
       because: z.string().describe("why this gate no longer governs work"),
     },

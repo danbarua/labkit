@@ -22,7 +22,6 @@ import {
   type NodeLabel,
   type NodePropsByLabel,
   type PublicNode,
-  type EdgeProps,
 } from "./domain";
 import type { LabKitDB } from "./backend";
 import type { Transactor } from "./transactor";

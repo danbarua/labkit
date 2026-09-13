@@ -3,16 +3,7 @@
  */
 
 import { optional, vertexProps } from "../../db/cypher";
-import type {
-  IndexedString,
-  ArtefactProps,
-  ClaimProps,
-  EdgeLabel,
-  EdgeProps,
-  GraphChange,
-  NodeLabel,
-  NodePropsByLabel,
-} from "../../db/domain";
+import type { IndexedString, ArtefactProps, ClaimProps, GraphChange } from "../../db/domain";
 import { labelForNaturalId } from "../../db/domain";
 import type {
   AnalysisRef,
@@ -29,9 +20,7 @@ import type {
 import { ref } from "../report";
 import type { ConcludeCommand, RecordAnalysisCommand } from "../commands";
 import { SessionCore } from "../core";
-import type { TenantGraph } from "../../db/graph";
 import type { UnitOfWork } from "../projection";
-import type { DomainEvent } from "../events";
 
 /**
  * A conclusion as this file records it — the public shape plus the standing the write resolved.

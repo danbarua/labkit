@@ -1,6 +1,6 @@
 /** The conditions a result will be held to, agreed before it exists. */
 
-import { optional, scalar, vertexProps } from "../../db/cypher";
+import { scalar, vertexProps } from "../../db/cypher";
 import { labelForNaturalId, type Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import type {
@@ -28,7 +28,6 @@ import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
 import { compose, per, type Row } from "../facts";
 import { criterionDetail, type CheckState } from "../survey-facts";
-import type { UnitOfWork } from "../projection";
 
 export class Counting extends SessionCore {
   constructor(

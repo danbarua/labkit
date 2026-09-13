@@ -117,7 +117,7 @@ describe("S-30: fixed before the first run", () => {
    * was reached and read, which is the fact the rule turns on.
    */
   test("Afterward 4: a verdict whose claim was superseded is still a verdict", async () => {
-    const { criterion, gate, work } = await aLockedDesign();
+    const { criterion, gate } = await aLockedDesign();
     const { question } = await session.pose({ question: "what did the pilot show?" });
     const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
     const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
