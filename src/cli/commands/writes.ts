@@ -21,6 +21,7 @@ import {
   evaluateCriterionCommand,
   keepCommand,
   noteCommand,
+  noteSupersedesCommand,
   openEnquiryCommand,
   planWorkCommand,
   poseCommand,
@@ -128,9 +129,10 @@ export function registerWrites(program: Command, run: Run): void {
     .description(
       "A dated, attributed record with nothing else required. `search` reaches it like anything " +
         "else with prose on it. --on attaches it to anything already on the record; skipping it " +
-        "costs nothing, since attaching is the part this verb exists to make optional.",
+        "costs nothing, since attaching is the part this verb exists to make optional. " +
+        "An existing note id with --supersedes records that it supersedes those notes, without writing a new note.",
     )
-    .argument("<text>", "the note, in your own words")
+    .argument("<text>", "the note, in your own words, or an existing note id with --supersedes")
     .option("--on <handle>", "what this note concerns, if anything")
     .option(
       "--prompted <question-id>",
@@ -138,20 +140,33 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .option(
       "--supersedes <note-id>",
-      "a note this one replaces — both stay readable; the edge is what a read walks (repeatable)",
+      "a note this one supersedes — both stay readable (repeatable)",
       collect(String),
     )
-    .action(async (text: string, opts: { on?: string; prompted?: string; supersedes?: string[] }) =>
-      parsed(
-        noteCommand,
-        {
-          text,
-          ...(opts.on === undefined ? {} : { on: opts.on }),
-          ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
-          ...(opts.supersedes === undefined ? {} : { supersedes: opts.supersedes }),
-        },
-        (write, input) => write.note(input),
-      ),
+    .action(
+      async (text: string, opts: { on?: string; prompted?: string; supersedes?: string[] }) => {
+        if (opts.supersedes !== undefined && opts.on === undefined && opts.prompted === undefined) {
+          const historic = noteSupersedesCommand.safeParse({
+            note: text,
+            supersedes: opts.supersedes,
+          });
+          if (historic.success) {
+            return run(async ({ write }) =>
+              answer(await write.note(historic.data), (r, p) => asHandles([r.note], p)),
+            );
+          }
+        }
+        return parsed(
+          noteCommand,
+          {
+            text,
+            ...(opts.on === undefined ? {} : { on: opts.on }),
+            ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
+            ...(opts.supersedes === undefined ? {} : { supersedes: opts.supersedes }),
+          },
+          (write, input) => write.note(input),
+        );
+      },
     );
   program
     .command("observe")

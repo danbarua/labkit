@@ -76,12 +76,26 @@ export class Asking extends SessionCore {
   }
 
   /**
-   * Puts a note on the record — a dated, attributed `Prose` record and nothing else required.
-   * The one write with no prerequisites besides `pose`, and this one has no shape to satisfy at
-   * all: no `kind`, no required attachment.
+   * Puts a note on the record, or records that an existing note supersedes another.
+   * Historic form writes SUPERSEDES only — no new note.
    */
   async note(input: NoteCommand): Promise<Noted> {
     return this.handle("note", input, async (unitOfWork) => {
+      if (!("text" in input)) {
+        const noted = input.note;
+        const rows = await this.graph.query(
+          `MATCH (n:Note {natural_id: $id}) RETURN n`,
+          { n: vertexProps<{ text: string }>() },
+          { id: noted },
+        );
+        if (rows.length === 0) throw new Error(`no note ${noted}; write it first`);
+        for (const old of input.supersedes) {
+          if (old === noted) throw new Error(`a note cannot supersede itself (${noted})`);
+          await this.noteExistsToSupersede(old);
+          unitOfWork.edge(noted, "SUPERSEDES", old);
+        }
+        return { subject: noted, result: { note: noted } };
+      }
       if (input.prompted) await this.hasNoOriginYet(input.prompted);
       const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);

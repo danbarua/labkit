@@ -727,9 +727,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "prerequisites besides `pose`. `search` reaches it like anything else with prose on it. " +
       "`on` attaches it to anything already on the record; omitting it costs nothing, since " +
       "attaching is the part this verb exists to make optional. `supersedes` names earlier " +
-      "notes this one replaces: both stay readable; the edge is what a read walks.",
+      "notes this one supersedes: both stay readable. With `note` and `supersedes` and no `text`, " +
+      "records that an existing note supersedes another, without writing a new note.",
     inputSchema: {
-      text: z.string().describe("the note, in your own words"),
+      text: z.string().optional().describe("the note, in your own words"),
+      note: z
+        .string()
+        .optional()
+        .describe("an existing note; with supersedes and no text, no new note is written"),
       on: z
         .string()
         .optional()
@@ -744,17 +749,21 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       supersedes: z
         .array(z.string())
         .optional()
-        .describe(`ids of notes this one replaces, e.g. NOTE_18 — both stay readable`),
+        .describe(`ids of notes this one supersedes, e.g. NOTE_18 — both stay readable`),
     },
     outputSchema: noted,
-    handler: (write, { text, on, prompted, supersedes }) =>
+    handler: (write, { text, note, on, prompted, supersedes }) =>
       write.note(
-        noteCommand.parse({
-          text,
-          ...(on === undefined ? {} : { on }),
-          ...(prompted === undefined ? {} : { prompted }),
-          ...(supersedes === undefined ? {} : { supersedes }),
-        }),
+        noteCommand.parse(
+          note !== undefined && text === undefined
+            ? { note, ...(supersedes === undefined ? {} : { supersedes }) }
+            : {
+                text,
+                ...(on === undefined ? {} : { on }),
+                ...(prompted === undefined ? {} : { prompted }),
+                ...(supersedes === undefined ? {} : { supersedes }),
+              },
+        ),
       ),
   }),
 
