@@ -81,6 +81,28 @@ export const notes = z.strictObject({
 });
 
 /**
+ * One step on the path that produced a handle's current state. Superseded steps
+ * are false starts; `successor` names what stands instead when the graph says.
+ */
+export const howStep = z.strictObject({
+  handle: z.string(),
+  /** Kind label, or the record's own prose when it has any. */
+  what: z.string(),
+  superseded: z.boolean(),
+  successor: z.string().optional(),
+  /** Decision reason when the superseding act carried one. */
+  because: z.string().optional(),
+  /** Minting event seq when the log joins; absent when it does not. */
+  seq: z.number().int().optional(),
+});
+
+/** `how` — the ordered acts behind one handle, false starts marked. */
+export const how = z.strictObject({
+  subject: z.string(),
+  steps: z.array(howStep),
+});
+
+/**
  * `what_happened` — the acts themselves, which is the one thing the graph does not hold.
  */
 export const whatHappened = z.strictObject({
@@ -952,6 +974,8 @@ export type ConcludedClaim = z.infer<typeof concludedClaim>;
 export type SearchMatch = z.infer<typeof searchMatch>;
 export type SearchGroup = z.infer<typeof searchGroup>;
 export type Notes = z.infer<typeof notes>;
+export type HowStep = z.infer<typeof howStep>;
+export type How = z.infer<typeof how>;
 export type ListedNote = z.infer<typeof listedNote>;
 export type ChangedConclusion = z.infer<typeof changedConclusion>;
 export type UnaffectedRecord = z.infer<typeof unaffectedRecord>;

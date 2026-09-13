@@ -27,6 +27,7 @@ import {
   searchQuery,
   whatDependsOnQuery,
   whyQuery,
+  howQuery,
   workListQuery,
 } from "../../domain/queries";
 import { GATE_STATES, WORK_STATES } from "../../domain/vocab";
@@ -34,6 +35,7 @@ import {
   renderHistorical,
   renderKnown,
   renderWhyDispatch,
+  renderHow,
   renderClaims,
   renderConflict,
   renderSearch,
@@ -112,6 +114,24 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (subject: string) => {
       const query = parseCommand(whyQuery, { subject });
       return run(async ({ read }) => answer(await read.why(query), renderWhyDispatch));
+    });
+  program
+    .command("how")
+    .helpGroup("What stands")
+    .summary("how a handle reached its current state")
+    .description(
+      "The ordered steps that produced the current state of any handle on the record. " +
+        "Marks steps that were superseded (false starts) and names their successor when " +
+        "SUPERSEDES or CHANGES edges record one. Optional --since <seq> narrows like happened.",
+    )
+    .argument("<subject>", "a handle of any kind")
+    .option("--since <n>", "only steps after this event seq", whole)
+    .action(async (subject: string, opts: { since?: number }) => {
+      const query = parseCommand(howQuery, {
+        subject,
+        ...(opts.since === undefined ? {} : { since: opts.since }),
+      });
+      return run(async ({ read }) => answer(await read.how(query), renderHow));
     });
   program
     .command("search")

@@ -17,6 +17,7 @@ import type {
   EnquiryInContext,
   EnquiryStatus,
   Explanation,
+  How,
   GateStatus,
   HistoricalSurvey,
   InterpretationHistory,
@@ -67,6 +68,7 @@ import type {
   StoppedWorkQuery,
   WhatDependsOnQuery,
   WhyQuery,
+  HowQuery,
   WhySupportedQuery,
   WorkListQuery,
 } from "../queries";
@@ -384,6 +386,22 @@ export class ReadSurface extends SessionCore {
           .join(", ")}`,
       });
     return EXPLAINERS.claim(this, found[0]!.claim);
+  }
+  /**
+   * `how <handle>` — ordered steps behind the current state of any handle.
+   * Refuses unknown like `why`. Walks SUPERSEDES/CHANGES (Notes and Decisions) and
+   * MOTIVATES pairings in StoryGroup; marks superseded with successor when present.
+   */
+  async how(query: HowQuery): Promise<How> {
+    const subject = query.subject;
+    const asHandle = subject.toUpperCase() as AnyRef;
+    if (!(await this.reachable({ subject: asHandle })))
+      throw new DomainRefusal({
+        kind: "not-found",
+        message: `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
+        subject: asHandle,
+      });
+    return this.#story.how(query);
   }
 }
 

@@ -141,6 +141,13 @@ export const whyQuery = z.object({
 });
 export type WhyQuery = z.infer<typeof whyQuery>;
 
+export const howQuery = z.object({
+  subject: z.string(),
+  since: z.number().int().optional(),
+});
+export type HowQuery = z.infer<typeof howQuery>;
+
+
 export const whatDependsOnQuery = z.object({
   subject: z.string(),
 });

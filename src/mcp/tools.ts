@@ -28,6 +28,7 @@ import {
   searchQuery,
   whatDependsOnQuery,
   whyQuery,
+  howQuery,
   whySupportedQuery,
   workListQuery,
 } from "../domain/queries";
@@ -105,6 +106,7 @@ import {
   gateList,
   workList,
   standing,
+  how,
 } from "../domain/reports";
 
 /**
@@ -230,6 +232,23 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     // No `outputSchema` -- see `known`'s comment for the measured reason.
     handler: (read, { subject }) => read.why(whyQuery.parse({ subject })),
+  }),
+
+  tool({
+    name: "how",
+    title: "How a handle reached its current state",
+    group: "What stands",
+    description:
+      "The ordered steps (by event seq when available, else natural id) that produced the current state of the named handle. " +
+        "Any handle on the record is accepted. Steps that were superseded are marked, with successor named when SUPERSEDES/CHANGES record one. " +
+        "`--since` (or since in the call) narrows to later steps.",
+    inputSchema: {
+      subject: z.string().describe("a handle of any kind"),
+      since: z.number().int().optional().describe("event seq cursor; only steps after this"),
+    },
+    outputSchema: how,
+    handler: (read, { subject, since }) =>
+      read.how(howQuery.parse({ subject, ...(since === undefined ? {} : { since }) })),
   }),
 
   tool({

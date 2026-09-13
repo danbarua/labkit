@@ -108,6 +108,8 @@ export type {
   SearchMatch,
   SearchGroup,
   Notes,
+  How,
+  HowStep,
   ListedNote,
   QuestionStanding,
   AcceptedQuestion,
