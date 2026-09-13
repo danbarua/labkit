@@ -997,7 +997,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       criterion: z.string().describe(`criterion id, e.g. ${CRITERION_PREFIX}1`),
       value: z.string().describe("what the check gave, in the checker's words"),
-      outcome: z.enum(["pass", "fail"]).describe("whether the condition was met"),
+      outcome: evaluateCriterionCommand.shape.outcome.describe("whether the condition was met"),
       gate: z.string().optional().describe(`gate id this evaluation is for, e.g. ${GATE_PREFIX}1`),
       citing: z
         .array(z.string())
@@ -1319,7 +1319,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "on the record, but it no longer holds work. Closing an already-closed gate is refused.",
     inputSchema: {
       gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}2 — from declare_gate`),
-      closure: z.enum(["sidestepped", "retired"]),
+      closure: closeGateCommand.shape.closure,
       because: z.string().describe("why this gate no longer governs work"),
     },
     outputSchema: closedGateSchema,

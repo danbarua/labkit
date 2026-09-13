@@ -28,6 +28,7 @@ import {
 } from "../src/attribution";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { GATE_STATES } from "../src/domain/vocab";
+import { GATE_CLOSURES } from "../src/domain/commands";
 import {
   explanationSchema,
   historicalSurveySchema,
@@ -628,6 +629,15 @@ describe("the tool documentation resource", () => {
       properties: Record<string, { enum?: string[] }>;
     };
     expect(declared.properties.state?.enum).toEqual([...GATE_STATES]);
+  });
+
+  test("close_gate advertises GATE_CLOSURES", () => {
+    const tool = WRITE_TOOLS.find((t) => t.name === "close_gate")!;
+    // Through `toJSONSchema`: it is what an agent is actually handed.
+    const declared = z.toJSONSchema(z.strictObject(tool.inputSchema)) as {
+      properties: Record<string, { enum?: string[] }>;
+    };
+    expect(declared.properties.closure?.enum).toEqual([...GATE_CLOSURES]);
   });
 
   test("every tool, and every field of every declared output, is documented", async () => {
