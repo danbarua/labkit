@@ -1322,11 +1322,7 @@ export class StoryGroup extends SessionCore {
     });
 
     let filtered = steps;
-    if (since !== undefined) filtered = steps.filter((s) => s.seq === undefined || s.seq > since);
-    if (!filtered.some((s) => s.handle === id)) {
-      const subj = steps.find((s) => s.handle === id);
-      if (subj) filtered = [subj, ...filtered];
-    }
+    if (since !== undefined) filtered = steps.filter((s) => s.seq !== undefined && s.seq > since);
     return { subject: id, steps: filtered };
   }
 }
