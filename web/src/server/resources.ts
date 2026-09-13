@@ -9,16 +9,22 @@ import {
   naturalIdFrom,
   type CollectionDocument,
   type CollectionSlug,
-  type HypermediaRef,
+  type HalDir,
+  type HalLink,
+  type HalLinks,
+  type HalResource,
   type ResourceDocument,
   type RootDocument,
 } from "../hypermedia";
 
 type NodeProps = { natural_id: string } & Record<string, unknown>;
 
-const COLLECTION_HREFS = Object.fromEntries(
-  (Object.keys(LABEL_BY_COLLECTION) as CollectionSlug[]).map((slug) => [slug, `/${slug}`]),
-) as { readonly [S in CollectionSlug]: string };
+const COLLECTION_LINKS = Object.fromEntries(
+  (Object.keys(LABEL_BY_COLLECTION) as CollectionSlug[]).map((slug) => [
+    slug,
+    { href: `/${slug}` },
+  ]),
+) as { readonly [S in CollectionSlug]: HalLink };
 
 export async function loadRoot(graph: TenantGraph): Promise<RootDocument | null> {
   const rows = await graph.query(
@@ -29,10 +35,10 @@ export async function loadRoot(graph: TenantGraph): Promise<RootDocument | null>
   if (rows.length === 0) return null;
   return {
     id: "labkit",
-    href: "/",
-    links: {
-      start: { href: WALK_START_HREF, id: WALK_START_ID },
-      collections: COLLECTION_HREFS,
+    _links: {
+      self: { href: "/" },
+      start: { href: WALK_START_HREF, name: WALK_START_ID },
+      ...COLLECTION_LINKS,
     },
   };
 }
@@ -45,13 +51,22 @@ export async function loadCollection(
   const rows = await graph.query(`MATCH (n:${label}) RETURN n ORDER BY n.natural_id`, {
     n: vertexProps<NodeProps>(),
   });
+  const items: HalResource[] = rows.map((row) => {
+    const id = row.n.natural_id;
+    const href = hrefFor(id, label);
+    return {
+      id,
+      type: label,
+      _links: { self: { href, name: id } },
+    };
+  });
   return {
     type: label,
-    href: `/${slug}`,
-    items: rows.map((row) => ({
-      id: row.n.natural_id,
-      href: hrefFor(row.n.natural_id, label),
-    })),
+    _links: {
+      self: { href: `/${slug}` },
+      item: items.map((item) => item._links.self),
+    },
+    _embedded: items.length > 0 ? { item: items } : undefined,
   };
 }
 
@@ -89,29 +104,48 @@ export async function loadResource(
     ),
   ]);
 
+  const _links: HalLinks = {
+    self: { href: hrefFor(node.n.natural_id, label), name: node.n.natural_id },
+  };
+  const _embedded: NonNullable<HalResource["_embedded"]> = {};
+  addNeighbors(_links, _embedded, outbound, "out");
+  addNeighbors(_links, _embedded, inbound, "in");
+
   return {
     id: node.n.natural_id,
     type: label,
-    href: hrefFor(node.n.natural_id, label),
     properties: node.n,
-    links: {
-      out: groupLinks(outbound),
-      in: groupLinks(inbound),
-    },
+    _links,
+    _embedded: Object.keys(_embedded).length > 0 ? _embedded : undefined,
   };
 }
 
-function groupLinks(
+function addNeighbors(
+  links: HalLinks,
+  embedded: NonNullable<HalResource["_embedded"]>,
   rows: ReadonlyArray<{ rel: string; m: { label: string; properties: NodeProps } }>,
-): Partial<Record<EdgeLabel, HypermediaRef[]>> {
-  const grouped: Partial<Record<EdgeLabel, HypermediaRef[]>> = {};
+  dir: HalDir,
+): void {
   for (const row of rows) {
     const rel = row.rel as EdgeLabel;
     const id = row.m.properties.natural_id;
-    const ref: HypermediaRef = { id, href: hrefFor(id, row.m.label as NodeLabel) };
-    const existing = grouped[rel];
-    if (existing) existing.push(ref);
-    else grouped[rel] = [ref];
+    const href = hrefFor(id, row.m.label as NodeLabel);
+    const link: HalLink = { href, name: id, dir };
+    const neighbor: HalResource = {
+      id,
+      type: row.m.label as NodeLabel,
+      dir,
+      _links: { self: { href, name: id } },
+    };
+
+    const existingLinks = links[rel];
+    if (existingLinks == null) links[rel] = [link];
+    else if (Array.isArray(existingLinks)) existingLinks.push(link);
+    else links[rel] = [existingLinks, link];
+
+    const existingEmbedded = embedded[rel];
+    if (existingEmbedded == null) embedded[rel] = [neighbor];
+    else if (Array.isArray(existingEmbedded)) existingEmbedded.push(neighbor);
+    else embedded[rel] = [existingEmbedded, neighbor];
   }
-  return grouped;
 }

@@ -8,6 +8,8 @@
   --accent-dim: #2c4a48;
   --amber: #e0b25a;
   --danger: #e0687a;
+  --font-sans: "IBM Plex Sans";
+  --font-mono: "IBM Plex Mono",  "SF Mono", Menlo, Consolas, monospace;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 

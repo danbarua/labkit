@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { EdgeLabel } from "../../../src/db/domain";
 
 export type ViewMode = "2d" | "3d";
 export type Overlay = "structural" | "standing" | "temporal";
@@ -12,7 +13,7 @@ export interface GraphNodeSeed {
 export interface GraphEdgeSeed {
   from: string;
   to: string;
-  label: string;
+  label: EdgeLabel;
 }
 
 export interface GraphViewProps {
@@ -339,6 +340,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   const order = [...projected.entries()].sort((a, b) => b[1].depth - a[1].depth);
 
   ctx.lineWidth = 1;
+  const labels: { x: number; y: number; text: EdgeLabel; hot: boolean }[] = [];
   for (const edge of sim.edges) {
     const a = projected.get(edge.from);
     const b = projected.get(edge.to);
@@ -348,6 +350,21 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     ctx.moveTo(a.sx, a.sy);
     ctx.lineTo(b.sx, b.sy);
     ctx.stroke();
+
+    const hot =
+      edge.from === sim.selectedId ||
+      edge.to === sim.selectedId ||
+      edge.from === sim.hoverId ||
+      edge.to === sim.hoverId;
+    const scale = Math.min(a.scale, b.scale);
+    if (hot || scale > 0.55) {
+      labels.push({
+        x: (a.sx + b.sx) / 2,
+        y: (a.sy + b.sy) / 2,
+        text: edge.label,
+        hot,
+      });
+    }
   }
 
   for (const [id] of order) {
@@ -377,6 +394,18 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     }
     ctx.globalAlpha = 1;
   }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "9px ui-monospace, monospace";
+  for (const lab of labels) {
+    ctx.globalAlpha = lab.hot ? 0.95 : 0.75;
+    ctx.fillStyle = lab.hot ? "#5ad1c9" : "#c8cedb";
+    ctx.fillText(lab.text, lab.x, lab.y - 7);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
 
   if (sim.view === "3d") drawCompass(ctx, sim, width, height);
 }

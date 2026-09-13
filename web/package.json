@@ -10,6 +10,7 @@
     "db:down": "bash scripts/compose.sh stop db",
     "build": "vite build",
     "test:walk": "bash scripts/with-ports.sh bunx playwright test",
+    "test:walk-api": "bash scripts/with-ports.sh bun test tests/walk-api.test.ts",
     "ports": "bash scripts/worktree-ports.sh",
     "check:format": "biome format .",
     "check:lint": "biome lint .",

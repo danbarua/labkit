@@ -2,36 +2,43 @@
 
 Audience: a developer or coding agent opening this package on GitHub with no chat history.
 
-labkit-web is a read-only HTTP module in front of one LabKit AGE graph. It is not the CLI. It is not MCP. LabKit domain writes stay in `../src/domain`.
+labkit-web is (currently) a read-only HTTP module in front of one LabKit AGE graph. 
 
 ## Surfaces
 
 | Surface | Bind | Process |
 |---------|------|---------|
 | Vite (UI + API) | `127.0.0.1:$LABKIT_PORT_EXPLORER` (8850 on main) | `bun run dev` |
-| Graph store | host 5432 → container 5432 | `bun run db:up` (shared) |
+| Graph store | `127.0.0.1:5433` | pg0 instance `labkit` |
 
-`GET /healthz` returns `{ ok, worktree, tenant }`. See [infra.md](infra.md).
+`GET /healthz` returns `{ ok, worktree, tenant }`. Docker Compose: [infra.md](infra.md).
 
 ## Hypermedia
 
 Graph identity is a handle (`Q_1`, `GATE_4`, `NOTE_68`). The URL is `/{collection}/{n}` where `n` is the numeric suffix.
 
 ```
-GET /notes/68  →  { id: "NOTE_68", type: "Note", href: "/notes/68", properties, links }
+GET /notes/68  →  application/hal+json
+{
+  id: "NOTE_68",
+  type: "Note",
+  properties,
+  _links: { self: { href: "/notes/68", name: "NOTE_68" }, CONCERNS: [{ href, name, dir }] },
+  _embedded: { CONCERNS: [{ id, type, dir, _links: { self } }] }
+}
 ```
 
-`links.out` / `links.in` group existing edges by type. No edge means no link. Do not add a link to make a test green.
+Rel names are EdgeLabel. No `links.in` / `links.out`. Direction is `dir` on the link and on the embedded neighbor. No edge means no rel. Do not add a link to make a test green.
 
 Unlabelled Cypher `MATCH (...)->(m)` skips per-label RLS. Neighbor queries therefore include `n.retracted IS NULL AND m.retracted IS NULL`. Otherwise GET follows a handle that 404s.
 
-JSON root (`Accept: application/json` on `/`, or `/api` through Vite):
+HAL root (`Accept: application/hal+json` on `/`, or `/api` through Vite):
 
 ```
-{ id: "labkit", href: "/", links: { start: { id: "Q_1", href: "/questions/1" }, collections: { ... } } }
+{ id: "labkit", _links: { self: { href: "/" }, start: { href: "/questions/1", name: "Q_1" }, questions: { href: "/questions" }, ... } }
 ```
 
-The explorer loads `/api`, then `links.start`.
+The explorer loads `/api`, then `_links.start`.
 
 ## Explorer
 
@@ -55,10 +62,3 @@ That is the first `labkit pose` question on overlap_bench, then the enquiry it m
 - Node/edge vocabulary: `../src/db/domain.ts`.
 - Ingest copies stored edges even when current `EDGE_SCHEMA` would refuse them. The web app shows what was recorded.
 - Shared CLI/MCP/web contracts live under GitHub issue 393 (`danbarua/labkit`). This package reads the graph. It does not wait on those children.
-
-## Out of scope
-
-- Write verbs, `known` → `learned` as a first-class view, criterion → evaluation as a dashboard.
-- Batch-generated datamodels.
-- Architecture from `~/Code/AI/labkit-notebook` (Grok Build prototype).
-- Restoring compose `spike` / `pooler` profiles or `docker/webapp`. Those served an HTTP MCP spike on 8899, not this explorer.

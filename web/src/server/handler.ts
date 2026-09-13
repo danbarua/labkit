@@ -1,6 +1,6 @@
-import { LABEL_BY_COLLECTION, type CollectionSlug } from "../hypermedia";
+import { HAL_JSON, LABEL_BY_COLLECTION, type CollectionSlug } from "../hypermedia";
 import { loadCollection, loadResource, loadRoot } from "./resources";
-import type { Session } from "./session";
+import type { Runtime } from "./runtime";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -9,8 +9,32 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function notFound(): Response {
-  return json({ error: "not found" }, 404);
+function hal(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": HAL_JSON },
+  });
+}
+
+function problem(status: number, title: string, detail?: string): Response {
+  return new Response(
+    JSON.stringify({
+      type: "about:blank",
+      title,
+      status,
+      ...(detail === undefined ? {} : { detail }),
+    }),
+    { status, headers: { "content-type": "application/problem+json" } },
+  );
+}
+
+function acceptsDocument(accept: string | null): boolean {
+  if (accept == null || accept === "" || accept === "*/*") return true;
+  return /\bapplication\/(hal\+)?json\b/.test(accept);
+}
+
+function notFound(detail?: string): Response {
+  return problem(404, "Not Found", detail);
 }
 
 function isCollectionSlug(value: string): value is CollectionSlug {
@@ -21,49 +45,48 @@ export function isLabkitApiPath(pathname: string, accept: string): boolean {
   if (pathname === "/healthz") return true;
   if (pathname === "/api" || pathname.startsWith("/api/")) return true;
   if (pathname === "/") {
-    return accept === "" || accept === "*/*" || /\bapplication\/json\b/.test(accept);
+    return acceptsDocument(accept);
   }
   const slug = pathname.split("/").filter((part) => part.length > 0)[0];
   return slug !== undefined && isCollectionSlug(slug);
 }
 
-export async function handle(req: Request, session: Session): Promise<Response> {
+export async function handle(req: Request, runtime: Runtime): Promise<Response> {
   if (req.method !== "GET") {
-    return json({ error: "method not allowed" }, 405);
+    return problem(405, "Method Not Allowed", `${req.method} is not GET`);
   }
 
-  let path = new URL(req.url).pathname;
+  const original = new URL(req.url).pathname;
+  let path = original;
   if (path === "/api" || path === "/api/") path = "/";
-  else if (path.startsWith("/api/")) path = path.slice("/api".length);
+  else if (path.startsWith("/api/")) path = path.slice("/api".length) || "/";
 
   if (path === "/healthz") {
-    return json({ ok: true, worktree: session.worktree, tenant: session.tenant });
+    return json({ ok: true, worktree: runtime.worktree, tenant: runtime.tenant });
   }
 
   if (path === "/") {
-    const accept = req.headers.get("accept");
-    const jsonAccept =
-      accept == null || accept === "" || accept === "*/*" || /\bapplication\/json\b/.test(accept);
-    if (!jsonAccept) return notFound();
-    const root = await loadRoot(session.graph);
-    if (root == null) return notFound();
-    return json(root);
+    // `/api` is the HAL root for any Accept. `/` with HTML is the SPA and
+    // never reaches handle; if it does, still return the root document.
+    const root = await loadRoot(runtime.graph);
+    if (root == null) return notFound("no pose question in this graph");
+    return hal(root);
   }
 
   const parts = path.split("/").filter((part) => part.length > 0);
   if (parts.length === 1) {
     const slug = parts[0]!;
-    if (!isCollectionSlug(slug)) return notFound();
-    return json(await loadCollection(session.graph, slug));
+    if (!isCollectionSlug(slug)) return notFound(`${original} is not a collection`);
+    return hal(await loadCollection(runtime.graph, slug));
   }
   if (parts.length === 2) {
     const slug = parts[0]!;
     const n = parts[1]!;
-    if (!isCollectionSlug(slug)) return notFound();
-    const resource = await loadResource(session.graph, slug, n);
-    if (resource == null) return notFound();
-    return json(resource);
+    if (!isCollectionSlug(slug)) return notFound(`${original} is not a resource`);
+    const resource = await loadResource(runtime.graph, slug, n);
+    if (resource == null) return notFound(`${original} is not in the graph`);
+    return hal(resource);
   }
 
-  return notFound();
+  return notFound(`${original} is not a labkit resource`);
 }
