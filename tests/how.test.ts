@@ -92,17 +92,16 @@ test("how on notes with supersedes marks superseded and names successor", async 
   expect(hNew.steps.some((s) => s.handle === newer && !s.superseded)).toBe(true);
 });
 
-test("--since narrows steps to later seqs", async () => {
-  const { enquiry } = await session.writes.openEnquiry("seq test?");
-  // produce a few events
-  await session.writes.pose({ question: "q1" });
-  const { question } = await session.writes.pose({ question: "q2" });
-  const later = await session.reads.how({ subject: question });
-  const maxSeq = Math.max(...later.steps.map((s) => s.seq ?? 0));
-  if (maxSeq > 0) {
-    const narrowed = await session.reads.how({ subject: question, since: maxSeq - 1 });
-    expect(narrowed.steps.every((s) => s.seq === undefined || s.seq > maxSeq - 1)).toBe(true);
-  }
+test("--since is a cursor: only later seqs, including dropping the named handle", async () => {
+  const { note: old } = await session.writes.note({ text: "initial take" });
+  const { note: newer } = await session.writes.note({ text: "later take", supersedes: [old] });
+  const hOld = await session.reads.how({ subject: old });
+  const oldSeq = hOld.steps.find((s) => s.handle === old)?.seq;
+  expect(oldSeq).toBeDefined();
+  const after = await session.reads.how({ subject: old, since: oldSeq });
+  expect(after.steps.every((s) => s.seq !== undefined && s.seq > oldSeq!)).toBe(true);
+  expect(after.steps.some((s) => s.handle === old)).toBe(false);
+  expect(after.steps.some((s) => s.handle === newer)).toBe(true);
 });
 
 test("how refuses unknown handle like why", async () => {
