@@ -509,6 +509,13 @@ describe("an agent can track work through the tools alone", () => {
         arguments: { enquiry: id(enquiry) },
       });
       expect(again.isError).toBe(true);
+      const sentence = (again.content as Array<{ type: string; text?: string }>)
+        .map((block) => block.text ?? "")
+        .join("");
+      expect(sentence).toContain(`enquiry ${id(enquiry)} is already closed by decision`);
+      expect(sentence).toContain(
+        "closing it again would leave two decisions resolving one enquiry",
+      );
       await c.close();
     } finally {
       await scenario.end();

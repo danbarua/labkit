@@ -211,3 +211,34 @@ test("main prints a validation message for a wrong claim handle", async () => {
     if (db !== undefined) rmSync(db, { recursive: true, force: true });
   }
 });
+
+test("main prints one labkit line when closing an enquiry twice", async () => {
+  let db: string | undefined;
+  const chunks: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  const error = console.error;
+  try {
+    db = await mkdtemp(join(tmpdir(), "labkit-close-twice-"));
+    expect(await main(["--db", db, "open", "does width matter?"])).toBe(0);
+    expect(await main(["--db", db, "close", "enquiry", "LOE_1"])).toBe(0);
+
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+      return true;
+    }) as typeof process.stderr.write;
+    console.error = (...args: unknown[]) => {
+      chunks.push(args.map(String).join(" "));
+    };
+
+    const code = await main(["--db", db, "close", "enquiry", "LOE_1"]);
+    const stderr = chunks.join("");
+    expect(code).toBe(1);
+    expect(stderr).toContain("labkit: enquiry LOE_1 is already closed by decision");
+    expect(stderr.match(/^labkit:/gm) ?? []).toHaveLength(1);
+    expect(stderr).not.toContain('"labkit":"request-failed"');
+  } finally {
+    process.stderr.write = write;
+    console.error = error;
+    if (db !== undefined) rmSync(db, { recursive: true, force: true });
+  }
+}, 60_000);
