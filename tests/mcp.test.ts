@@ -687,20 +687,20 @@ describe("behaviour — the same answers, over the wire", () => {
     const graph = await scenario.begin();
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
 
-    const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
-    await s.pose({ question: "does depth move convergence?" });
-    const { observations } = await s.recordObservations({
+    const { enquiry } = await s.writes.openEnquiry("does the pruning schedule move convergence?");
+    await s.writes.pose({ question: "does depth move convergence?" });
+    const { observations } = await s.writes.recordObservations({
       enquiry,
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     });
-    const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+    const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
       enquiry,
       method: "paired comparison",
       from: [observations],
       concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
     });
-    await s.closeEnquiry({
+    await s.writes.closeEnquiry({
       enquiry,
       answeredBy: claimOf(analysisClaims, PROP),
     });
