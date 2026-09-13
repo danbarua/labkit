@@ -122,7 +122,7 @@ export function registerReads(program: Command, run: Run): void {
     .description(
       "The ordered steps that produced the current state of any handle on the record. " +
         "Marks steps that were superseded (false starts) and names their successor when " +
-        "SUPERSEDES or CHANGES edges record one. Optional --since <seq> narrows like happened.",
+        "the record says one step supersedes or changes another. Optional --since <seq> narrows like happened.",
     )
     .argument("<subject>", "a handle of any kind")
     .option("--since <n>", "only steps after this event seq", whole)
