@@ -1,0 +1,64 @@
+# Infra
+
+## Docker Postgres
+
+`docker/postgres/Dockerfile` builds `labkit-web-db` from `apache/age:release_PG18_1.7.0`. It is not a pulled `postgres` image. The Dockerfile adds `CREATE DATABASE` only (`labkit_tests` for `test:pg`, `labkit` for the overseer). Extensions, roles, and schema come from LabKit migrations.
+
+Start it from `web/`:
+
+```
+bun run db:up
+```
+
+That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` first. Bare `docker compose up -d db` binds **5432** even in a worktree and collides with another checkout. `bun run db:down` stops the `db` service for this compose project. It does not delete the volume.
+
+`test:pg` truncates `labkit_tests`. Never point it at `labkit`.
+
+## pg0
+
+A native Postgres 18.1.0 lives at `~/.pg0/instances/labkit` on **5433**. AGE 1.7.0 is installed there (`age.dylib`, `CREATE EXTENSION age`).
+
+pg0 did not fail as a database. A connection that does not `LOAD 'age'` and set `search_path` to include `ag_catalog` errors with `type "agtype" does not exist`. The Docker image sets `shared_preload_libraries=age`, so every backend has the type. That is why the overseer defaults to Docker.
+
+Leave 5433 alone unless an operator names it.
+
+## Ports
+
+`scripts/worktree-ports.sh` hashes the worktree path. Offset 0 is the main checkout. Other worktrees use `10000 + cksum(path) % 10000`. A hash collision is refused.
+
+| Env | Main | Use |
+|-----|------|-----|
+| `LABKIT_PORT_DB` | 5432 | Docker Postgres host port |
+| `LABKIT_PORT_WEB` | 8899 | Overseer API |
+| `LABKIT_PORT_UI` | 5173 | Vite explorer |
+| `LABKIT_PORT_EXPLORER` | 8850 | Retired static explorer. Do not bind the new UI here. |
+
+`web/scripts/with-ports.sh` exports these, then execs. `bun run server`, `dev`, `ingest`, and `test:walk` all go through it.
+
+Vite `strictPort` is on. If 5173 (or the worktree UI port) is taken, Vite exits. Playwright `reuseExistingServer` will keep a **stale** Vite that was started without the current proxy. Symptom: UI banner `404: Not Found`, `.current-handle` empty, `GET /questions/1` through Vite returns `index.html`. Restart Vite. Confirm JSON:
+
+```
+curl -H 'accept: application/json' http://127.0.0.1:$LABKIT_PORT_UI/questions/1
+```
+
+Two API processes on one port: the second exits 1. If `/healthz` on that port already returns `ok`, ignore the failed duplicate.
+
+## Ingest
+
+`bun run ingest` copies `../08_overlap_bench/.labkit` (repo-sibling path) into Docker `labkit`, tenant `overlap-bench`.
+
+The live PGlite directory is locked. Ingest copies it to a temp dir first. Nodes keep stored `natural_id` values so `Q_1` and `NOTE_68` survive. Edges are MATCH then CREATE. Do not `MERGE` relationships. AGE can mint an edge whose `start_id` and `end_id` are both 0.
+
+Expected counts on overlap_bench: **290** nodes, **452** edges.
+
+## Cull (`207a96e2`, 2026-09-08)
+
+Deleted on purpose: `explorer/` (static 2D/3D), `docker/webapp`, compose `spike`/`pooler`/`migrate` services, and a large comment/markdown pass.
+
+Kept as facts, not restored as code:
+
+- Explorer colour tokens and `#bar` layout (now `web/src/styles.css`).
+- Compose `db` service and `LABKIT_PORT_DB`.
+- Worktree port hash (the 2026-08-28 failure: one worktree's `/healthz` looked like yours).
+
+Not restored: HTTP MCP spike, `labkit_spike` database, batch datamodel generation from a LabKit dump.

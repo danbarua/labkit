@@ -3,11 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "server": "bun src/server/main.ts",
-    "ingest": "bun scripts/ingest-overlap-bench.ts",
+    "dev": "bash scripts/with-ports.sh bunx vite --host 127.0.0.1",
+    "server": "bash scripts/with-ports.sh bun src/server/main.ts",
+    "ingest": "bash scripts/with-ports.sh bun scripts/ingest-overlap-bench.ts",
+    "db:up": "bash ../scripts/compose.sh up -d db",
+    "db:down": "bash ../scripts/compose.sh stop db",
     "build": "vite build",
-    "test:walk": "playwright test",
+    "test:walk": "bash scripts/with-ports.sh bunx playwright test",
+    "ports": "bash ../scripts/worktree-ports.sh",
     "check:format": "biome format .",
     "check:lint": "biome lint .",
     "format": "biome format --write ."
@@ -17,7 +20,7 @@
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.10",
+    "@biomejs/biome": "2.5.13",
     "@playwright/test": "^1.55.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-scroll-area": "^1.2.10",

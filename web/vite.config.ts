@@ -2,7 +2,9 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-const api = "http://127.0.0.1:8899";
+const apiPort = process.env.LABKIT_PORT_WEB ?? "8899";
+const uiPort = Number(process.env.LABKIT_PORT_UI ?? "5173");
+const api = `http://127.0.0.1:${apiPort}`;
 
 const collections = [
   "/questions",
@@ -30,7 +32,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    host: "127.0.0.1",
+    port: uiPort,
+    strictPort: true,
     proxy: {
       "/api": {
         target: api,
