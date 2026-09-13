@@ -60,6 +60,22 @@ export class Asking extends SessionCore {
   }
 
   /**
+   * Refuses a missing supersession target. Same silent-CREATE trap as `noteExists`: without
+   * this the new note would stand with no edge and no error.
+   */
+  private async noteExistsToSupersede(note: NoteRef): Promise<void> {
+    const rows = await this.graph.query(
+      `MATCH (n:Note {natural_id: $id}) RETURN n`,
+      { n: vertexProps<{ text: string }>() },
+      { id: note },
+    );
+    if (rows.length === 0)
+      throw new Error(
+        `no note ${note} for this note to supersede; write it first, or drop --supersedes`,
+      );
+  }
+
+  /**
    * Puts a note on the record — a dated, attributed `Prose` record and nothing else required.
    * The one write with no prerequisites besides `pose`, and this one has no shape to satisfy at
    * all: no `kind`, no required attachment.
@@ -70,10 +86,16 @@ export class Asking extends SessionCore {
       const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
       if (input.prompted) unitOfWork.edge(noted, "MOTIVATES", input.prompted);
+      for (const old of input.supersedes ?? []) {
+        // Mint first: a target equal to this note's new id is self, not "missing".
+        if (old === noted)
+          throw new Error(`a note cannot supersede itself (${noted})`);
+        await this.noteExistsToSupersede(old);
+        unitOfWork.edge(noted, "SUPERSEDES", old);
+      }
       return { subject: noted, result: { note: noted } };
     });
   }
-
   /**
    * Refuses a question that does not exist, and one that already says where it came from. Two
    * origins would leave a reader two answers to *why was this asked* and nothing saying which

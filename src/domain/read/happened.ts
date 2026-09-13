@@ -48,23 +48,42 @@ export class HappenedGroup extends SessionCore {
       `MATCH (n:Note)
        OPTIONAL MATCH (n)-[:CONCERNS]->(about) WHERE about.retracted IS NULL
        OPTIONAL MATCH (n)-[:MOTIVATES]->(q:Question)
-       RETURN n, about, q`,
+       OPTIONAL MATCH (n)-[:SUPERSEDES]->(old:Note)
+       OPTIONAL MATCH (newer:Note)-[:SUPERSEDES]->(n)
+       RETURN n, about, q, old, newer`,
       {
         n: vertexProps<{ natural_id: string; text: string }>(),
         about: optional(vertexProps<{ natural_id: string }>()),
         q: optional(vertexProps<{ natural_id: string }>()),
+        old: optional(vertexProps<{ natural_id: string }>()),
+        newer: optional(vertexProps<{ natural_id: string }>()),
       },
       {},
     );
     // Folded by id: a note concerning one thing and prompting another arrives
-    // as two rows, and AGE returns them in no order of its own.
+    // as two rows, and AGE returns them in no order of its own. Multiple
+    // SUPERSEDES in either direction also fan out rows.
     const byId = new Map<string, ListedNote>();
     for (const row of rows) {
       const id = row.n.natural_id;
-      const found = byId.get(id) ?? { note: ref("note", id), says: row.n.text, concerns: [] };
+      const found = byId.get(id) ?? {
+        note: ref("note", id),
+        says: row.n.text,
+        concerns: [],
+        supersedes: [],
+        supersededBy: [],
+      };
       const about = row.about?.natural_id;
       if (about && !found.concerns.includes(about as AnyRef)) found.concerns.push(about as AnyRef);
       if (row.q) found.prompted = ref("question", row.q.natural_id);
+      if (row.old?.natural_id) {
+        const o = ref("note", row.old.natural_id);
+        if (!found.supersedes.includes(o)) found.supersedes.push(o);
+      }
+      if (row.newer?.natural_id) {
+        const nb = ref("note", row.newer.natural_id);
+        if (!found.supersededBy.includes(nb)) found.supersededBy.push(nb);
+      }
       byId.set(id, found);
     }
     // Newest first, by the id's own number — notes carry no timestamp of their

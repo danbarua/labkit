@@ -249,6 +249,7 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Decision"],
     ["Decision", "Claim"],
     ["Decision", "Computation"],
+    ["Note", "Note"],
   ],
   /**
    * `Review -> EvidenceUnit` is how a review of an *analysis* has somewhere to point; without

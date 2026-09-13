@@ -707,7 +707,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "A dated, attributed record with nothing else required -- the one write with no " +
       "prerequisites besides `pose`. `search` reaches it like anything else with prose on it. " +
       "`on` attaches it to anything already on the record; omitting it costs nothing, since " +
-      "attaching is the part this verb exists to make optional.",
+      "attaching is the part this verb exists to make optional. `supersedes` names earlier " +
+      "notes this one replaces: both stay readable; the edge is what a read walks.",
     inputSchema: {
       text: z.string().describe("the note, in your own words"),
       on: z
@@ -721,14 +722,21 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           "a question this note is the reason for -- why it was asked, not what it is about. " +
             "The other direction of `pose`'s `from`, for a note written after the question",
         ),
+      supersedes: z
+        .array(z.string())
+        .optional()
+        .describe(
+          `ids of notes this one replaces, e.g. NOTE_18 — both stay readable`,
+        ),
     },
     outputSchema: noted,
-    handler: (write, { text, on, prompted }) =>
+    handler: (write, { text, on, prompted, supersedes }) =>
       write.note(
         noteCommand.parse({
           text,
           ...(on === undefined ? {} : { on }),
           ...(prompted === undefined ? {} : { prompted }),
+          ...(supersedes === undefined ? {} : { supersedes }),
         }),
       ),
   }),

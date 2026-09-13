@@ -104,6 +104,7 @@ export const noteCommand = z.object({
   text: z.string(),
   on: anyRefString().optional(),
   prompted: refString("question").optional(),
+  supersedes: z.array(refString("note")).optional(),
 });
 export type NoteCommand = z.infer<typeof noteCommand>;
 
