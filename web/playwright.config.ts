@@ -1,9 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const apiPort = process.env.LABKIT_PORT_WEB ?? "8899";
 const explorerPort = process.env.LABKIT_PORT_EXPLORER ?? "8850";
 const dbPort = process.env.LABKIT_PORT_DB ?? "5432";
-const api = `http://127.0.0.1:${apiPort}`;
 const ui = `http://127.0.0.1:${explorerPort}`;
 
 export default defineConfig({
@@ -14,28 +12,17 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "bun src/server/main.ts",
-      url: `${api}/healthz`,
+      command: "bunx vite --host 127.0.0.1",
+      url: `${ui}/healthz`,
       reuseExistingServer: true,
-      timeout: 60_000,
+      timeout: 120_000,
       env: {
         LABKIT_DB_URL:
           process.env.LABKIT_DB_URL ?? `postgresql://postgres:agens@127.0.0.1:${dbPort}/labkit`,
         LABKIT_TENANT: process.env.LABKIT_TENANT ?? "overlap-bench",
-        LABKIT_PORT_WEB: apiPort,
         LABKIT_PORT_DB: dbPort,
         LABKIT_PORT_EXPLORER: explorerPort,
       },
-    },
-    {
-      command: "bunx vite --host 127.0.0.1",
-      env: {
-        LABKIT_PORT_WEB: apiPort,
-        LABKIT_PORT_EXPLORER: explorerPort,
-      },
-      url: ui,
-      reuseExistingServer: true,
-      timeout: 60_000,
     },
   ],
   projects: [

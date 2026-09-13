@@ -10,7 +10,7 @@ Start it from `web/`:
 bun run db:up
 ```
 
-That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` first and sets `--project-name` to `labkit-web` (or `labkit-web-<offset>` in a worktree). Bare `docker compose up -d db` binds **5432** and uses project name `web`. `bun run db:down` stops this worktree's `db` service. It does not delete the volume.
+That runs `scripts/compose.sh` with `--project-name labkit-web` and host port **5432**. Every checkout shares this database. `bun run db:down` stops that shared `db` service. It does not delete the volume.
 
 Ingest refuses destination databases named `labkit_tests` or `postgres`.
 
@@ -24,23 +24,15 @@ Leave 5433 alone unless an operator names it.
 
 ## Ports
 
-`scripts/worktree-ports.sh` (this package) hashes the worktree path. Offset 0 is the main checkout. Other worktrees use `10000 + cksum(path) % 10000`. A hash collision is refused.
+`scripts/worktree-ports.sh` hashes the worktree path for **HTTP** only. Postgres stays on 5432.
 
 | Env | Main | Use |
 |-----|------|-----|
-| `LABKIT_PORT_DB` | 5432 | Docker Postgres host port |
-| `LABKIT_PORT_WEB` | 8899 | labkit-web API |
-| `LABKIT_PORT_EXPLORER` | 8850 | Vite explorer |
+| `LABKIT_PORT_DB` | 5432 | Shared Docker Postgres |
+| `LABKIT_PORT_EXPLORER` | 8850 | Vite (UI + API). Other worktrees offset this. |
+| `LABKIT_PORT_WEB` | 8899 | Optional `bun run server` without Vite |
 
-`web/scripts/with-ports.sh` exports these, then execs. `bun run server`, `dev`, `ingest`, and `test:walk` all go through it.
-
-Vite `strictPort` is on. If 8850 (or the worktree explorer port) is taken, Vite exits. Playwright `reuseExistingServer` will keep a **stale** Vite that was started without the current proxy. Symptom: UI banner `404: Not Found`, `.current-handle` empty, `GET /questions/1` through Vite returns `index.html`. Restart Vite. Confirm JSON:
-
-```
-curl -H 'accept: application/json' http://127.0.0.1:$LABKIT_PORT_EXPLORER/questions/1
-```
-
-Two API processes on one port: the second exits 1. If `/healthz` on that port already returns `ok`, ignore the failed duplicate.
+`bun run dev` is the loop. Vite migrates, seeds if source `max(labkit_event.seq)` moved, and serves both surfaces. Handler edits hot-reload. Restart Vite if `/healthz` 404s because a stale process is sitting on 8850.
 
 ## Ingest
 
