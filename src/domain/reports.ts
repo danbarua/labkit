@@ -6,10 +6,10 @@
 import { z } from "zod";
 import type { EdgeLabel, NodeLabel } from "../db/domain";
 import type { Command } from "./commands";
+import { citedBasis } from "./commands";
 import type { DomainEvent, GraphChange } from "./events";
 import type { AnyRef, Kind, Ref } from "./ref";
 import { GATE_STATES, WORK_STATES } from "./vocab";
-
 /**
  * `Ref<K>` — the natural-id handle the domain passes around, which over the wire is just its
  * id: `"GATE_1"`, not `{"kind":"gate","id":"GATE_1"}`.
@@ -788,13 +788,17 @@ export const declaredGate = z.strictObject({
   gate: ref("gate"),
   events: z.array(domainEvent),
 });
-/** What evaluate_criterion returns — the decision and what it bears on. */
+/** What evaluate_criterion returns — the decision (outcome, value) and scope (gates governed unconditionally + optional gate/about/citing + at) decided by the act. */
 export const evaluatedCriterion = z.strictObject({
   evaluation: ref("evaluation"),
   criterion: ref("criterion"),
   outcome: z.enum(["pass", "fail"]),
   value: z.string(),
   gates: z.array(ref("gate")),
+  at: z.string(),
+  gate: ref("gate").optional(),
+  about: ref("claim").optional(),
+  citing: z.array(citedBasis).optional(),
   events: z.array(domainEvent),
 });
 export const acceptedAsUnresolved = z.strictObject({
