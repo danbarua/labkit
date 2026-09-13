@@ -30,32 +30,32 @@ afterEach(async () => {
 const afterwards = async () => new ResearchSession(await scenario.current(), { clock });
 
 async function anEnquiry() {
-  const { enquiry } = await session.openEnquiry("does T beat the control?");
+  const { enquiry } = await session.writes.openEnquiry("does T beat the control?");
   return enquiry;
 }
 
 describe("why <task> names the state work already computes", () => {
   test("blocked work names the failing gate", async () => {
     const enquiry = await anEnquiry();
-    const { criterion } = await session.stateCriterion("the median must agree");
-    const { work } = await session.planWork({
+    const { criterion } = await session.writes.stateCriterion("the median must agree");
+    const { work } = await session.writes.planWork({
       objective: "run stage 2",
       acceptance: "a table",
       addressing: enquiry,
     });
-    const { gate } = await session.declareGate({
+    const { gate } = await session.writes.declareGate({
       governedBy: [criterion],
       consequence: "stage 2 does not start",
       protecting: [work],
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "median p = 0.21",
       outcome: "fail",
     });
 
-    const explained = await (await afterwards()).why({ subject: work });
+    const explained = await (await afterwards()).reads.why({ subject: work });
     expect(explained.is).toBe("blocked");
     expect(explained.because.map((c) => c.handle)).toContain(gate);
     expect(explained.because[0]!.wording).toContain("failed");
@@ -64,19 +64,19 @@ describe("why <task> names the state work already computes", () => {
 
   test("waiting work names the unevaluated gate", async () => {
     const enquiry = await anEnquiry();
-    const { criterion } = await session.stateCriterion("the median must agree");
-    const { work } = await session.planWork({
+    const { criterion } = await session.writes.stateCriterion("the median must agree");
+    const { work } = await session.writes.planWork({
       objective: "run stage 2",
       acceptance: "a table",
       addressing: enquiry,
     });
-    const { gate } = await session.declareGate({
+    const { gate } = await session.writes.declareGate({
       governedBy: [criterion],
       consequence: "stage 2 does not start",
       protecting: [work],
     });
 
-    const explained = await (await afterwards()).why({ subject: work });
+    const explained = await (await afterwards()).reads.why({ subject: work });
     expect(explained.is).toBe("waiting");
     expect(explained.because.map((c) => c.handle)).toContain(gate);
     expect(explained.because[0]!.wording).toBe("never-evaluated");
@@ -84,17 +84,17 @@ describe("why <task> names the state work already computes", () => {
 
   test("carried-out work names the analysis that implemented it", async () => {
     const enquiry = await anEnquiry();
-    const { observations } = await session.recordObservations({
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "stage 1 results",
       finding: "per-image accuracy",
     });
-    const { work } = await session.planWork({
+    const { work } = await session.writes.planWork({
       objective: "run the comparison",
       acceptance: "a table",
       addressing: enquiry,
     });
-    const { analysis } = await recordAnalysis(session, {
+    const { analysis } = await recordAnalysis(session.writes, {
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -102,48 +102,48 @@ describe("why <task> names the state work already computes", () => {
       concludes: [{ proposition: "T beats the control", finding: "p = 0.004" }],
     });
 
-    const explained = await (await afterwards()).why({ subject: work });
+    const explained = await (await afterwards()).reads.why({ subject: work });
     expect(explained.is).toBe("carried-out");
     expect(explained.because.map((c) => c.handle)).toContain(analysis);
   });
 
   test("ready work says no gate holds it", async () => {
     const enquiry = await anEnquiry();
-    const { work } = await session.planWork({
+    const { work } = await session.writes.planWork({
       objective: "run stage 2",
       acceptance: "a table",
       addressing: enquiry,
     });
 
-    const explained = await (await afterwards()).why({ subject: work });
+    const explained = await (await afterwards()).reads.why({ subject: work });
     expect(explained.is).toBe("planned — ready, no gate holds it");
     expect(explained.because.map((c) => c.handle)).toContain(enquiry);
   });
 
   test("ready work with no enquiry says so", async () => {
-    const { work } = await session.planWork({
+    const { work } = await session.writes.planWork({
       objective: "run stage 2",
       acceptance: "a table",
     });
 
-    const explained = await (await afterwards()).why({ subject: work });
+    const explained = await (await afterwards()).reads.why({ subject: work });
     expect(explained.is).toBe("planned — ready, no gate holds it, and no question named");
     expect(explained.because).toHaveLength(0);
   });
 
   test("abandoned work still names the stopping decision", async () => {
     const enquiry = await anEnquiry();
-    const { work } = await session.planWork({
+    const { work } = await session.writes.planWork({
       objective: "run stage 2",
       acceptance: "a table",
       addressing: enquiry,
     });
-    const stopped = await session.stopWork({
+    const stopped = await session.writes.stopWork({
       work,
       because: "the comparison is no longer worth running",
     });
 
-    const explained = await (await afterwards()).why({ subject: work });
+    const explained = await (await afterwards()).reads.why({ subject: work });
     expect(explained.is).toBe("abandoned");
     expect(explained.because.map((c) => c.handle)).toContain(stopped.decision);
   });

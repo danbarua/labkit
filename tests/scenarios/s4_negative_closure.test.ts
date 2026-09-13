@@ -47,15 +47,15 @@ const TRANSFORMATION = "the encoding performs structured internal transformation
  * separate enquiry asks whether the learned construction is special.
  */
 async function aProgrammeWithOneOpenQuestion() {
-  const { enquiry: established } = await session.openEnquiry(
+  const { enquiry: established } = await session.writes.openEnquiry(
     "does the encoding transform structure at all?",
   );
-  const { observations: priorObs } = await session.recordObservations({
+  const { observations: priorObs } = await session.writes.recordObservations({
     enquiry: established,
     name: "response-map measurements",
     finding: "response maps across 40 initial conditions",
   });
-  await recordAnalysis(session, {
+  await recordAnalysis(session.writes, {
     enquiry: established,
     method: "response-map-analysis",
     from: [priorObs],
@@ -67,10 +67,10 @@ async function aProgrammeWithOneOpenQuestion() {
     ],
   });
 
-  const { enquiry: specificity } = await session.openEnquiry(
+  const { enquiry: specificity } = await session.writes.openEnquiry(
     "is the learned construction special on the internal measure?",
   );
-  const { observations } = await session.recordObservations({
+  const { observations } = await session.writes.recordObservations({
     enquiry: specificity,
     name: "five-construction comparison",
     finding: "internal mapping strength for all five graph constructions",
@@ -83,7 +83,7 @@ describe("S-4: a negative result that closes the question", () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
 
     // Agent: no detectable evidence of that. All five form a tight cluster.
-    const { claims: nullResultClaims } = await recordAnalysis(session, {
+    const { claims: nullResultClaims } = await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -97,19 +97,21 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // Researcher: then close that question for this endpoint.
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry: specificity,
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.open).toBe(false);
   });
 
   test("Afterward 1 & 2: closed, and specifically ANSWERED — not abandoned, not deferred", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { claims: nullResultClaims } = await recordAnalysis(session, {
+    const { claims: nullResultClaims } = await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -121,13 +123,15 @@ describe("S-4: a negative result that closes the question", () => {
         },
       ],
     });
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry: specificity,
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.open).toBe(false);
     expect(status.closure).toBe("answered");
     // The three must not be one state.
@@ -137,7 +141,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("Afterward 2, polarity: answered NEGATIVELY, and that is queryable", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { claims: nullResultClaims } = await recordAnalysis(session, {
+    const { claims: nullResultClaims } = await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -149,19 +153,21 @@ describe("S-4: a negative result that closes the question", () => {
         },
       ],
     });
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry: specificity,
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.answer).toBe("no");
   });
 
   test("Afterward 3: the neighbouring supported claim is untouched, and LabKit says so", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { claims: nullResultClaims } = await recordAnalysis(session, {
+    const { claims: nullResultClaims } = await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -173,26 +179,28 @@ describe("S-4: a negative result that closes the question", () => {
         },
       ],
     });
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry: specificity,
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
     // Reconstructible from a fresh reader, not from a value we kept.
     const reader = new ResearchSession(await scenario.current(), { clock });
-    const neighbour = await reader.whySupported({
-      claim: await claimNamed(reader, TRANSFORMATION),
+    const neighbour = await reader.reads.whySupported({
+      claim: await claimNamed(reader.reads, TRANSFORMATION),
     });
     expect(neighbour.verdict).toBe("supported");
     expect(neighbour.superseded).toEqual([]);
 
-    const closed = await reader.whySupported({ claim: await claimNamed(reader, SPECIFICITY) });
+    const closed = await reader.reads.whySupported({
+      claim: await claimNamed(reader.reads, SPECIFICITY),
+    });
     expect(closed.verdict).toBe("challenged");
   });
 
   test("Afterward 4: the null result is cited AS evidence, not as an absence of it", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { claims: nullResultClaims } = await recordAnalysis(session, {
+    const { claims: nullResultClaims } = await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -204,13 +212,15 @@ describe("S-4: a negative result that closes the question", () => {
         },
       ],
     });
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry: specificity,
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.evidence).toHaveLength(1);
     expect(status.evidence[0]!.states).toContain("no separation detectable");
   });
@@ -223,10 +233,12 @@ describe("S-4: a negative result that closes the question", () => {
   test("closing a question with no evidence reads as abandoned, not answered", async () => {
     const { specificity } = await aProgrammeWithOneOpenQuestion();
 
-    await session.closeEnquiry({ enquiry: specificity });
+    await session.writes.closeEnquiry({ enquiry: specificity });
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.open).toBe(false);
     expect(status.closure).toBe("abandoned");
     expect(status.answer).toBeNull();
@@ -240,7 +252,7 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("a refuted claim is distinguishable from one nobody has examined", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    await recordAnalysis(session, {
+    await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -253,13 +265,15 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    const refuted = await session.whySupported({ claim: await claimNamed(session, SPECIFICITY) });
+    const refuted = await session.reads.whySupported({
+      claim: await claimNamed(session.reads, SPECIFICITY),
+    });
 
     // **A sentence nobody claimed has no claim to ask about.** `whySupported` takes a handle,
     // and there is no handle to hand it for an unclaimed sentence.
-    expect(await session.claimsAsserting({ proposition: "nobody has ever asked this" })).toEqual(
-      [],
-    );
+    expect(
+      await session.reads.claimsAsserting({ proposition: "nobody has ever asked this" }),
+    ).toEqual([]);
 
     expect(refuted.verdict).toBe("challenged");
     expect(refuted.challenged).toBe(true);
@@ -274,12 +288,12 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("an analysis from a different enquiry cannot answer this question", async () => {
     const { established, specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { observations: elsewhere } = await session.recordObservations({
+    const { observations: elsewhere } = await session.writes.recordObservations({
       enquiry: established,
       name: "unrelated measurements",
       finding: "unrelated",
     });
-    const { claims: unrelatedClaims } = await recordAnalysis(session, {
+    const { claims: unrelatedClaims } = await recordAnalysis(session.writes, {
       enquiry: established,
       method: "unrelated-analysis",
       from: [elsewhere],
@@ -293,15 +307,17 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     await expect(
-      session.closeEnquiry({
+      session.writes.closeEnquiry({
         enquiry: specificity,
         answeredBy: claimOf(unrelatedClaims, SPECIFICITY),
       }),
     ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
     // Nothing was written on the way to failing.
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
     expect(observations).toMatch(/^ART_/);
@@ -309,7 +325,7 @@ describe("S-4: a negative result that closes the question", () => {
 
   test("a question cannot be answered on a proposition the analysis never concluded", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    await recordAnalysis(session, {
+    await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -323,14 +339,16 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     await expect(
-      session.closeEnquiry({
+      session.writes.closeEnquiry({
         enquiry: specificity,
         answeredBy: ref("claim", "CLM_99999"),
       }),
     ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.open).toBe(true);
   });
 
@@ -341,7 +359,7 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("polarity comes from the answering finding, not from any finding in the analysis", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { claims: mixedClaims } = await recordAnalysis(session, {
+    const { claims: mixedClaims } = await recordAnalysis(session.writes, {
       enquiry: specificity,
       method: "mixed-analysis",
       from: [observations],
@@ -358,13 +376,15 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry: specificity,
       answeredBy: claimOf(mixedClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.closure).toBe("answered");
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
@@ -380,28 +400,33 @@ describe("S-4: a negative result that closes the question", () => {
    */
   test("a withdrawn challenge is historical, and propagates as an affected claim", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: refutation, claims: refutationClaims } = await recordAnalysis(session, {
-      enquiry: specificity,
-      method: "cluster-comparison",
-      from: [observations],
-      concludes: [
-        {
-          proposition: SPECIFICITY,
-          finding: "no separation detectable",
-          bearing: "challenges",
-        },
-      ],
-    });
+    const { analysis: refutation, claims: refutationClaims } = await recordAnalysis(
+      session.writes,
+      {
+        enquiry: specificity,
+        method: "cluster-comparison",
+        from: [observations],
+        concludes: [
+          {
+            proposition: SPECIFICITY,
+            finding: "no separation detectable",
+            bearing: "challenges",
+          },
+        ],
+      },
+    );
 
-    const before = await session.whySupported({ claim: claimOf(refutationClaims, SPECIFICITY) });
+    const before = await session.reads.whySupported({
+      claim: claimOf(refutationClaims, SPECIFICITY),
+    });
     expect(before.challenged).toBe(true);
     expect(before.against).toHaveLength(1);
 
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: refutation,
       verdict: "the clustering metric was misapplied",
     });
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: refutation,
       because: review,
       enquiry: specificity,
@@ -424,14 +449,16 @@ describe("S-4: a negative result that closes the question", () => {
     // supporting side saw nothing here at all. By handle, not by sentence: after the
     // replacement two records assert these words, and this names the refutation's own claim,
     // the one that was withdrawn.
-    const revision = await (await afterwards()).why({ subject: report.replacement });
+    const revision = await (await afterwards()).reads.why({ subject: report.replacement });
     if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
     expect(revision.report.changed).toHaveLength(1);
     expect(revision.report.changed[0]!.was).toEqual(claimOf(refutationClaims, SPECIFICITY));
 
     // After the replacement the sentence is claimed twice; this asks about
     // the original, which is the one that was withdrawn.
-    const after = await session.whySupported({ claim: claimOf(refutationClaims, SPECIFICITY) });
+    const after = await session.reads.whySupported({
+      claim: claimOf(refutationClaims, SPECIFICITY),
+    });
     expect(after.withdrawn).toBe(true);
     expect(after.verdict).toBe("withdrawn");
     expect(after.against.map((a) => a.finding)).toEqual(["still no separation, corrected metric"]);
@@ -442,15 +469,17 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // ...and invalidating the record enumerates the challenged claim.
-    const downstream = await session.whatDependsOn({ subject: "cluster-comparison output" });
+    const downstream = await session.reads.whatDependsOn({ subject: "cluster-comparison output" });
     expect(downstream.claims.map((c) => c.asserts)).toContain(SPECIFICITY);
   });
 
   test("an enquiry nobody has closed is open, and that is not a kind of closure", async () => {
     const { specificity } = await aProgrammeWithOneOpenQuestion();
 
-    const status = await session.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
+    const status = await session.reads.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
+      status,
+    );
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
   });

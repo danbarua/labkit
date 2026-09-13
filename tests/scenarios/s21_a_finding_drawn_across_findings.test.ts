@@ -44,15 +44,15 @@ const HEADLINE = "T shows no detectable advantage over any tested control";
 
 /** Four comparisons, each its own analysis with its own finding. */
 async function fourComparisons() {
-  const { enquiry } = await session.openEnquiry("does T beat the controls?");
+  const { enquiry } = await session.writes.openEnquiry("does T beat the controls?");
   const claims = [];
   for (const [name, proposition] of CONTROLS) {
-    const { observations } = await session.recordObservations({
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: `${name} run`,
       finding: `paired scores, ${name}`,
     });
-    const { claims: drawn } = await recordAnalysis(session, {
+    const { claims: drawn } = await recordAnalysis(session.writes, {
       enquiry,
       method: `paired comparison, ${name}`,
       from: [observations],
@@ -67,12 +67,12 @@ describe("S-21: a finding drawn across findings", () => {
   test("the synthesis names what it rests on, and no run it did not do", async () => {
     const { claims } = await fourComparisons();
 
-    const { claim } = await session.synthesise({
+    const { claim } = await session.writes.synthesise({
       proposition: HEADLINE,
       restingOn: claims,
     });
 
-    const why = await (await afterwards()).whySupported({ claim });
+    const why = await (await afterwards()).reads.whySupported({ claim });
     expect(why.proposition).toBe(HEADLINE);
     expect(why.drawnAcross.map((r) => r.claim).sort()).toEqual([...claims].sort());
     // No evidence of its own, and that is the point: a synthesis measures
@@ -87,25 +87,25 @@ describe("S-21: a finding drawn across findings", () => {
    */
   test("the synthesis reads the same way whichever reader is asked", async () => {
     const { claims } = await fourComparisons();
-    const { claim } = await session.synthesise({ proposition: HEADLINE, restingOn: claims });
+    const { claim } = await session.writes.synthesise({ proposition: HEADLINE, restingOn: claims });
 
-    const explained = await (await afterwards()).why({ subject: claim });
+    const explained = await (await afterwards()).reads.why({ subject: claim });
     expect(explained.is).not.toMatch(/nothing has examined/);
     expect(explained.because.map((c) => c.handle).sort()).toEqual([...claims].sort());
   });
 
   test("a synthesis can answer the question its parts were pursued under", async () => {
     const { enquiry, claims } = await fourComparisons();
-    const { claim } = await session.synthesise({
+    const { claim } = await session.writes.synthesise({
       proposition: HEADLINE,
       restingOn: claims,
     });
 
-    await session.closeEnquiry({ enquiry, answeredBy: claim });
+    await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
 
     // Afterward: the question is answered, and answered on the headline —
     // not on whichever of the four was cited to stand in for it.
-    const status = await (await afterwards()).enquiryStatus({ enquiry });
+    const status = await (await afterwards()).reads.enquiryStatus({ enquiry });
     expect(status.open).toBe(false);
     expect(status.closure).toBe("answered");
     // All four findings are what it rests on. Citing one would name an
@@ -117,13 +117,13 @@ describe("S-21: a finding drawn across findings", () => {
    * The bearing half, which is what a negative result looks like.
    */
   test("a synthesis over challenging findings can close its enquiry too", async () => {
-    const { enquiry } = await session.openEnquiry("does T beat the controls?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("does T beat the controls?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "paired runs",
       finding: "matched scores",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -134,14 +134,14 @@ describe("S-21: a finding drawn across findings", () => {
         bearing: "challenges" as const,
       })),
     });
-    const { claim } = await session.synthesise({
+    const { claim } = await session.writes.synthesise({
       proposition: HEADLINE,
       restingOn: CONTROLS.map(([, proposition]) => claimOf(claims, proposition)),
     });
 
-    await session.closeEnquiry({ enquiry, answeredBy: claim });
+    await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
 
-    const status = await (await afterwards()).enquiryStatus({ enquiry });
+    const status = await (await afterwards()).reads.enquiryStatus({ enquiry });
     expect(status.closure).toBe("answered");
     // Answered "no", and resting on all four — the polarity comes from which
     // way the findings underneath it cut.
@@ -153,29 +153,29 @@ describe("S-21: a finding drawn across findings", () => {
     await fourComparisons();
 
     await expect(
-      session.synthesise({ proposition: HEADLINE, restingOn: [ref("claim", "CLM_999")] }),
+      session.writes.synthesise({ proposition: HEADLINE, restingOn: [ref("claim", "CLM_999")] }),
     ).rejects.toThrow(/no claim CLM_999 to rest on/);
 
-    const found = await (await afterwards()).claimsAsserting({ proposition: HEADLINE });
+    const found = await (await afterwards()).reads.claimsAsserting({ proposition: HEADLINE });
     expect(found).toEqual([]);
   });
 
   test("a synthesis resting on nothing is refused: that is an analysis's conclusion", async () => {
     await fourComparisons();
 
-    await expect(session.synthesise({ proposition: HEADLINE, restingOn: [] })).rejects.toThrow(
-      /at least one finding to rest on/,
-    );
+    await expect(
+      session.writes.synthesise({ proposition: HEADLINE, restingOn: [] }),
+    ).rejects.toThrow(/at least one finding to rest on/);
   });
   test("reinterpret narrows exactly the named synthesis and preserves its parts", async () => {
     const { claims } = await fourComparisons();
     const restingOn = [claims[0]!, claims[1]!, claims[0]!];
-    const { claim: synthesis } = await session.synthesise({
+    const { claim: synthesis } = await session.writes.synthesise({
       proposition: HEADLINE,
       restingOn,
     });
 
-    const report = await session.reinterpret({
+    const report = await session.writes.reinterpret({
       of: synthesis,
       as: "T shows no advantage in the measured controls",
       because: "the headline overstates what the comparisons establish",
@@ -202,12 +202,14 @@ describe("S-21: a finding drawn across findings", () => {
       edges.filter((edge) => edge.label === "SUPPORTS" || edge.label === "CHALLENGES"),
     ).toEqual([]);
 
-    const narrowed = await (await afterwards()).whySupported({ claim: report.nowClaims.claim });
+    const narrowed = await (await afterwards()).reads.whySupported({
+      claim: report.nowClaims.claim,
+    });
     expect(narrowed.drawnAcross.map((part) => part.claim).sort()).toEqual(expectedParts);
     expect(narrowed.support).toEqual([]);
 
     await expect(
-      session.reinterpret({
+      session.writes.reinterpret({
         of: synthesis,
         as: "T has no measured advantage",
         because: "trying to reinterpret the superseded synthesis",
@@ -216,13 +218,13 @@ describe("S-21: a finding drawn across findings", () => {
   });
 
   test("accepting a synthesis keeps its identity and cites every component finding", async () => {
-    const { enquiry } = await session.openEnquiry("does the measured effect hold?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("does the measured effect hold?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "paired measurements",
       finding: "paired measurements",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -236,11 +238,11 @@ describe("S-21: a finding drawn across findings", () => {
       ],
     });
     const parts = [claims[0]!.claim, claims[1]!.claim, claims[0]!.claim];
-    const { claim: synthesis } = await session.synthesise({
+    const { claim: synthesis } = await session.writes.synthesise({
       proposition: "the effect is unresolved across both comparisons",
       restingOn: parts,
     });
-    const accepted = await session.acceptAsUnresolved({
+    const accepted = await session.writes.acceptAsUnresolved({
       enquiry,
       because: "the available comparisons do not settle the question",
       until: "a new independent comparison is available",
@@ -250,8 +252,8 @@ describe("S-21: a finding drawn across findings", () => {
       (change): change is import("../../src/domain").EdgeCreated => change.change === "EdgeCreated",
     );
     const expectedEvidence = [
-      ...(await session.whySupported({ claim: claims[0]!.claim })).support,
-      ...(await session.whySupported({ claim: claims[1]!.claim })).against,
+      ...(await session.reads.whySupported({ claim: claims[0]!.claim })).support,
+      ...(await session.reads.whySupported({ claim: claims[1]!.claim })).against,
     ]
       .map((finding) => finding.evidence)
       .sort();
@@ -265,7 +267,7 @@ describe("S-21: a finding drawn across findings", () => {
         .map((edge) => edge.to)
         .sort(),
     ).toEqual(expectedEvidence);
-    const explained = await (await afterwards()).why({ subject: accepted.decision });
+    const explained = await (await afterwards()).reads.why({ subject: accepted.decision });
     expect(explained.because).toContainEqual(
       expect.objectContaining({
         handle: synthesis,
@@ -276,22 +278,24 @@ describe("S-21: a finding drawn across findings", () => {
 
   test("criterion verdicts and design amendments can cite a synthesis", async () => {
     const { claims } = await fourComparisons();
-    const { claim: synthesis } = await session.synthesise({
+    const { claim: synthesis } = await session.writes.synthesise({
       proposition: HEADLINE,
       restingOn: claims,
     });
-    const { work } = await session.planWork({
+    const { work } = await session.writes.planWork({
       objective: "report the comparison",
       acceptance: "the result passes its locked check",
     });
-    const { criterion } = await session.stateCriterion("all four controls show no advantage");
-    const { gate } = await session.declareGate({
+    const { criterion } = await session.writes.stateCriterion(
+      "all four controls show no advantage",
+    );
+    const { gate } = await session.writes.declareGate({
       governedBy: [criterion],
       consequence: "the comparison is not reported",
       protecting: [work],
     });
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "four of four comparisons are within noise",
@@ -300,19 +304,19 @@ describe("S-21: a finding drawn across findings", () => {
     });
 
     const expectedFindings = CONTROLS.map(([name]) => `difference within noise, ${name}`).sort();
-    const standing = await (await afterwards()).criterionStanding({ criterion });
+    const standing = await (await afterwards()).reads.criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis.map((finding) => finding.states).sort()).toEqual(
       expectedFindings,
     );
 
-    const amendment = await session.amendDesign({
+    const amendment = await session.writes.amendDesign({
       criterion,
       nowRequires: "all prespecified controls show no advantage",
       because: "the criterion named the realized count rather than the prespecified set",
       citing: synthesis,
     });
     expect(amendment.nature).toBe("mechanical");
-    const history = await (await afterwards()).designHistory({ gate });
+    const history = await (await afterwards()).reads.designHistory({ gate });
     expect(
       history.conditions[0]!.amendments[0]!.citing.map((finding) => finding.states).sort(),
     ).toEqual(expectedFindings);

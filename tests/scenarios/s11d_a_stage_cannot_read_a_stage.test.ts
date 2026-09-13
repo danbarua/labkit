@@ -41,13 +41,13 @@ const TRENDS = "the response trends upward with dose";
  * calibrated it, and the trend analysis reads the calibrated series."
  */
 async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("does the response trend upward with dose?");
-  const { observations: raw } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does the response trend upward with dose?");
+  const { observations: raw } = await s.writes.recordObservations({
     enquiry,
     name: "raw sensor series",
     finding: "eleven dose levels, instrument settings not logged",
   });
-  const { analysis: calibration } = await recordAnalysis(s, {
+  const { analysis: calibration } = await recordAnalysis(s.writes, {
     enquiry,
     method: "calibrate",
     from: [raw],
@@ -63,7 +63,7 @@ async function aPipelineOnUnverifiableRawData(s: ResearchSession) {
   // expressible: `from` took observations only, so the intermediate had to be
   // re-entered as if it were fresh measurement — severing the chain to the raw
   // series and making stage two look independently reproducible.
-  const { analysis: trend } = await recordAnalysis(s, {
+  const { analysis: trend } = await recordAnalysis(s.writes, {
     enquiry,
     method: "dose-response-fit",
     from: [calibration],
@@ -76,7 +76,7 @@ describe("S-11d: a stage cannot read a stage", () => {
   /** The record is right about stage one: it rests on something uncheckable. */
   test("stage one reports itself unreproducible, correctly", async () => {
     const { raw, calibration } = await aPipelineOnUnverifiableRawData(session);
-    const report = await (await afterwards()).reproducibilityOf({
+    const report = await (await afterwards()).reads.reproducibilityOf({
       analysis: calibration,
       rebuilt: [{ part: raw, hash: "sha256:whatever" }],
     });
@@ -92,7 +92,10 @@ describe("S-11d: a stage cannot read a stage", () => {
   test("stage two does not claim reproducibility it cannot have", async () => {
     const { trend } = await aPipelineOnUnverifiableRawData(session);
 
-    const report = await (await afterwards()).reproducibilityOf({ analysis: trend, rebuilt: [] });
+    const report = await (await afterwards()).reads.reproducibilityOf({
+      analysis: trend,
+      rebuilt: [],
+    });
 
     expect(report.reproducible).toBe(false);
     // The calibration's output artefact -- what stage two actually read.
@@ -107,7 +110,7 @@ describe("S-11d: a stage cannot read a stage", () => {
   test("what depends on the raw series reaches every stage built on it", async () => {
     const { raw } = await aPipelineOnUnverifiableRawData(session);
 
-    const fromRaw = await (await afterwards()).whatDependsOn({ subject: raw });
+    const fromRaw = await (await afterwards()).reads.whatDependsOn({ subject: raw });
     expect(fromRaw.claims.map((c) => c.asserts).sort()).toEqual(
       ["the calibration is stable", TRENDS].sort(),
     );

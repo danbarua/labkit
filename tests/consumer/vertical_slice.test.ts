@@ -53,14 +53,16 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
    */
   test("a finding whose prespecified check failed reads differently from one whose check passed", async () => {
     const build = (outcome: "pass" | "fail") => async (s: ResearchSession) => {
-      const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
-      const { criterion: seedStability } = await s.stateCriterion("stable across five seeds");
-      const { observations } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry("does the pruning schedule move convergence?");
+      const { criterion: seedStability } = await s.writes.stateCriterion(
+        "stable across five seeds",
+      );
+      const { observations } = await s.writes.recordObservations({
         enquiry,
         name: "sweep readings",
         finding: "twelve runs across the schedule",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "convergence-fit",
         from: [observations],
@@ -72,7 +74,7 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
         ],
         heldTo: [seedStability],
       });
-      await s.evaluateCriterion({
+      await s.writes.evaluateCriterion({
         criterion: seedStability,
         value:
           outcome === "pass"
@@ -81,7 +83,7 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
         outcome,
         citing: [claimOf(analysisClaims, CONVERGES)],
       });
-      return s.whySupported({ claim: claimOf(analysisClaims, CONVERGES) });
+      return s.reads.whySupported({ claim: claimOf(analysisClaims, CONVERGES) });
     };
 
     const { a: passed, b: failed } = await inTwoWorlds(build("pass"), build("fail"));
@@ -110,32 +112,32 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
   };
 
   const settle = async (s: ResearchSession, asks: string, proposition: string) => {
-    const { enquiry } = await s.openEnquiry(asks);
-    const { observations } = await s.recordObservations({
+    const { enquiry } = await s.writes.openEnquiry(asks);
+    const { observations } = await s.writes.recordObservations({
       enquiry,
       name: `${proposition} readings`,
       finding: `measurements for ${proposition}`,
     });
-    await recordAnalysis(s, {
+    await recordAnalysis(s.writes, {
       enquiry,
       method: "paired-comparison",
       from: [observations],
       concludes: [{ proposition, finding: `result for ${proposition}` }],
     });
-    await s.isConfirmed({
-      claim: await claimNamed(s, proposition),
+    await s.writes.isConfirmed({
+      claim: await claimNamed(s.reads, proposition),
       because: "re-run under seed control",
     });
-    await s.closeEnquiry({
+    await s.writes.closeEnquiry({
       enquiry,
-      answeredBy: await claimNamed(s, proposition),
+      answeredBy: await claimNamed(s.reads, proposition),
     });
   };
 
   const inOrder = (first: typeof FIRST, second: typeof FIRST) => async (s: ResearchSession) => {
     await settle(s, first.asks, first.prop);
     await settle(s, second.asks, second.prop);
-    return (await s.whatIsKnown()).established;
+    return (await s.reads.whatIsKnown()).established;
   };
 
   /**
@@ -199,16 +201,18 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
         clock,
         events: inMemoryEventLog(),
       });
-      const { enquiry } = await s.openEnquiry("does the encoding beat the historical control?");
+      const { enquiry } = await s.writes.openEnquiry(
+        "does the encoding beat the historical control?",
+      );
 
       // The historical control, as it survives: recorded, hashed.
-      const { observations: historical } = await s.recordObservations({
+      const { observations: historical } = await s.writes.recordObservations({
         enquiry,
         name: "random control",
         finding: "the 2024 control, as archived",
         contentHash: "sha256:1111",
       });
-      const { analysis } = await recordAnalysis(s, {
+      const { analysis } = await recordAnalysis(s.writes, {
         enquiry,
         method: "paired-comparison",
         from: [historical],
@@ -221,7 +225,7 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
       });
 
       // A regeneration that does NOT match -- coherent, unlike the first draft.
-      const report = await s.reproducibilityOf({
+      const report = await s.reads.reproducibilityOf({
         analysis,
         rebuilt: [{ part: historical, hash: "sha256:2222" }],
       });
@@ -251,14 +255,14 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
    */
   test("who closed the question survives only as prose, and cannot be asked for", async () => {
     const build = (closer: string) => async (s: ResearchSession) => {
-      const { enquiry } = await s.openEnquiry("is the marginal split difference real?");
-      const { observations } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry("is the marginal split difference real?");
+      const { observations } = await s.writes.recordObservations({
         enquiry,
         name: "marginal split results",
         // The only place a name can go. It is evidence prose, not attribution.
         finding: `difference 2.1%, CI excludes zero (adjudicated by ${closer})`,
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "paired-comparison",
         from: [observations],
@@ -270,11 +274,11 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
         ],
       });
       // No actor may be supplied here. That is the whole finding.
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry,
         answeredBy: claimOf(analysisClaims, "the difference is real"),
       });
-      return s.enquiryStatus({ enquiry });
+      return s.reads.enquiryStatus({ enquiry });
     };
 
     const { a: byAlice, b: byBob } = await inTwoWorlds(build("Alice"), build("Bob"));

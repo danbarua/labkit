@@ -50,14 +50,14 @@ const SEED = "seed-to-seed variation is within tolerance";
  * result AND both robustness conditions hold.
  */
 async function aPrespecifiedRobustnessDesign() {
-  const { work: tertiary } = await session.planWork({
+  const { work: tertiary } = await session.writes.planWork({
     objective: "fit the tertiary model",
     acceptance: "reached only if the preceding checks are consistent",
   });
-  const { criterion: primary } = await session.stateCriterion(PRIMARY);
-  const { criterion: median } = await session.stateCriterion(MEDIAN);
-  const { criterion: seed } = await session.stateCriterion(SEED);
-  const { gate } = await session.declareGate({
+  const { criterion: primary } = await session.writes.stateCriterion(PRIMARY);
+  const { criterion: median } = await session.writes.stateCriterion(MEDIAN);
+  const { criterion: seed } = await session.writes.stateCriterion(SEED);
+  const { gate } = await session.writes.declareGate({
     governedBy: [primary, median, seed],
     consequence: "the tertiary analysis is reached only if the preceding checks are consistent",
     protecting: [tertiary],
@@ -69,27 +69,27 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
   test("Afterward 1: the result is inconclusive — neither effect confirmed nor null confirmed", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002, Holm-corrected",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median aggregation p = 0.21",
       outcome: "fail",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: seed,
       gate,
       value: "MCSE exceeds the effect",
       outcome: "fail",
     });
 
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     // Not satisfied -- so the primary result does not carry the day...
     expect(status.state).toBe("blocked");
     // ...and not "never evaluated" either. The work was done; it disagreed.
@@ -102,27 +102,27 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
   test("Afterward 2: the unmet condition is named before anyone spends the compute", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.21",
       outcome: "fail",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: seed,
       gate,
       value: "MCSE exceeds the effect",
       outcome: "fail",
     });
 
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
     expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
   });
@@ -135,13 +135,13 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
   test("Afterward 3: checks are itemised, and a failure is distinguishable from a check never run", async () => {
     const { primary, median, gate } = await aPrespecifiedRobustnessDesign();
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.21",
@@ -149,8 +149,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     });
     // Seed stability is never evaluated at all.
 
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     // Keyed by proposition for readability here; `criterion` is the stable
     // identity and two criteria worded alike are two criteria.
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c.state]));
@@ -163,15 +163,15 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
   test("some checks run, none failing, is not the same as all of them passing", async () => {
     const { primary, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002",
       outcome: "pass",
     });
 
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
     expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
@@ -183,19 +183,19 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    */
   test("Afterward 4: establishing one outstanding check does not silently unblock the work", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.21",
       outcome: "fail",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: seed,
       gate,
       value: "MCSE exceeds the effect",
@@ -203,15 +203,15 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     });
 
     // Seed stability is later established on a re-run.
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: seed,
       gate,
       value: "MCSE now within tolerance",
       outcome: "pass",
     });
 
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("blocked");
     expect(status.unmet.map((u) => u.requires)).toContain(MEDIAN);
     expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
@@ -224,13 +224,13 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
     // Both jobs, named explicitly: the same three checks gate the tertiary
     // model and are the standard this analysis is held to.
-    const { enquiry } = await session.openEnquiry("does T differ from rewired?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("does T differ from rewired?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "per-image results",
       finding: "per-image accuracy, 10,000 images",
     });
-    const { analysis } = await recordAnalysis(session, {
+    const { analysis } = await recordAnalysis(session.writes, {
       enquiry,
       method: "holm-pairwise",
       from: [observations],
@@ -243,19 +243,19 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       heldTo: [primary, median, seed],
     });
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.21",
       outcome: "fail",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: seed,
       gate,
       value: "MCSE exceeds the effect",
@@ -263,18 +263,18 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     });
 
     // The gate knows the checks disagreed.
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("blocked");
 
     // And so does the finding: `QUALIFIES` connects the prespecified criteria
     // to the analysis they qualify, so "supported" means "the evidence holds
     // up by its own prespecified standard", not just "some evidence exists".
     // See tests/scenarios/s3b_criteria_qualify_only.test.ts.
-    const why = await session.whySupported({
-      claim: await claimNamed(session, "T differs from rewired"),
+    const why = await session.reads.whySupported({
+      claim: await claimNamed(session.reads, "T differs from rewired"),
     });
-    expect(await whyOf(await afterwards(), "T differs from rewired")).toEqual(why);
+    expect(await whyOf((await afterwards()).reads, "T differs from rewired")).toEqual(why);
     expect(why.verdict).toBe("standard-unmet");
     expect([...why.unmet.map((u) => u.requires)].sort()).toEqual([MEDIAN, SEED].sort());
     // Disqualified, not withdrawn: the numbers are exactly as they were.
@@ -289,27 +289,27 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    * proposition text would collapse them into one check.
    */
   test("two criteria worded identically are two separate checks", async () => {
-    const { work } = await session.planWork({
+    const { work } = await session.writes.planWork({
       objective: "downstream work",
       acceptance: "both hold",
     });
-    const { criterion: first } = await session.stateCriterion("seed stability is adequate");
-    const { criterion: second } = await session.stateCriterion("seed stability is adequate");
-    const { gate } = await session.declareGate({
+    const { criterion: first } = await session.writes.stateCriterion("seed stability is adequate");
+    const { criterion: second } = await session.writes.stateCriterion("seed stability is adequate");
+    const { gate } = await session.writes.declareGate({
       governedBy: [first, second],
       consequence: "block unless both hold",
       protecting: [work],
     });
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: first,
       gate,
       value: "within tolerance",
       outcome: "pass",
     });
 
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     expect(status.checks).toHaveLength(2);
     expect(new Set(status.checks.map((c) => c.criterion)).size).toBe(2);
     // One checked, one not -- which the collapsed version could not express.
@@ -324,32 +324,32 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
    */
   test("the evaluation that decided a failed check is the failing one, deterministically", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: seed,
       gate,
       value: "within tolerance",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.21",
       outcome: "fail",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.04 on a second run",
       outcome: "pass",
     });
 
-    const check = (await session.gateStatus({ gate })).checks.find(
+    const check = (await session.reads.gateStatus({ gate })).checks.find(
       (c) => c.proposition === MEDIAN,
     )!;
     expect(check.state).toBe("failed");
@@ -364,33 +364,33 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
 
   test("re-running a failed check until it passes does not clear it", async () => {
     const { primary, median, seed, gate } = await aPrespecifiedRobustnessDesign();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: primary,
       gate,
       value: "p = 0.002",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: seed,
       gate,
       value: "within tolerance",
       outcome: "pass",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.21",
       outcome: "fail",
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: median,
       gate,
       value: "median p = 0.04 on a second run",
       outcome: "pass",
     });
 
-    const status = await session.gateStatus({ gate });
-    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate });
+    expect(await (await afterwards()).reads.gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("blocked");
     expect(status.unmet.map((u) => u.requires)).toEqual([MEDIAN]);
     expect(status.everFailed).toBe(true);

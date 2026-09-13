@@ -75,7 +75,7 @@ describe("an event says who caused it", () => {
     const events = inMemoryEventLog();
     const session = new ResearchSession(graph, { clock, events });
 
-    await session.pose({ question: "is the solver faster?" });
+    await session.writes.pose({ question: "is the solver faster?" });
 
     expect((await events.all())[0]?.attribution).toEqual(UNATTRIBUTED);
   });

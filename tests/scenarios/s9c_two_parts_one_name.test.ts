@@ -40,20 +40,20 @@ const NAME = "control series";
  * Researcher: "We regenerated the control, and this analysis compares it against the original."
  */
 async function anAnalysisComparingBothControls(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("do the two controls agree?");
-  const { observations: original } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("do the two controls agree?");
+  const { observations: original } = await s.writes.recordObservations({
     enquiry,
     name: NAME,
     finding: "the historical series",
     contentHash: "sha256:orig",
   });
-  const { observations: regenerated } = await s.recordObservations({
+  const { observations: regenerated } = await s.writes.recordObservations({
     enquiry,
     name: NAME,
     finding: "regenerated from an inferred algorithm",
     contentHash: "sha256:regen",
   });
-  const { analysis: comparison } = await recordAnalysis(s, {
+  const { analysis: comparison } = await recordAnalysis(s.writes, {
     enquiry,
     method: "compare-controls",
     from: [original, regenerated],
@@ -70,7 +70,7 @@ describe("S-9c: two parts, one name", () => {
   test("a part that matched and a part that differed are distinguishable", async () => {
     const { original, regenerated, comparison } = await anAnalysisComparingBothControls(session);
 
-    const report = await (await afterwards()).reproducibilityOf({
+    const report = await (await afterwards()).reads.reproducibilityOf({
       analysis: comparison,
       rebuilt: [
         { part: original, hash: "sha256:orig" },
@@ -91,12 +91,12 @@ describe("S-9c: two parts, one name", () => {
   /** The same for the two absences, which S-9 fought to keep apart. */
   test("unverifiable and not-rebuilt stay distinguishable under a shared name", async () => {
     const { enquiry } = await anAnalysisComparingBothControls(session);
-    const { observations: noHash } = await session.recordObservations({
+    const { observations: noHash } = await session.writes.recordObservations({
       enquiry,
       name: NAME,
       finding: "a third copy, no hash recorded",
     });
-    const { analysis } = await recordAnalysis(session, {
+    const { analysis } = await recordAnalysis(session.writes, {
       enquiry,
       method: "second-look",
       from: [noHash],
@@ -108,7 +108,7 @@ describe("S-9c: two parts, one name", () => {
       ],
     });
 
-    const report = await (await afterwards()).reproducibilityOf({ analysis, rebuilt: [] });
+    const report = await (await afterwards()).reads.reproducibilityOf({ analysis, rebuilt: [] });
     expect(report.unverifiable).toEqual([{ part: noHash, name: NAME }]);
     expect(report.notRebuilt).toEqual([]);
   });

@@ -35,10 +35,10 @@ const SHARP = "does the edge padding change the reconstruction error?";
 
 describe("S-28: a hunch became a question", () => {
   test("Afterward 1: the question says which note it came out of", async () => {
-    const { note } = await session.note({ text: HUNCH });
-    const { question } = await session.pose({ question: SHARP, from: note });
+    const { note } = await session.writes.note({ text: HUNCH });
+    const { question } = await session.writes.pose({ question: SHARP, from: note });
 
-    const origin = await (await afterwards()).originOf({ question });
+    const origin = await (await afterwards()).reads.originOf({ question });
     expect(origin?.kind).toBe("noted");
     expect(origin?.from).toBe(note);
     // The note's own words, not a restatement: a hunch is worth reading back
@@ -47,25 +47,25 @@ describe("S-28: a hunch became a question", () => {
   });
 
   test("Afterward 2: opening an enquiry from a hunch keeps it too", async () => {
-    const { note } = await session.note({ text: HUNCH });
-    const { question } = await session.openEnquiry(SHARP, note);
+    const { note } = await session.writes.note({ text: HUNCH });
+    const { question } = await session.writes.openEnquiry(SHARP, note);
 
     // The compound act records what the primitive would have. Otherwise the
     // common case is the one that loses the provenance.
-    const origin = await (await afterwards()).originOf({ question });
+    const origin = await (await afterwards()).reads.originOf({ question });
     expect(origin?.kind).toBe("noted");
     expect(origin?.from).toBe(note);
   });
 
   test("Afterward 3: a sharpened question still reads as sharpened", async () => {
-    const { question: broad } = await session.pose({ question: "does the edge matter?" });
-    const { question: sharp } = await session.sharpen({
+    const { question: broad } = await session.writes.pose({ question: "does the edge matter?" });
+    const { question: sharp } = await session.writes.sharpen({
       from: broad,
       into: SHARP,
       because: "which edge, and measured how",
     });
 
-    const origin = await (await afterwards()).originOf({ question: sharp });
+    const origin = await (await afterwards()).reads.originOf({ question: sharp });
     expect(origin?.kind).toBe("sharpened");
     expect(origin?.from).toBe(broad);
     expect(origin?.said).toBe("does the edge matter?");
@@ -73,23 +73,23 @@ describe("S-28: a hunch became a question", () => {
   });
 
   test("Afterward 4: a question asked outright still has no origin", async () => {
-    const { question } = await session.pose({ question: SHARP });
-    expect(await (await afterwards()).originOf({ question })).toBeNull();
+    const { question } = await session.writes.pose({ question: SHARP });
+    expect(await (await afterwards()).reads.originOf({ question })).toBeNull();
   });
 
   test("Afterward 5: `why` on the question names the note that prompted it", async () => {
-    const { note } = await session.note({ text: HUNCH });
-    const { question } = await session.pose({ question: SHARP, from: note });
+    const { note } = await session.writes.note({ text: HUNCH });
+    const { question } = await session.writes.pose({ question: SHARP, from: note });
 
     // The generic walk, not a second special-cased read: the edge is one the
     // existing reader already renders, and this is the check that it does.
-    const why = await (await afterwards()).why({ subject: question });
+    const why = await (await afterwards()).reads.why({ subject: question });
     expect(why.because).toEqual([{ handle: note, wording: `was prompted by ${HUNCH}` }]);
   });
 
   test("posing from a note nobody wrote is refused, and the message says what to do", async () => {
-    await expect(session.pose({ question: SHARP, from: "NOTE_404" as never })).rejects.toThrow(
-      /no note NOTE_404/,
-    );
+    await expect(
+      session.writes.pose({ question: SHARP, from: "NOTE_404" as never }),
+    ).rejects.toThrow(/no note NOTE_404/);
   });
 });

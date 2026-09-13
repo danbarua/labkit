@@ -40,14 +40,14 @@ async function afterwards(): Promise<ResearchSession> {
  * The whole conversation. Six acts, none of them irregular.
  */
 async function aPromotedAnswerNobodyChecked() {
-  const { criterion: check } = await session.stateCriterion(CHECK);
-  const { enquiry } = await session.openEnquiry(QUESTION);
-  const { observations } = await session.recordObservations({
+  const { criterion: check } = await session.writes.stateCriterion(CHECK);
+  const { enquiry } = await session.writes.openEnquiry(QUESTION);
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "8k-step run logs",
     finding: "loss plateaus at 4.1 by step 6k",
   });
-  const { claims } = await recordAnalysis(session, {
+  const { claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "8k-step ablation",
     from: [observations],
@@ -55,8 +55,8 @@ async function aPromotedAnswerNobodyChecked() {
     heldTo: [check],
   });
   const claim = claims[0]!.claim;
-  await session.isConfirmed({ claim, because: "we are relying on this to ship" });
-  await session.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.isConfirmed({ claim, because: "we are relying on this to ship" });
+  await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
   return { check, enquiry, claim };
 }
 
@@ -64,7 +64,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
   test("the claim's own report says the prespecified check is unmet", async () => {
     const { check, claim } = await aPromotedAnswerNobodyChecked();
 
-    const why = await session.whySupported({ claim });
+    const why = await session.reads.whySupported({ claim });
     expect(why.unmet.map((u: { criterion: string }) => u.criterion)).toContain(check);
     expect(why.standard.find((c: { criterion: string }) => c.criterion === check)?.state).toBe(
       "never-run",
@@ -81,11 +81,11 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
     const { claim, enquiry } = await aPromotedAnswerNobodyChecked();
 
     const later = await afterwards();
-    const survey = await later.whatIsKnown();
+    const survey = await later.reads.whatIsKnown();
     const asked = (bucket: readonly { asks: string }[]) => bucket.some((q) => q.asks === QUESTION);
 
     expect(asked(survey.established)).toBe(false);
-    expect((await later.enquiryStatus({ enquiry })).restsOn).toBe("exploratory");
+    expect((await later.reads.enquiryStatus({ enquiry })).restsOn).toBe("exploratory");
 
     // It is not untested, not unresolved, and not accepted either: the question
     // *was* worked on, *was* answered, and nobody parked it. Whatever bucket it
@@ -113,30 +113,30 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
    */
   test("a check that was run and passed leaves the answer established", async () => {
     const { check, claim, enquiry } = await aPromotedAnswerNobodyChecked();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: check,
       outcome: "pass",
       value: "loss 3.6 vs 3.8 baseline",
       citing: [claim],
     });
     const later = await afterwards();
-    const survey = await later.whatIsKnown();
+    const survey = await later.reads.whatIsKnown();
     expect(survey.established.some((q: { asks: string }) => q.asks === QUESTION)).toBe(true);
-    expect((await later.enquiryStatus({ enquiry })).restsOn).toBe("confirmatory");
+    expect((await later.reads.enquiryStatus({ enquiry })).restsOn).toBe("confirmatory");
   });
 
   /**
    * The mirror image, and the case that was passing for the wrong reason.
    */
   test("a promoted negative result whose check passed is established", async () => {
-    const { criterion: check } = await session.stateCriterion(CHECK);
-    const { enquiry } = await session.openEnquiry(QUESTION);
-    const { observations } = await session.recordObservations({
+    const { criterion: check } = await session.writes.stateCriterion(CHECK);
+    const { enquiry } = await session.writes.openEnquiry(QUESTION);
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "8k-step run logs",
       finding: "loss plateaus at 4.1 by step 6k",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "8k-step ablation",
       from: [observations],
@@ -150,17 +150,17 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
       heldTo: [check],
     });
     const claim = claims[0]!.claim;
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: check,
       outcome: "pass",
       value: "loss 3.6 vs 3.8 baseline",
       citing: [claim],
     });
-    await session.isConfirmed({ claim, because: "the answer is no, and we checked" });
-    await session.closeEnquiry({ enquiry, answeredBy: claim });
+    await session.writes.isConfirmed({ claim, because: "the answer is no, and we checked" });
+    await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
 
     const later = await afterwards();
-    const survey = await later.whatIsKnown();
+    const survey = await later.reads.whatIsKnown();
     expect(survey.established.some((q) => q.asks === QUESTION)).toBe(true);
     expect(survey.provisional.some((q) => q.asks === QUESTION)).toBe(false);
   });

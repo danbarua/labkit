@@ -47,14 +47,14 @@ async function afterwards(): Promise<ResearchSession> {
  * bootstrap analysis drawing six pairwise conclusions from them.
  */
 async function bootstrapAnalysisAsShipped() {
-  const { enquiry } = await session.openEnquiry("which graph construction classifies best?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("which graph construction classifies best?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "per-image classification results",
     finding: "per-image accuracy for all five constructions, 10,000 images",
     contentHash: "sha256:obs",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "bootstrap-pairwise",
     from: [observations],
@@ -103,7 +103,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
 
     // Reviewer: your bootstrap is centred on the observed effect. It isn't a null test.
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict:
         "bootstrap is centred on the observed effect; it does not implement the intended null",
@@ -111,7 +111,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // Researcher: replace the analysis, mark the prior inference superseded,
     // and propagate whatever claims change.
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -129,7 +129,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // asked of the record, because six conclusions arrive as six acts and what
     // a revision changed is therefore spread across them rather than held by
     // any one of them.
-    const explained = await (await afterwards()).why({ subject: report.replacement });
+    const explained = await (await afterwards()).reads.why({ subject: report.replacement });
     if (explained.kind !== "analysis")
       throw new Error(`asked about an analysis, got ${explained.kind}`);
     expect(explained.report.supersedes).toEqual(analysis);
@@ -156,12 +156,12 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
 
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -173,7 +173,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // Every finding the replacement superseded, read from the record. Matched
     // by id, not by sentence: after a replacement both the superseded claim and
     // the one standing in its place assert the same words.
-    const revision = await (await afterwards()).why({ subject: report.replacement });
+    const revision = await (await afterwards()).reads.why({ subject: report.replacement });
     if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
     const supersededHere = [
       ...revision.report.changed.map((c) => c.was),
@@ -183,18 +183,18 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // ...and the same answer from a different question. `whatDependsOn` walks
     // the artefact; this walks the lineage. They must agree on the count.
-    const downstream = await session.whatDependsOn({ subject: "bootstrap-pairwise output" });
+    const downstream = await session.reads.whatDependsOn({ subject: "bootstrap-pairwise output" });
     expect(downstream.claims).toHaveLength(supersededHere.length);
   });
 
   test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
 
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -205,25 +205,29 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // The observations are not superseded by this act: it revises an analysis,
     // and what an analysis read is untouched by its being revised.
-    const stillThere = await (await afterwards()).whatDependsOn({ subject: observations });
+    const stillThere = await (await afterwards()).reads.whatDependsOn({ subject: observations });
     expect(stillThere.claims.length).toBeGreaterThan(0);
 
     // Durable check: the replacement conclusion still rests on the same
     // observations, and those observations were never invalidated.
-    const why = await session.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).whySupported({ claim: claimOf(report.claims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(report.claims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.restingOn.map((a) => a.name)).toContain("per-image classification results");
   });
 
   test("Afterward 4: the replacement conclusion is supported via a different inference", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -232,9 +236,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    const why = await session.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).whySupported({ claim: claimOf(report.claims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(report.claims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.method)).toEqual(["sign-flip-permutation"]);
@@ -243,11 +251,11 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("Afterward 5: what the superseded inference claimed is still readable", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -256,9 +264,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    const why = await session.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).whySupported({ claim: claimOf(report.claims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(report.claims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.superseded).toHaveLength(1);
     expect(why.superseded[0]).toMatchObject({
@@ -271,37 +283,37 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    * The regression test for the relationship S-11 earned.
    */
   test("a claim rests only on what its own analysis consumed, not on everything in the enquiry", async () => {
-    const { enquiry } = await session.openEnquiry("which construction classifies best?");
-    const { observations: mnist } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("which construction classifies best?");
+    const { observations: mnist } = await session.writes.recordObservations({
       enquiry,
       name: "mnist per-image results",
       finding: "per-image accuracy on MNIST",
     });
-    const { observations: fashion } = await session.recordObservations({
+    const { observations: fashion } = await session.writes.recordObservations({
       enquiry,
       name: "fashion-mnist per-image results",
       finding: "per-image accuracy on Fashion-MNIST",
     });
 
-    const { claims: mnistClaims } = await recordAnalysis(session, {
+    const { claims: mnistClaims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "permutation-mnist",
       from: [mnist],
       concludes: [{ proposition: "T beats lattice on MNIST", finding: "p = 0.001" }],
     });
-    const { claims: fashionClaims } = await recordAnalysis(session, {
+    const { claims: fashionClaims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "permutation-fashion",
       from: [fashion],
       concludes: [{ proposition: "T beats lattice on Fashion", finding: "p = 0.02" }],
     });
 
-    const onMnist = await session.whySupported({
+    const onMnist = await session.reads.whySupported({
       claim: claimOf(mnistClaims, "T beats lattice on MNIST"),
     });
     expect(onMnist.restingOn.map((a) => a.name)).toEqual(["mnist per-image results"]);
 
-    const onFashion = await session.whySupported({
+    const onFashion = await session.reads.whySupported({
       claim: claimOf(fashionClaims, "T beats lattice on Fashion"),
     });
     expect(onFashion.restingOn.map((a) => a.name)).toEqual(["fashion-mnist per-image results"]);
@@ -309,12 +321,12 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("why support was withdrawn is answerable from the graph, not just the event log", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict:
         "bootstrap is centred on the observed effect; it does not implement the intended null",
     });
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -325,7 +337,9 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // A fresh session over the same graph -- nothing carried in memory.
     const reader = new ResearchSession(await scenario.current(), { clock });
-    const why = await reader.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await reader.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(why.superseded[0]!.reason).toBe(
       "bootstrap is centred on the observed effect; it does not implement the intended null",
     );
@@ -336,32 +350,32 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    * replacement has to be justified by a review OF the analysis being replaced.
    */
   test("a replacement cannot cite a review of some other analysis", async () => {
-    const { enquiry } = await session.openEnquiry("which construction classifies best?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("which construction classifies best?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "obs",
       finding: "raw",
     });
 
-    const { analysis: target, claims: targetClaims } = await recordAnalysis(session, {
+    const { analysis: target, claims: targetClaims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "bootstrap-pairwise",
       from: [observations],
       concludes: [{ proposition: "T beats rewired", finding: "p = 0.002 (bootstrap)" }],
     });
-    const { analysis: unrelated } = await recordAnalysis(session, {
+    const { analysis: unrelated } = await recordAnalysis(session.writes, {
       enquiry,
       method: "unrelated-analysis",
       from: [observations],
       concludes: [{ proposition: "something else entirely", finding: "n/a" }],
     });
-    const { review: reviewOfUnrelated } = await session.recordReview({
+    const { review: reviewOfUnrelated } = await session.writes.recordReview({
       of: unrelated,
       verdict: "a verdict about other work",
     });
 
     await expect(
-      replaceAnalysis(session, {
+      replaceAnalysis(session.writes, {
         supersedes: target,
         because: reviewOfUnrelated,
         enquiry,
@@ -373,9 +387,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // ...and nothing was invalidated on the way to failing.
     // The replacement was refused, so the original claim is the only one.
-    const why = await session.whySupported({ claim: claimOf(targetClaims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(targetClaims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).whySupported({ claim: claimOf(targetClaims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(targetClaims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.verdict).toBe("supported");
     expect(why.superseded).toHaveLength(0);
@@ -383,11 +401,11 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
   test("the temporal seam records the invalidation, with its time and what it moved", async () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict: "not a null test",
     });
-    const _report = await replaceAnalysis(session, {
+    const _report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -426,11 +444,11 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    */
   test("a superseded analysis takes no further conclusions", async () => {
     const { enquiry, analysis, observations } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict: "the bootstrap does not implement the intended null",
     });
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -442,7 +460,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     // Refused, and the message names where the finding belongs instead —
     // a three-part refusal, not a bare no.
     await expect(
-      session.conclude({
+      session.writes.conclude({
         analysis,
         proposition: "one more thing the old run showed",
         finding: "noticed afterwards",
@@ -453,7 +471,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // The replacement still takes them, which is what makes the refusal about
     // supersession rather than about analyses in general.
-    const { claims } = await session.conclude({
+    const { claims } = await session.writes.conclude({
       analysis: report.replacement,
       proposition: "one more thing the new run showed",
       finding: "noticed afterwards",

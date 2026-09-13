@@ -44,20 +44,20 @@ const DIVERGE = "the treated and control arms diverge";
  * needs the whole series."
  */
 async function anAnalysisRestingOnBothControls(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("do the treated and control arms diverge?");
-  const { observations: surviving } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("do the treated and control arms diverge?");
+  const { observations: surviving } = await s.writes.recordObservations({
     enquiry,
     name: NAME,
     finding: "the surviving fragment of the original series",
     contentHash: "sha256:surviving",
   });
-  const { observations: regenerated } = await s.recordObservations({
+  const { observations: regenerated } = await s.writes.recordObservations({
     enquiry,
     name: NAME,
     finding: "the remainder, regenerated from an inferred algorithm",
     contentHash: "sha256:regenerated",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "arm-comparison",
     from: [surviving, regenerated],
@@ -75,7 +75,7 @@ describe("S-9d: resting on one thing, or two?", () => {
   test("the record holds two distinct inputs under the one name", async () => {
     const { surviving, regenerated, analysis } = await anAnalysisRestingOnBothControls(session);
 
-    const parts = await (await afterwards()).reproducibilityOf({
+    const parts = await (await afterwards()).reads.reproducibilityOf({
       analysis,
       rebuilt: [
         { part: surviving, hash: "sha256:surviving" },
@@ -94,7 +94,7 @@ describe("S-9d: resting on one thing, or two?", () => {
   test("two inputs sharing a name are reported as two", async () => {
     const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
 
-    const why = await whyOf(await afterwards(), DIVERGE);
+    const why = await whyOf((await afterwards()).reads, DIVERGE);
 
     expect(why.restingOn).toHaveLength(2);
     expect(why.restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
@@ -111,15 +111,18 @@ describe("S-9d: resting on one thing, or two?", () => {
     const reader = await afterwards();
 
     for (const part of [surviving, regenerated]) {
-      const rests = await reader.whatDependsOn({ subject: part });
+      const rests = await reader.reads.whatDependsOn({ subject: part });
       expect(rests.claims.map((c) => c.asserts)).toEqual([DIVERGE]);
     }
     expect(surviving).not.toEqual(regenerated);
 
-    await expect(reader.whatDependsOn({ subject: NAME })).rejects.toThrow(/2 artefacts are named/);
+    await expect(reader.reads.whatDependsOn({ subject: NAME })).rejects.toThrow(
+      /2 artefacts are named/,
+    );
 
-    const restingOn = (await reader.whySupported({ claim: await claimNamed(reader, DIVERGE) }))
-      .restingOn;
+    const restingOn = (
+      await reader.reads.whySupported({ claim: await claimNamed(reader.reads, DIVERGE) })
+    ).restingOn;
     expect(restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
   });
 });

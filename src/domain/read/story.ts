@@ -32,6 +32,7 @@ import type {
   Revision,
   SupportExplanation,
 } from "../report";
+import { DomainRefusal } from "../refusal";
 import type {
   DoTheseConflictQuery,
   EnquiryStatusQuery,
@@ -63,9 +64,11 @@ export class StoryGroup extends SessionCore {
     );
     const loe = named[0];
     if (!loe)
-      throw new Error(
-        `no enquiry ${enquiry}; an enquiry is opened against a question, and 'search' finds its handle by the approach it was opened with`,
-      );
+      throw new DomainRefusal({
+        kind: "not-found",
+        message: `no enquiry ${enquiry}; an enquiry is opened against a question, and 'search' finds its handle by the approach it was opened with`,
+        subject: enquiry,
+      });
 
     const rows = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(loe:LineOfEnquiry {natural_id: $id})

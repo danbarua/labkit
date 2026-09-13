@@ -63,13 +63,13 @@ async function inTwoWorlds<T>(
  * has no recorded provenance — nobody wrote down what generated it."
  */
 async function theCachedConstruction(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("does the accelerated path match the reference?");
-  const { observations: control } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does the accelerated path match the reference?");
+  const { observations: control } = await s.writes.recordObservations({
     enquiry,
     name: CONTROL,
     finding: "randomised control series",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "stage2-construction",
     from: [control],
@@ -96,13 +96,13 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("two worlds that differ in what the record says are told apart", async () => {
     const build = (recorded: string) => async (s: ResearchSession) => {
       const { enquiry } = await theCachedConstruction(s);
-      const { observations: second } = await s.recordObservations({
+      const { observations: second } = await s.writes.recordObservations({
         enquiry,
         name: "second control",
         finding: "control series, second pass",
         contentHash: recorded,
       });
-      const { analysis: rebuilt } = await recordAnalysis(s, {
+      const { analysis: rebuilt } = await recordAnalysis(s.writes, {
         enquiry,
         method: "stage2-construction, second control",
         from: [second],
@@ -115,7 +115,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       });
       // The same rebuild offered in both worlds; only what the record holds
       // differs.
-      return (await afterwards()).reproducibilityOf({
+      return (await afterwards()).reads.reproducibilityOf({
         analysis: rebuilt,
         rebuilt: [{ part: second, hash: "sha256:one" }],
       });
@@ -135,13 +135,13 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("a reconstruction and independent fresh work leave the same durable record", async () => {
     const build = (finding: string) => async (s: ResearchSession) => {
       const { enquiry } = await theCachedConstruction(s);
-      const { observations: second } = await s.recordObservations({
+      const { observations: second } = await s.writes.recordObservations({
         enquiry,
         name: CONTROL,
         finding,
         contentHash: "sha256:second",
       });
-      const { analysis: rebuilt, claims: rebuiltClaims } = await recordAnalysis(s, {
+      const { analysis: rebuilt, claims: rebuiltClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "stage2-construction, second control",
         from: [second],
@@ -149,14 +149,14 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       });
       const reader = await afterwards();
       return {
-        why: await reader.whySupported({ claim: claimOf(rebuiltClaims, MATCHES) }),
-        known: (await reader.whatIsKnown()).provisional.map((q) => q.asks).sort(),
+        why: await reader.reads.whySupported({ claim: claimOf(rebuiltClaims, MATCHES) }),
+        known: (await reader.reads.whatIsKnown()).provisional.map((q) => q.asks).sort(),
         // Identity normalised, the way `rebuilt` below already is. Natural ids
         // are global sequences, so two paired worlds legitimately draw
         // different ones -- comparing them raw would report a difference that
         // is only the counter moving. What the comparison is for is whether
         // anything *else* differs.
-        depends: normaliseIds(await reader.whatDependsOn({ subject: second })),
+        depends: normaliseIds(await reader.reads.whatDependsOn({ subject: second })),
         rebuilt: rebuilt.replace(/\d+/, "N"),
       };
     };
@@ -184,19 +184,19 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("what the record claims when the second control is a rebuild", async () => {
     const why = await inOneWorld(async (s) => {
       const { enquiry } = await theCachedConstruction(s);
-      const { observations: regenerated } = await s.recordObservations({
+      const { observations: regenerated } = await s.writes.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
-      const { claims: secondClaims } = await recordAnalysis(s, {
+      const { claims: secondClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "stage2-construction, rebuilt",
         from: [regenerated],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
-      return (await afterwards()).whySupported({ claim: claimOf(secondClaims, MATCHES) });
+      return (await afterwards()).reads.whySupported({ claim: claimOf(secondClaims, MATCHES) });
     });
     // Recorded, not asserted-as-correct. Whether two entries here is a wrong
     // answer or an accurate report of what the researcher recorded is the
@@ -213,20 +213,20 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("the rebuild recorded through the verb that already exists", async () => {
     const why = await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
-      const { observations: regenerated } = await s.recordObservations({
+      const { observations: regenerated } = await s.writes.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
-      const verified = await s.reverify({
+      const verified = await s.writes.reverify({
         historical: analysis,
         enquiry,
         method: "stage2-construction, rebuilt",
         under: [regenerated],
         concludes: { proposition: MATCHES, finding: "agreement within 1e-6" },
       });
-      return (await afterwards()).whySupported({ claim: claimOf(verified.claims, MATCHES) });
+      return (await afterwards()).reads.whySupported({ claim: claimOf(verified.claims, MATCHES) });
     });
     expect(why.support.length).toBe(1);
     expect(why.reverifiedBy.map((r) => r.method)).toEqual(["stage2-construction, rebuilt"]);
@@ -240,26 +240,26 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("a reconstruction attempt that fails is not a question nobody has looked at", async () => {
     const { untested, unresolved } = await inOneWorld(async (s) => {
       const { enquiry } = await theCachedConstruction(s);
-      const { enquiry: provenance } = await s.openEnquiry(
+      const { enquiry: provenance } = await s.writes.openEnquiry(
         "what generated the historical random control?",
       );
 
       // The attempt, recorded against the question it is an attempt to answer.
-      await s.recordObservations({
+      await s.writes.recordObservations({
         enquiry: provenance,
         name: "regeneration attempt",
         finding: "three candidate algorithms tried; none reproduces the recorded series",
       });
       // And an unrelated regeneration on the original enquiry, so the two
       // enquiries are not trivially distinguishable by having any work at all.
-      await s.recordObservations({
+      await s.writes.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
 
-      const known = await (await afterwards()).whatIsKnown();
+      const known = await (await afterwards()).reads.whatIsKnown();
       return {
         untested: known.untested.map((q) => q.asks),
         unresolved: known.unresolved.map((q) => q.asks),
@@ -280,7 +280,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("a rebuild that concludes nothing has no act to be recorded as", async () => {
     await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
-      const { observations: regenerated } = await s.recordObservations({
+      const { observations: regenerated } = await s.writes.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
@@ -291,7 +291,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // The only verb on the surface that records an act with a historical
       // target insists on a conclusion to re-check.
       await expect(
-        s.reverify({
+        s.writes.reverify({
           historical: analysis,
           enquiry,
           method: "control regeneration",
@@ -312,13 +312,13 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("what was this artefact rebuilding — still nothing answers", async () => {
     await inOneWorld(async (s) => {
       const { enquiry, analysis } = await theCachedConstruction(s);
-      const { observations: regenerated } = await s.recordObservations({
+      const { observations: regenerated } = await s.writes.recordObservations({
         enquiry,
         name: CONTROL,
         contentHash: "sha256:second",
         finding: "randomised control series, regenerated from an inferred algorithm",
       });
-      await s.reverify({
+      await s.writes.reverify({
         historical: analysis,
         enquiry,
         method: "stage2-construction, rebuilt",
@@ -328,7 +328,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
 
       const reader = await afterwards();
       // Asking by name is refused, correctly.
-      await expect(reader.whatDependsOn({ subject: CONTROL })).rejects.toThrow(
+      await expect(reader.reads.whatDependsOn({ subject: CONTROL })).rejects.toThrow(
         /2 artefacts are named/,
       );
 
@@ -336,7 +336,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // **shape**, not on its values, and that is deliberate: a test that only checked `claims`
       // would stay green even if a field naming what was rebuilt were added to this report by
       // mistake.
-      const exact = await reader.whatDependsOn({ subject: regenerated });
+      const exact = await reader.reads.whatDependsOn({ subject: regenerated });
       expect(Object.keys(exact).sort()).toEqual([
         "claims",
         "complete",
@@ -351,7 +351,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // Same detector on the other read a consumer would reach for. The
       // reproducibility report is offered per part and says which parts match;
       // no field of it says what any part was an attempt to rebuild.
-      const report = await reader.reproducibilityOf({
+      const report = await reader.reads.reproducibilityOf({
         analysis,
         rebuilt: [{ part: regenerated, hash: "sha256:second" }],
       });

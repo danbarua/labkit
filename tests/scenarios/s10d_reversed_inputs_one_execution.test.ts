@@ -34,20 +34,20 @@ const PROP = "the two series differ in magnitude";
 
 /** Two series, and a run that takes the difference between them. */
 async function aDifference() {
-  const { enquiry } = await session.openEnquiry("do the two series differ?");
-  const { observations: treated } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("do the two series differ?");
+  const { observations: treated } = await session.writes.recordObservations({
     enquiry,
     name: "treated series",
     finding: "twelve points",
     contentHash: "sha256:treated",
   });
-  const { observations: control } = await session.recordObservations({
+  const { observations: control } = await session.writes.recordObservations({
     enquiry,
     name: "control series",
     finding: "twelve points",
     contentHash: "sha256:control",
   });
-  const { analysis } = await recordAnalysis(session, {
+  const { analysis } = await recordAnalysis(session.writes, {
     enquiry,
     method: METHOD,
     from: [treated, control],
@@ -59,7 +59,7 @@ async function aDifference() {
 describe("S-10d — the order a run read its inputs in", () => {
   test("a rerun that read the same records in the other order is shown as such", async () => {
     const { enquiry, treated, control, analysis } = await aDifference();
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical: analysis,
       enquiry,
       method: METHOD,
@@ -71,7 +71,7 @@ describe("S-10d — the order a run read its inputs in", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf({ verification: rerun.verification });
+    const report = await later.reads.reproductionOf({ verification: rerun.verification });
 
     // The same two records on both sides, so nothing differs...
     expect(report.differs).toEqual([]);
@@ -87,7 +87,7 @@ describe("S-10d — the order a run read its inputs in", () => {
 
   test("a rerun that read them in the same order is shown as that", async () => {
     const { enquiry, treated, control, analysis } = await aDifference();
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical: analysis,
       enquiry,
       method: METHOD,
@@ -99,7 +99,7 @@ describe("S-10d — the order a run read its inputs in", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf({ verification: rerun.verification });
+    const report = await later.reads.reproductionOf({ verification: rerun.verification });
 
     expect(report.differs).toEqual([]);
     expect(report.verificationRead.map((i) => i.name)).toEqual([
@@ -114,7 +114,7 @@ describe("S-10d — the order a run read its inputs in", () => {
    */
   test("the two orders are different sequences of the same records", async () => {
     const { enquiry, treated, control, analysis } = await aDifference();
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical: analysis,
       enquiry,
       method: METHOD,
@@ -126,7 +126,7 @@ describe("S-10d — the order a run read its inputs in", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf({ verification: rerun.verification });
+    const report = await later.reads.reproductionOf({ verification: rerun.verification });
 
     expect(report.verificationRead.map((i) => i.part)).not.toEqual(
       report.ofRead.map((i) => i.part),

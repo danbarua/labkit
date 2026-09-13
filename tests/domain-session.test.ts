@@ -62,21 +62,21 @@ function failingOn(
  * nothing at all.
  */
 test("an interrupted reinterpret does not retract a finding it cannot replace", async () => {
-  const { enquiry } = await session.openEnquiry("does T differ from rewired?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does T differ from rewired?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "per-image results",
     finding: "per-image accuracy",
   });
-  const { claims: analysisClaims } = await recordAnalysis(session, {
+  const { claims: analysisClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "holm-pairwise",
     from: [observations],
     concludes: [{ proposition: "T beats rewired", finding: "p = 0.002" }],
   });
 
-  const before = await session.whySupported({
-    claim: await claimNamed(session, "T beats rewired"),
+  const before = await session.reads.whySupported({
+    claim: await claimNamed(session.reads, "T beats rewired"),
   });
 
   // Fourth edge: MOTIVATES, EVALUATES, the CHANGES that withdraws the original,
@@ -84,7 +84,7 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
   // claim. Failing on the last one is the damaging moment.
   const interrupted = new ResearchSession(failingOn(graph, "createEdge", 4));
   await expect(
-    interrupted.reinterpret({
+    interrupted.writes.reinterpret({
       of: claimOf(analysisClaims, "T beats rewired"),
       as: "T beats rewired on the primary endpoint only",
       because: "the secondary endpoint was never powered",
@@ -92,13 +92,15 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
   ).rejects.toThrow(/injected failure/);
 
   // Nothing moved: the finding still stands and still rests on its evidence.
-  const after = await session.whySupported({ claim: await claimNamed(session, "T beats rewired") });
+  const after = await session.reads.whySupported({
+    claim: await claimNamed(session.reads, "T beats rewired"),
+  });
   expect(after).toEqual(before);
   expect(after.withdrawn).toBe(false);
   expect(after.verdict).toBe("supported");
   // And no half-made revision is readable.
-  const history = await session.interpretationHistory({
-    claim: await claimNamed(session, "T beats rewired"),
+  const history = await session.reads.interpretationHistory({
+    claim: await claimNamed(session.reads, "T beats rewired"),
   });
   expect(history.nowClaims.asserts).toBe("T beats rewired");
   expect(history.revisions).toEqual([]);
@@ -110,23 +112,25 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
  * conditions -- one of which the researcher intended to retire.
  */
 test("an interrupted amendDesign leaves the gate governed by its original condition alone", async () => {
-  const { criterion } = await session.stateCriterion("solver converges within 500 iterations");
-  const { work } = await session.planWork({
+  const { criterion } = await session.writes.stateCriterion(
+    "solver converges within 500 iterations",
+  );
+  const { work } = await session.writes.planWork({
     objective: "fit the tertiary model",
     acceptance: "converges",
   });
-  const { gate } = await session.declareGate({
+  const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "the tertiary model may be fitted",
     protecting: [work],
   });
-  const { enquiry } = await session.openEnquiry("does the solver converge?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does the solver converge?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "solver traces",
     finding: "iteration counts",
   });
-  const { claims: analysisClaims } = await recordAnalysis(session, {
+  const { claims: analysisClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "feasibility",
     from: [observations],
@@ -138,7 +142,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
     ],
   });
 
-  const before = await session.gateStatus({ gate });
+  const before = await session.reads.gateStatus({ gate });
   expect(before.checks.map((c) => c.proposition)).toEqual([
     "solver converges within 500 iterations",
   ]);
@@ -147,7 +151,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
   // the original.
   const interrupted = new ResearchSession(failingOn(graph, "createEdge", 2));
   await expect(
-    interrupted.amendDesign({
+    interrupted.writes.amendDesign({
       criterion,
       nowRequires: "solver converges within 2,000 iterations",
       because: "500 was not reachable on this hardware",
@@ -157,7 +161,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
 
   // One condition, not two. A gate governed by both the retired and the
   // proposed condition is a control-plane object nobody agreed to.
-  const after = await session.gateStatus({ gate });
+  const after = await session.reads.gateStatus({ gate });
   expect(after.checks.map((c) => c.proposition)).toEqual([
     "solver converges within 500 iterations",
   ]);
@@ -168,7 +172,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
  * Row AD's atomicity, and the reason this test exists at all.
  */
 test("recordObservations writes the unit and the evidence together or not at all", async () => {
-  const { enquiry } = await session.openEnquiry("does the coating hold at temperature?");
+  const { enquiry } = await session.writes.openEnquiry("does the coating hold at temperature?");
 
   const realCreateNode = graph.createNode.bind(graph);
   let unitAttempted = false;
@@ -181,7 +185,7 @@ test("recordObservations writes the unit and the evidence together or not at all
   }) as typeof graph.createNode;
 
   await expect(
-    session.recordObservations({
+    session.writes.recordObservations({
       enquiry,
       name: "thermal cycling run",
       finding: "no delamination after 200 cycles",
@@ -204,7 +208,7 @@ test("recordObservations writes the unit and the evidence together or not at all
 
   // And the verb still works afterwards -- the rollback released the
   // transaction rather than leaving the session wedged in a failed one.
-  const { observations: again } = await session.recordObservations({
+  const { observations: again } = await session.writes.recordObservations({
     enquiry,
     name: "thermal cycling run",
     finding: "no delamination after 200 cycles",
@@ -217,13 +221,13 @@ test("recordObservations writes the unit and the evidence together or not at all
  * writes it describes.
  */
 test("an interrupted sharpen leaves nothing at all", async () => {
-  const { enquiry } = await session.openEnquiry("does the coating hold?");
-  const { observations: obs } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does the coating hold?");
+  const { observations: obs } = await session.writes.recordObservations({
     enquiry,
     name: "run A",
     finding: "no delamination",
   });
-  await recordAnalysis(session, {
+  await recordAnalysis(session.writes, {
     enquiry,
     method: "cycling",
     from: [obs],
@@ -238,7 +242,7 @@ test("an interrupted sharpen leaves nothing at all", async () => {
       },
     ],
   });
-  const { question: original } = await session.pose({ question: "is the coating durable?" });
+  const { question: original } = await session.writes.pose({ question: "is the coating durable?" });
 
   // Fail on the second BASED_ON edge: the decision keeps one finding of three.
   const realCreateEdge = graph.createEdge.bind(graph);
@@ -251,7 +255,7 @@ test("an interrupted sharpen leaves nothing at all", async () => {
   }) as typeof graph.createEdge;
 
   await expect(
-    session.sharpen({
+    session.writes.sharpen({
       from: original,
       into: "is it durable at 200C?",
       because: "too vague",
@@ -267,10 +271,10 @@ test("an interrupted sharpen leaves nothing at all", async () => {
 
   // And so `originOf` answers null because the question genuinely has no
   // origin, not because the edge it needs happened to be written last.
-  expect(await session.originOf({ question: original })).toBeNull();
+  expect(await session.reads.originOf({ question: original })).toBeNull();
 
   // The sharper question was never created, so the survey is simply correct.
-  const survey = await session.whatIsKnown();
+  const survey = await session.reads.whatIsKnown();
   expect(survey.untested.map((q) => q.asks)).toEqual(["is the coating durable?"]);
 });
 
@@ -278,24 +282,24 @@ test("an interrupted sharpen leaves nothing at all", async () => {
  * `evaluateCriterion`'s three interruption windows.
  */
 const aGatedCheck = async () => {
-  const { enquiry } = await session.openEnquiry("does the solver converge?");
-  const { observations: obs } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does the solver converge?");
+  const { observations: obs } = await session.writes.recordObservations({
     enquiry,
     name: "sweep",
     finding: "residuals recorded",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "convergence",
     from: [obs],
     concludes: [{ proposition: "the solver converges", finding: "residual 1e-9" }],
   });
-  const { work } = await session.planWork({
+  const { work } = await session.writes.planWork({
     objective: "scale to the full grid",
     acceptance: "convergence holds",
   });
-  const { criterion } = await session.stateCriterion("residual below 1e-8");
-  const { gate } = await session.declareGate({
+  const { criterion } = await session.writes.stateCriterion("residual below 1e-8");
+  const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "do not scale up",
     protecting: [work],
@@ -318,7 +322,7 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
     }) as typeof graph.createEdge;
 
     await expect(
-      session.evaluateCriterion({
+      session.writes.evaluateCriterion({
         criterion,
         gate,
         value: "9e-9",
@@ -333,7 +337,7 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
     });
     expect(left).toEqual([]);
 
-    const status = await session.gateStatus({ gate });
+    const status = await session.reads.gateStatus({ gate });
     expect(status.state).toBe("never-evaluated");
     expect(status.everFailed).toBe(false);
   });
@@ -341,13 +345,13 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
 
 /** A failed close is atomic, so its retry owns the only resolving decision. */
 test("a close interrupted before BASED_ON writes nothing before retry", async () => {
-  const { enquiry } = await session.openEnquiry("does the coating fail under load?");
-  const { observations: obs } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does the coating fail under load?");
+  const { observations: obs } = await session.writes.recordObservations({
     enquiry,
     name: "load runs",
     finding: "cracks at 40MPa",
   });
-  const { claims: analysisClaims } = await recordAnalysis(session, {
+  const { claims: analysisClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "load-test",
     from: [obs],
@@ -367,18 +371,18 @@ test("a close interrupted before BASED_ON writes nothing before retry", async ()
     return realCreateEdge(from as never, edge as never, to as never);
   }) as typeof graph.createEdge;
 
-  await expect(session.closeEnquiry({ enquiry, answeredBy })).rejects.toThrow(/injected/);
+  await expect(session.writes.closeEnquiry({ enquiry, answeredBy })).rejects.toThrow(/injected/);
   graph.createEdge = realCreateEdge;
 
   // The caller saw a throw, so it retries. This one succeeds.
-  await session.closeEnquiry({ enquiry, answeredBy });
+  await session.writes.closeEnquiry({ enquiry, answeredBy });
 
   const resolving = await graph.query(
     `MATCH (d:Decision)-[:RESOLVES]->(:LineOfEnquiry {natural_id: $enquiry}) RETURN d`,
     { d: vertexProps<{ natural_id: string; reason: string }>() },
     { enquiry },
   );
-  const status = await session.enquiryStatus({ enquiry });
+  const status = await session.reads.enquiryStatus({ enquiry });
 
   expect(resolving).toHaveLength(1);
   // The question was answered "no" on a challenging finding. Anything else is
@@ -394,24 +398,24 @@ test("a close interrupted before BASED_ON writes nothing before retry", async ()
 test("a verdict is withdrawn when the evidence it was reached against is retracted", async () => {
   const { enquiry, obs, analysis, analysisClaims, criterion, gate } = await aGatedCheck();
 
-  await session.evaluateCriterion({
+  await session.writes.evaluateCriterion({
     criterion,
     gate,
     value: "9e-9",
     outcome: "fail",
     citing: [claimOf(analysisClaims, "the solver converges")],
   });
-  const before = await session.gateStatus({ gate });
+  const before = await session.reads.gateStatus({ gate });
   expect((await evaluationsOf(session, before.checks[0]!))[0]?.basis?.map((b) => b.states)).toEqual(
     ["residual 1e-9"],
   );
   expect(before.state).toBe("blocked");
 
-  const { review } = await session.recordReview({
+  const { review } = await session.writes.recordReview({
     of: analysis,
     verdict: "the sweep dropped the last decade",
   });
-  await replaceAnalysis(session, {
+  await replaceAnalysis(session.writes, {
     supersedes: analysis,
     because: review,
     enquiry,
@@ -420,7 +424,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
     concludes: [{ proposition: "the solver converges", finding: "residual 4e-9" }],
   });
 
-  const after = await session.gateStatus({ gate });
+  const after = await session.reads.gateStatus({ gate });
   expect((await evaluationsOf(session, after.checks[0]!))[0]?.withdrawn).toBe(true);
   expect(after.state).not.toBe("blocked");
 });
@@ -431,13 +435,13 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
 test("an enquiry cannot be closed twice, and the refusal names the existing close", async () => {
   const s = session;
 
-  const { enquiry } = await s.openEnquiry("does pruning move convergence?");
-  const { observations } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does pruning move convergence?");
+  const { observations } = await s.writes.recordObservations({
     enquiry,
     name: "readings",
     finding: "twelve runs",
   });
-  const { claims: analysisClaims } = await recordAnalysis(s, {
+  const { claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "paired comparison",
     from: [observations],
@@ -450,11 +454,11 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
     ],
   });
 
-  await s.closeEnquiry({ enquiry });
-  expect((await s.enquiryStatus({ enquiry })).closure).toBe("abandoned");
+  await s.writes.closeEnquiry({ enquiry });
+  expect((await s.reads.enquiryStatus({ enquiry })).closure).toBe("abandoned");
 
   await expect(
-    s.closeEnquiry({
+    s.writes.closeEnquiry({
       enquiry,
       answeredBy: claimOf(analysisClaims, "pruning moves convergence"),
     }),
@@ -462,7 +466,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
 
   // And the record is unchanged rather than half-updated: one close, the one
   // that happened.
-  const after = await s.enquiryStatus({ enquiry });
+  const after = await s.reads.enquiryStatus({ enquiry });
   expect(after.closure).toBe("abandoned");
   expect(after.answer).toBeNull();
 });
@@ -472,13 +476,13 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
  */
 test("a question accepted as unresolved can still be closed when evidence arrives", async () => {
   const s = session;
-  const { enquiry } = await s.openEnquiry("does depth move convergence?");
-  const { observations } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does depth move convergence?");
+  const { observations } = await s.writes.recordObservations({
     enquiry,
     name: "sweep",
     finding: "runs",
   });
-  const { claims: analysisClaims } = await recordAnalysis(s, {
+  const { claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "paired comparison",
     from: [observations],
@@ -490,22 +494,22 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     ],
   });
 
-  await s.acceptAsUnresolved({
+  await s.writes.acceptAsUnresolved({
     enquiry,
     because: "the confirmatory set is spent",
     until: "a data source other than the spent set",
     inLightOf: claimOf(analysisClaims, "depth moves convergence"),
   });
-  const accepted = await s.enquiryStatus({ enquiry });
+  const accepted = await s.reads.enquiryStatus({ enquiry });
   expect(accepted.closure).toBeNull();
   expect(accepted.open).toBe(true);
 
   // Evidence arrives. This must be allowed -- DEFERS is not RESOLVES.
-  await s.closeEnquiry({
+  await s.writes.closeEnquiry({
     enquiry,
     answeredBy: claimOf(analysisClaims, "depth moves convergence"),
   });
-  const closed = await s.enquiryStatus({ enquiry });
+  const closed = await s.reads.enquiryStatus({ enquiry });
   expect(closed.closure).toBe("answered");
   expect(closed.answer).toBe("yes");
 });
@@ -514,7 +518,9 @@ test("a question accepted as unresolved can still be closed when evidence arrive
  * `pursue` is NOT transactional and does not need to be.
  */
 test("an interrupted pursue leaves no enquiry at all", async () => {
-  const { question } = await session.pose({ question: "does the coating hold at temperature?" });
+  const { question } = await session.writes.pose({
+    question: "does the coating hold at temperature?",
+  });
 
   const realCreateEdge = graph.createEdge.bind(graph);
   graph.createEdge = (async (from: string, edge: string, to: string) => {
@@ -522,7 +528,7 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
     return realCreateEdge(from as never, edge as never, to as never);
   }) as typeof graph.createEdge;
 
-  await expect(session.pursue({ question, approach: "thermal cycling" })).rejects.toThrow(
+  await expect(session.writes.pursue({ question, approach: "thermal cycling" })).rejects.toThrow(
     /injected/,
   );
   graph.createEdge = realCreateEdge;
@@ -536,17 +542,17 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
 
   // The question is reported untested, which is true: it is on the books and
   // nothing has been run against it. Same answer `pose()` alone would give.
-  const survey = await session.whatIsKnown();
+  const survey = await session.reads.whatIsKnown();
   expect(survey.untested.map((q) => q.asks)).toEqual(["does the coating hold at temperature?"]);
   expect(survey.unresolved).toEqual([]);
 
   // And pursuing again works — no phantom blocks it, and two enquiries on one
   // question would be legitimate anyway.
-  const { enquiry: retried } = await session.pursue({
+  const { enquiry: retried } = await session.writes.pursue({
     question,
     approach: "thermal cycling",
   });
-  expect((await session.enquiryStatus({ enquiry: retried })).open).toBe(true);
+  expect((await session.reads.enquiryStatus({ enquiry: retried })).open).toBe(true);
 });
 
 /**
@@ -561,8 +567,8 @@ test("stateCriterion and planWork have no interruption window to have", async ()
     return (realCreateEdge as (...a: unknown[]) => unknown)(...args);
   }) as typeof graph.createEdge;
 
-  const { criterion } = await session.stateCriterion("residual below 1e-8");
-  const { work } = await session.planWork({
+  const { criterion } = await session.writes.stateCriterion("residual below 1e-8");
+  const { work } = await session.writes.planWork({
     objective: "scale up",
     acceptance: "converges",
   });
@@ -580,13 +586,13 @@ test("stateCriterion and planWork have no interruption window to have", async ()
  * orphan `Review` node — `pursue`'s argument, checked rather than assumed.
  */
 test("an interrupted recordReview leaves a review nothing can reach", async () => {
-  const { enquiry } = await session.openEnquiry("does it hold?");
-  const { observations: obs } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does it hold?");
+  const { observations: obs } = await session.writes.recordObservations({
     enquiry,
     name: "run",
     finding: "data",
   });
-  const { analysis } = await recordAnalysis(session, {
+  const { analysis } = await recordAnalysis(session.writes, {
     enquiry,
     method: "m",
     from: [obs],
@@ -600,7 +606,7 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
   }) as typeof graph.createEdge;
 
   await expect(
-    session.recordReview({
+    session.writes.recordReview({
       of: analysis,
       verdict: "the aggregation dropped a fold",
     }),
@@ -613,7 +619,9 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
   expect(attached).toEqual([]);
 
   // The finding still stands: no review reaches it, so nothing retracts it.
-  const why = await session.whySupported({ claim: await claimNamed(session, "it holds") });
+  const why = await session.reads.whySupported({
+    claim: await claimNamed(session.reads, "it holds"),
+  });
   expect(why.verdict).toBe("supported");
   expect(why.withdrawn).toBe(false);
 });
@@ -622,9 +630,9 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
  * `declareGate` writes its edges **after** the node -- `evaluateCriterion`'s arrangement.
  */
 test("an interrupted declareGate leaves no gate at all", async () => {
-  const { criterion: c1 } = await session.stateCriterion("residual below 1e-8");
-  const { criterion: c2 } = await session.stateCriterion("runtime under an hour");
-  const { work } = await session.planWork({
+  const { criterion: c1 } = await session.writes.stateCriterion("residual below 1e-8");
+  const { criterion: c2 } = await session.writes.stateCriterion("runtime under an hour");
+  const { work } = await session.writes.planWork({
     objective: "scale up",
     acceptance: "both hold",
   });
@@ -639,7 +647,7 @@ test("an interrupted declareGate leaves no gate at all", async () => {
   }) as typeof graph.createEdge;
 
   await expect(
-    session.declareGate({
+    session.writes.declareGate({
       governedBy: [c1, c2],
       consequence: "do not scale up",
       protecting: [work],
@@ -655,7 +663,7 @@ test("an interrupted declareGate leaves no gate at all", async () => {
 
   // The work the gate would have protected is untouched: a failed
   // `declareGate` must not damage what it was declared over.
-  const contract = await session.contractFor({ work });
+  const contract = await session.reads.contractFor({ work });
   expect(contract.objective).toBe("scale up");
 });
 
@@ -663,27 +671,27 @@ test("an interrupted declareGate leaves no gate at all", async () => {
  * The empty contract, which is the case the array conversion could have broken quietly.
  */
 test("a task planned with no readable inputs reports an empty contract, not a missing one", async () => {
-  const { work: omitted } = await session.planWork({
+  const { work: omitted } = await session.writes.planWork({
     objective: "write the discussion section",
     acceptance: "a draft exists",
   });
-  const { work: explicit } = await session.planWork({
+  const { work: explicit } = await session.writes.planWork({
     objective: "tidy the repository",
     acceptance: "no stray files",
     mayRead: [],
   });
 
-  expect((await session.contractFor({ work: omitted })).mayRead).toEqual([]);
-  expect((await session.contractFor({ work: explicit })).mayRead).toEqual([]);
+  expect((await session.reads.contractFor({ work: omitted })).mayRead).toEqual([]);
+  expect((await session.reads.contractFor({ work: explicit })).mayRead).toEqual([]);
 
   // And the populated case still round-trips through the same read, so this
   // test fails for the right reason if arrays stop working altogether.
-  const { work: populated } = await session.planWork({
+  const { work: populated } = await session.writes.planWork({
     objective: "rerun the sweep",
     acceptance: "all seeds complete",
     mayRead: ["seeds.csv", "config.toml"],
   });
-  expect((await session.contractFor({ work: populated })).mayRead).toEqual([
+  expect((await session.reads.contractFor({ work: populated })).mayRead).toEqual([
     "seeds.csv",
     "config.toml",
   ]);
@@ -695,50 +703,52 @@ test("a task planned with no readable inputs reports an empty contract, not a mi
  * absent `addressing` is a real case, not a gap in this report.
  */
 test("a task planned against an enquiry reports it, with wording; one planned without reports none", async () => {
-  const { enquiry, question } = await session.openEnquiry(
+  const { enquiry, question } = await session.writes.openEnquiry(
     "can this mapping reach an external task?",
   );
-  const { work: served } = await session.planWork({
+  const { work: served } = await session.writes.planWork({
     objective: "advance the feasibility ladder",
     acceptance: "every fold converges",
     addressing: enquiry,
   });
-  const { work: unaddressed } = await session.planWork({
+  const { work: unaddressed } = await session.writes.planWork({
     objective: "tidy the repository",
     acceptance: "no stray files",
   });
 
-  expect((await session.contractFor({ work: served })).addressing).toEqual({
+  expect((await session.reads.contractFor({ work: served })).addressing).toEqual({
     enquiry,
     pursuing: "can this mapping reach an external task?",
     question,
     asks: "can this mapping reach an external task?",
   });
-  expect((await session.contractFor({ work: unaddressed })).addressing).toBeUndefined();
+  expect((await session.reads.contractFor({ work: unaddressed })).addressing).toBeUndefined();
 });
 
 test("closing a blocked gate releases work without changing its failed check", async () => {
-  const { criterion } = await session.stateCriterion("the error stays below 1e-6");
-  const { work } = await session.planWork({
+  const { criterion } = await session.writes.stateCriterion("the error stays below 1e-6");
+  const { work } = await session.writes.planWork({
     objective: "publish the comparison",
     acceptance: "the comparison is in the report",
   });
-  const { gate } = await session.declareGate({
+  const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "the comparison is withheld",
     protecting: [work],
   });
-  await session.evaluateCriterion({ criterion, gate, value: "2e-5", outcome: "fail" });
+  await session.writes.evaluateCriterion({ criterion, gate, value: "2e-5", outcome: "fail" });
 
-  expect((await session.gateStatus({ gate })).state).toBe("blocked");
-  expect((await session.workList({})).find((row) => row.work === work)?.state).toBe("blocked");
+  expect((await session.reads.gateStatus({ gate })).state).toBe("blocked");
+  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe(
+    "blocked",
+  );
 
-  const closed = await session.closeGate({
+  const closed = await session.writes.closeGate({
     gate,
     closure: "sidestepped",
     because: "the report now labels this comparison exploratory",
   });
-  const status = await session.gateStatus({ gate });
+  const status = await session.reads.gateStatus({ gate });
   expect(closed).toMatchObject({ gate, closure: "sidestepped" });
   expect(status.state).toBe("sidestepped");
   expect(status.closure).toEqual({
@@ -747,14 +757,16 @@ test("closing a blocked gate releases work without changing its failed check", a
     because: "the report now labels this comparison exploratory",
   });
   expect(status.checks.map((check) => check.state)).toEqual(["failed"]);
-  expect((await session.workList({})).find((row) => row.work === work)?.state).toBe("planned");
-  expect((await session.now({})).blocked.work.map((row) => row.work)).not.toContain(work);
+  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe(
+    "planned",
+  );
+  expect((await session.reads.now({})).blocked.work.map((row) => row.work)).not.toContain(work);
 
   await expect(
-    session.closeGate({ gate, closure: "retired", because: "duplicate" }),
+    session.writes.closeGate({ gate, closure: "retired", because: "duplicate" }),
   ).rejects.toThrow(/already/);
   await expect(
-    session.closeGate({
+    session.writes.closeGate({
       gate: "GATE_does_not_exist" as typeof gate,
       closure: "retired",
       because: "missing",
@@ -763,7 +775,7 @@ test("closing a blocked gate releases work without changing its failed check", a
 });
 
 test("criterion report refuses an evaluation with no stored outcome", async () => {
-  const { criterion } = await session.stateCriterion("a malformed evaluation is visible");
+  const { criterion } = await session.writes.stateCriterion("a malformed evaluation is visible");
   const evaluation = await graph.reserveId("CriterionEvaluation");
   await graph.query(
     "CREATE (ev:CriterionEvaluation {natural_id: $id, value: $value, evaluated_at: $at}) RETURN ev",
@@ -772,22 +784,24 @@ test("criterion report refuses an evaluation with no stored outcome", async () =
   );
   await graph.createEdge(criterion, "EVALUATED_AS", evaluation);
 
-  await expect(session.criterionStanding({ criterion })).rejects.toThrow(
+  await expect(session.reads.criterionStanding({ criterion })).rejects.toThrow(
     new RegExp(`evaluation ${evaluation} has no stored outcome`),
   );
 });
 
 test("knowledge survey refuses an evaluation with a malformed outcome", async () => {
-  const { criterion } = await session.stateCriterion(
+  const { criterion } = await session.writes.stateCriterion(
     "a malformed outcome cannot establish knowledge",
   );
-  const { enquiry } = await session.openEnquiry("does malformed evidence establish knowledge?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry(
+    "does malformed evidence establish knowledge?",
+  );
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "manual review",
     finding: "the malformed result was retained",
   });
-  const { claims } = await recordAnalysis(session, {
+  const { claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "manual review",
     from: [observations],
@@ -800,8 +814,8 @@ test("knowledge survey refuses an evaluation with a malformed outcome", async ()
     heldTo: [criterion],
   });
   const claim = claims[0]!.claim;
-  await session.isConfirmed({ claim, because: "the answer is being relied on" });
-  await session.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.isConfirmed({ claim, because: "the answer is being relied on" });
+  await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
 
   const evaluation = await graph.reserveId("CriterionEvaluation");
   await graph.query(
@@ -811,22 +825,22 @@ test("knowledge survey refuses an evaluation with a malformed outcome", async ()
   );
   await graph.createEdge(criterion, "EVALUATED_AS", evaluation);
 
-  await expect(session.whatIsKnown()).rejects.toThrow(
+  await expect(session.reads.whatIsKnown()).rejects.toThrow(
     new RegExp(`evaluation ${evaluation} has no stored outcome`),
   );
 });
 
 test("knowledge standing preserves valid pass and fail outcomes", async () => {
-  const { criterion } = await session.stateCriterion(
+  const { criterion } = await session.writes.stateCriterion(
     "a valid outcome preserves knowledge standing",
   );
-  const { enquiry } = await session.openEnquiry("does a valid outcome preserve knowledge?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does a valid outcome preserve knowledge?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "validation review",
     finding: "the checked result was retained",
   });
-  const { claims } = await recordAnalysis(session, {
+  const { claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "validation review",
     from: [observations],
@@ -839,29 +853,29 @@ test("knowledge standing preserves valid pass and fail outcomes", async () => {
     heldTo: [criterion],
   });
   const claim = claims[0]!.claim;
-  await session.evaluateCriterion({
+  await session.writes.evaluateCriterion({
     criterion,
     outcome: "pass",
     value: "the check passed",
     citing: [claim],
   });
-  await session.isConfirmed({ claim, because: "the checked answer is being relied on" });
-  await session.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.isConfirmed({ claim, because: "the checked answer is being relied on" });
+  await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
 
-  expect((await session.criterionStanding({ criterion })).state).toBe("passed");
-  let known = await session.whatIsKnown();
+  expect((await session.reads.criterionStanding({ criterion })).state).toBe("passed");
+  let known = await session.reads.whatIsKnown();
   expect(known.established.map((q) => q.asks)).toContain(
     "does a valid outcome preserve knowledge?",
   );
 
-  await session.evaluateCriterion({
+  await session.writes.evaluateCriterion({
     criterion,
     outcome: "fail",
     value: "the later check failed",
     citing: [claim],
   });
-  expect((await session.criterionStanding({ criterion })).state).toBe("failed");
-  known = await session.whatIsKnown();
+  expect((await session.reads.criterionStanding({ criterion })).state).toBe("failed");
+  known = await session.reads.whatIsKnown();
   expect(known.established.map((q) => q.asks)).not.toContain(
     "does a valid outcome preserve knowledge?",
   );

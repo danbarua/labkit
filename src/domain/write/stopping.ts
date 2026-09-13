@@ -12,6 +12,7 @@ import type {
   StoppedWork,
 } from "../report";
 import { ref } from "../report";
+import { DomainRefusal } from "../refusal";
 import type {
   AcceptAsUnresolvedCommand,
   CloseEnquiryCommand,
@@ -45,19 +46,26 @@ export class Stopping extends SessionCore {
         { id: input.enquiry },
       );
       if (!target)
-        throw new Error(
-          `no enquiry ${input.enquiry}; an enquiry exists once pursue records it, and its handle comes back from that act`,
-        );
+        throw new DomainRefusal({
+          kind: "not-found",
+          message: `no enquiry ${input.enquiry}; an enquiry exists once pursue records it, and its handle comes back from that act`,
+          subject: input.enquiry,
+        });
       const question = await this.questionBehind(input.enquiry);
       if (!question)
-        throw new Error(
-          `enquiry ${input.enquiry} has no motivating question; an enquiry is opened against a question, so pursue one before closing`,
-        );
+        throw new DomainRefusal({
+          kind: "invariant",
+          message: `enquiry ${input.enquiry} has no motivating question; an enquiry is opened against a question, so pursue one before closing`,
+          subject: input.enquiry,
+        });
       if (target.d)
-        throw new Error(
-          `enquiry ${input.enquiry} is already closed by decision ` +
+        throw new DomainRefusal({
+          kind: "invariant",
+          message:
+            `enquiry ${input.enquiry} is already closed by decision ` +
             `${target.d.natural_id} (${target.d.reason}); closing it again would leave two decisions resolving one enquiry`,
-        );
+          subject: input.enquiry,
+        });
 
       let answerBearing: EvidenceRef[] = [];
       let answeredProposition: string | undefined;
@@ -94,9 +102,11 @@ export class Stopping extends SessionCore {
           }
         }
         if (addresses.length === 0) {
-          throw new Error(
-            `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question — cite a claim this enquiry concluded, or close the enquiry that concluded this one`,
-          );
+          throw new DomainRefusal({
+            kind: "invariant",
+            message: `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question — cite a claim this enquiry concluded, or close the enquiry that concluded this one`,
+            subject: input.answeredBy,
+          });
         }
         const found = await this.findingOn(input.answeredBy);
         if (found) {
@@ -120,7 +130,12 @@ export class Stopping extends SessionCore {
               )),
             );
           }
-          if (parts.length === 0) throw new Error(noFindingBearsOn(input.answeredBy));
+          if (parts.length === 0)
+            throw new DomainRefusal({
+              kind: "not-found",
+              message: noFindingBearsOn(input.answeredBy),
+              subject: input.answeredBy,
+            });
           answerBearing = [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))];
           answeredProposition = parts[0]!.c.name;
         }
@@ -178,12 +193,19 @@ export class Stopping extends SessionCore {
 
       const question = await this.questionBehind(input.enquiry);
       if (!question)
-        throw new Error(
-          `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
-        );
+        throw new DomainRefusal({
+          kind: "invariant",
+          message: `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
+          subject: input.enquiry,
+        });
 
       const origin = await this.claimOrigin(input.inLightOf);
-      if (!origin) throw new Error(noFindingBearsOn(input.inLightOf));
+      if (!origin)
+        throw new DomainRefusal({
+          kind: "not-found",
+          message: noFindingBearsOn(input.inLightOf),
+          subject: input.inLightOf,
+        });
       const basis = origin.kind === "direct" ? [origin.evidence] : origin.evidence;
 
       const decision = ref(
@@ -221,13 +243,17 @@ export class Stopping extends SessionCore {
         { id: input.gate },
       );
       if (!target)
-        throw new Error(
-          `no gate ${input.gate}; a gate exists once declare records one, and its handle comes back from that act`,
-        );
+        throw new DomainRefusal({
+          kind: "not-found",
+          message: `no gate ${input.gate}; a gate exists once declare records one, and its handle comes back from that act`,
+          subject: input.gate,
+        });
       if (target.d)
-        throw new Error(
-          `gate ${input.gate} is already ${target.d.reason} by ${target.d.natural_id}; one decision closes a gate`,
-        );
+        throw new DomainRefusal({
+          kind: "invariant",
+          message: `gate ${input.gate} is already ${target.d.reason} by ${target.d.natural_id}; one decision closes a gate`,
+          subject: input.gate,
+        });
 
       const decision = ref(
         "decision",
@@ -260,14 +286,19 @@ export class Stopping extends SessionCore {
         { id: input.work },
       );
       if (!task)
-        throw new Error(
-          `no work ${input.work}; a task exists once \`plan\` records one, and its handle comes back from that act`,
-        );
+        throw new DomainRefusal({
+          kind: "not-found",
+          message: `no work ${input.work}; a task exists once \`plan\` records one, and its handle comes back from that act`,
+          subject: input.work,
+        });
       if (task.d)
-        throw new Error(
-          `work ${input.work} was already stopped, because "${task.d.reason}"; a piece of work is ` +
+        throw new DomainRefusal({
+          kind: "invariant",
+          message:
+            `work ${input.work} was already stopped, because "${task.d.reason}"; a piece of work is ` +
             `stopped once, and nothing re-opens one yet`,
-        );
+          subject: input.work,
+        });
 
       const decision = ref(
         "decision",

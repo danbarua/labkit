@@ -4,6 +4,7 @@
 
 import { expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
+import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../src/cli/cli";
@@ -86,7 +87,7 @@ test("a non-numeric --since or --limit is refused, not coerced", async () => {
 test("a handle of the wrong kind is refused at the boundary", async () => {
   // The query schema brands the handle. A claim where a gate belongs is refused
   // before `run` opens a database, the same way a write command is.
-  expect(await refusal(["gate", "CLM_1"])).toContain("gate handle expected");
+  expect(await refusal(["gate", "CLM_1"])).toContain('gate handle expected a Gate id, got "CLM_1"');
 });
 
 test("happened touching a non-handle is refused at the boundary", async () => {
@@ -95,7 +96,7 @@ test("happened touching a non-handle is refused at the boundary", async () => {
 
 test("a write handle of the wrong kind is refused at the boundary", async () => {
   expect(await refusal(["is", "confirmed", "GATE_1", "--because", "x"])).toContain(
-    "claim handle expected",
+    'claim handle expected a Claim id, got "GATE_1"',
   );
 });
 
@@ -111,6 +112,12 @@ test("a bad --state names the values it would have accepted", async () => {
   expect(await refusal(["gates", "--state", "blockd"])).toContain("sidestepped");
   expect(await refusal(["gates", "--state", "blockd"])).toContain("retired");
   expect(await refusal(["work", "--state", "carriedout"])).toContain("carried-out");
+});
+
+test("a bad gate closure names the schema values", async () => {
+  const message = await refusal(["close", "gate", "GATE_1", "--as", "passed", "--because", "x"]);
+  expect(message).toContain("sidestepped");
+  expect(message).toContain("retired");
 });
 
 test("a non-ISO --date is refused, not stamped into the record", async () => {
@@ -164,13 +171,72 @@ test("main prints a validation message when --state is wrong", async () => {
   console.error = (...args: unknown[]) => {
     chunks.push(args.map(String).join(" "));
   };
+  let db: string | undefined;
   try {
-    const db = await mkdtemp(join(tmpdir(), "labkit-state-msg-"));
+    db = await mkdtemp(join(tmpdir(), "labkit-state-msg-"));
     const code = await main(["--db", db, "gates", "--state", "blockd"]);
     expect(code).toBe(1);
     expect(chunks.join("")).toContain("sidestepped");
+    expect(chunks.join("")).not.toContain('"labkit":"request-failed"');
   } finally {
     process.stderr.write = write;
     console.error = error;
+    if (db !== undefined) rmSync(db, { recursive: true, force: true });
   }
 });
+
+test("main prints a validation message for a wrong claim handle", async () => {
+  const chunks: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  const error = console.error;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+    return true;
+  }) as typeof process.stderr.write;
+  console.error = (...args: unknown[]) => {
+    chunks.push(args.map(String).join(" "));
+  };
+  let db: string | undefined;
+  try {
+    db = await mkdtemp(join(tmpdir(), "labkit-claim-msg-"));
+    const code = await main(["--db", db, "is", "confirmed", "GATE_1", "--because", "x"]);
+    expect(code).toBe(1);
+    expect(chunks.join("")).toContain("claim handle expected a Claim id");
+    expect(chunks.join("")).not.toContain('"labkit":"request-failed"');
+  } finally {
+    process.stderr.write = write;
+    console.error = error;
+    if (db !== undefined) rmSync(db, { recursive: true, force: true });
+  }
+});
+
+test("main prints one labkit line when closing an enquiry twice", async () => {
+  let db: string | undefined;
+  const chunks: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  const error = console.error;
+  try {
+    db = await mkdtemp(join(tmpdir(), "labkit-close-twice-"));
+    expect(await main(["--db", db, "open", "does width matter?"])).toBe(0);
+    expect(await main(["--db", db, "close", "enquiry", "LOE_1"])).toBe(0);
+
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+      return true;
+    }) as typeof process.stderr.write;
+    console.error = (...args: unknown[]) => {
+      chunks.push(args.map(String).join(" "));
+    };
+
+    const code = await main(["--db", db, "close", "enquiry", "LOE_1"]);
+    const stderr = chunks.join("");
+    expect(code).toBe(1);
+    expect(stderr).toContain("labkit: enquiry LOE_1 is already closed by decision");
+    expect(stderr.match(/^labkit:/gm) ?? []).toHaveLength(1);
+    expect(stderr).not.toContain('"labkit":"request-failed"');
+  } finally {
+    process.stderr.write = write;
+    console.error = error;
+    if (db !== undefined) rmSync(db, { recursive: true, force: true });
+  }
+}, 60_000);

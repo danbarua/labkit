@@ -52,33 +52,33 @@ describe("S-8b: there is no who, only what ran", () => {
    */
   test("what produced an analysis is recoverable, and two configurations are distinguishable", async () => {
     const result = await inOneWorld(async (s) => {
-      const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
-      const { observations: readings } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry("does the pruning schedule move convergence?");
+      const { observations: readings } = await s.writes.recordObservations({
         enquiry,
         name: "sweep readings",
         finding: "twelve runs across the schedule",
         contentHash: "sha256:sweep",
       });
-      const { observations: older } = await s.recordObservations({
+      const { observations: older } = await s.writes.recordObservations({
         enquiry,
         name: CONFIG,
         finding: "opus-5, temperature 0, prompt v3",
         contentHash: "sha256:cfg-v3",
       });
-      const { analysis: first } = await recordAnalysis(s, {
+      const { analysis: first } = await recordAnalysis(s.writes, {
         enquiry,
         method: "convergence-fit",
         from: [readings, older],
         concludes: [{ proposition: MOVES, finding: "convergence moves by ~3 steps" }],
       });
 
-      const { observations: newer } = await s.recordObservations({
+      const { observations: newer } = await s.writes.recordObservations({
         enquiry,
         name: CONFIG,
         finding: "opus-5, temperature 0.7, prompt v4",
         contentHash: "sha256:cfg-v4",
       });
-      await recordAnalysis(s, {
+      await recordAnalysis(s.writes, {
         enquiry,
         method: "convergence-fit",
         from: [readings, newer],
@@ -88,7 +88,7 @@ describe("S-8b: there is no who, only what ran", () => {
       const reader = await afterwards();
       return {
         // Offering the older configuration against the older analysis, analysisClaims matches.
-        matched: await reader.reproducibilityOf({
+        matched: await reader.reads.reproducibilityOf({
           analysis: first,
           rebuilt: [
             { part: readings, hash: "sha256:sweep" },
@@ -97,7 +97,7 @@ describe("S-8b: there is no who, only what ran", () => {
         }),
         // Offering the newer one against it does not. "Which configuration
         // produced this" is answered by comparison, not by a signature.
-        mismatched: await reader.reproducibilityOf({
+        mismatched: await reader.reads.reproducibilityOf({
           analysis: first,
           rebuilt: [
             { part: readings, hash: "sha256:sweep" },
@@ -107,7 +107,7 @@ describe("S-8b: there is no who, only what ran", () => {
         // And the configuration carries its dependants like any other input,
         // so "what rests on this configuration" is the ordinary propagation
         // question rather than a new kind of query.
-        rests: await reader.whatDependsOn({ subject: older }),
+        rests: await reader.reads.whatDependsOn({ subject: older }),
       };
     });
 
@@ -123,14 +123,16 @@ describe("S-8b: there is no who, only what ran", () => {
    */
   test("approval is a decision on evidence against a condition, with no signer", async () => {
     const answer = await inOneWorld(async (s) => {
-      const { enquiry } = await s.openEnquiry("should the run be scaled up?");
-      const { criterion: budget } = await s.stateCriterion("projected cost under 40 GPU-hours");
-      const { observations: readings } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry("should the run be scaled up?");
+      const { criterion: budget } = await s.writes.stateCriterion(
+        "projected cost under 40 GPU-hours",
+      );
+      const { observations: readings } = await s.writes.recordObservations({
         enquiry,
         name: "cost projection",
         finding: "projected 31 GPU-hours at target scale",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "cost-projection",
         from: [readings],
@@ -142,17 +144,17 @@ describe("S-8b: there is no who, only what ran", () => {
         ],
         heldTo: [budget],
       });
-      await s.evaluateCriterion({
+      await s.writes.evaluateCriterion({
         criterion: budget,
         value: "31 GPU-hours",
         outcome: "pass",
         citing: [claimOf(analysisClaims, "the scale-up fits the budget")],
       });
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry,
         answeredBy: claimOf(analysisClaims, "the scale-up fits the budget"),
       });
-      return whyOf(await afterwards(), "the scale-up fits the budget");
+      return whyOf((await afterwards()).reads, "the scale-up fits the budget");
     });
 
     // The approval is fully accounted for without anyone signing it: what was

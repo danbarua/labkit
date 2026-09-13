@@ -49,10 +49,10 @@ const PROPOSITION = "the annealed protocol converges below tolerance";
  * Nobody wrote down what it started from."
  */
 async function aHistoricalResultWithNoRecordedInputs() {
-  const { enquiry } = await session.openEnquiry(
+  const { enquiry } = await session.writes.openEnquiry(
     "does the annealed protocol converge below tolerance?",
   );
-  const { analysis: historical, claims: historicalClaims } = await recordAnalysis(session, {
+  const { analysis: historical, claims: historicalClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "annealing-v1",
     from: [],
@@ -69,19 +69,19 @@ describe("S-10: rerunning is not reproducing", () => {
   test("recorded as two analyses, the re-run reads as independent confirmation", async () => {
     const { enquiry, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
 
-    const { observations: conditions } = await session.recordObservations({
+    const { observations: conditions } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    await recordAnalysis(session, {
+    await recordAnalysis(session.writes, {
       enquiry,
       method: "annealing-v1, re-run",
       from: [conditions],
       concludes: [{ proposition: PROPOSITION, finding: "converged, residual 2.9e-4" }],
     });
 
-    const why = await (await afterwards()).whySupported({
+    const why = await (await afterwards()).reads.whySupported({
       claim: claimOf(historicalClaims, PROPOSITION),
     });
     expect(why.verdict).toBe("supported");
@@ -101,12 +101,12 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 1: the conclusion may be reproduced; the execution is not", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
-    const { observations: conditions } = await session.recordObservations({
+    const { observations: conditions } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -117,7 +117,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     expect(report.conclusion).toBe("agrees");
     // The original recorded nothing it read, so there is nothing to have
     // reproduced. LabKit says that and stops.
@@ -132,12 +134,12 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 2: the difference is named as unrecorded, not as equal", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
-    const { observations: conditions } = await session.recordObservations({
+    const { observations: conditions } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -148,7 +150,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
       {
         what: "initial conditions, newly specified",
@@ -164,12 +168,12 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 3: bearing on the historical claim is answerable and is not confirmation", async () => {
     const { enquiry, historical, historicalClaims } = await aHistoricalResultWithNoRecordedInputs();
-    const { observations: conditions } = await session.recordObservations({
+    const { observations: conditions } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -180,7 +184,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     expect(report.bearing).toBe("raises");
     // There is no `confirms` field: "raises confidence" and "reproduced the
     // execution" are different questions, asked separately, without settling
@@ -190,7 +196,7 @@ describe("S-10: rerunning is not reproducing", () => {
 
     // And the claim itself now reads as re-verified rather than as twice
     // independently established.
-    const why = await (await afterwards()).whySupported({
+    const why = await (await afterwards()).reads.whySupported({
       claim: claimOf(historicalClaims, PROPOSITION),
     });
     expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);
@@ -203,12 +209,12 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("Afterward 4: the record says the original never recorded what it read", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
-    const { observations: conditions } = await session.recordObservations({
+    const { observations: conditions } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -219,7 +225,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     // LabKit does not decide whether two sets of numbers may be put side by
     // side -- that is the reader's call, not the record's. What the record
     // gives is the fact a comparison call would rest on: the re-run named
@@ -237,21 +245,21 @@ describe("S-10: rerunning is not reproducing", () => {
    * or it is just a blanket caveat on every second run.
    */
   test("two runs over the same recorded inputs are a reproduction, and comparable", async () => {
-    const { enquiry } = await session.openEnquiry(
+    const { enquiry } = await session.writes.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const { observations: conditions } = await session.recordObservations({
+    const { observations: conditions } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const { analysis: first } = await recordAnalysis(session, {
+    const { analysis: first } = await recordAnalysis(session.writes, {
       enquiry,
       method: "annealing-v1",
       from: [conditions],
       concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical: first,
       enquiry,
       method: "annealing-v1, re-run",
@@ -262,7 +270,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     // Both runs named what they read, and it was the same record. Nothing
     // differs, and the report says so without calling that a reproduction --
     // whether it is one depends on what the method does.
@@ -276,26 +286,26 @@ describe("S-10: rerunning is not reproducing", () => {
    * wording mistake, and it recurs.
    */
   test("two inputs sharing a name are not the same input", async () => {
-    const { enquiry } = await session.openEnquiry(
+    const { enquiry } = await session.writes.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const { observations: theirs } = await session.recordObservations({
+    const { observations: theirs } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const { observations: mine } = await session.recordObservations({
+    const { observations: mine } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions",
       finding: "seed 91, tolerance 1e-3, 64 steps",
     });
-    const { analysis: historical } = await recordAnalysis(session, {
+    const { analysis: historical } = await recordAnalysis(session.writes, {
       enquiry,
       method: "annealing-v1",
       from: [theirs],
       concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -306,7 +316,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     // Both directions, and both are true: the re-run read an "initial conditions" the original
     // did not, and the original read one the re-run did not. Identical names, two artefacts,
     // two differences. The entries carry identity, so "which one changed" is answerable even
@@ -332,7 +344,7 @@ describe("S-10: rerunning is not reproducing", () => {
    */
   test("two runs that both recorded no inputs have not reproduced anything", async () => {
     const { enquiry, historical } = await aHistoricalResultWithNoRecordedInputs();
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -343,7 +355,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     // Neither run named anything. Two empty lists, and no claim that they
     // therefore match -- absence on both sides is still absence.
     expect(report.verificationRead).toEqual([]);
@@ -356,26 +370,26 @@ describe("S-10: rerunning is not reproducing", () => {
    * `not-reproduced` with nothing named as differing.
    */
   test("an input the original used and the re-run did not is named", async () => {
-    const { enquiry } = await session.openEnquiry(
+    const { enquiry } = await session.writes.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const { observations: a } = await session.recordObservations({
+    const { observations: a } = await session.writes.recordObservations({
       enquiry,
       name: "conditions A",
       finding: "seed 4",
     });
-    const { observations: b } = await session.recordObservations({
+    const { observations: b } = await session.writes.recordObservations({
       enquiry,
       name: "conditions B",
       finding: "warm start",
     });
-    const { analysis: historical } = await recordAnalysis(session, {
+    const { analysis: historical } = await recordAnalysis(session.writes, {
       enquiry,
       method: "annealing-v1",
       from: [a, b],
       concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -386,7 +400,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
       { what: "conditions B", standing: "not-used-by-the-re-run" },
     ]);
@@ -398,10 +414,10 @@ describe("S-10: rerunning is not reproducing", () => {
    * *against* the proposition were reported as disagreeing with each other.
    */
   test("two runs that both find against the proposition agree with each other", async () => {
-    const { enquiry } = await session.openEnquiry(
+    const { enquiry } = await session.writes.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const { analysis: historical } = await recordAnalysis(session, {
+    const { analysis: historical } = await recordAnalysis(session.writes, {
       enquiry,
       method: "annealing-v1",
       from: [],
@@ -413,12 +429,12 @@ describe("S-10: rerunning is not reproducing", () => {
         },
       ],
     });
-    const { observations: conditions } = await session.recordObservations({
+    const { observations: conditions } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -430,7 +446,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
+    const report = await (await afterwards()).reads.reproductionOf({
+      verification: rerun.verification,
+    });
     expect(report.conclusion).toBe("agrees");
     // Agreeing with a negative finding does not raise confidence in the
     // proposition -- bearing is about the claim, not about the two runs.
@@ -441,26 +459,29 @@ describe("S-10: rerunning is not reproducing", () => {
    * External review, finding 5.
    */
   test("the claim does not rest on the re-run's inputs", async () => {
-    const { enquiry } = await session.openEnquiry(
+    const { enquiry } = await session.writes.openEnquiry(
       "does the annealed protocol converge below tolerance?",
     );
-    const { observations: original } = await session.recordObservations({
+    const { observations: original } = await session.writes.recordObservations({
       enquiry,
       name: "original conditions",
       finding: "seed 1",
     });
-    const { analysis: historical, claims: historicalClaims } = await recordAnalysis(session, {
-      enquiry,
-      method: "annealing-v1",
-      from: [original],
-      concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
-    });
-    const { observations: fresh } = await session.recordObservations({
+    const { analysis: historical, claims: historicalClaims } = await recordAnalysis(
+      session.writes,
+      {
+        enquiry,
+        method: "annealing-v1",
+        from: [original],
+        concludes: [{ proposition: PROPOSITION, finding: "converged, residual 3.1e-4" }],
+      },
+    );
+    const { observations: fresh } = await session.writes.recordObservations({
       enquiry,
       name: "initial conditions, newly specified",
       finding: "seed 4, tolerance 1e-6, 512 steps",
     });
-    await session.reverify({
+    await session.writes.reverify({
       historical,
       enquiry,
       method: "annealing-v1, re-run",
@@ -471,7 +492,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const why = await (await afterwards()).whySupported({
+    const why = await (await afterwards()).reads.whySupported({
       claim: claimOf(historicalClaims, PROPOSITION),
     });
     expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);

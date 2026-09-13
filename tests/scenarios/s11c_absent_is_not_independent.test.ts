@@ -48,14 +48,14 @@ const TREND = "the response trends upward with dose";
  * trend analysis actually reads."
  */
 async function aTwoStagePipeline(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("does the response trend upward with dose?");
-  const { observations: raw } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does the response trend upward with dose?");
+  const { observations: raw } = await s.writes.recordObservations({
     enquiry,
     name: "raw sensor series",
     finding: "eleven dose levels, uncalibrated",
     contentHash: "sha256:raw",
   });
-  const { analysis: calibration } = await recordAnalysis(s, {
+  const { analysis: calibration } = await recordAnalysis(s.writes, {
     enquiry,
     method: "calibrate",
     from: [raw],
@@ -69,13 +69,13 @@ async function aTwoStagePipeline(s: ResearchSession) {
 
   // Stage two. The calibrated series is re-recorded because nothing on the
   // surface hands stage one's output to stage two.
-  const { observations: calibrated } = await s.recordObservations({
+  const { observations: calibrated } = await s.writes.recordObservations({
     enquiry,
     name: "calibrated series",
     finding: "eleven dose levels, calibrated",
     contentHash: "sha256:calibrated",
   });
-  const { analysis: trend } = await recordAnalysis(s, {
+  const { analysis: trend } = await recordAnalysis(s.writes, {
     enquiry,
     method: "dose-response-fit",
     from: [calibrated],
@@ -91,7 +91,7 @@ describe("S-11c: nothing found is not nothing there", () => {
   test("a re-entered intermediate still severs the chain, and the report says so", async () => {
     const { raw } = await aTwoStagePipeline(session);
 
-    const affected = await (await afterwards()).whatDependsOn({ subject: raw });
+    const affected = await (await afterwards()).reads.whatDependsOn({ subject: raw });
 
     // The traversal is transitive now (row AE), but this builder deliberately re-enters the
     // intermediate as fresh observations rather than reading the first analysis's output --
@@ -110,15 +110,15 @@ describe("S-11c: nothing found is not nothing there", () => {
    */
   test("an empty answer says it is a lower bound rather than a finding of independence", async () => {
     const { raw, enquiry } = await aTwoStagePipeline(session);
-    const { observations: unrelated } = await session.recordObservations({
+    const { observations: unrelated } = await session.writes.recordObservations({
       enquiry,
       name: "lab humidity log",
       finding: "42% throughout, nothing read it",
     });
 
     const reader = await afterwards();
-    const under = await reader.whatDependsOn({ subject: raw });
-    const none = await reader.whatDependsOn({ subject: unrelated });
+    const under = await reader.reads.whatDependsOn({ subject: raw });
+    const none = await reader.reads.whatDependsOn({ subject: unrelated });
 
     // Nothing was found for the humidity log, and the report does not let that
     // be read as independence. This is the remedy in full: the values are
@@ -140,7 +140,7 @@ describe("S-11c: nothing found is not nothing there", () => {
    */
   test("the report cannot be made to claim completeness", async () => {
     const { raw } = await aTwoStagePipeline(session);
-    const affected = await (await afterwards()).whatDependsOn({ subject: raw });
+    const affected = await (await afterwards()).reads.whatDependsOn({ subject: raw });
 
     expect(affected.complete).toBe(false);
 

@@ -33,8 +33,8 @@ const PROP = "the series does not differ from itself";
 
 describe("S-10e — the same record, read twice by one run", () => {
   test("a run that read one record twice is not reported as having read it once", async () => {
-    const { enquiry } = await session.openEnquiry("does the series differ from itself?");
-    const { observations: series } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("does the series differ from itself?");
+    const { observations: series } = await session.writes.recordObservations({
       enquiry,
       name: "series",
       finding: "twelve points",
@@ -42,14 +42,14 @@ describe("S-10e — the same record, read twice by one run", () => {
     });
 
     // The null test: the same series on both sides of a difference.
-    const { analysis } = await recordAnalysis(session, {
+    const { analysis } = await recordAnalysis(session.writes, {
       enquiry,
       method: "difference of the two series",
       from: [series, series],
       concludes: [{ proposition: PROP, finding: "difference 0.0" }],
     });
     // And a re-run that read it once, so the two are genuinely different.
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical: analysis,
       enquiry,
       method: "difference of the two series",
@@ -61,32 +61,32 @@ describe("S-10e — the same record, read twice by one run", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf({ verification: rerun.verification });
+    const report = await later.reads.reproductionOf({ verification: rerun.verification });
 
     expect(report.ofRead.map((i) => i.part)).toEqual([series, series]);
     expect(report.verificationRead.map((i) => i.part)).toEqual([series]);
   });
 
   test("and the order of a repeat is kept, not just its count", async () => {
-    const { enquiry } = await session.openEnquiry("does the sandwich cancel?");
-    const { observations: a } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("does the sandwich cancel?");
+    const { observations: a } = await session.writes.recordObservations({
       enquiry,
       name: "series A",
       finding: "twelve points",
     });
-    const { observations: b } = await session.recordObservations({
+    const { observations: b } = await session.writes.recordObservations({
       enquiry,
       name: "series B",
       finding: "twelve points",
     });
 
-    const { analysis } = await recordAnalysis(session, {
+    const { analysis } = await recordAnalysis(session.writes, {
       enquiry,
       method: "a minus b plus a",
       from: [a, b, a],
       concludes: [{ proposition: PROP, finding: "residual 0.1" }],
     });
-    const rerun = await session.reverify({
+    const rerun = await session.writes.reverify({
       historical: analysis,
       enquiry,
       method: "a minus b plus a",
@@ -98,7 +98,7 @@ describe("S-10e — the same record, read twice by one run", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf({ verification: rerun.verification });
+    const report = await later.reads.reproductionOf({ verification: rerun.verification });
 
     expect(report.ofRead.map((i) => i.name)).toEqual(["series A", "series B", "series A"]);
     expect(report.differs).toEqual([]);

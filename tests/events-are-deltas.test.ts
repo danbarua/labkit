@@ -63,7 +63,7 @@ async function emptyGraph(): Promise<TenantGraph> {
 }
 
 test("pose books its id and names it in the event before the node exists", async () => {
-  const { question, events: recorded } = await session.pose({
+  const { question, events: recorded } = await session.writes.pose({
     question: "does the pruning schedule move convergence?",
   });
 
@@ -79,8 +79,8 @@ test("pose books its id and names it in the event before the node exists", async
 });
 
 test("closeEnquiry states the decision and its exact pursuit target", async () => {
-  const { enquiry } = await session.openEnquiry("does it hold?");
-  const { decision, events: recorded } = await session.closeEnquiry({ enquiry });
+  const { enquiry } = await session.writes.openEnquiry("does it hold?");
+  const { decision, events: recorded } = await session.writes.closeEnquiry({ enquiry });
 
   const closed = recorded[0]!;
   expect(closed.changes.map((c) => c.change)).toEqual(["NodeCreated", "EdgeCreated"]);
@@ -98,7 +98,7 @@ test("closeEnquiry states the decision and its exact pursuit target", async () =
 });
 
 test("the delta applied to an empty graph rebuilds the node, properties and all", async () => {
-  const { question } = await session.pose({ question: "does it hold?" });
+  const { question } = await session.writes.pose({ question: "does it hold?" });
   const history = await events.all();
 
   // Nothing reads the original record: the events are the only input.
@@ -120,7 +120,7 @@ test("the delta applied to an empty graph rebuilds the node, properties and all"
 });
 
 test("a property set in place is carried by the delta and applied from it", async () => {
-  const { question } = await session.pose({ question: "does it hold?" });
+  const { question } = await session.writes.pose({ question: "does it hold?" });
   const history = await events.all();
 
   const fresh = await emptyGraph();
@@ -146,21 +146,21 @@ test("a property set in place is carried by the delta and applied from it", asyn
 });
 
 test("a refused close writes nothing, because nothing was written before the refusal", async () => {
-  const { enquiry } = await session.openEnquiry("does it hold?");
-  await session.closeEnquiry({ enquiry });
+  const { enquiry } = await session.writes.openEnquiry("does it hold?");
+  await session.writes.closeEnquiry({ enquiry });
   const before = await contents(graph);
 
-  await expect(session.closeEnquiry({ enquiry })).rejects.toThrow(/already closed/);
+  await expect(session.writes.closeEnquiry({ enquiry })).rejects.toThrow(/already closed/);
 
   expect(await contents(graph)).toEqual(before);
 });
 
 test("a verb that refuses leaves no delta for the next event to claim", async () => {
-  const { enquiry } = await session.openEnquiry("does it hold?");
-  await session.closeEnquiry({ enquiry });
-  await expect(session.closeEnquiry({ enquiry })).rejects.toThrow();
+  const { enquiry } = await session.writes.openEnquiry("does it hold?");
+  await session.writes.closeEnquiry({ enquiry });
+  await expect(session.writes.closeEnquiry({ enquiry })).rejects.toThrow();
 
-  const { question, events: recorded } = await session.pose({ question: "and this one?" });
+  const { question, events: recorded } = await session.writes.pose({ question: "and this one?" });
   expect(createdIn(recorded[0]!)).toEqual([question]);
 });
 

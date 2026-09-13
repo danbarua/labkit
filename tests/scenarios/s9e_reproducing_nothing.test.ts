@@ -43,8 +43,8 @@ const HOLDS = "the simulation converges";
  * reproduces?"
  */
 async function anAnalysisThatConsumedNothing(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("does the simulation converge?");
-  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+  const { enquiry } = await s.writes.openEnquiry("does the simulation converge?");
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "pure-sim",
     from: [],
@@ -61,7 +61,7 @@ describe("S-9e: reproducing nothing", () => {
   test("an analysis that consumed nothing has not been shown to reproduce", async () => {
     const { analysis } = await anAnalysisThatConsumedNothing(session);
 
-    const report = await session.reproducibilityOf({ analysis, rebuilt: [] });
+    const report = await session.reads.reproducibilityOf({ analysis, rebuilt: [] });
     expect(report.reproducible).toBe(false);
     expect(report.exact).toEqual([]);
     expect(report.differing).toEqual([]);
@@ -69,7 +69,7 @@ describe("S-9e: reproducing nothing", () => {
     expect(report.notRebuilt).toEqual([]);
 
     // Afterward, from a second reader over the same graph.
-    const again = await (await afterwards()).reproducibilityOf({ analysis, rebuilt: [] });
+    const again = await (await afterwards()).reads.reproducibilityOf({ analysis, rebuilt: [] });
     expect(again.reproducible).toBe(false);
   });
 
@@ -80,7 +80,7 @@ describe("S-9e: reproducing nothing", () => {
    */
   test("an analysis that does not exist is refused, not reported on", async () => {
     await expect(
-      session.reproducibilityOf({ analysis: ref("analysis", "COMP_999999"), rebuilt: [] }),
+      session.reads.reproducibilityOf({ analysis: ref("analysis", "COMP_999999"), rebuilt: [] }),
     ).rejects.toThrow(/COMP_999999/);
   });
 
@@ -92,10 +92,10 @@ describe("S-9e: reproducing nothing", () => {
     const { analysis } = await anAnalysisThatConsumedNothing(session);
     const read = await afterwards();
 
-    const empty = await read.reproducibilityOf({ analysis, rebuilt: [] });
+    const empty = await read.reads.reproducibilityOf({ analysis, rebuilt: [] });
     let ghost = "(no throw)";
     try {
-      await read.reproducibilityOf({ analysis: ref("analysis", "COMP_999999"), rebuilt: [] });
+      await read.reads.reproducibilityOf({ analysis: ref("analysis", "COMP_999999"), rebuilt: [] });
     } catch (e) {
       ghost = (e as Error).message;
     }

@@ -34,20 +34,20 @@ const TREND = "the response trends upward with dose";
 
 /** Raw measurement, a calibration reading it, and a trend fit reading that. */
 async function twoStages() {
-  const { enquiry } = await session.openEnquiry("does the response trend upward?");
-  const { observations: raw } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does the response trend upward?");
+  const { observations: raw } = await session.writes.recordObservations({
     enquiry,
     name: "raw series",
     finding: "uncalibrated instrument output",
     contentHash: "sha256:raw",
   });
-  const calibration = await recordAnalysis(session, {
+  const calibration = await recordAnalysis(session.writes, {
     enquiry,
     method: "calibrate",
     from: [raw],
     concludes: [{ proposition: "the series is calibrated", finding: "offset removed" }],
   });
-  const trend = await recordAnalysis(session, {
+  const trend = await recordAnalysis(session.writes, {
     enquiry,
     method: "trend",
     from: [calibration.analysis],
@@ -63,7 +63,7 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
       clock,
       events: inMemoryEventLog(),
     });
-    const why = await later.whySupported({ claim: claimOf(trend.claims, TREND) });
+    const why = await later.reads.whySupported({ claim: claimOf(trend.claims, TREND) });
 
     expect(why.restingOn).toHaveLength(1);
     // The vocabulary is wrong and the wording is right, which is the wrong way
@@ -83,7 +83,7 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
     });
 
     // Stage one is fully accounted for: a hash was recorded and it matches.
-    const stageOne = await later.reproducibilityOf({
+    const stageOne = await later.reads.reproducibilityOf({
       analysis: calibration.analysis,
       rebuilt: [{ part: raw, hash: "sha256:raw" }],
     });
@@ -94,7 +94,7 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
     // there is nothing to hash against. That lands in `unverifiable`, which is the record
     // declining to answer rather than answering no, and it is the correct answer about that
     // record.
-    const stageTwo = await later.reproducibilityOf({ analysis: trend.analysis, rebuilt: [] });
+    const stageTwo = await later.reads.reproducibilityOf({ analysis: trend.analysis, rebuilt: [] });
     expect(stageTwo.unverifiable.map((p) => p.name)).toEqual(["calibrate output"]);
     // The half that makes this a real probe rather than a restatement: absence
     // is not reported as difference. `differing` would be a wrong answer.

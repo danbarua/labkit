@@ -39,19 +39,19 @@ async function afterwards(): Promise<ResearchSession> {
 
 /** An analysis, reviewed as defective — everything a replacement needs. */
 async function aDefectiveAnalysis() {
-  const { enquiry } = await session.openEnquiry("does the treatment shorten recovery?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does the treatment shorten recovery?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "recovery times",
     finding: "sixty patients, two arms",
   });
-  const { analysis, claims } = await recordAnalysis(session, {
+  const { analysis, claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "unadjusted comparison",
     from: [observations],
     concludes: [{ proposition: PROP, finding: "three days shorter" }],
   });
-  const { review } = await session.recordReview({
+  const { review } = await session.writes.recordReview({
     of: analysis,
     verdict: "unadjusted for baseline severity",
   });
@@ -68,7 +68,7 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
   test("the report says what the input actually is, rather than asserting it survived", async () => {
     const { enquiry, analysis, review } = await aDefectiveAnalysis();
 
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -81,8 +81,9 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // The replacement really does rest on it, and the record says the record it
     // rests on has been retracted — every finding in it superseded by this very
     // act. Read from the claim, because that is where a reader arrives.
-    const resting = (await (await afterwards()).whySupported({ claim: report.claims[0]!.claim }))
-      .restingOn;
+    const resting = (
+      await (await afterwards()).reads.whySupported({ claim: report.claims[0]!.claim })
+    ).restingOn;
     // **Two inputs, and that is the add-only rule.** The successor inherits
     // what its predecessor read, and consumes the predecessor's own output
     // besides, because this call named it. Only the second is retracted:
@@ -93,7 +94,7 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // An ordinary input is unchanged, so the flag is a discriminator and not a
     // relabelling of every row.
     const clean = await aDefectiveAnalysis();
-    const ordinary = await replaceAnalysis(session, {
+    const ordinary = await replaceAnalysis(session.writes, {
       supersedes: clean.analysis,
       because: clean.review,
       enquiry: clean.enquiry,
@@ -102,14 +103,14 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
       concludes: [{ proposition: PROP, finding: "one day shorter, adjusted" }],
     });
     const ordinaryResting = (
-      await (await afterwards()).whySupported({ claim: ordinary.claims[0]!.claim })
+      await (await afterwards()).reads.whySupported({ claim: ordinary.claims[0]!.claim })
     ).restingOn;
     expect(ordinaryResting[0]!.invalidated).toBeUndefined();
   });
 
   test("the replacement's conclusion does not stand on a retracted record", async () => {
     const { enquiry, analysis, review } = await aDefectiveAnalysis();
-    const report = await replaceAnalysis(session, {
+    const report = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -122,7 +123,7 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
       clock,
       events: inMemoryEventLog(),
     });
-    const why = await later.whySupported({ claim: report.claims[0]!.claim });
+    const why = await later.reads.whySupported({ claim: report.claims[0]!.claim });
 
     // a `supported` verdict stays, and that is the design rather than an oversight:
     // invalidating a record deliberately does not withdraw what rests on it --
@@ -137,7 +138,7 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // "not automatic" is relying on. If it did not, a `supported` verdict would be
     // a wrong answer with no way to find out.
     const retracted = why.restingOn.find((r) => r.invalidated)!;
-    const affected = await later.whatDependsOn({ subject: retracted.part });
+    const affected = await later.reads.whatDependsOn({ subject: retracted.part });
     expect(affected.claims.map((c) => c.claim)).toContain(report.claims[0]!.claim);
   });
 });

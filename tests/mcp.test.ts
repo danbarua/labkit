@@ -28,6 +28,7 @@ import {
 } from "../src/attribution";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
 import { GATE_STATES } from "../src/domain/vocab";
+import { GATE_CLOSURES } from "../src/domain/commands";
 import {
   explanationSchema,
   historicalSurveySchema,
@@ -369,9 +370,8 @@ describe("an agent can track work through the tools alone", () => {
         as: "the method is faster on this benchmark suite",
         because: "the suite is not representative of the general case",
       });
-      // Over the wire the pairs survive as objects, not sentences -- the
-      // schema mirror in src/mcp/schemas.ts is held to the report interface at
-      // compile time, and this checks the same thing at run time.
+      // Over the wire the pairs survive as objects, not sentences. The domain
+      // codec in src/domain/reports.ts is the schema this value must match.
       const previously = report.previously as Array<{
         claim: string;
         asserts: string;
@@ -508,6 +508,13 @@ describe("an agent can track work through the tools alone", () => {
         arguments: { enquiry: id(enquiry) },
       });
       expect(again.isError).toBe(true);
+      const sentence = (again.content as Array<{ type: string; text?: string }>)
+        .map((block) => block.text ?? "")
+        .join("");
+      expect(sentence).toContain(`enquiry ${id(enquiry)} is already closed by decision`);
+      expect(sentence).toContain(
+        "closing it again would leave two decisions resolving one enquiry",
+      );
       await c.close();
     } finally {
       await scenario.end();
@@ -630,6 +637,15 @@ describe("the tool documentation resource", () => {
     expect(declared.properties.state?.enum).toEqual([...GATE_STATES]);
   });
 
+  test("close_gate advertises GATE_CLOSURES", () => {
+    const tool = WRITE_TOOLS.find((t) => t.name === "close_gate")!;
+    // Through `toJSONSchema`: it is what an agent is actually handed.
+    const declared = z.toJSONSchema(z.strictObject(tool.inputSchema)) as {
+      properties: Record<string, { enum?: string[] }>;
+    };
+    expect(declared.properties.closure?.enum).toEqual([...GATE_CLOSURES]);
+  });
+
   test("every tool, and every field of every declared output, is documented", async () => {
     const client = await connected();
     try {
@@ -677,20 +693,20 @@ describe("behaviour — the same answers, over the wire", () => {
     const graph = await scenario.begin();
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
 
-    const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
-    await s.pose({ question: "does depth move convergence?" });
-    const { observations } = await s.recordObservations({
+    const { enquiry } = await s.writes.openEnquiry("does the pruning schedule move convergence?");
+    await s.writes.pose({ question: "does depth move convergence?" });
+    const { observations } = await s.writes.recordObservations({
       enquiry,
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     });
-    const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+    const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
       enquiry,
       method: "paired comparison",
       from: [observations],
       concludes: [{ proposition: PROP, finding: "moves by ~3 steps" }],
     });
-    await s.closeEnquiry({
+    await s.writes.closeEnquiry({
       enquiry,
       answeredBy: claimOf(analysisClaims, PROP),
     });
@@ -780,9 +796,8 @@ describe("behaviour — the same answers, over the wire", () => {
   });
 
   test("every tool's real output parses against its declared schema", async () => {
-    // The compile-time gate in src/mcp/schemas.ts is two-way assignability, and it has one
-    // measured hole: a schema that DROPS an optional field is still assignable both ways, so
-    // tsc passes. This narrows that hole and does not close it.
+    // Runtime parse against the domain codec the tool advertises. The type is
+    // `z.infer` of that codec. There is no second Exact<> list in mcp/schemas.ts.
     const { client, read, enquiry } = await seeded();
     try {
       const parsed = async (name: string, args: Record<string, unknown>) => {

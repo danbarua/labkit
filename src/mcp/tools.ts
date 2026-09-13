@@ -61,51 +61,51 @@ import {
 } from "../domain/commands";
 
 import {
-  claimsAssertingSchema,
-  searchSchema,
-  whatHappenedSchema,
-  conflictVerdictSchema,
-  criteriaGoverningSchema,
-  gateStatusSchema,
-  originOfSchema,
-  reproducibilityReportSchema,
-  taskContractSchema,
-  amendmentReportSchema,
-  posedSchema,
-  notedSchema,
-  notesSchema,
-  pursuedSchema,
-  openedEnquirySchema,
-  recordedObservationsSchema,
-  sharpenedQuestionSchema,
-  recordedReviewSchema,
-  synthesisedSchema,
-  closedEnquirySchema,
-  closedGateSchema,
-  stoppedWorkSchema,
-  plannedWorkSchema,
-  statedCriterionSchema,
-  declaredGateSchema,
-  evaluatedCriterionSchema,
-  acceptedAsUnresolvedSchema,
-  restatedSchema,
-  undoneSchema,
-  reinterpretationReportSchema,
-  replacementReportSchema,
-  verificationReportSchema,
-  recordedAnalysisSchema,
-  pursuitsSchema,
-  dependencyReportSchema,
-  designHistorySchema,
-  enquiryStatusSchema,
-  interpretationHistorySchema,
-  reproductionReportSchema,
-  supportExplanationSchema,
-  registeredSessionSchema,
-  gateListSchema,
-  workListSchema,
-  standingSchema,
-} from "./schemas";
+  claimsAsserting,
+  search,
+  whatHappened,
+  conflictVerdict,
+  criteriaGoverning,
+  gateStatus,
+  originOf,
+  reproducibilityReport,
+  taskContract,
+  amendmentReport,
+  posed,
+  noted,
+  notes,
+  pursued,
+  openedEnquiry,
+  recordedObservations,
+  sharpenedQuestion,
+  recordedReview,
+  synthesised,
+  closedEnquiry,
+  closedGate,
+  stoppedWork,
+  plannedWork,
+  statedCriterion,
+  declaredGate,
+  evaluatedCriterion,
+  acceptedAsUnresolved,
+  restated,
+  undone,
+  reinterpretationReport,
+  replacementReport,
+  verificationReport,
+  recordedAnalysis,
+  pursuits,
+  dependencyReport,
+  designHistory,
+  enquiryStatus,
+  interpretationHistory,
+  reproductionReport,
+  supportExplanation,
+  registeredSession,
+  gateList,
+  workList,
+  standing,
+} from "../domain/reports";
 
 /**
  * One tool. `Shape` is a Zod **raw shape** — `{ at: z.string().optional() }`,
@@ -122,8 +122,7 @@ export interface ToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly description: string;
   readonly inputSchema: Shape;
   /**
-   * The shape of what the handler returns, mirrored from `src/domain/report.ts` and held to it
-   * at compile time — see `./schemas`.
+   * The shape of what the handler returns, owned by `src/domain/reports.ts` and shared with the CLI.
    */
   readonly outputSchema?: z.ZodType;
   handler(read: ReadSurface, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
@@ -188,7 +187,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       since: z.number().optional().describe("a `seq` `now` returned before"),
     },
-    outputSchema: standingSchema,
+    outputSchema: standing,
     handler: (read, { since }) =>
       read.now(nowQuery.parse({ ...(since === undefined ? {} : { since }) })),
   }),
@@ -252,7 +251,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
     },
-    outputSchema: supportExplanationSchema,
+    outputSchema: supportExplanation,
     handler: (read, { claim }) => read.whySupported(whySupportedQuery.parse({ claim })),
   }),
 
@@ -268,7 +267,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       text: z.string().describe("the text to search for"),
     },
-    outputSchema: searchSchema,
+    outputSchema: search,
     handler: async (read, { text }) => ({
       groups: await read.search(searchQuery.parse({ text })),
     }),
@@ -287,7 +286,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       proposition: z.string().describe("the sentence, as worded"),
     },
-    outputSchema: claimsAssertingSchema,
+    outputSchema: claimsAsserting,
     handler: async (read, { proposition }) => ({
       claims: await read.claimsAsserting(claimsAssertingQuery.parse({ proposition })),
     }),
@@ -305,7 +304,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
     },
-    outputSchema: pursuitsSchema,
+    outputSchema: pursuits,
     handler: async (read, { question }) => ({
       enquiries: await read.pursuitsOf(pursuitsOfQuery.parse({ question })),
     }),
@@ -323,7 +322,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
     },
-    outputSchema: originOfSchema,
+    outputSchema: originOf,
     handler: async (read, { question }) => ({
       origin: await read.originOf(originOfQuery.parse({ question })),
     }),
@@ -342,7 +341,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       state: gateListQuery.shape.state.describe("only gates in this state (default: all of them)"),
     },
-    outputSchema: gateListSchema,
+    outputSchema: gateList,
     handler: async (read, { state }) => ({
       gates: await read.gateList(
         gateListQuery.parse({ ...(state === undefined ? {} : { state }) }),
@@ -359,7 +358,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "never run, and which have no standing verdict. `everFailed` survives a later pass, so a " +
       "gate that failed and was re-checked does not read as though it never failed.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
-    outputSchema: gateStatusSchema,
+    outputSchema: gateStatus,
     handler: (read, { gate }) => read.gateStatus(gateStatusQuery.parse({ gate })),
   }),
 
@@ -371,7 +370,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "The prespecified conditions a gate is governed by. Pair it with `gate_status` to get " +
       "their current standing; this answers only which conditions apply.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
-    outputSchema: criteriaGoverningSchema,
+    outputSchema: criteriaGoverning,
     handler: async (read, { gate }) => ({
       criteria: await read.criteriaGoverning(criteriaGoverningQuery.parse({ gate })),
     }),
@@ -386,7 +385,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "rather than from timestamps. Takes the gate's id — the conditions belong to the gate, " +
       "so that is the handle, not the design's name.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
-    outputSchema: designHistorySchema,
+    outputSchema: designHistory,
     handler: (read, { gate }) => read.designHistory(designHistoryQuery.parse({ gate })),
   }),
   tool({
@@ -404,7 +403,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       state: workListQuery.shape.state.describe("only work in this state (default: all of it)"),
     },
-    outputSchema: workListSchema,
+    outputSchema: workList,
     handler: async (read, { state }) => ({
       work: await read.workList(workListQuery.parse({ ...(state === undefined ? {} : { state }) })),
     }),
@@ -419,7 +418,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "read. `enforced` is always false and says so: the record states what the work may " +
       "look at, and nothing stops a computation reading elsewhere.",
     inputSchema: { work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1`) },
-    outputSchema: taskContractSchema,
+    outputSchema: taskContract,
     handler: (read, { work }) => read.contractFor(contractForQuery.parse({ work })),
   }),
 
@@ -433,7 +432,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
     },
-    outputSchema: enquiryStatusSchema,
+    outputSchema: enquiryStatus,
     handler: (read, { enquiry }) => read.enquiryStatus(enquiryStatusQuery.parse({ enquiry })),
   }),
 
@@ -449,7 +448,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4`),
     },
-    outputSchema: interpretationHistorySchema,
+    outputSchema: interpretationHistory,
     handler: (read, { claim }) =>
       read.interpretationHistory(interpretationHistoryQuery.parse({ claim })),
   }),
@@ -468,7 +467,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`),
     },
-    outputSchema: reproductionReportSchema,
+    outputSchema: reproductionReport,
     handler: (read, { analysis }) =>
       read.reproductionOf(reproductionOfQuery.parse({ verification: analysis })),
   }),
@@ -495,7 +494,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("what you rebuilt, and its hash — omit to ask what the record can account for"),
     },
-    outputSchema: reproducibilityReportSchema,
+    outputSchema: reproducibilityReport,
     handler: (read, { analysis, rebuilt }) =>
       read.reproducibilityOf(reproducibilityOfQuery.parse({ analysis, rebuilt: rebuilt ?? [] })),
   }),
@@ -513,7 +512,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       artefact: z.string().describe(`logical name, or an ${ARTEFACT_PREFIX}… id`),
     },
-    outputSchema: dependencyReportSchema,
+    outputSchema: dependencyReport,
     handler: (read, { artefact }) =>
       read.whatDependsOn(whatDependsOnQuery.parse({ subject: artefact })),
   }),
@@ -532,7 +531,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       a: z.string().describe(`the first claim's id, e.g. ${CLAIM_PREFIX}4`),
       b: z.string().describe(`the second claim's id, e.g. ${CLAIM_PREFIX}7`),
     },
-    outputSchema: conflictVerdictSchema,
+    outputSchema: conflictVerdict,
     handler: (read, { a, b }) => read.doTheseConflict(doTheseConflictQuery.parse({ a, b })),
   }),
 
@@ -561,7 +560,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
         ),
       limit: z.number().optional().describe("how many at most (default 50)"),
     },
-    outputSchema: whatHappenedSchema,
+    outputSchema: whatHappened,
     handler: async (read, { since_seq, by, operation, touching, reconstructed, limit }) => {
       const page = await read.whatHappenedPage(
         eventFilter.parse({
@@ -601,7 +600,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "somebody already remembers. This lists them all, newest first — what each says, what it " +
       "concerns, and the question it prompted where it prompted one.",
     inputSchema: {},
-    outputSchema: notesSchema,
+    outputSchema: notes,
     handler: async (read) => ({ notes: await read.notes(notesQuery.parse({})) }),
   }),
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;
@@ -634,7 +633,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           "the note this question came out of, when it came out of one — a hunch written down before there was anything to ask",
         ),
     },
-    outputSchema: posedSchema,
+    outputSchema: posed,
     handler: (write, { question, from }) =>
       write.pose(poseCommand.parse({ question, ...(from ? { from: from } : {}) })),
   }),
@@ -655,7 +654,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           "the note this question came out of, when it came out of one — a hunch written down before there was anything to ask",
         ),
     },
-    outputSchema: openedEnquirySchema,
+    outputSchema: openedEnquiry,
     handler: (write, { question, from }) => {
       const input = openEnquiryCommand.parse({
         question,
@@ -676,7 +675,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
       approach: z.string().describe("how this line of enquiry means to answer it"),
     },
-    outputSchema: pursuedSchema,
+    outputSchema: pursued,
     handler: (write, { question, approach }) =>
       write.pursue(pursueCommand.parse({ question: question, approach })),
   }),
@@ -695,7 +694,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       into: z.string().describe("the sharper question, as asked"),
       because: z.string().describe("why it was sharpened"),
     },
-    outputSchema: sharpenedQuestionSchema,
+    outputSchema: sharpenedQuestion,
     handler: (write, { from, into, because }) =>
       write.sharpen(sharpenCommand.parse({ from, into, because })),
   }),
@@ -723,7 +722,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
             "The other direction of `pose`'s `from`, for a note written after the question",
         ),
     },
-    outputSchema: notedSchema,
+    outputSchema: noted,
     handler: (write, { text, on, prompted }) =>
       write.note(
         noteCommand.parse({
@@ -752,7 +751,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("a hash of the underlying data, if there is one"),
     },
-    outputSchema: recordedObservationsSchema,
+    outputSchema: recordedObservations,
     handler: (write, { enquiry, name, finding, content_hash }) =>
       write.recordObservations(
         recordObservationsCommand.parse({
@@ -788,7 +787,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("ids of prespecified criteria the conclusions are held to"),
     },
-    outputSchema: recordedAnalysisSchema,
+    outputSchema: recordedAnalysis,
     handler: (write, { enquiry, method, from, implementing, held_to }) =>
       write.recordAnalysis(
         recordAnalysisCommand.parse({
@@ -838,7 +837,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("confirmatory means it was prespecified; exploratory is the default"),
     },
-    outputSchema: recordedAnalysisSchema,
+    outputSchema: recordedAnalysis,
     handler: (write, { analysis, finding, proposition, replacing, bearing, standing }) =>
       write.conclude(
         concludeCommand.parse({
@@ -875,7 +874,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .array(z.string())
         .describe(`ids of the claims this is drawn across, e.g. ${CLAIM_PREFIX}12`),
     },
-    outputSchema: synthesisedSchema,
+    outputSchema: synthesised,
     handler: (write, { proposition, resting_on }) =>
       write.synthesise(
         synthesiseCommand.parse({
@@ -896,7 +895,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       of: z.string().describe(`id of the analysis reviewed, e.g. ${ANALYSIS_PREFIX}3`),
       verdict: z.string().describe("what the review found"),
     },
-    outputSchema: recordedReviewSchema,
+    outputSchema: recordedReview,
     handler: (write, { of, verdict }) =>
       write.recordReview(recordReviewCommand.parse({ of: of, verdict })),
   }),
@@ -923,7 +922,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           `the line of enquiry this work exists to advance, e.g. ${ENQUIRY_PREFIX}7 — omit for ungated work`,
         ),
     },
-    outputSchema: plannedWorkSchema,
+    outputSchema: plannedWork,
     handler: (write, { objective, acceptance, may_read, enquiry }) =>
       write.planWork(
         planWorkCommand.parse({
@@ -946,7 +945,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       proposition: z.string().describe("the condition, as a sentence"),
     },
-    outputSchema: statedCriterionSchema,
+    outputSchema: statedCriterion,
     handler: (write, { proposition }) => {
       const input = stateCriterionCommand.parse({ proposition });
       return write.stateCriterion(input.proposition);
@@ -975,7 +974,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .min(1, "a gate needs at least one piece of work to protect")
         .describe(`work ids, e.g. ${WORK_PREFIX}1`),
     },
-    outputSchema: declaredGateSchema,
+    outputSchema: declaredGate,
     handler: (write, { governed_by, consequence, protecting }) =>
       write.declareGate(
         declareGateCommand.parse({
@@ -997,7 +996,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       criterion: z.string().describe(`criterion id, e.g. ${CRITERION_PREFIX}1`),
       value: z.string().describe("what the check gave, in the checker's words"),
-      outcome: z.enum(["pass", "fail"]).describe("whether the condition was met"),
+      outcome: evaluateCriterionCommand.shape.outcome.describe("whether the condition was met"),
       gate: z.string().optional().describe(`gate id this evaluation is for, e.g. ${GATE_PREFIX}1`),
       citing: z
         .array(z.string())
@@ -1014,7 +1013,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
             `e.g. ${CLAIM_PREFIX}12. Omit when the check is evaluated as a whole.`,
         ),
     },
-    outputSchema: evaluatedCriterionSchema,
+    outputSchema: evaluatedCriterion,
     handler: (write, { criterion, value, outcome, gate, citing, about }) =>
       write.evaluateCriterion(
         evaluateCriterionCommand.parse({
@@ -1056,7 +1055,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           `id of the claim prompting the amendment, e.g. ${CLAIM_PREFIX}4 — omit only before the condition's first evaluation`,
         ),
     },
-    outputSchema: amendmentReportSchema,
+    outputSchema: amendmentReport,
     handler: (write, { criterion, now_requires, because, citing }) =>
       write.amendDesign(
         amendDesignCommand.parse({
@@ -1081,7 +1080,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
       because: z.string().describe(`id of the finding that left it open, e.g. ${EVIDENCE_PREFIX}7`),
     },
-    outputSchema: restatedSchema,
+    outputSchema: restated,
     handler: (write, { claim, because }) =>
       write.isUndecided(
         claimIsUndecidedCommand.parse({
@@ -1102,7 +1101,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       claim: z.string().describe(`id of the claim, e.g. ${CLAIM_PREFIX}4`),
       because: z.string().describe("a sentence saying what justifies vouching for it"),
     },
-    outputSchema: restatedSchema,
+    outputSchema: restated,
     handler: (write, { claim, because }) =>
       write.isConfirmed(claimIsConfirmedCommand.parse({ claim: claim, because })),
   }),
@@ -1121,7 +1120,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       event: z.number().describe("the act's seq, from `what_happened`"),
       because: z.string().describe("why this is being taken back"),
     },
-    outputSchema: undoneSchema,
+    outputSchema: undone,
     handler: (write, { event, because }) => write.undo(undoCommand.parse({ event, because })),
   }),
 
@@ -1154,7 +1153,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           `ids the successor read in ADDITION to its predecessor's — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
         ),
     },
-    outputSchema: replacementReportSchema,
+    outputSchema: replacementReport,
     handler: (write, { keeping, because, method, from }) =>
       write.keep(
         keepCommand.parse({
@@ -1190,7 +1189,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
           `ids the replacement read — ${OBSERVATIONS_PREFIX}\u2026 or ${ANALYSIS_PREFIX}\u2026`,
         ),
     },
-    outputSchema: replacementReportSchema,
+    outputSchema: replacementReport,
     handler: (write, { supersedes, because, method, from }) =>
       write.replaceAnalysis(
         replaceAnalysisCommand.parse({
@@ -1237,7 +1236,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe("confirmatory means it was prespecified; exploratory is the default"),
     },
-    outputSchema: verificationReportSchema,
+    outputSchema: verificationReport,
     handler: (
       write,
       { historical, enquiry, method, under, proposition, finding, bearing, standing },
@@ -1274,7 +1273,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       as: z.string().describe("the narrower reading"),
       because: z.string().describe("why it is being narrowed"),
     },
-    outputSchema: reinterpretationReportSchema,
+    outputSchema: reinterpretationReport,
     handler: (write, { claim, as: narrower, because }) =>
       write.reinterpret(
         reinterpretCommand.parse({
@@ -1301,7 +1300,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         .optional()
         .describe(`id of the claim that answers it, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
     },
-    outputSchema: closedEnquirySchema,
+    outputSchema: closedEnquiry,
     handler: (write, { enquiry, answered_by }) =>
       write.closeEnquiry(
         closeEnquiryCommand.parse({
@@ -1319,10 +1318,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "on the record, but it no longer holds work. Closing an already-closed gate is refused.",
     inputSchema: {
       gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}2 — from declare_gate`),
-      closure: z.enum(["sidestepped", "retired"]),
+      closure: closeGateCommand.shape.closure,
       because: z.string().describe("why this gate no longer governs work"),
     },
-    outputSchema: closedGateSchema,
+    outputSchema: closedGate,
     handler: (write, { gate, closure, because }) =>
       write.closeGate(closeGateCommand.parse({ gate: gate, closure, because })),
   }),
@@ -1340,7 +1339,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1 — from plan_work`),
       because: z.string().describe("why it is not being done"),
     },
-    outputSchema: stoppedWorkSchema,
+    outputSchema: stoppedWork,
     handler: (write, { work, because }) =>
       write.stopWork(stopWorkCommand.parse({ work: work, because })),
   }),
@@ -1359,7 +1358,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       until: z.string().describe("what would reopen it"),
       in_light_of: z.string().describe(`id of the claim this rests on, e.g. ${CLAIM_PREFIX}4`),
     },
-    outputSchema: acceptedAsUnresolvedSchema,
+    outputSchema: acceptedAsUnresolved,
     handler: (write, { enquiry, because, until, in_light_of }) =>
       write.acceptAsUnresolved(
         acceptAsUnresolvedCommand.parse({
@@ -1429,7 +1428,7 @@ export const SESSION_TOOLS: readonly SessionToolDefinition<z.ZodRawShape>[] = [
             "performed, however long ago, and take nothing here",
         ),
     },
-    outputSchema: registeredSessionSchema,
+    outputSchema: registeredSession,
     // Returns what it recorded, which is the rule for a verb that mints
     // something: a caller who cannot read back what LabKit understood cannot
     // tell a typo from a success. `replaced` is the previous registration, so

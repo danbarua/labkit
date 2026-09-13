@@ -37,8 +37,8 @@ describe("S-31: the read answers what was asked", () => {
    * verb that mints something, applied to its return type.
    */
   test("closing names the enquiry, the question and which kind of close it was", async () => {
-    const { enquiry } = await session.openEnquiry("does the coating slow corrosion?");
-    const closed = await session.closeEnquiry({ enquiry });
+    const { enquiry } = await session.writes.openEnquiry("does the coating slow corrosion?");
+    const closed = await session.writes.closeEnquiry({ enquiry });
 
     expect(closed.enquiry).toBe(enquiry);
     expect(closed.question).toMatch(/^Q_/);
@@ -47,13 +47,13 @@ describe("S-31: the read answers what was asked", () => {
   });
 
   test("a close with a result behind it says so, and names the claim", async () => {
-    const { enquiry } = await session.openEnquiry("does the coating slow corrosion?");
-    const { analysis } = await session.recordAnalysis({
+    const { enquiry } = await session.writes.openEnquiry("does the coating slow corrosion?");
+    const { analysis } = await session.writes.recordAnalysis({
       enquiry,
       method: "a salt-spray run",
       from: [],
     });
-    const concluded = await session.conclude({
+    const concluded = await session.writes.conclude({
       analysis,
       finding: "no pitting at 500 hours",
       proposition: "the coating slows corrosion",
@@ -61,7 +61,7 @@ describe("S-31: the read answers what was asked", () => {
     });
     const claim = concluded.claims[0]!.claim;
 
-    const closed = await session.closeEnquiry({ enquiry, answeredBy: claim });
+    const closed = await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
     expect(closed.closure).toBe("answered");
     expect(closed.answered?.claim).toBe(claim);
     expect(closed.answered?.asserts).toBe("the coating slows corrosion");
@@ -72,19 +72,19 @@ describe("S-31: the read answers what was asked", () => {
    * record produce the same empty answer, and nothing said which this was.
    */
   test("a page that is not the whole answer says so", async () => {
-    for (let i = 0; i < 4; i++) await session.pose({ question: `question ${i}` });
+    for (let i = 0; i < 4; i++) await session.writes.pose({ question: `question ${i}` });
     // This session, not a second reader: the event log is per-session here, and
     // a fresh one would be empty by design.
     const later = session;
 
-    const page = await later.whatHappenedPage({ limit: 2 });
+    const page = await later.reads.whatHappenedPage({ limit: 2 });
     expect(page.acts).toHaveLength(2);
     expect(page.more).toBe(true);
 
     // The boundary: exactly as many acts as the limit, and no more behind them.
-    expect((await later.whatHappenedPage({ limit: 4 })).more).toBe(false);
+    expect((await later.reads.whatHappenedPage({ limit: 4 })).more).toBe(false);
     // No limit at all is always the whole answer.
-    expect((await later.whatHappenedPage({})).more).toBe(false);
+    expect((await later.reads.whatHappenedPage({})).more).toBe(false);
   });
 
   /**
@@ -92,15 +92,17 @@ describe("S-31: the read answers what was asked", () => {
    * the ones attached to that handle. A note attached to nothing was unreachable.
    */
   test("every note is listable, with what it concerns and what it prompted", async () => {
-    const { note: loose } = await session.note({ text: "the val split is the first 50 images" });
-    const { question } = await session.pose({ question: "does the edge padding matter?" });
-    const { note: why } = await session.note({
+    const { note: loose } = await session.writes.note({
+      text: "the val split is the first 50 images",
+    });
+    const { question } = await session.writes.pose({ question: "does the edge padding matter?" });
+    const { note: why } = await session.writes.note({
       text: "a throwaway run: cc 0.160 against 0.062",
       prompted: question,
     });
-    const { note: about } = await session.note({ text: "seeds 1..10", on: question });
+    const { note: about } = await session.writes.note({ text: "seeds 1..10", on: question });
 
-    const listed = await (await afterwards()).notes({});
+    const listed = await (await afterwards()).reads.notes({});
     // Newest first.
     expect(listed.map((n) => n.note)).toEqual([about, why, loose]);
 
