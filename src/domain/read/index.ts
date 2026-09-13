@@ -36,6 +36,7 @@ import type {
   TaskContract,
 } from "../report";
 import { kindOf } from "../report";
+import { DomainRefusal } from "../refusal";
 import type { Neighbour } from "./explain";
 import { SessionCore, type Methods } from "../core";
 import type { DomainEvent, EventFilter } from "../events";
@@ -361,20 +362,27 @@ export class ReadSurface extends SessionCore {
     const kind = kindOf(asHandle);
     if (kind) {
       if (!(await this.reachable({ subject: asHandle })))
-        throw new Error(
-          `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
-        );
+        throw new DomainRefusal({
+          kind: "not-found",
+          message: `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
+          subject: asHandle,
+        });
       return EXPLAINERS[kind](this, asHandle);
     }
 
     const found = await this.claimsAsserting({ proposition: subject });
-    if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);
+    if (found.length === 0)
+      throw new DomainRefusal({
+        kind: "not-found",
+        message: `nothing on the record claims "${subject}"`,
+      });
     if (found.length > 1)
-      throw new Error(
-        `"${subject}" is claimed ${found.length} times; name one: ${found
+      throw new DomainRefusal({
+        kind: "ambiguous",
+        message: `"${subject}" is claimed ${found.length} times; name one: ${found
           .map((c) => c.claim)
           .join(", ")}`,
-      );
+      });
     return EXPLAINERS.claim(this, found[0]!.claim);
   }
 }

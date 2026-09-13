@@ -10,6 +10,7 @@ export {
   type RetiredOperation,
 } from "./write";
 export { SessionCore } from "./core";
+export { DomainRefusal } from "./refusal";
 export {
   READ_GROUPS,
   WRITE_GROUPS,
