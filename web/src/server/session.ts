@@ -19,7 +19,7 @@ export interface Session {
  * Migrate before connecting because bootstrap loads AGE, which is absent on a fresh database.
  */
 export async function openSession(): Promise<Session> {
-  process.env.LABKIT_DB_URL ??= `postgresql://postgres:agens@127.0.0.1:${process.env.LABKIT_PORT_DB ?? "5432"}/labkit`;
+  process.env.LABKIT_DB_URL ??= "postgresql://postgres:agens@127.0.0.1:5433/labkit";
   const tenant = process.env.LABKIT_TENANT ?? "overlap-bench";
   const url = process.env.LABKIT_DB_URL;
 

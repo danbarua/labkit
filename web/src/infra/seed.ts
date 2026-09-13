@@ -19,7 +19,7 @@ import { validateIdentifier } from "../../../src/db/agtype";
 const SOURCE_LABKIT = resolve(
   process.env.LABKIT_SOURCE ?? join(import.meta.dir, "../../../../08_overlap_bench/.labkit"),
 );
-const DEFAULT_DEST = `postgresql://postgres:agens@127.0.0.1:${process.env.LABKIT_PORT_DB ?? "5432"}/labkit`;
+const DEFAULT_DEST = `postgresql://postgres:agens@127.0.0.1:${process.env.LABKIT_PORT_DB ?? "5433"}/labkit`;
 const TENANT = process.env.LABKIT_TENANT ?? "overlap-bench";
 const SOURCE_KEY = "overlap-bench";
 const WALK_START = "Q_1";
