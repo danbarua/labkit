@@ -143,29 +143,31 @@ export function registerWrites(program: Command, run: Run): void {
       "a note this one supersedes — both stay readable (repeatable)",
       collect(String),
     )
-    .action(async (text: string, opts: { on?: string; prompted?: string; supersedes?: string[] }) => {
-      if (opts.supersedes !== undefined && opts.on === undefined && opts.prompted === undefined) {
-        const historic = noteSupersedesCommand.safeParse({
-          note: text,
-          supersedes: opts.supersedes,
-        });
-        if (historic.success) {
-          return run(async ({ write }) =>
-            answer(await write.note(historic.data), (r, p) => asHandles([r.note], p)),
-          );
+    .action(
+      async (text: string, opts: { on?: string; prompted?: string; supersedes?: string[] }) => {
+        if (opts.supersedes !== undefined && opts.on === undefined && opts.prompted === undefined) {
+          const historic = noteSupersedesCommand.safeParse({
+            note: text,
+            supersedes: opts.supersedes,
+          });
+          if (historic.success) {
+            return run(async ({ write }) =>
+              answer(await write.note(historic.data), (r, p) => asHandles([r.note], p)),
+            );
+          }
         }
-      }
-      return parsed(
-        noteCommand,
-        {
-          text,
-          ...(opts.on === undefined ? {} : { on: opts.on }),
-          ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
-          ...(opts.supersedes === undefined ? {} : { supersedes: opts.supersedes }),
-        },
-        (write, input) => write.note(input),
-      );
-    });
+        return parsed(
+          noteCommand,
+          {
+            text,
+            ...(opts.on === undefined ? {} : { on: opts.on }),
+            ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
+            ...(opts.supersedes === undefined ? {} : { supersedes: opts.supersedes }),
+          },
+          (write, input) => write.note(input),
+        );
+      },
+    );
   program
     .command("observe")
     .helpGroup("Doing the work")

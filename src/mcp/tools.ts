@@ -731,7 +731,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       "records that an existing note supersedes another, without writing a new note.",
     inputSchema: {
       text: z.string().optional().describe("the note, in your own words"),
-      note: z.string().optional().describe("an existing note; with supersedes and no text, no new note is written"),
+      note: z
+        .string()
+        .optional()
+        .describe("an existing note; with supersedes and no text, no new note is written"),
       on: z
         .string()
         .optional()
