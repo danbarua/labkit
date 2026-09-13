@@ -4,7 +4,7 @@ This is **labkit-web**, the package in `web/`. It is the outer peel: HTTP and br
 
 Treat this directory as independent. Own `docs/`, `package.json`, Docker, and `scripts/`. Hygiene (pre-commit, pre-push, pre-PR) stays inside `web/`.
 
-A researcher opens a handle and follows hypermedia links. This package does not run CLI or MCP verbs.
+A researcher opens a handle and follows hypermedia links.
 
 ## Boot
 
