@@ -8,9 +8,10 @@ import type {
   IndexedString,
   Prose,
 } from "../../db/domain";
+import { SEARCHABLE_TEXT, labelForNaturalId } from "../../db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
-import { ref, isRefOfKind, verdictOf } from "../report";
+import { ref, isRefOfKind, verdictOf, kindOf } from "../report";
 import type {
   AffectedClaim,
   AffectedEnquiry,
@@ -23,6 +24,7 @@ import type {
   DependencyReport,
   EnquiryRef,
   EnquiryStatus,
+  How,
   IdentifiedArtefact,
   InterpretationHistory,
   ObservationsRef,
@@ -32,10 +34,13 @@ import type {
   Revision,
   SupportExplanation,
 } from "../report";
+import { createdIn } from "../events";
+import type { DomainEvent } from "../events";
 import { DomainRefusal } from "../refusal";
 import type {
   DoTheseConflictQuery,
   EnquiryStatusQuery,
+  HowQuery,
   InterpretationHistoryQuery,
   ReproducibilityOfQuery,
   ReproductionOfQuery,
@@ -1094,5 +1099,185 @@ export class StoryGroup extends SessionCore {
       );
     }
     return ref("observations", rows[0]!.a.natural_id);
+  }
+  /**
+   * Walks SUPERSEDES both ways (Note and Decision), CHANGES, and paired MOTIVATES.
+   * Works for any handle kind. Steps that were superseded are marked false starts;
+   * successor is named when SUPERSEDES/CHANGES record one (via the MOTIVATES target).
+   * Orders by event seq when available, else by id numeric. --since filters steps.
+   */
+  async how({ subject, since }: HowQuery): Promise<How> {
+    const id = subject.toUpperCase();
+
+    const relevant = new Set<string>();
+    const toVisit: string[] = [id];
+    const visited = new Set<string>();
+    while (toVisit.length > 0) {
+      const cur = toVisit.pop()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      relevant.add(cur);
+
+      const sup = await this.graph.query(
+        `MATCH (a {natural_id: $id})-[r:SUPERSEDES]->(b) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other
+         UNION
+         MATCH (b)-[r:SUPERSEDES]->(a {natural_id: $id}) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other`,
+        { other: vertexProps<{ natural_id: string }>() },
+        { id: cur },
+      );
+      for (const r of sup) { const o = r.other?.natural_id; if (o && !visited.has(o)) toVisit.push(o); }
+
+      const ch = await this.graph.query(
+        `MATCH (a {natural_id: $id})-[r:CHANGES]->(b) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other
+         UNION
+         MATCH (b)-[r:CHANGES]->(a {natural_id: $id}) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other`,
+        { other: vertexProps<{ natural_id: string }>() },
+        { id: cur },
+      );
+      for (const r of ch) { const o = r.other?.natural_id; if (o && !visited.has(o)) toVisit.push(o); }
+
+      const viaS = await this.graph.query(
+        `MATCH (d:Decision)-[:SUPERSEDES]->(x {natural_id: $id}) OPTIONAL MATCH (d)-[:MOTIVATES]->(m) RETURN d, m`,
+        { d: optional(vertexProps<{ natural_id: string }>()), m: optional(vertexProps<{ natural_id: string }>()) },
+        { id: cur },
+      );
+      for (const r of viaS) {
+        if (r.d?.natural_id && !visited.has(r.d.natural_id)) toVisit.push(r.d.natural_id);
+        if (r.m?.natural_id && !visited.has(r.m.natural_id)) toVisit.push(r.m.natural_id);
+      }
+      const viaC = await this.graph.query(
+        `MATCH (d:Decision)-[:CHANGES]->(x {natural_id: $id}) OPTIONAL MATCH (d)-[:MOTIVATES]->(m) RETURN d, m`,
+        { d: optional(vertexProps<{ natural_id: string }>()), m: optional(vertexProps<{ natural_id: string }>()) },
+        { id: cur },
+      );
+      for (const r of viaC) {
+        if (r.d?.natural_id && !visited.has(r.d.natural_id)) toVisit.push(r.d.natural_id);
+        if (r.m?.natural_id && !visited.has(r.m.natural_id)) toVisit.push(r.m.natural_id);
+      }
+
+      const mot = await this.graph.query(
+        `MATCH (d:Decision)-[:MOTIVATES]->(m {natural_id: $id})
+         OPTIONAL MATCH (d)-[:SUPERSEDES]->(s)
+         OPTIONAL MATCH (d)-[:CHANGES]->(c)
+         RETURN d, s, c`,
+        { d: optional(vertexProps<{ natural_id: string }>()), s: optional(vertexProps<{ natural_id: string }>()), c: optional(vertexProps<{ natural_id: string }>()) },
+        { id: cur },
+      );
+      for (const r of mot) {
+        if (r.d?.natural_id && !visited.has(r.d.natural_id)) toVisit.push(r.d.natural_id);
+        if (r.s?.natural_id && !visited.has(r.s.natural_id)) toVisit.push(r.s.natural_id);
+        if (r.c?.natural_id && !visited.has(r.c.natural_id)) toVisit.push(r.c.natural_id);
+      }
+
+      const decL = await this.graph.query(
+        `MATCH (d:Decision {natural_id: $id})
+         OPTIONAL MATCH (d)-[:SUPERSEDES]->(s)
+         OPTIONAL MATCH (d)-[:CHANGES]->(c)
+         OPTIONAL MATCH (d)-[:MOTIVATES]->(m)
+         RETURN s, c, m`,
+        { s: optional(vertexProps<{ natural_id: string }>()), c: optional(vertexProps<{ natural_id: string }>()), m: optional(vertexProps<{ natural_id: string }>()) },
+        { id: cur },
+      );
+      for (const r of decL) {
+        for (const k of ["s","c","m"] as const) {
+          const v = r[k]?.natural_id; if (v && !visited.has(v)) toVisit.push(v);
+        }
+      }
+    }
+
+    const evs: readonly DomainEvent[] = await this.events.all();
+    const seqFor = (h: string): number | undefined => {
+      for (const e of evs) {
+        if (e.seq === undefined) continue;
+        if (e.subject === h || createdIn(e).includes(h)) return e.seq;
+      }
+      return undefined;
+    };
+    const numberIn = (handle: string): number => Number(handle.slice(handle.indexOf("_") + 1)) || 0;
+
+    const subjectKind = kindOf(id);
+    const steps: Array<{handle:string;what:string;superseded:boolean;successor?:string;because?:string;seq?:number}> = [];
+
+    for (const h of relevant) {
+      const k = kindOf(h);
+      if (k === "decision" && h !== id && subjectKind !== "decision") continue;
+
+      let superseded = false;
+      let successor: string | undefined;
+      let because: string | undefined;
+
+      const nsup = await this.graph.query(
+        `MATCH (newer:Note)-[:SUPERSEDES]->(t {natural_id: $id}) WHERE t.retracted IS NULL RETURN newer LIMIT 1`,
+        { newer: vertexProps<{ natural_id: string }>() },
+        { id: h },
+      );
+      if (nsup[0]?.newer) { superseded = true; successor = nsup[0].newer.natural_id; }
+
+      if (!successor) {
+        type SupersederRow = {
+          d?: { natural_id: string; reason?: string };
+          succ?: { natural_id: string } | null;
+        };
+        let drow: SupersederRow | null = null;
+        // Collect candidates from both SUPERSEDES and CHANGES without LIMIT 1 so we can pick
+        // the decision that actually names a claim successor when the target is a claim.
+        // (replaceAnalysis SUPERSEDES the old claims as side-effect but MOTIVATES the new analysis;
+        // the conclude --replacing creates the decision that SUPERSEDES old claim and MOTIVATES new claim.)
+        const supRows = await this.graph.query(
+          `MATCH (d:Decision)-[:SUPERSEDES]->(t {natural_id: $id}) WHERE t.retracted IS NULL OPTIONAL MATCH (d)-[:MOTIVATES]->(succ) RETURN d, succ`,
+          { d: vertexProps<{ natural_id: string; reason?: string }>(), succ: optional(vertexProps<{ natural_id: string }>()) },
+          { id: h },
+        );
+        const chRows = await this.graph.query(
+          `MATCH (d:Decision)-[:CHANGES]->(t {natural_id: $id}) WHERE t.retracted IS NULL OPTIONAL MATCH (d)-[:MOTIVATES]->(succ) RETURN d, succ`,
+          { d: vertexProps<{ natural_id: string; reason?: string }>(), succ: optional(vertexProps<{ natural_id: string }>()) },
+          { id: h },
+        );
+        const candidates = [...supRows, ...chRows].filter((r) => r.d);
+        if (candidates.length > 0) {
+          // Prefer a successor that is a claim when the superseded handle is a claim.
+          const isClaim = kindOf(h) === "claim";
+          drow = candidates.find((r) => {
+            const s = r.succ?.natural_id;
+            return !isClaim || !s || kindOf(s) === "claim";
+          }) || candidates[0]!;
+        }
+        if (drow?.d) { superseded = true; successor = drow.succ?.natural_id; because = drow.d.reason || undefined; }
+      }
+
+      let what = h;
+      const label = labelForNaturalId(h);
+      const props = SEARCHABLE_TEXT[label] ?? [];
+      if (props.length > 0) {
+        const [row] = await this.graph.query(
+          `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
+          { n: vertexProps<Record<string, unknown>>() },
+          { id: h },
+        );
+        if (row) {
+          for (const p of props) { const v = row.n[p]; if (typeof v === "string" && v.length > 0) { what = v; break; } }
+        }
+      }
+      if (what === h) what = k ?? "record";
+
+      const seq = seqFor(h);
+      steps.push({ handle: h, what, superseded, successor, because, seq });
+    }
+
+    steps.sort((a, b) => {
+      const sa = a.seq, sb = b.seq;
+      if (sa !== undefined && sb !== undefined) return sa - sb;
+      if (sa !== undefined) return -1;
+      if (sb !== undefined) return 1;
+      return numberIn(a.handle) - numberIn(b.handle);
+    });
+
+    let filtered = steps;
+    if (since !== undefined) filtered = steps.filter((s) => s.seq === undefined || s.seq > since);
+    if (!filtered.some((s) => s.handle === id)) {
+      const subj = steps.find((s) => s.handle === id);
+      if (subj) filtered = [subj, ...filtered];
+    }
+    return { subject: id, steps: filtered };
   }
 }
