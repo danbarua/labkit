@@ -98,14 +98,19 @@ export const pursueCommand = z.object({
 export type PursueCommand = z.infer<typeof pursueCommand>;
 
 /**
- * `note` — a dated, attributed record with nothing else required.
+ * `note` — mint a dated, attributed record, or record that an existing note supersedes another.
  */
-export const noteCommand = z.object({
+export const noteMintCommand = z.object({
   text: z.string(),
   on: anyRefString().optional(),
   prompted: refString("question").optional(),
   supersedes: z.array(refString("note")).optional(),
 });
+export const noteSupersedesCommand = z.object({
+  note: refString("note"),
+  supersedes: z.array(refString("note")).min(1),
+});
+export const noteCommand = z.union([noteSupersedesCommand, noteMintCommand]);
 export type NoteCommand = z.infer<typeof noteCommand>;
 
 /** `sharpen` — narrow a question into a more precise one, recording why. */

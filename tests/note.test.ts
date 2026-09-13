@@ -126,3 +126,31 @@ test("note --supersedes refuses self", async () => {
     g.reserveId = original;
   }
 });
+
+test("an existing note can supersede another without minting a third", async () => {
+  const { note: old } = await session.writes.note({ text: "initial take" });
+  const { note: newer } = await session.writes.note({ text: "later take" });
+  const result = await session.writes.note({ note: newer, supersedes: [old] });
+  expect(result.note).toBe(newer);
+  const listed = await session.reads.notes({});
+  expect(listed.map((n) => n.note).sort()).toEqual([old, newer].sort());
+  const byId = new Map(listed.map((n) => [n.note, n] as const));
+  expect(byId.get(newer)!.supersedes).toContain(old);
+  expect(byId.get(old)!.supersededBy).toContain(newer);
+  const whyOld = await session.reads.why({ subject: old });
+  expect(whyOld.because.some((b) => b.handle === newer)).toBe(true);
+});
+
+test("historic supersedes refuses a missing standing note", async () => {
+  const { note: old } = await session.writes.note({ text: "old" });
+  await expect(
+    session.writes.note({ note: "NOTE_999999" as never, supersedes: [old] }),
+  ).rejects.toThrow(/no note NOTE_999999; write it first/);
+});
+
+test("historic supersedes refuses self", async () => {
+  const { note } = await session.writes.note({ text: "only" });
+  await expect(session.writes.note({ note, supersedes: [note] })).rejects.toThrow(
+    /a note cannot supersede itself/,
+  );
+});

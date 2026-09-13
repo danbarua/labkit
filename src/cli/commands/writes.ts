@@ -21,6 +21,7 @@ import {
   evaluateCriterionCommand,
   keepCommand,
   noteCommand,
+  noteSupersedesCommand,
   openEnquiryCommand,
   planWorkCommand,
   poseCommand,
@@ -121,15 +122,29 @@ export function registerWrites(program: Command, run: Run): void {
     .action(async (from, { into, because }: { into: string; because: string }) =>
       parsed(sharpenCommand, { from, into, because }, (write, input) => write.sharpen(input)),
     );
-  program
+  const note = program
     .command("note")
     .helpGroup("Asking")
     .summary("put a note on the record -- the one write with no prerequisites")
     .description(
       "A dated, attributed record with nothing else required. `search` reaches it like anything " +
         "else with prose on it. --on attaches it to anything already on the record; skipping it " +
-        "costs nothing, since attaching is the part this verb exists to make optional.",
-    )
+        "costs nothing, since attaching is the part this verb exists to make optional. " +
+        "`note supersedes` records that an existing note supersedes another, without writing a new note.",
+    );
+  note
+    .command("supersedes")
+    .helpGroup("Asking")
+    .summary("record that an existing note supersedes another")
+    .argument("<note-id>", "the note that stands")
+    .argument("<old-id...>", "notes it supersedes")
+    .action(async (id: string, old: string[]) => {
+      const input = parseCommand(noteSupersedesCommand, { note: id, supersedes: old });
+      return run(async ({ write }) =>
+        answer(await write.note(input), (r, p) => asHandles([r.note], p)),
+      );
+    });
+  note
     .argument("<text>", "the note, in your own words")
     .option("--on <handle>", "what this note concerns, if anything")
     .option(
@@ -138,7 +153,7 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .option(
       "--supersedes <note-id>",
-      "a note this one replaces — both stay readable; the edge is what a read walks (repeatable)",
+      "a note this one supersedes — both stay readable (repeatable)",
       collect(String),
     )
     .action(async (text: string, opts: { on?: string; prompted?: string; supersedes?: string[] }) =>
