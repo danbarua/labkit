@@ -1,12 +1,10 @@
 # web/
 
-Read-only web app for one LabKit graph. A researcher opens a handle and follows hypermedia links. This package does not run CLI or MCP verbs.
+This is **labkit-web**, the package in `web/`. It is the outer peel: HTTP and browser. LabKit core stays in `../src`. Import it. Do not change it.
 
-LabKit core stays in `../src`. This directory is the HTTP and browser surface.
+Treat this directory as independent. Own `docs/`, `package.json`, Docker, and `scripts/`. Hygiene (pre-commit, pre-push, pre-PR) stays inside `web/`.
 
-As of 2026-09-13, until further notice, the repo root is unaware of `web/` and uncoupled from it. This package imports dependencies from `../src`. It changes nothing outside `web/`. It keeps its own `docs/`, `package.json`, Docker bits, and `scripts/`.
-
-Pre-commit, pre-push, and pre-PR hygiene is scoped to `web/` when the work is in `web/`.
+A researcher opens a handle and follows hypermedia links. This package does not run CLI or MCP verbs.
 
 ## Boot
 
