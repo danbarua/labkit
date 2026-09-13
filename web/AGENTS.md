@@ -6,6 +6,8 @@ Treat this directory as independent. Own `docs/`, `package.json`, Docker, and `s
 
 A researcher opens a handle and follows hypermedia links.
 
+The domain shape (event log as WAL, graph as projection, time as how you see it): [docs/map.md](docs/map.md).
+
 ## Boot
 
 From `web/`: `bun run dev`.
