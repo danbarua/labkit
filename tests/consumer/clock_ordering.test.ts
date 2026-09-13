@@ -172,7 +172,9 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
       // Forty days passed between the analysis and the closure. Nothing recorded
       // either instant, and this is the ordinary case: a question answered on a
       // finding nobody held to a prespecified condition.
-      expect(await settledNoEarlierThan(reader, await claimNamed(reader.reads, FIRST.prop))).toBeNull();
+      expect(
+        await settledNoEarlierThan(reader, await claimNamed(reader.reads, FIRST.prop)),
+      ).toBeNull();
     } finally {
       await scenario.end();
     }
@@ -412,7 +414,9 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
 
       // The present-tense read collapses that distinction, correctly -- it is
       // answering a different question.
-      expect((await reader.reads.whatIsKnown()).established.map((q) => q.asks)).toEqual([FIRST.asks]);
+      expect((await reader.reads.whatIsKnown()).established.map((q) => q.asks)).toEqual([
+        FIRST.asks,
+      ]);
     } finally {
       await scenario.end();
     }

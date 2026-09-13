@@ -124,7 +124,9 @@ describe("S-8b: there is no who, only what ran", () => {
   test("approval is a decision on evidence against a condition, with no signer", async () => {
     const answer = await inOneWorld(async (s) => {
       const { enquiry } = await s.writes.openEnquiry("should the run be scaled up?");
-      const { criterion: budget } = await s.writes.stateCriterion("projected cost under 40 GPU-hours");
+      const { criterion: budget } = await s.writes.stateCriterion(
+        "projected cost under 40 GPU-hours",
+      );
       const { observations: readings } = await s.writes.recordObservations({
         enquiry,
         name: "cost projection",

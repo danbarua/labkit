@@ -92,7 +92,10 @@ describe("S-11d: a stage cannot read a stage", () => {
   test("stage two does not claim reproducibility it cannot have", async () => {
     const { trend } = await aPipelineOnUnverifiableRawData(session);
 
-    const report = await (await afterwards()).reads.reproducibilityOf({ analysis: trend, rebuilt: [] });
+    const report = await (await afterwards()).reads.reproducibilityOf({
+      analysis: trend,
+      rebuilt: [],
+    });
 
     expect(report.reproducible).toBe(false);
     // The calibration's output artefact -- what stage two actually read.

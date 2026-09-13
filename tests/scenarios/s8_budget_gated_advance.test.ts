@@ -49,7 +49,9 @@ const COST = "a full run costs roughly 9,000 GPU-hours at the current throughput
  * until two conditions are established.
  */
 async function aStagedProgramme() {
-  const { enquiry } = await session.writes.openEnquiry("does the learned topology classify better than the baseline?",);
+  const { enquiry } = await session.writes.openEnquiry(
+    "does the learned topology classify better than the baseline?",
+  );
 
   const { work: feasibility } = await session.writes.planWork({
     objective: "feasibility slice: 1,000 training images",
@@ -144,7 +146,9 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     });
 
     const status = await session.reads.gateStatus({ gate: programme.advancement });
-    expect(await (await afterwards()).reads.gateStatus({ gate: programme.advancement })).toEqual(status);
+    expect(await (await afterwards()).reads.gateStatus({ gate: programme.advancement })).toEqual(
+      status,
+    );
 
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
@@ -286,7 +290,9 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     ).rejects.toThrow(/no finding bears on claim CLM_99999/);
 
     const later = await afterwards();
-    expect((await later.reads.gateStatus({ gate: programme.advancement })).state).toBe("never-evaluated");
+    expect((await later.reads.gateStatus({ gate: programme.advancement })).state).toBe(
+      "never-evaluated",
+    );
   });
 });
 

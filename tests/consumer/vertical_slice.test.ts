@@ -54,7 +54,9 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
   test("a finding whose prespecified check failed reads differently from one whose check passed", async () => {
     const build = (outcome: "pass" | "fail") => async (s: ResearchSession) => {
       const { enquiry } = await s.writes.openEnquiry("does the pruning schedule move convergence?");
-      const { criterion: seedStability } = await s.writes.stateCriterion("stable across five seeds");
+      const { criterion: seedStability } = await s.writes.stateCriterion(
+        "stable across five seeds",
+      );
       const { observations } = await s.writes.recordObservations({
         enquiry,
         name: "sweep readings",
@@ -199,7 +201,9 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
         clock,
         events: inMemoryEventLog(),
       });
-      const { enquiry } = await s.writes.openEnquiry("does the encoding beat the historical control?");
+      const { enquiry } = await s.writes.openEnquiry(
+        "does the encoding beat the historical control?",
+      );
 
       // The historical control, as it survives: recorded, hashed.
       const { observations: historical } = await s.writes.recordObservations({

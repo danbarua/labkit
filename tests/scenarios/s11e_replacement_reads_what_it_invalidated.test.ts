@@ -81,8 +81,9 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // The replacement really does rest on it, and the record says the record it
     // rests on has been retracted — every finding in it superseded by this very
     // act. Read from the claim, because that is where a reader arrives.
-    const resting = (await (await afterwards()).reads.whySupported({ claim: report.claims[0]!.claim }))
-      .restingOn;
+    const resting = (
+      await (await afterwards()).reads.whySupported({ claim: report.claims[0]!.claim })
+    ).restingOn;
     // **Two inputs, and that is the add-only rule.** The successor inherits
     // what its predecessor read, and consumes the predecessor's own output
     // besides, because this call named it. Only the second is retracted:

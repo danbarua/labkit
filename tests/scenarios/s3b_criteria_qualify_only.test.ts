@@ -97,7 +97,9 @@ describe("S-3b: the same design with nothing downstream", () => {
     });
     // Seed stability is never run at all.
 
-    const why = await session.reads.whySupported({ claim: await claimNamed(session.reads, PROPOSITION) });
+    const why = await session.reads.whySupported({
+      claim: await claimNamed(session.reads, PROPOSITION),
+    });
     expect(await whyOf((await afterwards()).reads, PROPOSITION)).toEqual(why);
 
     expect(why.verdict).toBe("standard-unmet");
@@ -131,7 +133,9 @@ describe("S-3b: the same design with nothing downstream", () => {
       outcome: "fail",
     });
 
-    const why = await session.reads.whySupported({ claim: await claimNamed(session.reads, PROPOSITION) });
+    const why = await session.reads.whySupported({
+      claim: await claimNamed(session.reads, PROPOSITION),
+    });
     expect(await whyOf((await afterwards()).reads, PROPOSITION)).toEqual(why);
 
     const byName = Object.fromEntries(why.standard.map((c) => [c.proposition, c.state]));
@@ -185,7 +189,9 @@ describe("S-3b: the same design with nothing downstream", () => {
       });
     }
 
-    const why = await session.reads.whySupported({ claim: await claimNamed(session.reads, PROPOSITION) });
+    const why = await session.reads.whySupported({
+      claim: await claimNamed(session.reads, PROPOSITION),
+    });
     expect(await whyOf((await afterwards()).reads, PROPOSITION)).toEqual(why);
     expect(why.verdict).toBe("supported");
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
@@ -211,7 +217,9 @@ describe("S-3b: the same design with nothing downstream", () => {
       concludes: [{ proposition: PROPOSITION, finding: "p = 0.002, Holm-corrected" }],
     });
 
-    const why = await session.reads.whySupported({ claim: await claimNamed(session.reads, PROPOSITION) });
+    const why = await session.reads.whySupported({
+      claim: await claimNamed(session.reads, PROPOSITION),
+    });
     expect(await whyOf((await afterwards()).reads, PROPOSITION)).toEqual(why);
     expect(why.verdict).toBe("supported");
     expect(why.standard).toEqual([]);
@@ -249,7 +257,8 @@ describe("S-3b: the same design with nothing downstream", () => {
       outcome: "fail",
     });
     expect(
-      (await session.reads.whySupported({ claim: await claimNamed(session.reads, PROPOSITION) })).verdict,
+      (await session.reads.whySupported({ claim: await claimNamed(session.reads, PROPOSITION) }))
+        .verdict,
     ).toBe("standard-unmet");
 
     const { review } = await session.writes.recordReview({
@@ -293,7 +302,9 @@ describe("S-3b: the same design with nothing downstream", () => {
       outcome: "fail",
     });
 
-    const { enquiry: other } = await session.writes.openEnquiry("does T differ from rewired on the held-out split?",);
+    const { enquiry: other } = await session.writes.openEnquiry(
+      "does T differ from rewired on the held-out split?",
+    );
     const { observations: otherObservations } = await session.writes.recordObservations({
       enquiry: other,
       name: "held-out results",
@@ -313,7 +324,9 @@ describe("S-3b: the same design with nothing downstream", () => {
 
     // The same sentence, a different run, held to nothing. The agreed checks
     // do not travel with the wording.
-    const there = await reader.reads.whySupported({ claim: claimOf(otherAnalysisClaims, PROPOSITION) });
+    const there = await reader.reads.whySupported({
+      claim: claimOf(otherAnalysisClaims, PROPOSITION),
+    });
     expect(there.verdict).toBe("supported");
     expect(there.standard).toEqual([]);
   });

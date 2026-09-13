@@ -31,7 +31,10 @@ describe("S-24 — a mistaken act taken back", () => {
     const { question, events } = await session.writes.pose({ question: wording });
     const seq = events[0]!.seq!;
 
-    const undone = await session.writes.undo({ event: seq, because: "duplicate entry, wrong wording" });
+    const undone = await session.writes.undo({
+      event: seq,
+      because: "duplicate entry, wrong wording",
+    });
     expect(undone.event).toBe(seq);
     expect(undone.retracted).toContain(question);
   });
@@ -94,7 +97,9 @@ describe("S-24 — a mistaken act taken back", () => {
   });
 
   test("work stays waiting when its last gate is retracted", async () => {
-    const { criterion } = await session.writes.stateCriterion("the result clears the release threshold");
+    const { criterion } = await session.writes.stateCriterion(
+      "the result clears the release threshold",
+    );
     const { work } = await session.writes.planWork({
       objective: "publish the result",
       acceptance: "the result is published",
@@ -110,7 +115,9 @@ describe("S-24 — a mistaken act taken back", () => {
       because: "the gate was declared against the wrong work",
     });
 
-    expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe("waiting");
+    expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe(
+      "waiting",
+    );
     expect((await session.reads.now({})).untouched.map((row) => row.work)).not.toContain(work);
   });
 
@@ -137,7 +144,10 @@ describe("S-24 — a mistaken act taken back", () => {
     const all = await session.events.all();
     const concludeSeq = all.find((e) => e.operation === "conclude")!.seq!;
 
-    const undone = await session.writes.undo({ event: concludeSeq, because: "this claim was wrong" });
+    const undone = await session.writes.undo({
+      event: concludeSeq,
+      because: "this claim was wrong",
+    });
     expect(undone.retracted).toContain(claim);
   });
 

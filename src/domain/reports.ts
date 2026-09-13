@@ -920,7 +920,6 @@ export const workList = z.strictObject({
   work: z.array(listedWork),
 });
 
-
 /** How much of the record was read off something. See `Transcription` in the domain. */
 export const transcription = z.strictObject({
   transcribed: z.number(),
@@ -941,7 +940,6 @@ export const standing = z.strictObject({
   seq: z.number(),
   since: z.number().optional(),
 });
-
 
 // Public report types are inferred from the codecs above.
 export type ConcludedClaim = z.infer<typeof concludedClaim>;

@@ -44,7 +44,9 @@ const clock: Clock = (() => {
 describe("commands are values a caller can hold", () => {
   test("a command built ahead of time issues the same act as an inline argument", async () => {
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
-    const { question } = await s.writes.pose({ question: "does the pruning schedule move convergence?" });
+    const { question } = await s.writes.pose({
+      question: "does the pruning schedule move convergence?",
+    });
 
     // Built and held, not passed inline. The type annotation is the point:
     // it names a shape that had no name before this commit.
@@ -101,8 +103,12 @@ describe("commands are values a caller can hold", () => {
     });
     // The criteria intentionally have the same wording: only their handles can identify which
     // prespecified conditions the analysis is held to.
-    const { criterion: first } = await s.writes.stateCriterion("the result clears the held-out check");
-    const { criterion: second } = await s.writes.stateCriterion("the result clears the held-out check");
+    const { criterion: first } = await s.writes.stateCriterion(
+      "the result clears the held-out check",
+    );
+    const { criterion: second } = await s.writes.stateCriterion(
+      "the result clears the held-out check",
+    );
 
     const recorded = await s.writes.recordAnalysis({
       enquiry,

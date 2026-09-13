@@ -116,10 +116,13 @@ describe("S-9d: resting on one thing, or two?", () => {
     }
     expect(surviving).not.toEqual(regenerated);
 
-    await expect(reader.reads.whatDependsOn({ subject: NAME })).rejects.toThrow(/2 artefacts are named/);
+    await expect(reader.reads.whatDependsOn({ subject: NAME })).rejects.toThrow(
+      /2 artefacts are named/,
+    );
 
-    const restingOn = (await reader.reads.whySupported({ claim: await claimNamed(reader.reads, DIVERGE) }))
-      .restingOn;
+    const restingOn = (
+      await reader.reads.whySupported({ claim: await claimNamed(reader.reads, DIVERGE) })
+    ).restingOn;
     expect(restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
   });
 });

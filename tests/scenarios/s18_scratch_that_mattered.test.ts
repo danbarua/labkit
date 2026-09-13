@@ -206,7 +206,8 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       (await reader.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).standing,
     ).toBe("confirmatory");
     expect(
-      (await reader.reads.whySupported({ claim: claimOf(otherAnalysisClaims, PROPOSITION) })).standing,
+      (await reader.reads.whySupported({ claim: claimOf(otherAnalysisClaims, PROPOSITION) }))
+        .standing,
     ).toBe("exploratory");
   });
 });

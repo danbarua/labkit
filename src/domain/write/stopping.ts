@@ -63,7 +63,7 @@ export class Stopping extends SessionCore {
           kind: "invariant",
           message:
             `enquiry ${input.enquiry} is already closed by decision ` +
-              `${target.d.natural_id} (${target.d.reason}); closing it again would leave two decisions resolving one enquiry`,
+            `${target.d.natural_id} (${target.d.reason}); closing it again would leave two decisions resolving one enquiry`,
           subject: input.enquiry,
         });
 
@@ -296,7 +296,7 @@ export class Stopping extends SessionCore {
           kind: "invariant",
           message:
             `work ${input.work} was already stopped, because "${task.d.reason}"; a piece of work is ` +
-              `stopped once, and nothing re-opens one yet`,
+            `stopped once, and nothing re-opens one yet`,
           subject: input.work,
         });
 

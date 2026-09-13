@@ -237,7 +237,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.reads.interpretationHistory({ claim: await claimNamed(later.reads, NARROWER) });
+    const history = await later.reads.interpretationHistory({
+      claim: await claimNamed(later.reads, NARROWER),
+    });
     expect(history.revisions[0]!.restingOnTheOldReading.map((q) => q.asks)).toEqual([
       "does the encoding preferentially preserve discriminative signal?",
     ]);
@@ -362,7 +364,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    const still = await later.reads.whySupported({ claim: claimOf(programme.firstClaims, PREFERENTIAL) });
+    const still = await later.reads.whySupported({
+      claim: claimOf(programme.firstClaims, PREFERENTIAL),
+    });
     expect(still.withdrawn).toBe(true);
     expect(still.replacedBy?.asserts).toBe(NARROWER);
     expect(still.verdict).toBe("withdrawn");

@@ -147,7 +147,9 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     const why = await session.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
     expect(
-      await (await afterwards()).reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(analysisClaims, PROPOSITION),
+      }),
     ).toEqual(why);
 
     expect(why.verdict).toBe("standard-unmet");
@@ -219,7 +221,9 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     const why = await session.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
     expect(
-      await (await afterwards()).reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(analysisClaims, PROPOSITION),
+      }),
     ).toEqual(why);
 
     expect(why.verdict).toBe("supported");
@@ -374,8 +378,11 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     expect(
-      (await (await afterwards()).reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }))
-        .verdict,
+      (
+        await (
+          await afterwards()
+        ).reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })
+      ).verdict,
     ).toBe("supported");
   });
 
@@ -596,9 +603,9 @@ describe("S-3c: the check was wrong, not the result", () => {
     const listed = await reader.reads.gateList({});
     const ourGate = listed.find((g) => g.gate === gate);
     expect(ourGate?.state).toBe("incomplete");
-    expect((await reader.reads.gateList({ state: "incomplete" })).some((g) => g.gate === gate)).toBe(
-      true,
-    );
+    expect(
+      (await reader.reads.gateList({ state: "incomplete" })).some((g) => g.gate === gate),
+    ).toBe(true);
     expect((await reader.reads.gateList({ state: "satisfied" })).some((g) => g.gate === gate)).toBe(
       false,
     );

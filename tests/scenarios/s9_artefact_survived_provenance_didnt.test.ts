@@ -48,7 +48,9 @@ const PROPOSITION = "the accelerated path matches the reference";
  * result rests on it."
  */
 async function aCachedConstructionWithOneUnrecordedPart() {
-  const { enquiry } = await session.writes.openEnquiry("does the accelerated path match the reference?");
+  const { enquiry } = await session.writes.openEnquiry(
+    "does the accelerated path match the reference?",
+  );
   const parts = [
     (
       await session.writes.recordObservations({
@@ -181,7 +183,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
    */
   test("Afterward 4: regenerating does not close the question of what made the original", async () => {
     const { enquiry } = await aCachedConstructionWithOneUnrecordedPart();
-    const { enquiry: unresolved } = await session.writes.openEnquiry("what generated the historical random control?",);
+    const { enquiry: unresolved } = await session.writes.openEnquiry(
+      "what generated the historical random control?",
+    );
 
     await session.writes.recordObservations({
       enquiry,

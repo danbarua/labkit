@@ -46,15 +46,29 @@ async function anArcOfWork() {
   });
   const claim = claims[0]!.claim;
   const { criterion } = await session.writes.stateCriterion("the median must agree");
-  const { work } = await session.writes.planWork({ objective: "run stage 2", acceptance: "a table" });
+  const { work } = await session.writes.planWork({
+    objective: "run stage 2",
+    acceptance: "a table",
+  });
   const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "stage 2 does not start",
     protecting: [work],
   });
-  await session.writes.evaluateCriterion({ criterion, gate, value: "median p = 0.21", outcome: "fail" });
-  const { note } = await session.writes.note({ on: question, text: "the locked parameters live here" });
-  const { review } = await session.writes.recordReview({ of: analysis, verdict: "the method is sound" });
+  await session.writes.evaluateCriterion({
+    criterion,
+    gate,
+    value: "median p = 0.21",
+    outcome: "fail",
+  });
+  const { note } = await session.writes.note({
+    on: question,
+    text: "the locked parameters live here",
+  });
+  const { review } = await session.writes.recordReview({
+    of: analysis,
+    verdict: "the method is sound",
+  });
   const { decision } = await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
   return {
     question,

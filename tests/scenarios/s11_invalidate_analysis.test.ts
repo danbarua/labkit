@@ -210,9 +210,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // Durable check: the replacement conclusion still rests on the same
     // observations, and those observations were never invalidated.
-    const why = await session.reads.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).reads.whySupported({ claim: claimOf(report.claims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(report.claims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.restingOn.map((a) => a.name)).toContain("per-image classification results");
   });
@@ -232,9 +236,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    const why = await session.reads.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).reads.whySupported({ claim: claimOf(report.claims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(report.claims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.method)).toEqual(["sign-flip-permutation"]);
@@ -256,9 +264,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
       concludes: SIGN_FLIP_CONCLUSIONS,
     });
 
-    const why = await session.reads.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).reads.whySupported({ claim: claimOf(report.claims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(report.claims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.superseded).toHaveLength(1);
     expect(why.superseded[0]).toMatchObject({
@@ -325,7 +337,9 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // A fresh session over the same graph -- nothing carried in memory.
     const reader = new ResearchSession(await scenario.current(), { clock });
-    const why = await reader.reads.whySupported({ claim: claimOf(report.claims, "T beats rewired") });
+    const why = await reader.reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
+    });
     expect(why.superseded[0]!.reason).toBe(
       "bootstrap is centred on the observed effect; it does not implement the intended null",
     );
@@ -373,9 +387,13 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
 
     // ...and nothing was invalidated on the way to failing.
     // The replacement was refused, so the original claim is the only one.
-    const why = await session.reads.whySupported({ claim: claimOf(targetClaims, "T beats rewired") });
+    const why = await session.reads.whySupported({
+      claim: claimOf(targetClaims, "T beats rewired"),
+    });
     expect(
-      await (await afterwards()).reads.whySupported({ claim: claimOf(targetClaims, "T beats rewired") }),
+      await (await afterwards()).reads.whySupported({
+        claim: claimOf(targetClaims, "T beats rewired"),
+      }),
     ).toEqual(why);
     expect(why.verdict).toBe("supported");
     expect(why.superseded).toHaveLength(0);

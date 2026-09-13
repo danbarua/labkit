@@ -48,7 +48,9 @@ async function aRunPartlyReAnalysed(holdTo = false) {
   // `supported` on the untouched finding an answer about the check rather than
   // about supersession, and the first test would have been asserting the wrong
   // thing while passing for a reason it did not name.
-  const criterion = holdTo ? (await session.writes.stateCriterion(AGGREGATION)).criterion : undefined;
+  const criterion = holdTo
+    ? (await session.writes.stateCriterion(AGGREGATION)).criterion
+    : undefined;
   const { analysis: v1, claims: v1Claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "raw-scale aggregation",
@@ -194,7 +196,10 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       concludes: [{ proposition: REPRODUCES, finding: "0.2842 vs 0.3505", bearing: "challenges" }],
     });
     const buggy = claims[0]!.claim;
-    const { review } = await session.writes.recordReview({ of: pilot, verdict: "the pilot had a bug" });
+    const { review } = await session.writes.recordReview({
+      of: pilot,
+      verdict: "the pilot had a bug",
+    });
     const report = await session.writes.replaceAnalysis({
       supersedes: pilot,
       because: review,

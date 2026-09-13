@@ -87,9 +87,7 @@ test("a non-numeric --since or --limit is refused, not coerced", async () => {
 test("a handle of the wrong kind is refused at the boundary", async () => {
   // The query schema brands the handle. A claim where a gate belongs is refused
   // before `run` opens a database, the same way a write command is.
-  expect(await refusal(["gate", "CLM_1"])).toContain(
-    'gate handle expected a Gate id, got "CLM_1"',
-  );
+  expect(await refusal(["gate", "CLM_1"])).toContain('gate handle expected a Gate id, got "CLM_1"');
 });
 
 test("happened touching a non-handle is refused at the boundary", async () => {

@@ -70,7 +70,9 @@ describe("S-23: prespecified is not promoted", () => {
     const { prespecified, promoted } = await twoRoutesToConfirmatory();
     const reader = await afterwards();
 
-    expect((await reader.reads.whySupported({ claim: prespecified })).standing).toBe("confirmatory");
+    expect((await reader.reads.whySupported({ claim: prespecified })).standing).toBe(
+      "confirmatory",
+    );
     expect((await reader.reads.whySupported({ claim: promoted })).standing).toBe("confirmatory");
   });
 
@@ -84,7 +86,9 @@ describe("S-23: prespecified is not promoted", () => {
     expect((await reader.reads.whySupported({ claim: promoted })).promotedBecause).toBe(
       "the prespecified robustness check passed",
     );
-    expect((await reader.reads.whySupported({ claim: prespecified })).promotedBecause).toBeUndefined();
+    expect(
+      (await reader.reads.whySupported({ claim: prespecified })).promotedBecause,
+    ).toBeUndefined();
   });
 
   test("the stream says which standing each was recorded with", async () => {

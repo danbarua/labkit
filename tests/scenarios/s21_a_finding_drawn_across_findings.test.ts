@@ -163,9 +163,9 @@ describe("S-21: a finding drawn across findings", () => {
   test("a synthesis resting on nothing is refused: that is an analysis's conclusion", async () => {
     await fourComparisons();
 
-    await expect(session.writes.synthesise({ proposition: HEADLINE, restingOn: [] })).rejects.toThrow(
-      /at least one finding to rest on/,
-    );
+    await expect(
+      session.writes.synthesise({ proposition: HEADLINE, restingOn: [] }),
+    ).rejects.toThrow(/at least one finding to rest on/);
   });
   test("reinterpret narrows exactly the named synthesis and preserves its parts", async () => {
     const { claims } = await fourComparisons();
@@ -202,7 +202,9 @@ describe("S-21: a finding drawn across findings", () => {
       edges.filter((edge) => edge.label === "SUPPORTS" || edge.label === "CHALLENGES"),
     ).toEqual([]);
 
-    const narrowed = await (await afterwards()).reads.whySupported({ claim: report.nowClaims.claim });
+    const narrowed = await (await afterwards()).reads.whySupported({
+      claim: report.nowClaims.claim,
+    });
     expect(narrowed.drawnAcross.map((part) => part.claim).sort()).toEqual(expectedParts);
     expect(narrowed.support).toEqual([]);
 
@@ -284,7 +286,9 @@ describe("S-21: a finding drawn across findings", () => {
       objective: "report the comparison",
       acceptance: "the result passes its locked check",
     });
-    const { criterion } = await session.writes.stateCriterion("all four controls show no advantage");
+    const { criterion } = await session.writes.stateCriterion(
+      "all four controls show no advantage",
+    );
     const { gate } = await session.writes.declareGate({
       governedBy: [criterion],
       consequence: "the comparison is not reported",

@@ -50,7 +50,10 @@ describe("enumerating gates and work", () => {
 
     // 2. blocked: a criterion evaluated and failed.
     const { criterion: failing } = await s.writes.stateCriterion("this one fails");
-    const { work: blockedWork } = await s.writes.planWork({ objective: "held up", acceptance: "done" });
+    const { work: blockedWork } = await s.writes.planWork({
+      objective: "held up",
+      acceptance: "done",
+    });
     const { gate: blockedGate } = await s.writes.declareGate({
       governedBy: [failing],
       consequence: "cannot proceed",
@@ -323,7 +326,10 @@ describe("enumerating gates and work", () => {
       });
 
       const { question } = await s.writes.pose({ question: "does precedence hold?" });
-      const { enquiry } = await s.writes.pursue({ question, approach: "do the work, fail the check" });
+      const { enquiry } = await s.writes.pursue({
+        question,
+        approach: "do the work, fail the check",
+      });
       const { observations: readings } = await s.writes.recordObservations({
         enquiry,
         name: "readings",

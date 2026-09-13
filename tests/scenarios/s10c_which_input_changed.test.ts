@@ -119,7 +119,9 @@ describe("S-10c: which input changed?", () => {
     const reader = await afterwards();
 
     // Name: refused, with the count that makes the refusal actionable.
-    await expect(reader.reads.whatDependsOn({ subject: NAME })).rejects.toThrow(/2 artefacts are named/);
+    await expect(reader.reads.whatDependsOn({ subject: NAME })).rejects.toThrow(
+      /2 artefacts are named/,
+    );
 
     // Reference: answered, separately, for each.
     for (const part of [original, regenerated]) {

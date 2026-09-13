@@ -191,7 +191,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
   test("an established weaker result does not discharge the stronger open question", async () => {
     const prior = await priorState();
 
-    const nonlinear = await session.reads.whySupported({ claim: await claimNamed(session.reads, NONLINEAR) });
+    const nonlinear = await session.reads.whySupported({
+      claim: await claimNamed(session.reads, NONLINEAR),
+    });
     expect(nonlinear.verdict).toBe("supported");
 
     const stronger = await session.reads.enquiryStatus({ enquiry: prior.smearEnquiry });

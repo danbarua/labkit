@@ -56,5 +56,7 @@ test("a note may concern another note -- CONCERNS is not scoped to one target ki
 });
 
 test("--on refuses a handle from the wrong kind of act", async () => {
-  await expect(session.writes.note({ text: "x", on: "NOT_A_REAL_HANDLE" as never })).rejects.toThrow();
+  await expect(
+    session.writes.note({ text: "x", on: "NOT_A_REAL_HANDLE" as never }),
+  ).rejects.toThrow();
 });

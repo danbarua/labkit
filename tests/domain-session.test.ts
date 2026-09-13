@@ -92,7 +92,9 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
   ).rejects.toThrow(/injected failure/);
 
   // Nothing moved: the finding still stands and still rests on its evidence.
-  const after = await session.reads.whySupported({ claim: await claimNamed(session.reads, "T beats rewired") });
+  const after = await session.reads.whySupported({
+    claim: await claimNamed(session.reads, "T beats rewired"),
+  });
   expect(after).toEqual(before);
   expect(after.withdrawn).toBe(false);
   expect(after.verdict).toBe("supported");
@@ -110,7 +112,9 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
  * conditions -- one of which the researcher intended to retire.
  */
 test("an interrupted amendDesign leaves the gate governed by its original condition alone", async () => {
-  const { criterion } = await session.writes.stateCriterion("solver converges within 500 iterations");
+  const { criterion } = await session.writes.stateCriterion(
+    "solver converges within 500 iterations",
+  );
   const { work } = await session.writes.planWork({
     objective: "fit the tertiary model",
     acceptance: "converges",
@@ -514,7 +518,9 @@ test("a question accepted as unresolved can still be closed when evidence arrive
  * `pursue` is NOT transactional and does not need to be.
  */
 test("an interrupted pursue leaves no enquiry at all", async () => {
-  const { question } = await session.writes.pose({ question: "does the coating hold at temperature?" });
+  const { question } = await session.writes.pose({
+    question: "does the coating hold at temperature?",
+  });
 
   const realCreateEdge = graph.createEdge.bind(graph);
   graph.createEdge = (async (from: string, edge: string, to: string) => {
@@ -613,7 +619,9 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
   expect(attached).toEqual([]);
 
   // The finding still stands: no review reaches it, so nothing retracts it.
-  const why = await session.reads.whySupported({ claim: await claimNamed(session.reads, "it holds") });
+  const why = await session.reads.whySupported({
+    claim: await claimNamed(session.reads, "it holds"),
+  });
   expect(why.verdict).toBe("supported");
   expect(why.withdrawn).toBe(false);
 });
@@ -731,7 +739,9 @@ test("closing a blocked gate releases work without changing its failed check", a
   await session.writes.evaluateCriterion({ criterion, gate, value: "2e-5", outcome: "fail" });
 
   expect((await session.reads.gateStatus({ gate })).state).toBe("blocked");
-  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe("blocked");
+  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe(
+    "blocked",
+  );
 
   const closed = await session.writes.closeGate({
     gate,
@@ -747,7 +757,9 @@ test("closing a blocked gate releases work without changing its failed check", a
     because: "the report now labels this comparison exploratory",
   });
   expect(status.checks.map((check) => check.state)).toEqual(["failed"]);
-  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe("planned");
+  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe(
+    "planned",
+  );
   expect((await session.reads.now({})).blocked.work.map((row) => row.work)).not.toContain(work);
 
   await expect(
@@ -781,7 +793,9 @@ test("knowledge survey refuses an evaluation with a malformed outcome", async ()
   const { criterion } = await session.writes.stateCriterion(
     "a malformed outcome cannot establish knowledge",
   );
-  const { enquiry } = await session.writes.openEnquiry("does malformed evidence establish knowledge?");
+  const { enquiry } = await session.writes.openEnquiry(
+    "does malformed evidence establish knowledge?",
+  );
   const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "manual review",

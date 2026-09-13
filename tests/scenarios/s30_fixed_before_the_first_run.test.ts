@@ -120,7 +120,11 @@ describe("S-30: fixed before the first run", () => {
     const { criterion, gate } = await aLockedDesign();
     const { question } = await session.writes.pose({ question: "what did the pilot show?" });
     const { enquiry } = await session.writes.pursue({ question, approach: "the pilot run" });
-    const { analysis } = await session.writes.recordAnalysis({ enquiry, method: "the pilot", from: [] });
+    const { analysis } = await session.writes.recordAnalysis({
+      enquiry,
+      method: "the pilot",
+      from: [],
+    });
     const pilot = await session.writes.conclude({
       analysis,
       finding: "the gap is 2.4 sd on the pilot split",
@@ -160,7 +164,11 @@ describe("S-30: fixed before the first run", () => {
     const { criterion, gate, work } = await aLockedDesign();
     const { question } = await session.writes.pose({ question: "what did the pilot show?" });
     const { enquiry } = await session.writes.pursue({ question, approach: "the pilot run" });
-    const { analysis } = await session.writes.recordAnalysis({ enquiry, method: "the pilot", from: [] });
+    const { analysis } = await session.writes.recordAnalysis({
+      enquiry,
+      method: "the pilot",
+      from: [],
+    });
     const pilot = await session.writes.conclude({
       analysis,
       finding: "the gap is 2.4 sd on the pilot split",
@@ -178,7 +186,10 @@ describe("S-30: fixed before the first run", () => {
 
     // `replaceAnalysis`, not `reinterpret`: only a Decision that SUPERSEDES the
     // claim fells the finding beneath it, which is what `verdictsWhere` counts.
-    const { review } = await session.writes.recordReview({ of: analysis, verdict: "the pilot had a bug" });
+    const { review } = await session.writes.recordReview({
+      of: analysis,
+      verdict: "the pilot had a bug",
+    });
     await session.writes.replaceAnalysis({
       supersedes: analysis,
       because: review,
@@ -205,7 +216,10 @@ describe("S-30: fixed before the first run", () => {
   test("a diagnosis is still accepted before the first run, and still classified by its blast radius", async () => {
     const { criterion } = await aLockedDesign();
     const { question } = await session.writes.pose({ question: "does ddof matter here?" });
-    const { enquiry } = await session.writes.pursue({ question, approach: "read the two definitions" });
+    const { enquiry } = await session.writes.pursue({
+      question,
+      approach: "read the two definitions",
+    });
     const { analysis } = await session.writes.recordAnalysis({
       enquiry,
       method: "compared the two conventions at n=10",

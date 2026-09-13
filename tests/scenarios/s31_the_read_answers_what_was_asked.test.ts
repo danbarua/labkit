@@ -92,7 +92,9 @@ describe("S-31: the read answers what was asked", () => {
    * the ones attached to that handle. A note attached to nothing was unreachable.
    */
   test("every note is listable, with what it concerns and what it prompted", async () => {
-    const { note: loose } = await session.writes.note({ text: "the val split is the first 50 images" });
+    const { note: loose } = await session.writes.note({
+      text: "the val split is the first 50 images",
+    });
     const { question } = await session.writes.pose({ question: "does the edge padding matter?" });
     const { note: why } = await session.writes.note({
       text: "a throwaway run: cc 0.160 against 0.062",

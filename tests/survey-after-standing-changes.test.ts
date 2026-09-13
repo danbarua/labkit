@@ -53,7 +53,10 @@ test("replace removes the old claim from established", async () => {
   const { enquiry, observations, analysis, claim } = await aClosedPromotedAnswer();
   expect((await s.reads.whatIsKnown()).established.some((q) => q.asks === ASKS)).toBe(true);
 
-  const { review } = await s.writes.recordReview({ of: analysis, verdict: "the metric was misapplied" });
+  const { review } = await s.writes.recordReview({
+    of: analysis,
+    verdict: "the metric was misapplied",
+  });
   const replaced = await replaceAnalysis(s.writes, {
     supersedes: analysis,
     because: review,

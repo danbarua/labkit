@@ -88,8 +88,8 @@ describe("S-28: a hunch became a question", () => {
   });
 
   test("posing from a note nobody wrote is refused, and the message says what to do", async () => {
-    await expect(session.writes.pose({ question: SHARP, from: "NOTE_404" as never })).rejects.toThrow(
-      /no note NOTE_404/,
-    );
+    await expect(
+      session.writes.pose({ question: SHARP, from: "NOTE_404" as never }),
+    ).rejects.toThrow(/no note NOTE_404/);
   });
 });

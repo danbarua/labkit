@@ -240,7 +240,9 @@ describe("S-9b: was this a rebuild, or new work?", () => {
   test("a reconstruction attempt that fails is not a question nobody has looked at", async () => {
     const { untested, unresolved } = await inOneWorld(async (s) => {
       const { enquiry } = await theCachedConstruction(s);
-      const { enquiry: provenance } = await s.writes.openEnquiry("what generated the historical random control?",);
+      const { enquiry: provenance } = await s.writes.openEnquiry(
+        "what generated the historical random control?",
+      );
 
       // The attempt, recorded against the question it is an attempt to answer.
       await s.writes.recordObservations({

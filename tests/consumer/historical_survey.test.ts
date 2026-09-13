@@ -111,9 +111,15 @@ test("historical standing follows each pursuit from its own start through closur
     method: "paired comparison",
     concludes: [{ proposition: "depth moves convergence", finding: "moves by three steps" }],
   });
-  await s.writes.closeEnquiry({ enquiry: first, answeredBy: claimOf(claims, "depth moves convergence") });
+  await s.writes.closeEnquiry({
+    enquiry: first,
+    answeredBy: claimOf(claims, "depth moves convergence"),
+  });
   clock.windTo("2026-01-04T09:00:00.000Z");
-  const { enquiry: sibling } = await s.writes.pursue({ question, approach: "independent replication" });
+  const { enquiry: sibling } = await s.writes.pursue({
+    question,
+    approach: "independent replication",
+  });
   clock.windTo("2026-01-06T09:00:00.000Z");
   await s.writes.closeEnquiry({ enquiry: sibling });
 

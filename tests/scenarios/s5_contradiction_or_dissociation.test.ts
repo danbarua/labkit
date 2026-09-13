@@ -283,7 +283,9 @@ describe("S-5 — contradiction or dissociation?", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const settledStill = await later.reads.whySupported({ claim: claimOf(settledClaims, IMMATERIAL) });
+    const settledStill = await later.reads.whySupported({
+      claim: claimOf(settledClaims, IMMATERIAL),
+    });
     expect(settledStill.withdrawn).toBe(false);
     expect(settledStill.verdict).toBe("supported");
   });
@@ -327,7 +329,9 @@ describe("S-5 — contradiction or dissociation?", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const here = await later.reads.whySupported({ claim: claimOf(programme.earlierClaims, IMMATERIAL) });
+    const here = await later.reads.whySupported({
+      claim: claimOf(programme.earlierClaims, IMMATERIAL),
+    });
     const there = await later.reads.whySupported({ claim: claimOf(freshClaims, IMMATERIAL) });
     expect(here.withdrawn).toBe(true);
     expect(there.withdrawn).toBe(false);
@@ -377,7 +381,9 @@ describe("S-5 — contradiction or dissociation?", () => {
     const earlier = await session.reads.whySupported({
       claim: claimOf(programme.earlierClaims, IMMATERIAL),
     });
-    const later = await session.reads.whySupported({ claim: claimOf(programme.laterClaims, IMMATERIAL) });
+    const later = await session.reads.whySupported({
+      claim: claimOf(programme.laterClaims, IMMATERIAL),
+    });
     expect(earlier.proposition).toBe(later.proposition);
     expect(earlier.support).not.toEqual(later.support);
   });

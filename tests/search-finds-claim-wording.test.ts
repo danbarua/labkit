@@ -31,7 +31,9 @@ const PROPOSITION = "T is the unique winner among the four tested evolved graphs
 
 /** One analysis with one conclusion, and the artefact it read. */
 async function aRecordedFinding() {
-  const { enquiry } = await session.writes.openEnquiry("does the pruning schedule move convergence?");
+  const { enquiry } = await session.writes.openEnquiry(
+    "does the pruning schedule move convergence?",
+  );
   const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "depth-sweep-raw",
@@ -71,9 +73,9 @@ test("claimsAsserting still needs the whole sentence, which is why search had to
   const { claim } = await aRecordedFinding();
 
   // The exact-match seam, unchanged: the full proposition resolves.
-  expect((await session.reads.claimsAsserting({ proposition: PROPOSITION })).map((c) => c.claim)).toEqual(
-    [claim],
-  );
+  expect(
+    (await session.reads.claimsAsserting({ proposition: PROPOSITION })).map((c) => c.claim),
+  ).toEqual([claim]);
   // A phrase does not, and nobody retypes the sentence above.
   expect(await session.reads.claimsAsserting({ proposition: "unique winner" })).toEqual([]);
 });

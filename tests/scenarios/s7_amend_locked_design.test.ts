@@ -45,7 +45,9 @@ const MULTICOLLINEAR =
  * result of each kind on the record.
  */
 async function lockedProgramme() {
-  const { enquiry } = await session.writes.openEnquiry("does the evolved condition beat the rewired control?",);
+  const { enquiry } = await session.writes.openEnquiry(
+    "does the evolved condition beat the rewired control?",
+  );
 
   const { work: confirmatoryWork } = await session.writes.planWork({
     objective: "the prespecified comparison against the rewired control",
@@ -222,7 +224,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
     // ...and the cited diagnosis is a finding with a chain behind it, not an
     // assertion attached to the amendment.
-    const why = await later.reads.whySupported({ claim: await claimNamed(later.reads, MULTICOLLINEAR) });
+    const why = await later.reads.whySupported({
+      claim: await claimNamed(later.reads, MULTICOLLINEAR),
+    });
     expect(why.verdict).toBe("supported");
     expect(why.restingOn.map((a) => a.name)).toContain("non-convergence traces");
   });
@@ -251,7 +255,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const standing = await later.reads.whySupported({ claim: await claimNamed(later.reads, BEATS_CONTROL) });
+    const standing = await later.reads.whySupported({
+      claim: await claimNamed(later.reads, BEATS_CONTROL),
+    });
     expect(standing.verdict).toBe("supported");
     expect(standing.superseded).toEqual([]);
   });
@@ -433,7 +439,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     expect(after.everFailed).toBe(true);
 
     // The retired condition is still readable where it belongs.
-    const history = await new ResearchSession(await scenario.current(), { clock }).reads.designHistory({
+    const history = await new ResearchSession(await scenario.current(), {
+      clock,
+    }).reads.designHistory({
       gate: programme.feasibilityBoundary,
     });
     expect(theCondition(history).originally.criterion).toBe(programme.iterationLimit);
@@ -465,7 +473,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    expect(await later.reads.designHistory({ gate: programme.feasibilityBoundary })).toEqual(afterFirst);
+    expect(await later.reads.designHistory({ gate: programme.feasibilityBoundary })).toEqual(
+      afterFirst,
+    );
   });
 
   /** Amending a condition nobody stated writes nothing. */
@@ -487,7 +497,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    expect(await later.reads.designHistory({ gate: programme.feasibilityBoundary })).toEqual(before);
+    expect(await later.reads.designHistory({ gate: programme.feasibilityBoundary })).toEqual(
+      before,
+    );
   });
 
   /**
