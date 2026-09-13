@@ -10,7 +10,7 @@ Start it from `web/`:
 bun run db:up
 ```
 
-That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` first. Bare `docker compose up -d db` binds **5432** even in a worktree and collides with another checkout. `bun run db:down` stops the `db` service for this compose project. It does not delete the volume.
+That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` first and sets `--project-name` to `labkit-overseer` (or `labkit-overseer-<offset>` in a worktree). Bare `docker compose up -d db` binds **5432** and uses project name `web`. `bun run db:down` stops this worktree's `db` service. It does not delete the volume.
 
 Ingest refuses destination databases named `labkit_tests` or `postgres`.
 
